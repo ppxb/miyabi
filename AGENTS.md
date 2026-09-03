@@ -149,6 +149,7 @@ miyabi/
 - 根目录一份 `.gitignore`，不在 `web/` 单独放。`web/dist` 不入库，`make build` 先构建前端再编译 Go。
 - API 路径前缀 `/api`，JSON 字段 snake_case。
 - 测试重点放在 `codeid`、`scraper/merge`、各 scraper 的 HTML 解析（用固定 fixture），不写 handler 集成测试。
+- 不要写无用的兜底代码、防御性代码。
 
 ## 实施阶段
 
