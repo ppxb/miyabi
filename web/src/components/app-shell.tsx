@@ -1,13 +1,13 @@
-import type { PropsWithChildren } from "react"
-import { Compass, Library, Settings } from "lucide-react"
-import { Link } from "@tanstack/react-router"
+import type { PropsWithChildren } from 'react'
+import { Compass, Library, Settings } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button'
 
 const navigation = [
-  { to: "/", label: "媒体库", icon: Library, exact: true },
-  { to: "/discover", label: "发现", icon: Compass, exact: false },
-  { to: "/settings", label: "设置", icon: Settings, exact: false },
+  { to: '/', label: '媒体库', icon: Library, exact: true },
+  { to: '/discover', label: '发现', icon: Compass, exact: false },
+  { to: '/settings', label: '设置', icon: Settings, exact: false }
 ] as const
 
 export function AppShell({ children }: PropsWithChildren) {
@@ -23,7 +23,7 @@ export function AppShell({ children }: PropsWithChildren) {
               <Link
                 to={to}
                 activeOptions={{ exact }}
-                activeProps={{ className: "bg-zinc-800 text-zinc-50" }}
+                activeProps={{ className: 'bg-zinc-800 text-zinc-50' }}
               >
                 <Icon className="size-4" aria-hidden="true" />
                 <span className="hidden sm:inline">{label}</span>

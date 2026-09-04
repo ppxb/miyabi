@@ -1,9 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute } from '@tanstack/react-router'
 
-import { useHealth } from "@/api/health"
+import { useHealth } from '@/api/health'
 
-export const Route = createFileRoute("/")({
-  component: LibraryPage,
+export const Route = createFileRoute('/')({
+  component: LibraryPage
 })
 
 function LibraryPage() {
@@ -18,13 +18,9 @@ function LibraryPage() {
         </div>
         <div className="flex items-center gap-2 text-xs text-zinc-500">
           <span
-            className={`size-2 rounded-full ${health.data?.status === "ok" ? "bg-emerald-400" : health.isError ? "bg-red-400" : "bg-amber-400"}`}
+            className={`size-2 rounded-full ${health.data?.status === 'ok' ? 'bg-emerald-400' : health.isError ? 'bg-red-400' : 'bg-amber-400'}`}
           />
-          {health.data?.status === "ok"
-            ? "后端已连接"
-            : health.isError
-              ? "后端不可用"
-              : "正在连接"}
+          {health.data?.status === 'ok' ? '后端已连接' : health.isError ? '后端不可用' : '正在连接'}
         </div>
       </div>
 

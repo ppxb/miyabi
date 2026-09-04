@@ -1,11 +1,11 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQuery } from '@tanstack/react-query'
 
 type Health = {
-  status: "ok"
+  status: 'ok'
 }
 
 async function fetchHealth(): Promise<Health> {
-  const response = await fetch("/api/health")
+  const response = await fetch('/api/health')
   if (!response.ok) {
     throw new Error(`health request failed with status ${response.status}`)
   }
@@ -14,7 +14,7 @@ async function fetchHealth(): Promise<Health> {
 
 export function useHealth() {
   return useQuery({
-    queryKey: ["health"],
-    queryFn: fetchHealth,
+    queryKey: ['health'],
+    queryFn: fetchHealth
   })
 }

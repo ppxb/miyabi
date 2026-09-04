@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute } from '@tanstack/react-router'
 
-export const Route = createFileRoute("/discover")({
-  component: DiscoverPage,
+export const Route = createFileRoute('/discover')({
+  component: DiscoverPage
 })
 
 function DiscoverPage() {
