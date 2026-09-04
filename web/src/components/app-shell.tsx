@@ -19,9 +19,9 @@ export function AppShell({ children }: PropsWithChildren) {
   )?.id
 
   return (
-    <div className="relative min-h-dvh bg-background">
-      {children}
+    <div className="relative min-h-dvh">
       <FloatingNav items={NAV_ITEMS} activeId={activeId} />
+      {children}
     </div>
   )
 }

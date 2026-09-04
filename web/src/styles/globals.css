@@ -144,15 +144,9 @@
   }
 
   body {
-    @apply min-h-dvh bg-background text-foreground antialiased;
-    overflow-x: hidden;
+    @apply bg-background text-foreground;
   }
   html {
     @apply font-sans;
-    color-scheme: dark;
-  }
-
-  ::selection {
-    background-color: color-mix(in oklch, var(--primary) 25%, transparent);
   }
 }

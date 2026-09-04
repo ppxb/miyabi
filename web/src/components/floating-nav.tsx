@@ -23,7 +23,7 @@ type FloatingNavProps = {
 export function FloatingNav({ items, activeId }: FloatingNavProps) {
   return (
     <nav
-      className="fixed inset-x-0 bottom-4 z-50 mx-auto w-fit max-w-[calc(100vw-2rem)] rounded-full border border-border/70 bg-background/85 p-1.5 text-foreground shadow-lg shadow-black/10 backdrop-blur sm:p-1"
+      className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-border/70 bg-background/85 p-1.5 text-foreground backdrop-blur sm:bottom-4 sm:p-1"
       aria-label="主导航"
     >
       <ul className="flex items-center gap-1.5 sm:gap-1">

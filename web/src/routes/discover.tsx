@@ -12,14 +12,7 @@ function DiscoverPage() {
   return (
     <AppPage>
       <PageHeader title="发现" description="浏览 JavDB 的最新发行、即将发行和分类内容" />
-      <div className="flex flex-1 items-center justify-center rounded-3xl border border-dashed border-border/80 bg-card/30 px-6 py-20">
-        <EmptyState
-          className="min-h-0"
-          emoji="🧭"
-          title="发现功能即将上线"
-          description="JavDB 接入后，这里会展示最新已发行、即将发行、分类筛选和搜索。"
-        />
-      </div>
+      <EmptyState className="min-h-0 flex-1" emoji="(･o･;)" title="发现功能即将上线" />
     </AppPage>
   )
 }

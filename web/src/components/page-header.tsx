@@ -19,11 +19,11 @@ export function PageHeader({
     <header
       className={cn(
         'flex flex-col items-start justify-between gap-4 sm:flex-row',
-        inlineActions ? 'sm:items-center' : null
+        inlineActions ? 'flex-row' : null
       )}
     >
       <div className="flex flex-col gap-2">
-        <h1 className="text-4xl font-bold tracking-tight">{title}</h1>
+        <h1 className="text-4xl font-bold">{title}</h1>
         <p className="text-muted-foreground">{description}</p>
       </div>
       {children ? (

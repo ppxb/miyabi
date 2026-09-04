@@ -5,12 +5,11 @@ import { cn } from '@/lib/utils'
 type EmptyStateProps = {
   emoji: string
   title: string
-  description?: string
   actions?: ReactNode
   className?: string
 }
 
-export function EmptyState({ emoji, title, description, actions, className }: EmptyStateProps) {
+export function EmptyState({ emoji, title, actions, className }: EmptyStateProps) {
   return (
     <div
       className={cn(
@@ -18,13 +17,8 @@ export function EmptyState({ emoji, title, description, actions, className }: Em
         className
       )}
     >
-      <p className="text-6xl font-bold" aria-hidden="true">
-        {emoji}
-      </p>
-      <p className="text-sm font-medium text-foreground">{title}</p>
-      {description ? (
-        <p className="max-w-md text-sm leading-6 text-muted-foreground">{description}</p>
-      ) : null}
+      <p className="text-6xl font-bold">{emoji}</p>
+      <p className="text-sm text-muted-foreground">{title}</p>
       {actions ? <div className="pointer-events-auto mt-1">{actions}</div> : null}
     </div>
   )

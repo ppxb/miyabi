@@ -9,7 +9,7 @@ export const Route = createFileRoute('/settings')({
 
 function SettingsPage() {
   return (
-    <AppPage contentClassName="max-w-5xl">
+    <AppPage contentClassName="max-w-5xl gap-8" showBackTop={false}>
       <PageHeader title="设置" description="管理 115、JavDB 和本地应用选项" />
 
       <div className="grid gap-4 sm:grid-cols-2">
