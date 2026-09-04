@@ -18,6 +18,7 @@ type HealthChecker interface {
 type Dependencies struct {
 	Logger   *slog.Logger
 	Health   HealthChecker
+	Discover Discoverer
 	Frontend fs.FS
 }
 
@@ -32,6 +33,12 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	api := router.Group("/api")
 	api.GET("/health", healthHandler(deps.Health))
+	api.GET("/discover/movies", discoverBrowseHandler(deps.Discover))
+	api.GET("/discover/search", discoverSearchHandler(deps.Discover))
+	api.GET("/discover/tags", discoverTagsHandler(deps.Discover))
+	api.GET("/discover/movies/:id", discoverMovieHandler(deps.Discover))
+	api.GET("/javdb/route", javdbRouteHandler(deps.Discover))
+	api.POST("/javdb/reselect", javdbReselectHandler(deps.Discover))
 
 	if deps.Frontend != nil {
 		installFrontend(router, deps.Frontend)

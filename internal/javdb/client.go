@@ -1,0 +1,219 @@
+package javdb
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/url"
+	"sync/atomic"
+	"time"
+
+	"github.com/google/uuid"
+	"golang.org/x/sync/singleflight"
+	"golang.org/x/time/rate"
+)
+
+type routeState struct {
+	transport jsonTransport
+	status    RouteStatus
+}
+
+type jsonTransport interface {
+	getJSON(context.Context, string, url.Values, string, any) error
+	closeIdleConnections()
+}
+
+// Client is the anonymous JavDB App API client.
+type Client struct {
+	options     Options
+	limiter     *rate.Limiter
+	current     atomic.Pointer[routeState]
+	routes      singleflight.Group
+	selectRoute func(context.Context, string) (*routeState, error)
+}
+
+func New(options Options) (*Client, error) {
+	if options.DeviceUUID == "" {
+		return nil, errors.New("JavDB device UUID is required")
+	}
+	if _, err := uuid.Parse(options.DeviceUUID); err != nil {
+		return nil, fmt.Errorf("parse JavDB device UUID: %w", err)
+	}
+	if options.Timeout < 0 {
+		return nil, errors.New("JavDB timeout must not be negative")
+	}
+	requestsPerSecond := options.RequestsPerSecond
+	if requestsPerSecond == 0 {
+		requestsPerSecond = defaultRate
+	}
+	burst := options.Burst
+	if burst == 0 {
+		burst = defaultBurst
+	}
+	if requestsPerSecond < 0 || burst < 0 {
+		return nil, errors.New("JavDB rate limit must not be negative")
+	}
+
+	client := &Client{
+		options: options,
+		limiter: rate.NewLimiter(rate.Limit(requestsPerSecond), burst),
+	}
+	client.selectRoute = client.selectAndInstall
+	return client, nil
+}
+
+// NewDeviceUUID creates a device identifier to persist in settings.
+func NewDeviceUUID() (string, error) {
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return "", fmt.Errorf("create JavDB device UUID: %w", err)
+	}
+	return id.String(), nil
+}
+
+// Initialize selects and installs an API route.
+func (c *Client) Initialize(ctx context.Context) error {
+	_, err := c.ensureRoute(ctx)
+	return err
+}
+
+// Reselect runs a full route selection and replaces the active route on success.
+func (c *Client) Reselect(ctx context.Context) (RouteStatus, error) {
+	value, err, _ := c.routes.Do("route", func() (any, error) {
+		return c.selectRoute(ctx, "")
+	})
+	if err != nil {
+		return RouteStatus{}, err
+	}
+	return value.(*routeState).status, nil
+}
+
+// Route returns the active route, if the client has been initialized.
+func (c *Client) Route() (RouteStatus, bool) {
+	state := c.current.Load()
+	if state == nil {
+		return RouteStatus{}, false
+	}
+	return state.status, true
+}
+
+// Close releases idle connections held by the active transport.
+func (c *Client) Close() {
+	if state := c.current.Load(); state != nil {
+		state.transport.closeIdleConnections()
+	}
+}
+
+func (c *Client) getJSON(
+	ctx context.Context,
+	path string,
+	params url.Values,
+	language string,
+	destination any,
+) error {
+	state, err := c.ensureRoute(ctx)
+	if err != nil {
+		return err
+	}
+	if err := c.limiter.Wait(ctx); err != nil {
+		return err
+	}
+	err = state.transport.getJSON(ctx, path, params, language, destination)
+	if ctx.Err() != nil || !routeFailure(err) {
+		return err
+	}
+
+	state, err = c.replaceFailedRoute(ctx, state)
+	if err != nil {
+		return err
+	}
+	if err := c.limiter.Wait(ctx); err != nil {
+		return err
+	}
+	return state.transport.getJSON(ctx, path, params, language, destination)
+}
+
+func (c *Client) ensureRoute(ctx context.Context) (*routeState, error) {
+	if state := c.current.Load(); state != nil {
+		return state, nil
+	}
+	value, err, _ := c.routes.Do("route", func() (any, error) {
+		if state := c.current.Load(); state != nil {
+			return state, nil
+		}
+		return c.selectRoute(ctx, c.options.CachedHost)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*routeState), nil
+}
+
+func (c *Client) replaceFailedRoute(ctx context.Context, failed *routeState) (*routeState, error) {
+	value, err, _ := c.routes.Do("route", func() (any, error) {
+		if current := c.current.Load(); current != failed {
+			return current, nil
+		}
+		return c.selectRoute(ctx, "")
+	})
+	if err != nil {
+		return nil, err
+	}
+	return value.(*routeState), nil
+}
+
+func (c *Client) selectAndInstall(ctx context.Context, cachedHost string) (*routeState, error) {
+	result, err := selectRoute(ctx, cachedHost, c.probe)
+	if err != nil {
+		return nil, err
+	}
+	transport, err := newTransport(result.Host, c.options)
+	if err != nil {
+		return nil, err
+	}
+	state := &routeState{
+		transport: transport,
+		status: RouteStatus{
+			Host:    result.Host,
+			Latency: result.Latency,
+		},
+	}
+	previous := c.current.Swap(state)
+	if previous != nil {
+		previous.transport.closeIdleConnections()
+	}
+	return state, nil
+}
+
+func (c *Client) probe(ctx context.Context, host string) (time.Duration, map[string]any, error) {
+	transport, err := newTransport(host, c.options)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer transport.closeIdleConnections()
+
+	started := time.Now()
+	var startup map[string]any
+	if err := transport.getJSON(ctx, "/api/v1/startup", nil, defaultLanguage, &startup); err != nil {
+		return 0, nil, err
+	}
+	return time.Since(started), startup, nil
+}
+
+func routeFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+	var network *networkError
+	if errors.As(err, &network) {
+		return true
+	}
+	var response *HTTPError
+	if errors.As(err, &response) {
+		switch response.StatusCode {
+		case 502, 503, 504:
+			return true
+		}
+	}
+	return false
+}

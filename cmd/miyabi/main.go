@@ -15,7 +15,9 @@ import (
 	"github.com/ppxb/miyabi/internal/api"
 	"github.com/ppxb/miyabi/internal/config"
 	"github.com/ppxb/miyabi/internal/database"
+	"github.com/ppxb/miyabi/internal/javdb"
 	"github.com/ppxb/miyabi/internal/logging"
+	"github.com/ppxb/miyabi/internal/service"
 )
 
 func main() {
@@ -42,10 +44,18 @@ func run() error {
 		return err
 	}
 	defer store.Close()
+	discover, err := service.NewDiscoverService(context.Background(), store.Client, javdb.Options{
+		Proxy: cfg.Proxy,
+	})
+	if err != nil {
+		return fmt.Errorf("initialize discovery service: %w", err)
+	}
+	defer discover.Close()
 
 	router := api.NewRouter(api.Dependencies{
 		Logger:   logger,
 		Health:   store,
+		Discover: discover,
 		Frontend: miyabi.Frontend(),
 	})
 	server := &http.Server{

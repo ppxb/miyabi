@@ -1,0 +1,39 @@
+{
+  "success": true,
+  "data": {
+    "movies": [
+      {
+        "id": "movie-near",
+        "number": "ABP-124",
+        "title": "Similar result",
+        "release_date": "2026-08-02",
+        "duration": 118,
+        "thumb_url": "https://media.example/thumb-near.jpg",
+        "cover_url": "https://media.example/cover-near.jpg",
+        "magnets_count": 0,
+        "has_subtitle": false,
+        "has_preview": false
+      },
+      {
+        "id": "movie-exact",
+        "number": "ABP-123",
+        "title": "Exact result",
+        "origin_title": "Original title",
+        "release_date": "2026-08-01",
+        "duration": 120,
+        "score": 4.5,
+        "thumb_url": "https://media.example/thumb.jpg",
+        "cover_url": "https://media.example/cover.jpg",
+        "preview_images": [
+          {
+            "thumb_url": "https://media.example/preview-thumb.jpg",
+            "large_url": "https://media.example/preview.jpg"
+          }
+        ],
+        "magnets_count": 3,
+        "has_subtitle": true,
+        "has_preview": true
+      }
+    ]
+  }
+}

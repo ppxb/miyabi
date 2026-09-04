@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { AppPage } from '@/components/app-page'
 import { PageHeader } from '@/components/page-header'
+import { JavDBSection } from '@/features/settings/javdb-section'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage
@@ -18,7 +19,7 @@ function SettingsPage() {
           description="登录账号、媒体目录和扫描选项"
           status="即将接入"
         />
-        <SettingsPreview title="JavDB" description="当前线路、代理和请求限速" status="即将接入" />
+        <JavDBSection />
         <SettingsPreview
           title="任务与缓存"
           description="查看扫描、刮削和下载任务进度"

@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "data": {
+    "tags": [
+      {
+        "category_id": "category-1",
+        "category": "身材",
+        "tags": [
+          {"id": "tag-1", "name": "高挑"},
+          {"id": "tag-2", "name": "纖細"}
+        ]
+      }
+    ]
+  }
+}

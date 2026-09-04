@@ -1,0 +1,145 @@
+package api
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/ppxb/miyabi/internal/javdb"
+	"github.com/ppxb/miyabi/internal/service"
+)
+
+type Discoverer interface {
+	Search(context.Context, string, javdb.SearchOptions) ([]service.DiscoverMovie, error)
+	Browse(context.Context, javdb.BrowseOptions) ([]service.DiscoverMovie, error)
+	MovieDetail(context.Context, string) (service.DiscoverMovie, error)
+	Tags(context.Context, javdb.Zone) ([]javdb.TagCategory, error)
+	Route() service.JavDBRouteStatus
+	Reselect(context.Context) (service.JavDBRouteStatus, error)
+}
+
+type discoverSearchQuery struct {
+	Query    string `form:"q" binding:"required"`
+	Zone     string `form:"zone" binding:"omitempty,oneof=censored uncensored western fc2 all"`
+	Sort     string `form:"sort" binding:"omitempty,oneof=relevance release score update hit"`
+	FilterBy string `form:"filter_by"`
+	Page     int    `form:"page" binding:"omitempty,min=1"`
+	Limit    int    `form:"limit" binding:"omitempty,min=1,max=100"`
+}
+
+type discoverBrowseQuery struct {
+	Zone   string   `form:"zone" binding:"omitempty,oneof=censored uncensored western fc2"`
+	Main   []string `form:"main" binding:"omitempty,dive,oneof=p m c s i v"`
+	TagIDs []string `form:"tag_id" binding:"omitempty,dive,required"`
+	Year   string   `form:"year" binding:"omitempty,len=4,numeric"`
+	Month  string   `form:"month" binding:"omitempty,oneof=1 2 3 4 5 6 7 8 9 10 11 12"`
+	Sort   string   `form:"sort" binding:"omitempty,oneof=hit release score update want_watch_count watched_count"`
+	Order  string   `form:"order" binding:"omitempty,oneof=asc desc"`
+	Page   int      `form:"page" binding:"omitempty,min=1"`
+	Limit  int      `form:"limit" binding:"omitempty,min=1,max=100"`
+}
+
+type discoverTagsQuery struct {
+	Zone string `form:"zone" binding:"omitempty,oneof=censored uncensored western fc2"`
+}
+
+type movieURI struct {
+	ID string `uri:"id" binding:"required"`
+}
+
+func discoverSearchHandler(discover Discoverer) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var query discoverSearchQuery
+		if err := c.ShouldBindQuery(&query); err != nil {
+			c.Error(BadRequest(err))
+			return
+		}
+		movies, err := discover.Search(c.Request.Context(), query.Query, javdb.SearchOptions{
+			Zone:     javdb.Zone(query.Zone),
+			Sort:     query.Sort,
+			FilterBy: query.FilterBy,
+			Page:     query.Page,
+			Limit:    query.Limit,
+		})
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		c.JSON(http.StatusOK, movies)
+	}
+}
+
+func discoverBrowseHandler(discover Discoverer) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var query discoverBrowseQuery
+		if err := c.ShouldBindQuery(&query); err != nil {
+			c.Error(BadRequest(err))
+			return
+		}
+		movies, err := discover.Browse(c.Request.Context(), javdb.BrowseOptions{
+			Zone:   javdb.Zone(query.Zone),
+			Main:   query.Main,
+			TagIDs: query.TagIDs,
+			Year:   query.Year,
+			Month:  query.Month,
+			Sort:   query.Sort,
+			Order:  query.Order,
+			Page:   query.Page,
+			Limit:  query.Limit,
+		})
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		c.JSON(http.StatusOK, movies)
+	}
+}
+
+func discoverMovieHandler(discover Discoverer) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var uri movieURI
+		if err := c.ShouldBindUri(&uri); err != nil {
+			c.Error(BadRequest(err))
+			return
+		}
+		movie, err := discover.MovieDetail(c.Request.Context(), uri.ID)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		c.JSON(http.StatusOK, movie)
+	}
+}
+
+func discoverTagsHandler(discover Discoverer) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var query discoverTagsQuery
+		if err := c.ShouldBindQuery(&query); err != nil {
+			c.Error(BadRequest(err))
+			return
+		}
+		categories, err := discover.Tags(c.Request.Context(), javdb.Zone(query.Zone))
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		c.JSON(http.StatusOK, categories)
+	}
+}
+
+func javdbRouteHandler(discover Discoverer) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, discover.Route())
+	}
+}
+
+func javdbReselectHandler(discover Discoverer) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		status, err := discover.Reselect(c.Request.Context())
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		c.JSON(http.StatusOK, status)
+	}
+}
