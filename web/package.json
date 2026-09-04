@@ -1,0 +1,43 @@
+{
+  "name": "miyabi-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "routes:generate": "tsr generate",
+    "dev": "vite",
+    "dev:all": "concurrently --kill-others --names web,api --prefix-colors cyan,magenta \"vite\" \"go -C .. run -tags=dev ./cmd/miyabi\"",
+    "build": "pnpm routes:generate && tsc --noEmit && vite build",
+    "typecheck": "pnpm routes:generate && tsc --noEmit",
+    "lint": "oxlint src vite.config.ts",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.3.3",
+    "@tanstack/react-query": "^5.102.8",
+    "@tanstack/react-router": "^1.170.32",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.40.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwind-merge": "^3.6.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/router-cli": "^1.167.33",
+    "@tanstack/router-plugin": "^1.168.35",
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "oxfmt": "^0.66.0",
+    "oxlint": "^1.81.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}

@@ -1,0 +1,4 @@
+listen = ":8080"
+data_dir = "./data"
+log_level = "info"
+proxy = ""

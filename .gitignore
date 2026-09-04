@@ -23,6 +23,10 @@ config.local.*
 /web/.vite/
 /web/*.tsbuildinfo
 /web/src/routeTree.gen.ts
+/.pnpm-store/
+
+# 临时测试产物
+/.tmp/
 
 # 编辑器与系统
 .idea/
