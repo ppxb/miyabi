@@ -1,0 +1,62 @@
+import { Link } from '@tanstack/react-router'
+import type { LucideIcon } from 'lucide-react'
+
+import { buttonVariants } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
+import type { FileRoutesByTo } from '@/routeTree.gen'
+
+type FloatingNavTo = keyof FileRoutesByTo
+
+export type FloatingNavItem = {
+  id: string
+  icon: LucideIcon
+  label: string
+  to: FloatingNavTo
+}
+
+type FloatingNavProps = {
+  items: FloatingNavItem[]
+  activeId: string | undefined
+}
+
+export function FloatingNav({ items, activeId }: FloatingNavProps) {
+  return (
+    <nav
+      className="fixed inset-x-0 bottom-4 z-50 mx-auto w-fit max-w-[calc(100vw-2rem)] rounded-full border border-border/70 bg-background/85 p-1.5 text-foreground shadow-lg shadow-black/10 backdrop-blur sm:p-1"
+      aria-label="主导航"
+    >
+      <ul className="flex items-center gap-1.5 sm:gap-1">
+        {items.map(item => (
+          <NavItem key={item.id} item={item} isActive={item.id === activeId} />
+        ))}
+      </ul>
+    </nav>
+  )
+}
+
+type NavItemProps = {
+  item: FloatingNavItem
+  isActive: boolean
+}
+
+function NavItem({ item, isActive }: NavItemProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Link
+          to={item.to}
+          className={cn(
+            buttonVariants({ variant: isActive ? 'default' : 'ghost', size: 'icon' }),
+            'size-11 sm:size-9'
+          )}
+          aria-label={item.label}
+          aria-current={isActive ? 'page' : undefined}
+        >
+          <item.icon className="size-5" aria-hidden="true" />
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent side="top">{item.label}</TooltipContent>
+    </Tooltip>
+  )
+}

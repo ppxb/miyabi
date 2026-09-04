@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from '@tanstack/react-router'
 
 import { router } from '@/router'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import '@/styles/globals.css'
 
 const queryClient = new QueryClient({
@@ -24,7 +25,9 @@ declare module '@tanstack/react-router' {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <TooltipProvider delayDuration={0}>
+        <RouterProvider router={router} />
+      </TooltipProvider>
     </QueryClientProvider>
   </StrictMode>
 )
