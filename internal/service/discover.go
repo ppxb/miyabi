@@ -157,6 +157,14 @@ func (service *DiscoverService) MovieDetail(ctx context.Context, movieID string)
 	return projected[0], nil
 }
 
+func (service *DiscoverService) Media(ctx context.Context, rawURL string) (javdb.Media, error) {
+	media, err := service.javdb.FetchMedia(ctx, rawURL)
+	if err != nil {
+		return javdb.Media{}, fmt.Errorf("fetch JavDB media: %w", err)
+	}
+	return media, nil
+}
+
 func (service *DiscoverService) Tags(ctx context.Context, zone javdb.Zone) ([]javdb.TagCategory, error) {
 	categories, err := service.javdb.Tags(ctx, zone)
 	if err != nil {

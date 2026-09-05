@@ -1,4 +1,5 @@
 import type { DiscoverMovie } from '@/api/discover'
+import { imageURL } from '@/api/client'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -7,11 +8,10 @@ export function MovieCard({ movie }: { movie: DiscoverMovie }) {
     <Card size="sm" className="group gap-0 overflow-hidden py-0 transition-shadow hover:shadow-xl">
       <div className="relative aspect-3/2 overflow-hidden bg-muted">
         <img
-          src={movie.thumbnail}
+          src={imageURL(movie.thumbnail)}
           alt={movie.title}
           loading="lazy"
           decoding="async"
-          referrerPolicy="no-referrer"
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
         />
 

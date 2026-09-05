@@ -2,6 +2,7 @@ package javdb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -35,6 +36,10 @@ func (transport *fixtureTransport) getJSON(
 		return fmt.Errorf("missing fixture for %s in %s", path, language)
 	}
 	return decodeEnvelope(body, destination)
+}
+
+func (*fixtureTransport) getMedia(context.Context, string) (Media, error) {
+	return Media{}, errors.New("media is not fixtured")
 }
 
 func (*fixtureTransport) closeIdleConnections() {}

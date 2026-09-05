@@ -25,6 +25,10 @@ func (transport *stubTransport) getJSON(
 	return transport.err
 }
 
+func (*stubTransport) getMedia(context.Context, string) (Media, error) {
+	return Media{}, errors.New("media is not stubbed")
+}
+
 func (*stubTransport) closeIdleConnections() {}
 
 func TestClientReplaysOnceAfterRouteFailure(t *testing.T) {

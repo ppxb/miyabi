@@ -27,6 +27,11 @@ export function apiPost<T>(path: string): Promise<T> {
   return request<T>(path, { method: 'POST' })
 }
 
+// JavDB CDN hosts are not reachable from every browser network, so images go through the backend.
+export function imageURL(source: string) {
+  return `/api/image?url=${encodeURIComponent(source)}`
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init)
   if (!response.ok) {

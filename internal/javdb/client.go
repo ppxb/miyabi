@@ -20,6 +20,7 @@ type routeState struct {
 
 type jsonTransport interface {
 	getJSON(context.Context, string, url.Values, string, any) error
+	getMedia(context.Context, string) (Media, error)
 	closeIdleConnections()
 }
 

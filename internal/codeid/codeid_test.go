@@ -19,6 +19,9 @@ func TestParse(t *testing.T) {
 		{name: "compact", input: "ssis001.mkv", want: "SSIS-001", ok: true},
 		{name: "compact digit prefix", input: "1PONDO123456", want: "1PONDO-123456", ok: true},
 		{name: "unicode dash", input: "IPX－001.mkv", want: "IPX-001", ok: true},
+		{name: "single letter prefix", input: "A-1023", want: "A-1023", ok: true},
+		{name: "digit prefix separated", input: "1PONDO-123456.mp4", want: "1PONDO-123456", ok: true},
+		{name: "date is not a number", input: "2002-01-05.mp4", want: "", ok: false},
 		{name: "not a number", input: "poster.jpg", want: "", ok: false},
 	}
 

@@ -14,6 +14,7 @@ type Discoverer interface {
 	Browse(context.Context, javdb.BrowseOptions) ([]service.DiscoverMovie, error)
 	MovieDetail(context.Context, string) (service.DiscoverMovie, error)
 	Tags(context.Context, javdb.Zone) ([]javdb.TagCategory, error)
+	Media(context.Context, string) (javdb.Media, error)
 	Route() service.JavDBRouteStatus
 	Reselect(context.Context) (service.JavDBRouteStatus, error)
 }
@@ -45,6 +46,10 @@ type discoverTagsQuery struct {
 
 type movieURI struct {
 	ID string `uri:"id" binding:"required"`
+}
+
+type imageQuery struct {
+	URL string `form:"url" binding:"required,url"`
 }
 
 func discoverSearchHandler(discover Discoverer) gin.HandlerFunc {
@@ -124,6 +129,23 @@ func discoverTagsHandler(discover Discoverer) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, categories)
+	}
+}
+
+func imageHandler(discover Discoverer) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var query imageQuery
+		if err := c.ShouldBindQuery(&query); err != nil {
+			c.Error(BadRequest(err))
+			return
+		}
+		media, err := discover.Media(c.Request.Context(), query.URL)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		c.Header("Cache-Control", "public, max-age=86400")
+		c.Data(http.StatusOK, media.ContentType, media.Body)
 	}
 }
 

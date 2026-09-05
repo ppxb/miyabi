@@ -37,6 +37,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	api.GET("/discover/search", discoverSearchHandler(deps.Discover))
 	api.GET("/discover/tags", discoverTagsHandler(deps.Discover))
 	api.GET("/discover/movies/:id", discoverMovieHandler(deps.Discover))
+	api.GET("/image", imageHandler(deps.Discover))
 	api.GET("/javdb/route", javdbRouteHandler(deps.Discover))
 	api.POST("/javdb/reselect", javdbReselectHandler(deps.Discover))
 

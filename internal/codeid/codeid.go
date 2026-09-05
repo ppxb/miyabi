@@ -13,7 +13,7 @@ var (
 
 	// A separator is optional in a few release names, but when present it is
 	// the most reliable way to distinguish a catalogue number from a title.
-	separatedPattern = regexp.MustCompile(`(?i)(?:^|[^a-z0-9])([a-z0-9]{2,12})[-_. ]+([0-9]{2,7})(?:[^a-z0-9]|$)`)
+	separatedPattern = regexp.MustCompile(`(?i)(?:^|[^a-z0-9])([a-z][a-z0-9]{0,11}|[0-9][a-z][a-z0-9]{0,10})[-_. ]+([0-9]{2,7})(?:[^a-z0-9]|$)`)
 
 	// Compact numbers such as SSIS001 and 1PONDO123456 have no separator.
 	// The two alternatives account for prefixes that start with a letter and
