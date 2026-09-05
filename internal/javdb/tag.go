@@ -10,9 +10,6 @@ import (
 
 // Tags fetches and merges the English and Traditional Chinese taxonomy by ID.
 func (c *Client) Tags(ctx context.Context, zone Zone) ([]TagCategory, error) {
-	if zone == "" {
-		zone = ZoneCensored
-	}
 	english, err := c.fetchTags(ctx, zone, "en")
 	if err != nil {
 		return nil, err

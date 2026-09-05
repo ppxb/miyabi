@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiGet, apiPost } from '@/api/client'
 
@@ -100,6 +100,7 @@ const discoverKeys = {
 export function useDiscoverMovies(params: BrowseMoviesParams) {
   return useQuery({
     queryKey: discoverKeys.movies(params),
+    placeholderData: keepPreviousData,
     queryFn: () =>
       apiGet<DiscoverMovie[]>('/api/discover/movies', {
         zone: params.zone,
@@ -131,6 +132,7 @@ export function useSearchMovies(params: SearchMoviesParams) {
         limit: params.limit
       }),
     enabled: query.length > 0,
+    placeholderData: keepPreviousData,
     retry: false,
     refetchOnWindowFocus: false
   })

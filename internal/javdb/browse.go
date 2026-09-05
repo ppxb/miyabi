@@ -24,24 +24,15 @@ func (c *Client) Browse(ctx context.Context, options BrowseOptions) ([]Movie, er
 }
 
 func buildBrowseParams(options BrowseOptions) (url.Values, error) {
-	if options.Zone == "" {
-		options.Zone = ZoneCensored
-	}
 	zone, ok := zoneCodes[options.Zone]
 	if !ok {
 		return nil, errors.New("JavDB browse zone must be censored, uncensored, western, or fc2")
 	}
-	if options.Page <= 0 {
-		options.Page = 1
+	if options.Page <= 0 || options.Limit <= 0 {
+		return nil, errors.New("JavDB browse page and limit must be positive")
 	}
-	if options.Limit <= 0 {
-		options.Limit = 20
-	}
-	if options.Sort == "" {
-		options.Sort = "hit"
-	}
-	if options.Order == "" {
-		options.Order = "desc"
+	if options.Sort == "" || options.Order == "" {
+		return nil, errors.New("JavDB browse sort and order are required")
 	}
 
 	filter := fmt.Sprintf(

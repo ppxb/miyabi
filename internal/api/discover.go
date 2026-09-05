@@ -28,19 +28,19 @@ type discoverSearchQuery struct {
 }
 
 type discoverBrowseQuery struct {
-	Zone   string   `form:"zone" binding:"omitempty,oneof=censored uncensored western fc2"`
+	Zone   string   `form:"zone,default=censored" binding:"oneof=censored uncensored western fc2"`
 	Main   []string `form:"main" binding:"omitempty,dive,oneof=p m c s i v"`
 	TagIDs []string `form:"tag_id" binding:"omitempty,dive,required"`
 	Year   string   `form:"year" binding:"omitempty,len=4,numeric"`
 	Month  string   `form:"month" binding:"omitempty,oneof=1 2 3 4 5 6 7 8 9 10 11 12"`
-	Sort   string   `form:"sort" binding:"omitempty,oneof=hit release score update want_watch_count watched_count"`
-	Order  string   `form:"order" binding:"omitempty,oneof=asc desc"`
-	Page   int      `form:"page" binding:"omitempty,min=1"`
-	Limit  int      `form:"limit" binding:"omitempty,min=1,max=100"`
+	Sort   string   `form:"sort,default=hit" binding:"oneof=hit release score update want_watch_count watched_count"`
+	Order  string   `form:"order,default=desc" binding:"oneof=asc desc"`
+	Page   int      `form:"page,default=1" binding:"min=1"`
+	Limit  int      `form:"limit,default=20" binding:"min=1,max=100"`
 }
 
 type discoverTagsQuery struct {
-	Zone string `form:"zone" binding:"omitempty,oneof=censored uncensored western fc2"`
+	Zone string `form:"zone,default=censored" binding:"oneof=censored uncensored western fc2"`
 }
 
 type movieURI struct {

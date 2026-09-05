@@ -13,7 +13,7 @@ export function JavDBSection() {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 className="font-semibold">JavDB</h2>
-          <p className="mt-2 break-all text-sm leading-6 text-muted-foreground">
+          <p className="mt-2 text-sm leading-6 break-all text-muted-foreground">
             {status?.host ? status.host : '尚未选择线路'}
           </p>
           {status?.host ? (

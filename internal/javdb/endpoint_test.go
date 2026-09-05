@@ -103,6 +103,10 @@ func TestBrowseUsesDocumentedFilterMask(t *testing.T) {
 		TagIDs: []string{"tag-1", "tag-2"},
 		Year:   "2026",
 		Month:  "9",
+		Sort:   "hit",
+		Order:  "desc",
+		Page:   1,
+		Limit:  20,
 	})
 	if err != nil {
 		t.Fatal(err)
