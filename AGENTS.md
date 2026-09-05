@@ -168,7 +168,7 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 
 **发现**：`javdb.Client.Browse` 或 `Search` → 转换为发现 DTO → 按规范化番号查询本地 Movie 与进行中的 Task → 返回 `not_in_library`、`saving`、`in_library` 状态。发现列表允许包含未入库影片，不依赖 115 中已有内容。
 
-**最新与即将发行**：JavDB 按 `release desc` 会返回未来日期。`release_date <= today` 才进入“最新已发行”，未来日期单独标记为“即将发行”；`magnets_count == 0` 不展示保存按钮。
+**最新与即将发行**：发现列表保留 JavDB 返回的原始分页内容，不按发行日期做本地过滤，避免每页条目减少。`release_date > today` 的影片在卡片信息区显示“即将发行”，放在“有磁力”旁边。有磁力与发行日期状态独立；`magnets_count > 0` 只显示“有磁力”，不显示数量；`magnets_count == 0` 不展示保存按钮。
 
 **精确匹配**：JavDB 搜索是模糊搜索，同一查询会返回相似番号。扫描刮削必须用 `codeid.Normalize` 后完整相等匹配，禁止直接取搜索第一项。
 

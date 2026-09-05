@@ -202,7 +202,7 @@ function browseParams(
   const base = { zone, page, limit: PAGE_SIZE }
   switch (view) {
     case 'released':
-      // JavDB "release desc" is dominated by unreleased titles; newest updates with magnets is the released feed.
+      // Show JavDB's latest magnet updates, with future release dates labeled on cards.
       return { ...base, main: ['m'], sort: 'update', order: 'desc' }
     case 'upcoming':
       return { ...base, sort: 'release', order: 'desc' }
@@ -334,6 +334,7 @@ function DiscoverResults({
   if (movies.length === 0 && page === 1) {
     return <EmptyState emoji="(･o･;)" title={searching ? '没有搜索结果' : '暂无内容'} />
   }
+
   return (
     <>
       <MovieGrid movies={movies} />

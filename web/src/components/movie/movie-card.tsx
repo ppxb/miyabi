@@ -32,15 +32,13 @@ export function MovieCard({ movie }: { movie: DiscoverMovie }) {
         </OverflowTooltip>
         <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
           <span>{movie.release_date}</span>
-          {movie.duration > 0 ? <span>{movie.duration} 分钟</span> : null}
           {movie.rating > 0 ? <span className="ml-auto">{movie.rating.toFixed(1)}</span> : null}
         </div>
         <div className="flex flex-wrap gap-1.5">
           {movie.has_subtitle ? <Badge variant="secondary">字幕</Badge> : null}
           {movie.has_preview ? <Badge variant="secondary">预览</Badge> : null}
-          {movie.magnets_count > 0 ? (
-            <Badge variant="outline">{movie.magnets_count} 个磁力</Badge>
-          ) : null}
+          {movie.magnets_count > 0 ? <Badge variant="outline">含磁力</Badge> : null}
+          {movie.release_status === 'upcoming' ? <Badge variant="outline">即将发行</Badge> : null}
         </div>
       </CardContent>
     </Card>
@@ -53,9 +51,6 @@ function MovieStateBadge({ movie }: { movie: DiscoverMovie }) {
   }
   if (movie.state === 'saving') {
     return <Badge className="bg-amber-500 text-white">保存中</Badge>
-  }
-  if (movie.release_status === 'upcoming') {
-    return <Badge variant="secondary">即将发行</Badge>
   }
   return null
 }
