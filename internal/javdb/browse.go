@@ -43,6 +43,21 @@ func buildBrowseParams(options BrowseOptions) (url.Values, error) {
 		options.Year,
 		options.Month,
 	)
+	if options.EntityType != "" || options.EntityID != "" {
+		if len(options.TagIDs) != 0 || options.Year != "" || options.Month != "" {
+			return nil, errors.New("JavDB entity filters cannot include tags, year, or month")
+		}
+		letter, ok := map[EntityType]string{
+			EntityActor: "a", EntitySeries: "s", EntityMaker: "m", EntityDirector: "d",
+		}[options.EntityType]
+		if !ok || options.EntityID == "" {
+			return nil, errors.New("JavDB entity type and ID are required")
+		}
+		filter = fmt.Sprintf("%d:%s:%s", zone, letter, options.EntityID)
+		if len(options.Main) > 0 {
+			filter += ":" + strings.Join(options.Main, ",") + "::"
+		}
+	}
 	return url.Values{
 		"filter_by": {filter},
 		"sort_by":   {options.Sort},

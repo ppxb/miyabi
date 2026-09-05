@@ -138,14 +138,59 @@ func TestMovieDetailMapsGraphWithoutPlot(t *testing.T) {
 	if movie.Code != "ABP-123" || movie.Rating != 4.5 || movie.PreviewVideo == "" {
 		t.Fatalf("movie = %#v", movie)
 	}
-	if len(movie.Actors) != 1 || movie.Actors[0].NameZHT != "演員" {
+	if len(movie.Actors) != 2 || movie.Actors[0].NameZHT != "演員" ||
+		movie.Actors[0].Gender != "female" || movie.Actors[1].Gender != "male" {
 		t.Fatalf("actors = %#v", movie.Actors)
+	}
+	if !movie.HasSubtitle || !movie.HasPreview {
+		t.Fatalf("subtitle = %v, preview = %v", movie.HasSubtitle, movie.HasPreview)
 	}
 	if len(movie.Tags) != 1 || movie.Tags[0].CategoryID != "category-1" {
 		t.Fatalf("tags = %#v", movie.Tags)
 	}
 	if movie.Series == nil || movie.Maker == nil || movie.Director == nil {
 		t.Fatalf("graph = %#v %#v %#v", movie.Series, movie.Maker, movie.Director)
+	}
+	if movie.Zone != ZoneCensored || len(movie.ActorMovies) != 1 || len(movie.RelatedMovies) != 1 {
+		t.Fatalf("zone = %s, actor movies = %#v, related movies = %#v", movie.Zone, movie.ActorMovies, movie.RelatedMovies)
+	}
+	if movie.ActorMovies[0].Code != "ABP-124" || movie.RelatedMovies[0].Code != "SONE-001A" || movie.RelatedMovies[0].Thumbnail != "https://media.example/related-movie.jpg" {
+		t.Fatalf("recommendations = %#v, %#v", movie.ActorMovies, movie.RelatedMovies)
+	}
+}
+
+func TestBrowseBuildsEntityFilters(t *testing.T) {
+	for _, test := range []struct {
+		kind EntityType
+		want string
+	}{
+		{EntityActor, "3:a:entity-1"},
+		{EntitySeries, "3:s:entity-1"},
+		{EntityMaker, "3:m:entity-1"},
+		{EntityDirector, "3:d:entity-1"},
+	} {
+		t.Run(string(test.kind), func(t *testing.T) {
+			options := BrowseOptions{Zone: ZoneFC2, EntityType: test.kind, EntityID: "entity-1", Sort: "release", Order: "desc", Page: 2, Limit: 20}
+			params, err := buildBrowseParams(options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if params.Get("filter_by") != test.want || params.Get("page") != "2" || params.Get("limit") != "20" {
+				t.Fatalf("params = %v", params)
+			}
+			options.Main = []string{"m", "c"}
+			params, err = buildBrowseParams(options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if params.Get("filter_by") != test.want+":m,c::" {
+				t.Fatalf("main filter = %s", params.Get("filter_by"))
+			}
+			options.TagIDs = []string{"tag-1"}
+			if _, err := buildBrowseParams(options); err == nil {
+				t.Fatal("accepted unsupported mixed entity and tag filters")
+			}
+		})
 	}
 }
 
@@ -161,6 +206,22 @@ func TestResolveMovieIDRequiresExactNormalizedMatch(t *testing.T) {
 	}
 	if id != "movie-exact" {
 		t.Fatalf("id = %q", id)
+	}
+}
+
+func TestResolveMovieIDKeepsLetterVariantsDistinct(t *testing.T) {
+	transport := &fixtureTransport{responses: map[string][]byte{
+		"/api/v2/search|zh-TW": []byte(`{"success":1,"data":{"movies":[{"id":"base","number":"FJIN-106"},{"id":"variant","number":"FJIN-106a"}]}}`),
+	}}
+	client := clientWithTransport(transport)
+	for code, want := range map[string]string{"FJIN-106": "base", "fjin106a": "variant"} {
+		id, err := client.ResolveMovieID(t.Context(), code)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if id != want {
+			t.Errorf("ResolveMovieID(%q) = %q, want %q", code, id, want)
+		}
 	}
 }
 

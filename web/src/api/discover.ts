@@ -5,6 +5,13 @@ import { apiGet, apiPost } from '@/api/client'
 export type MovieState = 'not_in_library' | 'saving' | 'in_library'
 export type ReleaseStatus = 'unknown' | 'released' | 'upcoming'
 export type JavDBZone = 'censored' | 'uncensored' | 'western' | 'fc2'
+export type JavDBEntityType = 'actor' | 'series' | 'maker' | 'director'
+
+export type MovieReference = {
+  id: string
+  code: string
+  thumbnail: string
+}
 
 export type PreviewImage = {
   thumbnail: string
@@ -55,6 +62,23 @@ export type DiscoverMovie = {
   release_status: ReleaseStatus
 }
 
+export type DiscoverMovieDetail = DiscoverMovie & {
+  zone: JavDBZone
+  actor_movies: MovieReference[]
+  related_movies: MovieReference[]
+}
+
+export type DiscoverMagnet = {
+  hash: string
+  name: string
+  size: number
+  has_subtitle: boolean
+  hd: boolean
+  files_count: number
+  created_at: string
+  uri: string
+}
+
 export type TagCategory = {
   id: string
   name: string
@@ -70,6 +94,8 @@ export type JavDBRouteStatus = {
 
 export type BrowseMoviesParams = {
   zone?: JavDBZone
+  entityType?: JavDBEntityType
+  entityID?: string
   main?: string[]
   tagIds?: string[]
   year?: string
@@ -92,6 +118,8 @@ export type SearchMoviesParams = {
 const discoverKeys = {
   all: ['discover'] as const,
   movies: (params: BrowseMoviesParams) => [...discoverKeys.all, 'movies', params] as const,
+  movie: (id: string) => [...discoverKeys.all, 'movie', id] as const,
+  magnets: (id: string) => [...discoverKeys.all, 'movie', id, 'magnets'] as const,
   search: (params: SearchMoviesParams) => [...discoverKeys.all, 'search', params] as const,
   tags: (zone: JavDBZone) => [...discoverKeys.all, 'tags', zone] as const,
   route: ['javdb', 'route'] as const
@@ -104,6 +132,8 @@ export function useDiscoverMovies(params: BrowseMoviesParams) {
     queryFn: () =>
       apiGet<DiscoverMovie[]>('/api/discover/movies', {
         zone: params.zone,
+        entity_type: params.entityType,
+        entity_id: params.entityID,
         main: params.main,
         tag_id: params.tagIds,
         year: params.year,
@@ -113,6 +143,33 @@ export function useDiscoverMovies(params: BrowseMoviesParams) {
         page: params.page,
         limit: params.limit
       }),
+    retry: false,
+    refetchOnWindowFocus: false
+  })
+}
+
+export function useDiscoverMovie(id: string, enabled = true) {
+  return useQuery({
+    queryKey: discoverKeys.movie(id),
+    queryFn: ({ signal }) =>
+      apiGet<DiscoverMovieDetail>(
+        `/api/discover/movies/${encodeURIComponent(id)}`,
+        undefined,
+        signal
+      ),
+    enabled,
+    staleTime: 5 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false
+  })
+}
+
+export function useDiscoverMagnets(id: string) {
+  return useQuery({
+    queryKey: discoverKeys.magnets(id),
+    queryFn: () =>
+      apiGet<DiscoverMagnet[]>(`/api/discover/movies/${encodeURIComponent(id)}/magnets`),
+    staleTime: 5 * 60_000,
     retry: false,
     refetchOnWindowFocus: false
   })

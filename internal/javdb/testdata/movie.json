@@ -4,11 +4,12 @@
     "movie": {
       "id": "movie-exact",
       "number": "ABP-123",
+      "type": 0,
       "title": "Localized title",
       "origin_title": "Original title",
       "release_date": "2026-08-01",
       "duration": 120,
-      "score": 4.5,
+      "score": "4.5",
       "thumb_url": "https://media.example/thumb.jpg",
       "cover_url": "https://media.example/cover.jpg",
       "preview_images": [
@@ -19,8 +20,9 @@
       ],
       "preview_video_url": "https://media.example/preview.m3u8",
       "magnets_count": 3,
-      "has_subtitle": true,
-      "has_preview": true,
+      "has_cnsub": true,
+      "has_preview_images": true,
+      "has_preview_video": true,
       "series_id": "series-1",
       "series_name": "Series",
       "maker_id": "maker-1",
@@ -32,8 +34,14 @@
           "id": "actor-1",
           "name": "Actor",
           "name_zht": "演員",
-          "gender": "female",
+          "gender": 0,
           "avatar_url": "https://media.example/actor.jpg"
+        },
+        {
+          "id": "actor-2",
+          "name": "Actor Two",
+          "gender": 1,
+          "avatar_url": "https://media.example/actor-two.jpg"
         }
       ],
       "tags": [
@@ -43,6 +51,12 @@
           "name_zht": "標籤",
           "category_id": "category-1"
         }
+      ],
+      "actor_movies": [
+        { "id": "actor-movie-1", "number": "abp124", "thumb_url": "https://media.example/actor-movie.jpg" }
+      ],
+      "relative_movies": [
+        { "id": "related-movie-1", "number": "SONE-001a", "thumb_url": "https://media.example/related-movie.jpg" }
       ],
       "summary": "This field must not enter Miyabi's model."
     }

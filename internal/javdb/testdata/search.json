@@ -11,8 +11,9 @@
         "thumb_url": "https://media.example/thumb-near.jpg",
         "cover_url": "https://media.example/cover-near.jpg",
         "magnets_count": 0,
-        "has_subtitle": false,
-        "has_preview": false
+        "has_cnsub": false,
+        "has_preview_images": false,
+        "has_preview_video": false
       },
       {
         "id": "movie-exact",
@@ -31,8 +32,9 @@
           }
         ],
         "magnets_count": 3,
-        "has_subtitle": true,
-        "has_preview": true
+        "has_cnsub": true,
+        "has_preview_images": true,
+        "has_preview_video": false
       }
     ]
   }

@@ -11,10 +11,10 @@ import (
 )
 
 // MovieDetail fetches a movie and its graph metadata.
-func (c *Client) MovieDetail(ctx context.Context, movieID string) (Movie, error) {
+func (c *Client) MovieDetail(ctx context.Context, movieID string) (MovieDetail, error) {
 	movieID = strings.TrimSpace(movieID)
 	if movieID == "" {
-		return Movie{}, errors.New("JavDB movie ID is required")
+		return MovieDetail{}, errors.New("JavDB movie ID is required")
 	}
 
 	var data wireMovieData
@@ -25,9 +25,49 @@ func (c *Client) MovieDetail(ctx context.Context, movieID string) (Movie, error)
 		defaultLanguage,
 		&data,
 	); err != nil {
-		return Movie{}, err
+		return MovieDetail{}, err
 	}
-	return movieFromWire(data.Movie)
+	movie, err := movieFromWire(data.Movie.wireMovie)
+	if err != nil {
+		return MovieDetail{}, err
+	}
+	zone, err := zoneFromCode(data.Movie.Type)
+	if err != nil {
+		return MovieDetail{}, err
+	}
+	actorMovies, err := movieReferencesFromWire(data.Movie.ActorMovies)
+	if err != nil {
+		return MovieDetail{}, fmt.Errorf("decode actor movies: %w", err)
+	}
+	relatedMovies, err := movieReferencesFromWire(data.Movie.RelatedMovies)
+	if err != nil {
+		return MovieDetail{}, fmt.Errorf("decode related movies: %w", err)
+	}
+	return MovieDetail{Movie: movie, Zone: zone, ActorMovies: actorMovies, RelatedMovies: relatedMovies}, nil
+}
+
+func zoneFromCode(code int) (Zone, error) {
+	for zone, value := range zoneCodes {
+		if value == code {
+			return zone, nil
+		}
+	}
+	return "", fmt.Errorf("unsupported JavDB movie type %d", code)
+}
+
+func movieReferencesFromWire(source []wireMovieReference) ([]MovieReference, error) {
+	result := make([]MovieReference, len(source))
+	for index, item := range source {
+		if item.ID == "" {
+			return nil, fmt.Errorf("movie reference %d: missing id", index)
+		}
+		code := codeid.Normalize(item.Number)
+		if code == "" {
+			return nil, fmt.Errorf("movie reference %d: invalid number %q", index, item.Number)
+		}
+		result[index] = MovieReference{ID: item.ID, Code: code, Thumbnail: item.ThumbURL}
+	}
+	return result, nil
 }
 
 // ResolveMovieID finds the single exact catalogue-number match returned by
@@ -91,13 +131,13 @@ func movieFromWire(source wireMovie) (Movie, error) {
 		OriginTitle:   source.OriginTitle,
 		ReleaseDate:   source.ReleaseDate,
 		Duration:      source.Duration,
-		Rating:        source.Score,
+		Rating:        float64(source.Score),
 		Thumbnail:     source.ThumbURL,
 		Cover:         source.CoverURL,
 		PreviewVideo:  source.PreviewVideoURL,
 		MagnetsCount:  source.MagnetsCount,
-		HasSubtitle:   source.HasSubtitle,
-		HasPreview:    source.HasPreview,
+		HasSubtitle:   source.HasCNSub,
+		HasPreview:    source.HasPreviewImages || source.HasPreviewVideo,
 		PreviewImages: make([]PreviewImage, len(source.PreviewImages)),
 		Actors:        make([]Actor, len(source.Actors)),
 		Tags:          make([]Tag, len(source.Tags)),
@@ -109,11 +149,22 @@ func movieFromWire(source wireMovie) (Movie, error) {
 		}
 	}
 	for index, actor := range source.Actors {
+		gender := "unknown"
+		if actor.Gender != nil {
+			switch *actor.Gender {
+			case 0:
+				gender = "female"
+			case 1:
+				gender = "male"
+			default:
+				return Movie{}, fmt.Errorf("unsupported JavDB actor gender %d", *actor.Gender)
+			}
+		}
 		movie.Actors[index] = Actor{
 			ID:      actor.ID,
 			Name:    actor.Name,
 			NameZHT: actor.NameZHT,
-			Gender:  actor.Gender,
+			Gender:  gender,
 			Avatar:  actor.AvatarURL,
 		}
 	}

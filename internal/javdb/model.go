@@ -53,15 +53,51 @@ type SearchOptions struct {
 
 // BrowseOptions controls a category browse request.
 type BrowseOptions struct {
-	Zone   Zone
-	Main   []string
-	TagIDs []string
-	Year   string
-	Month  string
-	Sort   string
-	Order  string
-	Page   int
-	Limit  int
+	Zone       Zone
+	EntityType EntityType
+	EntityID   string
+	Main       []string
+	TagIDs     []string
+	Year       string
+	Month      string
+	Sort       string
+	Order      string
+	Page       int
+	Limit      int
+}
+
+type EntityType string
+
+const (
+	EntityActor    EntityType = "actor"
+	EntitySeries   EntityType = "series"
+	EntityMaker    EntityType = "maker"
+	EntityDirector EntityType = "director"
+)
+
+// MovieReference is the compact recommendation returned with a movie detail.
+type MovieReference struct {
+	ID        string `json:"id"`
+	Code      string `json:"code"`
+	Thumbnail string `json:"thumbnail"`
+}
+
+type MovieDetail struct {
+	Movie
+	Zone          Zone             `json:"zone"`
+	ActorMovies   []MovieReference `json:"actor_movies"`
+	RelatedMovies []MovieReference `json:"related_movies"`
+}
+
+// Magnet describes a resource indexed by JavDB. Size is measured in bytes.
+type Magnet struct {
+	Hash        string `json:"hash"`
+	Name        string `json:"name"`
+	Size        int64  `json:"size"`
+	HasSubtitle bool   `json:"has_subtitle"`
+	HD          bool   `json:"hd"`
+	FilesCount  int    `json:"files_count"`
+	CreatedAt   string `json:"created_at"`
 }
 
 // PreviewImage is one image returned for a movie preview gallery.

@@ -95,3 +95,14 @@ func TestProjectMoviesAddsLibraryTaskAndReleaseState(t *testing.T) {
 		t.Fatalf("remote movie = %#v", movies[2])
 	}
 }
+
+func TestProjectMagnetsBuildsStandardURIFromHash(t *testing.T) {
+	const hash = "0000000000000000000000000000000000000001"
+	result := projectMagnets([]javdb.Magnet{{Hash: hash, Name: "Fixture", Size: 1024}})
+	if len(result) != 1 || result[0].URI != "magnet:?xt=urn:btih:"+hash || result[0].Name != "Fixture" {
+		t.Fatalf("result = %#v", result)
+	}
+	if empty := projectMagnets(nil); empty == nil || len(empty) != 0 {
+		t.Fatalf("empty result = %#v", empty)
+	}
+}

@@ -42,6 +42,18 @@ type DiscoverMovie struct {
 	ReleaseStatus ReleaseStatus `json:"release_status"`
 }
 
+type DiscoverMovieDetail struct {
+	DiscoverMovie
+	Zone          javdb.Zone             `json:"zone"`
+	ActorMovies   []javdb.MovieReference `json:"actor_movies"`
+	RelatedMovies []javdb.MovieReference `json:"related_movies"`
+}
+
+type DiscoverMagnet struct {
+	javdb.Magnet
+	URI string `json:"uri"`
+}
+
 type JavDBRouteStatus struct {
 	Host      string `json:"host"`
 	LatencyMS int64  `json:"latency_ms"`
@@ -142,19 +154,41 @@ func (service *DiscoverService) Browse(
 	return service.projectMovies(ctx, movies)
 }
 
-func (service *DiscoverService) MovieDetail(ctx context.Context, movieID string) (DiscoverMovie, error) {
+func (service *DiscoverService) MovieDetail(ctx context.Context, movieID string) (DiscoverMovieDetail, error) {
 	movie, err := service.javdb.MovieDetail(ctx, movieID)
 	if err != nil {
-		return DiscoverMovie{}, fmt.Errorf("get JavDB movie detail: %w", err)
+		return DiscoverMovieDetail{}, fmt.Errorf("get JavDB movie detail: %w", err)
 	}
 	if err := service.persistActiveRoute(ctx); err != nil {
-		return DiscoverMovie{}, err
+		return DiscoverMovieDetail{}, err
 	}
-	projected, err := service.projectMovies(ctx, []javdb.Movie{movie})
+	projected, err := service.projectMovies(ctx, []javdb.Movie{movie.Movie})
 	if err != nil {
-		return DiscoverMovie{}, err
+		return DiscoverMovieDetail{}, err
 	}
-	return projected[0], nil
+	return DiscoverMovieDetail{
+		DiscoverMovie: projected[0], Zone: movie.Zone,
+		ActorMovies: movie.ActorMovies, RelatedMovies: movie.RelatedMovies,
+	}, nil
+}
+
+func (service *DiscoverService) Magnets(ctx context.Context, movieID string) ([]DiscoverMagnet, error) {
+	magnets, err := service.javdb.Magnets(ctx, movieID)
+	if err != nil {
+		return nil, fmt.Errorf("get JavDB magnets: %w", err)
+	}
+	if err := service.persistActiveRoute(ctx); err != nil {
+		return nil, err
+	}
+	return projectMagnets(magnets), nil
+}
+
+func projectMagnets(source []javdb.Magnet) []DiscoverMagnet {
+	result := make([]DiscoverMagnet, len(source))
+	for index, item := range source {
+		result[index] = DiscoverMagnet{Magnet: item, URI: "magnet:?xt=urn:btih:" + item.Hash}
+	}
+	return result
 }
 
 func (service *DiscoverService) Media(ctx context.Context, rawURL string) (javdb.Media, error) {

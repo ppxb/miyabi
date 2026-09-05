@@ -10,7 +10,11 @@ export class ApiError extends Error {
 
 type QueryValue = string | number | readonly string[] | undefined
 
-export async function apiGet<T>(path: string, query?: Record<string, QueryValue>): Promise<T> {
+export async function apiGet<T>(
+  path: string,
+  query?: Record<string, QueryValue>,
+  signal?: AbortSignal
+): Promise<T> {
   const url = new URL(path, window.location.origin)
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value === undefined || value === '') continue
@@ -20,7 +24,7 @@ export async function apiGet<T>(path: string, query?: Record<string, QueryValue>
       url.searchParams.set(key, String(value))
     }
   }
-  return request<T>(url.pathname + url.search)
+  return request<T>(url.pathname + url.search, { signal })
 }
 
 export function apiPost<T>(path: string): Promise<T> {

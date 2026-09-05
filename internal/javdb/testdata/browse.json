@@ -11,8 +11,9 @@
         "thumb_url": "https://media.example/browse-thumb.jpg",
         "cover_url": "https://media.example/browse-cover.jpg",
         "magnets_count": 2,
-        "has_subtitle": true,
-        "has_preview": false
+        "has_cnsub": true,
+        "has_preview_images": false,
+        "has_preview_video": false
       }
     ]
   }

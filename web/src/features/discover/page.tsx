@@ -3,16 +3,12 @@ import { type FormEvent, useState } from 'react'
 
 import {
   type BrowseMoviesParams,
-  type DiscoverMovie,
   type JavDBZone,
   type TagCategory,
   useDiscoverMovies,
   useDiscoverTags,
   useSearchMovies
 } from '@/api/discover'
-import { EmptyState } from '@/components/empty-state'
-import { ListPagination } from '@/components/list-pagination'
-import { MovieGrid, MovieGridSkeleton } from '@/components/movie'
 import { Button } from '@/components/ui/button'
 import {
   InputGroup,
@@ -30,17 +26,9 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-
-type DiscoverView = 'released' | 'upcoming' | 'category'
-
-const PAGE_SIZE = 20
-
-const zones: Array<{ value: JavDBZone; label: string }> = [
-  { value: 'censored', label: '有码' },
-  { value: 'uncensored', label: '无码' },
-  { value: 'fc2', label: 'FC2' },
-  { value: 'western', label: '欧美' }
-]
+import { type DiscoverView, useDiscoverStore } from '@/stores/discover'
+import { DISCOVER_PAGE_SIZE as PAGE_SIZE, DISCOVER_ZONES as zones } from './constants'
+import { DiscoverResults } from './results'
 
 // Taxonomy categories whose "tags" are filter mask fields rather than content tag ids.
 const MAIN_CATEGORY = 'main'
@@ -49,13 +37,8 @@ const YEAR_CATEGORY = 'year'
 const UNSUPPORTED_CATEGORIES = new Set(['month', 'duration'])
 
 export function DiscoverContent() {
-  const [zone, setZone] = useState<JavDBZone>('censored')
-  const [view, setView] = useState<DiscoverView>('released')
-  const [page, setPage] = useState(1)
-  const [draftKeyword, setDraftKeyword] = useState('')
-  const [keyword, setKeyword] = useState('')
-  const [categoryID, setCategoryID] = useState('')
-  const [tagID, setTagID] = useState('')
+  const { zone, view, page, keyword, categoryID, tagID, update } = useDiscoverStore()
+  const [draftKeyword, setDraftKeyword] = useState(keyword)
 
   const searching = keyword.length > 0
   const categoryMode = view === 'category' && !searching
@@ -65,7 +48,9 @@ export function DiscoverContent() {
   )
   const selectedCategory = categories.find(category => category.id === categoryID) ?? categories[0]
 
-  const browse = useDiscoverMovies(browseParams(view, zone, selectedCategory?.id, tagID, page))
+  const browse = useDiscoverMovies(
+    browseParams(view, zone, categoryID || selectedCategory?.id, tagID, page)
+  )
   const search = useSearchMovies({ query: keyword, zone, sort: 'release', page, limit: PAGE_SIZE })
   const activeQuery = searching ? search : browse
 
@@ -73,26 +58,20 @@ export function DiscoverContent() {
     event.preventDefault()
     const nextKeyword = draftKeyword.trim()
     setDraftKeyword(nextKeyword)
-    setKeyword(nextKeyword)
-    setPage(1)
+    update({ keyword: nextKeyword, page: 1 })
   }
 
   function clearSearch() {
     setDraftKeyword('')
-    setKeyword('')
-    setPage(1)
+    update({ keyword: '', page: 1 })
   }
 
   function changeZone(value: string) {
-    setZone(value as JavDBZone)
-    setCategoryID('')
-    setTagID('')
-    setPage(1)
+    update({ zone: value as JavDBZone, categoryID: '', tagID: '', page: 1 })
   }
 
   function changeView(value: string) {
-    setView(value as DiscoverView)
-    setPage(1)
+    update({ view: value as DiscoverView, page: 1 })
   }
 
   return (
@@ -166,13 +145,14 @@ export function DiscoverContent() {
           categoryID={selectedCategory?.id ?? ''}
           tagID={tagID}
           onCategoryChange={value => {
-            setCategoryID(value)
-            setTagID('')
-            setPage(1)
+            update({ categoryID: value, tagID: '', page: 1 })
           }}
           onTagChange={value => {
-            setTagID(value === 'all' ? '' : value)
-            setPage(1)
+            update({
+              categoryID: selectedCategory?.id ?? categoryID,
+              tagID: value === 'all' ? '' : value,
+              page: 1
+            })
           }}
           onRetry={() => taxonomy.refetch()}
         />
@@ -185,7 +165,7 @@ export function DiscoverContent() {
         error={activeQuery.isError}
         searching={searching}
         page={page}
-        onPageChange={setPage}
+        onPageChange={page => update({ page })}
         onRetry={() => activeQuery.refetch()}
       />
     </div>
@@ -295,55 +275,5 @@ function CategoryFilters({
         </SelectContent>
       </Select>
     </div>
-  )
-}
-
-function DiscoverResults({
-  movies,
-  loading,
-  fetching,
-  error,
-  searching,
-  page,
-  onPageChange,
-  onRetry
-}: {
-  movies: DiscoverMovie[] | undefined
-  loading: boolean
-  fetching: boolean
-  error: boolean
-  searching: boolean
-  page: number
-  onPageChange: (page: number) => void
-  onRetry: () => void
-}) {
-  if (error) {
-    return (
-      <EmptyState
-        emoji="Ò︵Ó"
-        title="数据加载失败"
-        actions={
-          <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-            重试
-          </Button>
-        }
-      />
-    )
-  }
-  if (loading || !movies) return <MovieGridSkeleton count={8} />
-  if (movies.length === 0 && page === 1) {
-    return <EmptyState emoji="(･o･;)" title={searching ? '没有搜索结果' : '暂无内容'} />
-  }
-
-  return (
-    <>
-      <MovieGrid movies={movies} />
-      <ListPagination
-        page={page}
-        hasMore={movies.length === PAGE_SIZE}
-        disabled={fetching}
-        onPageChange={onPageChange}
-      />
-    </>
   )
 }
