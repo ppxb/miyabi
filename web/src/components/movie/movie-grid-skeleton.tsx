@@ -8,7 +8,7 @@ export function MovieGridSkeleton({ count = 8 }: { count?: number }) {
         <Card key={index} size="sm" className="gap-0 overflow-hidden py-0">
           <Skeleton className="aspect-3/2 w-full rounded-none" />
           <CardContent className="space-y-2 p-3">
-            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-5 w-full" />
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-3 w-1/2" />
           </CardContent>

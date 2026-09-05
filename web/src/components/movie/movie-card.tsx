@@ -1,5 +1,6 @@
 import type { DiscoverMovie } from '@/api/discover'
 import { imageURL } from '@/api/client'
+import { OverflowTooltip } from '@/components/overflow-tooltip'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -8,11 +9,11 @@ export function MovieCard({ movie }: { movie: DiscoverMovie }) {
     <Card size="sm" className="group gap-0 overflow-hidden py-0 transition-shadow hover:shadow-xl">
       <div className="relative aspect-3/2 overflow-hidden bg-muted">
         <img
-          src={imageURL(movie.thumbnail)}
+          src={imageURL(movie.cover)}
           alt={movie.title}
           loading="lazy"
           decoding="async"
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+          className="h-full w-full object-contain"
         />
 
         <div className="absolute top-2 left-2 flex max-w-[calc(100%-1rem)] flex-wrap gap-1.5">
@@ -24,9 +25,11 @@ export function MovieCard({ movie }: { movie: DiscoverMovie }) {
       </div>
 
       <CardContent className="space-y-2 p-3">
-        <h3 className="line-clamp-2 min-h-10 text-sm leading-5 font-semibold" title={movie.title}>
-          {movie.title}
-        </h3>
+        <OverflowTooltip content={movie.title}>
+          <h3 className="truncate text-sm leading-5 font-semibold" tabIndex={0}>
+            {movie.title}
+          </h3>
+        </OverflowTooltip>
         <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
           <span>{movie.release_date}</span>
           {movie.duration > 0 ? <span>{movie.duration} 分钟</span> : null}

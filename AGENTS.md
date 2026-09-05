@@ -205,7 +205,7 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 - 115 与图片请求走 Resty；JavDB 按上文使用隔离的 tls-client transport。115 与 JavDB 各自一个 `rate.Limiter`。
 - ent schema 改动后执行 `go generate ./...`。
 - 前端所有服务端数据通过 TanStack Query，不放 Zustand。
-- 需要新增 shadcn/ui 组件时，先告知用户所需组件及安装命令，由用户执行安装；不自行安装。
+- 所有项目依赖的安装、升级和移除均由用户执行，包括 Go module、前端 npm/pnpm 包及 shadcn/ui 组件。助手先告知所需依赖、用途和具体命令，不自行运行依赖变更命令；可使用已安装的依赖进行构建、测试、lint 和格式化。依赖未就绪时继续完成不受影响的工作，并明确说明尚未完成的检查。
 - 前端提交前跑 `oxlint` 与 `oxfmt`，Go 用 `gofmt` 与 `go vet`。
 - 根目录一份 `.gitignore`，不在 `web/` 单独放。`web/dist` 不入库，`make build` 先构建前端再编译 Go。
 - API 路径前缀 `/api`，JSON 字段 snake_case。

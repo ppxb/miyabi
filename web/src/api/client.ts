@@ -29,7 +29,8 @@ export function apiPost<T>(path: string): Promise<T> {
 
 // JavDB CDN hosts are not reachable from every browser network, so images go through the backend.
 export function imageURL(source: string) {
-  return `/api/image?url=${encodeURIComponent(source)}`
+  // Invalidate the encoded image responses cached before the backend decoded them.
+  return `/api/image?v=3&url=${encodeURIComponent(source)}`
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

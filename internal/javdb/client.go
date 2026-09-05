@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
 	"golang.org/x/sync/singleflight"
 	"golang.org/x/time/rate"
@@ -20,7 +21,6 @@ type routeState struct {
 
 type jsonTransport interface {
 	getJSON(context.Context, string, url.Values, string, any) error
-	getMedia(context.Context, string) (Media, error)
 	closeIdleConnections()
 }
 
@@ -28,6 +28,7 @@ type jsonTransport interface {
 type Client struct {
 	options     Options
 	limiter     *rate.Limiter
+	media       *resty.Client
 	current     atomic.Pointer[routeState]
 	routes      singleflight.Group
 	selectRoute func(context.Context, string) (*routeState, error)
@@ -58,6 +59,7 @@ func New(options Options) (*Client, error) {
 	client := &Client{
 		options: options,
 		limiter: rate.NewLimiter(rate.Limit(requestsPerSecond), burst),
+		media:   newMediaClient(options),
 	}
 	client.selectRoute = client.selectAndInstall
 	return client, nil
@@ -98,8 +100,9 @@ func (c *Client) Route() (RouteStatus, bool) {
 	return state.status, true
 }
 
-// Close releases idle connections held by the active transport.
+// Close releases idle API and image connections.
 func (c *Client) Close() {
+	c.media.GetClient().CloseIdleConnections()
 	if state := c.current.Load(); state != nil {
 		state.transport.closeIdleConnections()
 	}

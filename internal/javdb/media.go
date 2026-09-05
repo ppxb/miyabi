@@ -4,55 +4,71 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
+	"net/http"
 	"net/url"
+	"strings"
 
-	http "github.com/bogdanfinn/fhttp"
+	"github.com/go-resty/resty/v2"
 )
 
-// Media is a raw image or video resource served by JavDB's CDN.
+// Media is a decoded image served by JavDB's CDN.
 type Media struct {
 	ContentType string
 	Body        []byte
 }
 
-// FetchMedia downloads a JavDB CDN resource through the App transport. The
-// browser cannot fetch these hosts directly in every network environment.
+func newMediaClient(options Options) *resty.Client {
+	timeout := options.Timeout
+	if timeout == 0 {
+		timeout = defaultTimeout
+	}
+	client := resty.New().
+		SetTimeout(timeout).
+		SetHeader("User-Agent", userAgent).
+		SetRedirectPolicy(resty.NoRedirectPolicy())
+	if options.Proxy != "" {
+		client.SetProxy(options.Proxy)
+	}
+	return client
+}
+
+// FetchMedia downloads and decodes a CDN image independently of API route
+// selection and API rate limiting, using the same configured outbound proxy.
 func (c *Client) FetchMedia(ctx context.Context, rawURL string) (Media, error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
 		return Media{}, errors.New("JavDB media URL must be an absolute https URL")
 	}
 
-	state, err := c.ensureRoute(ctx)
+	response, err := c.media.R().SetContext(ctx).Get(rawURL)
 	if err != nil {
-		return Media{}, err
+		return Media{}, fmt.Errorf("download JavDB image: %w", err)
 	}
-	if err := c.limiter.Wait(ctx); err != nil {
-		return Media{}, err
+	if response.StatusCode() < 200 || response.StatusCode() >= 300 {
+		return Media{}, &HTTPError{StatusCode: response.StatusCode()}
 	}
-	return state.transport.getMedia(ctx, rawURL)
+	return decodeImagePayload(response.Body())
 }
 
-func (t *transport) getMedia(ctx context.Context, rawURL string) (Media, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return Media{}, fmt.Errorf("create JavDB media request: %w", err)
+// The CDN serves either a standard image or a one-byte XOR key followed by the
+// encoded image. Detect the decoded MIME type instead of forwarding octet-stream.
+func decodeImagePayload(raw []byte) (Media, error) {
+	contentType := http.DetectContentType(raw)
+	if strings.HasPrefix(contentType, "image/") {
+		return Media{ContentType: contentType, Body: raw}, nil
 	}
-	request.Header.Set("user-agent", userAgent)
+	if len(raw) < 2 {
+		return Media{}, errors.New("JavDB media response is not a recognized image")
+	}
 
-	response, err := t.client.Do(request)
-	if err != nil {
-		return Media{}, &networkError{err: err}
+	key := raw[0]
+	decoded := make([]byte, len(raw)-1)
+	for index := range decoded {
+		decoded[index] = raw[index+1] ^ key
 	}
-	defer response.Body.Close()
-
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return Media{}, &HTTPError{StatusCode: response.StatusCode}
+	contentType = http.DetectContentType(decoded)
+	if !strings.HasPrefix(contentType, "image/") {
+		return Media{}, errors.New("JavDB media response is not a recognized image")
 	}
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return Media{}, &networkError{err: fmt.Errorf("read JavDB media: %w", err)}
-	}
-	return Media{ContentType: response.Header.Get("content-type"), Body: body}, nil
+	return Media{ContentType: contentType, Body: decoded}, nil
 }

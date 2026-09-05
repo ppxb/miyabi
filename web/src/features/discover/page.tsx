@@ -33,7 +33,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type DiscoverView = 'released' | 'upcoming' | 'category'
 
-const PAGE_SIZE = 40
+const PAGE_SIZE = 20
 
 const zones: Array<{ value: JavDBZone; label: string }> = [
   { value: 'censored', label: '有码' },

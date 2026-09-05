@@ -24,8 +24,8 @@ type discoverSearchQuery struct {
 	Zone     string `form:"zone" binding:"omitempty,oneof=censored uncensored western fc2 all"`
 	Sort     string `form:"sort" binding:"omitempty,oneof=relevance release score update hit"`
 	FilterBy string `form:"filter_by"`
-	Page     int    `form:"page" binding:"omitempty,min=1"`
-	Limit    int    `form:"limit" binding:"omitempty,min=1,max=100"`
+	Page     int    `form:"page,default=1" binding:"min=1"`
+	Limit    int    `form:"limit,default=20" binding:"min=1,max=100"`
 }
 
 type discoverBrowseQuery struct {
