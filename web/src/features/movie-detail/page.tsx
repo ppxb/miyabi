@@ -12,7 +12,6 @@ import { MovieDetailSkeleton } from './skeleton'
 export function MovieDetailPage({ movieId }: { movieId: string }) {
   const detail = useDiscoverMovie(movieId)
   const magnets = useDiscoverMagnets(movieId)
-  const fetching = detail.isFetching || magnets.isFetching
 
   return (
     <AppPage className="sm:px-6 lg:px-8" contentClassName="max-w-7xl gap-8">
