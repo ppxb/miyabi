@@ -70,6 +70,7 @@ type SearchOptions struct {
 
 // BrowseOptions controls a category browse request.
 type BrowseOptions struct {
+	// Zone is required for category/tag browsing and omitted for entity movies.
 	Zone       Zone
 	EntityType EntityType
 	EntityID   string

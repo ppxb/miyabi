@@ -24,10 +24,6 @@ func (c *Client) Browse(ctx context.Context, options BrowseOptions) ([]Movie, er
 }
 
 func buildBrowseParams(options BrowseOptions) (url.Values, error) {
-	zone, ok := zoneCodes[options.Zone]
-	if !ok {
-		return nil, errors.New("JavDB browse zone must be censored, uncensored, western, or fc2")
-	}
 	if options.Page <= 0 || options.Limit <= 0 {
 		return nil, errors.New("JavDB browse page and limit must be positive")
 	}
@@ -35,17 +31,10 @@ func buildBrowseParams(options BrowseOptions) (url.Values, error) {
 		return nil, errors.New("JavDB browse sort and order are required")
 	}
 
-	filter := fmt.Sprintf(
-		"%d:t:%s:%s:%s:%s:",
-		zone,
-		strings.Join(options.Main, ","),
-		strings.Join(options.TagIDs, ","),
-		options.Year,
-		options.Month,
-	)
+	var filter string
 	if options.EntityType != "" || options.EntityID != "" {
-		if len(options.TagIDs) != 0 || options.Year != "" || options.Month != "" {
-			return nil, errors.New("JavDB entity filters cannot include tags, year, or month")
+		if options.Zone != "" || len(options.TagIDs) != 0 || options.Year != "" || options.Month != "" {
+			return nil, errors.New("JavDB entity filters cannot include zone, tags, year, or month")
 		}
 		letter, ok := map[EntityType]string{
 			EntityActor: "a", EntitySeries: "s", EntityMaker: "m", EntityDirector: "d",
@@ -53,10 +42,25 @@ func buildBrowseParams(options BrowseOptions) (url.Values, error) {
 		if !ok || options.EntityID == "" {
 			return nil, errors.New("JavDB entity type and ID are required")
 		}
-		filter = fmt.Sprintf("%d:%s:%s", zone, letter, options.EntityID)
+		// Keep the empty leading slot: removing its colon makes JavDB return
+		// an unfiltered browse page instead of this entity's movies.
+		filter = fmt.Sprintf(":%s:%s", letter, options.EntityID)
 		if len(options.Main) > 0 {
 			filter += ":" + strings.Join(options.Main, ",") + "::"
 		}
+	} else {
+		zone, ok := zoneCodes[options.Zone]
+		if !ok {
+			return nil, errors.New("JavDB browse zone must be censored, uncensored, western, or fc2")
+		}
+		filter = fmt.Sprintf(
+			"%d:t:%s:%s:%s:%s:",
+			zone,
+			strings.Join(options.Main, ","),
+			strings.Join(options.TagIDs, ","),
+			options.Year,
+			options.Month,
+		)
 	}
 	return url.Values{
 		"filter_by": {filter},

@@ -1,8 +1,7 @@
 import { Link } from '@tanstack/react-router'
 
-import type { JavDBZone } from '@/api/discover'
 import { Badge } from '@/components/ui/badge'
-import type { MetadataSearchKind } from '@/features/discover/metadata-search'
+import type { MetadataTarget } from '@/features/discover/metadata-search'
 
 export function MetadataLink({
   kind,
@@ -10,17 +9,11 @@ export function MetadataLink({
   name,
   zone,
   badge = false
-}: {
-  kind: MetadataSearchKind
-  id: string
-  name: string
-  zone: JavDBZone
-  badge?: boolean
-}) {
+}: MetadataTarget & { badge?: boolean }) {
   const link = (
     <Link
       to="/discover/search"
-      search={{ kind, id, name, zone, page: 1 }}
+      search={kind === 'tag' ? { kind, id, name, zone, page: 1 } : { kind, id, name, page: 1 }}
       className={badge ? undefined : 'outline-ring transition-colors hover:text-muted-foreground'}
     >
       {name}

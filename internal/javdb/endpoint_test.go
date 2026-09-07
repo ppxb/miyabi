@@ -164,13 +164,13 @@ func TestBrowseBuildsEntityFilters(t *testing.T) {
 		kind EntityType
 		want string
 	}{
-		{EntityActor, "3:a:entity-1"},
-		{EntitySeries, "3:s:entity-1"},
-		{EntityMaker, "3:m:entity-1"},
-		{EntityDirector, "3:d:entity-1"},
+		{EntityActor, ":a:entity-1"},
+		{EntitySeries, ":s:entity-1"},
+		{EntityMaker, ":m:entity-1"},
+		{EntityDirector, ":d:entity-1"},
 	} {
 		t.Run(string(test.kind), func(t *testing.T) {
-			options := BrowseOptions{Zone: ZoneFC2, EntityType: test.kind, EntityID: "entity-1", Sort: "release", Order: "desc", Page: 2, Limit: 20}
+			options := BrowseOptions{EntityType: test.kind, EntityID: "entity-1", Sort: "release", Order: "desc", Page: 2, Limit: 20}
 			params, err := buildBrowseParams(options)
 			if err != nil {
 				t.Fatal(err)
@@ -186,6 +186,11 @@ func TestBrowseBuildsEntityFilters(t *testing.T) {
 			if params.Get("filter_by") != test.want+":m,c::" {
 				t.Fatalf("main filter = %s", params.Get("filter_by"))
 			}
+			options.Zone = ZoneFC2
+			if _, err := buildBrowseParams(options); err == nil {
+				t.Fatal("accepted an unsupported zone filter for entity movies")
+			}
+			options.Zone = ""
 			options.TagIDs = []string{"tag-1"}
 			if _, err := buildBrowseParams(options); err == nil {
 				t.Fatal("accepted unsupported mixed entity and tag filters")
@@ -251,7 +256,7 @@ func TestQueryOptionsRejectUnsupportedZones(t *testing.T) {
 	if _, err := buildSearchParams("ABP-123", SearchOptions{Zone: "invalid"}); err == nil {
 		t.Fatal("search accepted an unsupported zone")
 	}
-	if _, err := buildBrowseParams(BrowseOptions{Zone: ZoneAll}); err == nil {
+	if _, err := buildBrowseParams(BrowseOptions{Zone: ZoneAll, Page: 1, Limit: 20, Sort: "release", Order: "desc"}); err == nil {
 		t.Fatal("browse accepted the all zone")
 	}
 }

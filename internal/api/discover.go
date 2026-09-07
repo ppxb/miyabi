@@ -31,7 +31,7 @@ type discoverSearchQuery struct {
 }
 
 type discoverBrowseQuery struct {
-	Zone       string   `form:"zone,default=censored" binding:"oneof=censored uncensored western fc2"`
+	Zone       string   `form:"zone" binding:"required_without=EntityType,excluded_with=EntityType,omitempty,oneof=censored uncensored western fc2"`
 	EntityType string   `form:"entity_type" binding:"required_with=EntityID,omitempty,oneof=actor series maker director"`
 	EntityID   string   `form:"entity_id" binding:"required_with=EntityType"`
 	Main       []string `form:"main" binding:"omitempty,dive,oneof=p m c s i v"`

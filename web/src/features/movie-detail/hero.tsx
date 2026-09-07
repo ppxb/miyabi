@@ -44,12 +44,12 @@ export function MovieHero({ movie }: { movie: DiscoverMovieDetail }) {
         <dl className="space-y-3 text-sm">
           {movie.maker ? (
             <EntityRow label="厂牌">
-              <MetadataLink kind="maker" {...movie.maker} zone={movie.zone} />
+              <MetadataLink kind="maker" {...movie.maker} />
             </EntityRow>
           ) : null}
           {movie.series ? (
             <EntityRow label="系列">
-              <MetadataLink kind="series" {...movie.series} zone={movie.zone} />
+              <MetadataLink kind="series" {...movie.series} />
             </EntityRow>
           ) : null}
           {movie.actors.length > 0 ? (
@@ -61,14 +61,14 @@ export function MovieHero({ movie }: { movie: DiscoverMovieDetail }) {
                       /
                     </span>
                   ) : null}
-                  <MetadataLink kind="actor" id={actor.id} name={actor.name} zone={movie.zone} />
+                  <MetadataLink kind="actor" id={actor.id} name={actor.name} />
                 </span>
               ))}
             </EntityRow>
           ) : null}
           {movie.director ? (
             <EntityRow label="导演">
-              <MetadataLink kind="director" {...movie.director} zone={movie.zone} />
+              <MetadataLink kind="director" {...movie.director} />
             </EntityRow>
           ) : null}
           {movie.tags.length > 0 ? (

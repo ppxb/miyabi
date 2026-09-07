@@ -130,8 +130,8 @@ export function DiscoverContent() {
         </div>
       ) : (
         <Tabs value={view} onValueChange={changeView}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="released">最新发行</TabsTrigger>
+          <TabsList>
+            <TabsTrigger value="released">最新</TabsTrigger>
             <TabsTrigger value="upcoming">即将发行</TabsTrigger>
             <TabsTrigger value="category">分类浏览</TabsTrigger>
           </TabsList>

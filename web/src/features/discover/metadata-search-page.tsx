@@ -24,13 +24,12 @@ export function MetadataSearchPage({
   onZoneChange: (zone: JavDBZone) => void
 }) {
   const movies = useDiscoverMovies({
-    zone: search.zone,
     page: search.page,
     limit: DISCOVER_PAGE_SIZE,
     sort: 'release',
     order: 'desc',
     ...(search.kind === 'tag'
-      ? { tagIds: [search.id] }
+      ? { zone: search.zone, tagIds: [search.id] }
       : { entityType: search.kind, entityID: search.id })
   })
 
@@ -38,20 +37,22 @@ export function MetadataSearchPage({
     <AppPage>
       <PageBackButton />
       <PageHeader title={search.name} description={`${METADATA_LABELS[search.kind]}相关影片`}>
-        <Select value={search.zone} onValueChange={value => onZoneChange(value as JavDBZone)}>
-          <SelectTrigger className="w-32" aria-label="影片分区">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper" align="end">
-            <SelectGroup>
-              {DISCOVER_ZONES.map(zone => (
-                <SelectItem key={zone.value} value={zone.value}>
-                  {zone.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        {search.kind === 'tag' ? (
+          <Select value={search.zone} onValueChange={value => onZoneChange(value as JavDBZone)}>
+            <SelectTrigger className="w-32" aria-label="影片分区">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" align="end">
+              <SelectGroup>
+                {DISCOVER_ZONES.map(zone => (
+                  <SelectItem key={zone.value} value={zone.value}>
+                    {zone.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        ) : null}
       </PageHeader>
       <DiscoverResults
         movies={movies.data}
