@@ -115,9 +115,6 @@ export type BrowseMoviesParams = {
 
 export type SearchMoviesParams = {
   query: string
-  zone?: JavDBZone | 'all'
-  sort?: string
-  filterBy?: string
   page?: number
   limit?: number
 }
@@ -203,9 +200,6 @@ export function useSearchMovies(params: SearchMoviesParams) {
         '/api/discover/search',
         {
           q: query,
-          zone: params.zone,
-          sort: params.sort,
-          filter_by: params.filterBy,
           page: params.page,
           limit: params.limit
         },

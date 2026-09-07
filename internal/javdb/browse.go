@@ -49,12 +49,16 @@ func buildBrowseParams(options BrowseOptions) (url.Values, error) {
 			filter += ":" + strings.Join(options.Main, ",") + "::"
 		}
 	} else {
-		zone, ok := zoneCodes[options.Zone]
-		if !ok {
-			return nil, errors.New("JavDB browse zone must be censored, uncensored, western, or fc2")
+		zone := ""
+		if options.Zone != "" {
+			code, ok := zoneCodes[options.Zone]
+			if !ok {
+				return nil, errors.New("JavDB browse zone must be censored, uncensored, western, or fc2")
+			}
+			zone = strconv.Itoa(code)
 		}
 		filter = fmt.Sprintf(
-			"%d:t:%s:%s:%s:%s:",
+			"%s:t:%s:%s:%s:%s:",
 			zone,
 			strings.Join(options.Main, ","),
 			strings.Join(options.TagIDs, ","),

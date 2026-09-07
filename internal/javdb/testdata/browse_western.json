@@ -1,0 +1,19 @@
+{
+  "success": 1,
+  "data": {
+    "movies": [
+      {
+        "id": "western-scene-one",
+        "number": "ExampleStudioName.26.09.05",
+        "title": "Western fixture one",
+        "release_date": "2026-09-05"
+      },
+      {
+        "id": "western-scene-two",
+        "number": "ExampleStudioName.26.09.06",
+        "title": "Western fixture two",
+        "release_date": "2026-09-06"
+      }
+    ]
+  }
+}

@@ -125,6 +125,59 @@ func TestBrowseUsesDocumentedFilterMask(t *testing.T) {
 	}
 }
 
+func TestBrowseWithoutZoneKeepsTheFilterMask(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		main []string
+		sort string
+		mask string
+	}{
+		{name: "latest", main: []string{"m"}, sort: "update", mask: ":t:m::::"},
+		{name: "upcoming", sort: "release", mask: ":t:::::"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			params, err := buildBrowseParams(BrowseOptions{
+				Main: test.main, Sort: test.sort, Order: "desc", Page: 1, Limit: 20,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if params.Get("filter_by") != test.mask || params.Get("sort_by") != test.sort {
+				t.Fatalf("params = %v", params)
+			}
+		})
+	}
+}
+
+func TestBrowsePreservesWesternSceneNumbers(t *testing.T) {
+	transport := &fixtureTransport{responses: map[string][]byte{
+		"/api/v1/movies/tags|zh-TW": fixtureFile(t, "browse_western.json"),
+	}}
+	client := clientWithTransport(transport)
+	movies, err := client.Browse(t.Context(), BrowseOptions{
+		Zone: ZoneWestern, Sort: "release", Order: "desc", Page: 1, Limit: 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(movies) != 2 || movies[0].Code != "EXAMPLESTUDIONAME.26.09.05" || movies[1].Code != "EXAMPLESTUDIONAME.26.09.06" {
+		t.Fatalf("western movies = %+v", movies)
+	}
+}
+
+func TestMovieReferencesPreserveWesternSceneNumbers(t *testing.T) {
+	movies, err := movieReferencesFromWire([]wireMovieReference{
+		{ID: "western-scene-one", Number: "ExampleStudio.26.09.05"},
+		{ID: "western-scene-two", Number: "ExampleStudio.26.09.06"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(movies) != 2 || movies[0].Code != "EXAMPLESTUDIO.26.09.05" || movies[1].Code != "EXAMPLESTUDIO.26.09.06" {
+		t.Fatalf("western references = %+v", movies)
+	}
+}
+
 func TestMovieDetailMapsGraphWithoutPlot(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
 		"/api/v4/movies/movie-exact|zh-TW": fixtureFile(t, "movie.json"),

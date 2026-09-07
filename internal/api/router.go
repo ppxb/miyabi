@@ -26,7 +26,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(
-		sloggin.New(deps.Logger),
+		sloggin.NewWithFilters(deps.Logger, sloggin.IgnoreStatus(statusClientClosedRequest)),
 		recoveryMiddleware(deps.Logger),
 		errorMiddleware(deps.Logger),
 	)

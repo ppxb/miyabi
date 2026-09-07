@@ -10,12 +10,15 @@ const (
 	prefix        = `(?:[A-Z][A-Z0-9]{0,11}|[0-9]{1,4}[A-Z][A-Z0-9]{0,10})`
 	compactPrefix = `(?:[A-Z]{1,12}|[0-9]{1,4}[A-Z]{1,11})`
 	fc2Number     = `FC2[-_. ]*(?:PPV)?[-_. ]*[0-9]{3,8}`
+	// Western scenes use a site name and a dotted date as the full identifier.
+	westernNumber = `(?:[A-Z][A-Z0-9]*|[0-9]+[A-Z][A-Z0-9]*)\.(?:[0-9]{2}|[0-9]{4})\.[0-9]{2}\.[0-9]{2}`
 )
 
 var (
 	separators       = strings.NewReplacer("－", "-", "﹣", "-", "–", "-", "—", "-", "＿", "_")
 	delimiters       = regexp.MustCompile(`[-_. ]+`)
 	fc2Pattern       = regexp.MustCompile(`^FC2[-_. ]*(?:PPV)?[-_. ]*([0-9]{3,8})$`)
+	westernPattern   = regexp.MustCompile(`^` + westernNumber + `$`)
 	numericPattern   = regexp.MustCompile(`^([0-9]{6})[-_]([0-9]{2,3})$`)
 	separatedPattern = regexp.MustCompile(`^(` + prefix + `)[-_. ]+([0-9]{2,7}[A-Z]?(?:[-_][0-9]{2,3})*)$`)
 	compactPattern   = regexp.MustCompile(`^(` + compactPrefix + `)([0-9]{2,7}[A-Z]?(?:[-_][0-9]{2,3})*)$`)
@@ -23,6 +26,7 @@ var (
 	// Six-digit date codes keep their second numeric segment. Other trailing
 	// segments in filenames (SSIS-589-02, for example) identify a video part.
 	filenamePattern = regexp.MustCompile(`(?:^|[^A-Z0-9])(` +
+		westernNumber + `|` +
 		fc2Number + `|` +
 		prefix + `[-_. ]*[0-9]{6}[-_][0-9]{2,3}|` +
 		`[0-9]{6}[-_][0-9]{2,3}|` +
@@ -50,6 +54,9 @@ func Parse(name string) (string, bool) {
 // number from filenames or discard suffixes; those belong to Parse.
 func Normalize(raw string) string {
 	value := strings.ToUpper(strings.TrimSpace(separators.Replace(raw)))
+	if westernPattern.MatchString(value) {
+		return value
+	}
 	if match := fc2Pattern.FindStringSubmatch(value); match != nil {
 		return "FC2-PPV-" + match[1]
 	}

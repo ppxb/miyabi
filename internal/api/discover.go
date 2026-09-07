@@ -22,16 +22,13 @@ type Discoverer interface {
 }
 
 type discoverSearchQuery struct {
-	Query    string `form:"q" binding:"required"`
-	Zone     string `form:"zone" binding:"omitempty,oneof=censored uncensored western fc2 all"`
-	Sort     string `form:"sort" binding:"omitempty,oneof=relevance release score update hit"`
-	FilterBy string `form:"filter_by"`
-	Page     int    `form:"page,default=1" binding:"min=1"`
-	Limit    int    `form:"limit,default=20" binding:"min=1,max=100"`
+	Query string `form:"q" binding:"required"`
+	Page  int    `form:"page,default=1" binding:"min=1"`
+	Limit int    `form:"limit,default=20" binding:"min=1,max=100"`
 }
 
 type discoverBrowseQuery struct {
-	Zone       string   `form:"zone" binding:"required_without=EntityType,excluded_with=EntityType,omitempty,oneof=censored uncensored western fc2"`
+	Zone       string   `form:"zone" binding:"excluded_with=EntityType,omitempty,oneof=censored uncensored western fc2"`
 	EntityType string   `form:"entity_type" binding:"required_with=EntityID,omitempty,oneof=actor series maker director"`
 	EntityID   string   `form:"entity_id" binding:"required_with=EntityType"`
 	Main       []string `form:"main" binding:"omitempty,dive,oneof=p m c s i v"`
@@ -68,11 +65,8 @@ func discoverSearchHandler(discover Discoverer) gin.HandlerFunc {
 			return
 		}
 		movies, err := discover.Search(c.Request.Context(), query.Query, javdb.SearchOptions{
-			Zone:     javdb.Zone(query.Zone),
-			Sort:     query.Sort,
-			FilterBy: query.FilterBy,
-			Page:     query.Page,
-			Limit:    query.Limit,
+			Page:  query.Page,
+			Limit: query.Limit,
 		})
 		if err != nil {
 			c.Error(err)

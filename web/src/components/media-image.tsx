@@ -21,10 +21,9 @@ export function MediaImage(props: MediaImageProps) {
     return (
       <div
         role="img"
-        aria-label="图片已隐藏"
         className="flex size-full items-center justify-center bg-muted text-muted-foreground"
       >
-        <EyeOffIcon className="size-6" aria-hidden="true" />
+        <EyeOffIcon className="size-6" />
       </div>
     )
   }

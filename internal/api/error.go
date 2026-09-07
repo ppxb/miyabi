@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -9,7 +10,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/pan"
+	sloggin "github.com/samber/slog-gin"
 )
+
+// 499 distinguishes requests abandoned by the caller from server failures.
+const statusClientClosedRequest = 499
 
 type requestError struct {
 	err error
@@ -35,6 +40,15 @@ func errorMiddleware(logger *slog.Logger) gin.HandlerFunc {
 		}
 
 		err := c.Errors.Last().Err
+		if errors.Is(err, context.Canceled) && errors.Is(c.Request.Context().Err(), context.Canceled) {
+			c.AbortWithStatus(statusClientClosedRequest)
+			logger.DebugContext(c.Request.Context(), "request canceled",
+				"method", c.Request.Method,
+				"path", c.Request.URL.Path,
+				"id", sloggin.GetRequestID(c),
+			)
+			return
+		}
 		status := http.StatusInternalServerError
 		var invalidRequest *requestError
 		switch {
@@ -44,12 +58,6 @@ func errorMiddleware(logger *slog.Logger) gin.HandlerFunc {
 			status = http.StatusNotFound
 		case errors.Is(err, pan.ErrUnauthorized):
 			status = http.StatusUnauthorized
-		default:
-			logger.ErrorContext(c.Request.Context(), "request failed",
-				"method", c.Request.Method,
-				"path", c.Request.URL.Path,
-				"error", err,
-			)
 		}
 
 		c.AbortWithStatusJSON(status, gin.H{"error": err.Error()})
