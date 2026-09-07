@@ -18,12 +18,8 @@ type Media struct {
 }
 
 func newMediaClient(options Options) *resty.Client {
-	timeout := options.Timeout
-	if timeout == 0 {
-		timeout = defaultTimeout
-	}
 	client := resty.New().
-		SetTimeout(timeout).
+		SetTimeout(options.Timeout).
 		SetHeader("User-Agent", userAgent).
 		SetRedirectPolicy(resty.NoRedirectPolicy())
 	if options.Proxy != "" {

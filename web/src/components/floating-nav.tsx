@@ -22,7 +22,7 @@ type FloatingNavProps = {
 
 export function FloatingNav({ items, activeId }: FloatingNavProps) {
   return (
-    <nav className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-border/70 bg-background/85 p-1.5 text-foreground backdrop-blur sm:bottom-4 sm:p-1">
+    <nav className="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-full border border-border/70 bg-background/85 p-1.5 text-foreground backdrop-blur sm:bottom-8 sm:p-1">
       <ul className="flex items-center gap-2 sm:gap-2">
         {items.map(item => (
           <NavItem key={item.id} item={item} isActive={item.id === activeId} />

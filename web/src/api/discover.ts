@@ -82,8 +82,7 @@ export type DiscoverMagnet = {
 export type TagCategory = {
   id: string
   name: string
-  name_zht: string
-  tags: Tag[]
+  tags: NamedEntity[]
 }
 
 export type JavDBRouteStatus = {
@@ -125,31 +124,41 @@ const discoverKeys = {
   route: ['javdb', 'route'] as const
 }
 
-export function useDiscoverMovies(params: BrowseMoviesParams) {
+const discoverQueryDefaults = {
+  retry: false,
+  refetchOnWindowFocus: false
+} as const
+
+export function useDiscoverMovies(params: BrowseMoviesParams, enabled = true) {
   return useQuery({
+    ...discoverQueryDefaults,
     queryKey: discoverKeys.movies(params),
+    enabled,
     placeholderData: keepPreviousData,
-    queryFn: () =>
-      apiGet<DiscoverMovie[]>('/api/discover/movies', {
-        zone: params.zone,
-        entity_type: params.entityType,
-        entity_id: params.entityID,
-        main: params.main,
-        tag_id: params.tagIds,
-        year: params.year,
-        month: params.month,
-        sort: params.sort,
-        order: params.order,
-        page: params.page,
-        limit: params.limit
-      }),
-    retry: false,
-    refetchOnWindowFocus: false
+    queryFn: ({ signal }) =>
+      apiGet<DiscoverMovie[]>(
+        '/api/discover/movies',
+        {
+          zone: params.zone,
+          entity_type: params.entityType,
+          entity_id: params.entityID,
+          main: params.main,
+          tag_id: params.tagIds,
+          year: params.year,
+          month: params.month,
+          sort: params.sort,
+          order: params.order,
+          page: params.page,
+          limit: params.limit
+        },
+        signal
+      )
   })
 }
 
 export function useDiscoverMovie(id: string, enabled = true) {
   return useQuery({
+    ...discoverQueryDefaults,
     queryKey: discoverKeys.movie(id),
     queryFn: ({ signal }) =>
       apiGet<DiscoverMovieDetail>(
@@ -158,58 +167,62 @@ export function useDiscoverMovie(id: string, enabled = true) {
         signal
       ),
     enabled,
-    staleTime: 5 * 60_000,
-    retry: false,
-    refetchOnWindowFocus: false
+    staleTime: 5 * 60_000
   })
 }
 
 export function useDiscoverMagnets(id: string) {
   return useQuery({
+    ...discoverQueryDefaults,
     queryKey: discoverKeys.magnets(id),
-    queryFn: () =>
-      apiGet<DiscoverMagnet[]>(`/api/discover/movies/${encodeURIComponent(id)}/magnets`),
-    staleTime: 5 * 60_000,
-    retry: false,
-    refetchOnWindowFocus: false
+    queryFn: ({ signal }) =>
+      apiGet<DiscoverMagnet[]>(
+        `/api/discover/movies/${encodeURIComponent(id)}/magnets`,
+        undefined,
+        signal
+      ),
+    staleTime: 60_000
   })
 }
 
 export function useSearchMovies(params: SearchMoviesParams) {
   const query = params.query.trim()
   return useQuery({
+    ...discoverQueryDefaults,
     queryKey: discoverKeys.search({ ...params, query }),
-    queryFn: () =>
-      apiGet<DiscoverMovie[]>('/api/discover/search', {
-        q: query,
-        zone: params.zone,
-        sort: params.sort,
-        filter_by: params.filterBy,
-        page: params.page,
-        limit: params.limit
-      }),
+    queryFn: ({ signal }) =>
+      apiGet<DiscoverMovie[]>(
+        '/api/discover/search',
+        {
+          q: query,
+          zone: params.zone,
+          sort: params.sort,
+          filter_by: params.filterBy,
+          page: params.page,
+          limit: params.limit
+        },
+        signal
+      ),
     enabled: query.length > 0,
-    placeholderData: keepPreviousData,
-    retry: false,
-    refetchOnWindowFocus: false
+    placeholderData: keepPreviousData
   })
 }
 
 export function useDiscoverTags(zone: JavDBZone, enabled = true) {
   return useQuery({
+    ...discoverQueryDefaults,
     queryKey: discoverKeys.tags(zone),
-    queryFn: () => apiGet<TagCategory[]>('/api/discover/tags', { zone }),
+    queryFn: ({ signal }) => apiGet<TagCategory[]>('/api/discover/tags', { zone }, signal),
     enabled,
-    retry: false,
-    refetchOnWindowFocus: false
+    staleTime: 24 * 60 * 60_000
   })
 }
 
 export function useJavDBRoute() {
   return useQuery({
+    ...discoverQueryDefaults,
     queryKey: discoverKeys.route,
-    queryFn: () => apiGet<JavDBRouteStatus>('/api/javdb/route'),
-    refetchOnWindowFocus: false
+    queryFn: ({ signal }) => apiGet<JavDBRouteStatus>('/api/javdb/route', undefined, signal)
   })
 }
 

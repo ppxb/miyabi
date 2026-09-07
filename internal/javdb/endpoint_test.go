@@ -225,9 +225,8 @@ func TestResolveMovieIDKeepsLetterVariantsDistinct(t *testing.T) {
 	}
 }
 
-func TestTagsMergesEnglishAndTraditionalChineseByID(t *testing.T) {
+func TestTagsOnlyRequestsTraditionalChinese(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v2/tags|en":    fixtureFile(t, "tags_en.json"),
 		"/api/v2/tags|zh-TW": fixtureFile(t, "tags_zh.json"),
 	}}
 	client := clientWithTransport(transport)
@@ -236,15 +235,14 @@ func TestTagsMergesEnglishAndTraditionalChineseByID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(categories) != 1 || categories[0].Name != "Body" || categories[0].NameZHT != "身材" {
+	if len(categories) != 1 || categories[0].ID != "category-1" || categories[0].Name != "身材" {
 		t.Fatalf("categories = %#v", categories)
 	}
-	if len(categories[0].Tags) != 2 || categories[0].Tags[0].NameZHT != "高挑" ||
-		categories[0].Tags[0].CategoryID != "category-1" {
+	if len(categories[0].Tags) != 2 || categories[0].Tags[0].Name != "高挑" ||
+		categories[0].Tags[0].ID != "tag-1" {
 		t.Fatalf("tags = %#v", categories[0].Tags)
 	}
-	if len(transport.calls) != 2 || transport.calls[0].language != "en" ||
-		transport.calls[1].language != defaultLanguage {
+	if len(transport.calls) != 1 || transport.calls[0].language != defaultLanguage {
 		t.Fatalf("calls = %#v", transport.calls)
 	}
 }

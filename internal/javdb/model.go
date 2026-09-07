@@ -123,12 +123,17 @@ type Tag struct {
 	CategoryID string `json:"category_id"`
 }
 
-// TagCategory groups the bilingual tag taxonomy returned by JavDB.
+// TagOption is a content tag or a browse option such as year or resource type.
+type TagOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// TagCategory groups the Traditional Chinese taxonomy returned by JavDB.
 type TagCategory struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	NameZHT string `json:"name_zht"`
-	Tags    []Tag  `json:"tags"`
+	ID   string      `json:"id"`
+	Name string      `json:"name"`
+	Tags []TagOption `json:"tags"`
 }
 
 type Series struct {

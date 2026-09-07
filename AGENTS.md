@@ -140,7 +140,7 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 - 列表：`id`、`number`、`title`、`origin_title`、`release_date`、`duration`、`thumb_url`、`cover_url`、`preview_images`、`magnets_count`、字幕/预览标志。
 - 详情：列表字段以及 `score`、演员、标签、系列、厂牌、导演、预览图、预览视频。
 - 演员详情还可返回头像、繁中名、生日、出生地、身高、三围、罩杯、血型和社交账号；第一阶段只持久化媒体库和列表需要的字段，其余按需请求。
-- taxonomy 实测有码区为 11 个分类、355 个标签；英文与繁中数据以标签 ID 对齐。
+- taxonomy 实测有码区为 11 个分类、355 个标签；只请求繁中数据，保留标签 ID。
 - 磁力：`hash`、`name`、`size`、`cnsub`、`hd`、`files_count`、`created_at`。提交 115 时自行从 hash 构造标准 magnet URI，不依赖第三方跳转 URL。
 - `duration` 在 26 部跨年份、跨分区样本中覆盖 26/26，可作为稳定字段，单位为分钟。
 - `summary` 在 26 部样本中繁中仅 8/26 非空，近期有码、无码和 FC2 样本均为 0，且出现与影片演员不一致的错误内容。项目明确丢弃该字段，不寻找其他剧情替代字段。
@@ -150,7 +150,7 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 - 请求携带 App 版本、Android 设备参数、稳定 `device_uuid`、`jdsignature` 和 `Dart/3.4 (dart:io)` User-Agent。
 - 签名常量、App 版本和设备 profile 集中定义，使用 golden vector 测试，不散落在业务代码。
 - 影片详情默认使用 `zh-TW`。实测 `en` 的剧情均为空，`ja` 与 `zh-TW` 完全相同，视为回退而非独立日文数据，不实现 `ja` 模式。
-- taxonomy 可分别获取 `en` 与 `zh-TW`，按 ID 合并，以支持中文展示和英文别名搜索。
+- taxonomy 只获取 `zh-TW`，使用单一 `name` 字段展示分类和选项，不请求英文数据或合并别名。
 - JavDB 是 Resty 约定的唯一例外：使用 `tls-client` 的 Chrome profile。不要自己实现 TLS 指纹，也不要为了形式统一强行套入 Resty。
 
 ### 自动线路
@@ -176,7 +176,7 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 
 **播放**：请求时实时调用 `pan.Client.PlayURL` 取直链或 m3u8，不落库。直链需带 115 指定 User-Agent，由 `/api/play/:id/stream` 反向代理解决。
 
-**离线下载**：用户在发现页或影片详情选择 JavDB 返回的磁力 → service 从 hash 构造 magnet URI → `pan.Client.AddOffline` → 写 Task（保留 code、javdb_id、hash）→ worker 定时轮询 → 完成后触发目录扫描与刮削。核心流程不要求用户手动粘贴磁力或上传 torrent。
+**离线下载**：用户在发现页或影片详情选择 JavDB 返回的磁力 → service 从 hash 构造 magnet URI → `pan.Client.AddOffline` → 写 Task（type 为 offline，payload.code 在写入时规范化，同时保留 javdb_id、hash）→ worker 定时轮询 → 完成后触发目录扫描与刮削。核心流程不要求用户手动粘贴磁力或上传 torrent。
 
 ## 约定
 

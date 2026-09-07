@@ -38,7 +38,8 @@ type routeResult struct {
 	ReusedCached bool
 }
 
-type probe func(context.Context, string) (time.Duration, map[string]any, error)
+// onStart records the request start after transport construction.
+type probe func(context.Context, string, func(time.Time)) (time.Duration, map[string]any, error)
 
 type probeResult struct {
 	host    string
@@ -47,108 +48,128 @@ type probeResult struct {
 	err     error
 }
 
+type probeEvent struct {
+	probeResult
+	started time.Time
+}
+
+type runningProbe struct {
+	started time.Time
+	cancel  context.CancelFunc
+}
+
 func selectRoute(ctx context.Context, cachedHost string, check probe) (routeResult, error) {
 	if cachedHost != "" {
 		host, err := normalizeHost(cachedHost)
 		if err != nil {
 			return routeResult{}, fmt.Errorf("cached JavDB host: %w", err)
 		}
-		latency, _, err := check(ctx, host)
-		if err == nil {
-			return routeResult{Host: host, Latency: latency, ReusedCached: true}, nil
-		}
+		latency, _, err := check(ctx, host, nil)
 		if ctx.Err() != nil {
 			return routeResult{}, ctx.Err()
 		}
-	}
-
-	bootstrapResults := probeAll(ctx, bootstrapHosts, check)
-	if ctx.Err() != nil {
-		return routeResult{}, ctx.Err()
-	}
-
-	var dynamicCandidates []string
-	var discoveryErrors []error
-	for _, result := range bootstrapResults {
-		if result.err != nil {
-			discoveryErrors = append(discoveryErrors, fmt.Errorf("%s: %w", result.host, result.err))
-			continue
-		}
-		hosts, err := apiHostsFromStartup(result.startup)
-		if err != nil {
-			discoveryErrors = append(discoveryErrors, fmt.Errorf("%s: %w", result.host, err))
-			continue
-		}
-		if len(hosts) != 0 && len(dynamicCandidates) == 0 {
-			dynamicCandidates = hosts
-			break
+		if err == nil {
+			return routeResult{Host: host, Latency: latency, ReusedCached: true}, nil
 		}
 	}
 
-	known := make(map[string]probeResult, len(bootstrapResults))
-	for _, result := range bootstrapResults {
-		known[result.host] = result
-	}
-	var pending []string
-	for _, host := range dynamicCandidates {
-		if _, ok := known[host]; !ok {
-			pending = append(pending, host)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	events := make(chan probeEvent)
+	running := make(map[string]*runningProbe)
+	seen := make(map[string]bool)
+	known := make(map[string]probeResult)
+
+	start := func(host string) {
+		if seen[host] {
+			return
 		}
+		seen[host] = true
+		probeCtx, stop := context.WithCancel(ctx)
+		running[host] = &runningProbe{cancel: stop}
+		go func() {
+			latency, startup, err := check(probeCtx, host, func(started time.Time) {
+				select {
+				case events <- probeEvent{probeResult: probeResult{host: host}, started: started}:
+				case <-ctx.Done():
+				}
+			})
+			select {
+			case events <- probeEvent{probeResult: probeResult{host: host, latency: latency, startup: startup, err: err}}:
+			case <-ctx.Done():
+			}
+		}()
 	}
-	for _, result := range probeAll(ctx, pending, check) {
-		known[result.host] = result
-	}
-	if ctx.Err() != nil {
-		return routeResult{}, ctx.Err()
+	for _, host := range bootstrapHosts {
+		start(host)
 	}
 
-	candidates := make([]string, 0, len(dynamicCandidates)+len(bootstrapHosts))
-	seen := make(map[string]bool, cap(candidates))
-	for _, host := range append(dynamicCandidates, bootstrapHosts...) {
-		if !seen[host] {
-			seen[host] = true
-			candidates = append(candidates, host)
+	var dynamic []string
+	var failures []error
+	var best probeResult
+	ticker := time.NewTicker(5 * time.Millisecond)
+	defer ticker.Stop()
+	for len(running) > 0 {
+		select {
+		case <-ctx.Done():
+			return routeResult{}, ctx.Err()
+		case event := <-events:
+			state := running[event.host]
+			if !event.started.IsZero() {
+				state.started = event.started
+				continue
+			}
+			state.cancel()
+			delete(running, event.host)
+			result := event.probeResult
+			known[result.host] = result
+			if result.err != nil {
+				failures = append(failures, fmt.Errorf("%s: %w", result.host, result.err))
+				continue
+			}
+			if best.host == "" || result.latency < best.latency {
+				best = result
+			}
+			if len(dynamic) == 0 {
+				hosts, err := apiHostsFromStartup(result.startup)
+				if err != nil {
+					failures = append(failures, fmt.Errorf("%s: %w", result.host, err))
+				} else if len(hosts) > 0 {
+					dynamic = hosts
+					for _, host := range dynamic {
+						start(host)
+					}
+				}
+			}
+		case <-ticker.C:
+			// Until a dynamic source is found, a slow bootstrap may still be
+			// the only source. Construction time never counts as request latency.
+			if len(dynamic) > 0 && best.host != "" {
+				now := time.Now()
+				for _, state := range running {
+					if !state.started.IsZero() && now.Sub(state.started) > best.latency {
+						state.cancel()
+					}
+				}
+			}
 		}
 	}
+	if err := ctx.Err(); err != nil {
+		return routeResult{}, err
+	}
 
+	// Ties follow dynamic response order, then the fixed bootstrap order.
 	var selected probeResult
-	for _, host := range candidates {
+	for _, host := range append(dynamic, bootstrapHosts...) {
 		result := known[host]
-		if result.err != nil {
-			continue
-		}
-		if selected.host == "" || result.latency < selected.latency {
+		if result.err == nil && (selected.host == "" || result.latency < selected.latency) {
 			selected = result
 		}
 	}
 	if selected.host == "" {
-		if len(discoveryErrors) == 0 {
-			return routeResult{}, errors.New("no JavDB route responded successfully")
-		}
-		return routeResult{}, fmt.Errorf("select JavDB route: %w", errors.Join(discoveryErrors...))
+		return routeResult{}, fmt.Errorf("select JavDB route: %w", errors.Join(failures...))
 	}
 	return routeResult{Host: selected.host, Latency: selected.latency}, nil
-}
-
-func probeAll(ctx context.Context, hosts []string, check probe) []probeResult {
-	results := make(chan probeResult, len(hosts))
-	for _, host := range hosts {
-		go func() {
-			latency, startup, err := check(ctx, host)
-			results <- probeResult{host: host, latency: latency, startup: startup, err: err}
-		}()
-	}
-
-	collected := make([]probeResult, 0, len(hosts))
-	for range hosts {
-		select {
-		case <-ctx.Done():
-			return collected
-		case result := <-results:
-			collected = append(collected, result)
-		}
-	}
-	return collected
 }
 
 func apiHostsFromStartup(startup map[string]any) ([]string, error) {

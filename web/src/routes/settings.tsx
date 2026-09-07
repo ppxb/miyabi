@@ -1,8 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { CloudIcon, DatabaseIcon, ListChecksIcon } from 'lucide-react'
 
 import { AppPage } from '@/components/app-page'
 import { PageHeader } from '@/components/page-header'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 import { JavDBSection } from '@/features/settings/javdb-section'
+import { PrivacySection } from '@/features/settings/privacy-section'
+import { SettingRow, SettingsSection } from '@/features/settings/shared'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage
@@ -13,46 +18,31 @@ function SettingsPage() {
     <AppPage contentClassName="max-w-5xl gap-8" showBackTop={false}>
       <PageHeader title="设置" description="管理 115、JavDB 和本地应用选项" />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <SettingsPreview
-          title="115 网盘"
-          description="登录账号、媒体目录和扫描选项"
-          status="即将接入"
-        />
-        <JavDBSection />
-        <SettingsPreview
-          title="任务与缓存"
-          description="查看扫描、刮削和下载任务进度"
-          status="即将接入"
-        />
-        <SettingsPreview
-          title="数据目录"
-          description="管理 SQLite 索引和图片缓存位置"
-          status="即将接入"
-        />
-      </div>
+      <Card>
+        <CardContent className="space-y-8">
+          <PrivacySection />
+          <hr className="border-border" />
+          <JavDBSection />
+          <hr className="border-border" />
+          <SettingsSection icon={<CloudIcon className="size-4" />} title="115 网盘">
+            <SettingRow title="账号与媒体目录" description="登录账号、选择媒体目录和管理扫描选项">
+              <Badge variant="secondary">即将接入</Badge>
+            </SettingRow>
+          </SettingsSection>
+          <hr className="border-border" />
+          <SettingsSection icon={<ListChecksIcon className="size-4" />} title="任务">
+            <SettingRow title="任务进度" description="查看扫描、刮削和下载任务进度">
+              <Badge variant="secondary">即将接入</Badge>
+            </SettingRow>
+          </SettingsSection>
+          <hr className="border-border" />
+          <SettingsSection icon={<DatabaseIcon className="size-4" />} title="数据与缓存">
+            <SettingRow title="数据目录" description="管理 SQLite 索引和图片缓存位置">
+              <Badge variant="secondary">即将接入</Badge>
+            </SettingRow>
+          </SettingsSection>
+        </CardContent>
+      </Card>
     </AppPage>
-  )
-}
-
-type SettingsPreviewProps = {
-  title: string
-  description: string
-  status: string
-}
-
-function SettingsPreview({ title, description, status }: SettingsPreviewProps) {
-  return (
-    <section className="rounded-3xl border border-border/70 bg-card/40 p-5 shadow-sm shadow-black/5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="font-semibold">{title}</h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
-        </div>
-        <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-          {status}
-        </span>
-      </div>
-    </section>
   )
 }

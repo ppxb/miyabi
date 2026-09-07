@@ -2,9 +2,13 @@ package javdb
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"encoding/base64"
 	"errors"
 	"reflect"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -29,7 +33,7 @@ func TestAPIHostsFromStartup(t *testing.T) {
 }
 
 func TestSelectRouteReusesCachedHost(t *testing.T) {
-	check := func(_ context.Context, host string) (time.Duration, map[string]any, error) {
+	check := func(_ context.Context, host string, _ func(time.Time)) (time.Duration, map[string]any, error) {
 		if host != "https://cached.example" {
 			t.Fatalf("unexpected host %q", host)
 		}
@@ -45,7 +49,7 @@ func TestSelectRouteReusesCachedHost(t *testing.T) {
 }
 
 func TestSelectRouteChoosesFastestDynamicHost(t *testing.T) {
-	check := func(_ context.Context, host string) (time.Duration, map[string]any, error) {
+	check := func(_ context.Context, host string, _ func(time.Time)) (time.Duration, map[string]any, error) {
 		switch host {
 		case bootstrapHosts[0]:
 			return 20 * time.Millisecond, map[string]any{"backup_domains_data": encryptedBackupDomains}, nil
@@ -70,7 +74,7 @@ func TestSelectRouteChoosesFastestDynamicHost(t *testing.T) {
 }
 
 func TestSelectRouteFallsBackToFastestBootstrap(t *testing.T) {
-	check := func(_ context.Context, host string) (time.Duration, map[string]any, error) {
+	check := func(_ context.Context, host string, _ func(time.Time)) (time.Duration, map[string]any, error) {
 		switch host {
 		case bootstrapHosts[0]:
 			return 30 * time.Millisecond, nil, nil
@@ -95,4 +99,103 @@ func TestAPIHostsFromStartupAllowsMissingDynamicData(t *testing.T) {
 	if err != nil || len(hosts) != 0 {
 		t.Fatalf("hosts = %v, error = %v", hosts, err)
 	}
+}
+
+func TestSelectRouteStartsDynamicProbesBeforeSlowBootstrapsFinish(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		const dynamicHost = "https://dynamic.example"
+		startup := startupWithDynamicHost(t, dynamicHost)
+		check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, map[string]any, error) {
+			onStart(time.Now())
+			switch host {
+			case bootstrapHosts[0]:
+				time.Sleep(10 * time.Millisecond)
+				return 10 * time.Millisecond, startup, nil
+			case dynamicHost:
+				time.Sleep(2 * time.Millisecond)
+				return 2 * time.Millisecond, nil, nil
+			default:
+				<-ctx.Done()
+				return 0, nil, ctx.Err()
+			}
+		}
+		started := time.Now()
+		result, err := selectRoute(t.Context(), "", check)
+		if err != nil || result.Host != dynamicHost || time.Since(started) > 20*time.Millisecond {
+			t.Fatalf("selection = %+v, error = %v, duration = %v", result, err, time.Since(started))
+		}
+	})
+}
+
+func TestSelectRouteDoesNotCountTransportConstructionAsLatency(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, map[string]any, error) {
+			if host == bootstrapHosts[2] {
+				time.Sleep(60 * time.Millisecond)
+			}
+			onStart(time.Now())
+			switch host {
+			case bootstrapHosts[0]:
+				time.Sleep(20 * time.Millisecond)
+				return 20 * time.Millisecond, map[string]any{"backup_domains_data": encryptedBackupDomains}, nil
+			case bootstrapHosts[2]:
+				time.Sleep(5 * time.Millisecond)
+				return 5 * time.Millisecond, nil, nil
+			default:
+				<-ctx.Done()
+				return 0, nil, ctx.Err()
+			}
+		}
+		result, err := selectRoute(t.Context(), "", check)
+		if err != nil || result.Host != bootstrapHosts[2] || result.Latency != 5*time.Millisecond {
+			t.Fatalf("selection = %+v, error = %v", result, err)
+		}
+	})
+}
+
+func TestSelectRouteWaitsForDynamicSourceEvenWhenBootstrapIsSlow(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		const dynamicHost = "https://dynamic.example"
+		startup := startupWithDynamicHost(t, dynamicHost)
+		check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, map[string]any, error) {
+			onStart(time.Now())
+			switch host {
+			case bootstrapHosts[0]:
+				time.Sleep(5 * time.Millisecond)
+				return 5 * time.Millisecond, nil, nil
+			case bootstrapHosts[1]:
+				select {
+				case <-time.After(50 * time.Millisecond):
+					return 50 * time.Millisecond, startup, nil
+				case <-ctx.Done():
+					return 0, nil, ctx.Err()
+				}
+			case dynamicHost:
+				time.Sleep(time.Millisecond)
+				return time.Millisecond, nil, nil
+			default:
+				return 0, nil, errors.New("offline")
+			}
+		}
+		result, err := selectRoute(t.Context(), "", check)
+		if err != nil || result.Host != dynamicHost {
+			t.Fatalf("selection = %+v, error = %v", result, err)
+		}
+	})
+}
+
+func startupWithDynamicHost(t *testing.T, host string) map[string]any {
+	t.Helper()
+	plain := []byte(`{"apiDomains":["` + host + `"]}`)
+	padding := aes.BlockSize - len(plain)%aes.BlockSize
+	for range padding {
+		plain = append(plain, byte(padding))
+	}
+	block, err := aes.NewCipher(backupKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encrypted := make([]byte, len(plain))
+	cipher.NewCBCEncrypter(block, backupIV).CryptBlocks(encrypted, plain)
+	return map[string]any{"backup_domains_data": base64.StdEncoding.EncodeToString(encrypted)}
 }

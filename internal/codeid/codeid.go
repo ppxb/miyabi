@@ -6,68 +6,60 @@ import (
 	"strings"
 )
 
-var (
-	// FC2 numbers are commonly written as FC2-PPV-1234567, FC2PPV1234567,
-	// or FC2-1234567.  PPV is part of the canonical form for all of them.
-	fc2Pattern = regexp.MustCompile(`(?i)(?:^|[^a-z0-9])fc2[-_. ]*(?:ppv)?[-_. ]*([0-9]{3,8})(?:[^a-z0-9]|$)`)
-
-	// A separator is optional in a few release names, but when present it is
-	// the most reliable way to distinguish a catalogue number from a title.
-	// A trailing letter is part of the catalogue number, as in FJIN-106a.
-	separatedPattern = regexp.MustCompile(`(?i)(?:^|[^a-z0-9])([a-z][a-z0-9]{0,11}|[0-9][a-z][a-z0-9]{0,10})[-_. ]+([0-9]{2,7})([a-z]?)(?:[^a-z0-9]|$)`)
-
-	// Compact numbers such as SSIS001 and 1PONDO123456 have no separator.
-	// The two alternatives account for prefixes that start with a letter and
-	// prefixes that start with a digit (for example 1PONDO).
-	compactPattern = regexp.MustCompile(`(?i)(?:^|[^a-z0-9])(?:([a-z][a-z0-9]{1,10}?)([0-9]{2,7})|([0-9][a-z][a-z0-9]{0,10}?)([0-9]{2,7}))([a-z]?)(?:[^a-z0-9]|$)`)
+const (
+	prefix        = `(?:[A-Z][A-Z0-9]{0,11}|[0-9]{1,4}[A-Z][A-Z0-9]{0,10})`
+	compactPrefix = `(?:[A-Z]{1,12}|[0-9]{1,4}[A-Z]{1,11})`
+	fc2Number     = `FC2[-_. ]*(?:PPV)?[-_. ]*[0-9]{3,8}`
 )
 
-// Parse extracts the first catalogue number from name.
-//
-// The returned number is already normalized.  A false result means that the
-// filename does not contain a supported number.
+var (
+	separators       = strings.NewReplacer("－", "-", "﹣", "-", "–", "-", "—", "-", "＿", "_")
+	delimiters       = regexp.MustCompile(`[-_. ]+`)
+	fc2Pattern       = regexp.MustCompile(`^FC2[-_. ]*(?:PPV)?[-_. ]*([0-9]{3,8})$`)
+	numericPattern   = regexp.MustCompile(`^([0-9]{6})[-_]([0-9]{2,3})$`)
+	separatedPattern = regexp.MustCompile(`^(` + prefix + `)[-_. ]+([0-9]{2,7}[A-Z]?(?:[-_][0-9]{2,3})*)$`)
+	compactPattern   = regexp.MustCompile(`^(` + compactPrefix + `)([0-9]{2,7}[A-Z]?(?:[-_][0-9]{2,3})*)$`)
+
+	// Six-digit date codes keep their second numeric segment. Other trailing
+	// segments in filenames (SSIS-589-02, for example) identify a video part.
+	filenamePattern = regexp.MustCompile(`(?:^|[^A-Z0-9])(` +
+		fc2Number + `|` +
+		prefix + `[-_. ]*[0-9]{6}[-_][0-9]{2,3}|` +
+		`[0-9]{6}[-_][0-9]{2,3}|` +
+		prefix + `[-_. ]+[0-9]{2,7}[A-Z]?|` +
+		compactPrefix + `[0-9]{2,7}[A-Z]?)(?:[^A-Z0-9]|$)`)
+	domainNoise = regexp.MustCompile(`(?:\[(?:[A-Z0-9-]+\.)+[A-Z]{2,}\]|(?:HTTPS?://)?(?:[A-Z0-9-]+\.)+[A-Z]{2,}[@/\\])`)
+	codecNoise  = regexp.MustCompile(`\b[HX][ ._-]?26[45]\b`)
+)
+
+// Parse extracts a catalogue number from a filename, discarding website,
+// encoding, subtitle and video-part annotations.
 func Parse(name string) (string, bool) {
-	name = normalizeSeparators(name)
-
-	if match := fc2Pattern.FindStringSubmatch(name); match != nil {
-		return normalizeFC2(match[1]), true
+	name = strings.ToUpper(separators.Replace(name))
+	name = domainNoise.ReplaceAllString(name, " ")
+	name = codecNoise.ReplaceAllString(name, " ")
+	match := filenamePattern.FindStringSubmatch(name)
+	if match == nil {
+		return "", false
 	}
-	if match := separatedPattern.FindStringSubmatch(name); match != nil {
-		return normalizeParts(match[1], match[2]+match[3]), true
-	}
-	if match := compactPattern.FindStringSubmatch(name); match != nil {
-		if match[1] != "" {
-			return normalizeParts(match[1], match[2]+match[5]), true
-		}
-		return normalizeParts(match[3], match[4]+match[5]), true
-	}
-
-	return "", false
+	code := Normalize(match[1])
+	return code, code != ""
 }
 
-// Normalize converts a catalogue number to its canonical spelling.
-// Invalid or empty input returns an empty string.
+// Normalize canonicalizes a complete catalogue number. It does not extract a
+// number from filenames or discard suffixes; those belong to Parse.
 func Normalize(raw string) string {
-	if code, ok := Parse(raw); ok {
-		return code
+	value := strings.ToUpper(strings.TrimSpace(separators.Replace(raw)))
+	if match := fc2Pattern.FindStringSubmatch(value); match != nil {
+		return "FC2-PPV-" + match[1]
+	}
+	if match := numericPattern.FindStringSubmatch(value); match != nil {
+		return match[1] + "-" + match[2]
+	}
+	for _, pattern := range []*regexp.Regexp{compactPattern, separatedPattern} {
+		if match := pattern.FindStringSubmatch(value); match != nil {
+			return match[1] + "-" + delimiters.ReplaceAllString(match[2], "-")
+		}
 	}
 	return ""
-}
-
-func normalizeFC2(number string) string {
-	return "FC2-PPV-" + number
-}
-
-func normalizeParts(prefix, number string) string {
-	return strings.ToUpper(prefix + "-" + number)
-}
-
-func normalizeSeparators(value string) string {
-	return strings.NewReplacer(
-		"－", "-",
-		"﹣", "-",
-		"–", "-",
-		"—", "-",
-		"＿", "_",
-	).Replace(value)
 }

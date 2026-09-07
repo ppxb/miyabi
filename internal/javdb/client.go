@@ -26,12 +26,14 @@ type jsonTransport interface {
 
 // Client is the anonymous JavDB App API client.
 type Client struct {
-	options     Options
-	limiter     *rate.Limiter
-	media       *resty.Client
-	current     atomic.Pointer[routeState]
-	routes      singleflight.Group
-	selectRoute func(context.Context, string) (*routeState, error)
+	options      Options
+	limiter      *rate.Limiter
+	media        *resty.Client
+	current      atomic.Pointer[routeState]
+	routes       singleflight.Group
+	routeContext context.Context
+	stopRoutes   context.CancelFunc
+	selectRoute  func(context.Context, string) (*routeState, error)
 }
 
 func New(options Options) (*Client, error) {
@@ -44,22 +46,26 @@ func New(options Options) (*Client, error) {
 	if options.Timeout < 0 {
 		return nil, errors.New("JavDB timeout must not be negative")
 	}
-	requestsPerSecond := options.RequestsPerSecond
-	if requestsPerSecond == 0 {
-		requestsPerSecond = defaultRate
+	if options.Timeout == 0 {
+		options.Timeout = defaultTimeout
 	}
-	burst := options.Burst
-	if burst == 0 {
-		burst = defaultBurst
+	if options.RequestsPerSecond == 0 {
+		options.RequestsPerSecond = defaultRate
 	}
-	if requestsPerSecond < 0 || burst < 0 {
+	if options.Burst == 0 {
+		options.Burst = defaultBurst
+	}
+	if options.RequestsPerSecond < 0 || options.Burst < 0 {
 		return nil, errors.New("JavDB rate limit must not be negative")
 	}
 
+	routeContext, stopRoutes := context.WithCancel(context.Background())
 	client := &Client{
-		options: options,
-		limiter: rate.NewLimiter(rate.Limit(requestsPerSecond), burst),
-		media:   newMediaClient(options),
+		options:      options,
+		limiter:      rate.NewLimiter(rate.Limit(options.RequestsPerSecond), options.Burst),
+		media:        newMediaClient(options),
+		routeContext: routeContext,
+		stopRoutes:   stopRoutes,
 	}
 	client.selectRoute = client.selectAndInstall
 	return client, nil
@@ -82,13 +88,13 @@ func (c *Client) Initialize(ctx context.Context) error {
 
 // Reselect runs a full route selection and replaces the active route on success.
 func (c *Client) Reselect(ctx context.Context) (RouteStatus, error) {
-	value, err, _ := c.routes.Do("route", func() (any, error) {
+	state, err := c.waitRoute(ctx, func(ctx context.Context) (*routeState, error) {
 		return c.selectRoute(ctx, "")
 	})
 	if err != nil {
 		return RouteStatus{}, err
 	}
-	return value.(*routeState).status, nil
+	return state.status, nil
 }
 
 // Route returns the active route, if the client has been initialized.
@@ -102,6 +108,7 @@ func (c *Client) Route() (RouteStatus, bool) {
 
 // Close releases idle API and image connections.
 func (c *Client) Close() {
+	c.stopRoutes()
 	c.media.GetClient().CloseIdleConnections()
 	if state := c.current.Load(); state != nil {
 		state.transport.closeIdleConnections()
@@ -141,29 +148,43 @@ func (c *Client) ensureRoute(ctx context.Context) (*routeState, error) {
 	if state := c.current.Load(); state != nil {
 		return state, nil
 	}
-	value, err, _ := c.routes.Do("route", func() (any, error) {
+	return c.waitRoute(ctx, func(ctx context.Context) (*routeState, error) {
 		if state := c.current.Load(); state != nil {
 			return state, nil
 		}
 		return c.selectRoute(ctx, c.options.CachedHost)
 	})
-	if err != nil {
-		return nil, err
-	}
-	return value.(*routeState), nil
 }
 
 func (c *Client) replaceFailedRoute(ctx context.Context, failed *routeState) (*routeState, error) {
-	value, err, _ := c.routes.Do("route", func() (any, error) {
+	return c.waitRoute(ctx, func(ctx context.Context) (*routeState, error) {
 		if current := c.current.Load(); current != failed {
 			return current, nil
 		}
 		return c.selectRoute(ctx, "")
 	})
-	if err != nil {
+}
+
+func (c *Client) waitRoute(ctx context.Context, selectRoute func(context.Context) (*routeState, error)) (*routeState, error) {
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return value.(*routeState), nil
+	result := c.routes.DoChan("route", func() (any, error) {
+		// Selection belongs to the long-lived client. A browser leaving only
+		// cancels its own wait; cached, bootstrap and dynamic probes are bounded.
+		shared, cancel := context.WithTimeout(c.routeContext, 3*c.options.Timeout)
+		defer cancel()
+		return selectRoute(shared)
+	})
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case selected := <-result:
+		if selected.Err != nil {
+			return nil, selected.Err
+		}
+		return selected.Val.(*routeState), nil
+	}
 }
 
 func (c *Client) selectAndInstall(ctx context.Context, cachedHost string) (*routeState, error) {
@@ -173,6 +194,10 @@ func (c *Client) selectAndInstall(ctx context.Context, cachedHost string) (*rout
 	}
 	transport, err := newTransport(result.Host, c.options)
 	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		transport.closeIdleConnections()
 		return nil, err
 	}
 	state := &routeState{
@@ -189,7 +214,7 @@ func (c *Client) selectAndInstall(ctx context.Context, cachedHost string) (*rout
 	return state, nil
 }
 
-func (c *Client) probe(ctx context.Context, host string) (time.Duration, map[string]any, error) {
+func (c *Client) probe(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, map[string]any, error) {
 	transport, err := newTransport(host, c.options)
 	if err != nil {
 		return 0, nil, err
@@ -197,6 +222,9 @@ func (c *Client) probe(ctx context.Context, host string) (time.Duration, map[str
 	defer transport.closeIdleConnections()
 
 	started := time.Now()
+	if onStart != nil {
+		onStart(started)
+	}
 	var startup map[string]any
 	if err := transport.getJSON(ctx, "/api/v1/startup", nil, defaultLanguage, &startup); err != nil {
 		return 0, nil, err

@@ -42,13 +42,8 @@ func newTransport(host string, options Options) (*transport, error) {
 	if err != nil {
 		return nil, err
 	}
-	timeout := options.Timeout
-	if timeout == 0 {
-		timeout = defaultTimeout
-	}
-
 	clientOptions := []tlsclient.HttpClientOption{
-		tlsclient.WithTimeoutSeconds(int(math.Ceil(timeout.Seconds()))),
+		tlsclient.WithTimeoutSeconds(int(math.Ceil(options.Timeout.Seconds()))),
 		tlsclient.WithClientProfile(profiles.Chrome_120),
 		tlsclient.WithNotFollowRedirects(),
 		tlsclient.WithCookieJar(tlsclient.NewCookieJar()),

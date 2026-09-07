@@ -49,7 +49,8 @@ export function DiscoverContent() {
   const selectedCategory = categories.find(category => category.id === categoryID) ?? categories[0]
 
   const browse = useDiscoverMovies(
-    browseParams(view, zone, categoryID || selectedCategory?.id, tagID, page)
+    browseParams(view, zone, categoryID || selectedCategory?.id, tagID, page),
+    !searching
   )
   const search = useSearchMovies({ query: keyword, zone, sort: 'release', page, limit: PAGE_SIZE })
   const activeQuery = searching ? search : browse
@@ -252,7 +253,7 @@ function CategoryFilters({
           <SelectGroup>
             {categories.map(category => (
               <SelectItem key={category.id} value={category.id}>
-                {category.name_zht}
+                {category.name}
               </SelectItem>
             ))}
           </SelectGroup>
@@ -268,7 +269,7 @@ function CategoryFilters({
             <SelectItem value="all">全部标签</SelectItem>
             {selectedCategory?.tags.map(tag => (
               <SelectItem key={tag.id} value={tag.id}>
-                {tag.name_zht}
+                {tag.name}
               </SelectItem>
             ))}
           </SelectGroup>

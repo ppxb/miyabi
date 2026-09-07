@@ -22,8 +22,7 @@ test: web-build generate
 
 lint: generate
 	go vet ./...
-	pnpm --dir web typecheck
 	pnpm --dir web lint
 
 format-check:
-	pnpm --dir web format:check
+	pnpm --dir web fmt:check

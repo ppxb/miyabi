@@ -16,25 +16,9 @@ export function MovieRecommendations({
   movies: MovieReference[]
 }) {
   const visible = movies.slice(0, 8)
-  const sectionRef = useRef<HTMLElement>(null)
-  const [loadDetails, setLoadDetails] = useState(false)
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries.some(entry => entry.isIntersecting)) {
-          setLoadDetails(true)
-          observer.disconnect()
-        }
-      },
-      { rootMargin: '200px 0px' }
-    )
-    observer.observe(sectionRef.current!)
-    return () => observer.disconnect()
-  }, [])
 
   return (
-    <section ref={sectionRef} aria-labelledby={id} className="space-y-4">
+    <section aria-labelledby={id} className="space-y-4">
       <h2 id={id} className="text-xl font-semibold tracking-normal">
         {title}
       </h2>
@@ -43,7 +27,7 @@ export function MovieRecommendations({
       ) : (
         <MovieGridLayout>
           {visible.map(movie => (
-            <RecommendationCard key={movie.id} movie={movie} loadDetail={loadDetails} />
+            <RecommendationCard key={movie.id} movie={movie} />
           ))}
         </MovieGridLayout>
       )}
@@ -51,7 +35,38 @@ export function MovieRecommendations({
   )
 }
 
-function RecommendationCard({ movie, loadDetail }: { movie: MovieReference; loadDetail: boolean }) {
+function RecommendationCard({ movie }: { movie: MovieReference }) {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [loadDetail, setLoadDetail] = useState(false)
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          setLoadDetail(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '200px 0px' }
+    )
+    observer.observe(cardRef.current!)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div ref={cardRef} className="h-full min-w-0">
+      <RecommendationContent movie={movie} loadDetail={loadDetail} />
+    </div>
+  )
+}
+
+function RecommendationContent({
+  movie,
+  loadDetail
+}: {
+  movie: MovieReference
+  loadDetail: boolean
+}) {
   const detail = useDiscoverMovie(movie.id, loadDetail)
 
   if (detail.data) return <MovieCard movie={detail.data} />

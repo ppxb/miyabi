@@ -89,7 +89,7 @@ func (c *Client) ResolveMovieID(ctx context.Context, number string) (string, err
 
 	var matched string
 	for _, movie := range movies {
-		if codeid.Normalize(movie.Code) != wanted {
+		if movie.Code != wanted {
 			continue
 		}
 		if matched != "" {

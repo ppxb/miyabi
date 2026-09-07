@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/ent/setting"
+	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/javdb"
 )
 
@@ -69,9 +71,25 @@ func TestProjectMoviesAddsLibraryTaskAndReleaseState(t *testing.T) {
 	}
 	if _, err := store.Client.Task.Create().
 		SetType("offline").
-		SetPayload(map[string]any{"code": "abp002"}).
+		SetPayload(map[string]any{"code": "ABP-002"}).
 		Save(t.Context()); err != nil {
 		t.Fatal(err)
+	}
+
+	for _, item := range []struct {
+		kind    string
+		status  task.Status
+		payload map[string]any
+	}{
+		{"scrape", task.StatusRunning, map[string]any{"code": "ABP-003"}},
+		{"offline", task.StatusDone, map[string]any{"code": "ABP-003"}},
+		{"offline", task.StatusFailed, map[string]any{"code": "ABP-003"}},
+		{"offline", task.StatusQueued, map[string]any{"code": "ABP-999"}},
+		{"offline", task.StatusQueued, map[string]any{"code": 123}},
+	} {
+		if err := store.Client.Task.Create().SetType(item.kind).SetStatus(item.status).SetPayload(item.payload).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	today := time.Now().In(time.Local)
@@ -93,6 +111,58 @@ func TestProjectMoviesAddsLibraryTaskAndReleaseState(t *testing.T) {
 	}
 	if movies[2].State != MovieNotInLibrary || movies[2].ReleaseStatus != ReleaseUnknown {
 		t.Fatalf("remote movie = %#v", movies[2])
+	}
+}
+
+func TestProjectEmptyMoviesSkipsDatabase(t *testing.T) {
+	service := &DiscoverService{}
+	result, err := service.projectMovies(t.Context(), nil)
+	if err != nil || result == nil || len(result) != 0 {
+		t.Fatalf("empty projection = %#v, error = %v", result, err)
+	}
+}
+
+func TestCachedCatalogueStillReflectsCurrentLibraryAndTaskState(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	service, err := NewDiscoverService(t.Context(), store.Client, javdb.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+	loads := 0
+	project := func() MovieState {
+		t.Helper()
+		source, err := cachedJavDB(t.Context(), service, service.lists, "fixture", func(context.Context) ([]javdb.Movie, error) {
+			loads++
+			return []javdb.Movie{{ID: "fixture", Code: "ABP-001"}}, nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		movies, err := service.projectMovies(t.Context(), source)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return movies[0].State
+	}
+	if got := project(); got != MovieNotInLibrary {
+		t.Fatalf("initial state = %s", got)
+	}
+	if err := store.Client.Task.Create().SetType("offline").SetPayload(map[string]any{"code": "ABP-001"}).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got := project(); got != MovieSaving {
+		t.Fatalf("queued state = %s", got)
+	}
+	if err := store.Client.Movie.Create().SetCode("ABP-001").Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if got := project(); got != MovieInLibrary || loads != 1 {
+		t.Fatalf("scanned state = %s, loads = %d", got, loads)
 	}
 }
 

@@ -2,16 +2,15 @@ package service
 
 import (
 	"context"
-	"encoding/json"
-	"encoding/json/jsontext"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/ppxb/miyabi/internal/codeid"
+	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/movie"
-	"github.com/ppxb/miyabi/internal/ent/setting"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/javdb"
 )
@@ -69,6 +68,10 @@ type persistedRoute struct {
 type DiscoverService struct {
 	database *ent.Client
 	javdb    *javdb.Client
+	lists    *responseCache[[]javdb.Movie]
+	details  *responseCache[javdb.MovieDetail]
+	tags     *responseCache[[]javdb.TagCategory]
+	magnets  *responseCache[[]javdb.Magnet]
 
 	routeMu sync.RWMutex
 	route   JavDBRouteStatus
@@ -114,6 +117,10 @@ func NewDiscoverService(
 	return &DiscoverService{
 		database: database,
 		javdb:    client,
+		lists:    newResponseCache[[]javdb.Movie](128, time.Minute),
+		details:  newResponseCache[javdb.MovieDetail](256, 5*time.Minute),
+		tags:     newResponseCache[[]javdb.TagCategory](4, 24*time.Hour),
+		magnets:  newResponseCache[[]javdb.Magnet](64, time.Minute),
 		route: JavDBRouteStatus{
 			Host:      route.Host,
 			LatencyMS: route.LatencyMS,
@@ -130,12 +137,13 @@ func (service *DiscoverService) Search(
 	keyword string,
 	options javdb.SearchOptions,
 ) ([]DiscoverMovie, error) {
-	movies, err := service.javdb.Search(ctx, keyword, options)
+	keyword = strings.TrimSpace(keyword)
+	key := fmt.Sprintf("search:%q:%#v", keyword, options)
+	movies, err := cachedJavDB(ctx, service, service.lists, key, func(ctx context.Context) ([]javdb.Movie, error) {
+		return service.javdb.Search(ctx, keyword, options)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("search JavDB: %w", err)
-	}
-	if err := service.persistActiveRoute(ctx); err != nil {
-		return nil, err
 	}
 	return service.projectMovies(ctx, movies)
 }
@@ -144,23 +152,22 @@ func (service *DiscoverService) Browse(
 	ctx context.Context,
 	options javdb.BrowseOptions,
 ) ([]DiscoverMovie, error) {
-	movies, err := service.javdb.Browse(ctx, options)
+	key := fmt.Sprintf("browse:%#v", options)
+	movies, err := cachedJavDB(ctx, service, service.lists, key, func(ctx context.Context) ([]javdb.Movie, error) {
+		return service.javdb.Browse(ctx, options)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("browse JavDB: %w", err)
-	}
-	if err := service.persistActiveRoute(ctx); err != nil {
-		return nil, err
 	}
 	return service.projectMovies(ctx, movies)
 }
 
 func (service *DiscoverService) MovieDetail(ctx context.Context, movieID string) (DiscoverMovieDetail, error) {
-	movie, err := service.javdb.MovieDetail(ctx, movieID)
+	movie, err := cachedJavDB(ctx, service, service.details, movieID, func(ctx context.Context) (javdb.MovieDetail, error) {
+		return service.javdb.MovieDetail(ctx, movieID)
+	})
 	if err != nil {
 		return DiscoverMovieDetail{}, fmt.Errorf("get JavDB movie detail: %w", err)
-	}
-	if err := service.persistActiveRoute(ctx); err != nil {
-		return DiscoverMovieDetail{}, err
 	}
 	projected, err := service.projectMovies(ctx, []javdb.Movie{movie.Movie})
 	if err != nil {
@@ -173,12 +180,11 @@ func (service *DiscoverService) MovieDetail(ctx context.Context, movieID string)
 }
 
 func (service *DiscoverService) Magnets(ctx context.Context, movieID string) ([]DiscoverMagnet, error) {
-	magnets, err := service.javdb.Magnets(ctx, movieID)
+	magnets, err := cachedJavDB(ctx, service, service.magnets, movieID, func(ctx context.Context) ([]javdb.Magnet, error) {
+		return service.javdb.Magnets(ctx, movieID)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("get JavDB magnets: %w", err)
-	}
-	if err := service.persistActiveRoute(ctx); err != nil {
-		return nil, err
 	}
 	return projectMagnets(magnets), nil
 }
@@ -200,12 +206,11 @@ func (service *DiscoverService) Media(ctx context.Context, rawURL string) (javdb
 }
 
 func (service *DiscoverService) Tags(ctx context.Context, zone javdb.Zone) ([]javdb.TagCategory, error) {
-	categories, err := service.javdb.Tags(ctx, zone)
+	categories, err := cachedJavDB(ctx, service, service.tags, string(zone), func(ctx context.Context) ([]javdb.TagCategory, error) {
+		return service.javdb.Tags(ctx, zone)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("get JavDB tags: %w", err)
-	}
-	if err := service.persistActiveRoute(ctx); err != nil {
-		return nil, err
 	}
 	return categories, nil
 }
@@ -248,41 +253,39 @@ func (service *DiscoverService) projectMovies(
 	ctx context.Context,
 	source []javdb.Movie,
 ) ([]DiscoverMovie, error) {
+	if len(source) == 0 {
+		return []DiscoverMovie{}, nil
+	}
 	codes := make([]string, len(source))
+	taskCodes := make([]any, len(source))
 	for index, item := range source {
 		codes[index] = item.Code
+		taskCodes[index] = item.Code
 	}
 
 	inLibrary := make(map[string]bool, len(codes))
-	if len(codes) != 0 {
-		movies, err := service.database.Movie.Query().Where(movie.CodeIn(codes...)).All(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("query local movies: %w", err)
-		}
-		for _, item := range movies {
-			inLibrary[item.Code] = true
-		}
+	libraryCodes, err := service.database.Movie.Query().Where(movie.CodeIn(codes...)).Select(movie.FieldCode).Strings(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("query local movies: %w", err)
+	}
+	for _, code := range libraryCodes {
+		inLibrary[code] = true
 	}
 
 	saving := make(map[string]bool)
 	tasks, err := service.database.Task.Query().Where(
+		task.TypeEQ("offline"),
 		task.StatusIn(task.StatusQueued, task.StatusRunning),
-	).All(ctx)
+		func(selector *sql.Selector) {
+			selector.Where(sqljson.ValueIn(task.FieldPayload, taskCodes, sqljson.Path("code")))
+		},
+	).Select(task.FieldPayload).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("query active tasks: %w", err)
 	}
 	for _, item := range tasks {
-		value, ok := item.Payload["code"]
-		if !ok {
-			continue
-		}
-		code, ok := value.(string)
-		if !ok {
-			return nil, fmt.Errorf("task %d payload code is not a string", item.ID)
-		}
-		if normalized := codeid.Normalize(code); normalized != "" {
-			saving[normalized] = true
-		}
+		// The query only returns tasks whose canonical string code is on this page.
+		saving[item.Payload["code"].(string)] = true
 	}
 
 	now := time.Now().In(time.Local)
@@ -319,62 +322,25 @@ func (service *DiscoverService) projectMovies(
 }
 
 func (service *DiscoverService) persistActiveRoute(ctx context.Context) error {
+	service.routeMu.Lock()
+	defer service.routeMu.Unlock()
 	active, ok := service.javdb.Route()
 	if !ok {
 		return nil
 	}
 	route := persistedRoute{Host: active.Host, LatencyMS: active.Latency.Milliseconds()}
-	service.routeMu.RLock()
 	unchanged := service.route.Active && service.route.Host == route.Host &&
 		service.route.LatencyMS == route.LatencyMS
-	service.routeMu.RUnlock()
 	if unchanged {
 		return nil
 	}
 	if err := saveSetting(ctx, service.database, javdbRouteSetting, route); err != nil {
 		return fmt.Errorf("cache JavDB route: %w", err)
 	}
-	service.routeMu.Lock()
 	service.route = JavDBRouteStatus{
 		Host:      route.Host,
 		LatencyMS: route.LatencyMS,
 		Active:    true,
-	}
-	service.routeMu.Unlock()
-	return nil
-}
-
-func loadSetting[T any](
-	ctx context.Context,
-	database *ent.Client,
-	key string,
-) (T, bool, error) {
-	var value T
-	record, err := database.Setting.Query().Where(setting.Key(key)).Only(ctx)
-	if ent.IsNotFound(err) {
-		return value, false, nil
-	}
-	if err != nil {
-		return value, false, fmt.Errorf("load setting %s: %w", key, err)
-	}
-	if err := json.Unmarshal(record.Value, &value); err != nil {
-		return value, false, fmt.Errorf("decode setting %s: %w", key, err)
-	}
-	return value, true, nil
-}
-
-func saveSetting(ctx context.Context, database *ent.Client, key string, value any) error {
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Errorf("encode setting %s: %w", key, err)
-	}
-	if err := database.Setting.Create().
-		SetKey(key).
-		SetValue(jsontext.Value(encoded)).
-		OnConflictColumns(setting.FieldKey).
-		UpdateNewValues().
-		Exec(ctx); err != nil {
-		return fmt.Errorf("save setting %s: %w", key, err)
 	}
 	return nil
 }
