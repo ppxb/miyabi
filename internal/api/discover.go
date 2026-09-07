@@ -18,6 +18,7 @@ type Discoverer interface {
 	Media(context.Context, string) (javdb.Media, error)
 	Route() service.JavDBRouteStatus
 	Reselect(context.Context) (service.JavDBRouteStatus, error)
+	SelectRoute(context.Context, string) (service.JavDBRouteStatus, error)
 }
 
 type discoverSearchQuery struct {
@@ -53,6 +54,10 @@ type movieURI struct {
 
 type imageQuery struct {
 	URL string `form:"url" binding:"required,url"`
+}
+
+type javdbRouteInput struct {
+	Host string `json:"host" binding:"omitempty,url"`
 }
 
 func discoverSearchHandler(discover Discoverer) gin.HandlerFunc {
@@ -179,6 +184,22 @@ func javdbRouteHandler(discover Discoverer) gin.HandlerFunc {
 func javdbReselectHandler(discover Discoverer) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		status, err := discover.Reselect(c.Request.Context())
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		c.JSON(http.StatusOK, status)
+	}
+}
+
+func javdbSelectRouteHandler(discover Discoverer) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input javdbRouteInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.Error(BadRequest(err))
+			return
+		}
+		status, err := discover.SelectRoute(c.Request.Context(), input.Host)
 		if err != nil {
 			c.Error(err)
 			return

@@ -19,7 +19,6 @@ type Dependencies struct {
 	Logger   *slog.Logger
 	Health   HealthChecker
 	Discover Discoverer
-	Settings Settings
 	Frontend fs.FS
 }
 
@@ -34,8 +33,6 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	api := router.Group("/api")
 	api.GET("/health", healthHandler(deps.Health))
-	api.GET("/settings/preferences", preferencesHandler(deps.Settings))
-	api.PUT("/settings/preferences", savePreferencesHandler(deps.Settings))
 	api.GET("/discover/movies", discoverBrowseHandler(deps.Discover))
 	api.GET("/discover/search", discoverSearchHandler(deps.Discover))
 	api.GET("/discover/tags", discoverTagsHandler(deps.Discover))
@@ -43,6 +40,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	api.GET("/discover/movies/:id/magnets", discoverMagnetsHandler(deps.Discover))
 	api.GET("/image", imageHandler(deps.Discover))
 	api.GET("/javdb/route", javdbRouteHandler(deps.Discover))
+	api.PUT("/javdb/route", javdbSelectRouteHandler(deps.Discover))
 	api.POST("/javdb/reselect", javdbReselectHandler(deps.Discover))
 
 	if deps.Frontend != nil {

@@ -26,7 +26,7 @@
 | JavDB Transport | `github.com/bogdanfinn/tls-client` | App API 已验证使用 Chrome TLS 指纹；只在 `internal/javdb` 内使用 |
 | 图片处理 | `github.com/disintegration/imaging` | 海报裁剪、缩略图 |
 | 限速 | `golang.org/x/time/rate` | 115 与 JavDB 分别限速 |
-| 配置 | `github.com/knadh/koanf/v2` | 启动参数：监听地址、数据目录、日志级别、代理。文件 + 环境变量覆盖。运行时设置存 Setting 表 |
+| 配置 | `github.com/knadh/koanf/v2` | 启动参数：监听地址、数据目录、日志级别、代理。文件 + 环境变量覆盖。服务端运行时设置存 Setting 表；NSFW 等浏览器偏好由 Zustand persist 存 localStorage |
 | 日志 | `log/slog` | 标准库 |
 | 前端 | Vite 8 + React 19 + TypeScript | |
 | 前端状态 | TanStack Query + Zustand | 服务端状态与 UI 状态分离 |
@@ -155,12 +155,13 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 
 ### 自动线路
 
-- 启动或首次请求时，优先用 `/api/v1/startup` 验证上次缓存 host；成功立即复用。
-- 缓存 host 失败后并发探测固定 bootstrap，从合法 startup 响应中解密 `backup_domains_data.apiDomains`，再并发测速动态候选，选择成功请求中延迟最低者。
+- 首次请求时对固定 bootstrap、缓存 host 和发现的动态候选完整测速，等待各线路成功或超时后汇总；不因已有较快线路而提前取消其他探测。若上次为手动选择且该线路仍可用，则保留选择，否则使用延迟最低者。
+- 手动重新测速同样覆盖全部已知线路，以及各合法 startup 响应中解密得到的 `backup_domains_data.apiDomains`，按 host 去重，每条线路只探测一次，最后自动选择延迟最低者。完整测速与连接失败时的快速重选分别合并并发请求，互不替代。
 - 缓存稳定 `device_uuid` 和最终 host；选线探测不携带 token、不开业务重试。
 - Miyabi 是长驻服务，不能照搬 CLI 的“一次命令一次选线”。当前线路发生连接失败、DNS、TLS、超时或 502/503/504 时，用 `singleflight` 触发一次重选，原 GET 请求最多重放一次，并原子替换共享 Client。
 - 4xx、JavDB `success: 0` 业务错误、JSON 解码错误和字段不兼容不触发换线，应直接暴露错误以便发现协议变化。
-- 设置页展示当前线路与最近延迟，并提供手动重新选线；不做固定周期的全线路探测。
+- 设置页沿用 jm-boom 的线路下拉框和测速按钮，展示当前线路、候选状态与最近延迟，支持自动优选和手动切换。手动选择也由后端先验证再启用；连接失败仍按自动重选规则处理。测速按钮重新执行自动优选，不做固定周期的全线路探测。
+- 后端不可用时，设置页显示启动服务和重试提示，不直接展示底层异常；NSFW 等本地显示偏好不受影响。
 
 ## 关键流程
 
@@ -205,6 +206,7 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 - 115 与图片请求走 Resty；JavDB 按上文使用隔离的 tls-client transport。115 与 JavDB 各自一个 `rate.Limiter`。
 - ent schema 改动后执行 `go generate ./...`。
 - 前端所有服务端数据通过 TanStack Query，不放 Zustand。
+- NSFW 等普通显示偏好由 Zustand persist 持久化到当前浏览器 localStorage，不存 SQLite、不调用设置 API。服务端不可用时本地偏好仍可使用。
 - 所有项目依赖的安装、升级和移除均由用户执行，包括 Go module、前端 npm/pnpm 包及 shadcn/ui 组件。助手先告知所需依赖、用途和具体命令，不自行运行依赖变更命令；可使用已安装的依赖进行构建、测试、lint 和格式化。依赖未就绪时继续完成不受影响的工作，并明确说明尚未完成的检查。
 - 前端提交前跑 `oxlint` 与 `oxfmt`，Go 用 `gofmt` 与 `go vet`。
 - 根目录一份 `.gitignore`，不在 `web/` 单独放。`web/dist` 不入库，`make build` 先构建前端再编译 Go。

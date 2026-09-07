@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -30,10 +32,12 @@ type Client struct {
 	limiter      *rate.Limiter
 	media        *resty.Client
 	current      atomic.Pointer[routeState]
+	lastProbe    atomic.Pointer[[]RouteCandidate]
 	routes       singleflight.Group
+	selectionMu  sync.Mutex
 	routeContext context.Context
 	stopRoutes   context.CancelFunc
-	selectRoute  func(context.Context, string) (*routeState, error)
+	selectRoute  func(context.Context, routeSelection) (*routeState, error)
 }
 
 func New(options Options) (*Client, error) {
@@ -86,10 +90,46 @@ func (c *Client) Initialize(ctx context.Context) error {
 	return err
 }
 
-// Reselect runs a full route selection and replaces the active route on success.
+// Reselect measures every candidate and replaces the active route on success.
 func (c *Client) Reselect(ctx context.Context) (RouteStatus, error) {
-	state, err := c.waitRoute(ctx, func(ctx context.Context) (*routeState, error) {
-		return c.selectRoute(ctx, "")
+	state, err := c.waitRoute(ctx, "probe-all", func(ctx context.Context) (*routeState, error) {
+		return c.selectRoute(ctx, routeSelection{full: true, hosts: c.routeHosts()})
+	})
+	if err != nil {
+		return RouteStatus{}, err
+	}
+	return state.status, nil
+}
+
+// SelectRoute verifies a known candidate before changing the active route.
+// Connection failures still trigger automatic selection on subsequent requests.
+func (c *Client) SelectRoute(ctx context.Context, rawHost string) (RouteStatus, error) {
+	c.selectionMu.Lock()
+	defer c.selectionMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return RouteStatus{}, err
+	}
+	host, err := normalizeHost(rawHost)
+	if err != nil {
+		return RouteStatus{}, err
+	}
+	current, _ := c.Route()
+	index := slices.IndexFunc(current.Candidates, func(candidate RouteCandidate) bool { return candidate.Host == host })
+	if index < 0 {
+		return RouteStatus{}, fmt.Errorf("unknown JavDB route %q", host)
+	}
+	latency, _, err := c.probe(ctx, host, nil)
+	candidates := slices.Clone(current.Candidates)
+	candidates[index] = RouteCandidate{Host: host, Latency: latency, Status: RouteAvailable}
+	if err != nil {
+		if ctx.Err() == nil {
+			candidates[index].Status = RouteUnavailable
+			c.lastProbe.Store(&candidates)
+		}
+		return RouteStatus{}, err
+	}
+	state, err := c.installRoute(ctx, RouteStatus{
+		Host: host, Latency: latency, Manual: true, Candidates: candidates,
 	})
 	if err != nil {
 		return RouteStatus{}, err
@@ -100,10 +140,32 @@ func (c *Client) Reselect(ctx context.Context) (RouteStatus, error) {
 // Route returns the active route, if the client has been initialized.
 func (c *Client) Route() (RouteStatus, bool) {
 	state := c.current.Load()
-	if state == nil {
-		return RouteStatus{}, false
+	var status RouteStatus
+	if state != nil {
+		status = state.status
 	}
-	return state.status, true
+	if candidates := c.lastProbe.Load(); candidates != nil {
+		status.Candidates = *candidates
+	} else if state == nil {
+		hosts := slices.Clone(bootstrapHosts)
+		if c.options.CachedHost != "" {
+			hosts = append(hosts, c.options.CachedHost)
+		}
+		status.Candidates = routeCandidates(hosts, nil)
+	}
+	return status, state != nil
+}
+
+func (c *Client) routeHosts() []string {
+	status, _ := c.Route()
+	hosts := make([]string, 0, len(status.Candidates)+1)
+	for _, candidate := range status.Candidates {
+		hosts = append(hosts, candidate.Host)
+	}
+	if status.Host != "" {
+		hosts = append(hosts, status.Host)
+	}
+	return hosts
 }
 
 // Close releases idle API and image connections.
@@ -148,30 +210,36 @@ func (c *Client) ensureRoute(ctx context.Context) (*routeState, error) {
 	if state := c.current.Load(); state != nil {
 		return state, nil
 	}
-	return c.waitRoute(ctx, func(ctx context.Context) (*routeState, error) {
+	return c.waitRoute(ctx, "initialize", func(ctx context.Context) (*routeState, error) {
 		if state := c.current.Load(); state != nil {
 			return state, nil
 		}
-		return c.selectRoute(ctx, c.options.CachedHost)
+		options := routeSelection{full: true, hosts: c.routeHosts()}
+		if c.options.ManualRoute {
+			options.preferredHost = c.options.CachedHost
+		}
+		return c.selectRoute(ctx, options)
 	})
 }
 
 func (c *Client) replaceFailedRoute(ctx context.Context, failed *routeState) (*routeState, error) {
-	return c.waitRoute(ctx, func(ctx context.Context) (*routeState, error) {
+	return c.waitRoute(ctx, "recover", func(ctx context.Context) (*routeState, error) {
 		if current := c.current.Load(); current != failed {
 			return current, nil
 		}
-		return c.selectRoute(ctx, "")
+		return c.selectRoute(ctx, routeSelection{hosts: c.routeHosts()})
 	})
 }
 
-func (c *Client) waitRoute(ctx context.Context, selectRoute func(context.Context) (*routeState, error)) (*routeState, error) {
+func (c *Client) waitRoute(ctx context.Context, key string, selectRoute func(context.Context) (*routeState, error)) (*routeState, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	result := c.routes.DoChan("route", func() (any, error) {
+	result := c.routes.DoChan(key, func() (any, error) {
+		c.selectionMu.Lock()
+		defer c.selectionMu.Unlock()
 		// Selection belongs to the long-lived client. A browser leaving only
-		// cancels its own wait; cached, bootstrap and dynamic probes are bounded.
+		// cancels its own wait; bootstrap and dynamic probes are bounded.
 		shared, cancel := context.WithTimeout(c.routeContext, 3*c.options.Timeout)
 		defer cancel()
 		return selectRoute(shared)
@@ -187,12 +255,24 @@ func (c *Client) waitRoute(ctx context.Context, selectRoute func(context.Context
 	}
 }
 
-func (c *Client) selectAndInstall(ctx context.Context, cachedHost string) (*routeState, error) {
-	result, err := selectRoute(ctx, cachedHost, c.probe)
+func (c *Client) selectAndInstall(ctx context.Context, options routeSelection) (*routeState, error) {
+	result, err := selectRoute(ctx, options, c.probe)
+	// Publish completed measurements even if every candidate failed.
+	if result.Candidates != nil {
+		c.lastProbe.Store(&result.Candidates)
+	}
 	if err != nil {
 		return nil, err
 	}
-	transport, err := newTransport(result.Host, c.options)
+	return c.installRoute(ctx, RouteStatus{
+		Host: result.Host, Latency: result.Latency,
+		Manual:     result.Manual,
+		Candidates: result.Candidates,
+	})
+}
+
+func (c *Client) installRoute(ctx context.Context, status RouteStatus) (*routeState, error) {
+	transport, err := newTransport(status.Host, c.options)
 	if err != nil {
 		return nil, err
 	}
@@ -202,12 +282,10 @@ func (c *Client) selectAndInstall(ctx context.Context, cachedHost string) (*rout
 	}
 	state := &routeState{
 		transport: transport,
-		status: RouteStatus{
-			Host:    result.Host,
-			Latency: result.Latency,
-		},
+		status:    status,
 	}
 	previous := c.current.Swap(state)
+	c.lastProbe.Store(&status.Candidates)
 	if previous != nil {
 		previous.transport.closeIdleConnections()
 	}

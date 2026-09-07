@@ -56,7 +56,6 @@ func run() error {
 		Logger:   logger,
 		Health:   store,
 		Discover: discover,
-		Settings: service.NewSettingService(store.Client),
 		Frontend: miyabi.Frontend(),
 	})
 	server := &http.Server{

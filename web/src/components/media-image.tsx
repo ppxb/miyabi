@@ -2,9 +2,9 @@ import { EyeOffIcon, ImageOffIcon } from 'lucide-react'
 import { useState } from 'react'
 
 import { imageURL } from '@/api/client'
-import { usePreferences } from '@/api/settings'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { useSettingsStore } from '@/stores/settings'
 
 type MediaImageProps = {
   source: string
@@ -16,8 +16,8 @@ type MediaImageProps = {
 
 // All media images pass through this component so hidden images have no img/src.
 export function MediaImage(props: MediaImageProps) {
-  const preferences = usePreferences()
-  if (preferences.data?.nsfw_mode !== false) {
+  const nsfwMode = useSettingsStore(state => state.nsfwMode)
+  if (nsfwMode) {
     return (
       <div
         role="img"

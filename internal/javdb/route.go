@@ -33,9 +33,16 @@ const (
 var backupKey, backupIV = backupKeyMaterial()
 
 type routeResult struct {
-	Host         string
-	Latency      time.Duration
-	ReusedCached bool
+	Host       string
+	Latency    time.Duration
+	Manual     bool
+	Candidates []RouteCandidate
+}
+
+type routeSelection struct {
+	full          bool
+	hosts         []string
+	preferredHost string
 }
 
 // onStart records the request start after transport construction.
@@ -58,21 +65,7 @@ type runningProbe struct {
 	cancel  context.CancelFunc
 }
 
-func selectRoute(ctx context.Context, cachedHost string, check probe) (routeResult, error) {
-	if cachedHost != "" {
-		host, err := normalizeHost(cachedHost)
-		if err != nil {
-			return routeResult{}, fmt.Errorf("cached JavDB host: %w", err)
-		}
-		latency, _, err := check(ctx, host, nil)
-		if ctx.Err() != nil {
-			return routeResult{}, ctx.Err()
-		}
-		if err == nil {
-			return routeResult{Host: host, Latency: latency, ReusedCached: true}, nil
-		}
-	}
-
+func selectRoute(ctx context.Context, options routeSelection, check probe) (routeResult, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	events := make(chan probeEvent)
@@ -103,12 +96,23 @@ func selectRoute(ctx context.Context, cachedHost string, check probe) (routeResu
 	for _, host := range bootstrapHosts {
 		start(host)
 	}
+	for _, host := range options.hosts {
+		start(host)
+	}
+	if options.preferredHost != "" {
+		start(options.preferredHost)
+	}
 
 	var dynamic []string
+	dynamicSeen := make(map[string]bool)
 	var failures []error
 	var best probeResult
-	ticker := time.NewTicker(5 * time.Millisecond)
-	defer ticker.Stop()
+	var ticks <-chan time.Time
+	if !options.full {
+		ticker := time.NewTicker(5 * time.Millisecond)
+		defer ticker.Stop()
+		ticks = ticker.C
+	}
 	for len(running) > 0 {
 		select {
 		case <-ctx.Done():
@@ -130,18 +134,21 @@ func selectRoute(ctx context.Context, cachedHost string, check probe) (routeResu
 			if best.host == "" || result.latency < best.latency {
 				best = result
 			}
-			if len(dynamic) == 0 {
+			if options.full || len(dynamic) == 0 {
 				hosts, err := apiHostsFromStartup(result.startup)
 				if err != nil {
 					failures = append(failures, fmt.Errorf("%s: %w", result.host, err))
 				} else if len(hosts) > 0 {
-					dynamic = hosts
-					for _, host := range dynamic {
+					for _, host := range hosts {
+						if !dynamicSeen[host] {
+							dynamicSeen[host] = true
+							dynamic = append(dynamic, host)
+						}
 						start(host)
 					}
 				}
 			}
-		case <-ticker.C:
+		case <-ticks:
 			// Until a dynamic source is found, a slow bootstrap may still be
 			// the only source. Construction time never counts as request latency.
 			if len(dynamic) > 0 && best.host != "" {
@@ -158,18 +165,53 @@ func selectRoute(ctx context.Context, cachedHost string, check probe) (routeResu
 		return routeResult{}, err
 	}
 
-	// Ties follow dynamic response order, then the fixed bootstrap order.
+	// Ties follow dynamic response order, then bootstrap and previously known hosts.
+	hosts := append(dynamic, bootstrapHosts...)
+	hosts = append(hosts, options.hosts...)
+	if options.preferredHost != "" {
+		hosts = append(hosts, options.preferredHost)
+	}
+	result := routeResult{Candidates: routeCandidates(hosts, known)}
 	var selected probeResult
-	for _, host := range append(dynamic, bootstrapHosts...) {
-		result := known[host]
-		if result.err == nil && (selected.host == "" || result.latency < selected.latency) {
-			selected = result
+	for _, host := range hosts {
+		candidate := known[host]
+		if candidate.err == nil && (selected.host == "" || candidate.latency < selected.latency) {
+			selected = candidate
 		}
 	}
 	if selected.host == "" {
-		return routeResult{}, fmt.Errorf("select JavDB route: %w", errors.Join(failures...))
+		return result, fmt.Errorf("select JavDB route: %w", errors.Join(failures...))
 	}
-	return routeResult{Host: selected.host, Latency: selected.latency}, nil
+	if preferred, ok := known[options.preferredHost]; ok && preferred.err == nil {
+		selected = preferred
+		result.Manual = true
+	}
+	result.Host = selected.host
+	result.Latency = selected.latency
+	return result, nil
+}
+
+func routeCandidates(hosts []string, known map[string]probeResult) []RouteCandidate {
+	candidates := make([]RouteCandidate, 0, len(hosts))
+	seen := make(map[string]bool, len(hosts))
+	for _, host := range hosts {
+		if seen[host] {
+			continue
+		}
+		seen[host] = true
+		candidate := RouteCandidate{Host: host, Status: RouteUntested}
+		if result, ok := known[host]; ok {
+			switch {
+			case result.err == nil:
+				candidate.Status = RouteAvailable
+				candidate.Latency = result.latency
+			case !errors.Is(result.err, context.Canceled):
+				candidate.Status = RouteUnavailable
+			}
+		}
+		candidates = append(candidates, candidate)
+	}
+	return candidates
 }
 
 func apiHostsFromStartup(startup map[string]any) ([]string, error) {

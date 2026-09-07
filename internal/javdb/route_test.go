@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"reflect"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -32,19 +33,24 @@ func TestAPIHostsFromStartup(t *testing.T) {
 	}
 }
 
-func TestSelectRouteReusesCachedHost(t *testing.T) {
+func TestSelectRouteFullRetainsAvailableManualPreference(t *testing.T) {
 	check := func(_ context.Context, host string, _ func(time.Time)) (time.Duration, map[string]any, error) {
-		if host != "https://cached.example" {
-			t.Fatalf("unexpected host %q", host)
+		if host == "https://cached.example" {
+			return 12 * time.Millisecond, nil, nil
 		}
-		return 12 * time.Millisecond, nil, nil
+		return time.Millisecond, nil, nil
 	}
-	result, err := selectRoute(context.Background(), "https://cached.example/", check)
+	result, err := selectRoute(t.Context(), routeSelection{full: true, preferredHost: "https://cached.example"}, check)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Host != "https://cached.example" || !result.ReusedCached {
+	if result.Host != "https://cached.example" || !result.Manual || len(result.Candidates) != len(bootstrapHosts)+1 {
 		t.Fatalf("result = %#v", result)
+	}
+	for _, candidate := range result.Candidates {
+		if candidate.Status != RouteAvailable {
+			t.Fatalf("candidate was not measured: %+v", candidate)
+		}
 	}
 }
 
@@ -64,7 +70,7 @@ func TestSelectRouteChoosesFastestDynamicHost(t *testing.T) {
 		}
 	}
 
-	result, err := selectRoute(context.Background(), "", check)
+	result, err := selectRoute(context.Background(), routeSelection{}, check)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +91,7 @@ func TestSelectRouteFallsBackToFastestBootstrap(t *testing.T) {
 		}
 	}
 
-	result, err := selectRoute(context.Background(), "", check)
+	result, err := selectRoute(context.Background(), routeSelection{}, check)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +126,7 @@ func TestSelectRouteStartsDynamicProbesBeforeSlowBootstrapsFinish(t *testing.T) 
 			}
 		}
 		started := time.Now()
-		result, err := selectRoute(t.Context(), "", check)
+		result, err := selectRoute(t.Context(), routeSelection{}, check)
 		if err != nil || result.Host != dynamicHost || time.Since(started) > 20*time.Millisecond {
 			t.Fatalf("selection = %+v, error = %v, duration = %v", result, err, time.Since(started))
 		}
@@ -146,7 +152,7 @@ func TestSelectRouteDoesNotCountTransportConstructionAsLatency(t *testing.T) {
 				return 0, nil, ctx.Err()
 			}
 		}
-		result, err := selectRoute(t.Context(), "", check)
+		result, err := selectRoute(t.Context(), routeSelection{}, check)
 		if err != nil || result.Host != bootstrapHosts[2] || result.Latency != 5*time.Millisecond {
 			t.Fatalf("selection = %+v, error = %v", result, err)
 		}
@@ -177,11 +183,84 @@ func TestSelectRouteWaitsForDynamicSourceEvenWhenBootstrapIsSlow(t *testing.T) {
 				return 0, nil, errors.New("offline")
 			}
 		}
-		result, err := selectRoute(t.Context(), "", check)
+		result, err := selectRoute(t.Context(), routeSelection{}, check)
 		if err != nil || result.Host != dynamicHost {
 			t.Fatalf("selection = %+v, error = %v", result, err)
 		}
 	})
+}
+
+func TestSelectRouteFullMeasuresSlowKnownAndNewDynamicCandidates(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		const firstDynamic = "https://first.example"
+		const secondDynamic = "https://second.example"
+		const previousHost = "https://previous.example"
+		firstStartup := startupWithDynamicHost(t, firstDynamic)
+		secondStartup := startupWithDynamicHost(t, secondDynamic)
+		var mu sync.Mutex
+		calls := make(map[string]int)
+		check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, map[string]any, error) {
+			mu.Lock()
+			calls[host]++
+			mu.Unlock()
+			onStart(time.Now())
+			delay := 80 * time.Millisecond
+			var startup map[string]any
+			switch host {
+			case bootstrapHosts[0]:
+				delay, startup = 10*time.Millisecond, firstStartup
+			case bootstrapHosts[1]:
+				delay, startup = 40*time.Millisecond, secondStartup
+			case firstDynamic:
+				delay = time.Millisecond
+			case secondDynamic:
+				delay = 2 * time.Millisecond
+			}
+			select {
+			case <-time.After(delay):
+				if host == bootstrapHosts[3] {
+					return 0, nil, context.DeadlineExceeded
+				}
+				return delay, startup, nil
+			case <-ctx.Done():
+				return 0, nil, ctx.Err()
+			}
+		}
+		started := time.Now()
+		result, err := selectRoute(t.Context(), routeSelection{
+			full: true, hosts: []string{previousHost, bootstrapHosts[0], previousHost},
+		}, check)
+		if err != nil || result.Host != firstDynamic || time.Since(started) < 80*time.Millisecond {
+			t.Fatalf("result = %+v, error = %v, elapsed = %v", result, err, time.Since(started))
+		}
+		if len(result.Candidates) != len(bootstrapHosts)+3 {
+			t.Fatalf("missing candidates: %+v", result.Candidates)
+		}
+		for _, candidate := range result.Candidates {
+			want := RouteAvailable
+			if candidate.Host == bootstrapHosts[3] {
+				want = RouteUnavailable
+			}
+			if candidate.Status != want || calls[candidate.Host] != 1 {
+				t.Fatalf("candidate = %+v, calls = %d", candidate, calls[candidate.Host])
+			}
+		}
+	})
+}
+
+func TestSelectRouteFullReturnsResultsWhenAllCandidatesFail(t *testing.T) {
+	check := func(context.Context, string, func(time.Time)) (time.Duration, map[string]any, error) {
+		return 0, nil, context.DeadlineExceeded
+	}
+	result, err := selectRoute(t.Context(), routeSelection{full: true}, check)
+	if err == nil || len(result.Candidates) != len(bootstrapHosts) {
+		t.Fatalf("result = %+v, error = %v", result, err)
+	}
+	for _, candidate := range result.Candidates {
+		if candidate.Status != RouteUnavailable {
+			t.Fatalf("candidate = %+v", candidate)
+		}
+	}
 }
 
 func startupWithDynamicHost(t *testing.T, host string) map[string]any {

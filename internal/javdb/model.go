@@ -18,6 +18,7 @@ const (
 // Options configures the anonymous JavDB App API client.
 type Options struct {
 	CachedHost        string
+	ManualRoute       bool
 	DeviceUUID        string
 	Proxy             string
 	Timeout           time.Duration
@@ -27,8 +28,24 @@ type Options struct {
 
 // RouteStatus describes the currently selected API route.
 type RouteStatus struct {
+	Host       string
+	Latency    time.Duration
+	Manual     bool
+	Candidates []RouteCandidate
+}
+
+type RouteAvailability string
+
+const (
+	RouteUntested    RouteAvailability = "untested"
+	RouteAvailable   RouteAvailability = "available"
+	RouteUnavailable RouteAvailability = "unavailable"
+)
+
+type RouteCandidate struct {
 	Host    string
 	Latency time.Duration
+	Status  RouteAvailability
 }
 
 // Zone is a JavDB movie section.

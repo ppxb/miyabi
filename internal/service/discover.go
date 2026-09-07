@@ -54,14 +54,23 @@ type DiscoverMagnet struct {
 }
 
 type JavDBRouteStatus struct {
-	Host      string `json:"host"`
-	LatencyMS int64  `json:"latency_ms"`
-	Active    bool   `json:"active"`
+	Host       string                `json:"host"`
+	LatencyMS  int64                 `json:"latency_ms"`
+	Active     bool                  `json:"active"`
+	Manual     bool                  `json:"manual"`
+	Candidates []JavDBRouteCandidate `json:"candidates"`
+}
+
+type JavDBRouteCandidate struct {
+	Host      string                  `json:"host"`
+	LatencyMS int64                   `json:"latency_ms"`
+	Status    javdb.RouteAvailability `json:"status"`
 }
 
 type persistedRoute struct {
 	Host      string `json:"host"`
 	LatencyMS int64  `json:"latency_ms"`
+	Manual    bool   `json:"manual"`
 }
 
 // DiscoverService combines JavDB catalogue data with Miyabi's local state.
@@ -107,6 +116,7 @@ func NewDiscoverService(
 	}
 	if found {
 		options.CachedHost = route.Host
+		options.ManualRoute = route.Manual
 	}
 	options.DeviceUUID = deviceUUID
 	client, err := javdb.New(options)
@@ -124,6 +134,7 @@ func NewDiscoverService(
 		route: JavDBRouteStatus{
 			Host:      route.Host,
 			LatencyMS: route.LatencyMS,
+			Manual:    route.Manual,
 		},
 	}, nil
 }
@@ -227,16 +238,38 @@ func (service *DiscoverService) ResolveMovieID(ctx context.Context, code string)
 }
 
 func (service *DiscoverService) Route() JavDBRouteStatus {
-	if active, ok := service.javdb.Route(); ok {
-		return JavDBRouteStatus{
-			Host:      active.Host,
-			LatencyMS: active.Latency.Milliseconds(),
-			Active:    true,
+	status, active := service.javdb.Route()
+	result := JavDBRouteStatus{
+		Host: status.Host, LatencyMS: status.Latency.Milliseconds(),
+		Active: active, Manual: status.Manual,
+		Candidates: make([]JavDBRouteCandidate, len(status.Candidates)),
+	}
+	for index, candidate := range status.Candidates {
+		result.Candidates[index] = JavDBRouteCandidate{
+			Host: candidate.Host, LatencyMS: candidate.Latency.Milliseconds(), Status: candidate.Status,
 		}
 	}
-	service.routeMu.RLock()
-	defer service.routeMu.RUnlock()
-	return service.route
+	if !active {
+		service.routeMu.RLock()
+		result.Host = service.route.Host
+		result.LatencyMS = service.route.LatencyMS
+		result.Manual = service.route.Manual
+		service.routeMu.RUnlock()
+	}
+	return result
+}
+
+func (service *DiscoverService) SelectRoute(ctx context.Context, host string) (JavDBRouteStatus, error) {
+	if host == "" {
+		return service.Reselect(ctx)
+	}
+	if _, err := service.javdb.SelectRoute(ctx, host); err != nil {
+		return JavDBRouteStatus{}, fmt.Errorf("select JavDB route: %w", err)
+	}
+	if err := service.persistActiveRoute(ctx); err != nil {
+		return JavDBRouteStatus{}, err
+	}
+	return service.Route(), nil
 }
 
 func (service *DiscoverService) Reselect(ctx context.Context) (JavDBRouteStatus, error) {
@@ -328,9 +361,9 @@ func (service *DiscoverService) persistActiveRoute(ctx context.Context) error {
 	if !ok {
 		return nil
 	}
-	route := persistedRoute{Host: active.Host, LatencyMS: active.Latency.Milliseconds()}
+	route := persistedRoute{Host: active.Host, LatencyMS: active.Latency.Milliseconds(), Manual: active.Manual}
 	unchanged := service.route.Active && service.route.Host == route.Host &&
-		service.route.LatencyMS == route.LatencyMS
+		service.route.LatencyMS == route.LatencyMS && service.route.Manual == route.Manual
 	if unchanged {
 		return nil
 	}
@@ -341,6 +374,7 @@ func (service *DiscoverService) persistActiveRoute(ctx context.Context) error {
 		Host:      route.Host,
 		LatencyMS: route.LatencyMS,
 		Active:    true,
+		Manual:    route.Manual,
 	}
 	return nil
 }

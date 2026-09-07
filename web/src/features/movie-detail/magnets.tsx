@@ -42,21 +42,22 @@ export function MovieMagnets({ query }: { query: ReturnType<typeof useDiscoverMa
       ) : query.data.length === 0 ? (
         <p className="text-sm text-muted-foreground">暂无磁力链</p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-4">
           {query.data.map(magnet => (
-            <Card key={magnet.hash} size="sm" className="py-0">
-              <CardContent className="flex items-center gap-4 p-4">
+            <Card key={magnet.hash} size="sm">
+              <CardContent className="flex items-center">
                 <div className="min-w-0 flex-1 space-y-2">
-                  <h3 className="text-base leading-6 font-semibold break-words">{magnet.name}</h3>
+                  <h3 className="text-base leading-6 font-semibold wrap-break-word">
+                    {magnet.name}
+                  </h3>
                   <a
                     href={magnet.uri}
-                    className="block font-mono text-sm leading-6 break-all text-muted-foreground outline-ring select-all hover:text-foreground"
+                    className="block font-mono text-xs break-all text-muted-foreground outline-ring select-all hover:text-foreground"
                   >
                     {magnet.uri}
                   </a>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm leading-6 text-muted-foreground">
-                    <span>{formatSize(magnet.size)}</span>
-                    <span>{magnet.files_count} 个文件</span>
+                    <span className="text-xs">{formatSize(magnet.size)}</span>
                     {magnet.has_subtitle ? <Badge variant="outline">字幕</Badge> : null}
                     {magnet.hd ? <Badge variant="outline">高清</Badge> : null}
                   </div>
