@@ -1,4 +1,3 @@
-# Go 构建产物
 /miyabi
 /miyabi.exe
 /bin/
@@ -6,18 +5,15 @@
 *.out
 coverage.*
 
-# 运行时数据：SQLite、图片缓存
 /data/
 *.db
 *.db-wal
 *.db-shm
 
-# 本地配置
 config.local.*
 .env
 .env.*
 
-# 前端
 /web/node_modules/
 /web/dist/
 /web/.vite/
@@ -25,10 +21,8 @@ config.local.*
 /web/src/routeTree.gen.ts
 /.pnpm-store/
 
-# 临时测试产物
 /.tmp/
 
-# 编辑器与系统
 .idea/
 .vscode/
 *.swp
