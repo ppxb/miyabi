@@ -3,7 +3,7 @@ import { MediaImage } from '@/components/media-image'
 
 export function MoviePreviews({ code, images }: { code: string; images: PreviewImage[] }) {
   return (
-    <section aria-labelledby="movie-previews-title" className="space-y-4">
+    <section className="space-y-4">
       <h2 id="movie-previews-title" className="text-xl font-semibold tracking-normal">
         预览图
       </h2>

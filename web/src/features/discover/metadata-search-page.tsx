@@ -39,7 +39,7 @@ export function MetadataSearchPage({
       <PageHeader title={search.name} description={`${METADATA_LABELS[search.kind]}相关影片`}>
         {search.kind === 'tag' ? (
           <Select value={search.zone} onValueChange={value => onZoneChange(value as JavDBZone)}>
-            <SelectTrigger className="w-32" aria-label="影片分区">
+            <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent position="popper" align="end">

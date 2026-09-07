@@ -12,7 +12,6 @@ export function MovieCard({ movie }: { movie: DiscoverMovie }) {
     <Link
       to="/discover/$movieId"
       params={{ movieId: movie.id }}
-      aria-label={`查看 ${movie.code} 的详情`}
       className="block rounded-2xl outline-ring"
     >
       <Card

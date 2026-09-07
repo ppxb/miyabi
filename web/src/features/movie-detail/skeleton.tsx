@@ -3,7 +3,7 @@ import { MovieGridSkeleton } from '@/components/movie'
 
 export function MovieDetailSkeleton() {
   return (
-    <div role="status" aria-label="正在加载影片详情" className="space-y-10">
+    <div role="status" className="space-y-10">
       <section className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-8">
         <Skeleton className="aspect-3/2 w-full rounded-2xl" />
         <div className="space-y-5 py-1">

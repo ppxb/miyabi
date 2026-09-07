@@ -47,10 +47,8 @@ function NavItem({ item, isActive }: NavItemProps) {
             buttonVariants({ variant: isActive ? 'default' : 'ghost', size: 'icon' }),
             'size-11 sm:size-9'
           )}
-          aria-label={item.label}
-          aria-current={isActive ? 'page' : undefined}
         >
-          <item.icon className="size-5" aria-hidden="true" />
+          <item.icon className="size-5" />
         </Link>
       </TooltipTrigger>
       <TooltipContent side="top">{item.label}</TooltipContent>

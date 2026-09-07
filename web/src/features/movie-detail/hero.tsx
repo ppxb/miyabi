@@ -56,11 +56,7 @@ export function MovieHero({ movie }: { movie: DiscoverMovieDetail }) {
             <EntityRow label="演员">
               {movie.actors.map((actor, index) => (
                 <span key={actor.id} className="inline-flex items-center gap-3">
-                  {index > 0 ? (
-                    <span aria-hidden="true" className="text-muted-foreground">
-                      /
-                    </span>
-                  ) : null}
+                  {index > 0 ? <span className="text-muted-foreground">/</span> : null}
                   <MetadataLink kind="actor" id={actor.id} name={actor.name} />
                 </span>
               ))}
@@ -115,7 +111,7 @@ function MovieStats({ movie }: { movie: DiscoverMovie }) {
           className="flex min-w-0 flex-1 flex-col items-center gap-2 p-3 sm:p-4"
         >
           <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <stat.icon className="size-4" aria-hidden="true" />
+            <stat.icon className="size-4" />
             {stat.label}
           </dt>
           <dd className="text-sm font-semibold tabular-nums sm:text-base">{stat.value}</dd>
@@ -128,7 +124,7 @@ function MovieStats({ movie }: { movie: DiscoverMovie }) {
 function EntityRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-start gap-4">
-      <dt className="w-10 shrink-0 text-xs leading-6 text-muted-foreground">{label}</dt>
+      <dt className="w-10 leading-6 text-muted-foreground">{label}</dt>
       <dd className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 leading-6">{children}</dd>
     </div>
   )

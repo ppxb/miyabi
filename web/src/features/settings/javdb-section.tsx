@@ -59,7 +59,7 @@ export function JavDBSection() {
             disabled={busy || !status || route.isError}
             onValueChange={changeRoute}
           >
-            <SelectTrigger className="min-w-0 flex-1 sm:w-72" aria-label="JavDB 线路">
+            <SelectTrigger className="min-w-0 flex-1 sm:w-72">
               <SelectValue>
                 {route.isError ? (
                   '后端不可用'

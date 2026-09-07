@@ -53,7 +53,7 @@ function SearchForm({
     <form className="w-full max-w-xl" onSubmit={submit}>
       <InputGroup>
         <InputGroupAddon>
-          <InputGroupButton type="submit" size="icon-xs" aria-label="搜索">
+          <InputGroupButton type="submit" size="icon-xs">
             <SearchIcon className="size-4" />
           </InputGroupButton>
         </InputGroupAddon>
@@ -65,13 +65,11 @@ function SearchForm({
           value={draft}
           onChange={event => setDraft(event.target.value)}
           placeholder="搜索番号、标题或演员"
-          aria-label="搜索关键词"
         />
         {draft ? (
           <InputGroupAddon align="inline-end">
             <InputGroupButton
               size="icon-xs"
-              aria-label="清空搜索"
               onClick={() => {
                 setDraft('')
                 onSearch('')

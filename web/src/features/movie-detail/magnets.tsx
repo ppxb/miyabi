@@ -22,7 +22,7 @@ export function MovieMagnets({ query }: { query: ReturnType<typeof useDiscoverMa
   }
 
   return (
-    <section aria-labelledby="movie-magnets-title" className="space-y-4">
+    <section className="space-y-4">
       <h2 id="movie-magnets-title" className="text-xl font-semibold tracking-normal">
         磁力链
       </h2>
@@ -62,13 +62,7 @@ export function MovieMagnets({ query }: { query: ReturnType<typeof useDiscoverMa
                     {magnet.hd ? <Badge variant="outline">高清</Badge> : null}
                   </div>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copy(magnet)}
-                  aria-label={`复制 ${magnet.name} 的磁力链接`}
-                >
+                <Button type="button" variant="outline" size="sm" onClick={() => copy(magnet)}>
                   {copiedHash === magnet.hash ? <CheckIcon /> : <CopyIcon />}
                   {copiedHash === magnet.hash ? '已复制' : '复制'}
                 </Button>

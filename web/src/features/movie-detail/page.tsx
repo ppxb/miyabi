@@ -21,7 +21,7 @@ export function MovieDetailPage({ movieId }: { movieId: string }) {
       {detail.isPending ? (
         <MovieDetailSkeleton />
       ) : detail.data ? (
-        <div className="space-y-10" aria-busy={fetching}>
+        <div className="space-y-10">
           {detail.isRefetchError ? (
             <p role="alert" className="text-sm text-destructive">
               刷新失败，请重试。

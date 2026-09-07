@@ -37,10 +37,9 @@ function VisibleImage({ source, original, alt, loading = 'lazy', className }: Me
     return (
       <div
         role="img"
-        aria-label={`${alt}加载失败`}
         className="flex size-full items-center justify-center bg-muted text-muted-foreground"
       >
-        <ImageOffIcon className="size-6" aria-hidden="true" />
+        <ImageOffIcon className="size-6" />
       </div>
     )
   }

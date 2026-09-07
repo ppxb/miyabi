@@ -18,7 +18,7 @@ export function MovieRecommendations({
   const visible = movies.slice(0, 8)
 
   return (
-    <section aria-labelledby={id} className="space-y-4">
+    <section className="space-y-4">
       <h2 id={id} className="text-xl font-semibold tracking-normal">
         {title}
       </h2>

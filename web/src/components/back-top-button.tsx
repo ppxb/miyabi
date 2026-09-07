@@ -19,9 +19,8 @@ export function BackTopButton() {
       size="icon-lg"
       className="fixed right-6 bottom-32 z-40 bg-background/80 backdrop-blur"
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-      aria-label="回到顶部"
     >
-      <ChevronUpIcon className="size-4" aria-hidden="true" />
+      <ChevronUpIcon className="size-4" />
     </Button>
   )
 }

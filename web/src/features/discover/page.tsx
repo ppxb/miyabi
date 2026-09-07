@@ -170,7 +170,7 @@ function CategoryFilters({
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
       <Select value={zone} onValueChange={value => onZoneChange(value as JavDBZone)}>
-        <SelectTrigger className="w-full sm:w-32" aria-label="影片分区">
+        <SelectTrigger className="w-full sm:w-32">
           <SelectValue />
         </SelectTrigger>
         <SelectContent position="popper" align="start">
@@ -199,7 +199,7 @@ function CategoryFilters({
       ) : (
         <>
           <Select value={categoryID} onValueChange={onCategoryChange}>
-            <SelectTrigger className="w-full sm:w-48" aria-label="标签分类">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="选择分类" />
             </SelectTrigger>
             <SelectContent position="popper" align="start">
@@ -213,7 +213,7 @@ function CategoryFilters({
             </SelectContent>
           </Select>
           <Select value={tagID || 'all'} onValueChange={onTagChange}>
-            <SelectTrigger className="w-full sm:w-56" aria-label="内容标签">
+            <SelectTrigger className="w-full sm:w-56">
               <SelectValue placeholder="全部标签" />
             </SelectTrigger>
             <SelectContent position="popper" align="start">
