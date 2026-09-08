@@ -99,7 +99,7 @@ function MovieStats({ movie }: { movie: DiscoverMovie }) {
   if (stats.length === 0) return null
 
   return (
-    <dl className="flex flex-wrap divide-x divide-border/60 rounded-2xl bg-card/60 py-1">
+    <dl className="flex flex-wrap divide-x divide-border/60 rounded-2xl bg-muted py-1 ring-1 ring-border dark:bg-card/60 dark:ring-0">
       {stats.map(stat => (
         <div
           key={stat.label}

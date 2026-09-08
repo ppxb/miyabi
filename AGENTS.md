@@ -180,6 +180,12 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 - 登录后可在“媒体目录”行通过 Dialog 浏览 115 文件夹并挂载当前目录，支持路径导航和分页；文件仅用于浏览，不能作为媒体目录选择。
 - “媒体目录”描述保持固定，绑定路径显示在右侧操作按钮之前的禁用 shadcn Input 中，挂载/更换按钮使用 shadcn Tooltip。目录弹窗的路径导航使用 shadcn Breadcrumb，长名称保持单行省略。
 - 挂载目录由后端向 115 读取确认，目录 ID、名称、路径及所属账号一起存入 Setting 的 `pan.library_directory`。同一账号重新登录保留选择，换号后不沿用旧账号目录；取消挂载只删除本地配置。
+- 详情页磁力在未登录时只显示复制，登录后增加“一键加入 115”。必须先挂载当前账号的媒体目录；未挂载时提示前往设置，保留复制功能。提交期间禁用重复点击，只有 115 单条磁力结果成功才显示“已加入”。
+- 磁力按钮通过本地 Task 查询恢复状态，按账号、影片和 hash 读取最新一次任务；进行中显示“已加入 115”，完成或失败后允许“重新加入 115”。Task 完成仅是下载历史，不能证明资源现在仍存在于 115，更不能显示“已在库中”或永久禁用重新提交；远端删除与本地索引的同步由后续扫描处理。状态不依赖页面内 mutation 的临时成功标记；存在进行中任务时前端每 5 秒刷新本地状态，任务状态变化时更新影片标签。
+- 影片状态 `saving` 的界面文案为“下载中”，表示离线任务进行中，不表示正在刮削。只有扫描创建或关联 Movie 后才能显示“已入库”；已下载仍需后续扫描入库。
+- 离线提交由 service 核对磁力属于当前 JavDB 影片，从 hash 构造 URI，再由 pan 使用开放平台 `/open/offline/add_task_urls` 提交到已挂载目录；前端不接触令牌，也不提交任意来源的 URL。
+- 已接受的离线任务写入 Task（type=offline），保存规范化 code、javdb_id、hash、info_hash、account_id 和 directory_id。同账号同 hash 的进行中任务复用已有记录；后台每 30 秒同步当前账号的远端任务状态，无进行中任务时不请求 115。
+- “已加入”仅表示 115 接受任务。当前实现同步远端下载状态，完成后记录 file_id；媒体库扫描与刮削尚待后续接入，不能因提交或下载完成直接创建 Movie。
 
 ## 关键流程
 
@@ -195,7 +201,7 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 
 **播放**：请求时实时调用 `pan.Client.PlayURL` 取直链或 m3u8，不落库。直链需带 115 指定 User-Agent，由 `/api/play/:id/stream` 反向代理解决。
 
-**离线下载**：用户在发现页或影片详情选择 JavDB 返回的磁力 → service 从 hash 构造 magnet URI → `pan.Client.AddOffline` → 写 Task（type 为 offline，payload.code 在写入时规范化，同时保留 javdb_id、hash）→ worker 定时轮询 → 完成后触发目录扫描与刮削。核心流程不要求用户手动粘贴磁力或上传 torrent。
+**离线下载**：用户在影片详情选择 JavDB 返回的磁力 → service 核对来源并从 hash 构造 magnet URI → `pan.Client.AddOffline` → 写 Task（type 为 offline，payload.code 在写入时规范化，同时保留 javdb_id、hash）→ worker 定时轮询并更新状态。目录扫描服务接入后，再衔接下载完成后的扫描与刮削。核心流程不要求用户手动粘贴磁力或上传 torrent。
 
 ## 约定
 

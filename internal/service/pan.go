@@ -72,7 +72,7 @@ func (service *PanService) Account(ctx context.Context) (PanAccountStatus, error
 		return PanAccountStatus{}, nil
 	}
 
-	account, err := panRead(ctx, service, func(token string) (pan.Account, error) {
+	account, err := withPanToken(ctx, service, func(token string) (pan.Account, error) {
 		return service.client.Account(ctx, token)
 	})
 	if err != nil {
@@ -178,8 +178,8 @@ func (service *PanService) saveTokens(ctx context.Context, tokens pan.Tokens) er
 	return nil
 }
 
-// Callers hold mu so account reads, directory operations, and login share token rotation.
-func panRead[T any](ctx context.Context, service *PanService, read func(string) (T, error)) (T, error) {
+// Callers hold mu. Only rejected authorization is replayed after refreshing tokens.
+func withPanToken[T any](ctx context.Context, service *PanService, request func(string) (T, error)) (T, error) {
 	var zero T
 	if service.tokens.AccessToken == "" {
 		return zero, pan.ErrUnauthorized
@@ -190,12 +190,12 @@ func panRead[T any](ctx context.Context, service *PanService, read func(string) 
 			return zero, err
 		}
 	}
-	value, err := read(service.tokens.AccessToken)
+	value, err := request(service.tokens.AccessToken)
 	if errors.Is(err, pan.ErrUnauthorized) && !refreshed {
 		if err := service.refreshTokens(ctx); err != nil {
 			return zero, err
 		}
-		return read(service.tokens.AccessToken)
+		return request(service.tokens.AccessToken)
 	}
 	return value, err
 }

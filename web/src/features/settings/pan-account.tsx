@@ -53,18 +53,12 @@ export function PanStorageUsage({ space }: { space: PanAccount['space'] }) {
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden="true" className="size-2.5 rounded-full bg-sky-500" />
+          <span className="size-2.5 rounded-full bg-sky-500" />
           已使用
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span
-            aria-hidden="true"
-            className="size-2.5 rounded-full border border-border bg-muted"
-          />
+          <span className="size-2.5 rounded-full border border-border bg-muted" />
           剩余
-          <span className="font-medium text-foreground tabular-nums">
-            {space.remaining.formatted}
-          </span>
         </span>
       </div>
     </div>

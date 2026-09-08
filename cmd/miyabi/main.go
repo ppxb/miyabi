@@ -19,6 +19,7 @@ import (
 	"github.com/ppxb/miyabi/internal/logging"
 	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/service"
+	"github.com/ppxb/miyabi/internal/worker"
 )
 
 func main() {
@@ -59,12 +60,14 @@ func run() error {
 		return fmt.Errorf("initialize pan service: %w", err)
 	}
 	defer drive.Close()
+	offline := service.NewOfflineService(store.Client, discover, drive)
 
 	router := api.NewRouter(api.Dependencies{
 		Logger:   logger,
 		Health:   store,
 		Discover: discover,
 		Pan:      drive,
+		Offline:  offline,
 		Frontend: miyabi.Frontend(),
 	})
 	server := &http.Server{
@@ -74,7 +77,15 @@ func run() error {
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	workerDone := make(chan struct{})
+	go func() {
+		defer close(workerDone)
+		worker.RunOffline(ctx, offline, logger)
+	}()
+	defer func() {
+		stop()
+		<-workerDone
+	}()
 
 	serverError := make(chan error, 1)
 	go func() {

@@ -1,0 +1,70 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
+
+import { ApiError, apiGet, apiPost } from '@/api/client'
+import { panKeys } from '@/api/pan'
+
+export type OfflineSubmission = {
+  task_id: number
+  hash: string
+  status: 'queued' | 'running' | 'done' | 'failed'
+  progress: number
+  error?: string
+}
+
+const offlineKeys = {
+  movie: (movieID: string, accountID: string) => ['offline', accountID, movieID] as const
+}
+
+export function useOfflineTasks(movieID: string, accountID: string) {
+  const queryClient = useQueryClient()
+  const query = useQuery({
+    queryKey: offlineKeys.movie(movieID, accountID),
+    queryFn: ({ signal }) =>
+      apiGet<OfflineSubmission[]>(
+        `/api/discover/movies/${encodeURIComponent(movieID)}/offline`,
+        { account_id: accountID },
+        signal
+      ),
+    enabled: accountID !== '',
+    staleTime: 0,
+    retry: false,
+    refetchInterval: query => {
+      if (query.state.status === 'error') return false
+      return query.state.data?.some(task => task.status === 'queued' || task.status === 'running')
+        ? 5000
+        : false
+    }
+  })
+  const statuses = query.data?.map(task => `${task.task_id}:${task.status}`).join(',')
+  useEffect(() => {
+    if (accountID && statuses !== undefined) {
+      void queryClient.invalidateQueries({ queryKey: ['discover', 'movie', movieID], exact: true })
+      void queryClient.invalidateQueries({ queryKey: ['discover', 'movies'], refetchType: 'none' })
+      void queryClient.invalidateQueries({ queryKey: ['discover', 'search'], refetchType: 'none' })
+    }
+  }, [queryClient, movieID, accountID, statuses])
+  return query
+}
+
+export function useAddOffline(movieID: string, accountID: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (hash: string) =>
+      apiPost<OfflineSubmission>(`/api/discover/movies/${encodeURIComponent(movieID)}/offline`, {
+        hash
+      }),
+    retry: false,
+    onSuccess: submission => {
+      queryClient.setQueryData<OfflineSubmission[]>(
+        offlineKeys.movie(movieID, accountID),
+        tasks => [submission, ...(tasks ?? []).filter(task => task.hash !== submission.hash)]
+      )
+    },
+    onError: error => {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 400)) {
+        void queryClient.invalidateQueries({ queryKey: panKeys.account })
+      }
+    }
+  })
+}

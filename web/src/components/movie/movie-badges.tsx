@@ -17,7 +17,7 @@ export function MovieStateBadge({ state }: { state: MovieState }) {
     return <Badge variant="outline">已入库</Badge>
   }
   if (state === 'saving') {
-    return <Badge variant="outline">保存中</Badge>
+    return <Badge variant="outline">下载中</Badge>
   }
   return null
 }

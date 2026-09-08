@@ -27,8 +27,12 @@ export async function apiGet<T>(
   return request<T>(url.pathname + url.search, { signal })
 }
 
-export function apiPost<T>(path: string): Promise<T> {
-  return request<T>(path, { method: 'POST' })
+export function apiPost<T>(path: string, body?: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
 }
 
 export function apiDelete<T>(path: string): Promise<T> {

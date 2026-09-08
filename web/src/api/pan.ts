@@ -56,10 +56,11 @@ export const panKeys = {
     ['pan', 'files', accountID, directoryID, page] as const
 }
 
-export function usePanAccount() {
+export function usePanAccount(enabled = true) {
   return useQuery({
     queryKey: panKeys.account,
     queryFn: ({ signal }) => apiGet<PanAccountStatus>('/api/pan/account', undefined, signal),
+    enabled,
     retry: false,
     refetchOnWindowFocus: false
   })

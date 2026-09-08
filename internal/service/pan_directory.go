@@ -25,7 +25,7 @@ type panLibraryDirectory struct {
 func (service *PanService) Files(ctx context.Context, directoryID string, page int) (pan.FilePage, error) {
 	service.mu.Lock()
 	defer service.mu.Unlock()
-	files, err := panRead(ctx, service, func(token string) (pan.FilePage, error) {
+	files, err := withPanToken(ctx, service, func(token string) (pan.FilePage, error) {
 		return service.client.List(ctx, token, directoryID, (page-1)*100, 100)
 	})
 	if err != nil {
@@ -37,13 +37,13 @@ func (service *PanService) Files(ctx context.Context, directoryID string, page i
 func (service *PanService) SelectDirectory(ctx context.Context, directoryID string) (PanLibraryDirectory, error) {
 	service.mu.Lock()
 	defer service.mu.Unlock()
-	account, err := panRead(ctx, service, func(token string) (pan.Account, error) {
+	account, err := withPanToken(ctx, service, func(token string) (pan.Account, error) {
 		return service.client.Account(ctx, token)
 	})
 	if err != nil {
 		return PanLibraryDirectory{}, fmt.Errorf("get 115 account for directory: %w", err)
 	}
-	files, err := panRead(ctx, service, func(token string) (pan.FilePage, error) {
+	files, err := withPanToken(ctx, service, func(token string) (pan.FilePage, error) {
 		return service.client.List(ctx, token, directoryID, 0, 1)
 	})
 	if err != nil {

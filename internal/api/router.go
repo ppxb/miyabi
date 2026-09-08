@@ -20,6 +20,7 @@ type Dependencies struct {
 	Health   HealthChecker
 	Discover Discoverer
 	Pan      PanManager
+	Offline  OfflineManager
 	Frontend fs.FS
 }
 
@@ -39,6 +40,8 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	api.GET("/discover/tags", discoverTagsHandler(deps.Discover))
 	api.GET("/discover/movies/:id", discoverMovieHandler(deps.Discover))
 	api.GET("/discover/movies/:id/magnets", discoverMagnetsHandler(deps.Discover))
+	api.POST("/discover/movies/:id/offline", offlineAddHandler(deps.Offline))
+	api.GET("/discover/movies/:id/offline", offlineTasksHandler(deps.Offline))
 	api.GET("/image", imageHandler(deps.Discover))
 	api.GET("/javdb/route", javdbRouteHandler(deps.Discover))
 	api.PUT("/javdb/route", javdbSelectRouteHandler(deps.Discover))

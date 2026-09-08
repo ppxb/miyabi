@@ -28,7 +28,7 @@ export function MovieDetailPage({ movieId }: { movieId: string }) {
           ) : null}
           <MovieHero movie={detail.data} />
           <MoviePreviews code={detail.data.code} images={detail.data.preview_images} />
-          <MovieMagnets query={magnets} />
+          <MovieMagnets movieID={movieId} query={magnets} />
           <MovieRecommendations
             id="actor-movies-title"
             title="TA（们）还出演过"

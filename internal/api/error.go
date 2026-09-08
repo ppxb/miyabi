@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/pan"
+	"github.com/ppxb/miyabi/internal/service"
 	sloggin "github.com/samber/slog-gin"
 )
 
@@ -53,6 +54,8 @@ func errorMiddleware(logger *slog.Logger) gin.HandlerFunc {
 		var invalidRequest *requestError
 		switch {
 		case errors.As(err, &invalidRequest):
+			status = http.StatusBadRequest
+		case errors.Is(err, service.ErrMediaDirectoryRequired), errors.Is(err, service.ErrMagnetNotFound):
 			status = http.StatusBadRequest
 		case ent.IsNotFound(err):
 			status = http.StatusNotFound
