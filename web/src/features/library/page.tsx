@@ -9,7 +9,6 @@ import { EmptyState } from '@/components/empty-state'
 import { ListPagination } from '@/components/list-pagination'
 import { MovieGridLayout } from '@/components/movie/movie-grid'
 import { MovieGridSkeleton } from '@/components/movie/movie-grid-skeleton'
-import { OverflowTooltip } from '@/components/overflow-tooltip'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -107,12 +106,7 @@ export function LibraryPage({
           {source ? (
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
               <div className="min-w-0 flex-1 space-y-1">
-                <p className="text-sm">
-                  {library.data.total} 部影片 · {library.data.file_count} 个视频
-                </p>
-                <OverflowTooltip content={source.directory.path}>
-                  <p className="truncate text-xs text-muted-foreground">{source.directory.path}</p>
-                </OverflowTooltip>
+                <p className="text-sm">发现 {library.data.total} 部影片</p>
               </div>
               {library.data.unmatched_files > 0 ? (
                 <LibraryFilesDialog>

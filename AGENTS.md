@@ -251,6 +251,8 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 - ent schema 改动后执行 `go generate ./...`。
 - 前端所有服务端数据通过 TanStack Query，不放 Zustand。
 - NSFW 等普通显示偏好由 Zustand persist 持久化到当前浏览器 localStorage，不存 SQLite、不调用设置 API。服务端不可用时本地偏好仍可使用。
+- 媒体图片的 NSFW 行为沿用 jm-boom：开启隐私模式时不渲染 `<img>`；隐藏、缺图和加载失败统一显示灰底 `ImageIcon` 占位，图片地址变化后重置失败状态。
+- 媒体卡片不添加悬停阴影、缩放或背景变色。
 - 设置页最上方为“外观”分组，主题切换沿用 jm-boom `feat/docker` 的 shadcn Tabs 图标按钮，支持跟随系统、浅色、深色。主题由 next-themes 持久化到 `miyabi-theme`，全局 ThemeProvider 负责应用到页面。
 - 所有项目依赖的安装、升级和移除均由用户执行，包括 Go module、前端 npm/pnpm 包及 shadcn/ui 组件。助手先告知所需依赖、用途和具体命令，不自行运行依赖变更命令；可使用已安装的依赖进行构建、测试、lint 和格式化。依赖未就绪时继续完成不受影响的工作，并明确说明尚未完成的检查。
 - 前端提交前跑 `oxlint` 与 `oxfmt`，Go 用 `gofmt` 与 `go vet`。

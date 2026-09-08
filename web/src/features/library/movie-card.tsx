@@ -12,7 +12,7 @@ export function LibraryMovieCard({ movie }: { movie: LibraryMovie }) {
     <LibraryFilesDialog movie={movie}>
       <Button
         variant="ghost"
-        className="block h-auto min-w-0 rounded-2xl p-0 text-left whitespace-normal"
+        className="block h-auto min-w-0 rounded-2xl p-0 text-left whitespace-normal hover:bg-transparent hover:text-current dark:hover:bg-transparent"
       >
         <MovieCard
           movie={movie}

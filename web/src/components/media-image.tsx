@@ -1,8 +1,7 @@
-import { EyeOffIcon, ImageOffIcon } from 'lucide-react'
+import { ImageIcon } from 'lucide-react'
 import { useState } from 'react'
 
 import { imageURL } from '@/api/client'
-import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { useSettingsStore } from '@/stores/settings'
 
@@ -13,48 +12,32 @@ type MediaImageProps = {
   className?: string
 }
 
-// All media images pass through this component so hidden images have no img/src.
 export function MediaImage(props: MediaImageProps) {
-  const nsfwMode = useSettingsStore(state => state.nsfwMode)
-  if (nsfwMode) {
-    return (
-      <div className="flex size-full items-center justify-center bg-muted text-muted-foreground">
-        <EyeOffIcon className="size-6" />
-      </div>
-    )
-  }
-  return <VisibleImage key={props.source} {...props} />
+  return <MediaImageContent key={JSON.stringify([props.source, props.original])} {...props} />
 }
 
-function VisibleImage({ source, original, loading = 'lazy', className }: MediaImageProps) {
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-
-  if (status === 'error') {
-    return (
-      <div className="flex size-full items-center justify-center bg-muted text-muted-foreground">
-        <ImageOffIcon className="size-6" />
-      </div>
-    )
-  }
+function MediaImageContent({ source, original, loading = 'lazy', className }: MediaImageProps) {
+  const [hasImageError, setHasImageError] = useState(false)
+  const nsfwMode = useSettingsStore(state => state.nsfwMode)
+  const shouldShowImage = !nsfwMode && source.length > 0 && !hasImageError
 
   return (
-    <div className="relative size-full">
-      {status === 'loading' ? (
-        <Skeleton className="absolute inset-0 size-full rounded-none" />
-      ) : null}
-      <img
-        src={imageURL(source)}
-        srcSet={original ? `${imageURL(source)} 1x, ${imageURL(original)} 2x` : undefined}
-        loading={loading}
-        decoding="async"
-        onLoad={() => setStatus('ready')}
-        onError={() => setStatus('error')}
-        className={cn(
-          'size-full transition-opacity duration-200',
-          status === 'ready' ? 'opacity-100' : 'opacity-0',
-          className
-        )}
-      />
+    <div className="relative size-full overflow-hidden bg-muted">
+      {shouldShowImage ? (
+        <img
+          src={imageURL(source)}
+          srcSet={original ? `${imageURL(source)} 1x, ${imageURL(original)} 2x` : undefined}
+          loading={loading}
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setHasImageError(true)}
+          className={cn('size-full', className)}
+        />
+      ) : (
+        <div className="flex size-full items-center justify-center text-muted-foreground">
+          <ImageIcon className="size-6" />
+        </div>
+      )}
     </div>
   )
 }

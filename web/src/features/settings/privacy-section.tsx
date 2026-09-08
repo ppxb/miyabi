@@ -10,11 +10,7 @@ export function PrivacySection() {
 
   return (
     <SettingsSection icon={<ShieldIcon className="size-4" />} title="NSFW 保护">
-      <SettingRow
-        title="开启隐私保护模式"
-        description="开启后隐藏列表页、搜索页、详情页敏感图片。"
-        inline
-      >
+      <SettingRow title="封面隐私模式" description="开启后遮挡影片封面和预览图" inline>
         <Switch checked={nsfwMode} onCheckedChange={setNsfwMode} />
       </SettingRow>
     </SettingsSection>

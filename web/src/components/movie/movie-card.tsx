@@ -1,5 +1,4 @@
 import { Link } from '@tanstack/react-router'
-import { FilmIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import type { DiscoverMovie } from '@/api/discover'
@@ -40,15 +39,11 @@ export function MovieCard({
 }) {
   const title = movie.title || movie.code
   return (
-    <Card size="sm" className="h-full gap-0 overflow-hidden py-0 transition-shadow hover:shadow-xl">
+    <Card size="sm" className="h-full gap-0 overflow-hidden py-0">
       <div className="relative flex aspect-3/2 items-center justify-center overflow-hidden bg-muted">
-        {movie.cover ? (
-          <div className="absolute inset-0">
-            <MovieCover source={movie.cover} />
-          </div>
-        ) : (
-          <FilmIcon className="size-8 text-muted-foreground/60" />
-        )}
+        <div className="absolute inset-0">
+          <MovieCover source={movie.cover ?? ''} />
+        </div>
         <div className="absolute top-2 left-2 flex max-w-[calc(100%-1rem)] flex-wrap gap-1.5">
           <Badge variant="outline" className="max-w-full truncate bg-background/85 backdrop-blur">
             {movie.code}
