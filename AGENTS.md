@@ -26,7 +26,7 @@
 | JavDB Transport | `github.com/bogdanfinn/tls-client` | App API 已验证使用 Chrome TLS 指纹；只在 `internal/javdb` 内使用 |
 | 图片处理 | `github.com/disintegration/imaging` | 海报裁剪、缩略图 |
 | 限速 | `golang.org/x/time/rate` | 115 与 JavDB 分别限速 |
-| 配置 | `github.com/knadh/koanf/v2` | 启动参数：监听地址、数据目录、日志级别、代理。文件 + 环境变量覆盖。服务端运行时设置存 Setting 表；NSFW 等浏览器偏好由 Zustand persist 存 localStorage |
+| 配置 | `github.com/knadh/koanf/v2` | 启动参数：监听地址、数据目录、日志级别、代理。文件 + 环境变量覆盖。服务端运行时设置存 Setting 表；NSFW 由 Zustand persist 存 localStorage，主题由 next-themes 管理 |
 | 日志 | `log/slog` | 标准库 |
 | 前端 | Vite 8 + React 19 + TypeScript | |
 | 前端状态 | TanStack Query + Zustand | 服务端状态与 UI 状态分离 |
@@ -178,6 +178,7 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 - `access_token`、`refresh_token` 和过期时间一起存入 Setting 的 `pan.credentials`，不返回前端、不写入日志或 localStorage。按请求需要刷新令牌，串行处理刷新与凭据写入；令牌交换或刷新开始后，即使浏览器取消请求也完成持久化。
 - 退出登录删除 Miyabi 保存的凭据，不调用 115 撤销应用授权接口。
 - 登录后可在“媒体目录”行通过 Dialog 浏览 115 文件夹并挂载当前目录，支持路径导航和分页；文件仅用于浏览，不能作为媒体目录选择。
+- “媒体目录”描述保持固定，绑定路径显示在右侧操作按钮之前的禁用 shadcn Input 中，挂载/更换按钮使用 shadcn Tooltip。目录弹窗的路径导航使用 shadcn Breadcrumb，长名称保持单行省略。
 - 挂载目录由后端向 115 读取确认，目录 ID、名称、路径及所属账号一起存入 Setting 的 `pan.library_directory`。同一账号重新登录保留选择，换号后不沿用旧账号目录；取消挂载只删除本地配置。
 
 ## 关键流程
@@ -226,9 +227,11 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 - ent schema 改动后执行 `go generate ./...`。
 - 前端所有服务端数据通过 TanStack Query，不放 Zustand。
 - NSFW 等普通显示偏好由 Zustand persist 持久化到当前浏览器 localStorage，不存 SQLite、不调用设置 API。服务端不可用时本地偏好仍可使用。
+- 设置页最上方为“外观”分组，主题切换沿用 jm-boom `feat/docker` 的 shadcn Tabs 图标按钮，支持跟随系统、浅色、深色。主题由 next-themes 持久化到 `miyabi-theme`，全局 ThemeProvider 负责应用到页面。
 - 所有项目依赖的安装、升级和移除均由用户执行，包括 Go module、前端 npm/pnpm 包及 shadcn/ui 组件。助手先告知所需依赖、用途和具体命令，不自行运行依赖变更命令；可使用已安装的依赖进行构建、测试、lint 和格式化。依赖未就绪时继续完成不受影响的工作，并明确说明尚未完成的检查。
 - 前端提交前跑 `oxlint` 与 `oxfmt`，Go 用 `gofmt` 与 `go vet`。
 - 业务界面使用 `components/ui` 中的 shadcn 组件，不直接使用 Radix 原语拼装同类控件；缺少组件时先告知安装命令，由用户安装。
+- 不使用 HTML 原生 `title` 悬停提示或图片 `alt` 提示文案；需要悬停说明的控件使用 shadcn Tooltip，保留控件的无障碍名称。
 - 设置项标题与描述统一使用 `SettingRow` 的块级布局。标题不代理触发右侧控件，通过 `aria-labelledby` 和 `aria-describedby` 关联控件的无障碍名称与描述。
 - 根目录一份 `.gitignore`，不在 `web/` 单独放。`web/dist` 不入库，`make build` 先构建前端再编译 Go。
 - API 路径前缀 `/api`，JSON 字段 snake_case。

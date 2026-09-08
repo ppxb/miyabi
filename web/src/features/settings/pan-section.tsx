@@ -62,7 +62,6 @@ export function PanSection() {
             variant="outline"
             size="icon"
             aria-label="扫码登录 115"
-            title="扫码登录 115"
             disabled={disconnect.isPending}
           >
             <QrCodeIcon className="size-4" />

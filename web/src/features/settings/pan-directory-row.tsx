@@ -2,6 +2,7 @@ import { FolderMinusIcon, FolderOpenIcon, LoaderCircleIcon } from 'lucide-react'
 
 import { useClearPanDirectory, type PanDirectory } from '@/api/pan'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { PanDirectoryDialog } from './pan-directory-dialog'
 import { SettingRow } from './shared'
@@ -22,22 +23,34 @@ export function PanDirectoryRow({
     <>
       <SettingRow
         title="媒体目录"
-        description={directory ? directory.path : '选择 115 中的目录作为媒体库来源'}
-        inline
+        description="选择 115 中的目录作为媒体库来源"
+        inline={!directory}
       >
-        <div className="flex items-center gap-2">
-          <PanDirectoryDialog accountID={accountID} directory={directory}>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label={action}
-              title={action}
-              disabled={disabled || clear.isPending}
-            >
-              <FolderOpenIcon className="size-4" />
-            </Button>
-          </PanDirectoryDialog>
+        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+          {directory ? (
+            <Input
+              value={directory.path}
+              aria-label="已挂载的媒体目录"
+              disabled
+              className="min-w-0 flex-1 text-ellipsis sm:w-64 sm:flex-none"
+            />
+          ) : null}
+          <Tooltip>
+            <PanDirectoryDialog accountID={accountID} directory={directory}>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label={action}
+                  disabled={disabled || clear.isPending}
+                >
+                  <FolderOpenIcon className="size-4" />
+                </Button>
+              </TooltipTrigger>
+            </PanDirectoryDialog>
+            <TooltipContent>{action}</TooltipContent>
+          </Tooltip>
           {directory ? (
             <Tooltip>
               <TooltipTrigger asChild>

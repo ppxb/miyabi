@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from '@tanstack/react-router'
+import { ThemeProvider } from 'next-themes'
 
 import { router } from '@/router'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -25,9 +26,17 @@ declare module '@tanstack/react-router' {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider delayDuration={0}>
-        <RouterProvider router={router} />
-      </TooltipProvider>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        storageKey="miyabi-theme"
+        enableSystem
+        disableTransitionOnChange
+      >
+        <TooltipProvider delayDuration={0}>
+          <RouterProvider router={router} />
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>
 )

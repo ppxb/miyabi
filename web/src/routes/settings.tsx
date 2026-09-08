@@ -5,6 +5,7 @@ import { AppPage } from '@/components/app-page'
 import { PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { AppearanceSection } from '@/features/settings/appearance-section'
 import { JavDBSection } from '@/features/settings/javdb-section'
 import { PanSection } from '@/features/settings/pan-section'
 import { PrivacySection } from '@/features/settings/privacy-section'
@@ -21,6 +22,8 @@ function SettingsPage() {
 
       <Card>
         <CardContent className="space-y-8">
+          <AppearanceSection />
+          <hr className="border-border" />
           <PrivacySection />
           <hr className="border-border" />
           <JavDBSection />

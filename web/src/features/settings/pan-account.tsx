@@ -14,12 +14,8 @@ export function PanAccountInfo({ account }: { account: PanAccount }) {
         </AvatarFallback>
       </Avatar>
       <div className="min-w-0 space-y-1">
-        <div className="truncate text-sm font-semibold" title={account.name}>
-          {account.name}
-        </div>
-        <div className="truncate text-xs text-muted-foreground" title={account.level}>
-          {account.level}
-        </div>
+        <div className="truncate text-sm font-semibold">{account.name}</div>
+        <div className="truncate text-xs text-muted-foreground">{account.level}</div>
       </div>
     </div>
   )
