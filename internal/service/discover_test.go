@@ -59,6 +59,34 @@ func TestNewDiscoverServicePersistsDeviceWithoutSelectingRoute(t *testing.T) {
 	}
 }
 
+func TestNewDiscoverServiceRestoresPersistedRoute(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	saved := persistedRoute{Host: "https://cached.example", LatencyMS: 125, Manual: true}
+	if err := saveSetting(t.Context(), store.Client, javdbRouteSetting, saved); err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewDiscoverService(t.Context(), store.Client, javdb.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+	status := service.Route()
+	if !status.Active || status.Host != saved.Host || status.LatencyMS != saved.LatencyMS || status.Manual != saved.Manual {
+		t.Fatalf("restored route = %#v", status)
+	}
+	if err := service.persistActiveRoute(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	restored, found, err := loadSetting[persistedRoute](t.Context(), store.Client, javdbRouteSetting)
+	if err != nil || !found || restored != saved {
+		t.Fatalf("persisted route = %#v, found = %t, error = %v", restored, found, err)
+	}
+}
+
 func TestProjectMoviesAddsLibraryTaskAndReleaseState(t *testing.T) {
 	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {

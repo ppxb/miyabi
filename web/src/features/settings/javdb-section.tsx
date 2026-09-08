@@ -111,8 +111,10 @@ export function JavDBSection() {
             ? '线路切换未完成，请稍后重试。'
             : '暂时没有找到可用线路，请稍后重新测速。'}
         </p>
-      ) : status?.host && !status.active ? (
-        <p className="text-xs text-muted-foreground">首次请求时将完成全部线路测速。</p>
+      ) : status && !status.active ? (
+        <p className="text-xs text-muted-foreground">
+          尚无缓存线路，首次请求时将完成全部线路测速。
+        </p>
       ) : null}
     </SettingsSection>
   )

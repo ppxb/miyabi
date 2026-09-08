@@ -72,6 +72,21 @@ func New(options Options) (*Client, error) {
 		stopRoutes:   stopRoutes,
 	}
 	client.selectRoute = client.selectAndInstall
+	if options.CachedHost != "" {
+		// Restore the last successful selection without probing. The first GET
+		// uses this transport and retains the normal failure recovery path.
+		hosts := append(slices.Clone(bootstrapHosts), options.CachedHost)
+		known := map[string]probeResult{
+			options.CachedHost: {latency: options.CachedLatency},
+		}
+		if _, err := client.installRoute(routeContext, RouteStatus{
+			Host: options.CachedHost, Latency: options.CachedLatency, Manual: options.ManualRoute,
+			Candidates: routeCandidates(hosts, known),
+		}); err != nil {
+			client.Close()
+			return nil, fmt.Errorf("restore cached JavDB route: %w", err)
+		}
+	}
 	return client, nil
 }
 
@@ -84,7 +99,7 @@ func NewDeviceUUID() (string, error) {
 	return id.String(), nil
 }
 
-// Initialize selects and installs an API route.
+// Initialize selects an API route when no cached or active route is available.
 func (c *Client) Initialize(ctx context.Context) error {
 	_, err := c.ensureRoute(ctx)
 	return err

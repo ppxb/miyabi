@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
@@ -30,6 +31,77 @@ func (transport *stubTransport) getJSON(
 
 func (*stubTransport) closeIdleConnections() {}
 
+func TestClientReusesCachedRouteWithoutSelecting(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		manual bool
+	}{
+		{name: "automatic"},
+		{name: "manual", manual: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			client, err := New(Options{
+				DeviceUUID: "00000000-0000-4000-8000-000000000000",
+				CachedHost: "https://cached.example", CachedLatency: 125 * time.Millisecond,
+				ManualRoute: test.manual,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer client.Close()
+			status, active := client.Route()
+			if !active || status.Host != "https://cached.example" || status.Manual != test.manual || status.Latency != 125*time.Millisecond {
+				t.Fatalf("restored route = %#v, active = %t", status, active)
+			}
+
+			cached := client.current.Load()
+			cached.transport.closeIdleConnections()
+			transport := &stubTransport{}
+			client.current.Store(&routeState{transport: transport, status: cached.status})
+			selections := 0
+			client.selectRoute = func(context.Context, routeSelection) (*routeState, error) {
+				selections++
+				return nil, errors.New("cached route must be reused without probing")
+			}
+			if err := client.Initialize(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if err := client.getJSON(t.Context(), "/test", nil, defaultLanguage, nil); err != nil {
+				t.Fatal(err)
+			}
+			if selections != 0 || transport.calls != 1 {
+				t.Fatalf("selections = %d, business requests = %d", selections, transport.calls)
+			}
+		})
+	}
+}
+
+func TestClientReselectStillMeasuresAllRoutesWithCache(t *testing.T) {
+	client, err := New(Options{
+		DeviceUUID: "00000000-0000-4000-8000-000000000000",
+		CachedHost: "https://cached.example", ManualRoute: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	selections := 0
+	client.selectRoute = func(_ context.Context, options routeSelection) (*routeState, error) {
+		selections++
+		if !options.full || !slices.Contains(options.hosts, "https://cached.example") {
+			return nil, errors.New("manual reselect must measure all routes, including the cached host")
+		}
+		return &routeState{status: RouteStatus{Host: "https://selected.example"}}, nil
+	}
+	status, err := client.Reselect(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selections != 1 || status.Host != "https://selected.example" || status.Manual {
+		t.Fatalf("selections = %d, selected route = %#v", selections, status)
+	}
+}
+
 func TestClientReplaysOnceAfterRouteFailure(t *testing.T) {
 	failedTransport := &stubTransport{err: &networkError{err: errors.New("connection reset")}}
 	replacementTransport := &stubTransport{}
@@ -39,8 +111,11 @@ func TestClientReplaysOnceAfterRouteFailure(t *testing.T) {
 	selections := 0
 	client := &Client{limiter: rate.NewLimiter(rate.Inf, 1), routeContext: t.Context(), options: Options{Timeout: time.Second}}
 	client.current.Store(failedState)
-	client.selectRoute = func(context.Context, routeSelection) (*routeState, error) {
+	client.selectRoute = func(_ context.Context, options routeSelection) (*routeState, error) {
 		selections++
+		if options.full {
+			return nil, errors.New("connection failure must use quick route recovery")
+		}
 		client.current.Store(replacementState)
 		return replacementState, nil
 	}

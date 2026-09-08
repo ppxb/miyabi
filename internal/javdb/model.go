@@ -18,6 +18,7 @@ const (
 // Options configures the anonymous JavDB App API client.
 type Options struct {
 	CachedHost        string
+	CachedLatency     time.Duration
 	ManualRoute       bool
 	DeviceUUID        string
 	Proxy             string

@@ -116,6 +116,7 @@ func NewDiscoverService(
 	}
 	if found {
 		options.CachedHost = route.Host
+		options.CachedLatency = time.Duration(route.LatencyMS) * time.Millisecond
 		options.ManualRoute = route.Manual
 	}
 	options.DeviceUUID = deviceUUID
@@ -134,6 +135,7 @@ func NewDiscoverService(
 		route: JavDBRouteStatus{
 			Host:      route.Host,
 			LatencyMS: route.LatencyMS,
+			Active:    route.Host != "",
 			Manual:    route.Manual,
 		},
 	}, nil
