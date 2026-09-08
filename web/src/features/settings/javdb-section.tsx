@@ -13,6 +13,7 @@ import {
   useSelectJavDBRoute
 } from '@/api/discover'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Select,
   SelectContent,
@@ -90,23 +91,28 @@ export function JavDBSection() {
               </SelectGroup>
             </SelectContent>
           </Select>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            disabled={busy}
-            onClick={refreshRoutes}
-          >
-            <RefreshCwIcon className={cn('size-4', busy && 'animate-spin')} />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                disabled={busy}
+                onClick={refreshRoutes}
+              >
+                <RefreshCwIcon className={cn('size-4', busy && 'animate-spin')} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{route.isError ? '重试' : '重新测速'}</TooltipContent>
+          </Tooltip>
         </div>
       </SettingRow>
       {route.isError ? (
-        <div role="status" className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+        <div className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
           后端服务暂不可用，请启动后端服务后点击重试。本地显示设置仍可使用。
         </div>
       ) : selectRoute.isError || reselect.isError ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p className="text-sm text-destructive">
           {selectRoute.isError
             ? '线路切换未完成，请稍后重试。'
             : '暂时没有找到可用线路，请稍后重新测速。'}

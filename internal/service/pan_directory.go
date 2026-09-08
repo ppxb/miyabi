@@ -64,15 +64,29 @@ func (service *PanService) SelectDirectory(ctx context.Context, directoryID stri
 		return PanLibraryDirectory{}, err
 	}
 	service.directory = record
+	service.authorizationVersion++
 	return directory, nil
 }
 
 func (service *PanService) ClearDirectory(ctx context.Context) error {
 	service.mu.Lock()
 	defer service.mu.Unlock()
+	return service.clearDirectory(ctx)
+}
+
+// The caller holds mu after verifying the current account with 115.
+func (service *PanService) discardOtherAccountDirectory(ctx context.Context, accountID string) error {
+	if service.directory.ID == "" || service.directory.AccountID == accountID {
+		return nil
+	}
+	return service.clearDirectory(ctx)
+}
+
+func (service *PanService) clearDirectory(ctx context.Context) error {
 	if _, err := service.database.Setting.Delete().Where(setting.Key(panDirectorySetting)).Exec(ctx); err != nil {
 		return fmt.Errorf("remove 115 media directory setting: %w", err)
 	}
 	service.directory = panLibraryDirectory{}
+	service.authorizationVersion++
 	return nil
 }

@@ -109,7 +109,7 @@ func TestProjectMoviesAddsLibraryTaskAndReleaseState(t *testing.T) {
 	}
 	if _, err := store.Client.Task.Create().
 		SetType("offline").
-		SetPayload(map[string]any{"code": "ABP-002"}).
+		SetPayload(map[string]any{"code": "ABP-002", "account_id": "100", "directory_id": "10"}).
 		Save(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -172,6 +172,11 @@ func TestCachedCatalogueStillReflectsCurrentLibraryAndTaskState(t *testing.T) {
 	}
 	defer service.Close()
 	loads := 0
+	if err := saveSetting(t.Context(), store.Client, panDirectorySetting, panLibraryDirectory{
+		AccountID: "100", PanLibraryDirectory: PanLibraryDirectory{ID: "10", Path: "/Movies"},
+	}); err != nil {
+		t.Fatal(err)
+	}
 	project := func() MovieState {
 		t.Helper()
 		source, err := cachedJavDB(t.Context(), service, service.lists, "fixture", func(context.Context) ([]javdb.Movie, error) {
@@ -190,7 +195,7 @@ func TestCachedCatalogueStillReflectsCurrentLibraryAndTaskState(t *testing.T) {
 	if got := project(); got != MovieNotInLibrary {
 		t.Fatalf("initial state = %s", got)
 	}
-	if err := store.Client.Task.Create().SetType("offline").SetPayload(map[string]any{"code": "ABP-001"}).Exec(t.Context()); err != nil {
+	if err := store.Client.Task.Create().SetType("offline").SetPayload(map[string]any{"code": "ABP-001", "account_id": "100", "directory_id": "10"}).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	if got := project(); got != MovieSaving {
@@ -220,8 +225,16 @@ func TestCachedCatalogueStillReflectsCurrentLibraryAndTaskState(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if got := project(); got != MovieSaving || loads != 1 {
+	if got := project(); got != MovieNotInLibrary || loads != 1 {
 		t.Fatalf("movie outside the mounted root = %s, loads = %d", got, loads)
+	}
+	if err := saveSetting(t.Context(), store.Client, panDirectorySetting, panLibraryDirectory{
+		AccountID: "200", PanLibraryDirectory: PanLibraryDirectory{ID: "10", Path: "/Movies"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := project(); got != MovieNotInLibrary {
+		t.Fatalf("another account inherited task state: %s", got)
 	}
 }
 

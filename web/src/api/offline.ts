@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
 
 import { ApiError, apiGet, apiPost } from '@/api/client'
 import { panKeys } from '@/api/pan'
@@ -19,8 +18,7 @@ export const offlineKeys = {
 }
 
 export function useOfflineTasks(movieID: string, accountID: string) {
-  const queryClient = useQueryClient()
-  const query = useQuery({
+  return useQuery({
     queryKey: offlineKeys.movie(movieID, accountID),
     queryFn: ({ signal }) =>
       apiGet<OfflineSubmission[]>(
@@ -40,15 +38,6 @@ export function useOfflineTasks(movieID: string, accountID: string) {
         : false
     }
   })
-  const statuses = query.data?.map(task => `${task.task_id}:${task.phase}`).join(',')
-  useEffect(() => {
-    if (accountID && statuses !== undefined) {
-      void queryClient.invalidateQueries({ queryKey: ['discover', 'movie', movieID], exact: true })
-      void queryClient.invalidateQueries({ queryKey: ['discover', 'movies'], refetchType: 'none' })
-      void queryClient.invalidateQueries({ queryKey: ['discover', 'search'], refetchType: 'none' })
-    }
-  }, [queryClient, movieID, accountID, statuses])
-  return query
 }
 
 export function useAddOffline(movieID: string, accountID: string) {

@@ -34,7 +34,13 @@ type TaskJob struct {
 	Payload map[string]any
 }
 
+type TaskRevisions struct {
+	Library uint64 `json:"library"`
+	Offline uint64 `json:"offline"`
+}
+
 type TaskService struct {
+	revisions   TaskRevisions
 	database    *ent.Client
 	enqueueMu   sync.Mutex
 	wake        chan struct{}
@@ -91,7 +97,9 @@ func (service *TaskService) List(ctx context.Context) ([]TaskInfo, error) {
 		return nil, fmt.Errorf("list scan tasks: %w", err)
 	}
 	active, err := service.database.Task.Query().Where(task.TypeIn("scan", "scrape", "cover"),
-		task.StatusIn(task.StatusQueued, task.StatusRunning)).All(ctx)
+		task.StatusIn(task.StatusQueued, task.StatusRunning), func(s *sql.Selector) {
+			s.Select("CASE WHEN type = 'scan' THEN id ELSE json_extract(payload, '$.scan_task_id') END").Distinct()
+		}).Select(task.FieldID).Ints(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list active library tasks: %w", err)
 	}
@@ -100,15 +108,7 @@ func (service *TaskService) List(ctx context.Context) ([]TaskInfo, error) {
 		ids[record.ID] = true
 	}
 	var missing []int
-	for _, record := range active {
-		id := record.ID
-		if record.Type != "scan" {
-			input, err := decodeTaskPayload[metadataPayload](record.Payload)
-			if err != nil {
-				return nil, err
-			}
-			id = input.ScanTaskID
-		}
+	for _, id := range active {
 		if !ids[id] {
 			missing = append(missing, id)
 			ids[id] = true
@@ -145,6 +145,39 @@ func (service *TaskService) List(ctx context.Context) ([]TaskInfo, error) {
 	return result, nil
 }
 
+type metadataTaskGroup struct {
+	ParentID  int         `json:"parent_id"`
+	Count     int         `json:"count"`
+	Type      string      `json:"type"`
+	Status    task.Status `json:"status"`
+	Error     *string     `json:"error"`
+	UpdatedAt time.Time   `json:"updated_at"`
+}
+
+// Return one row per parent/type/status, with its count and latest change.
+// Keep large cover documents inside SQLite instead of decoding every child.
+func (service *TaskService) metadataGroups(ctx context.Context, records []*ent.Task) ([]metadataTaskGroup, error) {
+	children := sql.Table(task.Table)
+	parents := make([]*sql.Predicate, 0, len(records))
+	for _, record := range records {
+		parents = append(parents, sqljson.ValueEQ(children.C(task.FieldPayload), record.ID, sqljson.Path("scan_task_id")))
+	}
+	parent := "json_extract(" + children.C(task.FieldPayload) + ", '$.scan_task_id')"
+	partition := "PARTITION BY " + parent + ", " + children.C(task.FieldType) + ", " + children.C(task.FieldStatus)
+	groups := sql.Select(
+		children.C(task.FieldID), sql.As(parent, "parent_id"),
+		sql.As("COUNT(*) OVER ("+partition+")", "count"),
+		sql.As("ROW_NUMBER() OVER ("+partition+" ORDER BY "+children.C(task.FieldUpdatedAt)+" DESC, "+children.C(task.FieldID)+" DESC)", "position"),
+	).From(children).Where(sql.And(sql.In(children.C(task.FieldType), "scrape", "cover"), sql.Or(parents...))).As("metadata_groups")
+	var result []metadataTaskGroup
+	err := service.database.Task.Query().Where(func(s *sql.Selector) {
+		s.Join(groups).On(s.C(task.FieldID), groups.C(task.FieldID))
+		s.Where(sql.EQ(groups.C("position"), 1))
+		s.Select(s.C(task.FieldType), s.C(task.FieldStatus), s.C(task.FieldError), s.C(task.FieldUpdatedAt), groups.C("parent_id"), groups.C("count"))
+	}).Select(task.FieldID).Scan(ctx, &result)
+	return result, err
+}
+
 func (service *TaskService) Info(ctx context.Context, id int) (TaskInfo, error) {
 	record, err := service.database.Task.Get(ctx, id)
 	if err != nil {
@@ -162,23 +195,13 @@ func (service *TaskService) workflowInfos(ctx context.Context, records []*ent.Ta
 	if len(records) == 0 {
 		return result, nil
 	}
-	parents := make([]*sql.Predicate, 0, len(records))
-	for _, record := range records {
-		parents = append(parents, sqljson.ValueEQ(task.FieldPayload, record.ID, sqljson.Path("scan_task_id")))
-	}
-	children, err := service.database.Task.Query().Where(task.TypeIn("scrape", "cover"), func(s *sql.Selector) {
-		s.Where(sql.Or(parents...))
-	}).All(ctx)
+	children, err := service.metadataGroups(ctx, records)
 	if err != nil {
 		return nil, fmt.Errorf("read metadata workflow progress: %w", err)
 	}
-	byParent := make(map[int][]*ent.Task)
+	byParent := make(map[int][]metadataTaskGroup)
 	for _, child := range children {
-		input, err := decodeTaskPayload[metadataPayload](child.Payload)
-		if err != nil {
-			return nil, err
-		}
-		byParent[input.ScanTaskID] = append(byParent[input.ScanTaskID], child)
+		byParent[child.ParentID] = append(byParent[child.ParentID], child)
 	}
 	for _, record := range records {
 		info, err := scanTaskInfo(record)
@@ -188,10 +211,10 @@ func (service *TaskService) workflowInfos(ctx context.Context, records []*ent.Ta
 		active, running, failed, artwork := false, false, false, false
 		for _, child := range byParent[record.ID] {
 			if child.Type == "scrape" {
-				info.Scan.MetadataTotal++
+				info.Scan.MetadataTotal += child.Count
 			}
 			if (child.Type == "cover" && child.Status == task.StatusDone) || child.Status == task.StatusFailed {
-				info.Scan.MetadataCompleted++
+				info.Scan.MetadataCompleted += child.Count
 			}
 			active = active || child.Status == task.StatusQueued || child.Status == task.StatusRunning
 			running = running || child.Status == task.StatusRunning
@@ -273,6 +296,7 @@ func (service *TaskService) Claim(ctx context.Context, types []string) (*TaskJob
 }
 
 func (service *TaskService) Finish(ctx context.Context, id int, runError error) error {
+	libraryChanged := false
 	if err := ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
 		record, err := tx.Task.Get(ctx, id)
 		if err != nil {
@@ -282,6 +306,7 @@ func (service *TaskService) Finish(ctx context.Context, id int, runError error) 
 		if runError != nil {
 			update.SetStatus(task.StatusFailed).SetError(runError.Error())
 			if record.Type == "scrape" || record.Type == "cover" {
+				libraryChanged = true
 				input, err := decodeTaskPayload[metadataPayload](record.Payload)
 				if err != nil {
 					return err
@@ -298,7 +323,11 @@ func (service *TaskService) Finish(ctx context.Context, id int, runError error) 
 	}); err != nil {
 		return fmt.Errorf("finish task %d: %w", id, err)
 	}
-	service.Notify()
+	if libraryChanged {
+		service.NotifyLibraryChanged()
+	} else {
+		service.NotifyOfflineChanged()
+	}
 	return nil
 }
 
@@ -321,12 +350,36 @@ func (service *TaskService) Subscribe() (<-chan struct{}, func()) {
 }
 
 func (service *TaskService) Notify() {
+	service.notify(false, false)
+}
+
+func (service *TaskService) NotifyLibraryChanged() {
+	service.notify(true, false)
+}
+
+func (service *TaskService) NotifyOfflineChanged() {
+	service.notify(false, true)
+}
+
+func (service *TaskService) Revisions() TaskRevisions {
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	return service.revisions
+}
+
+func (service *TaskService) notify(library, offline bool) {
 	select {
 	case service.wake <- struct{}{}:
 	default:
 	}
 	service.mu.Lock()
 	defer service.mu.Unlock()
+	if library {
+		service.revisions.Library++
+	}
+	if offline {
+		service.revisions.Offline++
+	}
 	for subscriber := range service.subscribers {
 		select {
 		case subscriber <- struct{}{}:

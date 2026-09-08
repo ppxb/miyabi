@@ -47,16 +47,12 @@ function LibraryFilesList({ movieID }: { movieID?: number }) {
   const files = useLibraryFiles(movieID, movieID === undefined, page)
 
   if (files.isPending) {
-    return (
-      <LoaderCircleIcon className="mx-auto my-8 size-6 animate-spin" aria-label="正在读取文件" />
-    )
+    return <LoaderCircleIcon className="mx-auto my-8 size-6 animate-spin" />
   }
   if (files.isError) {
     return (
       <div className="space-y-3 text-center">
-        <p role="alert" className="text-sm text-muted-foreground">
-          无法读取文件索引，请检查后端服务后重试。
-        </p>
+        <p className="text-sm text-muted-foreground">无法读取文件索引，请检查后端服务后重试。</p>
         <Button variant="outline" onClick={() => void files.refetch()}>
           重试
         </Button>

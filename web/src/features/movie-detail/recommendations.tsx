@@ -2,16 +2,14 @@ import { Link } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 
 import { type MovieReference, useDiscoverMovie } from '@/api/discover'
-import { MovieCard, MovieCardSkeleton, MovieGridLayout } from '@/components/movie'
+import { DiscoverMovieCard, MovieCardSkeleton, MovieGridLayout } from '@/components/movie'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
 export function MovieRecommendations({
-  id,
   title,
   movies
 }: {
-  id: string
   title: string
   movies: MovieReference[]
 }) {
@@ -19,9 +17,7 @@ export function MovieRecommendations({
 
   return (
     <section className="space-y-4">
-      <h2 id={id} className="text-xl font-semibold tracking-normal">
-        {title}
-      </h2>
+      <h2 className="text-xl font-semibold tracking-normal">{title}</h2>
       {visible.length === 0 ? (
         <p className="text-sm text-muted-foreground">暂无相关影片</p>
       ) : (
@@ -69,7 +65,7 @@ function RecommendationContent({
 }) {
   const detail = useDiscoverMovie(movie.id, loadDetail)
 
-  if (detail.data) return <MovieCard movie={detail.data} />
+  if (detail.data) return <DiscoverMovieCard movie={detail.data} />
   if (!detail.isError) return <MovieCardSkeleton />
 
   return (

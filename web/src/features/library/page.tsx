@@ -50,7 +50,7 @@ export function LibraryPage({
             <TooltipTrigger asChild>
               <Button
                 className="w-9 px-0 sm:w-auto sm:px-3"
-                aria-label={scanLabel}
+
                 disabled={scanning || startScan.isPending}
                 onClick={() => startScan.mutate(undefined, { onSuccess: () => onPageChange(1) })}
               >
@@ -72,7 +72,7 @@ export function LibraryPage({
       </PageHeader>
 
       {startScan.isError ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p className="text-sm text-destructive">
           {startScan.error instanceof ApiError && startScan.error.status === 401
             ? '115 登录已失效，请前往设置重新登录。'
             : startScan.error instanceof ApiError && startScan.error.status === 400
@@ -85,7 +85,7 @@ export function LibraryPage({
       ) : null}
 
       {tasks.isError ? (
-        <p role="status" className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           暂时无法获取任务状态，实时连接恢复后会自动同步。
         </p>
       ) : null}

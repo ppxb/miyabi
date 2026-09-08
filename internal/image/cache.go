@@ -75,6 +75,12 @@ func (cache *Cache) save(source stdimage.Image) (string, error) {
 	}
 	sum := sha256.Sum256(buffer.Bytes())
 	key := hex.EncodeToString(sum[:])
+	destination := filepath.Join(cache.directory, key+".jpg")
+	if _, err := os.Stat(destination); err == nil {
+		return URLPrefix + key, nil
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
 	temporary, err := os.CreateTemp(cache.directory, "image-*.tmp")
 	if err != nil {
 		return "", err
@@ -88,20 +94,28 @@ func (cache *Cache) save(source stdimage.Image) (string, error) {
 	if closeErr != nil {
 		return "", closeErr
 	}
-	if err := os.Rename(temporary.Name(), filepath.Join(cache.directory, key+".jpg")); err != nil {
+	if err := os.Rename(temporary.Name(), destination); err != nil {
 		return "", fmt.Errorf("store image cache: %w", err)
 	}
 	return URLPrefix + key, nil
 }
 
 func (cache *Cache) Read(key string) ([]byte, error) {
-	if len(key) != 64 {
-		return nil, fmt.Errorf("invalid artwork key")
-	}
-	if _, err := hex.DecodeString(key); err != nil {
+	name, err := cache.filePath(key)
+	if err != nil {
 		return nil, err
 	}
-	return os.ReadFile(filepath.Join(cache.directory, key+".jpg"))
+	return os.ReadFile(name)
+}
+
+func (cache *Cache) filePath(key string) (string, error) {
+	if len(key) != 64 {
+		return "", fmt.Errorf("invalid artwork key")
+	}
+	if _, err := hex.DecodeString(key); err != nil {
+		return "", err
+	}
+	return filepath.Join(cache.directory, key+".jpg"), nil
 }
 
 func (cache *Cache) ReadURL(url string) ([]byte, error) {
@@ -109,4 +123,25 @@ func (cache *Cache) ReadURL(url string) ([]byte, error) {
 		return nil, fmt.Errorf("image is not in the local cache")
 	}
 	return cache.Read(strings.TrimPrefix(url, URLPrefix))
+}
+
+func (cache *Cache) Exists(artwork Artwork) (bool, error) {
+	for _, url := range []string{artwork.Poster, artwork.Fanart, artwork.Thumbnail} {
+		if url == "" {
+			return false, nil
+		}
+		if !strings.HasPrefix(url, URLPrefix) {
+			return false, fmt.Errorf("image is not in the local cache")
+		}
+		name, err := cache.filePath(strings.TrimPrefix(url, URLPrefix))
+		if err != nil {
+			return false, err
+		}
+		if _, err := os.Stat(name); os.IsNotExist(err) {
+			return false, nil
+		} else if err != nil {
+			return false, err
+		}
+	}
+	return true, nil
 }

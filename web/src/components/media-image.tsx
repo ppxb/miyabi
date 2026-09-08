@@ -18,10 +18,7 @@ export function MediaImage(props: MediaImageProps) {
   const nsfwMode = useSettingsStore(state => state.nsfwMode)
   if (nsfwMode) {
     return (
-      <div
-        role="img"
-        className="flex size-full items-center justify-center bg-muted text-muted-foreground"
-      >
+      <div className="flex size-full items-center justify-center bg-muted text-muted-foreground">
         <EyeOffIcon className="size-6" />
       </div>
     )
@@ -34,10 +31,7 @@ function VisibleImage({ source, original, loading = 'lazy', className }: MediaIm
 
   if (status === 'error') {
     return (
-      <div
-        role="img"
-        className="flex size-full items-center justify-center bg-muted text-muted-foreground"
-      >
+      <div className="flex size-full items-center justify-center bg-muted text-muted-foreground">
         <ImageOffIcon className="size-6" />
       </div>
     )

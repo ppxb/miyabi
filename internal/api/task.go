@@ -9,6 +9,7 @@ import (
 )
 
 type TaskManager interface {
+	Revisions() service.TaskRevisions
 	List(context.Context) ([]service.TaskInfo, error)
 	Subscribe() (<-chan struct{}, func())
 }

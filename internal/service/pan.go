@@ -47,7 +47,7 @@ type PanService struct {
 	tokens    pan.Tokens
 	session   *panLoginSession
 	directory panLibraryDirectory
-	// Changes only when the user logs in or out, not when tokens rotate.
+	// Changes with login or mount selection, not when tokens rotate.
 	authorizationVersion uint64
 }
 
@@ -79,6 +79,9 @@ func (service *PanService) Account(ctx context.Context) (PanAccountStatus, error
 	})
 	if err != nil {
 		return PanAccountStatus{}, fmt.Errorf("get 115 account: %w", err)
+	}
+	if err := service.discardOtherAccountDirectory(ctx, account.ID); err != nil {
+		return PanAccountStatus{}, err
 	}
 	status := PanAccountStatus{Connected: true, Account: &account}
 	if service.directory.AccountID == account.ID {
@@ -139,6 +142,17 @@ func (service *PanService) LoginStatus(ctx context.Context, id string) (PanLogin
 			return PanLoginStatus{}, err
 		}
 		service.authorizationVersion++
+		account, err := withPanToken(tokenContext, service, func(token string) (pan.Account, error) {
+			return service.client.Account(tokenContext, token)
+		})
+		if err != nil {
+			session.err = fmt.Errorf("verify 115 login account: %w", err)
+			return PanLoginStatus{}, session.err
+		}
+		if err := service.discardOtherAccountDirectory(tokenContext, account.ID); err != nil {
+			session.err = err
+			return PanLoginStatus{}, err
+		}
 	}
 	session.state = state
 	if state != pan.LoginWaiting && state != pan.LoginScanned {

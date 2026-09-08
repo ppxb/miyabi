@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react'
 
 import type { DiscoverMovie } from '@/api/discover'
-import { MovieCard } from '@/components/movie/movie-card'
+import { DiscoverMovieCard } from '@/components/movie/movie-card'
 
 export function MovieGrid({ movies }: { movies: DiscoverMovie[] }) {
   return (
     <MovieGridLayout>
       {movies.map(movie => (
-        <MovieCard key={movie.id} movie={movie} />
+        <DiscoverMovieCard key={movie.id} movie={movie} />
       ))}
     </MovieGridLayout>
   )

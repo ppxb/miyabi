@@ -9,7 +9,7 @@ export function PanAccountInfo({ account }: { account: PanAccount }) {
     <div className="flex min-w-0 items-center gap-3">
       <Avatar key={account.avatar} className="size-12">
         {account.avatar ? <AvatarImage src={account.avatar} /> : null}
-        <AvatarFallback role="img" aria-label="用户头像">
+        <AvatarFallback>
           <UserRoundIcon className="size-5" />
         </AvatarFallback>
       </Avatar>
@@ -36,10 +36,7 @@ export function PanStorageUsage({ space }: { space: PanAccount['space'] }) {
       <div className="relative">
         <Progress
           value={fill}
-          aria-label="115 网盘容量使用情况"
-          getValueLabel={() =>
-            `已使用 ${space.used.formatted}，总容量 ${space.total.formatted}，剩余 ${space.remaining.formatted}`
-          }
+
           className="h-10 rounded-lg bg-muted/60 ring-1 ring-border/60 **:data-[slot=progress-indicator]:bg-sky-500"
         />
         <div
@@ -58,7 +55,7 @@ export function PanStorageUsage({ space }: { space: PanAccount['space'] }) {
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="size-2.5 rounded-full border border-border bg-muted" />
-          剩余
+          剩余 {space.remaining.formatted}
         </span>
       </div>
     </div>

@@ -36,7 +36,7 @@ export function PanSection() {
               type="button"
               variant="outline"
               size="icon"
-              aria-label="重新获取 115 账号状态"
+
               disabled={account.isFetching}
               onClick={() => void account.refetch()}
             >
@@ -51,17 +51,14 @@ export function PanSection() {
         </Tooltip>
       ) : null}
       {account.isPending ? (
-        <LoaderCircleIcon
-          className="size-4 animate-spin text-muted-foreground"
-          aria-label="正在读取账号"
-        />
+        <LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" />
       ) : !connected ? (
         <PanLoginDialog>
           <Button
             type="button"
             variant="outline"
             size="icon"
-            aria-label="扫码登录 115"
+
             disabled={disconnect.isPending}
           >
             <QrCodeIcon className="size-4" />
@@ -75,7 +72,7 @@ export function PanSection() {
               type="button"
               variant="outline"
               size="icon"
-              aria-label="退出 115 登录"
+
               disabled={disconnect.isPending}
               onClick={() => disconnect.mutate()}
             >
@@ -105,7 +102,7 @@ export function PanSection() {
         </SettingRow>
       )}
       {connected && profile && account.isError ? (
-        <p role="status" className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           暂时无法更新账号信息，请检查后端服务和网络后重试。
         </p>
       ) : null}
@@ -121,9 +118,7 @@ export function PanSection() {
         </>
       ) : null}
       {disconnect.isError ? (
-        <p role="alert" className="text-sm text-destructive">
-          退出登录未完成，请检查后端服务后重试。
-        </p>
+        <p className="text-sm text-destructive">退出登录未完成，请检查后端服务后重试。</p>
       ) : null}
     </SettingsSection>
   )

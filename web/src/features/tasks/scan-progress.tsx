@@ -14,6 +14,18 @@ const statusLabels = {
   failed: '处理失败'
 }
 
+function scanStatus(task: ScanTask, reconnecting: boolean) {
+  if (!isTaskActive(task)) return statusLabels[task.status]
+  if (reconnecting) return '进度重连中'
+  if (task.scan.metadata_total > 0) {
+    if (task.status === 'queued') return '等待刮削'
+    return task.scan.stage === 'artwork' ? '写入元数据' : '刮削中'
+  }
+  if (task.status === 'running' && ['reconciling', 'done'].includes(task.scan.stage))
+    return '核对中'
+  return statusLabels[task.status]
+}
+
 export function ScanProgressView({
   task,
   compactOnMobile = false
@@ -25,18 +37,7 @@ export function ScanProgressView({
   const active = isTaskActive(task)
   const scan = task.scan
   const metadata = scan.metadata_total > 0
-  const status =
-    active && connection === 'reconnecting'
-      ? '进度重连中'
-      : active && metadata
-        ? task.status === 'queued'
-          ? '等待刮削'
-          : scan.stage === 'artwork'
-            ? '写入元数据'
-            : '刮削中'
-        : task.status === 'running' && (scan.stage === 'reconciling' || scan.stage === 'done')
-          ? '核对中'
-          : statusLabels[task.status]
+  const status = scanStatus(task, connection === 'reconnecting')
   const count = metadata
     ? `${scan.metadata_completed} / ${scan.metadata_total} 部`
     : `识别到 ${scan.movies} 部`
@@ -48,19 +49,14 @@ export function ScanProgressView({
       {compactOnMobile ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span
-              tabIndex={0}
-              aria-label={task.error || summary}
-              className="flex h-9 items-center rounded outline-ring sm:hidden"
-            >
+            <span className="flex h-9 items-center rounded outline-ring sm:hidden">
               {task.status === 'failed' ? (
-                <CircleAlertIcon className="size-6 text-destructive" aria-hidden="true" />
+                <CircleAlertIcon className="size-6 text-destructive" />
               ) : (
                 <Progress
                   variant="circular"
                   value={value}
-                  aria-label="媒体库处理进度"
-                  aria-valuetext={summary}
+
                   className="text-emerald-600 dark:text-emerald-500"
                 />
               )}
@@ -71,13 +67,10 @@ export function ScanProgressView({
       ) : null}
       <div className={cn('space-y-2', compactOnMobile && 'hidden sm:block')}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <p role="status" className="shrink-0 text-xs">
-            {status}
-          </p>
+          <p className="shrink-0 text-xs">{status}</p>
           <Progress
             value={value}
-            aria-label="媒体库处理进度"
-            aria-valuetext={status}
+
             className="order-last h-1 w-full **:data-[slot=progress-indicator]:bg-emerald-600 sm:order-0 sm:w-auto sm:flex-1 dark:**:data-[slot=progress-indicator]:bg-emerald-500"
           />
           <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">
@@ -86,9 +79,7 @@ export function ScanProgressView({
         </div>
         {task.error ? (
           <OverflowTooltip content={task.error}>
-            <p role="alert" className="truncate text-xs text-destructive">
-              {task.error}
-            </p>
+            <p className="truncate text-xs text-destructive">{task.error}</p>
           </OverflowTooltip>
         ) : null}
       </div>

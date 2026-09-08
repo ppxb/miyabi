@@ -13,16 +13,9 @@ export function PrivacySection() {
       <SettingRow
         title="开启隐私保护模式"
         description="开启后隐藏列表页、搜索页、详情页敏感图片。"
-        controlID="nsfw-mode"
         inline
       >
-        <Switch
-          id="nsfw-mode"
-          aria-labelledby="nsfw-mode-title"
-          aria-describedby="nsfw-mode-description"
-          checked={nsfwMode}
-          onCheckedChange={setNsfwMode}
-        />
+        <Switch checked={nsfwMode} onCheckedChange={setNsfwMode} />
       </SettingRow>
     </SettingsSection>
   )

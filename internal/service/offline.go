@@ -149,7 +149,7 @@ func (service *OfflineService) Add(ctx context.Context, movieID, hash string) (O
 	}); err != nil {
 		return OfflineSubmission{}, fmt.Errorf("record 115 offline download: %w", err)
 	}
-	service.tasks.Notify()
+	service.tasks.NotifyOfflineChanged()
 	created, err = service.database.Task.Get(submitContext, created.ID)
 	if err != nil {
 		return OfflineSubmission{}, err
@@ -460,7 +460,9 @@ func (service *OfflineService) Sync(ctx context.Context) error {
 			return err
 		}
 	}
-	service.tasks.Notify()
+	if len(wanted) > 0 {
+		service.tasks.NotifyOfflineChanged()
+	}
 	return nil
 }
 
@@ -478,7 +480,7 @@ func (service *OfflineService) updateTask(ctx context.Context, record *ent.Task,
 		}); err != nil {
 			return fmt.Errorf("queue completed download scan: %w", err)
 		}
-		service.tasks.Notify()
+		service.tasks.NotifyOfflineChanged()
 		return nil
 	case -1:
 		status = task.StatusFailed
@@ -495,7 +497,9 @@ func (service *OfflineService) updateTask(ctx context.Context, record *ent.Task,
 	if err := update.Exec(ctx); err != nil {
 		return fmt.Errorf("update offline task %d: %w", record.ID, err)
 	}
-	service.tasks.Notify()
+	if record.Status != status {
+		service.tasks.NotifyOfflineChanged()
+	}
 	return nil
 }
 

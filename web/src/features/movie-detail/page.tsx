@@ -22,23 +22,13 @@ export function MovieDetailPage({ movieId }: { movieId: string }) {
       ) : detail.data ? (
         <div className="space-y-10">
           {detail.isRefetchError ? (
-            <p role="alert" className="text-sm text-destructive">
-              刷新失败，请重试。
-            </p>
+            <p className="text-sm text-destructive">刷新失败，请重试。</p>
           ) : null}
           <MovieHero movie={detail.data} />
           <MoviePreviews code={detail.data.code} images={detail.data.preview_images} />
           <MovieMagnets movieID={movieId} query={magnets} />
-          <MovieRecommendations
-            id="actor-movies-title"
-            title="TA（们）还出演过"
-            movies={detail.data.actor_movies}
-          />
-          <MovieRecommendations
-            id="related-movies-title"
-            title="你可能也喜欢"
-            movies={detail.data.related_movies}
-          />
+          <MovieRecommendations title="TA（们）还出演过" movies={detail.data.actor_movies} />
+          <MovieRecommendations title="你可能也喜欢" movies={detail.data.related_movies} />
         </div>
       ) : (
         <EmptyState

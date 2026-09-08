@@ -12,6 +12,14 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatSize } from '@/lib/format'
 
+const phaseLabels: Record<OfflineSubmission['phase'], string> = {
+  available: '一键加入 115',
+  downloading: '下载中',
+  processing: '入库处理中',
+  in_library: '已入库',
+  downloaded: '已下载'
+}
+
 export function MovieMagnets({
   movieID,
   query
@@ -42,11 +50,9 @@ export function MovieMagnets({
 
   return (
     <section className="space-y-4">
-      <h2 id="movie-magnets-title" className="text-xl font-semibold tracking-normal">
-        磁力链
-      </h2>
+      <h2 className="text-xl font-semibold tracking-normal">磁力链</h2>
       {connected && account.data?.account && !hasDirectory ? (
-        <p role="status" className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           请先到{' '}
           <Link to="/settings" className="text-foreground underline underline-offset-4">
             设置页
@@ -55,7 +61,7 @@ export function MovieMagnets({
         </p>
       ) : null}
       {connected && offline.isError ? (
-        <div role="alert" className="flex items-center gap-3 text-sm text-destructive">
+        <div className="flex items-center gap-3 text-sm text-destructive">
           <span>离线任务状态读取失败，请重试。</span>
           <Button type="button" variant="outline" size="sm" onClick={() => void offline.refetch()}>
             重试
@@ -96,11 +102,7 @@ export function MovieMagnets({
           ))}
         </div>
       )}
-      {copyError ? (
-        <p role="alert" className="text-sm text-destructive">
-          复制失败，请重试。
-        </p>
-      ) : null}
+      {copyError ? <p className="text-sm text-destructive">复制失败，请重试。</p> : null}
     </section>
   )
 }
@@ -135,14 +137,7 @@ function MagnetCard({
   if (add.isPending) {
     label = '提交中…'
   } else if (submitted) {
-    label =
-      task.phase === 'processing'
-        ? '入库处理中'
-        : task.phase === 'in_library'
-          ? '已入库'
-          : task.phase === 'downloaded'
-            ? '已下载'
-            : '下载中'
+    label = phaseLabels[task.phase]
   } else if (checkingStatus) {
     label = '读取状态…'
   } else if (statusError) {
@@ -203,11 +198,7 @@ function MagnetCard({
             ) : null}
           </div>
         </div>
-        {error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
       </CardContent>
     </Card>
   )

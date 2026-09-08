@@ -316,19 +316,23 @@ func (service *DiscoverService) projectMovies(
 	}
 
 	saving := make(map[string]bool)
-	tasks, err := service.database.Task.Query().Where(
-		task.TypeEQ("offline"),
-		task.StatusIn(task.StatusQueued, task.StatusRunning),
-		func(selector *sql.Selector) {
-			selector.Where(sqljson.ValueIn(task.FieldPayload, taskCodes, sqljson.Path("code")))
-		},
-	).Select(task.FieldPayload).All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("query active tasks: %w", err)
-	}
-	for _, item := range tasks {
-		// The query only returns tasks whose canonical string code is on this page.
-		saving[item.Payload["code"].(string)] = true
+	if sourceDirectory != nil {
+		tasks, err := service.database.Task.Query().Where(
+			task.TypeEQ("offline"), task.StatusIn(task.StatusQueued, task.StatusRunning),
+			func(selector *sql.Selector) {
+				selector.Where(sql.And(
+					sqljson.ValueIn(task.FieldPayload, taskCodes, sqljson.Path("code")),
+					sqljson.ValueEQ(task.FieldPayload, sourceDirectory.AccountID, sqljson.Path("account_id")),
+					sqljson.ValueEQ(task.FieldPayload, sourceDirectory.Directory.ID, sqljson.Path("directory_id")),
+				))
+			},
+		).Select(task.FieldPayload).All(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("query active tasks: %w", err)
+		}
+		for _, item := range tasks {
+			saving[item.Payload["code"].(string)] = true
+		}
 	}
 
 	now := time.Now().In(time.Local)

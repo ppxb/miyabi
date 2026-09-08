@@ -77,7 +77,7 @@ function DirectoryPicker({
 
   return (
     <div className="min-w-0 space-y-4">
-      <Breadcrumb aria-label="115 目录路径" className="min-w-0">
+      <Breadcrumb className="min-w-0">
         <BreadcrumbList className="gap-1 sm:gap-1">
           <BreadcrumbItem>
             {location.id === '0' ? (
@@ -117,21 +117,15 @@ function DirectoryPicker({
             ))}
         </BreadcrumbList>
       </Breadcrumb>
-      <div
-        className="h-64 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border p-1"
-        aria-busy={files.isFetching}
-      >
+      <div className="h-64 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border p-1">
         {files.isPending ? (
-          <div
-            role="status"
-            className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground"
-          >
+          <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
             <LoaderCircleIcon className="size-4 animate-spin" />
             正在读取目录…
           </div>
         ) : files.isError ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
-            <p role="alert" className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               目录读取失败，请检查 115 授权和网络后重试。
             </p>
             <Button
@@ -183,7 +177,7 @@ function DirectoryPicker({
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label="上一页"
+
             disabled={location.page === 1 || files.isFetching || select.isPending}
             onClick={() => navigate(location.id, location.page - 1)}
           >
@@ -193,7 +187,7 @@ function DirectoryPicker({
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label="下一页"
+
             disabled={
               !files.data?.has_more || files.isError || files.isFetching || select.isPending
             }
@@ -204,9 +198,7 @@ function DirectoryPicker({
         </div>
       </div>
       {select.isError ? (
-        <p role="alert" className="text-sm text-destructive">
-          目录挂载未完成，请稍后重试。
-        </p>
+        <p className="text-sm text-destructive">目录挂载未完成，请稍后重试。</p>
       ) : null}
       <div className="flex justify-end">
         <Button

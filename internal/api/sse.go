@@ -23,6 +23,7 @@ func taskEventsHandler(tasks TaskManager) gin.HandlerFunc {
 		c.Header("Connection", "keep-alive")
 		c.Header("X-Accel-Buffering", "no")
 		c.SSEvent("tasks", snapshot)
+		c.SSEvent("changes", tasks.Revisions())
 		c.Writer.Flush()
 		heartbeat := time.NewTicker(15 * time.Second)
 		defer heartbeat.Stop()
@@ -39,6 +40,7 @@ func taskEventsHandler(tasks TaskManager) gin.HandlerFunc {
 					return false
 				}
 				c.SSEvent("tasks", snapshot)
+				c.SSEvent("changes", tasks.Revisions())
 			}
 			return true
 		})

@@ -9,6 +9,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/task"
+	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
@@ -30,7 +31,11 @@ func libraryFixture(t *testing.T) (*LibraryService, TaskInfo, scanPayload) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return NewLibraryService(store.Client, nil, tasks), queued, scanPayload{Source: source, Scan: ScanProgress{Stage: "scanning"}}
+	images, err := mediaimage.NewCache(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return NewLibraryService(store.Client, nil, tasks, images), queued, scanPayload{Source: source, Scan: ScanProgress{Stage: "scanning"}}
 }
 
 func fixtureVideo(id, name string) scanVideo {
@@ -106,13 +111,13 @@ func TestScanReconcilesOnlyCompletedRootAndKeepsOtherSources(t *testing.T) {
 	}
 	canceled, cancel := context.WithCancel(ctx)
 	cancel()
-	if err := library.reconcileScan(canceled, queued.ID, "restarted-attempt", &payload); !errors.Is(err, context.Canceled) {
+	if err := library.reconcileScan(canceled, queued.ID, "restarted-attempt", &payload, nil); !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled reconciliation = %v", err)
 	}
 	if count, err := library.database.File.Query().Count(ctx); err != nil || count != 5 {
 		t.Fatalf("canceled scan pruned files: count = %d, error = %v", count, err)
 	}
-	if err := library.reconcileScan(ctx, queued.ID, "restarted-attempt", &payload); err != nil {
+	if err := library.reconcileScan(ctx, queued.ID, "restarted-attempt", &payload, nil); err != nil {
 		t.Fatal(err)
 	}
 	if payload.Scan.RemovedFiles != 2 || payload.Scan.RemovedMovies != 1 {
@@ -192,7 +197,7 @@ func TestTargetedScanDoesNotPruneSiblingDirectories(t *testing.T) {
 		}
 	}
 	payload.TargetID, payload.TargetPath = "target-folder", "/Movies/target"
-	if err := library.reconcileScan(ctx, queued.ID, "new", &payload); err != nil {
+	if err := library.reconcileScan(ctx, queued.ID, "new", &payload, nil); err != nil {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"102", "103", "104"} {

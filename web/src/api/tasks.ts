@@ -8,6 +8,8 @@ export type LibrarySource = {
   directory: PanDirectory
 }
 
+export type TaskRevisions = { library: number; offline: number }
+
 export type ScanTask = {
   id: number
   type: 'scan'

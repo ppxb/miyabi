@@ -113,6 +113,7 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 		Stage: "scanning", CurrentPath: source.Directory.Path, DirectoriesDiscovered: 1,
 	}
 	start := scanDirectory{id: source.Directory.ID, path: source.Directory.Path}
+	observed := make(map[string][]pan.File)
 	if payload.TargetID != "" {
 		info, err := service.sourceInfo(ctx, source, version, payload.TargetID)
 		if err != nil {
@@ -137,12 +138,16 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 			if err := service.indexScanPage(ctx, job.ID, scanID, path.Dir(payload.TargetPath), []scanVideo{video}, &payload); err != nil {
 				return err
 			}
+			observed[info.ParentID], err = service.directoryEntries(ctx, source, version, info.ParentID)
+			if err != nil {
+				return err
+			}
 			service.drive.mu.Lock()
 			defer service.drive.mu.Unlock()
 			if err := service.checkScanSource(source, version); err != nil {
 				return err
 			}
-			return service.reconcileScan(ctx, job.ID, scanID, &payload)
+			return service.reconcileScan(ctx, job.ID, scanID, &payload, observed)
 		}
 		start = scanDirectory{id: info.ID, path: payload.TargetPath}
 	}
@@ -174,6 +179,7 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 				return fmt.Errorf("目录 %s 的内容在扫描期间发生变化或分页不完整，请重新扫描", directory.path)
 			}
 			videos := make([]scanVideo, 0, len(page.Files))
+			observed[directory.id] = append(observed[directory.id], page.Files...)
 			for _, entry := range page.Files {
 				if seen[entry.ID] {
 					return fmt.Errorf("扫描期间重复遇到文件或目录 %s，请重新扫描", path.Join(directory.path, entry.Name))
@@ -260,7 +266,7 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 	if err := service.checkScanSource(source, version); err != nil {
 		return err
 	}
-	return service.reconcileScan(ctx, job.ID, scanID, &payload)
+	return service.reconcileScan(ctx, job.ID, scanID, &payload, observed)
 }
 
 func (service *LibraryService) checkScanSource(source LibrarySource, version uint64) error {
@@ -299,6 +305,7 @@ func isVideo(name string) bool {
 }
 
 func (service *LibraryService) indexScanPage(ctx context.Context, taskID int, scanID, directoryPath string, videos []scanVideo, payload *scanPayload) error {
+	indexChanged := false
 	err := ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
 		if len(videos) > 0 {
 			ids := make([]string, 0, len(videos))
@@ -309,9 +316,17 @@ func (service *LibraryService) indexScanPage(ctx context.Context, taskID int, sc
 					codes[video.Code] = 0
 				}
 			}
-			previousMovies, err := tx.File.Query().Where(file.FileIDIn(ids...)).QueryMovie().IDs(ctx)
+			previous, err := tx.File.Query().Where(file.FileIDIn(ids...)).All(ctx)
 			if err != nil {
 				return fmt.Errorf("load previous file associations: %w", err)
+			}
+			previousFiles := make(map[string]*ent.File, len(previous))
+			var previousMovies []int
+			for _, entry := range previous {
+				previousFiles[entry.FileID] = entry
+				if entry.MovieID != nil {
+					previousMovies = append(previousMovies, *entry.MovieID)
+				}
 			}
 			if len(codes) > 0 {
 				builders := make([]*ent.MovieCreate, 0, len(codes))
@@ -335,6 +350,13 @@ func (service *LibraryService) indexScanPage(ctx context.Context, taskID int, sc
 			}
 			builders := make([]*ent.FileCreate, 0, len(videos))
 			for _, video := range videos {
+				old := previousFiles[video.ID]
+				if old == nil || old.Name != video.Name || old.ParentID != video.ParentID ||
+					old.Size != video.Size || old.Sha1 != video.SHA1 || old.PickCode != video.PickCode ||
+					old.AccountID != payload.Source.AccountID || old.RootID != payload.Source.Directory.ID ||
+					old.Path != path.Join(directoryPath, video.Name) || valueOrZero(old.MovieID) != codes[video.Code] {
+					indexChanged = true
+				}
 				builder := tx.File.Create().SetFileID(video.ID).SetName(video.Name).SetSize(video.Size).
 					SetPickCode(video.PickCode).SetSha1(video.SHA1).SetParentID(video.ParentID).
 					SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).
@@ -359,13 +381,17 @@ func (service *LibraryService) indexScanPage(ctx context.Context, taskID int, sc
 	if err != nil {
 		return fmt.Errorf("save scan page: %w", err)
 	}
-	service.tasks.Notify()
+	if indexChanged {
+		service.tasks.NotifyLibraryChanged()
+	} else {
+		service.tasks.Notify()
+	}
 	return nil
 }
 
 // Reconcile runs only after every directory and page succeeded. Deletions and
 // their progress record commit together, and cannot touch another scan root.
-func (service *LibraryService) reconcileScan(ctx context.Context, taskID int, scanID string, payload *scanPayload) error {
+func (service *LibraryService) reconcileScan(ctx context.Context, taskID int, scanID string, payload *scanPayload, observed map[string][]pan.File) error {
 	err := ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
 		stale := file.And(libraryFiles(payload.Source), file.ScanIDNEQ(scanID))
 		if payload.TargetID != "" {
@@ -412,11 +438,31 @@ func (service *LibraryService) reconcileScan(ctx context.Context, taskID int, sc
 				return err
 			}
 		}
-		moviesToScrape, err := tx.File.Query().Where(indexed).QueryMovie().All(ctx)
+		moviesToScrape, err := tx.File.Query().Where(indexed).QueryMovie().
+			WithFiles(func(q *ent.FileQuery) { q.Where(libraryFiles(payload.Source)) }).All(ctx)
 		if err != nil {
 			return fmt.Errorf("find scanned metadata jobs: %w", err)
 		}
+		ids := make([]int, 0, len(moviesToScrape))
 		for _, record := range moviesToScrape {
+			if record.ScrapeStatus == movie.ScrapeStatusDone {
+				ids = append(ids, record.ID)
+			}
+		}
+		snapshots, err := completedMetadataSnapshots(ctx, tx.Client(), payload.Source, ids)
+		if err != nil {
+			return err
+		}
+		for _, record := range moviesToScrape {
+			if snapshot, found := snapshots[record.ID]; found && record.ScrapeStatus == movie.ScrapeStatusDone && snapshot.matches(record, observed) {
+				cached, err := service.images.Exists(movieArtwork(record))
+				if err != nil {
+					return fmt.Errorf("check cached artwork: %w", err)
+				}
+				if cached {
+					continue
+				}
+			}
 			input := metadataPayload{Source: payload.Source, ScanTaskID: taskID, MovieID: record.ID, Code: record.Code}
 			if record.Code == payload.Code {
 				input.JavDBID = payload.JavDBID
@@ -435,7 +481,11 @@ func (service *LibraryService) reconcileScan(ctx context.Context, taskID int, sc
 	if err != nil {
 		return fmt.Errorf("reconcile library: %w", err)
 	}
-	service.tasks.Notify()
+	if payload.Scan.RemovedFiles > 0 || payload.Scan.RemovedMovies > 0 {
+		service.tasks.NotifyLibraryChanged()
+	} else {
+		service.tasks.Notify()
+	}
 	return nil
 }
 

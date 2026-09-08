@@ -1,10 +1,12 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
 
+	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/nfo"
@@ -16,12 +18,17 @@ func (service *ScrapeService) Cover(ctx context.Context, job TaskJob) error {
 	if err != nil {
 		return err
 	}
+	if input.Snapshot != nil {
+		return nil
+	}
 	version, err := service.begin(ctx, input.metadataPayload)
 	if err != nil {
 		return err
 	}
 	var artwork mediaimage.Artwork
 	switch {
+	case input.Artwork != nil:
+		artwork = *input.Artwork
 	case input.Origin != nil:
 		poster, err := service.originImage(ctx, input.Source, version, input.Origin.Poster)
 		if err != nil {
@@ -35,8 +42,6 @@ func (service *ScrapeService) Cover(ctx context.Context, job TaskJob) error {
 		if err != nil {
 			return err
 		}
-	case input.Artwork != nil:
-		artwork = *input.Artwork
 	default:
 		if input.CoverURL == "" {
 			return fmt.Errorf("JavDB 未返回影片封面")
@@ -58,32 +63,59 @@ func (service *ScrapeService) Cover(ctx context.Context, job TaskJob) error {
 	if err != nil {
 		return fmt.Errorf("read cached fanart: %w", err)
 	}
+	input.Artwork = &artwork
+	encoded, err := encodeTaskPayload(input)
+	if err != nil {
+		return err
+	}
+	if err := service.library.database.Task.UpdateOneID(job.ID).SetPayload(encoded).Exec(ctx); err != nil {
+		return err
+	}
 	// Re-read the directory after scraping. Never upload alongside a video
 	// which was deleted or moved while waiting for JavDB or another task.
 	directories, err := service.directories(ctx, input.metadataPayload, version)
 	if err != nil {
 		return err
 	}
+	snapshot := &metadataSnapshot{}
+	var videos []pan.File
 	for i, directory := range directories {
-		if err := service.writeSidecars(ctx, input, version, directory, poster, fanart); err != nil {
+		state, err := service.writeSidecars(ctx, input, version, directory, poster, fanart)
+		if err != nil {
 			return err
+		}
+		snapshot.Directories = append(snapshot.Directories, state)
+		for _, entry := range directory.Files {
+			if directory.VideoIDs[entry.ID] {
+				videos = append(videos, entry)
+			}
 		}
 		if err := service.library.database.Task.UpdateOneID(job.ID).SetProgress((i + 1) * 100 / len(directories)).Exec(ctx); err != nil {
 			return err
 		}
-		service.library.tasks.Notify()
+	}
+	snapshot.Videos = videoFingerprint(videos)
+	input.Snapshot = snapshot
+	encoded, err = encodeTaskPayload(input)
+	if err != nil {
+		return err
 	}
 	service.library.drive.mu.Lock()
 	defer service.library.drive.mu.Unlock()
 	if err := service.library.checkScanSource(input.Source, version); err != nil {
 		return err
 	}
-	if err := service.library.database.Movie.UpdateOneID(input.MovieID).
-		SetCover(artwork.Thumbnail).SetPoster(artwork.Poster).SetFanarts([]string{artwork.Fanart}).
-		SetScrapeStatus(movie.ScrapeStatusDone).Exec(ctx); err != nil {
+	if err := ent.WithTx(ctx, service.library.database, func(tx *ent.Tx) error {
+		if err := tx.Movie.UpdateOneID(input.MovieID).
+			SetCover(artwork.Thumbnail).SetPoster(artwork.Poster).SetFanarts([]string{artwork.Fanart}).
+			SetScrapeStatus(movie.ScrapeStatusDone).Exec(ctx); err != nil {
+			return err
+		}
+		return tx.Task.UpdateOneID(job.ID).SetPayload(encoded).Exec(ctx)
+	}); err != nil {
 		return fmt.Errorf("save movie artwork: %w", err)
 	}
-	service.library.tasks.Notify()
+	service.library.tasks.NotifyLibraryChanged()
 	return nil
 }
 
@@ -95,14 +127,18 @@ func (service *ScrapeService) originImage(ctx context.Context, source LibrarySou
 	return service.library.readSidecar(ctx, source, version, info.File, 32<<20)
 }
 
-func (service *ScrapeService) writeSidecars(ctx context.Context, input coverPayload, version uint64, directory movieDirectory, poster, fanart []byte) error {
+func (service *ScrapeService) writeSidecars(ctx context.Context, input coverPayload, version uint64, directory movieDirectory, poster, fanart []byte) (metadataDirectorySnapshot, error) {
+	var snapshot metadataDirectorySnapshot
 	nfoName := input.Code + ".nfo"
 	// An existing matching NFO is already the source of truth. Preserve its
 	// formatting and user edits, as well as its referenced artwork.
-	if _, _, found, err := service.directoryNFO(ctx, input.metadataPayload, version, directory); err != nil {
-		return err
+	if doc, origin, found, err := service.directoryNFO(ctx, input.metadataPayload, version, directory); err != nil {
+		return snapshot, err
 	} else if found {
-		return nil
+		if err := verifyCoverOrigin(input, directory.ID, doc, *origin, poster, fanart); err != nil {
+			return snapshot, err
+		}
+		return directorySnapshot(directory.ID, origin.NFO, origin.Poster, origin.Fanart), nil
 	}
 	posterName, fanartName := "poster.jpg", "fanart.jpg"
 	existingPoster, posterExists := sidecarByName(directory.Files, posterName)
@@ -116,7 +152,7 @@ func (service *ScrapeService) writeSidecars(ctx context.Context, input coverPayl
 	doc.Fanart = fanartName
 	body, err := nfo.Encode(doc)
 	if err != nil {
-		return err
+		return snapshot, err
 	}
 	// NFO is the completion marker and is written last. A restarted job can
 	// reuse previously uploaded images without creating same-name duplicates.
@@ -130,11 +166,41 @@ func (service *ScrapeService) writeSidecars(ctx context.Context, input coverPayl
 			if strings.EqualFold(existing.SHA1, pan.SHA1(item.body)) {
 				continue
 			}
-			return fmt.Errorf("媒体目录已存在不同内容的 %s，已保留原文件", item.name)
+			return snapshot, fmt.Errorf("媒体目录已存在不同内容的 %s，已保留原文件", item.name)
 		}
 		if err := service.uploadSidecar(ctx, input.Source, version, directory, item.name, item.body); err != nil {
-			return fmt.Errorf("write %s to 115: %w", item.name, err)
+			return snapshot, fmt.Errorf("write %s to 115: %w", item.name, err)
 		}
+	}
+	return directorySnapshot(directory.ID, pan.File{Name: nfoName, SHA1: pan.SHA1(body)},
+		pan.File{Name: posterName, SHA1: pan.SHA1(poster)}, pan.File{Name: fanartName, SHA1: pan.SHA1(fanart)}), nil
+}
+
+// A retry may find sidecars written by its previous attempt. Accept those,
+// but never mark a newly edited metadata source as already synchronized.
+func verifyCoverOrigin(input coverPayload, directoryID string, current nfo.Movie, origin artworkOrigin, poster, fanart []byte) error {
+	expected := input.Document
+	posterSHA, fanartSHA := pan.SHA1(poster), pan.SHA1(fanart)
+	// directories() orders parent IDs as text; later NFOs keep their own edits.
+	if input.Origin != nil && directoryID > input.Origin.Poster.ParentID {
+		return nil
+	}
+	if input.Origin != nil && directoryID == input.Origin.Poster.ParentID {
+		posterSHA, fanartSHA = input.Origin.Poster.SHA1, input.Origin.Fanart.SHA1
+	} else {
+		expected.Thumbs = []nfo.Thumb{{Aspect: "poster", Path: origin.Poster.Name}}
+		expected.Fanart = origin.Fanart.Name
+	}
+	before, err := nfo.Encode(expected)
+	if err != nil {
+		return err
+	}
+	after, err := nfo.Encode(current)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(before, after) || !strings.EqualFold(posterSHA, origin.Poster.SHA1) || !strings.EqualFold(fanartSHA, origin.Fanart.SHA1) {
+		return fmt.Errorf("NFO 或图片在处理期间发生变化，请重新扫描")
 	}
 	return nil
 }

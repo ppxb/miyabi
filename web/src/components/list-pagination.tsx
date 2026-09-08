@@ -29,13 +29,9 @@ export function ListPagination({
       <PaginationContent>
         <PaginationItem>
           <PaginationPrevious
-            href="#"
             text="上一页"
-            className={page <= 1 || disabled ? 'pointer-events-none opacity-50' : undefined}
-            onClick={event => {
-              event.preventDefault()
-              changePage(page - 1)
-            }}
+            disabled={page <= 1 || disabled}
+            onClick={() => changePage(page - 1)}
           />
         </PaginationItem>
         <PaginationItem>
@@ -45,13 +41,9 @@ export function ListPagination({
         </PaginationItem>
         <PaginationItem>
           <PaginationNext
-            href="#"
             text="下一页"
-            className={disabled || !hasMore ? 'pointer-events-none opacity-50' : undefined}
-            onClick={event => {
-              event.preventDefault()
-              changePage(page + 1)
-            }}
+            disabled={disabled || !hasMore}
+            onClick={() => changePage(page + 1)}
           />
         </PaginationItem>
       </PaginationContent>

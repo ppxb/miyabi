@@ -3,6 +3,7 @@ import { CheckCircle2Icon, LoaderCircleIcon, QrCodeIcon, RefreshCwIcon } from 'l
 import { useEffect, useState, type ReactNode } from 'react'
 
 import {
+  invalidatePanSource,
   panKeys,
   useBeginPanLogin,
   usePanLoginStatus,
@@ -36,6 +37,7 @@ export function PanLoginDialog({ children }: { children: ReactNode }) {
 
   function completeLogin() {
     queryClient.setQueryData<PanAccountStatus>(panKeys.account, { connected: true })
+    invalidatePanSource(queryClient)
     changeOpen(false)
   }
 
@@ -105,7 +107,7 @@ function LoginContent({
     <div className="flex flex-col items-center gap-5">
       <div className="flex aspect-square w-full max-w-64 items-center justify-center overflow-hidden rounded-2xl border bg-muted">
         {pending ? (
-          <LoaderCircleIcon className="size-8 animate-spin text-muted-foreground" aria-hidden />
+          <LoaderCircleIcon className="size-8 animate-spin text-muted-foreground" />
         ) : session && !unavailable ? (
           <img
             src={session.qr_code}
@@ -114,13 +116,10 @@ function LoginContent({
             className="size-full bg-white object-contain p-3"
           />
         ) : (
-          <QrCodeIcon className="size-12 text-muted-foreground" aria-hidden />
+          <QrCodeIcon className="size-12 text-muted-foreground" />
         )}
       </div>
-      <p
-        role={unavailable ? 'alert' : 'status'}
-        className="flex items-center gap-2 text-center text-sm text-muted-foreground"
-      >
+      <p className="flex items-center gap-2 text-center text-sm text-muted-foreground">
         {state === 'scanned' ? (
           <CheckCircle2Icon className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
         ) : null}

@@ -30,6 +30,7 @@ type metadataPayload struct {
 }
 
 type artworkOrigin struct {
+	NFO    pan.File `json:"nfo"`
 	Poster pan.File `json:"poster"`
 	Fanart pan.File `json:"fanart"`
 }
@@ -41,6 +42,7 @@ type coverPayload struct {
 	CoverURL     string              `json:"cover_url,omitempty"`
 	Origin       *artworkOrigin      `json:"origin,omitempty"`
 	Artwork      *mediaimage.Artwork `json:"artwork,omitempty"`
+	Snapshot     *metadataSnapshot   `json:"snapshot,omitempty"`
 }
 
 type movieDirectory struct {
@@ -115,10 +117,8 @@ func (service *ScrapeService) Scrape(ctx context.Context, job TaskJob) error {
 	if cover.Document.Code == "" {
 		if record.ScrapeStatus == movie.ScrapeStatusDone {
 			cover.Document = movieNFO(record)
-			cover.Artwork = &mediaimage.Artwork{Poster: valueOrZero(record.Poster), Thumbnail: valueOrZero(record.Cover)}
-			if len(record.Fanarts) > 0 {
-				cover.Artwork.Fanart = record.Fanarts[0]
-			}
+			artwork := movieArtwork(record)
+			cover.Artwork = &artwork
 		} else {
 			id := input.JavDBID
 			if id == "" {
@@ -162,7 +162,7 @@ func (service *ScrapeService) Scrape(ctx context.Context, job TaskJob) error {
 	}); err != nil {
 		return fmt.Errorf("save movie metadata and queue artwork: %w", err)
 	}
-	service.library.tasks.Notify()
+	service.library.tasks.NotifyLibraryChanged()
 	return nil
 }
 
@@ -209,14 +209,14 @@ func (service *ScrapeService) directories(ctx context.Context, input metadataPay
 	return result, nil
 }
 
-func (service *ScrapeService) directoryNFO(ctx context.Context, input metadataPayload, version uint64, directory movieDirectory) (nfo.Movie, *artworkOrigin, bool, error) {
-	entry, found := sidecarByName(directory.Files, input.Code+".nfo")
+func findDirectoryNFO(code string, directory movieDirectory) (pan.File, bool) {
+	entry, found := sidecarByName(directory.Files, code+".nfo")
 	if !found {
 		var candidates []pan.File
 		for _, item := range directory.Files {
 			if !item.IsDirectory && strings.EqualFold(path.Ext(item.Name), ".nfo") {
-				code, _ := codeid.Parse(item.Name)
-				if code == input.Code {
+				candidateCode, _ := codeid.Parse(item.Name)
+				if candidateCode == code {
 					entry, found = item, true
 					break
 				}
@@ -227,6 +227,11 @@ func (service *ScrapeService) directoryNFO(ctx context.Context, input metadataPa
 			entry, found = candidates[0], true
 		}
 	}
+	return entry, found
+}
+
+func (service *ScrapeService) directoryNFO(ctx context.Context, input metadataPayload, version uint64, directory movieDirectory) (nfo.Movie, *artworkOrigin, bool, error) {
+	entry, found := findDirectoryNFO(input.Code, directory)
 	if !found {
 		return nfo.Movie{}, nil, false, nil
 	}
@@ -259,7 +264,7 @@ func (service *ScrapeService) directoryNFO(ctx context.Context, input metadataPa
 	if !posterFound || !fanartFound {
 		return nfo.Movie{}, nil, false, fmt.Errorf("NFO %s 对应的海报或封面不存在", entry.Name)
 	}
-	return doc, &artworkOrigin{Poster: poster, Fanart: fanart}, true, nil
+	return doc, &artworkOrigin{NFO: entry, Poster: poster, Fanart: fanart}, true, nil
 }
 
 func (service *ScrapeService) completeTagCategories(ctx context.Context, detail *DiscoverMovieDetail) error {

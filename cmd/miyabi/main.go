@@ -64,11 +64,11 @@ func run() error {
 	defer drive.Close()
 	tasks := service.NewTaskService(store.Client)
 	offline := service.NewOfflineService(store.Client, discover, drive, tasks)
-	library := service.NewLibraryService(store.Client, drive, tasks)
 	images, err := mediaimage.NewCache(cfg.DataDir)
 	if err != nil {
 		return err
 	}
+	library := service.NewLibraryService(store.Client, drive, tasks, images)
 	scrape := service.NewScrapeService(library, discover, images)
 	// Keep scans, metadata writes and directory sidecars ordered.
 	pool := worker.NewPool(tasks, map[string]worker.Handler{

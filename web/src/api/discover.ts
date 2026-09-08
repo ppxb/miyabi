@@ -140,17 +140,14 @@ const discoverQueryDefaults = {
   refetchOnWindowFocus: false
 } as const
 
-export function invalidateMovieStates(queryClient: QueryClient, cancelRefetch = true) {
-  return queryClient.invalidateQueries(
-    {
-      predicate: query =>
-        query.queryKey[0] === 'discover' &&
-        (query.queryKey[1] === 'movies' ||
-          query.queryKey[1] === 'search' ||
-          (query.queryKey[1] === 'movie' && query.queryKey.length === 3))
-    },
-    { cancelRefetch }
-  )
+export function invalidateMovieStates(queryClient: QueryClient) {
+  return queryClient.invalidateQueries({
+    predicate: query =>
+      query.queryKey[0] === 'discover' &&
+      (query.queryKey[1] === 'movies' ||
+        query.queryKey[1] === 'search' ||
+        (query.queryKey[1] === 'movie' && query.queryKey.length === 3))
+  })
 }
 
 export function useDiscoverMovies(params: BrowseMoviesParams, enabled = true) {

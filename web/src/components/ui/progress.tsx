@@ -24,11 +24,8 @@ function Progress({
       >
         <svg
           viewBox="0 0 24 24"
-          aria-hidden="true"
-          className={cn(
-            'size-full -rotate-90',
-            percent === null && 'animate-spin motion-reduce:animate-none'
-          )}
+
+          className={cn('size-full -rotate-90', percent === null && 'animate-spin')}
         >
           <circle cx="12" cy="12" r="9" fill="none" strokeWidth="2.5" className="stroke-muted" />
           <ProgressPrimitive.Indicator asChild>
@@ -68,7 +65,7 @@ function Progress({
         className={cn(
           'size-full flex-1 bg-primary transition-transform',
           percent === null &&
-            'w-1/3 flex-none animate-[progress-indeterminate_1.5s_ease-in-out_infinite] motion-reduce:translate-x-full motion-reduce:animate-none'
+            'w-1/3 flex-none animate-[progress-indeterminate_1.5s_ease-in-out_infinite]'
         )}
         style={percent === null ? undefined : { transform: `translateX(-${100 - percent}%)` }}
       />

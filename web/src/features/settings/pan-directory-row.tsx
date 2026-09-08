@@ -30,7 +30,7 @@ export function PanDirectoryRow({
           {directory ? (
             <Input
               value={directory.path}
-              aria-label="已挂载的媒体目录"
+
               disabled
               className="min-w-0 flex-1 text-ellipsis sm:w-64 sm:flex-none"
             />
@@ -42,7 +42,7 @@ export function PanDirectoryRow({
                   type="button"
                   variant="outline"
                   size="icon"
-                  aria-label={action}
+
                   disabled={disabled || clear.isPending}
                 >
                   <FolderOpenIcon className="size-4" />
@@ -58,7 +58,7 @@ export function PanDirectoryRow({
                   type="button"
                   variant="outline"
                   size="icon"
-                  aria-label="取消挂载媒体目录"
+
                   disabled={disabled || clear.isPending}
                   onClick={() => clear.mutate()}
                 >
@@ -75,9 +75,7 @@ export function PanDirectoryRow({
         </div>
       </SettingRow>
       {clear.isError ? (
-        <p role="alert" className="text-sm text-destructive">
-          取消挂载未完成，请检查后端服务后重试。
-        </p>
+        <p className="text-sm text-destructive">取消挂载未完成，请检查后端服务后重试。</p>
       ) : null}
     </>
   )

@@ -8,6 +8,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
+	mediaimage "github.com/ppxb/miyabi/internal/image"
 )
 
 type LibrarySource struct {
@@ -52,13 +53,14 @@ type LibraryFilePage struct {
 }
 
 type LibraryService struct {
+	images   *mediaimage.Cache
 	database *ent.Client
 	drive    *PanService
 	tasks    *TaskService
 }
 
-func NewLibraryService(database *ent.Client, drive *PanService, tasks *TaskService) *LibraryService {
-	return &LibraryService{database: database, drive: drive, tasks: tasks}
+func NewLibraryService(database *ent.Client, drive *PanService, tasks *TaskService, images *mediaimage.Cache) *LibraryService {
+	return &LibraryService{database: database, drive: drive, tasks: tasks, images: images}
 }
 
 // Browsing an existing index only reads SQLite. 115 is contacted when scanning,
