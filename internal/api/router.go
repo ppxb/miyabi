@@ -22,6 +22,7 @@ type Dependencies struct {
 	Pan      PanManager
 	Offline  OfflineManager
 	Library  LibraryManager
+	Play     PlayManager
 	Tasks    TaskManager
 	Artwork  ArtworkReader
 	Frontend fs.FS
@@ -42,6 +43,15 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	api.GET("/library/files", libraryFilesHandler(deps.Library))
 	api.POST("/library/scan", libraryScanHandler(deps.Library))
 	api.GET("/library/artwork/:key", libraryArtworkHandler(deps.Artwork))
+	playAPI := api.Group("/play", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		c.Next()
+	})
+	playAPI.GET("/files", playFilesHandler(deps.Play))
+	playAPI.GET("/:id", playStartHandler(deps.Play))
+	playAPI.DELETE("/:id", playReleaseHandler(deps.Play))
+	playAPI.GET("/:id/stream/:resource", playStreamHandler(deps.Play))
+	playAPI.HEAD("/:id/stream/:resource", playStreamHandler(deps.Play))
 	api.GET("/tasks", tasksHandler(deps.Tasks))
 	api.GET("/tasks/events", taskEventsHandler(deps.Tasks))
 	api.GET("/discover/movies", discoverBrowseHandler(deps.Discover))

@@ -4,6 +4,7 @@ import { CompassIcon, FilmIcon, SearchIcon, SettingsIcon } from 'lucide-react'
 
 import { FloatingNav, type FloatingNavItem } from '@/components/floating-nav'
 import { TaskEventsProvider } from '@/features/tasks/task-events'
+import { PlayerDialog } from '@/features/player/player-dialog'
 
 const NAV_ITEMS: FloatingNavItem[] = [
   { id: 'library', label: '媒体库', icon: FilmIcon, to: '/' },
@@ -25,6 +26,7 @@ export function AppShell({ children }: PropsWithChildren) {
       <div className="relative min-h-dvh">
         <FloatingNav items={NAV_ITEMS} activeId={activeId} />
         {children}
+        <PlayerDialog />
       </div>
     </TaskEventsProvider>
   )

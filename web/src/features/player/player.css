@@ -1,0 +1,14 @@
+.miyabi-player {
+  --video-border-radius: var(--radius-xl);
+  --video-font-family: var(--font-sans);
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.miyabi-player:not([data-fullscreen]) {
+  max-height: 65dvh;
+}
+
+.miyabi-player [data-media-provider] video {
+  object-fit: contain;
+}

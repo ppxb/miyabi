@@ -76,7 +76,7 @@ func (service *LibraryService) verifiedSource(ctx context.Context) (LibrarySourc
 		return service.drive.client.Account(ctx, token)
 	})
 	if err != nil {
-		return LibrarySource{}, fmt.Errorf("verify scan account: %w", err)
+		return LibrarySource{}, fmt.Errorf("verify library account: %w", err)
 	}
 	directory := service.drive.directory
 	if directory.ID == "" || directory.AccountID != account.ID {

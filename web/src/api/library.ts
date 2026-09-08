@@ -26,8 +26,10 @@ type LibraryPage = {
   has_more: boolean
 }
 
+export type LibraryFile = { id: string; name: string; path: string; size: number }
+
 type LibraryFilePage = {
-  files: { id: string; name: string; path: string; size: number }[]
+  files: LibraryFile[]
   total: number
   page: number
   has_more: boolean

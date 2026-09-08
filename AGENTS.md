@@ -31,7 +31,7 @@
 | 前端 | Vite 8 + React 19 + TypeScript | |
 | 前端状态 | TanStack Query + Zustand | 服务端状态与 UI 状态分离 |
 | 前端 UI | shadcn/ui + Tailwind CSS 4 | 组件可拷贝可改 |
-| 播放器 | Artplayer + hls.js | m3u8 与直链都支持 |
+| 播放器 | Vidstack React + hls.js | 共用播放浮层，支持原文件与 115 HLS 转码 |
 | 前端路由 | TanStack Router | 类型安全 |
 | 前端 lint/格式化 | oxlint + oxfmt | 不用 ESLint/Prettier |
 
@@ -217,7 +217,11 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 
 **刮削**：规范化番号 → 精确解析 JavDB ID → 获取详情 → 将强类型字段写库 → 入队封面任务。封面任务下载图片到本地缓存并裁剪，同时把不含剧情的 `.nfo`、`poster.jpg`、`fanart.jpg` 上传到 115 影片目录。不存在多源遍历、字段 merge 或换源功能。
 
-**播放**：请求时实时调用 `pan.Client.PlayURL` 取直链或 m3u8，不落库。直链需带 115 指定 User-Agent，由 `/api/play/:id/stream` 反向代理解决。
+**播放**：媒体库卡片与详情页共用 Vidstack 播放浮层；详情页仅在影片已入库时于预览图下方显示播放按钮。按番号读取当前媒体目录的全部关联视频，支持切换文件、原文件/115 转码及可用清晰度；切换同一文件的来源或清晰度保留播放位置，切换文件从头开始。关闭浮层立即卸载播放器、取消请求并释放播放会话。播放由用户主动发起，不受媒体图片的 NSFW 隐藏影响。
+
+- 请求时调用 `pan.Client.PlayURL` 获取直链或 HLS；播放前校验当前账号、挂载目录与 115 文件实际路径，不使用其他来源的索引。地址仅保存在有时限的内存会话，不落库、不返回上游签名 URL。
+- `/api/play/:id/stream/:resource` 转发会话内已登记资源，获取地址与流请求使用相同 User-Agent；支持 Range、If-Range、HEAD 与 206/416，视频流不整段缓冲、不持有令牌锁、不套用 API 的总超时。登录或目录变更后旧会话不可继续请求。
+- HLS 播放列表中的分段、子列表、密钥和初始化片段地址都改写到同源代理；相对地址按 CDN 最终响应 URL 解析，不依赖 `.m3u8` 扩展名。hls.js 从本地依赖按需加载，不从 CDN 注入脚本。
 
 **离线下载**：用户在影片详情选择 JavDB 返回的磁力 → service 核对来源并从 hash 构造 magnet URI → `pan.Client.AddOffline` → 写 Task（type 为 offline，payload.code 在写入时规范化，同时保留 javdb_id、hash）→ 轮询下载完成 → 同一事务创建定向扫描 → 创建或关联 Movie → 刮削、缓存图片并写回 NFO。核心流程不要求用户手动粘贴磁力或上传 torrent。
 
@@ -318,8 +322,8 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 
 ### Stage 7 播放
 - `pan/play.go`、`/api/play` 与流代理。
-- 前端 Artplayer 集成。
-- 验收：详情页可直接播放。
+- 前端 Vidstack 共用浮层，原文件与 115 转码、多文件与清晰度选择。
+- 验收：媒体库与已入库影片的详情页均可播放，关闭即停止并释放请求。
 
 ### Stage 8 JavDB 磁力与 115 离线下载
 - `javdb/magnet.go`、`pan/offline.go`、`service/offline` 与轮询任务。

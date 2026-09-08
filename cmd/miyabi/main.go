@@ -69,6 +69,8 @@ func run() error {
 		return err
 	}
 	library := service.NewLibraryService(store.Client, drive, tasks, images)
+	play := service.NewPlayService(library)
+	defer play.Close()
 	scrape := service.NewScrapeService(library, discover, images)
 	// Keep scans, metadata writes and directory sidecars ordered.
 	pool := worker.NewPool(tasks, map[string]worker.Handler{
@@ -84,6 +86,7 @@ func run() error {
 		Pan:      drive,
 		Offline:  offline,
 		Library:  library,
+		Play:     play,
 		Tasks:    tasks,
 		Artwork:  scrape,
 		Frontend: miyabi.Frontend(),

@@ -1,7 +1,7 @@
 import { FileVideoIcon, LoaderCircleIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
-import { useLibraryFiles, type LibraryMovie } from '@/api/library'
+import { useLibraryFiles } from '@/api/library'
 import { ListPagination } from '@/components/list-pagination'
 import { OverflowTooltip } from '@/components/overflow-tooltip'
 import { Button } from '@/components/ui/button'
@@ -15,36 +15,26 @@ import {
 } from '@/components/ui/dialog'
 import { formatSize } from '@/lib/format'
 
-export function LibraryFilesDialog({
-  movie,
-  children
-}: {
-  movie?: LibraryMovie
-  children: ReactNode
-}) {
+export function LibraryFilesDialog({ children }: { children: ReactNode }) {
   return (
     <Dialog>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="max-h-[85dvh] min-w-0 overflow-hidden sm:max-w-2xl">
         <DialogHeader className="min-w-0 pr-6">
-          <DialogTitle className="truncate">
-            {movie ? `${movie.code} 的文件` : '未识别的视频'}
-          </DialogTitle>
+          <DialogTitle>未识别的视频</DialogTitle>
           <DialogDescription>
-            {movie
-              ? '媒体目录中已索引的 115 视频文件。'
-              : '未从文件名识别出番号。整理 115 中的文件名后可重新扫描。'}
+            未从文件名识别出番号。整理 115 中的文件名后可重新扫描。
           </DialogDescription>
         </DialogHeader>
-        <LibraryFilesList movieID={movie?.id} />
+        <LibraryFilesList />
       </DialogContent>
     </Dialog>
   )
 }
 
-function LibraryFilesList({ movieID }: { movieID?: number }) {
+function LibraryFilesList() {
   const [page, setPage] = useState(1)
-  const files = useLibraryFiles(movieID, movieID === undefined, page)
+  const files = useLibraryFiles(undefined, true, page)
 
   if (files.isPending) {
     return <LoaderCircleIcon className="mx-auto my-8 size-6 animate-spin" />

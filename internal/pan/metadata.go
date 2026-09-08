@@ -75,41 +75,14 @@ func (client *Client) Info(ctx context.Context, accessToken, fileID string) (Fil
 // ReadMetadata reads a small sidecar, never the video itself. The signed URL
 // request uses the same User-Agent as downurl and carries no access token.
 func (client *Client) ReadMetadata(ctx context.Context, accessToken, pickCode string, limit int64) ([]byte, error) {
-	const userAgent = "Miyabi/1.0"
-	response, err := client.request(client.http.R().SetContext(ctx).SetAuthToken(accessToken).
-		SetHeader("User-Agent", userAgent).SetFormData(map[string]string{"pick_code": pickCode}),
-		http.MethodPost, apiURL+"/open/ufile/downurl")
+	downloadURL, err := client.DownloadURL(ctx, accessToken, pickCode)
 	if err != nil {
 		return nil, err
-	}
-	var result struct {
-		apiResponse
-		Data map[string]struct {
-			URL struct {
-				URL string `json:"url"`
-			} `json:"url"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(response.Body(), &result); err != nil {
-		return nil, fmt.Errorf("decode 115 download URL: %w", err)
-	}
-	if err := result.err(); err != nil {
-		return nil, err
-	}
-	if len(result.Data) != 1 {
-		return nil, fmt.Errorf("115 returned no unique metadata download URL")
-	}
-	var downloadURL string
-	for _, item := range result.Data {
-		downloadURL = item.URL.URL
-	}
-	if downloadURL == "" {
-		return nil, fmt.Errorf("115 metadata download URL is empty")
 	}
 	if err := client.limiter.Wait(ctx); err != nil {
 		return nil, err
 	}
-	download, err := client.http.R().SetContext(ctx).SetHeader("User-Agent", userAgent).
+	download, err := client.http.R().SetContext(ctx).SetHeader("User-Agent", mediaUserAgent).
 		SetDoNotParseResponse(true).Get(downloadURL)
 	if err != nil {
 		return nil, err

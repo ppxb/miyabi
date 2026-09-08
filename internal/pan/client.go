@@ -22,22 +22,29 @@ type Options struct {
 
 type Client struct {
 	http    *resty.Client
+	media   *resty.Client
 	limiter *rate.Limiter
 }
 
 func New(options Options) *Client {
 	client := resty.New().SetTimeout(35 * time.Second)
+	// Video transfers have no total timeout; only waiting for response headers is bounded.
+	media := resty.New()
+	media.GetClient().Transport.(*http.Transport).ResponseHeaderTimeout = 35 * time.Second
 	if options.Proxy != "" {
 		client.SetProxy(options.Proxy)
+		media.SetProxy(options.Proxy)
 	}
 	return &Client{
 		http:    client,
+		media:   media,
 		limiter: rate.NewLimiter(rate.Every(500*time.Millisecond), 1),
 	}
 }
 
 func (client *Client) Close() {
 	client.http.GetClient().CloseIdleConnections()
+	client.media.GetClient().CloseIdleConnections()
 }
 
 func (client *Client) request(request *resty.Request, method, endpoint string) (*resty.Response, error) {

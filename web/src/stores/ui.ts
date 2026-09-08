@@ -1,11 +1,13 @@
 import { create } from 'zustand'
 
 type UIState = {
-  taskPanelOpen: boolean
-  setTaskPanelOpen: (open: boolean) => void
+  playbackCode: string | null
+  openPlayer: (code: string) => void
+  closePlayer: () => void
 }
 
 export const useUIStore = create<UIState>(set => ({
-  taskPanelOpen: false,
-  setTaskPanelOpen: taskPanelOpen => set({ taskPanelOpen })
+  playbackCode: null,
+  openPlayer: playbackCode => set({ playbackCode }),
+  closePlayer: () => set({ playbackCode: null })
 }))
