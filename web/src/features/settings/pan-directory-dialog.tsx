@@ -1,5 +1,5 @@
 import {
-  ArrowUpIcon,
+  ArrowLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   FileIcon,
@@ -34,7 +34,7 @@ export function PanDirectoryDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] grid-cols-1 overflow-x-hidden overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>选择媒体目录</DialogTitle>
           <DialogDescription>进入目标文件夹后，点击“挂载当前目录”。</DialogDescription>
@@ -71,7 +71,7 @@ function DirectoryPicker({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <div className="flex items-start gap-2">
         <Button
           type="button"
@@ -81,7 +81,7 @@ function DirectoryPicker({
           disabled={!parent || select.isPending}
           onClick={() => parent && navigate(parent.id)}
         >
-          <ArrowUpIcon className="size-4" />
+          <ArrowLeftIcon className="size-4" />
         </Button>
         <nav aria-label="115 目录路径" className="min-w-0 flex-1">
           <ol className="flex flex-wrap items-center gap-1">
@@ -100,19 +100,19 @@ function DirectoryPicker({
             {files.data?.path
               .filter(directory => directory.id !== '0')
               .map(directory => (
-                <li key={directory.id} className="flex min-w-0 items-center gap-1">
+                <li key={directory.id} className="flex max-w-full min-w-0 items-center gap-1">
                   <ChevronRightIcon className="size-3 shrink-0 text-muted-foreground" aria-hidden />
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="max-w-40"
+                    className="max-w-40 min-w-0 shrink"
                     title={directory.name}
                     disabled={select.isPending}
                     onClick={() => navigate(directory.id)}
                     aria-current={location.id === directory.id ? 'page' : undefined}
                   >
-                    <span className="truncate">{directory.name}</span>
+                    <span className="min-w-0 truncate">{directory.name}</span>
                   </Button>
                 </li>
               ))}
@@ -120,7 +120,7 @@ function DirectoryPicker({
         </nav>
       </div>
       <div
-        className="h-64 overflow-y-auto overscroll-contain rounded-2xl border p-1"
+        className="h-64 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border p-1"
         aria-busy={files.isFetching}
       >
         {files.isPending ? (
@@ -160,7 +160,7 @@ function DirectoryPicker({
                   <Button
                     type="button"
                     variant="ghost"
-                    className="w-full justify-start rounded-xl"
+                    className="w-full max-w-full min-w-0 justify-start rounded-xl"
                     disabled={!file.is_directory || select.isPending}
                     onClick={() => navigate(file.id)}
                     title={file.name}

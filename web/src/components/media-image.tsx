@@ -9,7 +9,6 @@ import { useSettingsStore } from '@/stores/settings'
 type MediaImageProps = {
   source: string
   original?: string
-  alt: string
   loading?: 'eager' | 'lazy'
   className?: string
 }
@@ -30,7 +29,7 @@ export function MediaImage(props: MediaImageProps) {
   return <VisibleImage key={props.source} {...props} />
 }
 
-function VisibleImage({ source, original, alt, loading = 'lazy', className }: MediaImageProps) {
+function VisibleImage({ source, original, loading = 'lazy', className }: MediaImageProps) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   if (status === 'error') {
@@ -52,7 +51,6 @@ function VisibleImage({ source, original, alt, loading = 'lazy', className }: Me
       <img
         src={imageURL(source)}
         srcSet={original ? `${imageURL(source)} 1x, ${imageURL(original)} 2x` : undefined}
-        alt={alt}
         loading={loading}
         decoding="async"
         onLoad={() => setStatus('ready')}

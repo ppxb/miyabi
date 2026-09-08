@@ -19,7 +19,7 @@ export function MovieCard({ movie }: { movie: DiscoverMovie }) {
         className="group h-full gap-0 overflow-hidden py-0 transition-shadow hover:shadow-xl"
       >
         <div className="relative aspect-3/2 overflow-hidden bg-muted">
-          <MovieCover key={movie.cover} source={movie.cover} alt={movie.title} />
+          <MovieCover key={movie.cover} source={movie.cover} />
 
           <div className="absolute top-2 left-2 flex max-w-[calc(100%-1rem)] flex-wrap gap-1.5">
             <Badge variant="outline" className="bg-background/85 backdrop-blur">

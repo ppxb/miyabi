@@ -8,9 +8,7 @@ export function PanAccountInfo({ account }: { account: PanAccount }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
       <Avatar key={account.avatar} className="size-12">
-        {account.avatar ? (
-          <AvatarImage src={account.avatar} alt={`${account.name} 的头像`} />
-        ) : null}
+        {account.avatar ? <AvatarImage src={account.avatar} /> : null}
         <AvatarFallback role="img" aria-label="用户头像">
           <UserRoundIcon className="size-5" />
         </AvatarFallback>

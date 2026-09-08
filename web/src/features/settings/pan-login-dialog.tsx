@@ -109,7 +109,6 @@ function LoginContent({
         ) : session && !unavailable ? (
           <img
             src={session.qr_code}
-            alt="115 扫码登录二维码"
             width={256}
             height={256}
             className="size-full bg-white object-contain p-3"
