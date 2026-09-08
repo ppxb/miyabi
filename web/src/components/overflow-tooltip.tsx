@@ -1,5 +1,4 @@
 import { useRef, useState, type ReactElement, type ReactNode } from 'react'
-import { Slot } from 'radix-ui'
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -24,8 +23,13 @@ export function OverflowTooltip({ children, content }: OverflowTooltipProps) {
 
   return (
     <Tooltip open={open} onOpenChange={handleOpenChange}>
-      <TooltipTrigger asChild>
-        <Slot.Root ref={triggerRef}>{children}</Slot.Root>
+      <TooltipTrigger
+        asChild
+        ref={element => {
+          triggerRef.current = element
+        }}
+      >
+        {children}
       </TooltipTrigger>
       <TooltipContent>{content}</TooltipContent>
     </Tooltip>

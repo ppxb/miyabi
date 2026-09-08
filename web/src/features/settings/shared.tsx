@@ -43,13 +43,9 @@ export function SettingRow({
       )}
     >
       <div className="min-w-0 space-y-1">
-        {controlID ? (
-          <label htmlFor={controlID} className="text-sm font-medium">
-            {title}
-          </label>
-        ) : (
-          <div className="text-sm font-medium">{title}</div>
-        )}
+        <div id={controlID ? `${controlID}-title` : undefined} className="text-sm font-medium">
+          {title}
+        </div>
         <div
           id={controlID ? `${controlID}-description` : undefined}
           className="text-xs leading-5 break-all text-muted-foreground"

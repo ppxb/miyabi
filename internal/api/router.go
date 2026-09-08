@@ -19,6 +19,7 @@ type Dependencies struct {
 	Logger   *slog.Logger
 	Health   HealthChecker
 	Discover Discoverer
+	Pan      PanManager
 	Frontend fs.FS
 }
 
@@ -42,6 +43,17 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	api.GET("/javdb/route", javdbRouteHandler(deps.Discover))
 	api.PUT("/javdb/route", javdbSelectRouteHandler(deps.Discover))
 	api.POST("/javdb/reselect", javdbReselectHandler(deps.Discover))
+	panAPI := api.Group("/pan", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		c.Next()
+	})
+	panAPI.GET("/account", panAccountHandler(deps.Pan))
+	panAPI.DELETE("/account", panDisconnectHandler(deps.Pan))
+	panAPI.POST("/login", panBeginLoginHandler(deps.Pan))
+	panAPI.GET("/login/:id", panLoginStatusHandler(deps.Pan))
+	panAPI.GET("/files", panFilesHandler(deps.Pan))
+	panAPI.PUT("/directory", panSelectDirectoryHandler(deps.Pan))
+	panAPI.DELETE("/directory", panClearDirectoryHandler(deps.Pan))
 
 	if deps.Frontend != nil {
 		installFrontend(router, deps.Frontend)

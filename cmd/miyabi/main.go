@@ -17,6 +17,7 @@ import (
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/javdb"
 	"github.com/ppxb/miyabi/internal/logging"
+	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/service"
 )
 
@@ -51,11 +52,19 @@ func run() error {
 		return fmt.Errorf("initialize discovery service: %w", err)
 	}
 	defer discover.Close()
+	drive, err := service.NewPanService(context.Background(), store.Client, pan.Options{
+		Proxy: cfg.Proxy,
+	})
+	if err != nil {
+		return fmt.Errorf("initialize pan service: %w", err)
+	}
+	defer drive.Close()
 
 	router := api.NewRouter(api.Dependencies{
 		Logger:   logger,
 		Health:   store,
 		Discover: discover,
+		Pan:      drive,
 		Frontend: miyabi.Frontend(),
 	})
 	server := &http.Server{

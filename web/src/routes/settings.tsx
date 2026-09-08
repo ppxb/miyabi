@@ -1,11 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { CloudIcon, DatabaseIcon, ListChecksIcon } from 'lucide-react'
+import { DatabaseIcon, ListChecksIcon } from 'lucide-react'
 
 import { AppPage } from '@/components/app-page'
 import { PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { JavDBSection } from '@/features/settings/javdb-section'
+import { PanSection } from '@/features/settings/pan-section'
 import { PrivacySection } from '@/features/settings/privacy-section'
 import { SettingRow, SettingsSection } from '@/features/settings/shared'
 
@@ -24,11 +25,7 @@ function SettingsPage() {
           <hr className="border-border" />
           <JavDBSection />
           <hr className="border-border" />
-          <SettingsSection icon={<CloudIcon className="size-4" />} title="115 网盘">
-            <SettingRow title="账号与媒体目录" description="登录账号、选择媒体目录和管理扫描选项">
-              <Badge variant="secondary">即将接入</Badge>
-            </SettingRow>
-          </SettingsSection>
+          <PanSection />
           <hr className="border-border" />
           <SettingsSection icon={<ListChecksIcon className="size-4" />} title="任务">
             <SettingRow title="任务进度" description="查看扫描、刮削和下载任务进度">

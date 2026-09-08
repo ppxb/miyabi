@@ -166,6 +166,19 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 - 设置页沿用 jm-boom 的线路下拉框和测速按钮，展示当前线路、候选状态与最近延迟，支持自动优选和手动切换。手动选择也由后端先验证再启用；连接失败仍按自动重选规则处理。测速按钮重新执行自动优选，不做固定周期的全线路探测。
 - 后端不可用时，设置页显示启动服务和重试提示，不直接展示底层异常；NSFW 等本地显示偏好不受影响。
 
+## 115 授权与媒体目录
+
+- 设置页“115 网盘”使用“账号登录”行，右侧 Lucide 二维码按钮打开 shadcn Dialog；扫码确认后关闭弹窗并更新账号状态。已登录时隐藏二维码按钮，显示账号和退出入口；授权失效后恢复扫码入口。
+- 已登录账号左侧使用 shadcn Avatar 展示头像，头像右侧上方为用户名称、下方为 115 返回的等级名称，退出按钮位于最右侧。账号头像和登录二维码均不受 NSFW 影响；NSFW 只隐藏媒体内容图片。
+- 媒体目录下方使用 shadcn Progress 展示容量：右上角为“已使用 / 总容量”，加粗的容量条区分已用和剩余空间，剩余区域宽度足够时在条内显示数值，下方保留图例和剩余容量。数据复用 `/open/user/info`，不单独请求容量，也不虚构文件分类占比。
+- 使用 JavdBviewed 的 OpenList APP ID 设备码授权方式，直接请求 115，不依赖 OpenList 服务。PKCE 使用随机 verifier、`base64(SHA256(verifier))` 和 `code_challenge_method=sha256`。
+- 二维码通过 115 的 `/api/1.0/web/1.0/qrcode?uid=...` 图片接口取得，后端用 Resty 获取，前端以普通 `<img>` 展示。登录二维码不经过 `MediaImage`，不受 NSFW 影响，也不引入二维码生成库或第三方二维码服务。
+- 授权参数留在 `pan` 包，service 保管一个临时登录会话；前端用 TanStack Query 轮询，关闭弹窗时停止。过期、取消或出错后由用户重新获取二维码。
+- `access_token`、`refresh_token` 和过期时间一起存入 Setting 的 `pan.credentials`，不返回前端、不写入日志或 localStorage。按请求需要刷新令牌，串行处理刷新与凭据写入；令牌交换或刷新开始后，即使浏览器取消请求也完成持久化。
+- 退出登录删除 Miyabi 保存的凭据，不调用 115 撤销应用授权接口。
+- 登录后可在“媒体目录”行通过 Dialog 浏览 115 文件夹并挂载当前目录，支持路径导航和分页；文件仅用于浏览，不能作为媒体目录选择。
+- 挂载目录由后端向 115 读取确认，目录 ID、名称、路径及所属账号一起存入 Setting 的 `pan.library_directory`。同一账号重新登录保留选择，换号后不沿用旧账号目录；取消挂载只删除本地配置。
+
 ## 关键流程
 
 **扫描入库**：`pan.Client.List` 递归目录 → 目录内有 `.nfo` 则解析入库并入队封面缓存任务 → 否则逐文件 `codeid.Parse` → upsert File，命中番号则 upsert Movie 并关联 → 新影片入队刮削任务。
@@ -214,6 +227,8 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 - NSFW 等普通显示偏好由 Zustand persist 持久化到当前浏览器 localStorage，不存 SQLite、不调用设置 API。服务端不可用时本地偏好仍可使用。
 - 所有项目依赖的安装、升级和移除均由用户执行，包括 Go module、前端 npm/pnpm 包及 shadcn/ui 组件。助手先告知所需依赖、用途和具体命令，不自行运行依赖变更命令；可使用已安装的依赖进行构建、测试、lint 和格式化。依赖未就绪时继续完成不受影响的工作，并明确说明尚未完成的检查。
 - 前端提交前跑 `oxlint` 与 `oxfmt`，Go 用 `gofmt` 与 `go vet`。
+- 业务界面使用 `components/ui` 中的 shadcn 组件，不直接使用 Radix 原语拼装同类控件；缺少组件时先告知安装命令，由用户安装。
+- 设置项标题与描述统一使用 `SettingRow` 的块级布局。标题不代理触发右侧控件，通过 `aria-labelledby` 和 `aria-describedby` 关联控件的无障碍名称与描述。
 - 根目录一份 `.gitignore`，不在 `web/` 单独放。`web/dist` 不入库，`make build` 先构建前端再编译 Go。
 - API 路径前缀 `/api`，JSON 字段 snake_case。
 - 测试重点放在 `codeid`、JavDB 签名 golden vector、startup 动态域名解密、线路选择、wire JSON 解码与字段映射。使用脱敏固定 JSON fixture，不提交真实 token、磁力 hash 或完整线上响应。
@@ -254,7 +269,7 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 ### Stage 4 115 接入与扫描
 - `pan.Client`：开放平台登录、令牌刷新、限速、列目录。
 - `service/library` 扫描入库。
-- 前端：设置页登录、网盘浏览页、触发扫描。
+- 前端：设置页登录与网盘目录选择、触发扫描。
 - 验收：指定目录扫描后影片库出现条目。
 
 ### Stage 5 任务系统
