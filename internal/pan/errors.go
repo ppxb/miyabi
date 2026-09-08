@@ -5,7 +5,11 @@ import (
 	"fmt"
 )
 
-var ErrUnauthorized = errors.New("pan authorization required")
+var (
+	ErrUnauthorized  = errors.New("pan authorization required")
+	ErrNotFound      = errors.New("115 file not found")
+	ErrOfflineExists = errors.New("115 offline task already exists")
+)
 
 type apiError struct {
 	Code    int
@@ -17,6 +21,12 @@ func (err *apiError) Error() string {
 }
 
 func (err *apiError) Is(target error) bool {
+	if target == ErrNotFound {
+		return err.Code == 430004
+	}
+	if target == ErrOfflineExists {
+		return err.Code == 10008
+	}
 	if target != ErrUnauthorized {
 		return false
 	}

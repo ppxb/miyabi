@@ -299,12 +299,20 @@ func (service *DiscoverService) projectMovies(
 	}
 
 	inLibrary := make(map[string]bool, len(codes))
-	libraryCodes, err := service.database.Movie.Query().Where(movie.CodeIn(codes...)).Select(movie.FieldCode).Strings(ctx)
+	sourceDirectory, err := loadLibrarySource(ctx, service.database)
 	if err != nil {
-		return nil, fmt.Errorf("query local movies: %w", err)
+		return nil, err
 	}
-	for _, code := range libraryCodes {
-		inLibrary[code] = true
+	if sourceDirectory != nil {
+		libraryCodes, err := service.database.Movie.Query().Where(
+			movie.CodeIn(codes...), movie.HasFilesWith(libraryFiles(*sourceDirectory)),
+		).Select(movie.FieldCode).Strings(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("query local movies: %w", err)
+		}
+		for _, code := range libraryCodes {
+			inLibrary[code] = true
+		}
 	}
 
 	saving := make(map[string]bool)

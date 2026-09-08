@@ -1,79 +1,163 @@
 package service
 
 import (
-	"strings"
+	"errors"
 	"testing"
 
-	"github.com/ppxb/miyabi/internal/database"
+	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
-func TestOfflineCompletionRecordsTheFileWithoutCreatingAMovie(t *testing.T) {
-	store, err := database.Open(t.Context(), t.TempDir())
+func offlineFixture(t *testing.T) (*OfflineService, *ent.Task, offlinePayload, LibrarySource) {
+	t.Helper()
+	library, _, scan := libraryFixture(t)
+	drive := &PanService{directory: panLibraryDirectory{
+		AccountID: scan.Source.AccountID, PanLibraryDirectory: scan.Source.Directory,
+	}}
+	service := NewOfflineService(library.database, nil, drive, library.tasks)
+	input := offlinePayload{AccountID: scan.Source.AccountID, DirectoryID: scan.Source.Directory.ID,
+		Code: "ABP-001", JavDBID: "fixture-movie", Hash: "fixture-hash", InfoHash: "fixture-hash"}
+	encoded, err := encodeTaskPayload(input)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
-	record, err := store.Client.Task.Create().SetType("offline").SetStatus(task.StatusRunning).
-		SetPayload(map[string]any{"code": "ABP-001"}).Save(t.Context())
+	record, err := library.database.Task.Create().SetType("offline").SetStatus(task.StatusRunning).SetPayload(encoded).Save(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := &OfflineService{database: store.Client}
-	if err := service.updateTask(t.Context(), record, pan.OfflineTask{Status: 2, Progress: 100, FileID: "42"}); err != nil {
-		t.Fatal(err)
+	return service, record, input, scan.Source
+}
+
+func TestOfflineCompletionAndTargetedScanCommitTogether(t *testing.T) {
+	service, record, input, source := offlineFixture(t)
+	ctx := t.Context()
+	rollback := errors.New("fixture rollback")
+	err := ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
+		if err := service.completeTask(ctx, tx, record, input, "download-folder"); err != nil {
+			return err
+		}
+		return rollback
+	})
+	if !errors.Is(err, rollback) {
+		t.Fatalf("rollback: %v", err)
 	}
-	updated, err := store.Client.Task.Get(t.Context(), record.ID)
+	unchanged, err := service.database.Task.Get(ctx, record.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.Status != task.StatusDone || updated.Progress != 100 || updated.Payload["file_id"] != "42" {
-		t.Fatalf("completed task = %#v", updated)
+	if unchanged.Status != task.StatusRunning {
+		t.Fatal("completion escaped rollback")
 	}
-	count, err := store.Client.Movie.Query().Count(t.Context())
-	if err != nil || count != 0 {
-		t.Fatalf("movie count = %d, error = %v", count, err)
+	if count, err := service.database.Task.Query().Where(task.TypeEQ("scan")).Count(ctx); err != nil || count != 1 {
+		t.Fatalf("scan escaped rollback: count=%d err=%v", count, err)
+	}
+	if err := service.updateTask(ctx, record, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
+		t.Fatal(err)
+	}
+	done, err := service.database.Task.Get(ctx, record.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved, err := decodeTaskPayload[offlinePayload](done.Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if done.Status != task.StatusDone || saved.ScanTaskID == 0 {
+		t.Fatalf("completion: %#v %#v", done, saved)
+	}
+	scan, err := service.database.Task.Get(ctx, saved.ScanTaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := decodeTaskPayload[scanPayload](scan.Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target.TargetID != "download-folder" || target.OfflineTaskID != record.ID || target.Source.AccountID != source.AccountID || target.Source.Directory.ID != source.Directory.ID {
+		t.Fatalf("scan scope: %#v", target)
+	}
+	// A previously queued full scan must not swallow the completed download.
+	if count, err := service.database.Task.Query().Where(task.TypeEQ("scan")).Count(ctx); err != nil || count != 2 {
+		t.Fatalf("targeted scan count=%d err=%v", count, err)
+	}
+	if err := service.updateTask(ctx, done, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
+		t.Fatal(err)
+	}
+	if count, err := service.database.Task.Query().Where(task.TypeEQ("scan")).Count(ctx); err != nil || count != 2 {
+		t.Fatalf("completion duplicated scan: count=%d err=%v", count, err)
 	}
 }
 
-func TestOfflineTasksReturnLatestAttemptForCurrentMovieAndAccount(t *testing.T) {
-	store, err := database.Open(t.Context(), t.TempDir())
+func TestOfflineActionDependsOnCurrentFilesRatherThanDownloadHistory(t *testing.T) {
+	service, record, _, source := offlineFixture(t)
+	ctx := t.Context()
+	if err := service.updateTask(ctx, record, pan.OfflineTask{Status: 2, FileID: "video-1"}); err != nil {
+		t.Fatal(err)
+	}
+	record, err := service.database.Task.Get(ctx, record.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
-	hashA, hashB := strings.Repeat("a", 40), strings.Repeat("b", 40)
-	for _, fixture := range []struct {
-		movieID   string
-		accountID string
-		hash      string
-		status    task.Status
-	}{
-		{"movie", "100", hashA, task.StatusFailed},
-		{"movie", "100", hashA, task.StatusDone},
-		{"movie", "100", hashB, task.StatusRunning},
-		{"other", "100", hashA, task.StatusRunning},
-		{"movie", "200", hashA, task.StatusRunning},
-	} {
-		if err := store.Client.Task.Create().SetType("offline").SetStatus(fixture.status).
-			SetPayload(map[string]any{
-				"javdb_id": fixture.movieID, "account_id": fixture.accountID, "hash": fixture.hash,
-			}).Exec(t.Context()); err != nil {
-			t.Fatal(err)
-		}
-	}
-	service := &OfflineService{database: store.Client}
-	records, err := service.Tasks(t.Context(), "movie", "100")
+	input, err := decodeTaskPayload[offlinePayload](record.Payload)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(records) != 2 || records[0].Hash != hashB || records[0].Status != task.StatusRunning ||
-		records[1].Hash != hashA || records[1].Status != task.StatusDone {
-		t.Fatalf("offline tasks = %#v", records)
+	state, err := service.submission(ctx, record, &source)
+	if err != nil || state.Phase != "processing" {
+		t.Fatalf("processing: %#v %v", state, err)
 	}
-	empty, err := service.Tasks(t.Context(), "missing", "100")
-	if err != nil || empty == nil || len(empty) != 0 {
-		t.Fatalf("empty tasks = %#v, error = %v", empty, err)
+	if err := service.tasks.Finish(ctx, input.ScanTaskID, nil); err != nil {
+		t.Fatal(err)
+	}
+	record.Payload["file_ids"] = []string{"video-1"}
+	state, err = service.submission(ctx, record, &source)
+	if err != nil || state.Phase != "available" {
+		t.Fatalf("history without file: %#v %v", state, err)
+	}
+	movie, err := service.database.Movie.Create().SetCode(input.Code).Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.database.File.Create().SetFileID("video-1").SetName("ABP-001.mp4").SetSize(1).
+		SetAccountID(source.AccountID).SetRootID(source.Directory.ID).SetMovieID(movie.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	state, err = service.submission(ctx, record, &source)
+	if err != nil || state.Phase != "in_library" {
+		t.Fatalf("indexed file: %#v %v", state, err)
+	}
+	other := source
+	other.Directory.ID = "another-root"
+	state, err = service.submission(ctx, record, &other)
+	if err != nil || state.Phase != "available" {
+		t.Fatalf("other root: %#v %v", state, err)
+	}
+	if _, err := service.database.File.Delete().Where(file.FileIDEQ("video-1")).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	state, err = service.submission(ctx, record, &source)
+	if err != nil || state.Phase != "available" {
+		t.Fatalf("deleted file: %#v %v", state, err)
+	}
+}
+
+func TestCompletedOfflineTaskDefersScanForAnotherMount(t *testing.T) {
+	service, record, input, _ := offlineFixture(t)
+	service.drive.directory.ID = "another-root"
+	if err := service.updateTask(t.Context(), record, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
+		t.Fatal(err)
+	}
+	record, err := service.database.Task.Get(t.Context(), record.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved, err := decodeTaskPayload[offlinePayload](record.Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.ScanTaskID != 0 || saved.DirectoryID != input.DirectoryID || saved.FileID != "download-folder" {
+		t.Fatalf("unexpected scan or changed source: %#v", saved)
 	}
 }

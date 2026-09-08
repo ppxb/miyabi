@@ -3,6 +3,7 @@ import { useRouterState } from '@tanstack/react-router'
 import { CompassIcon, FilmIcon, SearchIcon, SettingsIcon } from 'lucide-react'
 
 import { FloatingNav, type FloatingNavItem } from '@/components/floating-nav'
+import { TaskEventsProvider } from '@/features/tasks/task-events'
 
 const NAV_ITEMS: FloatingNavItem[] = [
   { id: 'library', label: '媒体库', icon: FilmIcon, to: '/' },
@@ -20,9 +21,11 @@ export function AppShell({ children }: PropsWithChildren) {
   )?.id
 
   return (
-    <div className="relative min-h-dvh">
-      <FloatingNav items={NAV_ITEMS} activeId={activeId} />
-      {children}
-    </div>
+    <TaskEventsProvider>
+      <div className="relative min-h-dvh">
+        <FloatingNav items={NAV_ITEMS} activeId={activeId} />
+        {children}
+      </div>
+    </TaskEventsProvider>
   )
 }

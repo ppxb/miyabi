@@ -126,17 +126,79 @@ func (_u *FileUpdate) SetNillableParentID(v *string) *FileUpdate {
 	return _u
 }
 
-// SetMovieID sets the "movie" edge to the Movie entity by ID.
-func (_u *FileUpdate) SetMovieID(id int) *FileUpdate {
-	_u.mutation.SetMovieID(id)
+// SetAccountID sets the "account_id" field.
+func (_u *FileUpdate) SetAccountID(v string) *FileUpdate {
+	_u.mutation.SetAccountID(v)
 	return _u
 }
 
-// SetNillableMovieID sets the "movie" edge to the Movie entity by ID if the given value is not nil.
-func (_u *FileUpdate) SetNillableMovieID(id *int) *FileUpdate {
-	if id != nil {
-		_u = _u.SetMovieID(*id)
+// SetNillableAccountID sets the "account_id" field if the given value is not nil.
+func (_u *FileUpdate) SetNillableAccountID(v *string) *FileUpdate {
+	if v != nil {
+		_u.SetAccountID(*v)
 	}
+	return _u
+}
+
+// SetRootID sets the "root_id" field.
+func (_u *FileUpdate) SetRootID(v string) *FileUpdate {
+	_u.mutation.SetRootID(v)
+	return _u
+}
+
+// SetNillableRootID sets the "root_id" field if the given value is not nil.
+func (_u *FileUpdate) SetNillableRootID(v *string) *FileUpdate {
+	if v != nil {
+		_u.SetRootID(*v)
+	}
+	return _u
+}
+
+// SetPath sets the "path" field.
+func (_u *FileUpdate) SetPath(v string) *FileUpdate {
+	_u.mutation.SetPath(v)
+	return _u
+}
+
+// SetNillablePath sets the "path" field if the given value is not nil.
+func (_u *FileUpdate) SetNillablePath(v *string) *FileUpdate {
+	if v != nil {
+		_u.SetPath(*v)
+	}
+	return _u
+}
+
+// SetScanID sets the "scan_id" field.
+func (_u *FileUpdate) SetScanID(v string) *FileUpdate {
+	_u.mutation.SetScanID(v)
+	return _u
+}
+
+// SetNillableScanID sets the "scan_id" field if the given value is not nil.
+func (_u *FileUpdate) SetNillableScanID(v *string) *FileUpdate {
+	if v != nil {
+		_u.SetScanID(*v)
+	}
+	return _u
+}
+
+// SetMovieID sets the "movie_id" field.
+func (_u *FileUpdate) SetMovieID(v int) *FileUpdate {
+	_u.mutation.SetMovieID(v)
+	return _u
+}
+
+// SetNillableMovieID sets the "movie_id" field if the given value is not nil.
+func (_u *FileUpdate) SetNillableMovieID(v *int) *FileUpdate {
+	if v != nil {
+		_u.SetMovieID(*v)
+	}
+	return _u
+}
+
+// ClearMovieID clears the value of the "movie_id" field.
+func (_u *FileUpdate) ClearMovieID() *FileUpdate {
+	_u.mutation.ClearMovieID()
 	return _u
 }
 
@@ -247,6 +309,18 @@ func (_u *FileUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.ParentID(); ok {
 		_spec.SetField(file.FieldParentID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.AccountID(); ok {
+		_spec.SetField(file.FieldAccountID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.RootID(); ok {
+		_spec.SetField(file.FieldRootID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Path(); ok {
+		_spec.SetField(file.FieldPath, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ScanID(); ok {
+		_spec.SetField(file.FieldScanID, field.TypeString, value)
 	}
 	if _u.mutation.MovieCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -394,17 +468,79 @@ func (_u *FileUpdateOne) SetNillableParentID(v *string) *FileUpdateOne {
 	return _u
 }
 
-// SetMovieID sets the "movie" edge to the Movie entity by ID.
-func (_u *FileUpdateOne) SetMovieID(id int) *FileUpdateOne {
-	_u.mutation.SetMovieID(id)
+// SetAccountID sets the "account_id" field.
+func (_u *FileUpdateOne) SetAccountID(v string) *FileUpdateOne {
+	_u.mutation.SetAccountID(v)
 	return _u
 }
 
-// SetNillableMovieID sets the "movie" edge to the Movie entity by ID if the given value is not nil.
-func (_u *FileUpdateOne) SetNillableMovieID(id *int) *FileUpdateOne {
-	if id != nil {
-		_u = _u.SetMovieID(*id)
+// SetNillableAccountID sets the "account_id" field if the given value is not nil.
+func (_u *FileUpdateOne) SetNillableAccountID(v *string) *FileUpdateOne {
+	if v != nil {
+		_u.SetAccountID(*v)
 	}
+	return _u
+}
+
+// SetRootID sets the "root_id" field.
+func (_u *FileUpdateOne) SetRootID(v string) *FileUpdateOne {
+	_u.mutation.SetRootID(v)
+	return _u
+}
+
+// SetNillableRootID sets the "root_id" field if the given value is not nil.
+func (_u *FileUpdateOne) SetNillableRootID(v *string) *FileUpdateOne {
+	if v != nil {
+		_u.SetRootID(*v)
+	}
+	return _u
+}
+
+// SetPath sets the "path" field.
+func (_u *FileUpdateOne) SetPath(v string) *FileUpdateOne {
+	_u.mutation.SetPath(v)
+	return _u
+}
+
+// SetNillablePath sets the "path" field if the given value is not nil.
+func (_u *FileUpdateOne) SetNillablePath(v *string) *FileUpdateOne {
+	if v != nil {
+		_u.SetPath(*v)
+	}
+	return _u
+}
+
+// SetScanID sets the "scan_id" field.
+func (_u *FileUpdateOne) SetScanID(v string) *FileUpdateOne {
+	_u.mutation.SetScanID(v)
+	return _u
+}
+
+// SetNillableScanID sets the "scan_id" field if the given value is not nil.
+func (_u *FileUpdateOne) SetNillableScanID(v *string) *FileUpdateOne {
+	if v != nil {
+		_u.SetScanID(*v)
+	}
+	return _u
+}
+
+// SetMovieID sets the "movie_id" field.
+func (_u *FileUpdateOne) SetMovieID(v int) *FileUpdateOne {
+	_u.mutation.SetMovieID(v)
+	return _u
+}
+
+// SetNillableMovieID sets the "movie_id" field if the given value is not nil.
+func (_u *FileUpdateOne) SetNillableMovieID(v *int) *FileUpdateOne {
+	if v != nil {
+		_u.SetMovieID(*v)
+	}
+	return _u
+}
+
+// ClearMovieID clears the value of the "movie_id" field.
+func (_u *FileUpdateOne) ClearMovieID() *FileUpdateOne {
+	_u.mutation.ClearMovieID()
 	return _u
 }
 
@@ -545,6 +681,18 @@ func (_u *FileUpdateOne) sqlSave(ctx context.Context) (_node *File, err error) {
 	}
 	if value, ok := _u.mutation.ParentID(); ok {
 		_spec.SetField(file.FieldParentID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.AccountID(); ok {
+		_spec.SetField(file.FieldAccountID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.RootID(); ok {
+		_spec.SetField(file.FieldRootID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Path(); ok {
+		_spec.SetField(file.FieldPath, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ScanID(); ok {
+		_spec.SetField(file.FieldScanID, field.TypeString, value)
 	}
 	if _u.mutation.MovieCleared() {
 		edge := &sqlgraph.EdgeSpec{

@@ -10,16 +10,18 @@ export function ListPagination({
   page,
   hasMore,
   disabled,
+  scrollToTop = true,
   onPageChange
 }: {
   page: number
   hasMore: boolean
   disabled: boolean
+  scrollToTop?: boolean
   onPageChange: (page: number) => void
 }) {
   function changePage(nextPage: number) {
     onPageChange(nextPage)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    if (scrollToTop) window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   return (

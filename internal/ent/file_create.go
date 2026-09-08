@@ -111,16 +111,72 @@ func (_c *FileCreate) SetNillableParentID(v *string) *FileCreate {
 	return _c
 }
 
-// SetMovieID sets the "movie" edge to the Movie entity by ID.
-func (_c *FileCreate) SetMovieID(id int) *FileCreate {
-	_c.mutation.SetMovieID(id)
+// SetAccountID sets the "account_id" field.
+func (_c *FileCreate) SetAccountID(v string) *FileCreate {
+	_c.mutation.SetAccountID(v)
 	return _c
 }
 
-// SetNillableMovieID sets the "movie" edge to the Movie entity by ID if the given value is not nil.
-func (_c *FileCreate) SetNillableMovieID(id *int) *FileCreate {
-	if id != nil {
-		_c = _c.SetMovieID(*id)
+// SetNillableAccountID sets the "account_id" field if the given value is not nil.
+func (_c *FileCreate) SetNillableAccountID(v *string) *FileCreate {
+	if v != nil {
+		_c.SetAccountID(*v)
+	}
+	return _c
+}
+
+// SetRootID sets the "root_id" field.
+func (_c *FileCreate) SetRootID(v string) *FileCreate {
+	_c.mutation.SetRootID(v)
+	return _c
+}
+
+// SetNillableRootID sets the "root_id" field if the given value is not nil.
+func (_c *FileCreate) SetNillableRootID(v *string) *FileCreate {
+	if v != nil {
+		_c.SetRootID(*v)
+	}
+	return _c
+}
+
+// SetPath sets the "path" field.
+func (_c *FileCreate) SetPath(v string) *FileCreate {
+	_c.mutation.SetPath(v)
+	return _c
+}
+
+// SetNillablePath sets the "path" field if the given value is not nil.
+func (_c *FileCreate) SetNillablePath(v *string) *FileCreate {
+	if v != nil {
+		_c.SetPath(*v)
+	}
+	return _c
+}
+
+// SetScanID sets the "scan_id" field.
+func (_c *FileCreate) SetScanID(v string) *FileCreate {
+	_c.mutation.SetScanID(v)
+	return _c
+}
+
+// SetNillableScanID sets the "scan_id" field if the given value is not nil.
+func (_c *FileCreate) SetNillableScanID(v *string) *FileCreate {
+	if v != nil {
+		_c.SetScanID(*v)
+	}
+	return _c
+}
+
+// SetMovieID sets the "movie_id" field.
+func (_c *FileCreate) SetMovieID(v int) *FileCreate {
+	_c.mutation.SetMovieID(v)
+	return _c
+}
+
+// SetNillableMovieID sets the "movie_id" field if the given value is not nil.
+func (_c *FileCreate) SetNillableMovieID(v *int) *FileCreate {
+	if v != nil {
+		_c.SetMovieID(*v)
 	}
 	return _c
 }
@@ -185,6 +241,22 @@ func (_c *FileCreate) defaults() {
 		v := file.DefaultParentID
 		_c.mutation.SetParentID(v)
 	}
+	if _, ok := _c.mutation.AccountID(); !ok {
+		v := file.DefaultAccountID
+		_c.mutation.SetAccountID(v)
+	}
+	if _, ok := _c.mutation.RootID(); !ok {
+		v := file.DefaultRootID
+		_c.mutation.SetRootID(v)
+	}
+	if _, ok := _c.mutation.Path(); !ok {
+		v := file.DefaultPath
+		_c.mutation.SetPath(v)
+	}
+	if _, ok := _c.mutation.ScanID(); !ok {
+		v := file.DefaultScanID
+		_c.mutation.SetScanID(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -227,6 +299,18 @@ func (_c *FileCreate) check() error {
 	}
 	if _, ok := _c.mutation.ParentID(); !ok {
 		return &ValidationError{Name: "parent_id", err: errors.New(`ent: missing required field "File.parent_id"`)}
+	}
+	if _, ok := _c.mutation.AccountID(); !ok {
+		return &ValidationError{Name: "account_id", err: errors.New(`ent: missing required field "File.account_id"`)}
+	}
+	if _, ok := _c.mutation.RootID(); !ok {
+		return &ValidationError{Name: "root_id", err: errors.New(`ent: missing required field "File.root_id"`)}
+	}
+	if _, ok := _c.mutation.Path(); !ok {
+		return &ValidationError{Name: "path", err: errors.New(`ent: missing required field "File.path"`)}
+	}
+	if _, ok := _c.mutation.ScanID(); !ok {
+		return &ValidationError{Name: "scan_id", err: errors.New(`ent: missing required field "File.scan_id"`)}
 	}
 	return nil
 }
@@ -287,6 +371,22 @@ func (_c *FileCreate) createSpec() (*File, *sqlgraph.CreateSpec) {
 		_spec.SetField(file.FieldParentID, field.TypeString, value)
 		_node.ParentID = value
 	}
+	if value, ok := _c.mutation.AccountID(); ok {
+		_spec.SetField(file.FieldAccountID, field.TypeString, value)
+		_node.AccountID = value
+	}
+	if value, ok := _c.mutation.RootID(); ok {
+		_spec.SetField(file.FieldRootID, field.TypeString, value)
+		_node.RootID = value
+	}
+	if value, ok := _c.mutation.Path(); ok {
+		_spec.SetField(file.FieldPath, field.TypeString, value)
+		_node.Path = value
+	}
+	if value, ok := _c.mutation.ScanID(); ok {
+		_spec.SetField(file.FieldScanID, field.TypeString, value)
+		_node.ScanID = value
+	}
 	if nodes := _c.mutation.MovieIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -301,7 +401,7 @@ func (_c *FileCreate) createSpec() (*File, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.movie_files = &nodes[0]
+		_node.MovieID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
@@ -443,6 +543,72 @@ func (u *FileUpsert) SetParentID(v string) *FileUpsert {
 // UpdateParentID sets the "parent_id" field to the value that was provided on create.
 func (u *FileUpsert) UpdateParentID() *FileUpsert {
 	u.SetExcluded(file.FieldParentID)
+	return u
+}
+
+// SetAccountID sets the "account_id" field.
+func (u *FileUpsert) SetAccountID(v string) *FileUpsert {
+	u.Set(file.FieldAccountID, v)
+	return u
+}
+
+// UpdateAccountID sets the "account_id" field to the value that was provided on create.
+func (u *FileUpsert) UpdateAccountID() *FileUpsert {
+	u.SetExcluded(file.FieldAccountID)
+	return u
+}
+
+// SetRootID sets the "root_id" field.
+func (u *FileUpsert) SetRootID(v string) *FileUpsert {
+	u.Set(file.FieldRootID, v)
+	return u
+}
+
+// UpdateRootID sets the "root_id" field to the value that was provided on create.
+func (u *FileUpsert) UpdateRootID() *FileUpsert {
+	u.SetExcluded(file.FieldRootID)
+	return u
+}
+
+// SetPath sets the "path" field.
+func (u *FileUpsert) SetPath(v string) *FileUpsert {
+	u.Set(file.FieldPath, v)
+	return u
+}
+
+// UpdatePath sets the "path" field to the value that was provided on create.
+func (u *FileUpsert) UpdatePath() *FileUpsert {
+	u.SetExcluded(file.FieldPath)
+	return u
+}
+
+// SetScanID sets the "scan_id" field.
+func (u *FileUpsert) SetScanID(v string) *FileUpsert {
+	u.Set(file.FieldScanID, v)
+	return u
+}
+
+// UpdateScanID sets the "scan_id" field to the value that was provided on create.
+func (u *FileUpsert) UpdateScanID() *FileUpsert {
+	u.SetExcluded(file.FieldScanID)
+	return u
+}
+
+// SetMovieID sets the "movie_id" field.
+func (u *FileUpsert) SetMovieID(v int) *FileUpsert {
+	u.Set(file.FieldMovieID, v)
+	return u
+}
+
+// UpdateMovieID sets the "movie_id" field to the value that was provided on create.
+func (u *FileUpsert) UpdateMovieID() *FileUpsert {
+	u.SetExcluded(file.FieldMovieID)
+	return u
+}
+
+// ClearMovieID clears the value of the "movie_id" field.
+func (u *FileUpsert) ClearMovieID() *FileUpsert {
+	u.SetNull(file.FieldMovieID)
 	return u
 }
 
@@ -593,6 +759,83 @@ func (u *FileUpsertOne) SetParentID(v string) *FileUpsertOne {
 func (u *FileUpsertOne) UpdateParentID() *FileUpsertOne {
 	return u.Update(func(s *FileUpsert) {
 		s.UpdateParentID()
+	})
+}
+
+// SetAccountID sets the "account_id" field.
+func (u *FileUpsertOne) SetAccountID(v string) *FileUpsertOne {
+	return u.Update(func(s *FileUpsert) {
+		s.SetAccountID(v)
+	})
+}
+
+// UpdateAccountID sets the "account_id" field to the value that was provided on create.
+func (u *FileUpsertOne) UpdateAccountID() *FileUpsertOne {
+	return u.Update(func(s *FileUpsert) {
+		s.UpdateAccountID()
+	})
+}
+
+// SetRootID sets the "root_id" field.
+func (u *FileUpsertOne) SetRootID(v string) *FileUpsertOne {
+	return u.Update(func(s *FileUpsert) {
+		s.SetRootID(v)
+	})
+}
+
+// UpdateRootID sets the "root_id" field to the value that was provided on create.
+func (u *FileUpsertOne) UpdateRootID() *FileUpsertOne {
+	return u.Update(func(s *FileUpsert) {
+		s.UpdateRootID()
+	})
+}
+
+// SetPath sets the "path" field.
+func (u *FileUpsertOne) SetPath(v string) *FileUpsertOne {
+	return u.Update(func(s *FileUpsert) {
+		s.SetPath(v)
+	})
+}
+
+// UpdatePath sets the "path" field to the value that was provided on create.
+func (u *FileUpsertOne) UpdatePath() *FileUpsertOne {
+	return u.Update(func(s *FileUpsert) {
+		s.UpdatePath()
+	})
+}
+
+// SetScanID sets the "scan_id" field.
+func (u *FileUpsertOne) SetScanID(v string) *FileUpsertOne {
+	return u.Update(func(s *FileUpsert) {
+		s.SetScanID(v)
+	})
+}
+
+// UpdateScanID sets the "scan_id" field to the value that was provided on create.
+func (u *FileUpsertOne) UpdateScanID() *FileUpsertOne {
+	return u.Update(func(s *FileUpsert) {
+		s.UpdateScanID()
+	})
+}
+
+// SetMovieID sets the "movie_id" field.
+func (u *FileUpsertOne) SetMovieID(v int) *FileUpsertOne {
+	return u.Update(func(s *FileUpsert) {
+		s.SetMovieID(v)
+	})
+}
+
+// UpdateMovieID sets the "movie_id" field to the value that was provided on create.
+func (u *FileUpsertOne) UpdateMovieID() *FileUpsertOne {
+	return u.Update(func(s *FileUpsert) {
+		s.UpdateMovieID()
+	})
+}
+
+// ClearMovieID clears the value of the "movie_id" field.
+func (u *FileUpsertOne) ClearMovieID() *FileUpsertOne {
+	return u.Update(func(s *FileUpsert) {
+		s.ClearMovieID()
 	})
 }
 
@@ -909,6 +1152,83 @@ func (u *FileUpsertBulk) SetParentID(v string) *FileUpsertBulk {
 func (u *FileUpsertBulk) UpdateParentID() *FileUpsertBulk {
 	return u.Update(func(s *FileUpsert) {
 		s.UpdateParentID()
+	})
+}
+
+// SetAccountID sets the "account_id" field.
+func (u *FileUpsertBulk) SetAccountID(v string) *FileUpsertBulk {
+	return u.Update(func(s *FileUpsert) {
+		s.SetAccountID(v)
+	})
+}
+
+// UpdateAccountID sets the "account_id" field to the value that was provided on create.
+func (u *FileUpsertBulk) UpdateAccountID() *FileUpsertBulk {
+	return u.Update(func(s *FileUpsert) {
+		s.UpdateAccountID()
+	})
+}
+
+// SetRootID sets the "root_id" field.
+func (u *FileUpsertBulk) SetRootID(v string) *FileUpsertBulk {
+	return u.Update(func(s *FileUpsert) {
+		s.SetRootID(v)
+	})
+}
+
+// UpdateRootID sets the "root_id" field to the value that was provided on create.
+func (u *FileUpsertBulk) UpdateRootID() *FileUpsertBulk {
+	return u.Update(func(s *FileUpsert) {
+		s.UpdateRootID()
+	})
+}
+
+// SetPath sets the "path" field.
+func (u *FileUpsertBulk) SetPath(v string) *FileUpsertBulk {
+	return u.Update(func(s *FileUpsert) {
+		s.SetPath(v)
+	})
+}
+
+// UpdatePath sets the "path" field to the value that was provided on create.
+func (u *FileUpsertBulk) UpdatePath() *FileUpsertBulk {
+	return u.Update(func(s *FileUpsert) {
+		s.UpdatePath()
+	})
+}
+
+// SetScanID sets the "scan_id" field.
+func (u *FileUpsertBulk) SetScanID(v string) *FileUpsertBulk {
+	return u.Update(func(s *FileUpsert) {
+		s.SetScanID(v)
+	})
+}
+
+// UpdateScanID sets the "scan_id" field to the value that was provided on create.
+func (u *FileUpsertBulk) UpdateScanID() *FileUpsertBulk {
+	return u.Update(func(s *FileUpsert) {
+		s.UpdateScanID()
+	})
+}
+
+// SetMovieID sets the "movie_id" field.
+func (u *FileUpsertBulk) SetMovieID(v int) *FileUpsertBulk {
+	return u.Update(func(s *FileUpsert) {
+		s.SetMovieID(v)
+	})
+}
+
+// UpdateMovieID sets the "movie_id" field to the value that was provided on create.
+func (u *FileUpsertBulk) UpdateMovieID() *FileUpsertBulk {
+	return u.Update(func(s *FileUpsert) {
+		s.UpdateMovieID()
+	})
+}
+
+// ClearMovieID clears the value of the "movie_id" field.
+func (u *FileUpsertBulk) ClearMovieID() *FileUpsertBulk {
+	return u.Update(func(s *FileUpsert) {
+		s.ClearMovieID()
 	})
 }
 

@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { formatSize } from '@/lib/format'
 
 export function MovieMagnets({
   movieID,
@@ -128,19 +129,24 @@ function MagnetCard({
   onCopy: () => void
 }) {
   const add = useAddOffline(movieID, accountID)
-  const submitted = task?.status === 'queued' || task?.status === 'running'
+  const submitted = task !== undefined && task.phase !== 'available'
   const busy = add.isPending || (checkingStatus && !submitted)
   let label = '一键加入 115'
   if (add.isPending) {
     label = '提交中…'
   } else if (submitted) {
-    label = '已加入 115'
+    label =
+      task.phase === 'processing'
+        ? '入库处理中'
+        : task.phase === 'in_library'
+          ? '已入库'
+          : task.phase === 'downloaded'
+            ? '已下载'
+            : '下载中'
   } else if (checkingStatus) {
     label = '读取状态…'
   } else if (statusError) {
     label = '状态暂不可用'
-  } else if (task?.status === 'done' || task?.status === 'failed') {
-    label = '重新加入 115'
   }
 
   let error: string | undefined
@@ -151,7 +157,7 @@ function MagnetCard({
           ? '115 授权已失效，请到设置页重新登录。'
           : add.error.message
         : '加入失败，请检查后端服务和网络后重试。'
-  } else if (!add.isPending && task?.status === 'failed') {
+  } else if (!add.isPending && task?.error) {
     error = task.error
   }
 
@@ -185,7 +191,7 @@ function MagnetCard({
                 disabled={!hasDirectory || busy || statusError || submitted}
                 onClick={() => add.mutate(magnet.hash)}
               >
-                {busy ? (
+                {busy || task?.phase === 'downloading' || task?.phase === 'processing' ? (
                   <LoaderCircleIcon className="animate-spin" />
                 ) : submitted ? (
                   <CheckIcon />
@@ -205,15 +211,4 @@ function MagnetCard({
       </CardContent>
     </Card>
   )
-}
-
-function formatSize(bytes: number) {
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let size = bytes
-  let unit = 0
-  while (size >= 1024 && unit < units.length - 1) {
-    size /= 1024
-    unit++
-  }
-  return `${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(size)} ${units[unit]}`
 }

@@ -623,7 +623,9 @@ func (_q *MovieQuery) loadFiles(ctx context.Context, query *FileQuery, nodes []*
 			init(nodes[i])
 		}
 	}
-	query.withFKs = true
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(file.FieldMovieID)
+	}
 	query.Where(predicate.File(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(movie.FilesColumn), fks...))
 	}))
@@ -632,13 +634,13 @@ func (_q *MovieQuery) loadFiles(ctx context.Context, query *FileQuery, nodes []*
 		return err
 	}
 	for _, n := range neighbors {
-		fk := n.movie_files
+		fk := n.MovieID
 		if fk == nil {
-			return fmt.Errorf(`foreign-key "movie_files" is nil for node %v`, n.ID)
+			return fmt.Errorf(`foreign-key "movie_id" is nil for node %v`, n.ID)
 		}
 		node, ok := nodeids[*fk]
 		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "movie_files" returned %v for node %v`, *fk, n.ID)
+			return fmt.Errorf(`unexpected referenced foreign-key "movie_id" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

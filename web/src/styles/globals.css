@@ -122,6 +122,15 @@
   --scrollbar-thumb-hover: oklch(0.708 0 0 / 78%);
 }
 
+@keyframes progress-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

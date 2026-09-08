@@ -67,6 +67,9 @@ func sqliteDSN(databasePath string) string {
 	query.Add("_pragma", "busy_timeout(5000)")
 	query.Add("_pragma", "foreign_keys(1)")
 	query.Add("_pragma", "journal_mode(WAL)")
+	// Reserve the writer before a transaction reads. Scan transactions and
+	// offline task updates must not race while upgrading a WAL read snapshot.
+	query.Set("_txlock", "immediate")
 	uri.RawQuery = query.Encode()
 	return uri.String()
 }

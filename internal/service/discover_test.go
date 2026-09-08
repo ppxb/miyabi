@@ -94,7 +94,17 @@ func TestProjectMoviesAddsLibraryTaskAndReleaseState(t *testing.T) {
 	}
 	defer store.Close()
 
-	if _, err := store.Client.Movie.Create().SetCode("ABP-001").Save(t.Context()); err != nil {
+	localMovie, err := store.Client.Movie.Create().SetCode("ABP-001").Save(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Client.File.Create().SetFileID("1001").SetName("ABP-001.mp4").SetSize(1).
+		SetAccountID("100").SetRootID("10").SetMovie(localMovie).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveSetting(t.Context(), store.Client, panDirectorySetting, panLibraryDirectory{
+		AccountID: "100", PanLibraryDirectory: PanLibraryDirectory{ID: "10", Path: "/Movies"},
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.Client.Task.Create().
@@ -186,11 +196,32 @@ func TestCachedCatalogueStillReflectsCurrentLibraryAndTaskState(t *testing.T) {
 	if got := project(); got != MovieSaving {
 		t.Fatalf("queued state = %s", got)
 	}
-	if err := store.Client.Movie.Create().SetCode("ABP-001").Exec(t.Context()); err != nil {
+	localMovie, err := store.Client.Movie.Create().SetCode("ABP-001").Save(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := project(); got != MovieSaving {
+		t.Fatalf("metadata without a file changed library state: %s", got)
+	}
+	if err := store.Client.File.Create().SetFileID("1001").SetName("ABP-001.mp4").SetSize(1).
+		SetAccountID("100").SetRootID("10").SetMovie(localMovie).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveSetting(t.Context(), store.Client, panDirectorySetting, panLibraryDirectory{
+		AccountID: "100", PanLibraryDirectory: PanLibraryDirectory{ID: "10", Path: "/Movies"},
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if got := project(); got != MovieInLibrary || loads != 1 {
 		t.Fatalf("scanned state = %s, loads = %d", got, loads)
+	}
+	if err := saveSetting(t.Context(), store.Client, panDirectorySetting, panLibraryDirectory{
+		AccountID: "100", PanLibraryDirectory: PanLibraryDirectory{ID: "20", Path: "/Other"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := project(); got != MovieSaving || loads != 1 {
+		t.Fatalf("movie outside the mounted root = %s, loads = %d", got, loads)
 	}
 }
 

@@ -837,6 +837,10 @@ type FileMutation struct {
 	size          *int64
 	addsize       *int64
 	parent_id     *string
+	account_id    *string
+	root_id       *string
+	_path         *string
+	scan_id       *string
 	clearedFields map[string]struct{}
 	movie         *int
 	clearedmovie  bool
@@ -1251,27 +1255,208 @@ func (m *FileMutation) ResetParentID() {
 	m.parent_id = nil
 }
 
-// SetMovieID sets the "movie" edge to the Movie entity by id.
-func (m *FileMutation) SetMovieID(id int) {
-	m.movie = &id
+// SetAccountID sets the "account_id" field.
+func (m *FileMutation) SetAccountID(s string) {
+	m.account_id = &s
+}
+
+// AccountID returns the value of the "account_id" field in the mutation.
+func (m *FileMutation) AccountID() (r string, exists bool) {
+	v := m.account_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountID returns the old "account_id" field's value of the File entity.
+// If the File object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FileMutation) OldAccountID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountID: %w", err)
+	}
+	return oldValue.AccountID, nil
+}
+
+// ResetAccountID resets all changes to the "account_id" field.
+func (m *FileMutation) ResetAccountID() {
+	m.account_id = nil
+}
+
+// SetRootID sets the "root_id" field.
+func (m *FileMutation) SetRootID(s string) {
+	m.root_id = &s
+}
+
+// RootID returns the value of the "root_id" field in the mutation.
+func (m *FileMutation) RootID() (r string, exists bool) {
+	v := m.root_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRootID returns the old "root_id" field's value of the File entity.
+// If the File object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FileMutation) OldRootID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRootID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRootID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRootID: %w", err)
+	}
+	return oldValue.RootID, nil
+}
+
+// ResetRootID resets all changes to the "root_id" field.
+func (m *FileMutation) ResetRootID() {
+	m.root_id = nil
+}
+
+// SetPath sets the "path" field.
+func (m *FileMutation) SetPath(s string) {
+	m._path = &s
+}
+
+// Path returns the value of the "path" field in the mutation.
+func (m *FileMutation) Path() (r string, exists bool) {
+	v := m._path
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPath returns the old "path" field's value of the File entity.
+// If the File object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FileMutation) OldPath(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPath is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPath requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPath: %w", err)
+	}
+	return oldValue.Path, nil
+}
+
+// ResetPath resets all changes to the "path" field.
+func (m *FileMutation) ResetPath() {
+	m._path = nil
+}
+
+// SetScanID sets the "scan_id" field.
+func (m *FileMutation) SetScanID(s string) {
+	m.scan_id = &s
+}
+
+// ScanID returns the value of the "scan_id" field in the mutation.
+func (m *FileMutation) ScanID() (r string, exists bool) {
+	v := m.scan_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScanID returns the old "scan_id" field's value of the File entity.
+// If the File object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FileMutation) OldScanID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScanID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScanID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScanID: %w", err)
+	}
+	return oldValue.ScanID, nil
+}
+
+// ResetScanID resets all changes to the "scan_id" field.
+func (m *FileMutation) ResetScanID() {
+	m.scan_id = nil
+}
+
+// SetMovieID sets the "movie_id" field.
+func (m *FileMutation) SetMovieID(i int) {
+	m.movie = &i
+}
+
+// MovieID returns the value of the "movie_id" field in the mutation.
+func (m *FileMutation) MovieID() (r int, exists bool) {
+	v := m.movie
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMovieID returns the old "movie_id" field's value of the File entity.
+// If the File object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FileMutation) OldMovieID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMovieID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMovieID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMovieID: %w", err)
+	}
+	return oldValue.MovieID, nil
+}
+
+// ClearMovieID clears the value of the "movie_id" field.
+func (m *FileMutation) ClearMovieID() {
+	m.movie = nil
+	m.clearedFields[file.FieldMovieID] = struct{}{}
+}
+
+// MovieIDCleared returns if the "movie_id" field was cleared in this mutation.
+func (m *FileMutation) MovieIDCleared() bool {
+	_, ok := m.clearedFields[file.FieldMovieID]
+	return ok
+}
+
+// ResetMovieID resets all changes to the "movie_id" field.
+func (m *FileMutation) ResetMovieID() {
+	m.movie = nil
+	delete(m.clearedFields, file.FieldMovieID)
 }
 
 // ClearMovie clears the "movie" edge to the Movie entity.
 func (m *FileMutation) ClearMovie() {
 	m.clearedmovie = true
+	m.clearedFields[file.FieldMovieID] = struct{}{}
 }
 
 // MovieCleared reports if the "movie" edge to the Movie entity was cleared.
 func (m *FileMutation) MovieCleared() bool {
-	return m.clearedmovie
-}
-
-// MovieID returns the "movie" edge ID in the mutation.
-func (m *FileMutation) MovieID() (id int, exists bool) {
-	if m.movie != nil {
-		return *m.movie, true
-	}
-	return
+	return m.MovieIDCleared() || m.clearedmovie
 }
 
 // MovieIDs returns the "movie" edge IDs in the mutation.
@@ -1324,7 +1509,7 @@ func (m *FileMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *FileMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 13)
 	if m.created_at != nil {
 		fields = append(fields, file.FieldCreatedAt)
 	}
@@ -1348,6 +1533,21 @@ func (m *FileMutation) Fields() []string {
 	}
 	if m.parent_id != nil {
 		fields = append(fields, file.FieldParentID)
+	}
+	if m.account_id != nil {
+		fields = append(fields, file.FieldAccountID)
+	}
+	if m.root_id != nil {
+		fields = append(fields, file.FieldRootID)
+	}
+	if m._path != nil {
+		fields = append(fields, file.FieldPath)
+	}
+	if m.scan_id != nil {
+		fields = append(fields, file.FieldScanID)
+	}
+	if m.movie != nil {
+		fields = append(fields, file.FieldMovieID)
 	}
 	return fields
 }
@@ -1373,6 +1573,16 @@ func (m *FileMutation) Field(name string) (ent.Value, bool) {
 		return m.Size()
 	case file.FieldParentID:
 		return m.ParentID()
+	case file.FieldAccountID:
+		return m.AccountID()
+	case file.FieldRootID:
+		return m.RootID()
+	case file.FieldPath:
+		return m.Path()
+	case file.FieldScanID:
+		return m.ScanID()
+	case file.FieldMovieID:
+		return m.MovieID()
 	}
 	return nil, false
 }
@@ -1398,6 +1608,16 @@ func (m *FileMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldSize(ctx)
 	case file.FieldParentID:
 		return m.OldParentID(ctx)
+	case file.FieldAccountID:
+		return m.OldAccountID(ctx)
+	case file.FieldRootID:
+		return m.OldRootID(ctx)
+	case file.FieldPath:
+		return m.OldPath(ctx)
+	case file.FieldScanID:
+		return m.OldScanID(ctx)
+	case file.FieldMovieID:
+		return m.OldMovieID(ctx)
 	}
 	return nil, fmt.Errorf("unknown File field %s", name)
 }
@@ -1463,6 +1683,41 @@ func (m *FileMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetParentID(v)
 		return nil
+	case file.FieldAccountID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountID(v)
+		return nil
+	case file.FieldRootID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRootID(v)
+		return nil
+	case file.FieldPath:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPath(v)
+		return nil
+	case file.FieldScanID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScanID(v)
+		return nil
+	case file.FieldMovieID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMovieID(v)
+		return nil
 	}
 	return fmt.Errorf("unknown File field %s", name)
 }
@@ -1507,7 +1762,11 @@ func (m *FileMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *FileMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(file.FieldMovieID) {
+		fields = append(fields, file.FieldMovieID)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -1520,6 +1779,11 @@ func (m *FileMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *FileMutation) ClearField(name string) error {
+	switch name {
+	case file.FieldMovieID:
+		m.ClearMovieID()
+		return nil
+	}
 	return fmt.Errorf("unknown File nullable field %s", name)
 }
 
@@ -1550,6 +1814,21 @@ func (m *FileMutation) ResetField(name string) error {
 		return nil
 	case file.FieldParentID:
 		m.ResetParentID()
+		return nil
+	case file.FieldAccountID:
+		m.ResetAccountID()
+		return nil
+	case file.FieldRootID:
+		m.ResetRootID()
+		return nil
+	case file.FieldPath:
+		m.ResetPath()
+		return nil
+	case file.FieldScanID:
+		m.ResetScanID()
+		return nil
+	case file.FieldMovieID:
+		m.ResetMovieID()
 		return nil
 	}
 	return fmt.Errorf("unknown File field %s", name)

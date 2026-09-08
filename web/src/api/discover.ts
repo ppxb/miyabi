@@ -1,4 +1,10 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient
+} from '@tanstack/react-query'
 
 import { apiGet, apiPost, apiPut } from '@/api/client'
 
@@ -133,6 +139,19 @@ const discoverQueryDefaults = {
   retry: false,
   refetchOnWindowFocus: false
 } as const
+
+export function invalidateMovieStates(queryClient: QueryClient, cancelRefetch = true) {
+  return queryClient.invalidateQueries(
+    {
+      predicate: query =>
+        query.queryKey[0] === 'discover' &&
+        (query.queryKey[1] === 'movies' ||
+          query.queryKey[1] === 'search' ||
+          (query.queryKey[1] === 'movie' && query.queryKey.length === 3))
+    },
+    { cancelRefetch }
+  )
+}
 
 export function useDiscoverMovies(params: BrowseMoviesParams, enabled = true) {
   return useQuery({

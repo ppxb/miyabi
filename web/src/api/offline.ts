@@ -8,11 +8,13 @@ export type OfflineSubmission = {
   task_id: number
   hash: string
   status: 'queued' | 'running' | 'done' | 'failed'
+  phase: 'available' | 'downloading' | 'processing' | 'in_library' | 'downloaded'
   progress: number
   error?: string
 }
 
-const offlineKeys = {
+export const offlineKeys = {
+  all: ['offline'] as const,
   movie: (movieID: string, accountID: string) => ['offline', accountID, movieID] as const
 }
 
@@ -31,12 +33,14 @@ export function useOfflineTasks(movieID: string, accountID: string) {
     retry: false,
     refetchInterval: query => {
       if (query.state.status === 'error') return false
-      return query.state.data?.some(task => task.status === 'queued' || task.status === 'running')
+      return query.state.data?.some(
+        task => task.phase === 'downloading' || task.phase === 'processing'
+      )
         ? 5000
         : false
     }
   })
-  const statuses = query.data?.map(task => `${task.task_id}:${task.status}`).join(',')
+  const statuses = query.data?.map(task => `${task.task_id}:${task.phase}`).join(',')
   useEffect(() => {
     if (accountID && statuses !== undefined) {
       void queryClient.invalidateQueries({ queryKey: ['discover', 'movie', movieID], exact: true })

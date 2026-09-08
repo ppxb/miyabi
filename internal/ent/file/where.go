@@ -95,6 +95,31 @@ func ParentID(v string) predicate.File {
 	return predicate.File(sql.FieldEQ(FieldParentID, v))
 }
 
+// AccountID applies equality check predicate on the "account_id" field. It's identical to AccountIDEQ.
+func AccountID(v string) predicate.File {
+	return predicate.File(sql.FieldEQ(FieldAccountID, v))
+}
+
+// RootID applies equality check predicate on the "root_id" field. It's identical to RootIDEQ.
+func RootID(v string) predicate.File {
+	return predicate.File(sql.FieldEQ(FieldRootID, v))
+}
+
+// Path applies equality check predicate on the "path" field. It's identical to PathEQ.
+func Path(v string) predicate.File {
+	return predicate.File(sql.FieldEQ(FieldPath, v))
+}
+
+// ScanID applies equality check predicate on the "scan_id" field. It's identical to ScanIDEQ.
+func ScanID(v string) predicate.File {
+	return predicate.File(sql.FieldEQ(FieldScanID, v))
+}
+
+// MovieID applies equality check predicate on the "movie_id" field. It's identical to MovieIDEQ.
+func MovieID(v int) predicate.File {
+	return predicate.File(sql.FieldEQ(FieldMovieID, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.File {
 	return predicate.File(sql.FieldEQ(FieldCreatedAt, v))
@@ -538,6 +563,296 @@ func ParentIDEqualFold(v string) predicate.File {
 // ParentIDContainsFold applies the ContainsFold predicate on the "parent_id" field.
 func ParentIDContainsFold(v string) predicate.File {
 	return predicate.File(sql.FieldContainsFold(FieldParentID, v))
+}
+
+// AccountIDEQ applies the EQ predicate on the "account_id" field.
+func AccountIDEQ(v string) predicate.File {
+	return predicate.File(sql.FieldEQ(FieldAccountID, v))
+}
+
+// AccountIDNEQ applies the NEQ predicate on the "account_id" field.
+func AccountIDNEQ(v string) predicate.File {
+	return predicate.File(sql.FieldNEQ(FieldAccountID, v))
+}
+
+// AccountIDIn applies the In predicate on the "account_id" field.
+func AccountIDIn(vs ...string) predicate.File {
+	return predicate.File(sql.FieldIn(FieldAccountID, vs...))
+}
+
+// AccountIDNotIn applies the NotIn predicate on the "account_id" field.
+func AccountIDNotIn(vs ...string) predicate.File {
+	return predicate.File(sql.FieldNotIn(FieldAccountID, vs...))
+}
+
+// AccountIDGT applies the GT predicate on the "account_id" field.
+func AccountIDGT(v string) predicate.File {
+	return predicate.File(sql.FieldGT(FieldAccountID, v))
+}
+
+// AccountIDGTE applies the GTE predicate on the "account_id" field.
+func AccountIDGTE(v string) predicate.File {
+	return predicate.File(sql.FieldGTE(FieldAccountID, v))
+}
+
+// AccountIDLT applies the LT predicate on the "account_id" field.
+func AccountIDLT(v string) predicate.File {
+	return predicate.File(sql.FieldLT(FieldAccountID, v))
+}
+
+// AccountIDLTE applies the LTE predicate on the "account_id" field.
+func AccountIDLTE(v string) predicate.File {
+	return predicate.File(sql.FieldLTE(FieldAccountID, v))
+}
+
+// AccountIDContains applies the Contains predicate on the "account_id" field.
+func AccountIDContains(v string) predicate.File {
+	return predicate.File(sql.FieldContains(FieldAccountID, v))
+}
+
+// AccountIDHasPrefix applies the HasPrefix predicate on the "account_id" field.
+func AccountIDHasPrefix(v string) predicate.File {
+	return predicate.File(sql.FieldHasPrefix(FieldAccountID, v))
+}
+
+// AccountIDHasSuffix applies the HasSuffix predicate on the "account_id" field.
+func AccountIDHasSuffix(v string) predicate.File {
+	return predicate.File(sql.FieldHasSuffix(FieldAccountID, v))
+}
+
+// AccountIDEqualFold applies the EqualFold predicate on the "account_id" field.
+func AccountIDEqualFold(v string) predicate.File {
+	return predicate.File(sql.FieldEqualFold(FieldAccountID, v))
+}
+
+// AccountIDContainsFold applies the ContainsFold predicate on the "account_id" field.
+func AccountIDContainsFold(v string) predicate.File {
+	return predicate.File(sql.FieldContainsFold(FieldAccountID, v))
+}
+
+// RootIDEQ applies the EQ predicate on the "root_id" field.
+func RootIDEQ(v string) predicate.File {
+	return predicate.File(sql.FieldEQ(FieldRootID, v))
+}
+
+// RootIDNEQ applies the NEQ predicate on the "root_id" field.
+func RootIDNEQ(v string) predicate.File {
+	return predicate.File(sql.FieldNEQ(FieldRootID, v))
+}
+
+// RootIDIn applies the In predicate on the "root_id" field.
+func RootIDIn(vs ...string) predicate.File {
+	return predicate.File(sql.FieldIn(FieldRootID, vs...))
+}
+
+// RootIDNotIn applies the NotIn predicate on the "root_id" field.
+func RootIDNotIn(vs ...string) predicate.File {
+	return predicate.File(sql.FieldNotIn(FieldRootID, vs...))
+}
+
+// RootIDGT applies the GT predicate on the "root_id" field.
+func RootIDGT(v string) predicate.File {
+	return predicate.File(sql.FieldGT(FieldRootID, v))
+}
+
+// RootIDGTE applies the GTE predicate on the "root_id" field.
+func RootIDGTE(v string) predicate.File {
+	return predicate.File(sql.FieldGTE(FieldRootID, v))
+}
+
+// RootIDLT applies the LT predicate on the "root_id" field.
+func RootIDLT(v string) predicate.File {
+	return predicate.File(sql.FieldLT(FieldRootID, v))
+}
+
+// RootIDLTE applies the LTE predicate on the "root_id" field.
+func RootIDLTE(v string) predicate.File {
+	return predicate.File(sql.FieldLTE(FieldRootID, v))
+}
+
+// RootIDContains applies the Contains predicate on the "root_id" field.
+func RootIDContains(v string) predicate.File {
+	return predicate.File(sql.FieldContains(FieldRootID, v))
+}
+
+// RootIDHasPrefix applies the HasPrefix predicate on the "root_id" field.
+func RootIDHasPrefix(v string) predicate.File {
+	return predicate.File(sql.FieldHasPrefix(FieldRootID, v))
+}
+
+// RootIDHasSuffix applies the HasSuffix predicate on the "root_id" field.
+func RootIDHasSuffix(v string) predicate.File {
+	return predicate.File(sql.FieldHasSuffix(FieldRootID, v))
+}
+
+// RootIDEqualFold applies the EqualFold predicate on the "root_id" field.
+func RootIDEqualFold(v string) predicate.File {
+	return predicate.File(sql.FieldEqualFold(FieldRootID, v))
+}
+
+// RootIDContainsFold applies the ContainsFold predicate on the "root_id" field.
+func RootIDContainsFold(v string) predicate.File {
+	return predicate.File(sql.FieldContainsFold(FieldRootID, v))
+}
+
+// PathEQ applies the EQ predicate on the "path" field.
+func PathEQ(v string) predicate.File {
+	return predicate.File(sql.FieldEQ(FieldPath, v))
+}
+
+// PathNEQ applies the NEQ predicate on the "path" field.
+func PathNEQ(v string) predicate.File {
+	return predicate.File(sql.FieldNEQ(FieldPath, v))
+}
+
+// PathIn applies the In predicate on the "path" field.
+func PathIn(vs ...string) predicate.File {
+	return predicate.File(sql.FieldIn(FieldPath, vs...))
+}
+
+// PathNotIn applies the NotIn predicate on the "path" field.
+func PathNotIn(vs ...string) predicate.File {
+	return predicate.File(sql.FieldNotIn(FieldPath, vs...))
+}
+
+// PathGT applies the GT predicate on the "path" field.
+func PathGT(v string) predicate.File {
+	return predicate.File(sql.FieldGT(FieldPath, v))
+}
+
+// PathGTE applies the GTE predicate on the "path" field.
+func PathGTE(v string) predicate.File {
+	return predicate.File(sql.FieldGTE(FieldPath, v))
+}
+
+// PathLT applies the LT predicate on the "path" field.
+func PathLT(v string) predicate.File {
+	return predicate.File(sql.FieldLT(FieldPath, v))
+}
+
+// PathLTE applies the LTE predicate on the "path" field.
+func PathLTE(v string) predicate.File {
+	return predicate.File(sql.FieldLTE(FieldPath, v))
+}
+
+// PathContains applies the Contains predicate on the "path" field.
+func PathContains(v string) predicate.File {
+	return predicate.File(sql.FieldContains(FieldPath, v))
+}
+
+// PathHasPrefix applies the HasPrefix predicate on the "path" field.
+func PathHasPrefix(v string) predicate.File {
+	return predicate.File(sql.FieldHasPrefix(FieldPath, v))
+}
+
+// PathHasSuffix applies the HasSuffix predicate on the "path" field.
+func PathHasSuffix(v string) predicate.File {
+	return predicate.File(sql.FieldHasSuffix(FieldPath, v))
+}
+
+// PathEqualFold applies the EqualFold predicate on the "path" field.
+func PathEqualFold(v string) predicate.File {
+	return predicate.File(sql.FieldEqualFold(FieldPath, v))
+}
+
+// PathContainsFold applies the ContainsFold predicate on the "path" field.
+func PathContainsFold(v string) predicate.File {
+	return predicate.File(sql.FieldContainsFold(FieldPath, v))
+}
+
+// ScanIDEQ applies the EQ predicate on the "scan_id" field.
+func ScanIDEQ(v string) predicate.File {
+	return predicate.File(sql.FieldEQ(FieldScanID, v))
+}
+
+// ScanIDNEQ applies the NEQ predicate on the "scan_id" field.
+func ScanIDNEQ(v string) predicate.File {
+	return predicate.File(sql.FieldNEQ(FieldScanID, v))
+}
+
+// ScanIDIn applies the In predicate on the "scan_id" field.
+func ScanIDIn(vs ...string) predicate.File {
+	return predicate.File(sql.FieldIn(FieldScanID, vs...))
+}
+
+// ScanIDNotIn applies the NotIn predicate on the "scan_id" field.
+func ScanIDNotIn(vs ...string) predicate.File {
+	return predicate.File(sql.FieldNotIn(FieldScanID, vs...))
+}
+
+// ScanIDGT applies the GT predicate on the "scan_id" field.
+func ScanIDGT(v string) predicate.File {
+	return predicate.File(sql.FieldGT(FieldScanID, v))
+}
+
+// ScanIDGTE applies the GTE predicate on the "scan_id" field.
+func ScanIDGTE(v string) predicate.File {
+	return predicate.File(sql.FieldGTE(FieldScanID, v))
+}
+
+// ScanIDLT applies the LT predicate on the "scan_id" field.
+func ScanIDLT(v string) predicate.File {
+	return predicate.File(sql.FieldLT(FieldScanID, v))
+}
+
+// ScanIDLTE applies the LTE predicate on the "scan_id" field.
+func ScanIDLTE(v string) predicate.File {
+	return predicate.File(sql.FieldLTE(FieldScanID, v))
+}
+
+// ScanIDContains applies the Contains predicate on the "scan_id" field.
+func ScanIDContains(v string) predicate.File {
+	return predicate.File(sql.FieldContains(FieldScanID, v))
+}
+
+// ScanIDHasPrefix applies the HasPrefix predicate on the "scan_id" field.
+func ScanIDHasPrefix(v string) predicate.File {
+	return predicate.File(sql.FieldHasPrefix(FieldScanID, v))
+}
+
+// ScanIDHasSuffix applies the HasSuffix predicate on the "scan_id" field.
+func ScanIDHasSuffix(v string) predicate.File {
+	return predicate.File(sql.FieldHasSuffix(FieldScanID, v))
+}
+
+// ScanIDEqualFold applies the EqualFold predicate on the "scan_id" field.
+func ScanIDEqualFold(v string) predicate.File {
+	return predicate.File(sql.FieldEqualFold(FieldScanID, v))
+}
+
+// ScanIDContainsFold applies the ContainsFold predicate on the "scan_id" field.
+func ScanIDContainsFold(v string) predicate.File {
+	return predicate.File(sql.FieldContainsFold(FieldScanID, v))
+}
+
+// MovieIDEQ applies the EQ predicate on the "movie_id" field.
+func MovieIDEQ(v int) predicate.File {
+	return predicate.File(sql.FieldEQ(FieldMovieID, v))
+}
+
+// MovieIDNEQ applies the NEQ predicate on the "movie_id" field.
+func MovieIDNEQ(v int) predicate.File {
+	return predicate.File(sql.FieldNEQ(FieldMovieID, v))
+}
+
+// MovieIDIn applies the In predicate on the "movie_id" field.
+func MovieIDIn(vs ...int) predicate.File {
+	return predicate.File(sql.FieldIn(FieldMovieID, vs...))
+}
+
+// MovieIDNotIn applies the NotIn predicate on the "movie_id" field.
+func MovieIDNotIn(vs ...int) predicate.File {
+	return predicate.File(sql.FieldNotIn(FieldMovieID, vs...))
+}
+
+// MovieIDIsNil applies the IsNil predicate on the "movie_id" field.
+func MovieIDIsNil() predicate.File {
+	return predicate.File(sql.FieldIsNull(FieldMovieID))
+}
+
+// MovieIDNotNil applies the NotNil predicate on the "movie_id" field.
+func MovieIDNotNil() predicate.File {
+	return predicate.File(sql.FieldNotNull(FieldMovieID))
 }
 
 // HasMovie applies the HasEdge predicate on the "movie" edge.

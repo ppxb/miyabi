@@ -21,6 +21,9 @@ type Dependencies struct {
 	Discover Discoverer
 	Pan      PanManager
 	Offline  OfflineManager
+	Library  LibraryManager
+	Tasks    TaskManager
+	Artwork  ArtworkReader
 	Frontend fs.FS
 }
 
@@ -35,6 +38,12 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	api := router.Group("/api")
 	api.GET("/health", healthHandler(deps.Health))
+	api.GET("/library/movies", libraryMoviesHandler(deps.Library))
+	api.GET("/library/files", libraryFilesHandler(deps.Library))
+	api.POST("/library/scan", libraryScanHandler(deps.Library))
+	api.GET("/library/artwork/:key", libraryArtworkHandler(deps.Artwork))
+	api.GET("/tasks", tasksHandler(deps.Tasks))
+	api.GET("/tasks/events", taskEventsHandler(deps.Tasks))
 	api.GET("/discover/movies", discoverBrowseHandler(deps.Discover))
 	api.GET("/discover/search", discoverSearchHandler(deps.Discover))
 	api.GET("/discover/tags", discoverTagsHandler(deps.Discover))

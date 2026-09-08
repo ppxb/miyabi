@@ -36,6 +36,10 @@ var (
 		{Name: "name", Type: field.TypeString},
 		{Name: "size", Type: field.TypeInt64},
 		{Name: "parent_id", Type: field.TypeString, Default: ""},
+		{Name: "account_id", Type: field.TypeString, Default: ""},
+		{Name: "root_id", Type: field.TypeString, Default: ""},
+		{Name: "path", Type: field.TypeString, Default: ""},
+		{Name: "scan_id", Type: field.TypeString, Default: ""},
 		{Name: "movie_files", Type: field.TypeInt, Nullable: true},
 	}
 	// FilesTable holds the schema information for the "files" table.
@@ -46,9 +50,16 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "files_movies_files",
-				Columns:    []*schema.Column{FilesColumns[9]},
+				Columns:    []*schema.Column{FilesColumns[13]},
 				RefColumns: []*schema.Column{MoviesColumns[0]},
 				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "file_account_id_root_id_scan_id",
+				Unique:  false,
+				Columns: []*schema.Column{FilesColumns[9], FilesColumns[10], FilesColumns[12]},
 			},
 		},
 	}

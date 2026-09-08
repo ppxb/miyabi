@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 
@@ -57,7 +58,7 @@ func errorMiddleware(logger *slog.Logger) gin.HandlerFunc {
 			status = http.StatusBadRequest
 		case errors.Is(err, service.ErrMediaDirectoryRequired), errors.Is(err, service.ErrMagnetNotFound):
 			status = http.StatusBadRequest
-		case ent.IsNotFound(err):
+		case ent.IsNotFound(err), errors.Is(err, fs.ErrNotExist):
 			status = http.StatusNotFound
 		case errors.Is(err, pan.ErrUnauthorized):
 			status = http.StatusUnauthorized

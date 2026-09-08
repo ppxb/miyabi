@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { DatabaseIcon, ListChecksIcon } from 'lucide-react'
+import { DatabaseIcon } from 'lucide-react'
 
 import { AppPage } from '@/components/app-page'
 import { PageHeader } from '@/components/page-header'
@@ -10,6 +10,7 @@ import { JavDBSection } from '@/features/settings/javdb-section'
 import { PanSection } from '@/features/settings/pan-section'
 import { PrivacySection } from '@/features/settings/privacy-section'
 import { SettingRow, SettingsSection } from '@/features/settings/shared'
+import { TasksSection } from '@/features/settings/tasks-section'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage
@@ -30,11 +31,7 @@ function SettingsPage() {
           <hr className="border-border" />
           <PanSection />
           <hr className="border-border" />
-          <SettingsSection icon={<ListChecksIcon className="size-4" />} title="任务">
-            <SettingRow title="任务进度" description="查看扫描、刮削和下载任务进度">
-              <Badge variant="secondary">即将接入</Badge>
-            </SettingRow>
-          </SettingsSection>
+          <TasksSection />
           <hr className="border-border" />
           <SettingsSection icon={<DatabaseIcon className="size-4" />} title="数据与缓存">
             <SettingRow title="数据目录" description="管理 SQLite 索引和图片缓存位置">

@@ -24,7 +24,6 @@ type FileQuery struct {
 	inters     []Interceptor
 	predicates []predicate.File
 	withMovie  *MovieQuery
-	withFKs    bool
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -370,18 +369,11 @@ func (_q *FileQuery) prepareQuery(ctx context.Context) error {
 func (_q *FileQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*File, error) {
 	var (
 		nodes       = []*File{}
-		withFKs     = _q.withFKs
 		_spec       = _q.querySpec()
 		loadedTypes = [1]bool{
 			_q.withMovie != nil,
 		}
 	)
-	if _q.withMovie != nil {
-		withFKs = true
-	}
-	if withFKs {
-		_spec.Node.Columns = append(_spec.Node.Columns, file.ForeignKeys...)
-	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*File).scanValues(nil, columns)
 	}
@@ -413,10 +405,10 @@ func (_q *FileQuery) loadMovie(ctx context.Context, query *MovieQuery, nodes []*
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*File)
 	for i := range nodes {
-		if nodes[i].movie_files == nil {
+		if nodes[i].MovieID == nil {
 			continue
 		}
-		fk := *nodes[i].movie_files
+		fk := *nodes[i].MovieID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -433,7 +425,7 @@ func (_q *FileQuery) loadMovie(ctx context.Context, query *MovieQuery, nodes []*
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "movie_files" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "movie_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -466,6 +458,9 @@ func (_q *FileQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != file.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if _q.withMovie != nil {
+			_spec.Node.AddColumnOnce(file.FieldMovieID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,6 +16,7 @@ import (
 	"github.com/ppxb/miyabi/internal/api"
 	"github.com/ppxb/miyabi/internal/config"
 	"github.com/ppxb/miyabi/internal/database"
+	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/javdb"
 	"github.com/ppxb/miyabi/internal/logging"
 	"github.com/ppxb/miyabi/internal/pan"
@@ -60,7 +62,20 @@ func run() error {
 		return fmt.Errorf("initialize pan service: %w", err)
 	}
 	defer drive.Close()
-	offline := service.NewOfflineService(store.Client, discover, drive)
+	tasks := service.NewTaskService(store.Client)
+	offline := service.NewOfflineService(store.Client, discover, drive, tasks)
+	library := service.NewLibraryService(store.Client, drive, tasks)
+	images, err := mediaimage.NewCache(cfg.DataDir)
+	if err != nil {
+		return err
+	}
+	scrape := service.NewScrapeService(library, discover, images)
+	// Keep scans, metadata writes and directory sidecars ordered.
+	pool := worker.NewPool(tasks, map[string]worker.Handler{
+		"scan": library.Scan, "scrape": scrape.Scrape, "cover": scrape.Cover,
+	}, 1, logger)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	router := api.NewRouter(api.Dependencies{
 		Logger:   logger,
@@ -68,16 +83,25 @@ func run() error {
 		Discover: discover,
 		Pan:      drive,
 		Offline:  offline,
+		Library:  library,
+		Tasks:    tasks,
+		Artwork:  scrape,
 		Frontend: miyabi.Frontend(),
 	})
 	server := &http.Server{
 		Addr:              cfg.Listen,
 		Handler:           router,
 		ReadHeaderTimeout: 10 * time.Second,
+		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	workerDone := make(chan struct{})
+	poolDone := make(chan struct{})
+	poolError := make(chan error, 1)
+	go func() {
+		defer close(poolDone)
+		poolError <- pool.Run(ctx)
+	}()
 	go func() {
 		defer close(workerDone)
 		worker.RunOffline(ctx, offline, logger)
@@ -85,6 +109,7 @@ func run() error {
 	defer func() {
 		stop()
 		<-workerDone
+		<-poolDone
 	}()
 
 	serverError := make(chan error, 1)
@@ -93,19 +118,25 @@ func run() error {
 		serverError <- server.ListenAndServe()
 	}()
 
+	var runError error
 	select {
 	case err := <-serverError:
 		if !errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("serve HTTP: %w", err)
+			runError = fmt.Errorf("serve HTTP: %w", err)
+		}
+	case err := <-poolError:
+		if err != nil {
+			runError = fmt.Errorf("run task pool: %w", err)
 		}
 	case <-ctx.Done():
-		shutdownContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := server.Shutdown(shutdownContext); err != nil {
-			return fmt.Errorf("shutdown HTTP server: %w", err)
-		}
+	}
+	stop()
+	shutdownContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := server.Shutdown(shutdownContext); err != nil {
+		return errors.Join(runError, fmt.Errorf("shutdown HTTP server: %w", err))
 	}
 
 	logger.Info("HTTP server stopped")
-	return nil
+	return runError
 }

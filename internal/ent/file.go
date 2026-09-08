@@ -34,10 +34,19 @@ type File struct {
 	Size int64 `json:"size,omitempty"`
 	// ParentID holds the value of the "parent_id" field.
 	ParentID string `json:"parent_id,omitempty"`
+	// AccountID holds the value of the "account_id" field.
+	AccountID string `json:"account_id,omitempty"`
+	// RootID holds the value of the "root_id" field.
+	RootID string `json:"root_id,omitempty"`
+	// Path holds the value of the "path" field.
+	Path string `json:"path,omitempty"`
+	// ScanID holds the value of the "scan_id" field.
+	ScanID string `json:"scan_id,omitempty"`
+	// MovieID holds the value of the "movie_id" field.
+	MovieID *int `json:"movie_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the FileQuery when eager-loading is set.
 	Edges        FileEdges `json:"edges"`
-	movie_files  *int
 	selectValues sql.SelectValues
 }
 
@@ -66,14 +75,12 @@ func (*File) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case file.FieldID, file.FieldSize:
+		case file.FieldID, file.FieldSize, file.FieldMovieID:
 			values[i] = new(sql.NullInt64)
-		case file.FieldFileID, file.FieldPickCode, file.FieldSha1, file.FieldName, file.FieldParentID:
+		case file.FieldFileID, file.FieldPickCode, file.FieldSha1, file.FieldName, file.FieldParentID, file.FieldAccountID, file.FieldRootID, file.FieldPath, file.FieldScanID:
 			values[i] = new(sql.NullString)
 		case file.FieldCreatedAt, file.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
-		case file.ForeignKeys[0]: // movie_files
-			values[i] = new(sql.NullInt64)
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -143,12 +150,36 @@ func (_m *File) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ParentID = value.String
 			}
-		case file.ForeignKeys[0]:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for edge-field movie_files", value)
+		case file.FieldAccountID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field account_id", values[i])
 			} else if value.Valid {
-				_m.movie_files = new(int)
-				*_m.movie_files = int(value.Int64)
+				_m.AccountID = value.String
+			}
+		case file.FieldRootID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field root_id", values[i])
+			} else if value.Valid {
+				_m.RootID = value.String
+			}
+		case file.FieldPath:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field path", values[i])
+			} else if value.Valid {
+				_m.Path = value.String
+			}
+		case file.FieldScanID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field scan_id", values[i])
+			} else if value.Valid {
+				_m.ScanID = value.String
+			}
+		case file.FieldMovieID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field movie_id", values[i])
+			} else if value.Valid {
+				_m.MovieID = new(int)
+				*_m.MovieID = int(value.Int64)
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -214,6 +245,23 @@ func (_m *File) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("parent_id=")
 	builder.WriteString(_m.ParentID)
+	builder.WriteString(", ")
+	builder.WriteString("account_id=")
+	builder.WriteString(_m.AccountID)
+	builder.WriteString(", ")
+	builder.WriteString("root_id=")
+	builder.WriteString(_m.RootID)
+	builder.WriteString(", ")
+	builder.WriteString("path=")
+	builder.WriteString(_m.Path)
+	builder.WriteString(", ")
+	builder.WriteString("scan_id=")
+	builder.WriteString(_m.ScanID)
+	builder.WriteString(", ")
+	if v := _m.MovieID; v != nil {
+		builder.WriteString("movie_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

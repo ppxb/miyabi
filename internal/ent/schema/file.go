@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 )
 
 type File struct {
@@ -29,6 +30,18 @@ func (File) Fields() []ent.Field {
 			NonNegative(),
 		field.String("parent_id").
 			Default(""),
+		field.String("account_id").
+			Default(""),
+		field.String("root_id").
+			Default(""),
+		field.String("path").
+			Default(""),
+		field.String("scan_id").
+			Default(""),
+		field.Int("movie_id").
+			StorageKey("movie_files").
+			Optional().
+			Nillable(),
 	}
 }
 
@@ -36,6 +49,13 @@ func (File) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.From("movie", Movie.Type).
 			Ref("files").
+			Field("movie_id").
 			Unique(),
+	}
+}
+
+func (File) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("account_id", "root_id", "scan_id"),
 	}
 }

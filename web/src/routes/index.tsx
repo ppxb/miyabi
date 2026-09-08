@@ -2,17 +2,29 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { AppPage } from '@/components/app-page'
 import { EmptyState } from '@/components/empty-state'
-import { PageHeader } from '@/components/page-header'
+import { LibraryPage } from '@/features/library/page'
 
 export const Route = createFileRoute('/')({
-  component: LibraryPage
+  validateSearch: (search: Record<string, unknown>): { page?: number } => {
+    const page = Number(search.page ?? 1)
+    if (!Number.isInteger(page) || page < 1) throw new Error('媒体库页码无效')
+    return page > 1 ? { page } : {}
+  },
+  component: LibraryRoute,
+  errorComponent: () => (
+    <AppPage>
+      <EmptyState emoji="(･o･;)" title="媒体库页码无效" />
+    </AppPage>
+  )
 })
 
-function LibraryPage() {
+function LibraryRoute() {
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
   return (
-    <AppPage>
-      <PageHeader title="媒体库" description="来自 115 网盘的影片索引" />
-      <EmptyState className="min-h-0 flex-1" emoji="(˙ᯅ˙)" title="媒体库还是空的" />
-    </AppPage>
+    <LibraryPage
+      page={search.page ?? 1}
+      onPageChange={page => void navigate({ search: page > 1 ? { page } : {}, resetScroll: false })}
+    />
   )
 }

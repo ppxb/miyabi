@@ -30,6 +30,16 @@ const (
 	FieldSize = "size"
 	// FieldParentID holds the string denoting the parent_id field in the database.
 	FieldParentID = "parent_id"
+	// FieldAccountID holds the string denoting the account_id field in the database.
+	FieldAccountID = "account_id"
+	// FieldRootID holds the string denoting the root_id field in the database.
+	FieldRootID = "root_id"
+	// FieldPath holds the string denoting the path field in the database.
+	FieldPath = "path"
+	// FieldScanID holds the string denoting the scan_id field in the database.
+	FieldScanID = "scan_id"
+	// FieldMovieID holds the string denoting the movie_id field in the database.
+	FieldMovieID = "movie_files"
 	// EdgeMovie holds the string denoting the movie edge name in mutations.
 	EdgeMovie = "movie"
 	// Table holds the table name of the file in the database.
@@ -54,23 +64,17 @@ var Columns = []string{
 	FieldName,
 	FieldSize,
 	FieldParentID,
-}
-
-// ForeignKeys holds the SQL foreign-keys that are owned by the "files"
-// table and are not defined as standalone fields in the schema.
-var ForeignKeys = []string{
-	"movie_files",
+	FieldAccountID,
+	FieldRootID,
+	FieldPath,
+	FieldScanID,
+	FieldMovieID,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
 	for i := range Columns {
 		if column == Columns[i] {
-			return true
-		}
-	}
-	for i := range ForeignKeys {
-		if column == ForeignKeys[i] {
 			return true
 		}
 	}
@@ -96,6 +100,14 @@ var (
 	SizeValidator func(int64) error
 	// DefaultParentID holds the default value on creation for the "parent_id" field.
 	DefaultParentID string
+	// DefaultAccountID holds the default value on creation for the "account_id" field.
+	DefaultAccountID string
+	// DefaultRootID holds the default value on creation for the "root_id" field.
+	DefaultRootID string
+	// DefaultPath holds the default value on creation for the "path" field.
+	DefaultPath string
+	// DefaultScanID holds the default value on creation for the "scan_id" field.
+	DefaultScanID string
 )
 
 // OrderOption defines the ordering options for the File queries.
@@ -144,6 +156,31 @@ func BySize(opts ...sql.OrderTermOption) OrderOption {
 // ByParentID orders the results by the parent_id field.
 func ByParentID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldParentID, opts...).ToFunc()
+}
+
+// ByAccountID orders the results by the account_id field.
+func ByAccountID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAccountID, opts...).ToFunc()
+}
+
+// ByRootID orders the results by the root_id field.
+func ByRootID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRootID, opts...).ToFunc()
+}
+
+// ByPath orders the results by the path field.
+func ByPath(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPath, opts...).ToFunc()
+}
+
+// ByScanID orders the results by the scan_id field.
+func ByScanID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldScanID, opts...).ToFunc()
+}
+
+// ByMovieID orders the results by the movie_id field.
+func ByMovieID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMovieID, opts...).ToFunc()
 }
 
 // ByMovieField orders the results by movie field.

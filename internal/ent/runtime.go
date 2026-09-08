@@ -80,6 +80,22 @@ func init() {
 	fileDescParentID := fileFields[5].Descriptor()
 	// file.DefaultParentID holds the default value on creation for the parent_id field.
 	file.DefaultParentID = fileDescParentID.Default.(string)
+	// fileDescAccountID is the schema descriptor for account_id field.
+	fileDescAccountID := fileFields[6].Descriptor()
+	// file.DefaultAccountID holds the default value on creation for the account_id field.
+	file.DefaultAccountID = fileDescAccountID.Default.(string)
+	// fileDescRootID is the schema descriptor for root_id field.
+	fileDescRootID := fileFields[7].Descriptor()
+	// file.DefaultRootID holds the default value on creation for the root_id field.
+	file.DefaultRootID = fileDescRootID.Default.(string)
+	// fileDescPath is the schema descriptor for path field.
+	fileDescPath := fileFields[8].Descriptor()
+	// file.DefaultPath holds the default value on creation for the path field.
+	file.DefaultPath = fileDescPath.Default.(string)
+	// fileDescScanID is the schema descriptor for scan_id field.
+	fileDescScanID := fileFields[9].Descriptor()
+	// file.DefaultScanID holds the default value on creation for the scan_id field.
+	file.DefaultScanID = fileDescScanID.Default.(string)
 	movieMixin := schema.Movie{}.Mixin()
 	movieMixinFields0 := movieMixin[0].Fields()
 	_ = movieMixinFields0

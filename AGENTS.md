@@ -106,7 +106,7 @@ miyabi/
 
 - **SQLite**：索引。影片、演员、文件关系、任务状态。
 - **本地图片目录**：缓存。封面、海报、缩略图，用于列表页快速渲染。直接从 115 读图需要换取时效直链且受限速，不适合高频小图请求。
-- **115 影片目录**：元数据完成后写入 `<code>.nfo`、`poster.jpg`、`fanart.jpg`，与视频同目录。NFO 不写剧情。目录结构兼容 Emby/Jellyfin。
+- **115 影片目录**：元数据完成后写入 `<code>.nfo`、`poster.jpg`、`fanart.jpg`，与视频同目录。挂载根目录、多影片共用目录或已有不同内容图片时，图片使用 `<code>-poster.jpg` / `<code>-fanart.jpg`，由 NFO 引用，避免覆盖。NFO 不写剧情。目录结构兼容 Emby/Jellyfin。
 - **JavDB 缓存**：不做全量镜像。taxonomy、发现列表和详情只做有 TTL 的按需缓存；缓存失效不影响已有媒体库。
 - **发现与媒体库分离**：发现结果不写入 Movie。只有 115 中实际出现视频文件并完成扫描后，才创建或关联 Movie。
 - **重建**：扫描时若目录已有 `.nfo`，直接解析入库并下载图片到缓存，不再请求 JavDB。换机器或删库后重新扫描即可恢复。
@@ -116,7 +116,7 @@ miyabi/
 - **Movie**：`code`（唯一，规范化番号）、`javdb_id`（可空唯一）、`title`、`release_date`、`duration`（分钟）、`director_id/name`、`maker_id/name`、`series_id/name`、`rating`、`cover`、`poster`、`fanarts`（JSON）、`scrape_status`（pending/done/failed）。没有 `plot` 字段。
 - **Actor**：`javdb_id` 唯一、`name`、`name_zht`、`gender`、`avatar`，与 Movie 多对多。JavDB 的演员数组包含男性演员，因此不使用 Actress 模型；UI 可默认只展示女性演员。年龄由生日计算，不持久化。
 - **Tag**：`javdb_id` 唯一、`name`、`name_zht`、`category_id`，与 Movie 多对多。标签名称不作为唯一键。
-- **File**：`file_id`（唯一）、`pick_code`、`sha1`、`name`、`size`、`parent_id`，可选关联 Movie。
+- **File**：`file_id`（唯一）、`pick_code`、`sha1`、`name`、`size`、`parent_id`、`account_id`、`root_id`、`path`、`scan_id`，可选关联 Movie。账号和根目录用于区分索引来源；每次扫描执行使用新的 `scan_id`。
 - **Task**：`type`、`status`（queued/running/done/failed）、`payload`（JSON）、`progress`、`error`、`created_at`、`updated_at`。
 - **Setting**：`key` 唯一、`value` JSON。
 
@@ -181,13 +181,29 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 - “媒体目录”描述保持固定，绑定路径显示在右侧操作按钮之前的禁用 shadcn Input 中，挂载/更换按钮使用 shadcn Tooltip。目录弹窗的路径导航使用 shadcn Breadcrumb，长名称保持单行省略。
 - 挂载目录由后端向 115 读取确认，目录 ID、名称、路径及所属账号一起存入 Setting 的 `pan.library_directory`。同一账号重新登录保留选择，换号后不沿用旧账号目录；取消挂载只删除本地配置。
 - 详情页磁力在未登录时只显示复制，登录后增加“一键加入 115”。必须先挂载当前账号的媒体目录；未挂载时提示前往设置，保留复制功能。提交期间禁用重复点击，只有 115 单条磁力结果成功才显示“已加入”。
-- 磁力按钮通过本地 Task 查询恢复状态，按账号、影片和 hash 读取最新一次任务；进行中显示“已加入 115”，完成或失败后允许“重新加入 115”。Task 完成仅是下载历史，不能证明资源现在仍存在于 115，更不能显示“已在库中”或永久禁用重新提交；远端删除与本地索引的同步由后续扫描处理。状态不依赖页面内 mutation 的临时成功标记；存在进行中任务时前端每 5 秒刷新本地状态，任务状态变化时更新影片标签。
+- 磁力按钮通过本地 Task 查询恢复状态，按账号、影片和 hash 读取最新一次任务；下载中、入库处理中禁用提交，只有当前目录的关联 File 仍存在时显示“已入库”。有视频但未识别出对应影片时显示“已下载”。完成的下载历史不代表文件仍存在；扫描确认删除后恢复普通“一键加入 115”，没有“重新加入”状态。存在下载或入库流程时每 5 秒刷新本地状态，SSE 同步更新影片标签和按钮。
+- 115 返回重复任务（10008）时，复用同目录的进行中任务；已完成且视频仍在媒体目录内时复用结果并扫描；只有确认视频不存在才以 `del_source_file=0` 删除该条历史任务并提交。网络、鉴权和协议错误不当作文件不存在，不删除源文件，不接管媒体目录之外的资源。
 - 影片状态 `saving` 的界面文案为“下载中”，表示离线任务进行中，不表示正在刮削。只有扫描创建或关联 Movie 后才能显示“已入库”；已下载仍需后续扫描入库。
 - 离线提交由 service 核对磁力属于当前 JavDB 影片，从 hash 构造 URI，再由 pan 使用开放平台 `/open/offline/add_task_urls` 提交到已挂载目录；前端不接触令牌，也不提交任意来源的 URL。
 - 已接受的离线任务写入 Task（type=offline），保存规范化 code、javdb_id、hash、info_hash、account_id 和 directory_id。同账号同 hash 的进行中任务复用已有记录；后台每 30 秒同步当前账号的远端任务状态，无进行中任务时不请求 115。
-- “已加入”仅表示 115 接受任务。当前实现同步远端下载状态，完成后记录 file_id；媒体库扫描与刮削尚待后续接入，不能因提交或下载完成直接创建 Movie。
+- 115 接受任务后只记录下载状态。下载完成时保存 `file_id` 并在同一事务内创建独立的定向扫描任务，支持文件或文件夹，不能合并到可能已越过该目录的运行中扫描。扫描后才创建 Movie，并继续刮削、缓存封面和写回 NFO；切换账号或挂载目录后不向旧任务的来源写入数据。
 
 ## 关键流程
+
+### 当前扫描实现
+
+- 媒体库手动创建 `scan` 任务，后台递归读取已挂载目录的全部分页。视频按文件名识别番号，分集关联同一 Movie，未识别视频仍保存 File，前端提供文件列表查看。
+- 扫描分页批量 upsert File/Movie，与本页任务进度一起提交事务；已有元数据、演员标签关系和刮削状态保持不变，新影片为 `pending`。
+- 媒体库查询和发现页的“已入库”投影均要求影片关联当前挂载账号与根目录的 File，不因旧目录索引或孤立元数据记录显示已入库；浏览本地媒体库不请求 115。
+- 完整扫描成功后才按账号和挂载根目录清理未出现的 File，并删除因此失去全部文件的 Movie。扫描失败或取消不执行未读取文件的清理；只更新本地索引，不删除 115 文件。
+- 任务池注册 `scan`、`scrape`、`cover`，并发为 1；重启恢复排队任务。扫描的索引收尾与刮削入队、元数据写库与封面入队均在同一事务完成；已完成衔接的阶段不会在重启时重复入队。`offline` 保留远端轮询流程，不由本地任务池重新执行。
+- `/api/tasks/events` 提供 SSE，每次连接发送最新任务快照，进度更新写入 TanStack Query；未知总量阶段显示活动进度条及实际计数。媒体库和设置页展示扫描状态，不新增顶级任务菜单。
+- 完整扫描只清理当前挂载根目录；离线下载触发的定向扫描只清理目标文件或目标子树，不能清理整库。目录内单一 NFO 可为未识别的视频提供番号，避免重扫时丢失已有影片关系。
+- 刮削优先从匹配的 NFO 恢复元数据和同目录图片；没有 NFO 时复用完整的本地元数据，或按规范化番号精确匹配 JavDB。封面裁剪和缩略图存入本地内容寻址缓存，API 以不可变 URL 提供图片。图片仍经过 MediaImage 的 NSFW 控制。
+- 写回按图片、NFO 的顺序进行，NFO 最后写入作为完成标记；重启重试复用相同内容的图片，保留已有 NFO 及不同内容文件，不覆盖用户编辑。存在不完整 NFO 时直接报告错误，不绕过它请求 JavDB。
+- SSE 将刮削和封面子任务汇总进对应扫描的紧凑进度区；扫描阶段不伪造总量，元数据阶段展示已处理部数。扫描完成不等于刮削完成；封面缓存与 115 写回都完成后才标记 `scrape_status=done`。
+
+### 完整流程目标
 
 **扫描入库**：`pan.Client.List` 递归目录 → 目录内有 `.nfo` 则解析入库并入队封面缓存任务 → 否则逐文件 `codeid.Parse` → upsert File，命中番号则 upsert Movie 并关联 → 新影片入队刮削任务。
 
@@ -201,7 +217,7 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 
 **播放**：请求时实时调用 `pan.Client.PlayURL` 取直链或 m3u8，不落库。直链需带 115 指定 User-Agent，由 `/api/play/:id/stream` 反向代理解决。
 
-**离线下载**：用户在影片详情选择 JavDB 返回的磁力 → service 核对来源并从 hash 构造 magnet URI → `pan.Client.AddOffline` → 写 Task（type 为 offline，payload.code 在写入时规范化，同时保留 javdb_id、hash）→ worker 定时轮询并更新状态。目录扫描服务接入后，再衔接下载完成后的扫描与刮削。核心流程不要求用户手动粘贴磁力或上传 torrent。
+**离线下载**：用户在影片详情选择 JavDB 返回的磁力 → service 核对来源并从 hash 构造 magnet URI → `pan.Client.AddOffline` → 写 Task（type 为 offline，payload.code 在写入时规范化，同时保留 javdb_id、hash）→ 轮询下载完成 → 同一事务创建定向扫描 → 创建或关联 Movie → 刮削、缓存图片并写回 NFO。核心流程不要求用户手动粘贴磁力或上传 torrent。
 
 ## 约定
 

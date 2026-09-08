@@ -47,6 +47,8 @@ type PanService struct {
 	tokens    pan.Tokens
 	session   *panLoginSession
 	directory panLibraryDirectory
+	// Changes only when the user logs in or out, not when tokens rotate.
+	authorizationVersion uint64
 }
 
 func NewPanService(ctx context.Context, database *ent.Client, options pan.Options) (*PanService, error) {
@@ -136,6 +138,7 @@ func (service *PanService) LoginStatus(ctx context.Context, id string) (PanLogin
 			session.err = err
 			return PanLoginStatus{}, err
 		}
+		service.authorizationVersion++
 	}
 	session.state = state
 	if state != pan.LoginWaiting && state != pan.LoginScanned {
@@ -151,6 +154,7 @@ func (service *PanService) Disconnect(ctx context.Context) (PanAccountStatus, er
 		return PanAccountStatus{}, fmt.Errorf("remove 115 credentials: %w", err)
 	}
 	service.tokens = pan.Tokens{}
+	service.authorizationVersion++
 	service.session = nil
 	return PanAccountStatus{}, nil
 }

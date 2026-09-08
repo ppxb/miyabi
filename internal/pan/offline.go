@@ -9,10 +9,28 @@ import (
 )
 
 type OfflineTask struct {
-	Hash     string `json:"info_hash"`
-	Status   int    `json:"status"`
-	Progress int    `json:"percentDone"`
-	FileID   string `json:"file_id"`
+	Hash        string `json:"info_hash"`
+	Status      int    `json:"status"`
+	Progress    int    `json:"percentDone"`
+	FileID      string `json:"file_id"`
+	DirectoryID string `json:"wp_path_id"`
+}
+
+// RemoveOffline removes download history only. Source files are never deleted.
+func (client *Client) RemoveOffline(ctx context.Context, accessToken, hash string) error {
+	response, err := client.request(
+		client.http.R().SetContext(ctx).SetAuthToken(accessToken).SetFormData(map[string]string{
+			"info_hash": hash, "del_source_file": "0",
+		}), http.MethodPost, apiURL+"/open/offline/del_task",
+	)
+	if err != nil {
+		return err
+	}
+	var result apiResponse
+	if err := json.Unmarshal(response.Body(), &result); err != nil {
+		return fmt.Errorf("decode 115 offline removal: %w", err)
+	}
+	return result.err()
 }
 
 type OfflinePage struct {

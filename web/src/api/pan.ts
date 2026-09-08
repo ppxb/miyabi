@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 import { ApiError, apiDelete, apiGet, apiPost, apiPut } from '@/api/client'
+import { invalidateMovieStates } from '@/api/discover'
 
 export type PanDirectory = {
   id: string
@@ -98,6 +99,7 @@ export function useDisconnectPan() {
     mutationFn: () => apiDelete<PanAccountStatus>('/api/pan/account'),
     onSuccess: async status => {
       queryClient.setQueryData(panKeys.account, status)
+      void queryClient.invalidateQueries({ queryKey: ['library'] })
       await queryClient.cancelQueries({ queryKey: panKeys.fileLists })
       queryClient.removeQueries({ queryKey: panKeys.fileLists })
     }
@@ -126,6 +128,9 @@ export function useSelectPanDirectory(accountID: string) {
   return useMutation({
     mutationFn: (id: string) => apiPut<PanDirectory>('/api/pan/directory', { id }),
     onSuccess: directory => {
+      void queryClient.invalidateQueries({ queryKey: ['library'] })
+      void queryClient.invalidateQueries({ queryKey: ['offline'] })
+      void invalidateMovieStates(queryClient)
       queryClient.setQueryData<PanAccountStatus>(panKeys.account, status =>
         status?.account?.id === accountID ? { ...status, directory } : status
       )
@@ -143,6 +148,9 @@ export function useClearPanDirectory(accountID: string) {
   return useMutation({
     mutationFn: () => apiDelete<null>('/api/pan/directory'),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['library'] })
+      void queryClient.invalidateQueries({ queryKey: ['offline'] })
+      void invalidateMovieStates(queryClient)
       queryClient.setQueryData<PanAccountStatus>(panKeys.account, status =>
         status?.account?.id === accountID ? { ...status, directory: undefined } : status
       )
