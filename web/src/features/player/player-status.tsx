@@ -10,12 +10,7 @@ export function PlayerCloseButton() {
   const close = useUIStore(state => state.closePlayer)
 
   return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      className="cursor-pointer rounded-full bg-white/10 text-white backdrop-blur-xl hover:bg-white/20 hover:text-white dark:hover:bg-white/20"
-      onClick={close}
-    >
+    <Button variant="ghost" size="icon-sm" className="cursor-pointer" onClick={close}>
       <XIcon />
     </Button>
   )
@@ -27,12 +22,12 @@ type PlayerHeaderProps = {
 }
 
 export function PlayerTitle({ title }: { title?: string }) {
-  return <p className="min-w-0 flex-1 truncate text-sm font-medium text-white/90">{title}</p>
+  return <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground/90">{title}</p>
 }
 
 function PlayerStatus({ children, title, toolbar }: PlayerHeaderProps & { children: ReactNode }) {
   return (
-    <div className="relative grid aspect-video size-full place-items-center bg-black px-6 pt-16 pb-6 text-white">
+    <div className="relative grid aspect-video size-full place-items-center bg-black px-6 pt-16 pb-6 text-foreground">
       <div className="absolute inset-x-0 top-0 flex min-w-0 items-center gap-2 p-3 sm:p-4">
         <PlayerTitle title={title} />
         {toolbar}
@@ -46,11 +41,17 @@ function PlayerStatus({ children, title, toolbar }: PlayerHeaderProps & { childr
 export function PlayerLoading({ title, toolbar }: PlayerHeaderProps) {
   return (
     <PlayerStatus title={title} toolbar={toolbar}>
-      <div className="flex items-center gap-2 text-sm text-white/60">
-        <LoaderCircleIcon className="size-5 animate-spin" />
-        正在准备播放…
-      </div>
+      <PlayerLoadingIndicator />
     </PlayerStatus>
+  )
+}
+
+export function PlayerLoadingIndicator({ message = '正在准备播放…' }: { message?: string }) {
+  return (
+    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <LoaderCircleIcon className="size-5 animate-spin" />
+      {message}
+    </div>
   )
 }
 
@@ -82,7 +83,7 @@ export function PlayerError({
   return (
     <PlayerStatus title={title} toolbar={toolbar}>
       <div className="max-w-md space-y-4 text-center">
-        <p className="text-sm text-white/60">{description}</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
         <div className="flex flex-wrap justify-center gap-2">
           {needsSettings ? (
             <Button asChild size="sm">

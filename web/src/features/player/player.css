@@ -1,22 +1,49 @@
 .miyabi-player {
   --video-border: 0;
-  --video-border-radius: 1rem;
+  --video-border-radius: var(--radius-2xl);
   --video-font-family: var(--font-sans);
+  --video-brand: var(--primary);
+  --video-controls-color: var(--foreground);
+  --video-focus-ring-color: var(--ring);
   --media-button-size: 32px;
   --media-fullscreen-button-size: 32px;
   --media-sm-fullscreen-button-size: 32px;
   --video-sm-button-size: 32px;
-  --media-button-icon-size: 20px;
-  --media-button-border-radius: 9999px;
+  --media-button-icon-size: 16px;
+  --media-button-border-radius: var(--radius-4xl);
+  --media-button-border: 1px solid transparent;
+  --media-button-hover-bg: color-mix(in oklch, var(--muted) 50%, transparent);
   --media-button-hover-transform: none;
+  --media-button-hover-transition: background-color 150ms ease, color 150ms ease;
   --media-time-font-size: 12px;
   --video-sm-time-font-size: 12px;
   --video-fullscreen-time-font-size: 12px;
   --media-slider-track-height: 3px;
+  --media-slider-track-bg: var(--input);
+  --media-slider-track-fill-bg: var(--primary);
+  --media-slider-thumb-bg: var(--primary);
   --media-slider-thumb-size: 10px;
-  --media-menu-bg: rgb(28 28 30 / 0.94);
+  --media-menu-bg: color-mix(in oklch, var(--popover) 90%, transparent);
   --media-menu-border: 0;
-  --media-menu-border-radius: 1rem;
+  --media-menu-border-radius: var(--radius-2xl);
+  --media-menu-font-weight: 400;
+  --media-menu-padding: 4px;
+  --media-menu-text-color: var(--popover-foreground);
+  --media-menu-text-secondary-color: var(--muted-foreground);
+  --media-menu-section-bg: transparent;
+  --media-menu-top-bar-bg: var(--accent);
+  --media-menu-divider: 1px solid var(--border);
+  --media-menu-item-icon-size: 16px;
+  --media-menu-arrow-icon-size: 16px;
+  --media-menu-item-padding: 8px;
+  --media-menu-item-height: 36px;
+  --media-menu-item-border-radius: var(--radius-xl);
+  --media-menu-item-hover-bg: var(--accent);
+  --media-menu-icon-rotate-deg: 0deg;
+  --media-menu-checkbox-bg: var(--input);
+  --media-menu-checkbox-bg-active: var(--primary);
+  --media-menu-checkbox-handle-bg: var(--foreground);
+  --media-menu-checkbox-width: 32px;
   --media-controls-in-transition: opacity 180ms ease-out, visibility 0s;
   --media-controls-out-transition: opacity 360ms ease-out, visibility 0s linear 360ms;
   width: 100%;
@@ -24,6 +51,7 @@
   aspect-ratio: 16 / 9;
   border-radius: var(--video-border-radius);
   background: black;
+  color: var(--foreground);
 }
 
 .miyabi-player[data-fullscreen] {
@@ -32,6 +60,33 @@
 
 .miyabi-player [data-media-provider] video {
   object-fit: contain;
+}
+
+/* Vidstack's unknown-stream layout bypasses the buffering slot. */
+.miyabi-player .vds-buffering-indicator {
+  display: none;
+}
+
+.miyabi-player[data-buffering] .vds-video-layout[data-sm] .vds-play-button {
+  visibility: hidden;
+}
+
+.miyabi-player .vds-button {
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.miyabi-player .vds-tooltip-content {
+  display: none;
+}
+
+.miyabi-player .vds-menu-items[data-root] {
+  backdrop-filter: blur(24px);
+}
+
+.miyabi-player .vds-menu-checkbox[aria-checked='true']::after {
+  background-color: var(--primary-foreground);
 }
 
 /* Keep the gradient mounted while opacity fades, and hide visibility only after the fade. */
@@ -60,48 +115,36 @@
   align-self: center;
   width: calc(100% - 2.5rem);
   max-width: 36rem;
-  background: rgb(24 24 27 / 0.5);
+  z-index: auto;
+}
+
+/* Blur belongs on the background so tooltips can extend above both control rows. */
+.miyabi-player .vds-video-layout .vds-controls-group:nth-last-child(2)::before,
+.miyabi-player .vds-video-layout .vds-controls-group:last-child::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: color-mix(in oklch, var(--popover) 50%, transparent);
   backdrop-filter: blur(32px) saturate(160%);
+  pointer-events: none;
 }
 
 .miyabi-player .vds-video-layout .vds-controls-group:nth-last-child(2) {
   margin: 0;
   padding: 0.125rem 0.75rem 0;
-  border-radius: 0.875rem 0.875rem 0 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
 }
 
 .miyabi-player .vds-video-layout .vds-controls-group:last-child {
   margin: 0 0 1rem;
   padding: 0 0.375rem 0.25rem;
-  border-radius: 0 0 0.875rem 0.875rem;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
 
 .miyabi-player .vds-time-slider {
   --media-slider-height: 24px;
-}
-
-.miyabi-player .miyabi-player-select {
-  flex-shrink: 0;
-  height: 1.75rem;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  cursor: pointer;
-  border: 0;
-  border-radius: 9999px;
-  background: rgb(255 255 255 / 0.08);
-  color: white;
-}
-
-.miyabi-player .miyabi-player-select:hover {
-  background: rgb(255 255 255 / 0.16);
-}
-
-.miyabi-player-select [data-slot='select-value'] {
-  min-width: 0;
-}
-
-.miyabi-player-select > svg {
-  color: rgb(255 255 255 / 0.7);
 }
 
 .miyabi-player .vds-video-layout[data-sm] .vds-controls-group:first-child {

@@ -3,9 +3,10 @@ import {
   isHLSProvider,
   MediaPlayer,
   MediaProvider,
+  useMediaState,
   type MediaPlayerInstance
 } from '@vidstack/react'
-import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default'
+import { DefaultVideoLayout } from '@vidstack/react/player/layouts/default'
 import { ListVideoIcon } from 'lucide-react'
 
 import type { LibraryFile } from '@/api/library'
@@ -18,7 +19,14 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { formatSize } from '@/lib/format'
-import { PlayerCloseButton, PlayerError, PlayerLoading, PlayerTitle } from './player-status'
+import { playerIcons } from './icons'
+import {
+  PlayerCloseButton,
+  PlayerError,
+  PlayerLoading,
+  PlayerLoadingIndicator,
+  PlayerTitle
+} from './player-status'
 import { playerTranslations } from './translations'
 
 import '@vidstack/react/player/styles/default/theme.css'
@@ -137,39 +145,80 @@ function PlaybackPlayer({ title, files }: { title: string; files: LibraryFile[] 
           )}
         </div>
       ) : (
-        <DefaultVideoLayout
-          icons={defaultLayoutIcons}
-          translations={playerTranslations}
-          colorScheme="dark"
-          noModal
-          slots={{
-            topControlsGroupStart: <PlayerTitle title={title} />,
-            topControlsGroupCenter: fileControl,
-            topControlsGroupEnd: <PlayerCloseButton />,
-            chapterTitle: <div className="vds-controls-spacer" />,
-            beforeSettingsMenu:
-              sources.length > 1 && source ? (
-                <PlaybackSelect
-                  player={player}
-                  value={source.src}
-                  side="top"
-                  onValueChange={value => {
-                    resumeTime.current = position.current
-                    setAutoPlay(!player?.paused)
-                    setSelectedSrc(value)
-                  }}
-                >
-                  {sources.map(item => (
-                    <SelectItem key={item.src} value={item.src}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </PlaybackSelect>
-              ) : null
-          }}
-        />
+        <PlayerReady title={title} toolbar={fileControl}>
+          <DefaultVideoLayout
+            icons={playerIcons}
+            translations={playerTranslations}
+            colorScheme="dark"
+            noModal
+            slots={{
+              bufferingIndicator: null,
+              topControlsGroupStart: <PlayerTitle title={title} />,
+              topControlsGroupCenter: fileControl,
+              topControlsGroupEnd: <PlayerCloseButton />,
+              chapterTitle: <div className="vds-controls-spacer" />,
+              beforeSettingsMenu:
+                sources.length > 1 && source ? (
+                  <PlaybackSelect
+                    player={player}
+                    value={source.src}
+                    side="top"
+                    onValueChange={value => {
+                      resumeTime.current = position.current
+                      setAutoPlay(!player?.paused)
+                      setSelectedSrc(value)
+                    }}
+                  >
+                    {sources.map(item => (
+                      <SelectItem key={item.src} value={item.src}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </PlaybackSelect>
+                ) : null
+            }}
+          >
+            <PlayerBufferingIndicator />
+          </DefaultVideoLayout>
+        </PlayerReady>
       )}
     </MediaPlayer>
+  )
+}
+
+function PlayerReady({
+  title,
+  toolbar,
+  children
+}: {
+  title: string
+  toolbar: ReactNode
+  children: ReactNode
+}) {
+  const canPlay = useMediaState('canPlay')
+
+  if (!canPlay) {
+    return (
+      <div className="absolute inset-0 z-20 cursor-auto">
+        <PlayerLoading title={title} toolbar={toolbar} />
+      </div>
+    )
+  }
+
+  return children
+}
+
+function PlayerBufferingIndicator() {
+  const waiting = useMediaState('waiting')
+
+  if (!waiting) return null
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center">
+      <div className="rounded-full bg-background/75 px-4 py-2.5 backdrop-blur-xl">
+        <PlayerLoadingIndicator message="正在缓冲…" />
+      </div>
+    </div>
   )
 }
 
@@ -199,7 +248,7 @@ function PlaybackSelect({
         else player?.controls.resume()
       }}
     >
-      <SelectTrigger size="sm" className="miyabi-player-select max-w-full min-w-0">
+      <SelectTrigger size="sm" className="max-w-full min-w-0 shrink-0 cursor-pointer px-2 text-xs">
         {icon}
         <SelectValue>{label}</SelectValue>
       </SelectTrigger>
@@ -210,7 +259,7 @@ function PlaybackSelect({
         side={side}
         collisionBoundary={player?.el}
         collisionPadding={12}
-        className="max-w-[min(32rem,var(--radix-select-content-available-width))] bg-neutral-900/90 text-white ring-white/10 backdrop-blur-xl"
+        className="max-w-[min(32rem,var(--radix-select-content-available-width))] bg-popover/90 backdrop-blur-xl"
       >
         {children}
       </SelectContent>

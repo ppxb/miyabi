@@ -21,7 +21,7 @@ export function PlayerDialog() {
       }}
     >
       <DialogContent
-        className="dark aspect-video w-[min(72rem,calc(100vw-2rem),calc(88dvh*16/9))] max-w-none gap-0 overflow-hidden rounded-2xl bg-black p-0 text-white ring-0 sm:max-w-none"
+        className="dark aspect-video w-[min(72rem,calc(100vw-2rem),calc(88dvh*16/9))] max-w-none gap-0 overflow-hidden rounded-2xl bg-black p-0 text-foreground ring-0 sm:max-w-none"
         showCloseButton={false}
         onPointerDownOutside={event => event.preventDefault()}
       >
