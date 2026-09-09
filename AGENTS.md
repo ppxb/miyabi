@@ -257,6 +257,7 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 - 前端所有服务端数据通过 TanStack Query，不放 Zustand。
 - NSFW 等普通显示偏好由 Zustand persist 持久化到当前浏览器 localStorage，不存 SQLite、不调用设置 API。服务端不可用时本地偏好仍可使用。
 - 媒体图片的 NSFW 行为沿用 jm-boom：开启隐私模式时不渲染 `<img>`；隐藏、缺图和加载失败统一显示灰底 `ImageIcon` 占位，图片地址变化后重置失败状态。
+- 卡片与详情页封面通过 `MovieCover` 统一展示：前景按原比例完整显示，背景使用同图放大、模糊并压暗以填补比例留白。两层图片共用 `MediaImage` 的懒加载、隐私与错误处理。
 - 媒体卡片不添加悬停阴影、缩放或背景变色。
 - 设置页最上方为“外观”分组，主题切换沿用 jm-boom `feat/docker` 的 shadcn Tabs 图标按钮，支持跟随系统、浅色、深色。主题由 next-themes 持久化到 `miyabi-theme`，全局 ThemeProvider 负责应用到页面。
 - 所有项目依赖的安装、升级和移除均由用户执行，包括 Go module、前端 npm/pnpm 包及 shadcn/ui 组件。助手先告知所需依赖、用途和具体命令，不自行运行依赖变更命令；可使用已安装的依赖进行构建、测试、lint 和格式化。依赖未就绪时继续完成不受影响的工作，并明确说明尚未完成的检查。
@@ -293,6 +294,8 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 ### Stage 2 番号识别
 - `codeid.Parse` 与 `Normalize`，覆盖前缀噪声、分集、字幕后缀、FC2、无横线格式。
 - 支持欧美 `Site.YY.MM.DD` / `Site.YYYY.MM.DD` 编号，统一大小写但保留站点、完整日期段及点号，不截断成 `Site-YY`。没有站点前缀的日期不作为番号。
+- 支持 `HEYDOUGA-4030-2347` 等多段数字番号，规范化保留全部数字段与前导零。扫描 Heydouga 文件名时保留厂商号和作品号，再剥离分集、字幕等标记；普通 `SSIS-589-02` 仍按 `SSIS-589` 的分集处理，不能套用同一截断规则合并不同影片。
+- 完整番号优先保留显式分隔的前缀，`T28-638` 不能拆成 `T-28-638`；Heydouga 与日期式编号单独支持无横线前缀写法。
 - 表驱动测试。
 - 验收：测试通过。
 

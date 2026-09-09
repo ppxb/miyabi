@@ -7,27 +7,32 @@ import (
 )
 
 const (
-	prefix        = `(?:[A-Z][A-Z0-9]{0,11}|[0-9]{1,4}[A-Z][A-Z0-9]{0,10})`
-	compactPrefix = `(?:[A-Z]{1,12}|[0-9]{1,4}[A-Z]{1,11})`
-	fc2Number     = `FC2[-_. ]*(?:PPV)?[-_. ]*[0-9]{3,8}`
+	prefix         = `(?:[A-Z][A-Z0-9]{0,11}|[0-9]{1,4}[A-Z][A-Z0-9]{0,10})`
+	compactPrefix  = `(?:[A-Z]{1,12}|[0-9]{1,4}[A-Z]{1,11})`
+	fc2Number      = `FC2[-_. ]*(?:PPV)?[-_. ]*[0-9]{3,8}`
+	heydougaNumber = `HEYDOUGA[-_. ]*[0-9]{4}[-_. ]+[0-9]{1,7}`
+	numberSuffix   = `[0-9]{2,7}[A-Z]?(?:[-_. ]+[0-9]{1,7})*`
 	// Western scenes use a site name and a dotted date as the full identifier.
 	westernNumber = `(?:[A-Z][A-Z0-9]*|[0-9]+[A-Z][A-Z0-9]*)\.(?:[0-9]{2}|[0-9]{4})\.[0-9]{2}\.[0-9]{2}`
 )
 
 var (
-	separators       = strings.NewReplacer("－", "-", "﹣", "-", "–", "-", "—", "-", "＿", "_")
-	delimiters       = regexp.MustCompile(`[-_. ]+`)
-	fc2Pattern       = regexp.MustCompile(`^FC2[-_. ]*(?:PPV)?[-_. ]*([0-9]{3,8})$`)
-	westernPattern   = regexp.MustCompile(`^` + westernNumber + `$`)
-	numericPattern   = regexp.MustCompile(`^([0-9]{6})[-_]([0-9]{2,3})$`)
-	separatedPattern = regexp.MustCompile(`^(` + prefix + `)[-_. ]+([0-9]{2,7}[A-Z]?(?:[-_][0-9]{2,3})*)$`)
-	compactPattern   = regexp.MustCompile(`^(` + compactPrefix + `)([0-9]{2,7}[A-Z]?(?:[-_][0-9]{2,3})*)$`)
+	separators         = strings.NewReplacer("－", "-", "﹣", "-", "–", "-", "—", "-", "＿", "_")
+	delimiters         = regexp.MustCompile(`[-_. ]+`)
+	fc2Pattern         = regexp.MustCompile(`^FC2[-_. ]*(?:PPV)?[-_. ]*([0-9]{3,8})$`)
+	westernPattern     = regexp.MustCompile(`^` + westernNumber + `$`)
+	numericPattern     = regexp.MustCompile(`^([0-9]{6})[-_]([0-9]{2,3})$`)
+	heydougaPattern    = regexp.MustCompile(`^(HEYDOUGA)[-_. ]*([0-9]{4}(?:[-_. ]+[0-9]{1,7})+)$`)
+	compactDatePattern = regexp.MustCompile(`^(` + compactPrefix + `)([0-9]{6}[-_][0-9]{2,3})$`)
+	separatedPattern   = regexp.MustCompile(`^(` + prefix + `)[-_. ]+(` + numberSuffix + `)$`)
+	compactPattern     = regexp.MustCompile(`^(` + compactPrefix + `)(` + numberSuffix + `)$`)
 
-	// Six-digit date codes keep their second numeric segment. Other trailing
-	// segments in filenames (SSIS-589-02, for example) identify a video part.
+	// Heydouga catalogue numbers and six-digit date codes keep their second numeric segment.
+	// Other trailing segments in filenames (SSIS-589-02, for example) identify a video part.
 	filenamePattern = regexp.MustCompile(`(?:^|[^A-Z0-9])(` +
 		westernNumber + `|` +
 		fc2Number + `|` +
+		heydougaNumber + `|` +
 		prefix + `[-_. ]*[0-9]{6}[-_][0-9]{2,3}|` +
 		`[0-9]{6}[-_][0-9]{2,3}|` +
 		prefix + `[-_. ]+[0-9]{2,7}[A-Z]?|` +
@@ -63,7 +68,9 @@ func Normalize(raw string) string {
 	if match := numericPattern.FindStringSubmatch(value); match != nil {
 		return match[1] + "-" + match[2]
 	}
-	for _, pattern := range []*regexp.Regexp{compactPattern, separatedPattern} {
+	// Preserve explicit prefixes such as T28 before trying an omitted separator.
+	// Known multipart formats also accept compact spellings without losing a numeric segment.
+	for _, pattern := range []*regexp.Regexp{heydougaPattern, compactDatePattern, separatedPattern, compactPattern} {
 		if match := pattern.FindStringSubmatch(value); match != nil {
 			return match[1] + "-" + delimiters.ReplaceAllString(match[2], "-")
 		}

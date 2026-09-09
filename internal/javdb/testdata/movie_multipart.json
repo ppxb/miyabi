@@ -1,0 +1,21 @@
+{
+  "success": 1,
+  "data": {
+    "movie": {
+      "id": "movie-multipart",
+      "number": "heydouga-4030-2347",
+      "type": 1,
+      "actor_movies": [
+        { "id": "actor-standard", "number": "T28-638" },
+        { "id": "actor-fc2", "number": "FC2-PPV-1234567" },
+        { "id": "actor-date", "number": "1pondo-123456_01" },
+        { "id": "actor-letter", "number": "FJIN-106a" },
+        { "id": "actor-western", "number": "ExampleStudio.26.09.05" },
+        { "id": "actor-multipart", "number": "heydouga-4030-2347" }
+      ],
+      "relative_movies": [
+        { "id": "related-multipart", "number": "heydouga-4030-2348" }
+      ]
+    }
+  }
+}

@@ -7,5 +7,7 @@ export function MovieCover({
   source: string
   loading?: 'eager' | 'lazy'
 }) {
-  return <MediaImage source={source} loading={loading} className="object-contain" />
+  return (
+    <MediaImage source={source} loading={loading} blurredBackground className="object-contain" />
+  )
 }

@@ -212,6 +212,23 @@ func TestMovieDetailMapsGraphWithoutPlot(t *testing.T) {
 	}
 }
 
+func TestMovieDetailPreservesMultipartNumbers(t *testing.T) {
+	transport := &fixtureTransport{responses: map[string][]byte{
+		"/api/v4/movies/movie-multipart|zh-TW": fixtureFile(t, "movie_multipart.json"),
+	}}
+	client := clientWithTransport(transport)
+	movie, err := client.MovieDetail(t.Context(), "movie-multipart")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if movie.Code != "HEYDOUGA-4030-2347" || len(movie.ActorMovies) != 6 || len(movie.RelatedMovies) != 1 {
+		t.Fatalf("multipart detail = %+v", movie)
+	}
+	if movie.ActorMovies[0].Code != "T28-638" || movie.ActorMovies[5].Code != "HEYDOUGA-4030-2347" || movie.RelatedMovies[0].Code != "HEYDOUGA-4030-2348" {
+		t.Fatalf("multipart references = %+v, %+v", movie.ActorMovies, movie.RelatedMovies)
+	}
+}
+
 func TestBrowseBuildsEntityFilters(t *testing.T) {
 	for _, test := range []struct {
 		kind EntityType
@@ -273,6 +290,31 @@ func TestResolveMovieIDKeepsLetterVariantsDistinct(t *testing.T) {
 	}}
 	client := clientWithTransport(transport)
 	for code, want := range map[string]string{"FJIN-106": "base", "fjin106a": "variant"} {
+		id, err := client.ResolveMovieID(t.Context(), code)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if id != want {
+			t.Errorf("ResolveMovieID(%q) = %q, want %q", code, id, want)
+		}
+	}
+}
+
+func TestResolveMovieIDKeepsMultipartNumbersDistinct(t *testing.T) {
+	transport := &fixtureTransport{responses: map[string][]byte{
+		"/api/v2/search|zh-TW": []byte(`{"success":1,"data":{"movies":[
+			{"id":"partial","number":"HEYDOUGA-4030"},
+			{"id":"different-series","number":"HEYDOUGA-4031-2347"},
+			{"id":"different-movie","number":"HEYDOUGA-4030-2348"},
+			{"id":"exact","number":"heydouga-4030-2347"}
+		]}}`),
+	}}
+	client := clientWithTransport(transport)
+	for code, want := range map[string]string{
+		"heydouga4030_2347":  "exact",
+		"HEYDOUGA-4030-2348": "different-movie",
+		"HEYDOUGA-4031-2347": "different-series",
+	} {
 		id, err := client.ResolveMovieID(t.Context(), code)
 		if err != nil {
 			t.Fatal(err)
