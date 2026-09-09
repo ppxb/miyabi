@@ -6,48 +6,9 @@ function Progress({
   className,
   value,
   max = 100,
-  variant = 'linear',
   ...props
-}: React.ComponentProps<typeof ProgressPrimitive.Root> & {
-  variant?: 'linear' | 'circular'
-}) {
+}: React.ComponentProps<typeof ProgressPrimitive.Root>) {
   const percent = value == null ? null : (value / max) * 100
-
-  if (variant === 'circular') {
-    return (
-      <ProgressPrimitive.Root
-        data-slot="progress"
-        value={value}
-        max={max}
-        className={cn('size-6 shrink-0 text-primary', className)}
-        {...props}
-      >
-        <svg
-          viewBox="0 0 24 24"
-
-          className={cn('size-full -rotate-90', percent === null && 'animate-spin')}
-        >
-          <circle cx="12" cy="12" r="9" fill="none" strokeWidth="2.5" className="stroke-muted" />
-          <ProgressPrimitive.Indicator asChild>
-            <circle
-              data-slot="progress-indicator"
-              cx="12"
-              cy="12"
-              r="9"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              pathLength="100"
-              strokeDasharray="100"
-              strokeDashoffset={percent === null ? 75 : 100 - percent}
-              className="transition-[stroke-dashoffset]"
-            />
-          </ProgressPrimitive.Indicator>
-        </svg>
-      </ProgressPrimitive.Root>
-    )
-  }
 
   return (
     <ProgressPrimitive.Root

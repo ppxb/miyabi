@@ -3,7 +3,10 @@ import { useRouterState } from '@tanstack/react-router'
 import { CompassIcon, FilmIcon, SearchIcon, SettingsIcon } from 'lucide-react'
 
 import { FloatingNav, type FloatingNavItem } from '@/components/floating-nav'
+import { Toaster } from '@/components/ui/sonner'
+import { MoviePlaybackNavAction } from '@/features/movie-detail/playback-nav-action'
 import { TaskEventsProvider } from '@/features/tasks/task-events'
+import { TaskNotifications } from '@/features/tasks/task-notifications'
 import { PlayerDialog } from '@/features/player/player-dialog'
 
 const NAV_ITEMS: FloatingNavItem[] = [
@@ -24,9 +27,13 @@ export function AppShell({ children }: PropsWithChildren) {
   return (
     <TaskEventsProvider>
       <div className="relative min-h-dvh">
-        <FloatingNav items={NAV_ITEMS} activeId={activeId} />
+        <FloatingNav items={NAV_ITEMS} activeId={activeId}>
+          <MoviePlaybackNavAction />
+        </FloatingNav>
         {children}
         <PlayerDialog />
+        <Toaster position="top-right" closeButton duration={6000} />
+        <TaskNotifications />
       </div>
     </TaskEventsProvider>
   )

@@ -89,7 +89,6 @@ export function MovieMagnets({
             <MagnetCard
               key={`${movieID}:${magnet.hash}`}
               movieID={movieID}
-              accountID={accountID}
               magnet={magnet}
               task={tasks.get(magnet.hash)}
               checkingStatus={checkingStatus}
@@ -109,7 +108,6 @@ export function MovieMagnets({
 
 function MagnetCard({
   movieID,
-  accountID,
   magnet,
   task,
   checkingStatus,
@@ -120,7 +118,6 @@ function MagnetCard({
   onCopy
 }: {
   movieID: string
-  accountID: string
   magnet: DiscoverMagnet
   task?: OfflineSubmission
   checkingStatus: boolean
@@ -130,7 +127,7 @@ function MagnetCard({
   copied: boolean
   onCopy: () => void
 }) {
-  const add = useAddOffline(movieID, accountID)
+  const add = useAddOffline(movieID)
   const submitted = task !== undefined && task.phase !== 'available'
   const busy = add.isPending || (checkingStatus && !submitted)
   let label = '一键加入 115'
@@ -144,17 +141,7 @@ function MagnetCard({
     label = '状态暂不可用'
   }
 
-  let error: string | undefined
-  if (add.isError) {
-    error =
-      add.error instanceof ApiError
-        ? add.error.status === 401
-          ? '115 授权已失效，请到设置页重新登录。'
-          : add.error.message
-        : '加入失败，请检查后端服务和网络后重试。'
-  } else if (!add.isPending && task?.error) {
-    error = task.error
-  }
+  const error = !add.isPending ? task?.error : undefined
 
   return (
     <Card size="sm">

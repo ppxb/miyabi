@@ -19,6 +19,7 @@ export type ScanTask = {
   created_at: string
   updated_at: string
   source: LibrarySource
+  offline_task_id?: number
   scan: {
     stage: 'queued' | 'scanning' | 'reconciling' | 'scraping' | 'artwork' | 'done'
     current_path: string

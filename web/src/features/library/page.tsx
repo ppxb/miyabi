@@ -1,7 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { LoaderCircleIcon, RefreshCwIcon, ScanLineIcon } from 'lucide-react'
 
-import { ApiError } from '@/api/client'
 import { useLibraryMovies, useStartLibraryScan } from '@/api/library'
 import { isTaskActive, useTasks } from '@/api/tasks'
 import { AppPage } from '@/components/app-page'
@@ -14,7 +13,6 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { LibraryFilesDialog } from '@/features/library/files-dialog'
 import { LibraryMovieCard } from '@/features/library/movie-card'
-import { ScanProgressView } from '@/features/tasks/scan-progress'
 import { useTaskConnection } from '@/features/tasks/task-events'
 
 export function LibraryPage({
@@ -48,16 +46,11 @@ export function LibraryPage({
   return (
     <AppPage>
       <PageHeader title="媒体库" description="来自 115 网盘的影片索引" inlineActions>
-        {latest ? (
-          <div className="flex h-9 max-w-full items-center rounded-lg bg-muted px-1.5 sm:w-60 sm:px-3">
-            <ScanProgressView task={latest} compact />
-          </div>
-        ) : null}
         {source ? (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                className="w-9 px-0 sm:w-auto sm:px-3"
+                className="w-9 cursor-pointer px-0 sm:w-auto sm:px-3"
                 disabled={scanning || startScan.isPending}
                 onClick={() => startScan.mutate(undefined, { onSuccess: () => onPageChange(1) })}
               >
@@ -79,19 +72,6 @@ export function LibraryPage({
           </Button>
         ) : null}
       </PageHeader>
-
-      {startScan.isError ? (
-        <p className="text-sm text-destructive">
-          {startScan.error instanceof ApiError && startScan.error.status === 401
-            ? '115 登录已失效，请前往设置重新登录。'
-            : startScan.error instanceof ApiError && startScan.error.status === 400
-              ? startScan.error.message
-              : '无法创建扫描任务，请检查后端服务和 115 连接后重试。'}{' '}
-          <Link to="/settings" className="underline underline-offset-4">
-            前往设置
-          </Link>
-        </p>
-      ) : null}
 
       {tasks.isError ? (
         <div className="flex flex-wrap items-center gap-2">

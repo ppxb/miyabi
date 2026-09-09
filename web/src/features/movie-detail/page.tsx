@@ -1,11 +1,8 @@
-import { PlayIcon } from 'lucide-react'
-
 import { useDiscoverMagnets, useDiscoverMovie } from '@/api/discover'
 import { AppPage } from '@/components/app-page'
 import { EmptyState } from '@/components/empty-state'
 import { PageBackButton } from '@/components/page-back-button'
 import { Button } from '@/components/ui/button'
-import { useUIStore } from '@/stores/ui'
 import { MovieHero } from './hero'
 import { MovieMagnets } from './magnets'
 import { MoviePreviews } from './previews'
@@ -15,7 +12,6 @@ import { MovieDetailSkeleton } from './skeleton'
 export function MovieDetailPage({ movieId }: { movieId: string }) {
   const detail = useDiscoverMovie(movieId)
   const magnets = useDiscoverMagnets(movieId)
-  const openPlayer = useUIStore(state => state.openPlayer)
 
   return (
     <AppPage className="sm:px-6 lg:px-8" contentClassName="max-w-7xl gap-8">
@@ -30,12 +26,6 @@ export function MovieDetailPage({ movieId }: { movieId: string }) {
           ) : null}
           <MovieHero movie={detail.data} />
           <MoviePreviews code={detail.data.code} images={detail.data.preview_images} />
-          {detail.data.state === 'in_library' ? (
-            <Button onClick={() => openPlayer(detail.data.code)}>
-              <PlayIcon />
-              播放
-            </Button>
-          ) : null}
           <MovieMagnets movieID={movieId} query={magnets} />
           <MovieRecommendations title="TA（们）还出演过" movies={detail.data.actor_movies} />
           <MovieRecommendations title="你可能也喜欢" movies={detail.data.related_movies} />

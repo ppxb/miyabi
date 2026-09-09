@@ -11,6 +11,19 @@ import (
 type OfflineManager interface {
 	Add(context.Context, string, string) (service.OfflineSubmission, error)
 	Tasks(context.Context, string, string) ([]service.OfflineSubmission, error)
+	Activity(context.Context) (service.OfflineActivity, error)
+}
+
+func offlineActivityHandler(offline OfflineManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		activity, err := offline.Activity(c.Request.Context())
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		c.Header("Cache-Control", "no-store")
+		c.JSON(http.StatusOK, activity)
+	}
 }
 
 type offlineInput struct {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
+	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/pan"
 )
@@ -160,4 +161,129 @@ func TestCompletedOfflineTaskDefersScanForAnotherMount(t *testing.T) {
 	if saved.ScanTaskID != 0 || saved.DirectoryID != input.DirectoryID || saved.FileID != "download-folder" {
 		t.Fatalf("unexpected scan or changed source: %#v", saved)
 	}
+}
+
+func TestOfflineActivityKeepsLatestTasksInCurrentSource(t *testing.T) {
+	service, original, input, source := offlineFixture(t)
+	ctx := t.Context()
+	var latest int
+	for _, change := range []func(*offlinePayload){
+		func(payload *offlinePayload) { payload.Code = "ABP-002"; payload.JavDBID = "latest-movie" },
+		func(payload *offlinePayload) { payload.DirectoryID = "another-root" },
+		func(payload *offlinePayload) { payload.AccountID = "another-account" },
+	} {
+		payload := input
+		change(&payload)
+		encoded, err := encodeTaskPayload(payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		record, err := service.database.Task.Create().SetType("offline").SetStatus(task.StatusRunning).
+			SetPayload(encoded).Save(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if payload.Code == "ABP-002" {
+			latest = record.ID
+		}
+	}
+	activity, err := service.Activity(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if activity.Source == nil || *activity.Source != source || len(activity.Tasks) != 1 {
+		t.Fatalf("activity scope: %+v", activity)
+	}
+	current := activity.Tasks[0]
+	if current.TaskID != latest || current.TaskID == original.ID || current.Code != "ABP-002" ||
+		current.JavDBID != "latest-movie" || current.AccountID != source.AccountID ||
+		current.DirectoryID != source.Directory.ID || current.Phase != "downloading" {
+		t.Fatalf("latest task: %+v", current)
+	}
+	if err := saveSetting(ctx, service.database, panDirectorySetting, panLibraryDirectory{
+		AccountID: source.AccountID, PanLibraryDirectory: PanLibraryDirectory{ID: "empty-root"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	activity, err = service.Activity(ctx)
+	if err != nil || activity.Source == nil || activity.Source.Directory.ID != "empty-root" || len(activity.Tasks) != 0 {
+		t.Fatalf("changed source: %+v err=%v", activity, err)
+	}
+}
+
+func TestOfflineActivityWaitsForArtworkAndRechecksPlayableFiles(t *testing.T) {
+	service, download, input, source := offlineFixture(t)
+	ctx := t.Context()
+	if err := service.updateTask(ctx, download, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
+		t.Fatal(err)
+	}
+	download, err := service.database.Task.Get(ctx, download.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input, err = decodeTaskPayload[offlinePayload](download.Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scan, err := service.tasks.Info(ctx, input.ScanTaskID)
+	if err != nil || scan.OfflineTaskID != download.ID {
+		t.Fatalf("download scan identity: %+v err=%v", scan, err)
+	}
+	film, err := service.database.Movie.Create().SetCode(input.Code).SetScrapeStatus(movie.ScrapeStatusDone).Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"unmatched-video", "matched-video"} {
+		create := service.database.File.Create().SetFileID(id).SetName(id + ".mp4").SetSize(1).
+			SetAccountID(source.AccountID).SetRootID(source.Directory.ID)
+		if id == "matched-video" {
+			create.SetMovieID(film.ID)
+		}
+		if err := create.Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	input.FileIDs = []string{"unmatched-video", "matched-video"}
+	encoded, err := encodeTaskPayload(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.database.Task.UpdateOneID(download.ID).SetPayload(encoded).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := encodeTaskPayload(metadataPayload{Source: source, ScanTaskID: input.ScanTaskID, MovieID: film.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.database.Task.Create().SetType("scrape").SetStatus(task.StatusDone).SetPayload(metadata).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	cover, err := service.database.Task.Create().SetType("cover").SetStatus(task.StatusRunning).SetPayload(metadata).Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.tasks.Finish(ctx, input.ScanTaskID, nil); err != nil {
+		t.Fatal(err)
+	}
+	assertPhase := func(want string) {
+		t.Helper()
+		activity, err := service.Activity(ctx)
+		if err != nil || len(activity.Tasks) != 1 || activity.Tasks[0].Phase != want ||
+			activity.Tasks[0].ScanTaskID != input.ScanTaskID {
+			t.Fatalf("want %s, activity=%+v err=%v", want, activity, err)
+		}
+	}
+	assertPhase("processing")
+	if err := service.tasks.Finish(ctx, cover.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	assertPhase("in_library")
+	if _, err := service.database.File.Delete().Where(file.FileIDEQ("matched-video")).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	assertPhase("downloaded")
+	if _, err := service.database.File.Delete().Where(file.FileIDEQ("unmatched-video")).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	assertPhase("available")
 }

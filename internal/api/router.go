@@ -54,6 +54,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	playAPI.HEAD("/:id/stream/:resource", playStreamHandler(deps.Play))
 	api.GET("/tasks", tasksHandler(deps.Tasks))
 	api.GET("/tasks/events", taskEventsHandler(deps.Tasks))
+	api.GET("/offline/tasks", offlineActivityHandler(deps.Offline))
 	api.GET("/discover/movies", discoverBrowseHandler(deps.Discover))
 	api.GET("/discover/search", discoverSearchHandler(deps.Discover))
 	api.GET("/discover/tags", discoverTagsHandler(deps.Discover))

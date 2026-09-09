@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import type { LucideIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
 
 import { buttonVariants } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -18,16 +19,18 @@ export type FloatingNavItem = {
 type FloatingNavProps = {
   items: FloatingNavItem[]
   activeId: string | undefined
+  children?: ReactNode
 }
 
-export function FloatingNav({ items, activeId }: FloatingNavProps) {
+export function FloatingNav({ items, activeId, children }: FloatingNavProps) {
   return (
-    <nav className="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 rounded-full border border-border/70 bg-background/85 p-1.5 text-foreground backdrop-blur sm:bottom-8 sm:p-1">
+    <nav className="fixed bottom-8 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border/70 bg-background/85 p-1.5 text-foreground backdrop-blur sm:bottom-8 sm:p-1">
       <ul className="flex items-center gap-2 sm:gap-2">
         {items.map(item => (
           <NavItem key={item.id} item={item} isActive={item.id === activeId} />
         ))}
       </ul>
+      {children}
     </nav>
   )
 }

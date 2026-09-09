@@ -24,12 +24,22 @@ var (
 )
 
 type OfflineSubmission struct {
-	TaskID   int         `json:"task_id"`
-	Hash     string      `json:"hash"`
-	Status   task.Status `json:"status"`
-	Phase    string      `json:"phase"`
-	Progress int         `json:"progress"`
-	Error    *string     `json:"error,omitempty"`
+	TaskID      int         `json:"task_id"`
+	Code        string      `json:"code"`
+	JavDBID     string      `json:"javdb_id"`
+	AccountID   string      `json:"account_id"`
+	DirectoryID string      `json:"directory_id"`
+	ScanTaskID  int         `json:"scan_task_id,omitempty"`
+	Hash        string      `json:"hash"`
+	Status      task.Status `json:"status"`
+	Phase       string      `json:"phase"`
+	Progress    int         `json:"progress"`
+	Error       *string     `json:"error,omitempty"`
+}
+
+type OfflineActivity struct {
+	Source *LibrarySource      `json:"source,omitempty"`
+	Tasks  []OfflineSubmission `json:"tasks"`
 }
 
 type offlinePayload struct {
@@ -287,59 +297,136 @@ func (service *OfflineService) remoteHasVideo(ctx context.Context, source Librar
 }
 
 func (service *OfflineService) submission(ctx context.Context, record *ent.Task, source *LibrarySource) (OfflineSubmission, error) {
-	input, err := decodeTaskPayload[offlinePayload](record.Payload)
+	items, err := service.submissions(ctx, []*ent.Task{record}, source)
 	if err != nil {
 		return OfflineSubmission{}, err
 	}
-	result := OfflineSubmission{TaskID: record.ID, Hash: input.Hash, Status: record.Status,
-		Progress: record.Progress, Error: record.Error, Phase: "available"}
-	if source == nil || source.AccountID != input.AccountID || source.Directory.ID != input.DirectoryID {
-		return result, nil
-	}
-	if record.Status == task.StatusQueued || record.Status == task.StatusRunning {
-		result.Phase = "downloading"
-		return result, nil
-	}
-	if input.ScanTaskID != 0 {
-		scan, err := service.tasks.Info(ctx, input.ScanTaskID)
+	return items[0], nil
+}
+
+// Project task workflows and file presence in batches. The global observer and
+// movie buttons share this view without a database query for every download.
+func (service *OfflineService) submissions(ctx context.Context, records []*ent.Task, source *LibrarySource) ([]OfflineSubmission, error) {
+	inputs := make([]offlinePayload, len(records))
+	var scanIDs []int
+	var fileIDs []string
+	for index, record := range records {
+		input, err := decodeTaskPayload[offlinePayload](record.Payload)
 		if err != nil {
-			return OfflineSubmission{}, err
+			return nil, err
 		}
-		if scan.Status == task.StatusQueued || scan.Status == task.StatusRunning {
-			result.Phase = "processing"
-			return result, nil
+		inputs[index] = input
+		if source == nil || source.AccountID != input.AccountID || source.Directory.ID != input.DirectoryID ||
+			record.Status == task.StatusQueued || record.Status == task.StatusRunning {
+			continue
 		}
-		if scan.Error != nil {
-			result.Error = scan.Error
+		if input.ScanTaskID != 0 {
+			scanIDs = append(scanIDs, input.ScanTaskID)
 		}
-	} else if record.Status == task.StatusDone && input.FileID != "" {
-		result.Phase = "processing"
-		return result, nil
+		fileIDs = append(fileIDs, input.FileIDs...)
 	}
-	for start := 0; start < len(input.FileIDs); start += 500 {
-		present, err := service.database.File.Query().Where(libraryFiles(*source),
-			file.FileIDIn(input.FileIDs[start:min(start+500, len(input.FileIDs))]...)).Exist(ctx)
+	scans := make(map[int]TaskInfo)
+	for start := 0; start < len(scanIDs); start += 500 {
+		parents, err := service.database.Task.Query().Where(task.IDIn(scanIDs[start:min(start+500, len(scanIDs))]...)).All(ctx)
 		if err != nil {
-			return OfflineSubmission{}, fmt.Errorf("read downloaded file index: %w", err)
+			return nil, fmt.Errorf("read download scan tasks: %w", err)
 		}
-		if present {
-			matched, err := service.database.File.Query().Where(libraryFiles(*source),
-				file.FileIDIn(input.FileIDs[start:min(start+500, len(input.FileIDs))]...)).
-				QueryMovie().Where(movie.CodeEQ(input.Code)).Select(movie.FieldScrapeStatus).Only(ctx)
-			if err != nil && !ent.IsNotFound(err) {
-				return OfflineSubmission{}, err
+		infos, err := service.tasks.workflowInfos(ctx, parents)
+		if err != nil {
+			return nil, err
+		}
+		for _, info := range infos {
+			scans[info.ID] = info
+		}
+	}
+	indexed := make(map[string]*ent.Movie)
+	for start := 0; start < len(fileIDs); start += 500 {
+		files, err := service.database.File.Query().Where(libraryFiles(*source),
+			file.FileIDIn(fileIDs[start:min(start+500, len(fileIDs))]...)).
+			Select(file.FieldFileID, file.FieldMovieID).
+			WithMovie(func(query *ent.MovieQuery) { query.Select(movie.FieldCode, movie.FieldScrapeStatus) }).All(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("read downloaded file index: %w", err)
+		}
+		for _, entry := range files {
+			indexed[entry.FileID] = entry.Edges.Movie
+		}
+	}
+	result := make([]OfflineSubmission, len(records))
+	for index, record := range records {
+		input := inputs[index]
+		item := &result[index]
+		*item = OfflineSubmission{TaskID: record.ID, Code: input.Code, JavDBID: input.JavDBID,
+			AccountID: input.AccountID, DirectoryID: input.DirectoryID, ScanTaskID: input.ScanTaskID,
+			Hash: input.Hash, Status: record.Status, Progress: record.Progress, Error: record.Error, Phase: "available"}
+		if source == nil || source.AccountID != input.AccountID || source.Directory.ID != input.DirectoryID {
+			continue
+		}
+		if record.Status == task.StatusQueued || record.Status == task.StatusRunning {
+			item.Phase = "downloading"
+			continue
+		}
+		if input.ScanTaskID != 0 {
+			scan, found := scans[input.ScanTaskID]
+			if !found {
+				return nil, fmt.Errorf("scan task %d for download %d was not found", input.ScanTaskID, record.ID)
 			}
-			if err == nil {
-				result.Phase = "in_library"
+			if scan.Status == task.StatusQueued || scan.Status == task.StatusRunning {
+				item.Phase = "processing"
+				continue
+			}
+			if scan.Error != nil {
+				item.Error = scan.Error
+			}
+		} else if record.Status == task.StatusDone && input.FileID != "" {
+			item.Phase = "processing"
+			continue
+		}
+		for _, id := range input.FileIDs {
+			matched, present := indexed[id]
+			if !present {
+				continue
+			}
+			if matched != nil && matched.Code == input.Code {
+				item.Phase = "in_library"
 				if matched.ScrapeStatus != movie.ScrapeStatusFailed {
-					result.Error = nil
+					item.Error = nil
 				}
 				break
 			}
-			result.Phase = "downloaded"
+			item.Phase = "downloaded"
 		}
 	}
 	return result, nil
+}
+
+// Activity only reads local tasks and the mounted file index. Keeping each
+// magnet's latest workflow also retains long downloads until their final state.
+func (service *OfflineService) Activity(ctx context.Context) (OfflineActivity, error) {
+	result := OfflineActivity{Tasks: []OfflineSubmission{}}
+	source, err := loadLibrarySource(ctx, service.database)
+	if err != nil {
+		return result, err
+	}
+	result.Source = source
+	if source == nil {
+		return result, nil
+	}
+	records, err := service.database.Task.Query().Where(task.TypeEQ("offline"), func(s *sql.Selector) {
+		s.Where(sql.And(
+			sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("account_id")),
+			sqljson.ValueEQ(task.FieldPayload, source.Directory.ID, sqljson.Path("directory_id")),
+		))
+	}).Order(ent.Desc(task.FieldID)).All(ctx)
+	if err != nil {
+		return result, fmt.Errorf("load offline activity: %w", err)
+	}
+	records, err = latestOfflineTasks(records)
+	if err != nil {
+		return result, err
+	}
+	result.Tasks, err = service.submissions(ctx, records, source)
+	return result, err
 }
 
 // Tasks projects history through the current file index and workflow. A
@@ -358,7 +445,15 @@ func (service *OfflineService) Tasks(ctx context.Context, movieID, accountID str
 	if err != nil {
 		return nil, err
 	}
-	result := make([]OfflineSubmission, 0, len(records))
+	records, err = latestOfflineTasks(records)
+	if err != nil {
+		return nil, err
+	}
+	return service.submissions(ctx, records, source)
+}
+
+func latestOfflineTasks(records []*ent.Task) ([]*ent.Task, error) {
+	result := make([]*ent.Task, 0, len(records))
 	seen := make(map[string]bool)
 	for _, record := range records {
 		hash, ok := record.Payload["hash"].(string)
@@ -369,11 +464,7 @@ func (service *OfflineService) Tasks(ctx context.Context, movieID, accountID str
 			continue
 		}
 		seen[hash] = true
-		submission, err := service.submission(ctx, record, source)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, submission)
+		result = append(result, record)
 	}
 	return result, nil
 }

@@ -16,15 +16,16 @@ import (
 )
 
 type TaskInfo struct {
-	ID        int           `json:"id"`
-	Type      string        `json:"type"`
-	Status    task.Status   `json:"status"`
-	Progress  int           `json:"progress"`
-	Error     *string       `json:"error,omitempty"`
-	CreatedAt time.Time     `json:"created_at"`
-	UpdatedAt time.Time     `json:"updated_at"`
-	Source    LibrarySource `json:"source"`
-	Scan      ScanProgress  `json:"scan"`
+	ID            int           `json:"id"`
+	Type          string        `json:"type"`
+	Status        task.Status   `json:"status"`
+	Progress      int           `json:"progress"`
+	Error         *string       `json:"error,omitempty"`
+	CreatedAt     time.Time     `json:"created_at"`
+	UpdatedAt     time.Time     `json:"updated_at"`
+	Source        LibrarySource `json:"source"`
+	Scan          ScanProgress  `json:"scan"`
+	OfflineTaskID int           `json:"offline_task_id,omitempty"`
 }
 
 // TaskJob is internal execution input. API responses never expose raw payloads.
@@ -256,7 +257,7 @@ func scanTaskInfo(record *ent.Task) (TaskInfo, error) {
 	return TaskInfo{
 		ID: record.ID, Type: record.Type, Status: record.Status, Progress: record.Progress,
 		Error: record.Error, CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
-		Source: payload.Source, Scan: payload.Scan,
+		Source: payload.Source, Scan: payload.Scan, OfflineTaskID: payload.OfflineTaskID,
 	}, nil
 }
 
