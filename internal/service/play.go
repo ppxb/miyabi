@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
@@ -60,7 +59,7 @@ func NewPlayService(library *LibraryService) *PlayService {
 	return &PlayService{library: library, sessions: make(map[string]*playSession)}
 }
 
-func (service *PlayService) Files(ctx context.Context, code string) (PlayFiles, error) {
+func (service *PlayService) Files(ctx context.Context, movieID int) (PlayFiles, error) {
 	source, err := loadLibrarySource(ctx, service.library.database)
 	if err != nil {
 		return PlayFiles{}, err
@@ -70,7 +69,7 @@ func (service *PlayService) Files(ctx context.Context, code string) (PlayFiles, 
 	}
 	scope := libraryFiles(*source)
 	record, err := service.library.database.Movie.Query().
-		Where(movie.CodeEQ(codeid.Normalize(code)), movie.HasFilesWith(scope)).
+		Where(movie.IDEQ(movieID), movie.HasFilesWith(scope)).
 		WithFiles(func(query *ent.FileQuery) {
 			query.Where(scope).Order(ent.Desc(file.FieldSize), ent.Asc(file.FieldPath), ent.Asc(file.FieldID))
 		}).Only(ctx)

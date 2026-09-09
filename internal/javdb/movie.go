@@ -61,9 +61,9 @@ func movieReferencesFromWire(source []wireMovieReference) ([]MovieReference, err
 		if item.ID == "" {
 			return nil, fmt.Errorf("movie reference %d: missing id", index)
 		}
-		code := codeid.Normalize(item.Number)
+		code := strings.TrimSpace(item.Number)
 		if code == "" {
-			return nil, fmt.Errorf("movie reference %d: invalid number %q", index, item.Number)
+			return nil, fmt.Errorf("movie reference %d: missing number", index)
 		}
 		result[index] = MovieReference{ID: item.ID, Code: code, Thumbnail: item.ThumbURL}
 	}
@@ -75,7 +75,7 @@ func movieReferencesFromWire(source []wireMovieReference) ([]MovieReference, err
 func (c *Client) ResolveMovieID(ctx context.Context, number string) (string, error) {
 	wanted := codeid.Normalize(number)
 	if wanted == "" {
-		return "", fmt.Errorf("invalid catalogue number %q", number)
+		return "", errors.New("catalogue number is required")
 	}
 
 	movies, err := c.Search(ctx, wanted, SearchOptions{
@@ -89,7 +89,7 @@ func (c *Client) ResolveMovieID(ctx context.Context, number string) (string, err
 
 	var matched string
 	for _, movie := range movies {
-		if movie.Code != wanted {
+		if codeid.Normalize(movie.Code) != wanted {
 			continue
 		}
 		if matched != "" {
@@ -119,9 +119,9 @@ func movieFromWire(source wireMovie) (Movie, error) {
 	if source.ID == "" {
 		return Movie{}, errors.New("missing id")
 	}
-	code := codeid.Normalize(source.Number)
+	code := strings.TrimSpace(source.Number)
 	if code == "" {
-		return Movie{}, fmt.Errorf("invalid number %q", source.Number)
+		return Movie{}, errors.New("missing number")
 	}
 
 	movie := Movie{

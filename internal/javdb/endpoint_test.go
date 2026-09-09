@@ -160,7 +160,7 @@ func TestBrowsePreservesWesternSceneNumbers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(movies) != 2 || movies[0].Code != "EXAMPLESTUDIONAME.26.09.05" || movies[1].Code != "EXAMPLESTUDIONAME.26.09.06" {
+	if len(movies) != 2 || movies[0].Code != "ExampleStudioName.26.09.05" || movies[1].Code != "ExampleStudioName.26.09.06" {
 		t.Fatalf("western movies = %+v", movies)
 	}
 }
@@ -173,7 +173,7 @@ func TestMovieReferencesPreserveWesternSceneNumbers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(movies) != 2 || movies[0].Code != "EXAMPLESTUDIO.26.09.05" || movies[1].Code != "EXAMPLESTUDIO.26.09.06" {
+	if len(movies) != 2 || movies[0].Code != "ExampleStudio.26.09.05" || movies[1].Code != "ExampleStudio.26.09.06" {
 		t.Fatalf("western references = %+v", movies)
 	}
 }
@@ -190,9 +190,9 @@ func TestBrowsePreservesCatalogueNumberSegments(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		"SSIS-589", "FC2-PPV-1234567", "HEYDOUGA-4030-2347", "EXAMPLESTUDIO.26.09.05",
-		"SCUTE-1575-ITSUKI", "SCUTE-1575-NANAMI", "SCUTE-15750-ITSUKI", "EXAMPLE-123-MODEL2-0001",
-		"EXAMPLESTUDIONAME-001", "SSIS-1",
+		"SSIS-589", "FC2-PPV-1234567", "heydouga-4030-2347", "ExampleStudio.26.09.05",
+		"scute-1575-itsuki", "scute-1575-nanami", "scute-15750-itsuki", "EXAMPLE-123-model2-0001",
+		"ExampleStudioName-001", "SSIS-1",
 	}
 	if len(movies) != len(want) {
 		t.Fatalf("got %d movies, want %d", len(movies), len(want))
@@ -233,7 +233,7 @@ func TestMovieDetailMapsGraphWithoutPlot(t *testing.T) {
 	if movie.Zone != ZoneCensored || len(movie.ActorMovies) != 1 || len(movie.RelatedMovies) != 1 {
 		t.Fatalf("zone = %s, actor movies = %#v, related movies = %#v", movie.Zone, movie.ActorMovies, movie.RelatedMovies)
 	}
-	if movie.ActorMovies[0].Code != "ABP-124" || movie.RelatedMovies[0].Code != "SONE-001A" || movie.RelatedMovies[0].Thumbnail != "https://media.example/related-movie.jpg" {
+	if movie.ActorMovies[0].Code != "abp124" || movie.RelatedMovies[0].Code != "SONE-001a" || movie.RelatedMovies[0].Thumbnail != "https://media.example/related-movie.jpg" {
 		t.Fatalf("recommendations = %#v, %#v", movie.ActorMovies, movie.RelatedMovies)
 	}
 }
@@ -247,10 +247,10 @@ func TestMovieDetailPreservesMultipartNumbers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if movie.Code != "HEYDOUGA-4030-2347" || len(movie.ActorMovies) != 6 || len(movie.RelatedMovies) != 1 {
+	if movie.Code != "heydouga-4030-2347" || len(movie.ActorMovies) != 6 || len(movie.RelatedMovies) != 1 {
 		t.Fatalf("multipart detail = %+v", movie)
 	}
-	if movie.ActorMovies[0].Code != "T28-638" || movie.ActorMovies[5].Code != "HEYDOUGA-4030-2347" || movie.RelatedMovies[0].Code != "HEYDOUGA-4030-2348" {
+	if movie.ActorMovies[0].Code != "T28-638" || movie.ActorMovies[5].Code != "heydouga-4030-2347" || movie.RelatedMovies[0].Code != "heydouga-4030-2348" {
 		t.Fatalf("multipart references = %+v, %+v", movie.ActorMovies, movie.RelatedMovies)
 	}
 }
@@ -264,11 +264,11 @@ func TestMovieDetailPreservesNamedNumbers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if movie.Code != "SCUTE-1575-ITSUKI" || len(movie.ActorMovies) != 6 || len(movie.RelatedMovies) != 1 {
+	if movie.Code != "scute-1575-itsuki" || len(movie.ActorMovies) != 6 || len(movie.RelatedMovies) != 1 {
 		t.Fatalf("named detail = %+v", movie)
 	}
-	if movie.ActorMovies[4].Code != "EXAMPLE-123-MODEL2-0001" ||
-		movie.ActorMovies[5].Code != "SCUTE-15750-ITSUKI" || movie.RelatedMovies[0].Code != "SCUTE-1575-NANAMI" {
+	if movie.ActorMovies[4].Code != "EXAMPLE-123-model2-0001" ||
+		movie.ActorMovies[5].Code != "scute-15750-itsuki" || movie.RelatedMovies[0].Code != "scute-1575-nanami" {
 		t.Fatalf("named references = %+v, %+v", movie.ActorMovies, movie.RelatedMovies)
 	}
 }

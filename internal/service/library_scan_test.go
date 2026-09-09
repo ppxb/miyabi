@@ -86,6 +86,33 @@ func TestScanCombinesPartsPreservesMetadataAndRetainsUnmatchedFiles(t *testing.T
 	}
 }
 
+func TestScanKeepsLetterSerialsDistinctAndDoesNotExtractPartialNumbers(t *testing.T) {
+	library, queued, payload := libraryFixture(t)
+	ctx := t.Context()
+	if err := library.indexScanPage(ctx, queued.ID, "fixture", "/Movies", []scanVideo{
+		fixtureVideo("letter", "KNB-M014.mp4"),
+		fixtureVideo("short", "M-014.mp4"),
+		fixtureVideo("unidentified", "UNKNOWN-KNB-M014.mp4"),
+	}, &payload); err != nil {
+		t.Fatal(err)
+	}
+	page, err := library.Movies(ctx, 1, 24)
+	if err != nil || page.Total != 2 || page.UnmatchedFiles != 1 {
+		t.Fatalf("letter serials were lost or merged: %#v, %v", page, err)
+	}
+	ids := make(map[string]int)
+	for _, item := range page.Movies {
+		ids[item.Code] = item.ID
+	}
+	if ids["KNB-M014"] == 0 || ids["M-014"] == 0 || ids["KNB-M014"] == ids["M-014"] {
+		t.Fatalf("incorrect catalogue identities: %#v", ids)
+	}
+	unknown := library.database.File.Query().Where(file.FileIDEQ("unidentified")).OnlyX(ctx)
+	if unknown.MovieID != nil {
+		t.Fatal("unrecognized filename was associated with a partial catalogue number")
+	}
+}
+
 func TestScanReconcilesOnlyCompletedRootAndKeepsOtherSources(t *testing.T) {
 	library, queued, payload := libraryFixture(t)
 	ctx := t.Context()

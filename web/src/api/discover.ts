@@ -46,6 +46,7 @@ export type NamedEntity = {
 
 export type DiscoverMovie = {
   id: string
+  library_id?: number
   code: string
   title: string
   origin_title: string

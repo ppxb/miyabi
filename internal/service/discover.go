@@ -9,6 +9,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqljson"
+	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/task"
@@ -37,6 +38,7 @@ const (
 
 type DiscoverMovie struct {
 	javdb.Movie
+	LibraryID     int           `json:"library_id,omitempty"`
 	State         MovieState    `json:"state"`
 	ReleaseStatus ReleaseStatus `json:"release_status"`
 }
@@ -292,26 +294,34 @@ func (service *DiscoverService) projectMovies(
 		return []DiscoverMovie{}, nil
 	}
 	codes := make([]string, len(source))
-	taskCodes := make([]any, len(source))
+	ids := make([]string, len(source))
+	taskIDs := make([]any, len(source))
 	for index, item := range source {
-		codes[index] = item.Code
-		taskCodes[index] = item.Code
+		codes[index] = codeid.Normalize(item.Code)
+		ids[index] = item.ID
+		taskIDs[index] = item.ID
 	}
 
-	inLibrary := make(map[string]bool, len(codes))
+	byJavDBID := make(map[string]int, len(source))
+	byCode := make(map[string]int, len(source))
 	sourceDirectory, err := loadLibrarySource(ctx, service.database)
 	if err != nil {
 		return nil, err
 	}
 	if sourceDirectory != nil {
-		libraryCodes, err := service.database.Movie.Query().Where(
-			movie.CodeIn(codes...), movie.HasFilesWith(libraryFiles(*sourceDirectory)),
-		).Select(movie.FieldCode).Strings(ctx)
+		localMovies, err := service.database.Movie.Query().Where(
+			movie.Or(movie.JavdbIDIn(ids...), movie.And(movie.JavdbIDIsNil(), movie.CodeIn(codes...))),
+			movie.HasFilesWith(libraryFiles(*sourceDirectory)),
+		).Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID).All(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("query local movies: %w", err)
 		}
-		for _, code := range libraryCodes {
-			inLibrary[code] = true
+		for _, record := range localMovies {
+			if record.JavdbID != nil {
+				byJavDBID[*record.JavdbID] = record.ID
+			} else {
+				byCode[record.Code] = record.ID
+			}
 		}
 	}
 
@@ -321,7 +331,7 @@ func (service *DiscoverService) projectMovies(
 			task.TypeEQ("offline"), task.StatusIn(task.StatusQueued, task.StatusRunning),
 			func(selector *sql.Selector) {
 				selector.Where(sql.And(
-					sqljson.ValueIn(task.FieldPayload, taskCodes, sqljson.Path("code")),
+					sqljson.ValueIn(task.FieldPayload, taskIDs, sqljson.Path("javdb_id")),
 					sqljson.ValueEQ(task.FieldPayload, sourceDirectory.AccountID, sqljson.Path("account_id")),
 					sqljson.ValueEQ(task.FieldPayload, sourceDirectory.Directory.ID, sqljson.Path("directory_id")),
 				))
@@ -331,7 +341,7 @@ func (service *DiscoverService) projectMovies(
 			return nil, fmt.Errorf("query active tasks: %w", err)
 		}
 		for _, item := range tasks {
-			saving[item.Payload["code"].(string)] = true
+			saving[item.Payload["javdb_id"].(string)] = true
 		}
 	}
 
@@ -339,11 +349,15 @@ func (service *DiscoverService) projectMovies(
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 	result := make([]DiscoverMovie, len(source))
 	for index, item := range source {
+		libraryID := byJavDBID[item.ID]
+		if libraryID == 0 {
+			libraryID = byCode[codes[index]]
+		}
 		state := MovieNotInLibrary
 		switch {
-		case inLibrary[item.Code]:
+		case libraryID != 0:
 			state = MovieInLibrary
-		case saving[item.Code]:
+		case saving[item.ID]:
 			state = MovieSaving
 		}
 
@@ -361,6 +375,7 @@ func (service *DiscoverService) projectMovies(
 		}
 		result[index] = DiscoverMovie{
 			Movie:         item,
+			LibraryID:     libraryID,
 			State:         state,
 			ReleaseStatus: releaseStatus,
 		}

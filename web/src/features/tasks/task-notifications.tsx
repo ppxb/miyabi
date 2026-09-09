@@ -91,6 +91,7 @@ export function TaskNotifications() {
           version: JSON.stringify([
             task.status,
             task.phase,
+            task.library_id,
             task.progress,
             task.error,
             active && scan ? scanVersion(scan) : undefined,

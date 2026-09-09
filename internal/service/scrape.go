@@ -210,7 +210,7 @@ func (service *ScrapeService) directories(ctx context.Context, input metadataPay
 }
 
 func findDirectoryNFO(code string, directory movieDirectory) (pan.File, bool) {
-	entry, found := sidecarByName(directory.Files, code+".nfo")
+	entry, found := sidecarByName(directory.Files, nfo.FileStem(code)+".nfo")
 	if !found {
 		var candidates []pan.File
 		for _, item := range directory.Files {

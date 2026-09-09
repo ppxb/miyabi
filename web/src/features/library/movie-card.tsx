@@ -13,7 +13,7 @@ export function LibraryMovieCard({ movie }: { movie: LibraryMovie }) {
     <Button
       variant="ghost"
       className="block h-auto min-w-0 cursor-pointer rounded-2xl p-0 text-left whitespace-normal hover:bg-transparent hover:text-current dark:hover:bg-transparent"
-      onClick={() => openPlayer(movie.code)}
+      onClick={() => openPlayer(movie.id)}
     >
       <MovieCard
         movie={movie}

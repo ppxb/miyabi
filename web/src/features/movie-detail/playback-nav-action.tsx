@@ -16,9 +16,9 @@ export function MoviePlaybackNavAction() {
   const movie = useDiscoverMovie(movieID ?? '', movieID !== undefined)
   const openPlayer = useUIStore(state => state.openPlayer)
 
-  if (!movieID || movie.data?.state !== 'in_library') return null
+  const libraryID = movie.data?.library_id
+  if (!movieID || movie.data?.state !== 'in_library' || libraryID === undefined) return null
 
-  const code = movie.data.code
   return (
     <>
       <Separator orientation="vertical" className="data-vertical:h-6 data-vertical:self-center" />
@@ -29,7 +29,7 @@ export function MoviePlaybackNavAction() {
             variant="ghost"
             size="icon"
             className="size-11 cursor-pointer sm:size-9"
-            onClick={() => openPlayer(code)}
+            onClick={() => openPlayer(libraryID)}
           >
             <PlayIcon className="size-5" />
           </Button>

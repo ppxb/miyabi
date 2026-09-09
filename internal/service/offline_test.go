@@ -31,6 +31,49 @@ func offlineFixture(t *testing.T) (*OfflineService, *ent.Task, offlinePayload, L
 	return service, record, input, scan.Source
 }
 
+func TestOfflineProjectionUsesMovieIdentityAndExposesPlaybackID(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		code    string
+		javdbID string
+		phase   string
+	}{
+		{"same id with new spelling", "OLD-001", "fixture-movie", "in_library"},
+		{"pending exact code", "ABP-001", "", "in_library"},
+		{"conflicting id", "ABP-001", "other-movie", "downloaded"},
+		{"pending different code", "ABP-002", "", "downloaded"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			service, record, input, source := offlineFixture(t)
+			ctx := t.Context()
+			builder := service.database.Movie.Create().SetCode(test.code)
+			if test.javdbID != "" {
+				builder.SetJavdbID(test.javdbID)
+			}
+			local := builder.SaveX(ctx)
+			service.database.File.Create().SetFileID("video").SetName("video.mp4").SetSize(1).
+				SetAccountID(source.AccountID).SetRootID(source.Directory.ID).SetMovie(local).SaveX(ctx)
+			input.FileIDs = []string{"video"}
+			encoded, err := encodeTaskPayload(input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			record = service.database.Task.UpdateOne(record).SetStatus(task.StatusDone).SetPayload(encoded).SaveX(ctx)
+			result, err := service.submission(ctx, record, &source)
+			if err != nil || result.Phase != test.phase {
+				t.Fatalf("wrong offline identity: %#v, %v", result, err)
+			}
+			wantID := 0
+			if test.phase == "in_library" {
+				wantID = local.ID
+			}
+			if result.LibraryID != wantID {
+				t.Fatalf("playback ID = %d, want %d", result.LibraryID, wantID)
+			}
+		})
+	}
+}
+
 func TestOfflineCompletionAndTargetedScanCommitTogether(t *testing.T) {
 	service, record, input, source := offlineFixture(t)
 	ctx := t.Context()

@@ -1,9 +1,36 @@
 package nfo
 
 import (
+	"net/url"
 	"strings"
 	"testing"
 )
+
+func TestUnfamiliarNumbersRoundTripWithSafeFilenames(t *testing.T) {
+	seen := make(map[string]bool)
+	for _, code := range []string{"GLOD-0436", "KNB-M014", "Studio.26.09.05", "作品/限定 #007", "A/B", "A%2FB", "A+B", "A B", `A\B:001`} {
+		stem := FileStem(code)
+		if strings.ContainsAny(stem, `/\:*?"<>|`) || seen[stem] {
+			t.Fatalf("unsafe or colliding filename for %q: %q", code, stem)
+		}
+		seen[stem] = true
+		if decoded, err := url.QueryUnescape(stem); err != nil || decoded != code {
+			t.Fatalf("filename lost catalogue identity: %q -> %q", code, stem)
+		}
+		doc := Movie{Code: code, Title: "Fixture", Thumbs: []Thumb{{Aspect: "poster", Path: stem + "-poster.jpg"}}}
+		body, err := Encode(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		restored, err := Decode(body)
+		if err != nil || restored.Code != code || restored.Poster() != doc.Poster() {
+			t.Fatalf("number or artwork reference changed during NFO round trip: %#v, %v", restored, err)
+		}
+	}
+	if FileStem("KNB-M014") != "KNB-M014" {
+		t.Fatal("changed a conventional sidecar filename")
+	}
+}
 
 func TestRoundTripPreservesSourceIDsAndOmitsPlot(t *testing.T) {
 	input := []byte(`<movie>

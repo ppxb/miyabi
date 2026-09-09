@@ -3,6 +3,7 @@ package nfo
 import (
 	"encoding/xml"
 	"fmt"
+	"net/url"
 )
 
 // Kodi reads the standard fields. Source IDs and category/gender attributes
@@ -59,6 +60,12 @@ type Tag struct {
 type Thumb struct {
 	Aspect string `xml:"aspect,attr" json:"aspect"`
 	Path   string `xml:",chardata" json:"path"`
+}
+
+// FileStem encodes a catalogue number as one filename component. Metadata keeps
+// the full number; characters such as slashes must not become directory paths.
+func FileStem(code string) string {
+	return url.QueryEscape(code)
 }
 
 func (movie Movie) JavDBID() string {

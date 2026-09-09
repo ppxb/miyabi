@@ -1,6 +1,9 @@
 package codeid
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParse(t *testing.T) {
 	tests := []struct {
@@ -10,6 +13,17 @@ func TestParse(t *testing.T) {
 		ok    bool
 	}{
 		{name: "standard", input: "SSIS-589.mkv", want: "SSIS-589", ok: true},
+		{name: "four digit sequence", input: "GLOD-0436.mp4", want: "GLOD-0436", ok: true},
+		{name: "letter before sequence", input: "KNB-M014.mp4", want: "KNB-M014", ok: true},
+		{name: "letter serial is not a standalone disc marker", input: "KNB-CD014.mp4", want: "KNB-CD014", ok: true},
+		{name: "letter sequence underscore", input: "knb_m014.mkv", want: "KNB-M014", ok: true},
+		{name: "letter sequence video part", input: "KNB-M014-CD1.mp4", want: "KNB-M014", ok: true},
+		{name: "compact number video part", input: "abp001-CD1.mp4", want: "ABP-001", ok: true},
+		{name: "compact number named part", input: "abp001-PART2.mkv", want: "ABP-001", ok: true},
+		{name: "alphanumeric sequence", input: "KNB-M014A2-C.mp4", want: "KNB-M014A2", ok: true},
+		{name: "unknown prefix does not expose partial code", input: "UNKNOWN-KNB-M014.mp4", want: "", ok: false},
+		{name: "unknown dotted prefix does not expose partial code", input: "UNKNOWN.KNB-M014.mp4", want: "", ok: false},
+		{name: "extension is not a letter sequence", input: "video.m014", want: "", ok: false},
 		{name: "prefix noise", input: "[XLD]  SSIS-589 1080p.mkv", want: "SSIS-589", ok: true},
 		{name: "website prefix", input: "hhd800.com@SSIS001.mp4", want: "SSIS-001", ok: true},
 		{name: "bracketed website", input: "[hhd800.com]SSIS001.mp4", want: "SSIS-001", ok: true},
@@ -91,15 +105,21 @@ func TestNormalize(t *testing.T) {
 		want  string
 	}{
 		{input: " ssis 589 ", want: "SSIS-589"},
+		{input: "GLOD-0436", want: "GLOD-0436"},
+		{input: "KNB-M014", want: "KNB-M014"},
+		{input: "knb_m014", want: "KNB-M014"},
+		{input: "KNB M014", want: "KNB-M014"},
+		{input: "KNB-M014A2", want: "KNB-M014A2"},
+		{input: "M-014", want: "M-014"},
 		{input: " RKPrime.26.09.05 ", want: "RKPRIME.26.09.05"},
 		{input: "RKPrime.26.09.06", want: "RKPRIME.26.09.06"},
 		{input: "ExampleStudioName.26.09.05", want: "EXAMPLESTUDIONAME.26.09.05"},
 		{input: "21Studio.26.09.05", want: "21STUDIO.26.09.05"},
 		{input: "ExampleStudio.2026.09.05", want: "EXAMPLESTUDIO.2026.09.05"},
 		{input: "ExampleStudio.26.09.05-scene2", want: "EXAMPLESTUDIO.26.09.05-SCENE2"},
-		{input: "RKPrime.26.09.05.mp4", want: ""},
-		{input: "RKPrime.26.09.05.1080p", want: ""},
-		{input: "26.09.05", want: ""},
+		{input: "RKPrime.26.09.05.mp4", want: "RKPRIME.26.09.05.MP4"},
+		{input: "RKPrime.26.09.05.1080p", want: "RKPRIME.26.09.05.1080P"},
+		{input: "26.09.05", want: "26.09.05"},
 		{input: "FC2 PPV 1234567", want: "FC2-PPV-1234567"},
 		{input: "FC2 PPV 1234567-C", want: "FC2-PPV-1234567-C"},
 		{input: "FC2PPV1234567890", want: "FC2-PPV-1234567890"},
@@ -135,23 +155,26 @@ func TestNormalize(t *testing.T) {
 		{input: "HEYDOUGA-4030-2347-02", want: "HEYDOUGA-4030-2347-02"},
 		{input: "HEYDOUGA4030_2347_02", want: "HEYDOUGA-4030-2347-02"},
 		{input: "EXAMPLE-123-0000042-09", want: "EXAMPLE-123-0000042-09"},
-		{input: "HEYDOUGA-4030-2347.mp4", want: ""},
+		{input: "HEYDOUGA-4030-2347.mp4", want: "HEYDOUGA-4030-2347.MP4"},
 		{input: "HEYDOUGA-4030-2347-CD1", want: "HEYDOUGA-4030-2347-CD1"},
 		{input: "HEYDOUGA-4030-2347-C", want: "HEYDOUGA-4030-2347-C"},
 		{input: "011015-780", want: "011015-780"},
 		{input: "072625_01", want: "072625-01"},
 		{input: "SSIS-589-02", want: "SSIS-589-02"},
-		{input: "SSIS-589.mp4", want: ""},
-		{input: "SCUTE-1575-ITSUKI.mp4", want: ""},
-		{input: "SCUTE-1575-ITSUKI.mkv", want: ""},
-		{input: "SCUTE-1575-ITSUKI Example Title", want: ""},
-		{input: "SCUTE-1575-ITSUKI/other", want: ""},
-		{input: "SCUTE-1575-", want: ""},
-		{input: "prefix SSIS-589", want: ""},
-		{input: "2002-01-05", want: ""},
+		{input: "SSIS-589.mp4", want: "SSIS-589.MP4"},
+		{input: "SCUTE-1575-ITSUKI.mp4", want: "SCUTE-1575-ITSUKI.MP4"},
+		{input: "SCUTE-1575-ITSUKI.mkv", want: "SCUTE-1575-ITSUKI.MKV"},
+		{input: "SCUTE-1575-ITSUKI Example Title", want: "SCUTE-1575-ITSUKI EXAMPLE TITLE"},
+		{input: "SCUTE-1575-ITSUKI/other", want: "SCUTE-1575-ITSUKI/OTHER"},
+		{input: "SCUTE-1575-", want: "SCUTE-1575-"},
+		{input: "prefix SSIS-589", want: "PREFIX SSIS-589"},
+		{input: "2002-01-05", want: "2002-01-05"},
 		{input: "fjin-106a", want: "FJIN-106A"},
 		{input: "FJIN-106", want: "FJIN-106"},
-		{input: "not-a-code", want: ""},
+		{input: "not-a-code", want: "NOT-A-CODE"},
+		{input: " 配信/作品 #0007 ", want: "配信/作品 #0007"},
+		{input: "", want: ""},
+		{input: " \t\n", want: ""},
 	}
 
 	for _, tt := range tests {
@@ -164,4 +187,19 @@ func TestNormalize(t *testing.T) {
 			}
 		})
 	}
+}
+
+func FuzzNormalizeRetainsCompleteNumbers(f *testing.F) {
+	for _, input := range []string{"KNB-M014", "M-014", "SCUTE-1575-ITSUKI", "ExampleStudio.26.09.05", "作品/限定 #0007", ""} {
+		f.Add(input)
+	}
+	f.Fuzz(func(t *testing.T, input string) {
+		code := Normalize(input)
+		if strings.TrimSpace(input) != "" && code == "" {
+			t.Fatal("discarded a nonempty complete number")
+		}
+		if Normalize(code) != code {
+			t.Fatalf("normalization is not idempotent: %q -> %q -> %q", input, code, Normalize(code))
+		}
+	})
 }

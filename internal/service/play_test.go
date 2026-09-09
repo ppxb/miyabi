@@ -46,7 +46,7 @@ func TestPlayFilesUsesOnlyCurrentLibrarySource(t *testing.T) {
 		SetAccountID(source.AccountID).SetRootID("other").SetMovieID(movieID).SaveX(t.Context())
 	db.File.Create().SetFileID("301").SetName("ABP-001-account.mp4").SetSize(1).
 		SetAccountID("other").SetRootID(source.Directory.ID).SetMovieID(movieID).SaveX(t.Context())
-	files, err := service.Files(t.Context(), "abp-001")
+	files, err := service.Files(t.Context(), movieID)
 	if err != nil || len(files.Files) != 2 || files.Files[0].ID != "101" || files.Files[1].ID != "102" {
 		t.Fatalf("playable files = %#v, error = %v", files, err)
 	}
@@ -55,7 +55,7 @@ func TestPlayFilesUsesOnlyCurrentLibrarySource(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Files(t.Context(), "ABP-001"); !ent.IsNotFound(err) {
+	if _, err := service.Files(t.Context(), movieID); !ent.IsNotFound(err) {
 		t.Fatalf("old source remains playable: %v", err)
 	}
 }
@@ -64,12 +64,24 @@ func TestPlayFilesPrefersLargestVideo(t *testing.T) {
 	service, _ := playFixture(t)
 	service.library.database.File.Update().Where(file.FileIDEQ("102")).SetSize(4096).SaveX(t.Context())
 
-	files, err := service.Files(t.Context(), "ABP-001")
+	movieID := service.library.database.Movie.Query().Where(movie.CodeEQ("ABP-001")).OnlyIDX(t.Context())
+	files, err := service.Files(t.Context(), movieID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(files.Files) != 2 || files.Files[0].ID != "102" || files.Files[1].ID != "101" {
 		t.Fatalf("playable files are not ordered by size: %#v", files.Files)
+	}
+}
+
+func TestPlayFilesUsesLocalIDForUnfamiliarNumbers(t *testing.T) {
+	service, _ := playFixture(t)
+	ctx := t.Context()
+	local := service.library.database.Movie.Query().Where(movie.CodeEQ("ABP-001")).OnlyX(ctx)
+	service.library.database.Movie.UpdateOne(local).SetCode("作品/限定 #007").ExecX(ctx)
+	files, err := service.Files(ctx, local.ID)
+	if err != nil || files.Code != "作品/限定 #007" || len(files.Files) != 2 {
+		t.Fatalf("playback still depends on catalogue recognition: %#v, %v", files, err)
 	}
 }
 

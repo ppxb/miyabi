@@ -10,7 +10,7 @@ import (
 )
 
 type PlayManager interface {
-	Files(context.Context, string) (service.PlayFiles, error)
+	Files(context.Context, int) (service.PlayFiles, error)
 	Start(context.Context, string) (service.Playback, error)
 	Stream(context.Context, string, int, string, http.Header) (*http.Response, error)
 	Release(string)
@@ -19,13 +19,13 @@ type PlayManager interface {
 func playFilesHandler(play PlayManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var query struct {
-			Code string `form:"code" binding:"required,max=200"`
+			MovieID int `form:"movie_id" binding:"required,min=1"`
 		}
 		if err := c.ShouldBindQuery(&query); err != nil {
 			c.Error(BadRequest(err))
 			return
 		}
-		files, err := play.Files(c.Request.Context(), query.Code)
+		files, err := play.Files(c.Request.Context(), query.MovieID)
 		if err != nil {
 			c.Error(err)
 			return

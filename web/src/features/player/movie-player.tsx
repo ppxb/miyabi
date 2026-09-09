@@ -31,8 +31,8 @@ import '@vidstack/react/player/styles/default/theme.css'
 import '@vidstack/react/player/styles/default/layouts/video.css'
 import './player.css'
 
-export default function MoviePlayer({ code }: { code: string }) {
-  const files = usePlayFiles(code)
+export default function MoviePlayer({ movieID }: { movieID: number }) {
+  const files = usePlayFiles(movieID)
 
   if (files.isPending) return <PlayerLoading />
   if (files.isError) {

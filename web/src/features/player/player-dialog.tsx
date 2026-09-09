@@ -7,11 +7,11 @@ import { PlayerLoading } from './player-status'
 const MoviePlayer = lazy(() => import('./movie-player'))
 
 export function PlayerDialog() {
-  const code = useUIStore(state => state.playbackCode)
+  const movieID = useUIStore(state => state.playbackMovieID)
   const close = useUIStore(state => state.closePlayer)
 
   // Unmount the portal with the player so the exit animation cannot show a collapsed, empty frame.
-  if (code === null) return null
+  if (movieID === null) return null
 
   return (
     <Dialog
@@ -26,7 +26,7 @@ export function PlayerDialog() {
         onPointerDownOutside={event => event.preventDefault()}
       >
         <Suspense fallback={<PlayerLoading />}>
-          <MoviePlayer key={code} code={code} />
+          <MoviePlayer key={movieID} movieID={movieID} />
         </Suspense>
       </DialogContent>
     </Dialog>

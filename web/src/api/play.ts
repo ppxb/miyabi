@@ -29,11 +29,11 @@ const playQueryOptions = {
   refetchOnReconnect: false
 } as const
 
-export function usePlayFiles(code: string) {
+export function usePlayFiles(movieID: number) {
   return useQuery({
     ...playQueryOptions,
-    queryKey: ['play', 'files', code],
-    queryFn: ({ signal }) => apiGet<PlayFiles>('/api/play/files', { code }, signal)
+    queryKey: ['play', 'files', movieID],
+    queryFn: ({ signal }) => apiGet<PlayFiles>('/api/play/files', { movie_id: movieID }, signal)
   })
 }
 

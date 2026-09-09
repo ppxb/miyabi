@@ -26,10 +26,15 @@ export function SearchPage({
 }) {
   return (
     <AppPage>
-      <PageHeader title="搜索" description="搜索 JavDB 的全部分区" />
-      <SearchForm key={keyword} keyword={keyword} onSearch={onSearch} />
+      <PageHeader title="搜索" description="搜索 JavDB 的所有影片" />
+      <SearchForm key={`form:${keyword}`} keyword={keyword} onSearch={onSearch} />
       {keyword ? (
-        <SearchResults key={keyword} keyword={keyword} page={page} onPageChange={onPageChange} />
+        <SearchResults
+          key={`results:${keyword}`}
+          keyword={keyword}
+          page={page}
+          onPageChange={onPageChange}
+        />
       ) : null}
     </AppPage>
   )

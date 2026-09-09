@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -109,7 +110,7 @@ func TestProjectMoviesAddsLibraryTaskAndReleaseState(t *testing.T) {
 	}
 	if _, err := store.Client.Task.Create().
 		SetType("offline").
-		SetPayload(map[string]any{"code": "ABP-002", "account_id": "100", "directory_id": "10"}).
+		SetPayload(map[string]any{"code": "ABP-002", "javdb_id": "two", "account_id": "100", "directory_id": "10"}).
 		Save(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -160,6 +161,41 @@ func TestProjectEmptyMoviesSkipsDatabase(t *testing.T) {
 	}
 }
 
+func TestProjectionUsesSourceIDBeforeCatalogueSpelling(t *testing.T) {
+	library, _, payload := libraryFixture(t)
+	ctx := t.Context()
+	db := library.database
+	known := db.Movie.Create().SetCode("OLD-001").SetJavdbID("known-id").SaveX(ctx)
+	pending := db.Movie.Create().SetCode("KNB-M014").SaveX(ctx)
+	conflicting := db.Movie.Create().SetCode("GLOD-0436").SetJavdbID("different-id").SaveX(ctx)
+	for index, id := range []int{known.ID, pending.ID, conflicting.ID} {
+		db.File.Create().SetFileID(fmt.Sprint(index)).SetName("video.mp4").SetSize(1).
+			SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).SetMovieID(id).SaveX(ctx)
+	}
+	db.Task.Create().SetType("offline").SetPayload(map[string]any{
+		"javdb_id": "queued-id", "code": "PREVIOUS-002",
+		"account_id": payload.Source.AccountID, "directory_id": payload.Source.Directory.ID,
+	}).SaveX(ctx)
+	service := &DiscoverService{database: db}
+	source := []javdb.Movie{
+		{ID: "known-id", Code: "作品/新版 #001"},
+		{ID: "pending-id", Code: "knb_m014"},
+		{ID: "conflicting-id", Code: "GLOD-0436"},
+		{ID: "queued-id", Code: "Current.Number"},
+	}
+	result, err := service.projectMovies(ctx, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantIDs := []int{known.ID, pending.ID, 0, 0}
+	wantStates := []MovieState{MovieInLibrary, MovieInLibrary, MovieNotInLibrary, MovieSaving}
+	for index, item := range result {
+		if item.Code != source[index].Code || item.LibraryID != wantIDs[index] || item.State != wantStates[index] {
+			t.Fatalf("wrong identity projection at %d: %#v", index, item)
+		}
+	}
+}
+
 func TestCachedCatalogueStillReflectsCurrentLibraryAndTaskState(t *testing.T) {
 	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {
@@ -195,7 +231,7 @@ func TestCachedCatalogueStillReflectsCurrentLibraryAndTaskState(t *testing.T) {
 	if got := project(); got != MovieNotInLibrary {
 		t.Fatalf("initial state = %s", got)
 	}
-	if err := store.Client.Task.Create().SetType("offline").SetPayload(map[string]any{"code": "ABP-001", "account_id": "100", "directory_id": "10"}).Exec(t.Context()); err != nil {
+	if err := store.Client.Task.Create().SetType("offline").SetPayload(map[string]any{"code": "ABP-001", "javdb_id": "fixture", "account_id": "100", "directory_id": "10"}).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	if got := project(); got != MovieSaving {

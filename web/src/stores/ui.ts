@@ -1,13 +1,13 @@
 import { create } from 'zustand'
 
 type UIState = {
-  playbackCode: string | null
-  openPlayer: (code: string) => void
+  playbackMovieID: number | null
+  openPlayer: (movieID: number) => void
   closePlayer: () => void
 }
 
 export const useUIStore = create<UIState>(set => ({
-  playbackCode: null,
-  openPlayer: playbackCode => set({ playbackCode }),
-  closePlayer: () => set({ playbackCode: null })
+  playbackMovieID: null,
+  openPlayer: playbackMovieID => set({ playbackMovieID }),
+  closePlayer: () => set({ playbackMovieID: null })
 }))

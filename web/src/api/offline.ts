@@ -9,6 +9,7 @@ export type OfflineSubmission = {
   task_id: number
   code: string
   javdb_id: string
+  library_id?: number
   account_id: string
   directory_id: string
   scan_task_id?: number

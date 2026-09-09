@@ -87,11 +87,17 @@ export function notifyOfflineTask(
     })
   } else if (task.phase === 'in_library') {
     const notify = task.error ? toast.warning : toast.success
+    const libraryID = task.library_id
     notify(`${task.code} 已入库`, {
       ...props,
       description: task.error ? `元数据处理失败：${task.error}` : '下载与入库处理已完成',
       action: (
-        <TaskToastActions id={id} onPlay={() => useUIStore.getState().openPlayer(task.code)} />
+        <TaskToastActions
+          id={id}
+          onPlay={
+            libraryID === undefined ? undefined : () => useUIStore.getState().openPlayer(libraryID)
+          }
+        />
       )
     })
   } else if (task.error || task.status === 'failed') {

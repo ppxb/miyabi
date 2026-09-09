@@ -27,6 +27,7 @@ type OfflineSubmission struct {
 	TaskID      int         `json:"task_id"`
 	Code        string      `json:"code"`
 	JavDBID     string      `json:"javdb_id"`
+	LibraryID   int         `json:"library_id,omitempty"`
 	AccountID   string      `json:"account_id"`
 	DirectoryID string      `json:"directory_id"`
 	ScanTaskID  int         `json:"scan_task_id,omitempty"`
@@ -79,9 +80,6 @@ func (service *OfflineService) Add(ctx context.Context, movieID, hash string) (O
 		return OfflineSubmission{}, err
 	}
 	code := codeid.Normalize(movie.Code)
-	if code == "" {
-		return OfflineSubmission{}, fmt.Errorf("normalize offline movie code %q", movie.Code)
-	}
 	service.drive.mu.Lock()
 	defer service.drive.mu.Unlock()
 	account, err := withPanToken(ctx, service.drive, func(token string) (pan.Account, error) {
@@ -344,7 +342,9 @@ func (service *OfflineService) submissions(ctx context.Context, records []*ent.T
 		files, err := service.database.File.Query().Where(libraryFiles(*source),
 			file.FileIDIn(fileIDs[start:min(start+500, len(fileIDs))]...)).
 			Select(file.FieldFileID, file.FieldMovieID).
-			WithMovie(func(query *ent.MovieQuery) { query.Select(movie.FieldCode, movie.FieldScrapeStatus) }).All(ctx)
+			WithMovie(func(query *ent.MovieQuery) {
+				query.Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID, movie.FieldScrapeStatus)
+			}).All(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("read downloaded file index: %w", err)
 		}
@@ -387,8 +387,10 @@ func (service *OfflineService) submissions(ctx context.Context, records []*ent.T
 			if !present {
 				continue
 			}
-			if matched != nil && matched.Code == input.Code {
+			if matched != nil && (matched.JavdbID != nil && *matched.JavdbID == input.JavDBID ||
+				matched.JavdbID == nil && matched.Code == codeid.Normalize(input.Code)) {
 				item.Phase = "in_library"
+				item.LibraryID = matched.ID
 				if matched.ScrapeStatus != movie.ScrapeStatusFailed {
 					item.Error = nil
 				}

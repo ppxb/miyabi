@@ -129,7 +129,8 @@ func (service *ScrapeService) originImage(ctx context.Context, source LibrarySou
 
 func (service *ScrapeService) writeSidecars(ctx context.Context, input coverPayload, version uint64, directory movieDirectory, poster, fanart []byte) (metadataDirectorySnapshot, error) {
 	var snapshot metadataDirectorySnapshot
-	nfoName := input.Code + ".nfo"
+	stem := nfo.FileStem(input.Code)
+	nfoName := stem + ".nfo"
 	// An existing matching NFO is already the source of truth. Preserve its
 	// formatting and user edits, as well as its referenced artwork.
 	if doc, origin, found, err := service.directoryNFO(ctx, input.metadataPayload, version, directory); err != nil {
@@ -145,7 +146,7 @@ func (service *ScrapeService) writeSidecars(ctx context.Context, input coverPayl
 	existingFanart, fanartExists := sidecarByName(directory.Files, fanartName)
 	if directory.Shared || directory.ID == input.Source.Directory.ID || (posterExists && !strings.EqualFold(existingPoster.SHA1, pan.SHA1(poster))) ||
 		(fanartExists && !strings.EqualFold(existingFanart.SHA1, pan.SHA1(fanart))) {
-		posterName, fanartName = input.Code+"-poster.jpg", input.Code+"-fanart.jpg"
+		posterName, fanartName = stem+"-poster.jpg", stem+"-fanart.jpg"
 	}
 	doc := input.Document
 	doc.Thumbs = []nfo.Thumb{{Aspect: "poster", Path: posterName}}

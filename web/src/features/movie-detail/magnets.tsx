@@ -33,7 +33,7 @@ export function MovieMagnets({
   const accountID = connected ? (account.data?.account?.id ?? '') : ''
   const offline = useOfflineTasks(movieID, accountID)
   const tasks = new Map(offline.data?.map(task => [task.hash, task] as const))
-  const checkingStatus = offline.isPending || !offline.isFetchedAfterMount
+  const checkingStatus = offline.isPending
   const hasDirectory = Boolean(account.data?.directory)
   const [copiedHash, setCopiedHash] = useState('')
   const [copyError, setCopyError] = useState(false)
@@ -132,11 +132,11 @@ function MagnetCard({
   const busy = add.isPending || (checkingStatus && !submitted)
   let label = '一键加入 115'
   if (add.isPending) {
-    label = '提交中…'
+    label = '提交中'
   } else if (submitted) {
     label = phaseLabels[task.phase]
   } else if (checkingStatus) {
-    label = '读取状态…'
+    label = '读取状态'
   } else if (statusError) {
     label = '状态暂不可用'
   }
