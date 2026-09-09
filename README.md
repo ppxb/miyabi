@@ -21,20 +21,11 @@ docker compose pull
 docker compose up -d
 ```
 
-从本地源码构建：
-
-```bash
-docker build -t ghcr.io/ppxb/miyabi:latest .
-docker compose up -d
-```
-
 容器以 UID/GID `10001:10001` 运行；如将命名卷改为主机目录挂载，需要让该用户能够写入目录。健康检查使用 `/api/health`。
 
 ## 访问门禁与启动配置
 
-通过 `MIYABI_ACCESS_PASSWORD` 配置访问密码，验证后使用 `sessionStorage` 在当前标签页内放行，刷新页面无需再次输入。浏览器只保存放行标记，不保存密码；登录后继续打开原先访问的页面。
-
-未配置密码或将密码设为空时关闭门禁；Compose 部署要求先在 `.env` 中填写密码。
+通过 `MIYABI_ACCESS_PASSWORD` 配置访问密码。未配置密码或将密码设为空时关闭门禁。
 
 | 环境变量                 | 用途                     | 默认值                                |
 | ------------------------ | ------------------------ | ------------------------------------- |
@@ -57,7 +48,6 @@ docker compose up -d
 本项目参考了以下项目的部分实现，在此表示衷心的感谢！
 
 - [javdb-cli](https://github.com/FlanChanXwO/javdb-cli)
-- [jm-boom](https://github.com/ppxb/jm-boom)
 
 同时感谢社区 [LinuxDO](https://linux.do) 的帮助。
 
