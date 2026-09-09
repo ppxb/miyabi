@@ -178,6 +178,32 @@ func TestMovieReferencesPreserveWesternSceneNumbers(t *testing.T) {
 	}
 }
 
+func TestBrowsePreservesCatalogueNumberSegments(t *testing.T) {
+	transport := &fixtureTransport{responses: map[string][]byte{
+		"/api/v1/movies/tags|zh-TW": fixtureFile(t, "browse_catalogue_numbers.json"),
+	}}
+	client := clientWithTransport(transport)
+	movies, err := client.Browse(t.Context(), BrowseOptions{
+		Zone: ZoneUncensored, Sort: "release", Order: "desc", Page: 1, Limit: 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"SSIS-589", "FC2-PPV-1234567", "HEYDOUGA-4030-2347", "EXAMPLESTUDIO.26.09.05",
+		"SCUTE-1575-ITSUKI", "SCUTE-1575-NANAMI", "SCUTE-15750-ITSUKI", "EXAMPLE-123-MODEL2-0001",
+		"EXAMPLESTUDIONAME-001", "SSIS-1",
+	}
+	if len(movies) != len(want) {
+		t.Fatalf("got %d movies, want %d", len(movies), len(want))
+	}
+	for index, code := range want {
+		if movies[index].Code != code {
+			t.Errorf("movie %d code = %q, want %q", index, movies[index].Code, code)
+		}
+	}
+}
+
 func TestMovieDetailMapsGraphWithoutPlot(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
 		"/api/v4/movies/movie-exact|zh-TW": fixtureFile(t, "movie.json"),
@@ -226,6 +252,24 @@ func TestMovieDetailPreservesMultipartNumbers(t *testing.T) {
 	}
 	if movie.ActorMovies[0].Code != "T28-638" || movie.ActorMovies[5].Code != "HEYDOUGA-4030-2347" || movie.RelatedMovies[0].Code != "HEYDOUGA-4030-2348" {
 		t.Fatalf("multipart references = %+v, %+v", movie.ActorMovies, movie.RelatedMovies)
+	}
+}
+
+func TestMovieDetailPreservesNamedNumbers(t *testing.T) {
+	transport := &fixtureTransport{responses: map[string][]byte{
+		"/api/v4/movies/named-itsuki|zh-TW": fixtureFile(t, "movie_named.json"),
+	}}
+	client := clientWithTransport(transport)
+	movie, err := client.MovieDetail(t.Context(), "named-itsuki")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if movie.Code != "SCUTE-1575-ITSUKI" || len(movie.ActorMovies) != 6 || len(movie.RelatedMovies) != 1 {
+		t.Fatalf("named detail = %+v", movie)
+	}
+	if movie.ActorMovies[4].Code != "EXAMPLE-123-MODEL2-0001" ||
+		movie.ActorMovies[5].Code != "SCUTE-15750-ITSUKI" || movie.RelatedMovies[0].Code != "SCUTE-1575-NANAMI" {
+		t.Fatalf("named references = %+v, %+v", movie.ActorMovies, movie.RelatedMovies)
 	}
 }
 
@@ -321,6 +365,32 @@ func TestResolveMovieIDKeepsMultipartNumbersDistinct(t *testing.T) {
 		}
 		if id != want {
 			t.Errorf("ResolveMovieID(%q) = %q, want %q", code, id, want)
+		}
+	}
+}
+
+func TestResolveMovieIDKeepsNamedNumbersDistinct(t *testing.T) {
+	transport := &fixtureTransport{responses: map[string][]byte{
+		"/api/v2/search|zh-TW": fixtureFile(t, "browse_catalogue_numbers.json"),
+	}}
+	client := clientWithTransport(transport)
+	for code, want := range map[string]string{
+		"scute1575_itsuki":        "named-itsuki",
+		"SCUTE-1575-NANAMI":       "named-nanami",
+		"SCUTE-15750-ITSUKI":      "named-other-number",
+		"EXAMPLE-123-model2-0001": "named-variant",
+	} {
+		id, err := client.ResolveMovieID(t.Context(), code)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if id != want {
+			t.Errorf("ResolveMovieID(%q) = %q, want %q", code, id, want)
+		}
+	}
+	for _, code := range []string{"SCUTE-1575", "SCUTE-1575-OTHER", "EXAMPLE-123-model2-0002"} {
+		if id, err := client.ResolveMovieID(t.Context(), code); err == nil {
+			t.Errorf("ResolveMovieID(%q) accepted a partial match: %q", code, id)
 		}
 	}
 }

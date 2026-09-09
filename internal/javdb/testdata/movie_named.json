@@ -1,0 +1,21 @@
+{
+  "success": 1,
+  "data": {
+    "movie": {
+      "id": "named-itsuki",
+      "number": "scute-1575-itsuki",
+      "type": 1,
+      "actor_movies": [
+        { "id": "standard", "number": "SSIS-589" },
+        { "id": "fc2", "number": "FC2-PPV-1234567" },
+        { "id": "multipart", "number": "heydouga-4030-2347" },
+        { "id": "western", "number": "ExampleStudio.26.09.05" },
+        { "id": "named-variant", "number": "EXAMPLE-123-model2-0001" },
+        { "id": "named-other-number", "number": "scute-15750-itsuki" }
+      ],
+      "relative_movies": [
+        { "id": "named-nanami", "number": "scute-1575-nanami" }
+      ]
+    }
+  }
+}

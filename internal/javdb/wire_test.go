@@ -76,6 +76,25 @@ func TestMovieActorGenderMapping(t *testing.T) {
 	}
 }
 
+func TestMovieMappingsRejectInvalidNumbers(t *testing.T) {
+	for _, number := range []string{"", "not-a-code", "SCUTE-1575-ITSUKI.mp4", "SCUTE-1575-ITSUKI/other"} {
+		t.Run(number, func(t *testing.T) {
+			if _, err := moviesFromWire([]wireMovie{
+				{ID: "valid", Number: "SSIS-589"},
+				{ID: "invalid", Number: number},
+			}); err == nil {
+				t.Errorf("movies accepted invalid number %q", number)
+			}
+			if _, err := movieReferencesFromWire([]wireMovieReference{
+				{ID: "valid", Number: "SSIS-589"},
+				{ID: "invalid", Number: number},
+			}); err == nil {
+				t.Errorf("references accepted invalid number %q", number)
+			}
+		})
+	}
+}
+
 func TestDecodeEnvelopeAPIError(t *testing.T) {
 	err := decodeEnvelope([]byte(`{"success":0,"action":"BadRequest","message":"invalid"}`), nil)
 	var apiError *APIError
