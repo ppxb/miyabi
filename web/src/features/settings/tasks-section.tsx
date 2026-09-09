@@ -5,9 +5,11 @@ import { useTasks } from '@/api/tasks'
 import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsSection } from '@/features/settings/shared'
 import { ScanProgressView } from '@/features/tasks/scan-progress'
+import { useTaskConnection } from '@/features/tasks/task-events'
 
 export function TasksSection() {
   const tasks = useTasks()
+  const connection = useTaskConnection()
 
   return (
     <SettingsSection icon={<ListChecksIcon className="size-4" />} title="任务">
@@ -20,7 +22,12 @@ export function TasksSection() {
       {tasks.isError ? (
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">无法读取任务，请启动后端服务后重试。</p>
-          <Button variant="outline" size="sm" onClick={() => void tasks.refetch()}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={connection.status === 'connecting'}
+            onClick={connection.reconnect}
+          >
             重试
           </Button>
         </div>

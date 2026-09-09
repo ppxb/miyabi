@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { LoaderCircleIcon, ScanLineIcon } from 'lucide-react'
+import { LoaderCircleIcon, RefreshCwIcon, ScanLineIcon } from 'lucide-react'
 
 import { ApiError } from '@/api/client'
 import { useLibraryMovies, useStartLibraryScan } from '@/api/library'
@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { LibraryFilesDialog } from '@/features/library/files-dialog'
 import { LibraryMovieCard } from '@/features/library/movie-card'
 import { ScanProgressView } from '@/features/tasks/scan-progress'
+import { useTaskConnection } from '@/features/tasks/task-events'
 
 export function LibraryPage({
   page,
@@ -25,6 +26,7 @@ export function LibraryPage({
 }) {
   const library = useLibraryMovies(page)
   const tasks = useTasks()
+  const connection = useTaskConnection()
   const startScan = useStartLibraryScan()
   const source = library.data?.source
   const latest = tasks.data?.find(
@@ -34,14 +36,21 @@ export function LibraryPage({
       task.source.directory.id === source.directory.id
   )
   const scanning = latest !== undefined && isTaskActive(latest)
-  const scanLabel = scanning ? '正在处理' : latest?.status === 'failed' ? '重新扫描' : '扫描媒体库'
+  const processing = scanning && connection.status === 'connected'
+  const scanLabel = scanning
+    ? processing
+      ? '正在处理'
+      : '等待同步'
+    : latest?.status === 'failed'
+      ? '重新扫描'
+      : '扫描媒体库'
 
   return (
     <AppPage>
       <PageHeader title="媒体库" description="来自 115 网盘的影片索引" inlineActions>
         {latest ? (
-          <div className="max-w-full rounded-lg bg-muted px-1.5 sm:w-60 sm:px-3 sm:py-2">
-            <ScanProgressView task={latest} compactOnMobile />
+          <div className="flex h-9 max-w-full items-center rounded-lg bg-muted px-1.5 sm:w-60 sm:px-3">
+            <ScanProgressView task={latest} compact />
           </div>
         ) : null}
         {source ? (
@@ -49,12 +58,13 @@ export function LibraryPage({
             <TooltipTrigger asChild>
               <Button
                 className="w-9 px-0 sm:w-auto sm:px-3"
-
                 disabled={scanning || startScan.isPending}
                 onClick={() => startScan.mutate(undefined, { onSuccess: () => onPageChange(1) })}
               >
-                {scanning || startScan.isPending ? (
+                {processing || startScan.isPending ? (
                   <LoaderCircleIcon className="size-4 animate-spin" />
+                ) : scanning ? (
+                  <RefreshCwIcon className="size-4" />
                 ) : (
                   <ScanLineIcon className="size-4" />
                 )}
@@ -84,9 +94,19 @@ export function LibraryPage({
       ) : null}
 
       {tasks.isError ? (
-        <p className="text-sm text-muted-foreground">
-          暂时无法获取任务状态，实时连接恢复后会自动同步。
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm text-muted-foreground">
+            暂时无法获取任务状态，请检查后端服务后重试。
+          </p>
+          <Button
+            variant="link"
+            size="xs"
+            disabled={connection.status === 'connecting'}
+            onClick={connection.reconnect}
+          >
+            重新连接
+          </Button>
+        </div>
       ) : null}
 
       {library.isPending ? (

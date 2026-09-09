@@ -16,9 +16,12 @@ export function PlayerDialog() {
   const code = useUIStore(state => state.playbackCode)
   const close = useUIStore(state => state.closePlayer)
 
+  // Unmount the portal with the player so the exit animation cannot show a collapsed, empty frame.
+  if (code === null) return null
+
   return (
     <Dialog
-      open={code !== null}
+      open
       onOpenChange={open => {
         if (!open) close()
       }}
@@ -31,11 +34,9 @@ export function PlayerDialog() {
           <DialogTitle className="truncate">{code} · 播放</DialogTitle>
           <DialogDescription>可选择原文件播放或 115 转码。</DialogDescription>
         </DialogHeader>
-        {code !== null ? (
-          <Suspense fallback={<PlayerLoading />}>
-            <MoviePlayer key={code} code={code} />
-          </Suspense>
-        ) : null}
+        <Suspense fallback={<PlayerLoading />}>
+          <MoviePlayer key={code} code={code} />
+        </Suspense>
       </DialogContent>
     </Dialog>
   )
