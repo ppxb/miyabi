@@ -51,14 +51,7 @@ func (client *Client) DownloadURL(ctx context.Context, accessToken, pickCode str
 	return address, nil
 }
 
-func (client *Client) PlayURL(ctx context.Context, accessToken, pickCode string, hls bool) ([]PlaySource, error) {
-	if !hls {
-		address, err := client.DownloadURL(ctx, accessToken, pickCode)
-		if err != nil {
-			return nil, err
-		}
-		return []PlaySource{{URL: address}}, nil
-	}
+func (client *Client) PlayURL(ctx context.Context, accessToken, pickCode string) ([]PlaySource, error) {
 	response, err := client.request(client.http.R().SetContext(ctx).SetAuthToken(accessToken).
 		SetHeader("User-Agent", mediaUserAgent).SetQueryParam("pick_code", pickCode),
 		http.MethodGet, apiURL+"/open/video/play")
@@ -78,7 +71,7 @@ func (client *Client) PlayURL(ctx context.Context, accessToken, pickCode string,
 		return nil, err
 	}
 	if len(result.Data.Sources) == 0 {
-		return nil, fmt.Errorf("115 尚未提供该文件的转码播放地址，请使用原文件播放或稍后重试")
+		return nil, fmt.Errorf("115 暂未提供该文件的转码播放地址，请稍后重试")
 	}
 	for _, source := range result.Data.Sources {
 		if source.URL == "" || source.Height <= 0 {

@@ -12,18 +12,14 @@ import (
 func TestPlayURLDecodesOfficialResponses(t *testing.T) {
 	for _, test := range []struct {
 		name    string
-		hls     bool
 		body    string
 		wantErr bool
 	}{
-		{name: "original", body: `{"state":true,"code":0,"data":{"42":{"url":{"url":"https://cdn.example/video?sign=fixture"}}}}`},
-		{name: "hls without extension", hls: true, body: `{"state":true,"code":0,"data":{"video_url":[{"url":"http://cdn.example/m3u8/fixture?definition=4","height":1080,"width":1920,"definition":4,"title":1080}]}}`},
-		{name: "missing download", body: `{"state":true,"code":0,"data":{}}`, wantErr: true},
-		{name: "empty download URL", body: `{"state":true,"code":0,"data":{"42":{"url":{"url":""}}}}`, wantErr: true},
-		{name: "transcode pending", hls: true, body: `{"state":true,"code":0,"data":{"video_url":[]}}`, wantErr: true},
-		{name: "missing hls URL", hls: true, body: `{"state":true,"code":0,"data":{"video_url":[{"height":1080}]}}`, wantErr: true},
-		{name: "wrong wire type", hls: true, body: `{"state":true,"code":0,"data":{"video_url":{"url":"https://cdn.example/video"}}}`, wantErr: true},
-		{name: "api rejection", hls: true, body: `{"state":false,"code":500001,"message":"fixture failure"}`, wantErr: true},
+		{name: "hls without extension", body: `{"state":true,"code":0,"data":{"video_url":[{"url":"http://cdn.example/m3u8/fixture?definition=4","height":1080,"width":1920,"definition":4,"title":1080}]}}`},
+		{name: "transcode pending", body: `{"state":true,"code":0,"data":{"video_url":[]}}`, wantErr: true},
+		{name: "missing hls URL", body: `{"state":true,"code":0,"data":{"video_url":[{"height":1080}]}}`, wantErr: true},
+		{name: "wrong wire type", body: `{"state":true,"code":0,"data":{"video_url":{"url":"https://cdn.example/video"}}}`, wantErr: true},
+		{name: "api rejection", body: `{"state":false,"code":500001,"message":"fixture failure"}`, wantErr: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			client := New(Options{})
@@ -34,29 +30,56 @@ func TestPlayURLDecodesOfficialResponses(t *testing.T) {
 				if request.UserAgent() != mediaUserAgent || request.Header.Get("Authorization") != "Bearer fixture-token" {
 					t.Error("play URL request must use the media UA and OAuth token")
 				}
-				if test.hls {
-					if request.Method != http.MethodGet || request.URL.Path != "/open/video/play" || request.URL.Query().Get("pick_code") != "fixture-pick" {
-						t.Errorf("unexpected HLS request: %s %s", request.Method, request.URL.Path)
-					}
-				} else {
-					if err := request.ParseForm(); err != nil {
-						t.Fatal(err)
-					}
-					if request.Method != http.MethodPost || request.URL.Path != "/open/ufile/downurl" || request.PostForm.Get("pick_code") != "fixture-pick" {
-						t.Errorf("unexpected download URL request: %s %s", request.Method, request.URL.Path)
-					}
+				if request.Method != http.MethodGet || request.URL.Path != "/open/video/play" || request.URL.Query().Get("pick_code") != "fixture-pick" {
+					t.Errorf("unexpected HLS request: %s %s", request.Method, request.URL.Path)
 				}
 				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(test.body)), Request: request}, nil
 			}))
-			sources, err := client.PlayURL(t.Context(), "fixture-token", "fixture-pick", test.hls)
+			sources, err := client.PlayURL(t.Context(), "fixture-token", "fixture-pick")
 			if (err != nil) != test.wantErr {
 				t.Fatalf("PlayURL error = %v, want error = %t", err, test.wantErr)
 			}
-			if !test.wantErr && (len(sources) != 1 || sources[0].URL == "" || (test.hls && sources[0].Height != 1080)) {
+			if !test.wantErr && (len(sources) != 1 || sources[0].URL == "" || sources[0].Height != 1080) {
 				t.Fatalf("sources = %#v", sources)
 			}
 			if calls != 1 {
 				t.Fatalf("sent %d API calls for one source request", calls)
+			}
+		})
+	}
+}
+
+func TestDownloadURLDecodesMetadataSources(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		body    string
+		wantErr bool
+	}{
+		{name: "metadata", body: `{"state":true,"code":0,"data":{"42":{"url":{"url":"https://cdn.example/sidecar?sign=fixture"}}}}`},
+		{name: "missing download", body: `{"state":true,"code":0,"data":{}}`, wantErr: true},
+		{name: "empty download URL", body: `{"state":true,"code":0,"data":{"42":{"url":{"url":""}}}}`, wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			client := New(Options{})
+			defer client.Close()
+			client.http.SetTransport(offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
+				if err := request.ParseForm(); err != nil {
+					t.Fatal(err)
+				}
+				if request.Method != http.MethodPost || request.URL.Path != "/open/ufile/downurl" || request.PostForm.Get("pick_code") != "fixture-pick" {
+					t.Errorf("unexpected download URL request: %s %s", request.Method, request.URL.Path)
+				}
+				if request.UserAgent() != mediaUserAgent || request.Header.Get("Authorization") != "Bearer fixture-token" {
+					t.Error("download URL request must use the media UA and OAuth token")
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(test.body)), Request: request}, nil
+			}))
+			address, err := client.DownloadURL(t.Context(), "fixture-token", "fixture-pick")
+			if (err != nil) != test.wantErr {
+				t.Fatalf("DownloadURL error = %v, want error = %t", err, test.wantErr)
+			}
+			if !test.wantErr && address != "https://cdn.example/sidecar?sign=fixture" {
+				t.Fatalf("download URL = %q", address)
 			}
 		})
 	}

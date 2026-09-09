@@ -4,8 +4,6 @@ import { useEffect } from 'react'
 import { apiDelete, apiGet } from '@/api/client'
 import type { LibraryFile } from '@/api/library'
 
-export type PlayMode = 'original' | 'hls'
-
 export type PlayFiles = {
   code: string
   title: string
@@ -14,7 +12,7 @@ export type PlayFiles = {
 
 export type PlaySource = {
   src: string
-  type: 'video/object' | 'application/x-mpegurl'
+  type: 'application/x-mpegurl'
   label: string
 }
 
@@ -39,12 +37,12 @@ export function usePlayFiles(code: string) {
   })
 }
 
-export function usePlayback(fileID: string, mode: PlayMode) {
+export function usePlayback(fileID: string) {
   const query = useQuery({
     ...playQueryOptions,
-    queryKey: ['play', 'source', fileID, mode],
+    queryKey: ['play', 'source', fileID],
     queryFn: ({ signal }) =>
-      apiGet<Playback>(`/api/play/${encodeURIComponent(fileID)}`, { mode }, signal)
+      apiGet<Playback>(`/api/play/${encodeURIComponent(fileID)}`, undefined, signal)
   })
   const id = query.data?.id
 

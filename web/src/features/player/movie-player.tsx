@@ -1,14 +1,15 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import {
   isHLSProvider,
   MediaPlayer,
   MediaProvider,
-  VideoProviderLoader,
-  type Src
+  type MediaPlayerInstance
 } from '@vidstack/react'
 import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default'
+import { ListVideoIcon } from 'lucide-react'
 
-import { usePlayback, usePlayFiles, type PlayMode, type PlaySource } from '@/api/play'
+import type { LibraryFile } from '@/api/library'
+import { usePlayback, usePlayFiles } from '@/api/play'
 import {
   Select,
   SelectContent,
@@ -16,189 +17,203 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatSize } from '@/lib/format'
-import { PlayerError, PlayerLoading } from './player-status'
+import { PlayerCloseButton, PlayerError, PlayerLoading, PlayerTitle } from './player-status'
 import { playerTranslations } from './translations'
 
 import '@vidstack/react/player/styles/default/theme.css'
 import '@vidstack/react/player/styles/default/layouts/video.css'
 import './player.css'
 
-// Proxy paths have no file extension. Let the native video element inspect original files;
-// browser codec support is decided when loading, rather than guessed from a container name.
-class FileVideoLoader extends VideoProviderLoader {
-  canPlay(source: Src) {
-    return source.type === '?' && typeof source.src === 'string'
-  }
-}
-
-type PlaybackPosition = {
-  read: () => number
-  update: (time: number) => void
-}
-
 export default function MoviePlayer({ code }: { code: string }) {
   const files = usePlayFiles(code)
-  const [fileID, setFileID] = useState<string>()
-  const [mode, setMode] = useState<PlayMode>('original')
 
   if (files.isPending) return <PlayerLoading />
   if (files.isError) {
     return <PlayerError error={files.error} onRetry={() => void files.refetch()} />
   }
-  const file = files.data.files.find(item => item.id === fileID) ?? files.data.files[0]
-  if (!file) {
+  if (files.data.files.length === 0) {
     return (
       <PlayerError
+        title={files.data.title}
         message="没有可播放的文件，请重新扫描媒体库。"
         onRetry={() => void files.refetch()}
       />
     )
   }
 
-  return (
-    <div className="min-w-0 space-y-3">
-      <div className="flex min-w-0 flex-wrap items-center gap-3">
-        {files.data.files.length > 1 ? (
-          <Select value={file.id} onValueChange={setFileID}>
-            <SelectTrigger className="min-w-0 flex-1 basis-full sm:basis-0">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent position="popper" className="max-w-[calc(100vw-3rem)]">
-              {files.data.files.map(item => (
-                <SelectItem key={item.id} value={item.id}>
-                  <span className="truncate">
-                    {item.name} · {formatSize(item.size)}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <p className="min-w-0 flex-1 basis-full truncate text-sm sm:basis-0">{file.name}</p>
-        )}
-        <Tabs value={mode} onValueChange={value => setMode(value as PlayMode)}>
-          <TabsList>
-            <TabsTrigger value="original">原文件</TabsTrigger>
-            <TabsTrigger value="hls">115 转码</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-      <FilePlayer key={file.id} fileID={file.id} mode={mode} />
-    </div>
-  )
+  return <PlaybackPlayer title={files.data.title} files={files.data.files} />
 }
 
-function FilePlayer({ fileID, mode }: { fileID: string; mode: PlayMode }) {
-  const playback = usePlayback(fileID, mode)
-  const position = useRef(0)
-
-  if (playback.isPending || playback.isFetching) return <PlayerLoading />
-  if (playback.isError) {
-    return <PlayerError error={playback.error} onRetry={() => void playback.refetch()} />
-  }
-
-  return (
-    <PlaybackSources
-      key={playback.data.id}
-      sources={playback.data.sources}
-      position={{
-        read: () => position.current,
-        update: time => {
-          position.current = time
-        }
-      }}
-      onRetry={() => void playback.refetch()}
-    />
-  )
-}
-
-function PlaybackSources({
-  sources,
-  position,
-  onRetry
-}: {
-  sources: PlaySource[]
-  position: PlaybackPosition
-  onRetry: () => void
-}) {
-  const [index, setIndex] = useState(0)
-  const source = sources[index]
-
-  return (
-    <div className="space-y-3">
-      <Video key={source.src} source={source} position={position} onRetry={onRetry} />
-      {sources.length > 1 ? (
-        <div className="flex items-center justify-end gap-2">
-          <span className="text-xs text-muted-foreground">清晰度</span>
-          <Select value={String(index)} onValueChange={value => setIndex(Number(value))}>
-            <SelectTrigger size="sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {sources.map((item, itemIndex) => (
-                <SelectItem key={item.src} value={String(itemIndex)}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function Video({
-  source,
-  position,
-  onRetry
-}: {
-  source: PlaySource
-  position: PlaybackPosition
-  onRetry: () => void
-}) {
+function PlaybackPlayer({ title, files }: { title: string; files: LibraryFile[] }) {
+  const [fileID, setFileID] = useState(files[0].id)
+  const file = files.find(item => item.id === fileID) ?? files[0]
+  const playback = usePlayback(file.id)
+  const [selectedSrc, setSelectedSrc] = useState<string>()
+  const [player, setPlayer] = useState<MediaPlayerInstance | null>(null)
   const [failed, setFailed] = useState(false)
-  const [startTime] = useState(position.read)
+  const [autoPlay, setAutoPlay] = useState(true)
+  const position = useRef(0)
+  const resumeTime = useRef<number | null>(0)
+  const sources = playback.data?.sources ?? []
+  const source = sources.find(item => item.src === selectedSrc) ?? sources[0]
+  const loading = playback.isPending || playback.isFetching
 
-  if (failed) {
-    return (
-      <PlayerError
-        message={
-          source.type === 'video/object'
-            ? '此文件无法直接播放，可切换 115 转码，或重新加载播放地址。'
-            : '播放中断，请重新加载播放地址。'
-        }
-        onRetry={onRetry}
-      />
-    )
+  const retry = () => {
+    resumeTime.current = position.current
+    setFailed(false)
+    setAutoPlay(true)
+    void playback.refetch()
   }
+
+  const fileControl =
+    files.length > 1 ? (
+      <div className="miyabi-player-file shrink-0">
+        <PlaybackSelect
+          player={player}
+          value={file.id}
+          onValueChange={value => {
+            position.current = 0
+            resumeTime.current = 0
+            setFailed(false)
+            setAutoPlay(true)
+            setSelectedSrc(undefined)
+            setFileID(value)
+          }}
+          icon={<ListVideoIcon />}
+          label="文件"
+        >
+          {files.map(item => (
+            <SelectItem key={item.id} value={item.id}>
+              <span className="truncate">
+                {item.name} · {formatSize(item.size)}
+              </span>
+            </SelectItem>
+          ))}
+        </PlaybackSelect>
+      </div>
+    ) : null
 
   return (
     <MediaPlayer
-      className="miyabi-player"
-      src={source.type === 'video/object' ? source.src : source}
+      ref={setPlayer}
+      className="miyabi-player dark"
+      title={title}
+      src={loading || playback.isError || failed ? undefined : source}
       viewType="video"
       streamType="on-demand"
-      autoPlay
+      autoPlay={autoPlay}
       playsInline
-      currentTime={startTime}
-      onTimeUpdate={detail => {
-        position.update(detail.currentTime)
+      onCanPlay={() => {
+        if (player && resumeTime.current !== null) {
+          player.remoteControl.seek(resumeTime.current)
+          resumeTime.current = null
+        }
       }}
-      onError={() => setFailed(true)}
+      onTimeUpdate={detail => {
+        if (resumeTime.current === null) position.current = detail.currentTime
+      }}
+      onError={() => {
+        resumeTime.current = position.current
+        setFailed(true)
+      }}
       onProviderChange={provider => {
         if (isHLSProvider(provider)) provider.library = () => import('hls.js')
       }}
     >
-      <MediaProvider loaders={[FileVideoLoader]} />
-      <DefaultVideoLayout
-        icons={defaultLayoutIcons}
-        translations={playerTranslations}
-        colorScheme="dark"
-        noModal
-      />
+      <MediaProvider />
+      {loading || playback.isError || failed ? (
+        <div className="absolute inset-0 z-20 cursor-auto">
+          {loading ? (
+            <PlayerLoading title={title} toolbar={fileControl} />
+          ) : (
+            <PlayerError
+              title={title}
+              error={playback.error ?? undefined}
+              message="播放中断，请重新加载播放地址。"
+              onRetry={retry}
+              toolbar={fileControl}
+            />
+          )}
+        </div>
+      ) : (
+        <DefaultVideoLayout
+          icons={defaultLayoutIcons}
+          translations={playerTranslations}
+          colorScheme="dark"
+          noModal
+          slots={{
+            topControlsGroupStart: <PlayerTitle title={title} />,
+            topControlsGroupCenter: fileControl,
+            topControlsGroupEnd: <PlayerCloseButton />,
+            chapterTitle: <div className="vds-controls-spacer" />,
+            beforeSettingsMenu:
+              sources.length > 1 && source ? (
+                <PlaybackSelect
+                  player={player}
+                  value={source.src}
+                  side="top"
+                  onValueChange={value => {
+                    resumeTime.current = position.current
+                    setAutoPlay(!player?.paused)
+                    setSelectedSrc(value)
+                  }}
+                >
+                  {sources.map(item => (
+                    <SelectItem key={item.src} value={item.src}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </PlaybackSelect>
+              ) : null
+          }}
+        />
+      )}
     </MediaPlayer>
+  )
+}
+
+function PlaybackSelect({
+  player,
+  value,
+  onValueChange,
+  side = 'bottom',
+  icon,
+  label,
+  children
+}: {
+  player: MediaPlayerInstance | null
+  value: string
+  onValueChange: (value: string) => void
+  side?: 'top' | 'bottom'
+  icon?: ReactNode
+  label?: string
+  children: ReactNode
+}) {
+  return (
+    <Select
+      value={value}
+      onValueChange={onValueChange}
+      onOpenChange={open => {
+        if (open) player?.controls.pause()
+        else player?.controls.resume()
+      }}
+    >
+      <SelectTrigger size="sm" className="miyabi-player-select max-w-full min-w-0">
+        {icon}
+        <SelectValue>{label}</SelectValue>
+      </SelectTrigger>
+      <SelectContent
+        container={player?.el}
+        position="popper"
+        align="end"
+        side={side}
+        collisionBoundary={player?.el}
+        collisionPadding={12}
+        className="max-w-[min(32rem,var(--radix-select-content-available-width))] bg-neutral-900/90 text-white ring-white/10 backdrop-blur-xl"
+      >
+        {children}
+      </SelectContent>
+    </Select>
   )
 }

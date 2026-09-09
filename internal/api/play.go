@@ -11,7 +11,7 @@ import (
 
 type PlayManager interface {
 	Files(context.Context, string) (service.PlayFiles, error)
-	Start(context.Context, string, bool) (service.Playback, error)
+	Start(context.Context, string) (service.Playback, error)
 	Stream(context.Context, string, int, string, http.Header) (*http.Response, error)
 	Release(string)
 }
@@ -39,18 +39,11 @@ func playStartHandler(play PlayManager) gin.HandlerFunc {
 		var uri struct {
 			ID string `uri:"id" binding:"required,numeric,max=30"`
 		}
-		var query struct {
-			Mode string `form:"mode,default=original" binding:"oneof=original hls"`
-		}
 		if err := c.ShouldBindUri(&uri); err != nil {
 			c.Error(BadRequest(err))
 			return
 		}
-		if err := c.ShouldBindQuery(&query); err != nil {
-			c.Error(BadRequest(err))
-			return
-		}
-		playback, err := play.Start(c.Request.Context(), uri.ID, query.Mode == "hls")
+		playback, err := play.Start(c.Request.Context(), uri.ID)
 		if err != nil {
 			c.Error(err)
 			return

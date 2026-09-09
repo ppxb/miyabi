@@ -63,7 +63,7 @@ func TestPlaybackRejectsSourceChangesAndUnknownResources(t *testing.T) {
 	for _, change := range []string{"login", "logout", "directory", "account", "release"} {
 		t.Run(change, func(t *testing.T) {
 			service, source := playFixture(t)
-			playback, err := service.createSession(source, 0, []pan.PlaySource{{URL: "https://cdn.example/video?sign=fixture"}}, false)
+			playback, err := service.createSession(source, 0, []pan.PlaySource{{URL: "https://cdn.example/playlist?sign=fixture", Height: 1080}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -144,15 +144,24 @@ segment.ts?signature=segment-fixture
 func TestPlaybackStreamPreservesRangeAndHead(t *testing.T) {
 	content := "0123456789fixture-video"
 	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/playlist" {
+			io.WriteString(writer, "#EXTM3U\n#EXTINF:5,\nvideo\n#EXT-X-ENDLIST\n")
+			return
+		}
 		writer.Header().Set("ETag", `"fixture"`)
 		http.ServeContent(writer, request, "video.mp4", time.Unix(100, 0), strings.NewReader(content))
 	}))
 	defer upstream.Close()
 	service, source := playFixture(t)
-	playback, err := service.createSession(source, 0, []pan.PlaySource{{URL: upstream.URL + "/video"}}, false)
+	playback, err := service.createSession(source, 0, []pan.PlaySource{{URL: upstream.URL + "/playlist", Height: 1080}})
 	if err != nil {
 		t.Fatal(err)
 	}
+	playlist, err := service.Stream(t.Context(), playback.ID, 0, http.MethodGet, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	playlist.Body.Close()
 	for _, test := range []struct {
 		method, byteRange, ifRange, contentRange, body string
 		status                                         int
@@ -163,7 +172,7 @@ func TestPlaybackStreamPreservesRangeAndHead(t *testing.T) {
 		{method: "GET", byteRange: "bytes=2-5", ifRange: `"changed"`, body: content, status: 200},
 		{method: "GET", byteRange: "bytes=1000-", contentRange: "bytes */23", status: 416},
 	} {
-		response, err := service.Stream(t.Context(), playback.ID, 0, test.method, http.Header{"Range": {test.byteRange}, "If-Range": {test.ifRange}})
+		response, err := service.Stream(t.Context(), playback.ID, 1, test.method, http.Header{"Range": {test.byteRange}, "If-Range": {test.ifRange}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -193,9 +202,12 @@ func TestPlaybackRewritesRedirectedExtensionlessPlaylists(t *testing.T) {
 	}))
 	defer upstream.Close()
 	service, source := playFixture(t)
-	playback, err := service.createSession(source, 0, []pan.PlaySource{{URL: upstream.URL + "/start", Height: 1080}}, true)
+	playback, err := service.createSession(source, 0, []pan.PlaySource{{URL: upstream.URL + "/start", Height: 1080}})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(playback.Sources) != 1 || playback.Sources[0].Type != "application/x-mpegurl" || playback.Sources[0].Label != "1080p" {
+		t.Fatalf("unexpected HLS source: %#v", playback.Sources)
 	}
 	for _, index := range []int{0, 1} {
 		response, err := service.Stream(t.Context(), playback.ID, index, "GET", nil)
@@ -213,9 +225,13 @@ func TestPlaybackRewritesRedirectedExtensionlessPlaylists(t *testing.T) {
 	}
 }
 
-func TestPlaybackReleaseCancelsStreamingWithoutBufferingWholeVideo(t *testing.T) {
+func TestPlaybackReleaseCancelsStreamingWithoutBufferingWholeSegment(t *testing.T) {
 	finished := make(chan struct{})
 	upstream := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/playlist" {
+			io.WriteString(writer, "#EXTM3U\n#EXTINF:5,\nvideo\n#EXT-X-ENDLIST\n")
+			return
+		}
 		defer close(finished)
 		io.WriteString(writer, "video-prefix")
 		writer.(http.Flusher).Flush()
@@ -223,13 +239,18 @@ func TestPlaybackReleaseCancelsStreamingWithoutBufferingWholeVideo(t *testing.T)
 	}))
 	defer upstream.Close()
 	service, source := playFixture(t)
-	playback, err := service.createSession(source, 0, []pan.PlaySource{{URL: upstream.URL + "/video"}}, false)
+	playback, err := service.createSession(source, 0, []pan.PlaySource{{URL: upstream.URL + "/playlist", Height: 1080}})
 	if err != nil {
 		t.Fatal(err)
 	}
+	playlist, err := service.Stream(t.Context(), playback.ID, 0, http.MethodGet, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	playlist.Body.Close()
 	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
-	response, err := service.Stream(ctx, playback.ID, 0, "GET", nil)
+	response, err := service.Stream(ctx, playback.ID, 1, "GET", nil)
 	if err != nil {
 		t.Fatalf("stream waited for the full video: %v", err)
 	}

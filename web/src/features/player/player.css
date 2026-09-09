@@ -1,14 +1,128 @@
 .miyabi-player {
-  --video-border-radius: var(--radius-xl);
+  --video-border: 0;
+  --video-border-radius: 1rem;
   --video-font-family: var(--font-sans);
+  --media-button-size: 32px;
+  --media-fullscreen-button-size: 32px;
+  --media-sm-fullscreen-button-size: 32px;
+  --video-sm-button-size: 32px;
+  --media-button-icon-size: 20px;
+  --media-button-border-radius: 9999px;
+  --media-button-hover-transform: none;
+  --media-time-font-size: 12px;
+  --video-sm-time-font-size: 12px;
+  --video-fullscreen-time-font-size: 12px;
+  --media-slider-track-height: 3px;
+  --media-slider-thumb-size: 10px;
+  --media-menu-bg: rgb(28 28 30 / 0.94);
+  --media-menu-border: 0;
+  --media-menu-border-radius: 1rem;
+  --media-controls-in-transition: opacity 180ms ease-out, visibility 0s;
+  --media-controls-out-transition: opacity 360ms ease-out, visibility 0s linear 360ms;
   width: 100%;
+  height: 100%;
   aspect-ratio: 16 / 9;
+  border-radius: var(--video-border-radius);
+  background: black;
 }
 
-.miyabi-player:not([data-fullscreen]) {
-  max-height: 65dvh;
+.miyabi-player[data-fullscreen] {
+  --video-border-radius: 0;
 }
 
 .miyabi-player [data-media-provider] video {
   object-fit: contain;
+}
+
+/* Keep the gradient mounted while opacity fades, and hide visibility only after the fade. */
+.miyabi-player .vds-video-layout .vds-controls {
+  border-radius: var(--video-border-radius);
+  background-image: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 0.3),
+    transparent 25%,
+    transparent 65%,
+    rgb(0 0 0 / 0.2)
+  );
+}
+
+.miyabi-player .vds-video-layout .vds-controls-group:first-child {
+  gap: 0.5rem;
+  padding: 1rem;
+}
+
+.miyabi-player .vds-controls-group:first-child > .vds-controls-spacer {
+  display: none;
+}
+
+.miyabi-player .vds-video-layout .vds-controls-group:nth-last-child(2),
+.miyabi-player .vds-video-layout .vds-controls-group:last-child {
+  align-self: center;
+  width: calc(100% - 2.5rem);
+  max-width: 36rem;
+  background: rgb(24 24 27 / 0.5);
+  backdrop-filter: blur(32px) saturate(160%);
+}
+
+.miyabi-player .vds-video-layout .vds-controls-group:nth-last-child(2) {
+  margin: 0;
+  padding: 0.125rem 0.75rem 0;
+  border-radius: 0.875rem 0.875rem 0 0;
+}
+
+.miyabi-player .vds-video-layout .vds-controls-group:last-child {
+  margin: 0 0 1rem;
+  padding: 0 0.375rem 0.25rem;
+  border-radius: 0 0 0.875rem 0.875rem;
+}
+
+.miyabi-player .vds-time-slider {
+  --media-slider-height: 24px;
+}
+
+.miyabi-player .miyabi-player-select {
+  flex-shrink: 0;
+  height: 1.75rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  border: 0;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.08);
+  color: white;
+}
+
+.miyabi-player .miyabi-player-select:hover {
+  background: rgb(255 255 255 / 0.16);
+}
+
+.miyabi-player-select [data-slot='select-value'] {
+  min-width: 0;
+}
+
+.miyabi-player-select > svg {
+  color: rgb(255 255 255 / 0.7);
+}
+
+.miyabi-player .vds-video-layout[data-sm] .vds-controls-group:first-child {
+  gap: 0.25rem;
+  padding: 0.75rem;
+}
+
+.miyabi-player:not([data-started]) .vds-video-layout[data-sm] .vds-controls-group:first-child {
+  opacity: 1;
+  visibility: inherit;
+}
+
+.miyabi-player .vds-video-layout[data-sm] .miyabi-player-file [data-slot='select-value'] {
+  display: none;
+}
+
+.miyabi-player .vds-video-layout[data-sm] .vds-controls-group:nth-last-child(2),
+.miyabi-player .vds-video-layout[data-sm] .vds-controls-group:last-child {
+  width: calc(100% - 1.5rem);
+}
+
+.miyabi-player .vds-video-layout[data-sm] .vds-controls-group:last-child {
+  margin-bottom: 0.75rem;
 }

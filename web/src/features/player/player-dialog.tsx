@@ -1,12 +1,6 @@
 import { lazy, Suspense } from 'react'
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useUIStore } from '@/stores/ui'
 import { PlayerLoading } from './player-status'
 
@@ -27,13 +21,10 @@ export function PlayerDialog() {
       }}
     >
       <DialogContent
-        className="max-h-[92dvh] gap-4 overflow-y-auto rounded-3xl p-4 sm:max-w-5xl sm:p-6"
+        className="dark aspect-video w-[min(72rem,calc(100vw-2rem),calc(88dvh*16/9))] max-w-none gap-0 overflow-hidden rounded-2xl bg-black p-0 text-white ring-0 sm:max-w-none"
+        showCloseButton={false}
         onPointerDownOutside={event => event.preventDefault()}
       >
-        <DialogHeader className="min-w-0 pr-8">
-          <DialogTitle className="truncate">{code} · 播放</DialogTitle>
-          <DialogDescription>可选择原文件播放或 115 转码。</DialogDescription>
-        </DialogHeader>
         <Suspense fallback={<PlayerLoading />}>
           <MoviePlayer key={code} code={code} />
         </Suspense>

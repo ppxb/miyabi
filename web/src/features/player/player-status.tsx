@@ -1,26 +1,66 @@
+import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
-import { LoaderCircleIcon } from 'lucide-react'
+import { LoaderCircleIcon, XIcon } from 'lucide-react'
 
 import { ApiError } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { useUIStore } from '@/stores/ui'
 
-export function PlayerLoading() {
+export function PlayerCloseButton() {
+  const close = useUIStore(state => state.closePlayer)
+
   return (
-    <div className="grid aspect-video max-h-[65dvh] place-items-center rounded-xl bg-muted">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      className="cursor-pointer rounded-full bg-white/10 text-white backdrop-blur-xl hover:bg-white/20 hover:text-white dark:hover:bg-white/20"
+      onClick={close}
+    >
+      <XIcon />
+    </Button>
+  )
+}
+
+type PlayerHeaderProps = {
+  title?: string
+  toolbar?: ReactNode
+}
+
+export function PlayerTitle({ title }: { title?: string }) {
+  return <p className="min-w-0 flex-1 truncate text-sm font-medium text-white/90">{title}</p>
+}
+
+function PlayerStatus({ children, title, toolbar }: PlayerHeaderProps & { children: ReactNode }) {
+  return (
+    <div className="relative grid aspect-video size-full place-items-center bg-black px-6 pt-16 pb-6 text-white">
+      <div className="absolute inset-x-0 top-0 flex min-w-0 items-center gap-2 p-3 sm:p-4">
+        <PlayerTitle title={title} />
+        {toolbar}
+        <PlayerCloseButton />
+      </div>
+      {children}
+    </div>
+  )
+}
+
+export function PlayerLoading({ title, toolbar }: PlayerHeaderProps) {
+  return (
+    <PlayerStatus title={title} toolbar={toolbar}>
+      <div className="flex items-center gap-2 text-sm text-white/60">
         <LoaderCircleIcon className="size-5 animate-spin" />
         正在准备播放…
       </div>
-    </div>
+    </PlayerStatus>
   )
 }
 
 export function PlayerError({
   error,
   message = '加载失败，请检查服务后重试。',
-  onRetry
-}: {
+  onRetry,
+  title,
+  toolbar
+}: PlayerHeaderProps & {
   error?: Error
   message?: string
   onRetry: () => void
@@ -40,9 +80,9 @@ export function PlayerError({
             : message
 
   return (
-    <div className="grid aspect-video max-h-[65dvh] place-items-center rounded-xl bg-muted p-5">
+    <PlayerStatus title={title} toolbar={toolbar}>
       <div className="max-w-md space-y-4 text-center">
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <p className="text-sm text-white/60">{description}</p>
         <div className="flex flex-wrap justify-center gap-2">
           {needsSettings ? (
             <Button asChild size="sm">
@@ -56,6 +96,6 @@ export function PlayerError({
           </Button>
         </div>
       </div>
-    </div>
+    </PlayerStatus>
   )
 }

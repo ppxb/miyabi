@@ -84,7 +84,7 @@ func (service *PlayService) Files(ctx context.Context, code string) (PlayFiles, 
 	return result, nil
 }
 
-func (service *PlayService) Start(ctx context.Context, fileID string, hls bool) (Playback, error) {
+func (service *PlayService) Start(ctx context.Context, fileID string) (Playback, error) {
 	drive := service.library.drive
 	drive.mu.Lock()
 	defer drive.mu.Unlock()
@@ -109,7 +109,7 @@ func (service *PlayService) Start(ctx context.Context, fileID string, hls bool) 
 		return Playback{}, fmt.Errorf("115 returned no pick code for video")
 	}
 	sources, err := withPanToken(ctx, drive, func(token string) ([]pan.PlaySource, error) {
-		return drive.client.PlayURL(ctx, token, info.PickCode, hls)
+		return drive.client.PlayURL(ctx, token, info.PickCode)
 	})
 	if err != nil {
 		return Playback{}, fmt.Errorf("get 115 playback URL: %w", err)
@@ -117,10 +117,10 @@ func (service *PlayService) Start(ctx context.Context, fileID string, hls bool) 
 	if err := ctx.Err(); err != nil {
 		return Playback{}, err
 	}
-	return service.createSession(source, drive.authorizationVersion, sources, hls)
+	return service.createSession(source, drive.authorizationVersion, sources)
 }
 
-func (service *PlayService) createSession(source LibrarySource, version uint64, sources []pan.PlaySource, hls bool) (Playback, error) {
+func (service *PlayService) createSession(source LibrarySource, version uint64, sources []pan.PlaySource) (Playback, error) {
 	session := &playSession{id: uuid.NewString(), source: source, version: version, byURL: make(map[string]int)}
 	result := Playback{ID: session.id, Sources: make([]MediaSource, 0, len(sources))}
 	for _, source := range sources {
@@ -128,17 +128,13 @@ func (service *PlayService) createSession(source LibrarySource, version uint64, 
 		if err != nil {
 			return Playback{}, fmt.Errorf("115 returned an invalid playback URL")
 		}
-		local, err := session.register(address, hls)
+		local, err := session.register(address, true)
 		if err != nil {
 			return Playback{}, err
 		}
-		item := MediaSource{Src: local, Type: "video/object", Label: "原文件"}
-		if hls {
-			item.Type = "application/x-mpegurl"
-			item.Label = fmt.Sprintf("%dp", source.Height)
-			if source.Definition == 100 {
-				item.Label = "原画 · " + item.Label
-			}
+		item := MediaSource{Src: local, Type: "application/x-mpegurl", Label: fmt.Sprintf("%dp", source.Height)}
+		if source.Definition == 100 {
+			item.Label = "原画 · " + item.Label
 		}
 		result.Sources = append(result.Sources, item)
 	}
