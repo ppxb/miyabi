@@ -25,16 +25,23 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
+	if err := run(os.Args[1:]); err != nil {
 		slog.Error("miyabi stopped", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
-	cfg, err := config.Load(os.Args[1:])
+func run(args []string) error {
+	healthcheck := len(args) > 0 && args[0] == "healthcheck"
+	if healthcheck {
+		args = args[1:]
+	}
+	cfg, err := config.Load(args)
 	if err != nil {
 		return err
+	}
+	if healthcheck {
+		return checkHealth(cfg.Listen)
 	}
 
 	logger, err := logging.New(os.Stdout, cfg.LogLevel)

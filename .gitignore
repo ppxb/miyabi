@@ -14,7 +14,6 @@ coverage.*
 config.local.*
 .env
 .env.*
-!.env.example
 
 /web/node_modules/
 /web/dist/

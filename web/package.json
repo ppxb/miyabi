@@ -8,6 +8,7 @@
     "dev:all": "concurrently --kill-others --names web,api --prefix-colors cyan,magenta \"vite\" \"go -C .. run -tags=dev ./cmd/miyabi\"",
     "prebuild": "tsr generate",
     "build": "tsc && vite build",
+    "test": "node --experimental-transform-types --test tests/*.test.mjs",
     "lint": "oxlint src",
     "lint:fix": "oxlint src --fix",
     "fmt": "oxfmt src",

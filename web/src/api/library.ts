@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError, apiGet, apiPost } from '@/api/client'
 import { panKeys, type PanAccountStatus } from '@/api/pan'
@@ -47,7 +47,6 @@ export function useLibraryMovies(page: number) {
   return useQuery({
     queryKey: libraryKeys.movies(page),
     queryFn: ({ signal }) => apiGet<LibraryPage>('/api/library/movies', { page }, signal),
-    placeholderData: keepPreviousData,
     retry: false,
     refetchOnWindowFocus: false
   })
@@ -62,7 +61,6 @@ export function useLibraryFiles(movieID: number | undefined, unmatched: boolean,
         { movie_id: movieID, unmatched: unmatched ? 'true' : undefined, page },
         signal
       ),
-    placeholderData: keepPreviousData,
     retry: false,
     refetchOnWindowFocus: false
   })

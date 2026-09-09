@@ -10,6 +10,7 @@ import { MovieGridLayout } from '@/components/movie/movie-grid'
 import { MovieGridSkeleton } from '@/components/movie/movie-grid-skeleton'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { LibraryFilesDialog } from '@/features/library/files-dialog'
 import { LibraryMovieCard } from '@/features/library/movie-card'
@@ -46,7 +47,9 @@ export function LibraryPage({
   return (
     <AppPage>
       <PageHeader title="媒体库" description="来自 115 网盘的影片索引" inlineActions>
-        {source ? (
+        {library.isPending ? (
+          <Skeleton className="h-9 w-9 rounded-4xl sm:w-30" />
+        ) : source ? (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -89,8 +92,8 @@ export function LibraryPage({
         </div>
       ) : null}
 
-      {library.isPending || library.isPlaceholderData ? (
-        <MovieGridSkeleton count={library.data?.movies.length} />
+      {library.isPending ? (
+        <MovieGridSkeleton />
       ) : library.isError ? (
         <EmptyState
           emoji="(･o･;)"

@@ -23,7 +23,9 @@ WORKDIR /build
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 
-COPY . .
+COPY cmd ./cmd
+COPY internal ./internal
+COPY embed.go embed_dev.go ./
 COPY --from=web-builder /build/web/dist ./web/dist
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -31,17 +33,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM debian:bookworm-slim AS runtime
 
-ARG VERSION=dev
-ARG REVISION=unknown
-
-LABEL org.opencontainers.image.title="Miyabi" \
-      org.opencontainers.image.description="JavDB media library with 115 cloud playback" \
-      org.opencontainers.image.source="https://github.com/ppxb/miyabi" \
-      org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.revision="${REVISION}"
-
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 miyabi \
     && useradd --uid 10001 --gid miyabi --create-home --home-dir /app miyabi \
@@ -59,6 +52,15 @@ VOLUME ["/app/data"]
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl --fail --silent http://127.0.0.1:8080/api/health || exit 1
+    CMD ["/app/miyabi", "healthcheck"]
 
 ENTRYPOINT ["/app/miyabi"]
+
+ARG VERSION=dev
+ARG REVISION=unknown
+
+LABEL org.opencontainers.image.title="Miyabi" \
+      org.opencontainers.image.description="JavDB media library with 115 cloud playback" \
+      org.opencontainers.image.source="https://github.com/ppxb/miyabi" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}"

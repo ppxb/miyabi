@@ -120,7 +120,7 @@ function BrowseResults({
   return (
     <DiscoverResults
       movies={movies.data}
-      loading={movies.isPending || movies.isPlaceholderData}
+      loading={movies.isPending}
       fetching={movies.isFetching}
       error={movies.isError}
       searching={false}

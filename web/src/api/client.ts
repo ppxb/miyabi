@@ -57,8 +57,24 @@ export function imageURL(source: string) {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init)
   if (!response.ok) {
-    const payload = (await response.json()) as { error: string }
-    throw new ApiError(payload.error, response.status)
+    let message = response.statusText || `请求失败（HTTP ${response.status}）`
+    try {
+      const payload: unknown = await response.json()
+      if (
+        payload !== null &&
+        typeof payload === 'object' &&
+        'error' in payload &&
+        typeof payload.error === 'string' &&
+        payload.error.trim()
+      ) {
+        message = payload.error.trim()
+      }
+    } catch (error) {
+      if (init?.signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
+        throw error
+      }
+    }
+    throw new ApiError(message, response.status)
   }
   return response.json() as Promise<T>
 }

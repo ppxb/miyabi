@@ -1,10 +1,4 @@
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type QueryClient
-} from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
 import { apiGet, apiPost, apiPut } from '@/api/client'
 
@@ -156,7 +150,6 @@ export function useDiscoverMovies(params: BrowseMoviesParams, enabled = true) {
     ...discoverQueryDefaults,
     queryKey: discoverKeys.movies(params),
     enabled,
-    placeholderData: keepPreviousData,
     queryFn: ({ signal }) =>
       apiGet<DiscoverMovie[]>(
         '/api/discover/movies',
@@ -222,8 +215,7 @@ export function useSearchMovies(params: SearchMoviesParams) {
         },
         signal
       ),
-    enabled: query.length > 0,
-    placeholderData: keepPreviousData
+    enabled: query.length > 0
   })
 }
 

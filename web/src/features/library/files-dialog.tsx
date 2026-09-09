@@ -37,7 +37,7 @@ function LibraryFilesList() {
   const [page, setPage] = useState(1)
   const files = useLibraryFiles(undefined, true, page)
 
-  if (files.isPending || files.isPlaceholderData) {
+  if (files.isPending) {
     return (
       <div className="max-h-[50dvh] divide-y divide-border overflow-hidden">
         {Array.from({ length: 6 }, (_, index) => (
