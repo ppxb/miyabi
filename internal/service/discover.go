@@ -132,7 +132,7 @@ func NewDiscoverService(
 		javdb:    client,
 		lists:    newResponseCache[[]javdb.Movie](128, time.Minute),
 		details:  newResponseCache[javdb.MovieDetail](256, 5*time.Minute),
-		tags:     newResponseCache[[]javdb.TagCategory](4, 24*time.Hour),
+		tags:     newResponseCache[[]javdb.TagCategory](5, 24*time.Hour),
 		magnets:  newResponseCache[[]javdb.Magnet](64, time.Minute),
 		route: JavDBRouteStatus{
 			Host:      route.Host,
@@ -179,7 +179,14 @@ func (service *DiscoverService) Browse(
 
 func (service *DiscoverService) MovieDetail(ctx context.Context, movieID string) (DiscoverMovieDetail, error) {
 	movie, err := cachedJavDB(ctx, service, service.details, movieID, func(ctx context.Context) (javdb.MovieDetail, error) {
-		return service.javdb.MovieDetail(ctx, movieID)
+		detail, err := service.javdb.MovieDetail(ctx, movieID)
+		if err != nil {
+			return javdb.MovieDetail{}, err
+		}
+		if err := service.completeMovieTags(ctx, &detail); err != nil {
+			return javdb.MovieDetail{}, err
+		}
+		return detail, nil
 	})
 	if err != nil {
 		return DiscoverMovieDetail{}, fmt.Errorf("get JavDB movie detail: %w", err)

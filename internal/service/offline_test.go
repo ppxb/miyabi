@@ -119,7 +119,8 @@ func TestOfflineCompletionAndTargetedScanCommitTogether(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if target.TargetID != "download-folder" || target.OfflineTaskID != record.ID || target.Source.AccountID != source.AccountID || target.Source.Directory.ID != source.Directory.ID {
+	if target.TargetID != "download-folder" || target.OfflineTaskID != record.ID || target.Source.AccountID != source.AccountID || target.Source.Directory.ID != source.Directory.ID ||
+		target.Code != saved.Code || target.JavDBID != saved.JavDBID {
 		t.Fatalf("scan scope: %#v", target)
 	}
 	// A previously queued full scan must not swallow the completed download.

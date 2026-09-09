@@ -37,7 +37,7 @@ export function DiscoverResults({
       />
     )
   }
-  if (loading || !movies) return <MovieGridSkeleton count={8} />
+  if (loading || !movies) return <MovieGridSkeleton count={DISCOVER_PAGE_SIZE} />
   if (movies.length === 0 && page === 1) {
     return <EmptyState emoji="(･o･;)" title={searching ? '没有搜索结果' : '暂无内容'} />
   }

@@ -1,10 +1,11 @@
-import { FileVideoIcon, LoaderCircleIcon } from 'lucide-react'
+import { FileVideoIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
 import { useLibraryFiles } from '@/api/library'
 import { ListPagination } from '@/components/list-pagination'
 import { OverflowTooltip } from '@/components/overflow-tooltip'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Dialog,
   DialogContent,
@@ -36,8 +37,21 @@ function LibraryFilesList() {
   const [page, setPage] = useState(1)
   const files = useLibraryFiles(undefined, true, page)
 
-  if (files.isPending) {
-    return <LoaderCircleIcon className="mx-auto my-8 size-6 animate-spin" />
+  if (files.isPending || files.isPlaceholderData) {
+    return (
+      <div className="max-h-[50dvh] divide-y divide-border overflow-hidden">
+        {Array.from({ length: 6 }, (_, index) => (
+          <div key={index} className="flex items-center gap-3 py-3">
+            <Skeleton className="size-5 shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+            <Skeleton className="h-3 w-12" />
+          </div>
+        ))}
+      </div>
+    )
   }
   if (files.isError) {
     return (

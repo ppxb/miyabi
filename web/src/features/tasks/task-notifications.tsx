@@ -1,4 +1,3 @@
-import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 
@@ -13,7 +12,6 @@ export function TaskNotifications() {
   const tasks = useTasks()
   const activity = useOfflineActivity()
   const connection = useTaskConnection()
-  const navigate = useNavigate()
   const previous = useRef(new Map<string, NotificationState>())
   const dismissed = useRef(new Set<string>())
   const scope = useRef<string | undefined>(undefined)
@@ -50,10 +48,6 @@ export function TaskNotifications() {
       return {
         onDismiss: () => {
           dismissed.current.add(id)
-        },
-        onView: () => {
-          dismissed.current.add(id)
-          void navigate({ to: '/' })
         }
       }
     }
@@ -119,7 +113,7 @@ export function TaskNotifications() {
     }
     previous.current = current
     initialized.current = true
-  }, [tasks.data, tasks.isError, activity.data, activity.isError, connection.status, navigate])
+  }, [tasks.data, tasks.isError, activity.data, activity.isError, connection.status])
 
   return null
 }

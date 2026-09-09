@@ -64,7 +64,12 @@ func errorMiddleware(logger *slog.Logger) gin.HandlerFunc {
 			status = http.StatusUnauthorized
 		}
 
-		c.AbortWithStatusJSON(status, gin.H{"error": err.Error()})
+		message := err.Error()
+		var public interface{ PublicMessage() string }
+		if errors.As(err, &public) {
+			message = public.PublicMessage()
+		}
+		c.AbortWithStatusJSON(status, gin.H{"error": message})
 	}
 }
 

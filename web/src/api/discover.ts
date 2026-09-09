@@ -10,7 +10,7 @@ import { apiGet, apiPost, apiPut } from '@/api/client'
 
 export type MovieState = 'not_in_library' | 'saving' | 'in_library'
 export type ReleaseStatus = 'unknown' | 'released' | 'upcoming'
-export type JavDBZone = 'censored' | 'uncensored' | 'western' | 'fc2'
+export type JavDBZone = 'censored' | 'uncensored' | 'western' | 'fc2' | 'anime'
 export type JavDBEntityType = 'actor' | 'series' | 'maker' | 'director'
 
 export type MovieReference = {

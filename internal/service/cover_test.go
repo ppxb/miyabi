@@ -7,6 +7,17 @@ import (
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
+func TestFindDirectoryNFOMatchesCatalogueAlias(t *testing.T) {
+	directory := movieDirectory{Shared: true, Files: []pan.File{
+		{ID: "different", Name: "LUXU-1099.nfo"},
+		{ID: "alias", Name: "259LUXU-1899.nfo"},
+	}}
+	entry, found := findDirectoryNFO("LUXU-1899", directory)
+	if !found || entry.ID != "alias" {
+		t.Fatalf("matching alias NFO was not found: %#v, %v", entry, found)
+	}
+}
+
 func TestCoverRetryPreservesEditsAndRecognizesItsOwnWriteback(t *testing.T) {
 	poster, fanart := []byte("fixture poster"), []byte("fixture fanart")
 	origin := artworkOrigin{

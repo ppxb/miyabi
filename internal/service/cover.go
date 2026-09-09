@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
@@ -21,6 +22,8 @@ func (service *ScrapeService) Cover(ctx context.Context, job TaskJob) error {
 	if input.Snapshot != nil {
 		return nil
 	}
+	input.Code = codeid.Normalize(input.Code)
+	input.Document.Code = codeid.Normalize(input.Document.Code)
 	version, err := service.begin(ctx, input.metadataPayload)
 	if err != nil {
 		return err
@@ -106,7 +109,7 @@ func (service *ScrapeService) Cover(ctx context.Context, job TaskJob) error {
 		return err
 	}
 	if err := ent.WithTx(ctx, service.library.database, func(tx *ent.Tx) error {
-		if err := tx.Movie.UpdateOneID(input.MovieID).
+		if err := tx.Movie.UpdateOneID(input.MovieID).SetCode(input.Code).
 			SetCover(artwork.Thumbnail).SetPoster(artwork.Poster).SetFanarts([]string{artwork.Fanart}).
 			SetScrapeStatus(movie.ScrapeStatusDone).Exec(ctx); err != nil {
 			return err

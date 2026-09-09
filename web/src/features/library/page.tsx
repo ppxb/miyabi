@@ -89,8 +89,8 @@ export function LibraryPage({
         </div>
       ) : null}
 
-      {library.isPending ? (
-        <MovieGridSkeleton />
+      {library.isPending || library.isPlaceholderData ? (
+        <MovieGridSkeleton count={library.data?.movies.length} />
       ) : library.isError ? (
         <EmptyState
           emoji="(･o･;)"

@@ -13,6 +13,7 @@ var zoneCodes = map[Zone]int{
 	ZoneUncensored: 1,
 	ZoneWestern:    2,
 	ZoneFC2:        3,
+	ZoneAnime:      4,
 }
 
 // Search searches JavDB's movie catalogue.
@@ -60,7 +61,7 @@ func buildSearchParams(keyword string, options SearchOptions) (url.Values, error
 	if zone != ZoneAll {
 		code, ok := zoneCodes[zone]
 		if !ok {
-			return nil, errors.New("JavDB zone must be censored, uncensored, western, fc2, or all")
+			return nil, errors.New("JavDB zone must be censored, uncensored, western, fc2, anime, or all")
 		}
 		params.Set("movie_type", strconv.Itoa(code))
 	}

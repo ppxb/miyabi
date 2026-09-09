@@ -2,6 +2,7 @@
   --video-border: 0;
   --video-border-radius: var(--radius-2xl);
   --video-font-family: var(--font-sans);
+  --media-font-family: var(--font-sans);
   --video-brand: var(--primary);
   --video-controls-color: var(--foreground);
   --video-focus-ring-color: var(--ring);
@@ -23,6 +24,11 @@
   --media-slider-track-fill-bg: var(--primary);
   --media-slider-thumb-bg: var(--primary);
   --media-slider-thumb-size: 10px;
+  --media-slider-value-bg: var(--foreground);
+  --media-slider-value-color: var(--background);
+  --media-slider-value-border-radius: var(--radius-2xl);
+  --media-slider-value-padding: 0.375rem 0.75rem;
+  --video-time-bg: var(--foreground);
   --media-menu-bg: color-mix(in oklch, var(--popover) 90%, transparent);
   --media-menu-border: 0;
   --media-menu-border-radius: var(--radius-2xl);
@@ -170,6 +176,17 @@
 
 .miyabi-player .vds-time-slider {
   --media-slider-height: 24px;
+}
+
+.miyabi-player .vds-slider-value {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.miyabi-player .vds-video-layout .vds-time-slider .vds-slider-value {
+  text-shadow: none;
 }
 
 .miyabi-player .vds-video-layout[data-sm] .vds-controls-group:first-child {

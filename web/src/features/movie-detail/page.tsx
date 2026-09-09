@@ -25,7 +25,7 @@ export function MovieDetailPage({ movieId }: { movieId: string }) {
             <p className="text-sm text-destructive">刷新失败，请重试。</p>
           ) : null}
           <MovieHero movie={detail.data} />
-          <MoviePreviews code={detail.data.code} images={detail.data.preview_images} />
+          <MoviePreviews images={detail.data.preview_images} />
           <MovieMagnets movieID={movieId} query={magnets} />
           <MovieRecommendations title="TA（们）还出演过" movies={detail.data.actor_movies} />
           <MovieRecommendations title="你可能也喜欢" movies={detail.data.related_movies} />

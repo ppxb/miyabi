@@ -59,6 +59,42 @@ func identifyVideo(file pan.File) scanVideo {
 	return scanVideo{File: file, Code: code}
 }
 
+func (service *LibraryService) identifyScanVideos(ctx context.Context, payload scanPayload, entries []pan.File) (map[string]scanVideo, error) {
+	videos := make(map[string]scanVideo)
+	var ids []string
+	for _, entry := range entries {
+		if entry.IsDirectory || !isVideo(entry.Name) {
+			continue
+		}
+		if payload.OfflineTaskID != 0 && payload.TargetID != "" {
+			videos[entry.ID] = scanVideo{File: entry, Code: codeid.Normalize(payload.Code)}
+		} else {
+			videos[entry.ID] = identifyVideo(entry)
+			ids = append(ids, entry.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return videos, nil
+	}
+	// An unchanged 115 file keeps its verified catalogue identity. Read these
+	// associations in a batch so a rescan does not need to infer filename aliases.
+	known, err := service.database.File.Query().Where(file.FileIDIn(ids...), file.AccountIDEQ(payload.Source.AccountID),
+		file.HasMovieWith(movie.JavdbIDNotNil())).
+		Select(file.FieldFileID, file.FieldName, file.FieldSize, file.FieldSha1, file.FieldMovieID).
+		WithMovie(func(q *ent.MovieQuery) { q.Select(movie.FieldCode) }).All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load known video identities: %w", err)
+	}
+	for _, old := range known {
+		video := videos[old.FileID]
+		if old.Name == video.Name && old.Size == video.Size && old.Sha1 == video.SHA1 {
+			video.Code = old.Edges.Movie.Code
+			videos[old.FileID] = video
+		}
+	}
+	return videos, nil
+}
+
 func (service *LibraryService) StartScan(ctx context.Context) (TaskInfo, error) {
 	service.drive.mu.Lock()
 	defer service.drive.mu.Unlock()
@@ -90,6 +126,9 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 	if err != nil {
 		return err
 	}
+	if payload.OfflineTaskID != 0 && (payload.TargetID == "" || payload.JavDBID == "" || payload.Code == "") {
+		return fmt.Errorf("离线扫描缺少下载位置或 JavDB 影片信息")
+	}
 	// Index reconciliation and the next jobs commit together. A restart after
 	// that commit only needs to finish this task, not enqueue the jobs again.
 	if payload.Scan.Stage == "done" {
@@ -119,16 +158,20 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 		if err != nil {
 			return fmt.Errorf("read completed download: %w", err)
 		}
+		if payload.OfflineTaskID != 0 && info.ID == source.Directory.ID {
+			return fmt.Errorf("115 返回的是媒体根目录，无法确定本次下载的影片文件")
+		}
 		payload.TargetPath = fileInfoPath(info)
 		payload.TargetFile = !info.IsDirectory
 		if payload.TargetFile {
 			if !isVideo(info.Name) {
 				return fmt.Errorf("115 下载结果不是视频文件")
 			}
-			video := identifyVideo(info.File)
-			if video.Code == "" {
-				video.Code = payload.Code
+			videos, err := service.identifyScanVideos(ctx, payload, []pan.File{info.File})
+			if err != nil {
+				return err
 			}
+			video := videos[info.ID]
 			payload.Scan.FilesScanned, payload.Scan.VideoFiles = 1, 1
 			if video.Code != "" {
 				payload.Scan.MatchedFiles, payload.Scan.Movies = 1, 1
@@ -178,6 +221,10 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 			if page.Total != total || (len(page.Files) == 0 && page.HasMore) {
 				return fmt.Errorf("目录 %s 的内容在扫描期间发生变化或分页不完整，请重新扫描", directory.path)
 			}
+			identified, err := service.identifyScanVideos(ctx, payload, page.Files)
+			if err != nil {
+				return err
+			}
 			videos := make([]scanVideo, 0, len(page.Files))
 			observed[directory.id] = append(observed[directory.id], page.Files...)
 			for _, entry := range page.Files {
@@ -197,7 +244,7 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 				if !isVideo(entry.Name) {
 					continue
 				}
-				video := identifyVideo(entry)
+				video := identified[entry.ID]
 				payload.Scan.VideoFiles++
 				if video.Code != "" {
 					videos = append(videos, video)
@@ -328,7 +375,15 @@ func (service *LibraryService) indexScanPage(ctx context.Context, taskID int, sc
 					previousMovies = append(previousMovies, *entry.MovieID)
 				}
 			}
-			if len(codes) > 0 {
+			if len(codes) > 0 && payload.OfflineTaskID != 0 && payload.TargetID != "" {
+				id, err := indexDownloadedMovie(ctx, tx, *payload)
+				if err != nil {
+					return err
+				}
+				for code := range codes {
+					codes[code] = id
+				}
+			} else if len(codes) > 0 {
 				builders := make([]*ent.MovieCreate, 0, len(codes))
 				numbers := make([]string, 0, len(codes))
 				for code := range codes {
@@ -387,6 +442,27 @@ func (service *LibraryService) indexScanPage(ctx context.Context, taskID int, sc
 		service.tasks.Notify()
 	}
 	return nil
+}
+
+func indexDownloadedMovie(ctx context.Context, tx *ent.Tx, payload scanPayload) (int, error) {
+	code := codeid.Normalize(payload.Code)
+	// Persist the source ID with the file index, before metadata work starts,
+	// so another scan can reuse this association even while scraping is queued.
+	if err := tx.Movie.Create().SetCode(code).SetJavdbID(payload.JavDBID).
+		OnConflict().Ignore().Exec(ctx); err != nil {
+		return 0, fmt.Errorf("index downloaded movie: %w", err)
+	}
+	record, err := tx.Movie.Query().Where(movie.Or(movie.JavdbIDEQ(payload.JavDBID),
+		movie.And(movie.CodeEQ(code), movie.JavdbIDIsNil()))).Only(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("resolve downloaded movie association: %w", err)
+	}
+	if record.JavdbID == nil {
+		if err := tx.Movie.UpdateOneID(record.ID).SetJavdbID(payload.JavDBID).Exec(ctx); err != nil {
+			return 0, fmt.Errorf("save downloaded movie identity: %w", err)
+		}
+	}
+	return record.ID, nil
 }
 
 // Reconcile runs only after every directory and page succeeded. Deletions and
@@ -463,10 +539,8 @@ func (service *LibraryService) reconcileScan(ctx context.Context, taskID int, sc
 					continue
 				}
 			}
-			input := metadataPayload{Source: payload.Source, ScanTaskID: taskID, MovieID: record.ID, Code: record.Code}
-			if record.Code == payload.Code {
-				input.JavDBID = payload.JavDBID
-			}
+			input := metadataPayload{Source: payload.Source, ScanTaskID: taskID, MovieID: record.ID,
+				Code: record.Code, JavDBID: valueOrZero(record.JavdbID)}
 			encoded, err := encodeTaskPayload(input)
 			if err != nil {
 				return err

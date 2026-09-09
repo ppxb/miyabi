@@ -20,6 +20,12 @@ const (
 )
 
 var (
+	// Verified catalogue aliases apply to a whole prefix, never arbitrary leading digits.
+	// JavDB lists LUXU while the same entries' media filenames use 259LUXU.
+	prefixAliases = map[string]string{
+		"259LUXU": "LUXU",
+	}
+
 	separators          = strings.NewReplacer("－", "-", "﹣", "-", "–", "-", "—", "-", "＿", "_")
 	delimiters          = regexp.MustCompile(`[-_. ]+`)
 	fc2Pattern          = regexp.MustCompile(`^FC2[-_. ]*(?:PPV)?[-_. ]*([0-9]+)(` + catalogueSuffix + `)$`)
@@ -103,7 +109,11 @@ func Normalize(raw string) string {
 	// Known multipart formats also accept compact spellings without losing a numeric segment.
 	for _, pattern := range []*regexp.Regexp{heydougaPattern, compactDatePattern, separatedPattern, letterSerialPattern, compactPattern} {
 		if match := pattern.FindStringSubmatch(value); match != nil {
-			return match[1] + "-" + delimiters.ReplaceAllString(match[2], "-")
+			prefix := match[1]
+			if alias, found := prefixAliases[prefix]; found {
+				prefix = alias
+			}
+			return prefix + "-" + delimiters.ReplaceAllString(match[2], "-")
 		}
 	}
 	return value

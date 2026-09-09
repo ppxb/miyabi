@@ -11,7 +11,6 @@ import { TaskToastActions } from './task-toast-actions'
 type TaskToastOptions = {
   waiting?: boolean
   onDismiss?: () => void
-  onView?: () => void
 }
 
 export const scanToastID = (id: number) => `scan:${id}`
@@ -25,7 +24,7 @@ function taskToastOptions(id: string, active: boolean, options: TaskToastOptions
     closeButton: false,
     icon: undefined,
     onDismiss: options.onDismiss,
-    action: <TaskToastActions id={id} onView={options.onView} />
+    action: <TaskToastActions id={id} />
   }
 }
 

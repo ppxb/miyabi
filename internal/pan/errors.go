@@ -20,6 +20,10 @@ func (err *apiError) Error() string {
 	return fmt.Sprintf("115 error %d: %s", err.Code, err.Message)
 }
 
+func (err *apiError) PublicMessage() string {
+	return err.Message
+}
+
 func (err *apiError) Is(target error) bool {
 	if target == ErrNotFound {
 		return err.Code == 430004

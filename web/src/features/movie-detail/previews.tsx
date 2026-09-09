@@ -1,7 +1,7 @@
 import type { PreviewImage } from '@/api/discover'
 import { MediaImage } from '@/components/media-image'
 
-export function MoviePreviews({ images }: { code: string; images: PreviewImage[] }) {
+export function MoviePreviews({ images }: { images: PreviewImage[] }) {
   return (
     <section className="space-y-4">
       <h2 id="movie-previews-title" className="text-xl font-semibold tracking-normal">
@@ -11,10 +11,13 @@ export function MoviePreviews({ images }: { code: string; images: PreviewImage[]
         <p className="text-sm text-muted-foreground">暂无预览图</p>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
-          {images.map(preview => (
-            <div key={preview.original} className="aspect-video overflow-hidden rounded-lg">
+          {images.map((preview, index) => (
+            <div
+              key={`${preview.original}:${index}`}
+              className="aspect-video overflow-hidden rounded-lg"
+            >
               <MediaImage
-                source={preview.thumbnail}
+                source={preview.thumbnail || preview.original}
                 original={preview.original}
                 className="object-cover"
               />

@@ -80,6 +80,7 @@ func (service *ScrapeService) Scrape(ctx context.Context, job TaskJob) error {
 	if err != nil {
 		return err
 	}
+	input.Code = codeid.Normalize(input.Code)
 	// A committed cover job means the metadata transaction already succeeded.
 	queued, err := service.library.database.Task.Query().Where(task.TypeEQ("cover"), func(s *sql.Selector) {
 		s.Where(sqljson.ValueEQ(task.FieldPayload, job.ID, sqljson.Path("scrape_task_id")))
@@ -120,10 +121,13 @@ func (service *ScrapeService) Scrape(ctx context.Context, job TaskJob) error {
 			artwork := movieArtwork(record)
 			cover.Artwork = &artwork
 		} else {
-			id := input.JavDBID
+			id := valueOrZero(record.JavdbID)
 			if id == "" {
-				id = valueOrZero(record.JavdbID)
+				id = input.JavDBID
 			}
+			// Known source IDs own the catalogue number. Filename matching is
+			// needed only when discovering that identity for the first time.
+			knownID := id != ""
 			if id == "" {
 				id, err = service.discover.ResolveMovieID(ctx, input.Code)
 				if err != nil {
@@ -134,17 +138,15 @@ func (service *ScrapeService) Scrape(ctx context.Context, job TaskJob) error {
 			if err != nil {
 				return err
 			}
-			if codeid.Normalize(detail.Code) != input.Code {
+			if !knownID && codeid.Normalize(detail.Code) != input.Code {
 				return fmt.Errorf("JavDB 返回的番号 %s 与媒体文件 %s 不一致", detail.Code, input.Code)
 			}
-			if err := service.completeTagCategories(ctx, &detail); err != nil {
-				return err
-			}
 			cover.Document = detailNFO(detail)
-			cover.Document.Code = input.Code
 			cover.CoverURL = detail.Cover
 		}
 	}
+	cover.Code = codeid.Normalize(cover.Document.Code)
+	cover.Document.Code = cover.Code
 	encoded, err := encodeTaskPayload(cover)
 	if err != nil {
 		return err
@@ -267,35 +269,6 @@ func (service *ScrapeService) directoryNFO(ctx context.Context, input metadataPa
 	return doc, &artworkOrigin{NFO: entry, Poster: poster, Fanart: fanart}, true, nil
 }
 
-func (service *ScrapeService) completeTagCategories(ctx context.Context, detail *DiscoverMovieDetail) error {
-	missing := false
-	for _, item := range detail.Tags {
-		missing = missing || item.CategoryID == ""
-	}
-	if !missing {
-		return nil
-	}
-	categories, err := service.discover.Tags(ctx, detail.Zone)
-	if err != nil {
-		return err
-	}
-	ids := make(map[string]string)
-	for _, category := range categories {
-		for _, item := range category.Tags {
-			ids[item.ID] = category.ID
-		}
-	}
-	for i := range detail.Tags {
-		if detail.Tags[i].CategoryID == "" {
-			detail.Tags[i].CategoryID = ids[detail.Tags[i].ID]
-			if detail.Tags[i].CategoryID == "" {
-				return fmt.Errorf("JavDB 标签 %s 缺少分类", detail.Tags[i].ID)
-			}
-		}
-	}
-	return nil
-}
-
 func detailNFO(detail DiscoverMovieDetail) nfo.Movie {
 	doc := nfo.Movie{Title: detail.Title, Code: detail.Code, Premiered: detail.ReleaseDate,
 		Runtime: detail.Duration, Rating: detail.Rating,
@@ -354,7 +327,7 @@ func valueOrZero[T any](value *T) T {
 }
 
 func saveMovieMetadata(ctx context.Context, tx *ent.Tx, id int, doc nfo.Movie) error {
-	update := tx.Movie.UpdateOneID(id).SetTitle(doc.Title).SetScrapeStatus(movie.ScrapeStatusPending).
+	update := tx.Movie.UpdateOneID(id).SetCode(doc.Code).SetTitle(doc.Title).SetScrapeStatus(movie.ScrapeStatusPending).
 		ClearActors().ClearTags().ClearJavdbID().ClearReleaseDate().ClearDuration().ClearRating().
 		ClearDirectorID().ClearDirectorName().ClearMakerID().ClearMakerName().ClearSeriesID().ClearSeriesName()
 	if doc.JavDBID() != "" {

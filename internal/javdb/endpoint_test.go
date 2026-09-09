@@ -328,6 +328,50 @@ func TestResolveMovieIDRequiresExactNormalizedMatch(t *testing.T) {
 	}
 }
 
+func TestAnimeDetailAndCatalogueQueriesUseTheAnimeSection(t *testing.T) {
+	transport := &fixtureTransport{responses: map[string][]byte{
+		"/api/v4/movies/anime|zh-TW": []byte(`{"success":1,"data":{"movie":{"id":"anime","number":"GLOD-0436","type":4}}}`),
+		"/api/v2/tags|zh-TW":         fixtureFile(t, "tags_zh.json"),
+	}}
+	client := clientWithTransport(transport)
+	detail, err := client.MovieDetail(t.Context(), "anime")
+	if err != nil || detail.Zone != ZoneAnime || detail.Code != "GLOD-0436" {
+		t.Fatalf("anime detail = %#v, error = %v", detail, err)
+	}
+	params, err := buildSearchParams("GLOD-0436", SearchOptions{Zone: ZoneAnime})
+	if err != nil || params.Get("movie_type") != "4" {
+		t.Fatalf("anime search parameters = %#v, error = %v", params, err)
+	}
+	params, err = buildBrowseParams(BrowseOptions{Zone: ZoneAnime, Page: 1, Limit: 20, Sort: "release", Order: "desc"})
+	if err != nil || params.Get("filter_by") != "4:t:::::" {
+		t.Fatalf("anime browse parameters = %#v, error = %v", params, err)
+	}
+	if _, err := client.Tags(t.Context(), ZoneAnime); err != nil {
+		t.Fatal(err)
+	}
+	if call := transport.calls[len(transport.calls)-1]; call.params.Get("type") != "4" {
+		t.Fatalf("anime taxonomy used another section: %#v", call)
+	}
+}
+
+func TestMoviePreviewsOmitEmptyEntriesAndKeepAvailableURLs(t *testing.T) {
+	movie, err := movieFromWire(wireMovie{ID: "preview-movie", Number: "090826_100", PreviewImages: []wirePreviewImage{
+		{},
+		{ThumbURL: "https://media.example/thumb.jpg", LargeURL: "https://media.example/image.jpg"},
+		{},
+		{ThumbURL: "https://media.example/thumbnail-only.jpg"},
+		{LargeURL: "https://media.example/original-only.jpg"},
+	}})
+	if err != nil || len(movie.PreviewImages) != 3 {
+		t.Fatalf("previews = %#v, error = %v", movie.PreviewImages, err)
+	}
+	if movie.PreviewImages[0].Original != "https://media.example/image.jpg" ||
+		movie.PreviewImages[1].Thumbnail != "https://media.example/thumbnail-only.jpg" ||
+		movie.PreviewImages[2].Original != "https://media.example/original-only.jpg" {
+		t.Fatalf("available preview URLs changed: %#v", movie.PreviewImages)
+	}
+}
+
 func TestResolveMovieIDKeepsLetterVariantsDistinct(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
 		"/api/v2/search|zh-TW": []byte(`{"success":1,"data":{"movies":[{"id":"base","number":"FJIN-106"},{"id":"variant","number":"FJIN-106a"}]}}`),
@@ -341,6 +385,28 @@ func TestResolveMovieIDKeepsLetterVariantsDistinct(t *testing.T) {
 		if id != want {
 			t.Errorf("ResolveMovieID(%q) = %q, want %q", code, id, want)
 		}
+	}
+}
+
+func TestResolveMovieIDSearchesVerifiedCatalogueAlias(t *testing.T) {
+	transport := &fixtureTransport{responses: map[string][]byte{
+		"/api/v2/search|zh-TW": []byte(`{"success":1,"data":{"movies":[
+			{"id":"similar","number":"LUXU-1099"},
+			{"id":"longer","number":"LUXU-18990"},
+			{"id":"variant","number":"LUXU-1899-C"},
+			{"id":"exact","number":"LUXU-1899"}
+		]}}`),
+	}}
+	client := clientWithTransport(transport)
+	id, err := client.ResolveMovieID(t.Context(), "259luxu1899")
+	if err != nil || id != "exact" {
+		t.Fatalf("catalogue alias resolved to %q, error = %v", id, err)
+	}
+	if len(transport.calls) != 1 || transport.calls[0].params.Get("q") != "LUXU-1899" {
+		t.Fatalf("search did not use the JavDB catalogue number: %#v", transport.calls)
+	}
+	if id, err := client.ResolveMovieID(t.Context(), "999LUXU-1899"); err == nil {
+		t.Fatalf("unknown numeric prefix was mistaken for the same movie: %q", id)
 	}
 }
 

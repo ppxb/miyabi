@@ -53,7 +53,7 @@ func buildBrowseParams(options BrowseOptions) (url.Values, error) {
 		if options.Zone != "" {
 			code, ok := zoneCodes[options.Zone]
 			if !ok {
-				return nil, errors.New("JavDB browse zone must be censored, uncensored, western, or fc2")
+				return nil, errors.New("JavDB browse zone must be censored, uncensored, western, fc2, or anime")
 			}
 			zone = strconv.Itoa(code)
 		}

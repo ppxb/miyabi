@@ -13,6 +13,10 @@ func TestParse(t *testing.T) {
 		ok    bool
 	}{
 		{name: "standard", input: "SSIS-589.mkv", want: "SSIS-589", ok: true},
+		{name: "catalogue prefix alias", input: "259LUXU-1899.mp4", want: "LUXU-1899", ok: true},
+		{name: "compact prefix alias with disc", input: "259luxu1899-CD1.mp4", want: "LUXU-1899", ok: true},
+		{name: "prefix alias with subtitle", input: "[example.com] 259LUXU_1899-C.mkv", want: "LUXU-1899", ok: true},
+		{name: "unknown numeric prefix stays intact", input: "999LUXU-1899.mp4", want: "999LUXU-1899", ok: true},
 		{name: "four digit sequence", input: "GLOD-0436.mp4", want: "GLOD-0436", ok: true},
 		{name: "letter before sequence", input: "KNB-M014.mp4", want: "KNB-M014", ok: true},
 		{name: "letter serial is not a standalone disc marker", input: "KNB-CD014.mp4", want: "KNB-CD014", ok: true},
@@ -105,6 +109,18 @@ func TestNormalize(t *testing.T) {
 		want  string
 	}{
 		{input: " ssis 589 ", want: "SSIS-589"},
+		{input: "259LUXU-1899", want: "LUXU-1899"},
+		{input: "259luxu1899", want: "LUXU-1899"},
+		{input: "259LUXU_1899", want: "LUXU-1899"},
+		{input: "259LUXU－1899", want: "LUXU-1899"},
+		{input: "259LUXU-01899", want: "LUXU-01899"},
+		{input: "259LUXU-1899-C", want: "LUXU-1899-C"},
+		{input: "LUXU-1899", want: "LUXU-1899"},
+		{input: "999LUXU-1899", want: "999LUXU-1899"},
+		{input: "1259LUXU-1899", want: "1259LUXU-1899"},
+		{input: "259LUXUS-1899", want: "259LUXUS-1899"},
+		{input: "10MUSUME-123456-01", want: "10MUSUME-123456-01"},
+		{input: "1000GIRI-001", want: "1000GIRI-001"},
 		{input: "GLOD-0436", want: "GLOD-0436"},
 		{input: "KNB-M014", want: "KNB-M014"},
 		{input: "knb_m014", want: "KNB-M014"},

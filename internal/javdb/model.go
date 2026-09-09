@@ -58,6 +58,7 @@ const (
 	ZoneUncensored Zone = "uncensored"
 	ZoneWestern    Zone = "western"
 	ZoneFC2        Zone = "fc2"
+	ZoneAnime      Zone = "anime"
 )
 
 // SearchOptions controls a movie search request.

@@ -138,15 +138,18 @@ func movieFromWire(source wireMovie) (Movie, error) {
 		MagnetsCount:  source.MagnetsCount,
 		HasSubtitle:   source.HasCNSub,
 		HasPreview:    source.HasPreviewImages || source.HasPreviewVideo,
-		PreviewImages: make([]PreviewImage, len(source.PreviewImages)),
+		PreviewImages: make([]PreviewImage, 0, len(source.PreviewImages)),
 		Actors:        make([]Actor, len(source.Actors)),
 		Tags:          make([]Tag, len(source.Tags)),
 	}
-	for index, image := range source.PreviewImages {
-		movie.PreviewImages[index] = PreviewImage{
+	for _, image := range source.PreviewImages {
+		if image.ThumbURL == "" && image.LargeURL == "" {
+			continue
+		}
+		movie.PreviewImages = append(movie.PreviewImages, PreviewImage{
 			Thumbnail: image.ThumbURL,
 			Original:  image.LargeURL,
-		}
+		})
 	}
 	for index, actor := range source.Actors {
 		gender := "unknown"

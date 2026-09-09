@@ -11,7 +11,7 @@ import (
 func (c *Client) Tags(ctx context.Context, zone Zone) ([]TagCategory, error) {
 	code, ok := zoneCodes[zone]
 	if !ok {
-		return nil, errors.New("JavDB tag zone must be censored, uncensored, western, or fc2")
+		return nil, errors.New("JavDB tag zone must be censored, uncensored, western, fc2, or anime")
 	}
 
 	var data wireTagsData
