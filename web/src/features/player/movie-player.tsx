@@ -7,9 +7,7 @@ import {
   type MediaPlayerInstance
 } from '@vidstack/react'
 import { DefaultVideoLayout } from '@vidstack/react/player/layouts/default'
-import { ListVideoIcon } from 'lucide-react'
 
-import type { LibraryFile } from '@/api/library'
 import { usePlayback, usePlayFiles } from '@/api/play'
 import {
   Select,
@@ -18,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { formatSize } from '@/lib/format'
+import { PlayerControlsVisibility } from './controls-visibility'
 import { playerIcons } from './icons'
 import {
   PlayerCloseButton,
@@ -40,7 +38,8 @@ export default function MoviePlayer({ code }: { code: string }) {
   if (files.isError) {
     return <PlayerError error={files.error} onRetry={() => void files.refetch()} />
   }
-  if (files.data.files.length === 0) {
+  const file = files.data.files[0]
+  if (!file) {
     return (
       <PlayerError
         title={files.data.title}
@@ -50,13 +49,11 @@ export default function MoviePlayer({ code }: { code: string }) {
     )
   }
 
-  return <PlaybackPlayer title={files.data.title} files={files.data.files} />
+  return <PlaybackPlayer key={file.id} title={files.data.title} fileID={file.id} />
 }
 
-function PlaybackPlayer({ title, files }: { title: string; files: LibraryFile[] }) {
-  const [fileID, setFileID] = useState(files[0].id)
-  const file = files.find(item => item.id === fileID) ?? files[0]
-  const playback = usePlayback(file.id)
+function PlaybackPlayer({ title, fileID }: { title: string; fileID: string }) {
+  const playback = usePlayback(fileID)
   const [selectedSrc, setSelectedSrc] = useState<string>()
   const [player, setPlayer] = useState<MediaPlayerInstance | null>(null)
   const [failed, setFailed] = useState(false)
@@ -73,34 +70,6 @@ function PlaybackPlayer({ title, files }: { title: string; files: LibraryFile[] 
     setAutoPlay(true)
     void playback.refetch()
   }
-
-  const fileControl =
-    files.length > 1 ? (
-      <div className="miyabi-player-file shrink-0">
-        <PlaybackSelect
-          player={player}
-          value={file.id}
-          onValueChange={value => {
-            position.current = 0
-            resumeTime.current = 0
-            setFailed(false)
-            setAutoPlay(true)
-            setSelectedSrc(undefined)
-            setFileID(value)
-          }}
-          icon={<ListVideoIcon />}
-          label="文件"
-        >
-          {files.map(item => (
-            <SelectItem key={item.id} value={item.id}>
-              <span className="truncate">
-                {item.name} · {formatSize(item.size)}
-              </span>
-            </SelectItem>
-          ))}
-        </PlaybackSelect>
-      </div>
-    ) : null
 
   return (
     <MediaPlayer
@@ -129,23 +98,23 @@ function PlaybackPlayer({ title, files }: { title: string; files: LibraryFile[] 
         if (isHLSProvider(provider)) provider.library = () => import('hls.js')
       }}
     >
+      <PlayerControlsVisibility />
       <MediaProvider />
       {loading || playback.isError || failed ? (
         <div className="absolute inset-0 z-20 cursor-auto">
           {loading ? (
-            <PlayerLoading title={title} toolbar={fileControl} />
+            <PlayerLoading title={title} />
           ) : (
             <PlayerError
               title={title}
               error={playback.error ?? undefined}
               message="播放中断，请重新加载播放地址。"
               onRetry={retry}
-              toolbar={fileControl}
             />
           )}
         </div>
       ) : (
-        <PlayerReady title={title} toolbar={fileControl}>
+        <PlayerReady title={title}>
           <DefaultVideoLayout
             icons={playerIcons}
             translations={playerTranslations}
@@ -153,16 +122,15 @@ function PlaybackPlayer({ title, files }: { title: string; files: LibraryFile[] 
             noModal
             slots={{
               bufferingIndicator: null,
+              googleCastButton: null,
               topControlsGroupStart: <PlayerTitle title={title} />,
-              topControlsGroupCenter: fileControl,
               topControlsGroupEnd: <PlayerCloseButton />,
               chapterTitle: <div className="vds-controls-spacer" />,
               beforeSettingsMenu:
                 sources.length > 1 && source ? (
-                  <PlaybackSelect
+                  <PlaybackQualitySelect
                     player={player}
                     value={source.src}
-                    side="top"
                     onValueChange={value => {
                       resumeTime.current = position.current
                       setAutoPlay(!player?.paused)
@@ -174,7 +142,7 @@ function PlaybackPlayer({ title, files }: { title: string; files: LibraryFile[] 
                         {item.label}
                       </SelectItem>
                     ))}
-                  </PlaybackSelect>
+                  </PlaybackQualitySelect>
                 ) : null
             }}
           >
@@ -186,21 +154,13 @@ function PlaybackPlayer({ title, files }: { title: string; files: LibraryFile[] 
   )
 }
 
-function PlayerReady({
-  title,
-  toolbar,
-  children
-}: {
-  title: string
-  toolbar: ReactNode
-  children: ReactNode
-}) {
+function PlayerReady({ title, children }: { title: string; children: ReactNode }) {
   const canPlay = useMediaState('canPlay')
 
   if (!canPlay) {
     return (
       <div className="absolute inset-0 z-20 cursor-auto">
-        <PlayerLoading title={title} toolbar={toolbar} />
+        <PlayerLoading title={title} />
       </div>
     )
   }
@@ -222,21 +182,15 @@ function PlayerBufferingIndicator() {
   )
 }
 
-function PlaybackSelect({
+function PlaybackQualitySelect({
   player,
   value,
   onValueChange,
-  side = 'bottom',
-  icon,
-  label,
   children
 }: {
   player: MediaPlayerInstance | null
   value: string
   onValueChange: (value: string) => void
-  side?: 'top' | 'bottom'
-  icon?: ReactNode
-  label?: string
   children: ReactNode
 }) {
   return (
@@ -249,14 +203,13 @@ function PlaybackSelect({
       }}
     >
       <SelectTrigger size="sm" className="max-w-full min-w-0 shrink-0 cursor-pointer px-2 text-xs">
-        {icon}
-        <SelectValue>{label}</SelectValue>
+        <SelectValue />
       </SelectTrigger>
       <SelectContent
         container={player?.el}
         position="popper"
         align="end"
-        side={side}
+        side="top"
         collisionBoundary={player?.el}
         collisionPadding={12}
         className="max-w-[min(32rem,var(--radix-select-content-available-width))] bg-popover/90 backdrop-blur-xl"

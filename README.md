@@ -4,28 +4,48 @@
 
 ## Docker 部署
 
-镜像发布地址为 `ghcr.io/ppxb/miyabi`，支持 `linux/amd64` 和 `linux/arm64`。
+公开镜像：
 
-```bash
-cp .env.example .env
-# 编辑 .env，填写 MIYABI_ACCESS_PASSWORD 后再启动
-docker compose pull
-docker compose up -d
+```text
+ghcr.io/ppxb/miyabi
 ```
 
-查看日志与升级：
+直接使用 Docker 运行（请替换访问密码）：
 
 ```bash
-docker compose logs -f miyabi
-docker compose pull
-docker compose up -d
+docker run -d \
+  --name miyabi \
+  --restart unless-stopped \
+  --security-opt no-new-privileges:true \
+  -p 8080:8080 \
+  -v miyabi-data:/app/data \
+  -e MIYABI_ACCESS_PASSWORD='change-this-password' \
+  ghcr.io/ppxb/miyabi:latest
 ```
+
+启动后访问 `http://<服务器IP>:8080`。
+
+查看日志：
+
+```bash
+docker logs -f miyabi
+```
+
+升级时先拉取新镜像，再停止并移除旧容器：
+
+```bash
+docker pull ghcr.io/ppxb/miyabi:latest
+docker stop miyabi
+docker rm miyabi
+```
+
+然后重新执行上方的 `docker run` 命令，沿用原访问密码和 `miyabi-data` 数据卷。
 
 容器以 UID/GID `10001:10001` 运行；如将命名卷改为主机目录挂载，需要让该用户能够写入目录。健康检查使用 `/api/health`。
 
-## 访问门禁与启动配置
+## 启动配置
 
-通过 `MIYABI_ACCESS_PASSWORD` 配置访问密码。未配置密码或将密码设为空时关闭门禁。
+通过 `MIYABI_ACCESS_PASSWORD` 配置访问密码。未配置密码或将密码设为空时关闭门禁。**强烈建议您开启门禁**。
 
 | 环境变量                 | 用途                     | 默认值                                |
 | ------------------------ | ------------------------ | ------------------------------------- |

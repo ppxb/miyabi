@@ -89,8 +89,30 @@
   background-color: var(--primary-foreground);
 }
 
+.miyabi-player .vds-kb-bezel {
+  top: 50%;
+  margin-top: calc(var(--size) / -2);
+}
+
+.miyabi-player .vds-kb-icon {
+  display: grid;
+  place-items: center;
+}
+
+.miyabi-player .vds-kb-icon > svg {
+  display: block;
+}
+
+.miyabi-player .vds-video-layout {
+  --miyabi-toolbar-inset: 1.25rem;
+  --miyabi-toolbar-bottom: 1rem;
+}
+
 /* Keep the gradient mounted while opacity fades, and hide visibility only after the fade. */
 .miyabi-player .vds-video-layout .vds-controls {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr);
   border-radius: var(--video-border-radius);
   background-image: linear-gradient(
     to bottom,
@@ -112,20 +134,23 @@
 
 .miyabi-player .vds-video-layout .vds-controls-group:nth-last-child(2),
 .miyabi-player .vds-video-layout .vds-controls-group:last-child {
-  align-self: center;
-  width: calc(100% - 2.5rem);
+  justify-self: center;
+  width: calc(100% - 2 * var(--miyabi-toolbar-inset));
   max-width: 36rem;
   z-index: auto;
 }
 
-/* Blur belongs on the background so tooltips can extend above both control rows. */
-.miyabi-player .vds-video-layout .vds-controls-group:nth-last-child(2)::before,
-.miyabi-player .vds-video-layout .vds-controls-group:last-child::before {
+/* One backdrop spans both bottom rows, with their natural heights and shared stacking context. */
+.miyabi-player .vds-video-layout .vds-controls::before {
   content: '';
   position: absolute;
-  inset: 0;
+  grid-area: 5 / 1 / 7 / -1;
+  inset: 0 0 var(--miyabi-toolbar-bottom);
+  width: calc(100% - 2 * var(--miyabi-toolbar-inset));
+  max-width: 36rem;
+  margin-inline: auto;
   z-index: -1;
-  border-radius: inherit;
+  border-radius: var(--radius-xl);
   background: color-mix(in oklch, var(--popover) 50%, transparent);
   backdrop-filter: blur(32px) saturate(160%);
   pointer-events: none;
@@ -138,7 +163,7 @@
 }
 
 .miyabi-player .vds-video-layout .vds-controls-group:last-child {
-  margin: 0 0 1rem;
+  margin: 0 0 var(--miyabi-toolbar-bottom);
   padding: 0 0.375rem 0.25rem;
   border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
@@ -157,15 +182,7 @@
   visibility: inherit;
 }
 
-.miyabi-player .vds-video-layout[data-sm] .miyabi-player-file [data-slot='select-value'] {
-  display: none;
-}
-
-.miyabi-player .vds-video-layout[data-sm] .vds-controls-group:nth-last-child(2),
-.miyabi-player .vds-video-layout[data-sm] .vds-controls-group:last-child {
-  width: calc(100% - 1.5rem);
-}
-
-.miyabi-player .vds-video-layout[data-sm] .vds-controls-group:last-child {
-  margin-bottom: 0.75rem;
+.miyabi-player .vds-video-layout[data-sm] {
+  --miyabi-toolbar-inset: 0.75rem;
+  --miyabi-toolbar-bottom: 0.75rem;
 }

@@ -18,19 +18,17 @@ export function PlayerCloseButton() {
 
 type PlayerHeaderProps = {
   title?: string
-  toolbar?: ReactNode
 }
 
 export function PlayerTitle({ title }: { title?: string }) {
   return <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground/90">{title}</p>
 }
 
-function PlayerStatus({ children, title, toolbar }: PlayerHeaderProps & { children: ReactNode }) {
+function PlayerStatus({ children, title }: PlayerHeaderProps & { children: ReactNode }) {
   return (
     <div className="relative grid aspect-video size-full place-items-center bg-black px-6 pt-16 pb-6 text-foreground">
       <div className="absolute inset-x-0 top-0 flex min-w-0 items-center gap-2 p-3 sm:p-4">
         <PlayerTitle title={title} />
-        {toolbar}
         <PlayerCloseButton />
       </div>
       {children}
@@ -38,9 +36,9 @@ function PlayerStatus({ children, title, toolbar }: PlayerHeaderProps & { childr
   )
 }
 
-export function PlayerLoading({ title, toolbar }: PlayerHeaderProps) {
+export function PlayerLoading({ title }: PlayerHeaderProps) {
   return (
-    <PlayerStatus title={title} toolbar={toolbar}>
+    <PlayerStatus title={title}>
       <PlayerLoadingIndicator />
     </PlayerStatus>
   )
@@ -59,8 +57,7 @@ export function PlayerError({
   error,
   message = '加载失败，请检查服务后重试。',
   onRetry,
-  title,
-  toolbar
+  title
 }: PlayerHeaderProps & {
   error?: Error
   message?: string
@@ -81,7 +78,7 @@ export function PlayerError({
             : message
 
   return (
-    <PlayerStatus title={title} toolbar={toolbar}>
+    <PlayerStatus title={title}>
       <div className="max-w-md space-y-4 text-center">
         <p className="text-sm text-muted-foreground">{description}</p>
         <div className="flex flex-wrap justify-center gap-2">

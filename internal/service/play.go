@@ -72,7 +72,7 @@ func (service *PlayService) Files(ctx context.Context, code string) (PlayFiles, 
 	record, err := service.library.database.Movie.Query().
 		Where(movie.CodeEQ(codeid.Normalize(code)), movie.HasFilesWith(scope)).
 		WithFiles(func(query *ent.FileQuery) {
-			query.Where(scope).Order(ent.Asc(file.FieldPath), ent.Asc(file.FieldID))
+			query.Where(scope).Order(ent.Desc(file.FieldSize), ent.Asc(file.FieldPath), ent.Asc(file.FieldID))
 		}).Only(ctx)
 	if err != nil {
 		return PlayFiles{}, fmt.Errorf("read playable movie: %w", err)

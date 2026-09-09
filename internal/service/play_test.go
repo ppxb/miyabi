@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/pan"
 )
@@ -56,6 +57,19 @@ func TestPlayFilesUsesOnlyCurrentLibrarySource(t *testing.T) {
 	}
 	if _, err := service.Files(t.Context(), "ABP-001"); !ent.IsNotFound(err) {
 		t.Fatalf("old source remains playable: %v", err)
+	}
+}
+
+func TestPlayFilesPrefersLargestVideo(t *testing.T) {
+	service, _ := playFixture(t)
+	service.library.database.File.Update().Where(file.FileIDEQ("102")).SetSize(4096).SaveX(t.Context())
+
+	files, err := service.Files(t.Context(), "ABP-001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files.Files) != 2 || files.Files[0].ID != "102" || files.Files[1].ID != "101" {
+		t.Fatalf("playable files are not ordered by size: %#v", files.Files)
 	}
 }
 
