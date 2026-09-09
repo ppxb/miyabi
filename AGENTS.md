@@ -4,7 +4,7 @@
 
 ## 核心原则
 
-- 单用户自用工具，不做多租户、不做权限系统。
+- 单用户自用工具，不做多租户、不做权限系统。部署支持与 jm-boom 一致的轻量 Web 入口密码门禁。
 - 代码简洁优先：不写防御性兜底，错误直接向上返回，由 API 层统一转成响应。
 - 成熟库能用就用，不自己造轮子。
 - 网盘目前只有 115，包名直接叫 `pan`，不带 115 前缀。
@@ -43,6 +43,7 @@ miyabi/
 ├── internal/
 │   ├── api/                    gin 路由与 handler，只做参数绑定与响应
 │   │   ├── router.go
+│   │   ├── auth.go             Web 入口密码配置与校验
 │   │   ├── movie.go
 │   │   ├── discover.go
 │   │   ├── task.go
@@ -51,6 +52,7 @@ miyabi/
 │   │   ├── setting.go
 │   │   └── sse.go
 │   ├── service/                业务编排，唯一允许同时调用 ent / pan / javdb 的层
+│   │   ├── access_gate.go      可选入口密码校验，不创建账号或服务端会话
 │   │   ├── library.go          扫描入库、文件与影片关联
 │   │   ├── discover.go         JavDB 发现、搜索、分类与本地状态投影
 │   │   ├── scrape.go           JavDB 元数据入库、封面下载与 NFO 写入
@@ -95,7 +97,10 @@ miyabi/
 │   │   ├── components/
 │   │   └── stores/
 │   └── dist/                   构建产物，由 Go embed
-├── embed.go                    //go:embed web/dist
+├── embed.go                    发布构建嵌入 web/dist，!dev 标签
+├── embed_dev.go                dev 标签下关闭静态前端托管，使用 Vite
+├── Dockerfile                  前端构建、Go 编译、非 root 运行镜像
+├── docker-compose.yml          8080 端口与 /app/data 命名卷
 ├── Makefile
 └── AGENTS.md
 ```
@@ -189,6 +194,15 @@ JavDB 当前没有官方公开 API。Miyabi 使用经 `javdb-cli` 验证的 Andr
 - 115 接受任务后只记录下载状态。下载完成时保存 `file_id` 并在同一事务内创建独立的定向扫描任务，支持文件或文件夹，不能合并到可能已越过该目录的运行中扫描。扫描后才创建 Movie，并继续刮削、缓存封面和写回 NFO；切换账号或挂载目录后不向旧任务的来源写入数据。
 
 ## 关键流程
+
+### Web 入口门禁与 Docker 发布
+
+- 门禁沿用 jm-boom 的轻量行为：`MIYABI_ACCESS_PASSWORD` 或 `config.toml` 的 `access_password` 配置密码，空值关闭。服务端只校验 `/api/auth/login`，`/api/auth/config` 只返回是否开启；不返回密码、不创建账号或服务端会话，业务 API 不因此增加鉴权。
+- 密码校验位于 service，使用标准库 SHA-256 与恒定时间比较；错误交给统一 API 中间件映射为 401。前端通过 TanStack Query 获取配置和提交密码，使用 `sessionStorage` 的 `miyabi-access-granted` 保存当前标签页的放行状态，不保存密码。
+- 门禁放在根布局的 AppShell 外层，通过后才挂载导航、播放器、SSE 与通知；使用现有 shadcn Card/Input/Button，验证通过后直接显示原页面，保留原路径与查询参数。读取配置失败时提供明确的重试入口。
+- 保留两个互斥的 embed 文件：默认构建嵌入前端，`-tags=dev` 不要求 `web/dist` 存在。Docker 在构建前端后编译默认 Go 版本，运行镜像只携带内嵌前端的二进制。
+- Docker 使用 Node 24 / pnpm 10.33.0 构建前端、Go 1.27 交叉编译 Linux AMD64/ARM64，运行容器使用非 root 用户 `10001:10001`，通过 `8080` 端口提供同源访问，数据持久化到 `/app/data`，健康检查为 `/api/health`。构建上下文排除本地数据、配置和环境文件。
+- Docker Compose 要求在 `.env` 填写访问密码，`.env.example` 只保留空模板。tag `v*.*.*` 触发 GHCR 发布、git-cliff 变更日志及 GitHub Release；先创建 Release 草稿，镜像发布成功后公开。镜像名为 `ghcr.io/ppxb/miyabi`，分别预热 AMD64/ARM64 缓存，再发布正式多架构标签。
 
 ### 当前扫描实现
 

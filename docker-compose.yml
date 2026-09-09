@@ -1,0 +1,21 @@
+name: miyabi
+
+services:
+  miyabi:
+    image: ghcr.io/ppxb/miyabi:latest
+    container_name: miyabi
+    ports:
+      - "8080:8080"
+    volumes:
+      - miyabi-data:/app/data
+    environment:
+      MIYABI_ACCESS_PASSWORD: "${MIYABI_ACCESS_PASSWORD:?Set MIYABI_ACCESS_PASSWORD in .env before starting Miyabi}"
+      MIYABI_LOG_LEVEL: "${MIYABI_LOG_LEVEL:-info}"
+      MIYABI_PROXY: "${MIYABI_PROXY:-}"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  miyabi-data:
+    name: miyabi-data

@@ -20,10 +20,11 @@ const (
 )
 
 type Config struct {
-	Listen   string `koanf:"listen"`
-	DataDir  string `koanf:"data_dir"`
-	LogLevel string `koanf:"log_level"`
-	Proxy    string `koanf:"proxy"`
+	Listen         string `koanf:"listen"`
+	DataDir        string `koanf:"data_dir"`
+	LogLevel       string `koanf:"log_level"`
+	Proxy          string `koanf:"proxy"`
+	AccessPassword string `koanf:"access_password"`
 }
 
 type cliOptions struct {
@@ -43,10 +44,11 @@ func Load(args []string) (Config, error) {
 
 	k := koanf.New(".")
 	if err := k.Load(confmap.Provider(map[string]any{
-		"listen":    ":8080",
-		"data_dir":  "./data",
-		"log_level": "info",
-		"proxy":     "",
+		"listen":          ":8080",
+		"data_dir":        "./data",
+		"log_level":       "info",
+		"proxy":           "",
+		"access_password": "",
 	}, "."), nil); err != nil {
 		return Config{}, fmt.Errorf("load default config: %w", err)
 	}

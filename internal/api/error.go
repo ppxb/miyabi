@@ -60,7 +60,7 @@ func errorMiddleware(logger *slog.Logger) gin.HandlerFunc {
 			status = http.StatusBadRequest
 		case ent.IsNotFound(err), errors.Is(err, fs.ErrNotExist):
 			status = http.StatusNotFound
-		case errors.Is(err, pan.ErrUnauthorized):
+		case errors.Is(err, pan.ErrUnauthorized), errors.Is(err, service.ErrAccessPassword):
 			status = http.StatusUnauthorized
 		}
 

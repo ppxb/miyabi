@@ -82,6 +82,7 @@ func run() error {
 	router := api.NewRouter(api.Dependencies{
 		Logger:   logger,
 		Health:   store,
+		Access:   service.NewAccessGateService(cfg.AccessPassword),
 		Discover: discover,
 		Pan:      drive,
 		Offline:  offline,

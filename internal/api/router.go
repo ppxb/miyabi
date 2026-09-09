@@ -18,6 +18,7 @@ type HealthChecker interface {
 type Dependencies struct {
 	Logger   *slog.Logger
 	Health   HealthChecker
+	Access   AccessGate
 	Discover Discoverer
 	Pan      PanManager
 	Offline  OfflineManager
@@ -39,6 +40,12 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	api := router.Group("/api")
 	api.GET("/health", healthHandler(deps.Health))
+	authAPI := api.Group("/auth", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		c.Next()
+	})
+	authAPI.GET("/config", accessConfigHandler(deps.Access))
+	authAPI.POST("/login", accessLoginHandler(deps.Access))
 	api.GET("/library/movies", libraryMoviesHandler(deps.Library))
 	api.GET("/library/files", libraryFilesHandler(deps.Library))
 	api.POST("/library/scan", libraryScanHandler(deps.Library))
