@@ -166,13 +166,10 @@ func TestBrowsePreservesWesternSceneNumbers(t *testing.T) {
 }
 
 func TestMovieReferencesPreserveWesternSceneNumbers(t *testing.T) {
-	movies, err := movieReferencesFromWire([]wireMovieReference{
+	movies := movieReferencesFromWire("movie", "actor_movies", []wireMovieReference{
 		{ID: "western-scene-one", Number: "ExampleStudio.26.09.05"},
 		{ID: "western-scene-two", Number: "ExampleStudio.26.09.06"},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	if len(movies) != 2 || movies[0].Code != "ExampleStudio.26.09.05" || movies[1].Code != "ExampleStudio.26.09.06" {
 		t.Fatalf("western references = %+v", movies)
 	}
@@ -484,8 +481,16 @@ func TestTagsOnlyRequestsTraditionalChinese(t *testing.T) {
 }
 
 func TestQueryOptionsRejectUnsupportedZones(t *testing.T) {
-	if _, err := buildSearchParams("ABP-123", SearchOptions{Zone: "invalid"}); err == nil {
-		t.Fatal("search accepted an unsupported zone")
+	for _, zone := range []Zone{"invalid", ZoneUnknown} {
+		if _, err := buildSearchParams("ABP-123", SearchOptions{Zone: zone}); err == nil {
+			t.Fatalf("search accepted unsupported zone %q", zone)
+		}
+		if _, err := buildBrowseParams(BrowseOptions{Zone: zone, Page: 1, Limit: 20, Sort: "release", Order: "desc"}); err == nil {
+			t.Fatalf("browse accepted unsupported zone %q", zone)
+		}
+		if _, err := (&Client{}).Tags(t.Context(), zone); err == nil {
+			t.Fatalf("tags accepted unsupported zone %q", zone)
+		}
 	}
 	if _, err := buildBrowseParams(BrowseOptions{Zone: ZoneAll, Page: 1, Limit: 20, Sort: "release", Order: "desc"}); err == nil {
 		t.Fatal("browse accepted the all zone")

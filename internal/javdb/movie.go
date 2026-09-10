@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
 
@@ -31,43 +32,51 @@ func (c *Client) MovieDetail(ctx context.Context, movieID string) (MovieDetail, 
 	if err != nil {
 		return MovieDetail{}, err
 	}
-	zone, err := zoneFromCode(data.Movie.Type)
-	if err != nil {
-		return MovieDetail{}, err
+	zone := ZoneUnknown
+	if data.Movie.Type != nil {
+		zone = zoneFromCode(*data.Movie.Type)
+		if zone == ZoneUnknown {
+			slog.WarnContext(ctx, "unknown JavDB movie type; using unknown zone",
+				"movie_id", movie.ID, "field", "type", "value", *data.Movie.Type)
+		}
 	}
-	actorMovies, err := movieReferencesFromWire(data.Movie.ActorMovies)
-	if err != nil {
-		return MovieDetail{}, fmt.Errorf("decode actor movies: %w", err)
-	}
-	relatedMovies, err := movieReferencesFromWire(data.Movie.RelatedMovies)
-	if err != nil {
-		return MovieDetail{}, fmt.Errorf("decode related movies: %w", err)
-	}
-	return MovieDetail{Movie: movie, Zone: zone, ActorMovies: actorMovies, RelatedMovies: relatedMovies}, nil
+	return MovieDetail{
+		Movie: movie, Zone: zone,
+		ActorMovies:   movieReferencesFromWire(movie.ID, "actor_movies", data.Movie.ActorMovies),
+		RelatedMovies: movieReferencesFromWire(movie.ID, "relative_movies", data.Movie.RelatedMovies),
+	}, nil
 }
 
-func zoneFromCode(code int) (Zone, error) {
+func zoneFromCode(code int) Zone {
 	for zone, value := range zoneCodes {
 		if value == code {
-			return zone, nil
+			return zone
 		}
 	}
-	return "", fmt.Errorf("unsupported JavDB movie type %d", code)
+	return ZoneUnknown
 }
 
-func movieReferencesFromWire(source []wireMovieReference) ([]MovieReference, error) {
-	result := make([]MovieReference, len(source))
+func movieReferencesFromWire(movieID, field string, source []wireMovieReference) []MovieReference {
+	result := make([]MovieReference, 0, len(source))
 	for index, item := range source {
-		if item.ID == "" {
-			return nil, fmt.Errorf("movie reference %d: missing id", index)
-		}
+		id := strings.TrimSpace(item.ID)
 		code := strings.TrimSpace(item.Number)
-		if code == "" {
-			return nil, fmt.Errorf("movie reference %d: missing number", index)
+		reason := ""
+		switch {
+		case id == "":
+			reason = "missing id"
+		case code == "":
+			reason = "missing number"
 		}
-		result[index] = MovieReference{ID: item.ID, Code: code, Thumbnail: item.ThumbURL}
+		if reason != "" {
+			slog.Warn("skipping invalid JavDB recommendation",
+				"movie_id", movieID, "field", field, "index", index,
+				"reference_id", id, "reason", reason)
+			continue
+		}
+		result = append(result, MovieReference{ID: id, Code: code, Thumbnail: item.ThumbURL})
 	}
-	return result, nil
+	return result
 }
 
 // ResolveMovieID finds the single exact catalogue-number match returned by
@@ -116,7 +125,7 @@ func moviesFromWire(source []wireMovie) ([]Movie, error) {
 }
 
 func movieFromWire(source wireMovie) (Movie, error) {
-	if source.ID == "" {
+	if strings.TrimSpace(source.ID) == "" {
 		return Movie{}, errors.New("missing id")
 	}
 	code := strings.TrimSpace(source.Number)
@@ -160,7 +169,9 @@ func movieFromWire(source wireMovie) (Movie, error) {
 			case 1:
 				gender = "male"
 			default:
-				return Movie{}, fmt.Errorf("unsupported JavDB actor gender %d", *actor.Gender)
+				slog.Warn("unknown JavDB actor gender; using unknown",
+					"movie_id", movie.ID, "field", "actors.gender", "index", index,
+					"actor_id", actor.ID, "value", *actor.Gender)
 			}
 		}
 		movie.Actors[index] = Actor{

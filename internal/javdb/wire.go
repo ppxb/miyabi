@@ -57,7 +57,7 @@ type wireMovieData struct {
 
 type wireMovieDetail struct {
 	wireMovie
-	Type          int                  `json:"type"`
+	Type          *int                 `json:"type"`
 	ActorMovies   []wireMovieReference `json:"actor_movies"`
 	RelatedMovies []wireMovieReference `json:"relative_movies"`
 }

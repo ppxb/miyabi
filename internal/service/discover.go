@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -310,12 +311,14 @@ func (service *DiscoverService) projectMovies(
 	result := make([]DiscoverMovie, len(source))
 	for index, item := range source {
 		releaseStatus := ReleaseUnknown
+		item.ReleaseDate = strings.TrimSpace(item.ReleaseDate)
 		if item.ReleaseDate != "" {
 			releaseDate, err := time.ParseInLocation("2006-01-02", item.ReleaseDate, time.Local)
 			if err != nil {
-				return nil, fmt.Errorf("parse JavDB release date %q: %w", item.ReleaseDate, err)
-			}
-			if releaseDate.After(today) {
+				slog.WarnContext(ctx, "invalid JavDB release date; omitting date",
+					"movie_id", item.ID, "field", "release_date", "value", item.ReleaseDate)
+				item.ReleaseDate = ""
+			} else if releaseDate.After(today) {
 				releaseStatus = ReleaseUpcoming
 			} else {
 				releaseStatus = ReleaseReleased

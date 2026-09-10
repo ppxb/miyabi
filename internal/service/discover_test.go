@@ -138,6 +138,8 @@ func TestProjectMoviesAddsLibraryTaskAndReleaseState(t *testing.T) {
 		{ID: "one", Code: "ABP-001", ReleaseDate: today.Format("2006-01-02")},
 		{ID: "two", Code: "ABP-002", ReleaseDate: tomorrow},
 		{ID: "three", Code: "ABP-003"},
+		{ID: "one", Code: "ABP-001", ReleaseDate: "2026-02-30"},
+		{ID: "two", Code: "ABP-002", ReleaseDate: "TBA"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -150,6 +152,63 @@ func TestProjectMoviesAddsLibraryTaskAndReleaseState(t *testing.T) {
 	}
 	if movies[2].State != MovieNotInLibrary || movies[2].ReleaseStatus != ReleaseUnknown {
 		t.Fatalf("remote movie = %#v", movies[2])
+	}
+	if movies[3].State != MovieInLibrary || movies[3].ReleaseStatus != ReleaseUnknown ||
+		movies[3].ReleaseDate != "" || movies[3].LibraryID != localMovie.ID {
+		t.Fatalf("invalid date changed library state: %#v", movies[3])
+	}
+	if movies[4].State != MovieSaving || movies[4].ReleaseStatus != ReleaseUnknown || movies[4].ReleaseDate != "" {
+		t.Fatalf("invalid date changed task state: %#v", movies[4])
+	}
+}
+
+func TestProjectMoviesOmitsInvalidDatesWithoutMutatingCatalogue(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	service := &DiscoverService{database: store.Client}
+	now := time.Now().In(time.Local)
+	today := now.Format("2006-01-02")
+	past := now.AddDate(0, 0, -1).Format("2006-01-02")
+	future := now.AddDate(0, 0, 1).Format("2006-01-02")
+	cases := []struct {
+		input  string
+		date   string
+		status ReleaseStatus
+	}{
+		{past, past, ReleaseReleased},
+		{"", "", ReleaseUnknown},
+		{" \t\n", "", ReleaseUnknown},
+		{"2026-02-30", "", ReleaseUnknown},
+		{"0000-00-00", "", ReleaseUnknown},
+		{"TBA", "", ReleaseUnknown},
+		{"2026-09", "", ReleaseUnknown},
+		{"2026-09-10T00:00:00Z", "", ReleaseUnknown},
+		{" " + today + " ", today, ReleaseReleased},
+		{future, future, ReleaseUpcoming},
+	}
+	source := make([]javdb.Movie, len(cases))
+	for index, test := range cases {
+		source[index] = javdb.Movie{
+			ID: fmt.Sprintf("movie-%d", index), Code: fmt.Sprintf("ABP-%03d", index),
+			Title: "Fixture title", ReleaseDate: test.input,
+		}
+	}
+	result, err := service.projectMovies(t.Context(), source)
+	if err != nil || len(result) != len(source) {
+		t.Fatalf("optional dates blocked the page: %#v, %v", result, err)
+	}
+	for index, test := range cases {
+		movie := result[index]
+		if movie.ReleaseDate != test.date || movie.ReleaseStatus != test.status ||
+			movie.ID != source[index].ID || movie.Code != source[index].Code || movie.Title != source[index].Title {
+			t.Errorf("date %q damaged movie projection: %#v", test.input, movie)
+		}
+		if source[index].ReleaseDate != test.input {
+			t.Errorf("projection mutated cached catalogue date %q to %q", test.input, source[index].ReleaseDate)
+		}
 	}
 }
 

@@ -53,6 +53,9 @@ type RouteCandidate struct {
 type Zone string
 
 const (
+	// ZoneUnknown is only returned for missing or unsupported movie types.
+	// It is not a valid search, browse, or tag filter.
+	ZoneUnknown    Zone = "unknown"
 	ZoneAll        Zone = "all"
 	ZoneCensored   Zone = "censored"
 	ZoneUncensored Zone = "uncensored"

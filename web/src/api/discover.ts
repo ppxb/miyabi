@@ -70,7 +70,7 @@ export type DiscoverMovie = {
 }
 
 export type DiscoverMovieDetail = DiscoverMovie & {
-  zone: JavDBZone
+  zone: JavDBZone | 'unknown'
   actor_movies: MovieReference[]
   related_movies: MovieReference[]
 }

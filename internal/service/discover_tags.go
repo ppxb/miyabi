@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"slices"
 
 	"github.com/ppxb/miyabi/internal/javdb"
 )
@@ -9,6 +10,12 @@ import (
 // Catalogue tag IDs are global. Some details include unnamed tags whose
 // definitions live in another section's taxonomy; complete them before caching.
 func (service *DiscoverService) completeMovieTags(ctx context.Context, detail *javdb.MovieDetail) error {
+	if detail.Zone == javdb.ZoneUnknown {
+		// No supported taxonomy can be selected. Keep names supplied by the
+		// detail without making classification-dependent requests.
+		detail.Tags = namedMovieTags(detail.Tags)
+		return nil
+	}
 	var missing []int
 	for index, tag := range detail.Tags {
 		if tag.Name == "" || tag.CategoryID == "" {
@@ -56,12 +63,10 @@ func (service *DiscoverService) completeMovieTags(ctx context.Context, detail *j
 	}
 	// Retired tag IDs can remain on a movie without a name or taxonomy entry.
 	// Keep available metadata; an unnamed optional tag cannot be displayed.
-	tags := detail.Tags[:0]
-	for _, tag := range detail.Tags {
-		if tag.Name != "" {
-			tags = append(tags, tag)
-		}
-	}
-	detail.Tags = tags
+	detail.Tags = namedMovieTags(detail.Tags)
 	return nil
+}
+
+func namedMovieTags(tags []javdb.Tag) []javdb.Tag {
+	return slices.DeleteFunc(tags, func(tag javdb.Tag) bool { return tag.Name == "" })
 }

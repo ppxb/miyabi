@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -60,5 +61,32 @@ func TestCompleteMovieTagsSkipsLookupsForCompleteMetadata(t *testing.T) {
 		if err := service.completeMovieTags(t.Context(), &javdb.MovieDetail{Movie: javdb.Movie{Tags: tags}}); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestCompleteMovieTagsPreservesNamesWithoutLookingUpUnknownZone(t *testing.T) {
+	// No client or tag cache: an unknown zone must not issue taxonomy requests.
+	service := &DiscoverService{}
+	detail := javdb.MovieDetail{Zone: javdb.ZoneUnknown, Movie: javdb.Movie{
+		ID: "movie", Code: "ABP-001", Title: "Fixture title",
+		Tags: []javdb.Tag{
+			{ID: "named", Name: "上游标签", NameZHT: "上游標籤"},
+			{ID: "unnamed", CategoryID: "category"},
+			{ID: "complete", Name: "完整标签", CategoryID: "category"},
+		},
+	}}
+	if err := service.completeMovieTags(t.Context(), &detail); err != nil {
+		t.Fatal(err)
+	}
+	want := []javdb.Tag{
+		{ID: "named", Name: "上游标签", NameZHT: "上游標籤"},
+		{ID: "complete", Name: "完整标签", CategoryID: "category"},
+	}
+	if !slices.Equal(detail.Tags, want) || detail.Zone != javdb.ZoneUnknown || detail.Title != "Fixture title" {
+		t.Fatalf("unknown taxonomy damaged available metadata: %#v", detail)
+	}
+	detail.Tags = []javdb.Tag{{ID: "unnamed"}}
+	if err := service.completeMovieTags(t.Context(), &detail); err != nil || detail.Tags == nil || len(detail.Tags) != 0 {
+		t.Fatalf("unknown taxonomy did not leave an empty usable tag list: %#v, %v", detail.Tags, err)
 	}
 }

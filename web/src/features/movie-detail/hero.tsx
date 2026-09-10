@@ -66,16 +66,22 @@ export function MovieHero({ movie }: { movie: DiscoverMovieDetail }) {
             <div className="flex items-start gap-4">
               <dt className="w-10 shrink-0 pt-0.5 text-xs leading-5 text-muted-foreground">标签</dt>
               <dd className="flex min-w-0 flex-wrap gap-2">
-                {movie.tags.map(tag => (
-                  <MetadataLink
-                    key={tag.id}
-                    kind="tag"
-                    id={tag.id}
-                    name={tag.name}
-                    zone={movie.zone}
-                    badge
-                  />
-                ))}
+                {movie.tags.map(tag =>
+                  movie.zone === 'unknown' ? (
+                    <Badge key={tag.id} variant="outline">
+                      {tag.name}
+                    </Badge>
+                  ) : (
+                    <MetadataLink
+                      key={tag.id}
+                      kind="tag"
+                      id={tag.id}
+                      name={tag.name}
+                      zone={movie.zone}
+                      badge
+                    />
+                  )
+                )}
               </dd>
             </div>
           ) : null}
