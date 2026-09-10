@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiGet, apiPost, apiPut } from '@/api/client'
 
-export type MovieState = 'not_in_library' | 'saving' | 'in_library'
+export type MovieState = 'not_in_library' | 'saving' | 'processing' | 'in_library'
 export type ReleaseStatus = 'unknown' | 'released' | 'upcoming'
 export type JavDBZone = 'censored' | 'uncensored' | 'western' | 'fc2' | 'anime'
 export type JavDBEntityType = 'actor' | 'series' | 'maker' | 'director'
@@ -134,16 +134,6 @@ const discoverQueryDefaults = {
   retry: false,
   refetchOnWindowFocus: false
 } as const
-
-export function invalidateMovieStates(queryClient: QueryClient) {
-  return queryClient.invalidateQueries({
-    predicate: query =>
-      query.queryKey[0] === 'discover' &&
-      (query.queryKey[1] === 'movies' ||
-        query.queryKey[1] === 'search' ||
-        (query.queryKey[1] === 'movie' && query.queryKey.length === 3))
-  })
-}
 
 export function useDiscoverMovies(params: BrowseMoviesParams, enabled = true) {
   return useQuery({

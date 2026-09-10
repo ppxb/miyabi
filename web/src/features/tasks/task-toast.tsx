@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 
 import type { OfflineSubmission } from '@/api/offline'
 import { isTaskActive, type ScanTask } from '@/api/tasks'
+import { isOfflineTaskActive } from '@/lib/offline-state'
 import { useUIStore } from '@/stores/ui'
 import { scanStage } from './scan-status'
 import { TaskProgress } from './task-progress'
@@ -61,14 +62,29 @@ export function notifyOfflineTask(
   task: OfflineSubmission,
   options: TaskToastOptions & { scan?: ScanTask } = {}
 ) {
-  const active = task.phase === 'downloading' || task.phase === 'processing'
+  const active = isOfflineTaskActive(task)
   const id = offlineToastID(task.task_id)
   const props = taskToastOptions(id, active, options)
+  const libraryID = task.phase === 'in_library' ? task.library_id : undefined
+  const actions = (
+    <TaskToastActions
+      id={id}
+      onPlay={
+        libraryID === undefined ? undefined : () => useUIStore.getState().openPlayer(libraryID)
+      }
+    />
+  )
   if (active) {
     const scan = options.scan
-    const label = task.phase === 'downloading' ? '下载中' : '入库处理中'
+    const label =
+      task.phase === 'downloading'
+        ? '下载中'
+        : task.phase === 'in_library'
+          ? '已入库 · 整理中'
+          : '入库处理中'
     toast.info(`${task.code} · ${options.waiting ? '等待进度同步' : label}`, {
       ...props,
+      action: actions,
       icon: options.waiting ? undefined : <LoaderCircleIcon className="size-4 animate-spin" />,
       description: (
         <TaskProgress
@@ -86,18 +102,10 @@ export function notifyOfflineTask(
     })
   } else if (task.phase === 'in_library') {
     const notify = task.error ? toast.warning : toast.success
-    const libraryID = task.library_id
     notify(`${task.code} 已入库`, {
       ...props,
       description: task.error ? `元数据处理失败：${task.error}` : '下载与入库处理已完成',
-      action: (
-        <TaskToastActions
-          id={id}
-          onPlay={
-            libraryID === undefined ? undefined : () => useUIStore.getState().openPlayer(libraryID)
-          }
-        />
-      )
+      action: actions
     })
   } else if (task.error || task.status === 'failed') {
     toast.error(`${task.code} 处理失败`, { ...props, description: task.error })

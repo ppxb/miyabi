@@ -4,7 +4,12 @@ import { useState } from 'react'
 
 import type { DiscoverMagnet, useDiscoverMagnets } from '@/api/discover'
 import { ApiError } from '@/api/client'
-import { useAddOffline, useOfflineTasks, type OfflineSubmission } from '@/api/offline'
+import {
+  isOfflineTaskActive,
+  useAddOffline,
+  useOfflineTasks,
+  type OfflineSubmission
+} from '@/api/offline'
 import { usePanAccount } from '@/api/pan'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -31,7 +36,7 @@ export function MovieMagnets({
   const unauthorized = account.error instanceof ApiError && account.error.status === 401
   const connected = account.data?.connected === true && !unauthorized
   const accountID = connected ? (account.data?.account?.id ?? '') : ''
-  const offline = useOfflineTasks(movieID, accountID)
+  const offline = useOfflineTasks(movieID, accountID, account.data?.directory?.id ?? '')
   const tasks = new Map(offline.data?.map(task => [task.hash, task] as const))
   const checkingStatus = offline.isPending
   const hasDirectory = Boolean(account.data?.directory)
@@ -173,7 +178,7 @@ function MagnetCard({
                 disabled={!hasDirectory || busy || statusError || submitted}
                 onClick={() => add.mutate(magnet.hash)}
               >
-                {busy || task?.phase === 'downloading' || task?.phase === 'processing' ? (
+                {busy || (task && isOfflineTaskActive(task)) ? (
                   <LoaderCircleIcon className="animate-spin" />
                 ) : submitted ? (
                   <CheckIcon />
@@ -185,6 +190,9 @@ function MagnetCard({
             ) : null}
           </div>
         </div>
+        {task?.phase === 'in_library' && task.processing ? (
+          <p className="text-sm text-muted-foreground">文件已入库，后台整理中。</p>
+        ) : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
       </CardContent>
     </Card>

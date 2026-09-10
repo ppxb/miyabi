@@ -63,6 +63,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	api.GET("/tasks/events", taskEventsHandler(deps.Tasks))
 	api.GET("/offline/tasks", offlineActivityHandler(deps.Offline))
 	api.GET("/discover/movies", discoverBrowseHandler(deps.Discover))
+	api.POST("/discover/movie-states", discoverMovieStatesHandler(deps.Discover))
 	api.GET("/discover/search", discoverSearchHandler(deps.Discover))
 	api.GET("/discover/tags", discoverTagsHandler(deps.Discover))
 	api.GET("/discover/movies/:id", discoverMovieHandler(deps.Discover))

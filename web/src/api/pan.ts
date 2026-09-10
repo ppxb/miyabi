@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { useEffect } from 'react'
 
 import { ApiError, apiDelete, apiGet, apiPost, apiPut } from '@/api/client'
-import { invalidateMovieStates } from '@/api/discover'
+import { resetMovieStates } from '@/api/movie-state-cache'
 
 export type PanDirectory = {
   id: string
@@ -60,7 +60,7 @@ export const panKeys = {
 export function invalidatePanSource(queryClient: QueryClient) {
   void queryClient.invalidateQueries({ queryKey: ['library'] })
   void queryClient.invalidateQueries({ queryKey: ['offline'] })
-  void invalidateMovieStates(queryClient)
+  void resetMovieStates(queryClient)
 }
 
 export function usePanAccount(enabled = true) {

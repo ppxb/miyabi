@@ -10,7 +10,7 @@ import {
   type PropsWithChildren
 } from 'react'
 
-import { invalidateMovieStates } from '@/api/discover'
+import { invalidateMovieStates } from '@/api/movie-state-cache'
 import { libraryKeys } from '@/api/library'
 import { offlineKeys } from '@/api/offline'
 import { taskKeys, type ScanTask, type TaskRevisions } from '@/api/tasks'
@@ -40,11 +40,12 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     const events = new EventSource('/api/tasks/events')
     let revisions: TaskRevisions | undefined
-    let refreshTimer: ReturnType<typeof setTimeout> | undefined
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     let connectionTimer: ReturnType<typeof setTimeout> | undefined
     let libraryChanged = false
     let offlineChanged = false
+    let refreshing = false
+    let disposed = false
 
     function markDisconnected() {
       setConnection('disconnected')
@@ -68,15 +69,27 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
       connectionTimer = setTimeout(restartConnection, timeout)
     }
 
-    function refreshData() {
-      refreshTimer = undefined
-      if (libraryChanged) void queryClient.invalidateQueries({ queryKey: libraryKeys.all })
-      if (libraryChanged || offlineChanged) {
-        void invalidateMovieStates(queryClient)
-        void queryClient.invalidateQueries({ queryKey: offlineKeys.all })
+    async function refreshData() {
+      if (refreshing) return
+      refreshing = true
+      try {
+        // Refresh immediately, then reconcile once more if changes arrive
+        // during the request. Bursts do not cancel each other's responses.
+        while (!disposed && (libraryChanged || offlineChanged)) {
+          const refreshLibrary = libraryChanged
+          libraryChanged = false
+          offlineChanged = false
+          await Promise.all([
+            invalidateMovieStates(queryClient),
+            queryClient.invalidateQueries({ queryKey: offlineKeys.all }),
+            refreshLibrary
+              ? queryClient.invalidateQueries({ queryKey: libraryKeys.all })
+              : Promise.resolve()
+          ])
+        }
+      } finally {
+        refreshing = false
       }
-      libraryChanged = false
-      offlineChanged = false
     }
 
     events.addEventListener('tasks', async (event: MessageEvent<string>) => {
@@ -92,17 +105,10 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
     events.addEventListener('changes', (event: MessageEvent<string>) => {
       const next = JSON.parse(event.data) as TaskRevisions
       waitForActivity()
-      const reconnecting = revisions === undefined
       libraryChanged ||= revisions?.library !== next.library
       offlineChanged ||= revisions?.offline !== next.offline
       revisions = next
-      if (!libraryChanged && !offlineChanged) return
-      if (reconnecting) {
-        clearTimeout(refreshTimer)
-        refreshData()
-      } else if (refreshTimer === undefined) {
-        refreshTimer = setTimeout(refreshData, 1000)
-      }
+      void refreshData()
     })
 
     // The server sends a heartbeat every 15 seconds, even when no task changes.
@@ -119,8 +125,8 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
     waitForActivity(15_000)
 
     return () => {
+      disposed = true
       events.close()
-      clearTimeout(refreshTimer)
       clearTimeout(retryTimer)
       clearTimeout(connectionTimer)
     }

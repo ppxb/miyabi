@@ -7,12 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"entgo.io/ent/dialect/sql"
-	"entgo.io/ent/dialect/sql/sqljson"
-	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/ent/movie"
-	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/javdb"
 )
 
@@ -27,6 +22,7 @@ type ReleaseStatus string
 const (
 	MovieNotInLibrary MovieState = "not_in_library"
 	MovieSaving       MovieState = "saving"
+	MovieProcessing   MovieState = "processing"
 	MovieInLibrary    MovieState = "in_library"
 )
 
@@ -300,74 +296,19 @@ func (service *DiscoverService) projectMovies(
 	if len(source) == 0 {
 		return []DiscoverMovie{}, nil
 	}
-	codes := make([]string, len(source))
-	ids := make([]string, len(source))
-	taskIDs := make([]any, len(source))
+	identities := make([]MovieIdentity, len(source))
 	for index, item := range source {
-		codes[index] = codeid.Normalize(item.Code)
-		ids[index] = item.ID
-		taskIDs[index] = item.ID
+		identities[index] = MovieIdentity{ID: item.ID, Code: item.Code}
 	}
-
-	byJavDBID := make(map[string]int, len(source))
-	byCode := make(map[string]int, len(source))
-	sourceDirectory, err := loadLibrarySource(ctx, service.database)
+	states, err := service.MovieStates(ctx, identities)
 	if err != nil {
 		return nil, err
-	}
-	if sourceDirectory != nil {
-		localMovies, err := service.database.Movie.Query().Where(
-			movie.Or(movie.JavdbIDIn(ids...), movie.And(movie.JavdbIDIsNil(), movie.CodeIn(codes...))),
-			movie.HasFilesWith(libraryFiles(*sourceDirectory)),
-		).Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID).All(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("query local movies: %w", err)
-		}
-		for _, record := range localMovies {
-			if record.JavdbID != nil {
-				byJavDBID[*record.JavdbID] = record.ID
-			} else {
-				byCode[record.Code] = record.ID
-			}
-		}
-	}
-
-	saving := make(map[string]bool)
-	if sourceDirectory != nil {
-		tasks, err := service.database.Task.Query().Where(
-			task.TypeEQ("offline"), task.StatusIn(task.StatusQueued, task.StatusRunning),
-			func(selector *sql.Selector) {
-				selector.Where(sql.And(
-					sqljson.ValueIn(task.FieldPayload, taskIDs, sqljson.Path("javdb_id")),
-					sqljson.ValueEQ(task.FieldPayload, sourceDirectory.AccountID, sqljson.Path("account_id")),
-					sqljson.ValueEQ(task.FieldPayload, sourceDirectory.Directory.ID, sqljson.Path("directory_id")),
-				))
-			},
-		).Select(task.FieldPayload).All(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("query active tasks: %w", err)
-		}
-		for _, item := range tasks {
-			saving[item.Payload["javdb_id"].(string)] = true
-		}
 	}
 
 	now := time.Now().In(time.Local)
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 	result := make([]DiscoverMovie, len(source))
 	for index, item := range source {
-		libraryID := byJavDBID[item.ID]
-		if libraryID == 0 {
-			libraryID = byCode[codes[index]]
-		}
-		state := MovieNotInLibrary
-		switch {
-		case libraryID != 0:
-			state = MovieInLibrary
-		case saving[item.ID]:
-			state = MovieSaving
-		}
-
 		releaseStatus := ReleaseUnknown
 		if item.ReleaseDate != "" {
 			releaseDate, err := time.ParseInLocation("2006-01-02", item.ReleaseDate, time.Local)
@@ -382,8 +323,8 @@ func (service *DiscoverService) projectMovies(
 		}
 		result[index] = DiscoverMovie{
 			Movie:         item,
-			LibraryID:     libraryID,
-			State:         state,
+			LibraryID:     states[index].LibraryID,
+			State:         states[index].State,
 			ReleaseStatus: releaseStatus,
 		}
 	}

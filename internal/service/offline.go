@@ -34,6 +34,7 @@ type OfflineSubmission struct {
 	Hash        string      `json:"hash"`
 	Status      task.Status `json:"status"`
 	Phase       string      `json:"phase"`
+	Processing  bool        `json:"processing"`
 	Progress    int         `json:"progress"`
 	Error       *string     `json:"error,omitempty"`
 }
@@ -124,7 +125,7 @@ func (service *OfflineService) Add(ctx context.Context, movieID, hash string) (O
 		if err != nil {
 			return OfflineSubmission{}, err
 		}
-		if state.Phase == "processing" {
+		if state.Processing {
 			return state, nil
 		}
 	} else if !ent.IsNotFound(err) {
@@ -384,15 +385,16 @@ func (service *OfflineService) submissions(ctx context.Context, records []*ent.T
 				return nil, fmt.Errorf("scan task %d for download %d was not found", input.ScanTaskID, record.ID)
 			}
 			if scan.Status == task.StatusQueued || scan.Status == task.StatusRunning {
-				item.Phase = "processing"
-				continue
+				item.Processing = true
 			}
 			if scan.Error != nil {
 				item.Error = scan.Error
 			}
 		} else if record.Status == task.StatusDone && input.FileID != "" {
+			item.Processing = true
+		}
+		if item.Processing {
 			item.Phase = "processing"
-			continue
 		}
 		for _, id := range input.FileIDs {
 			matched, present := indexed[id]
@@ -408,7 +410,9 @@ func (service *OfflineService) submissions(ctx context.Context, records []*ent.T
 				}
 				break
 			}
-			item.Phase = "downloaded"
+			if !item.Processing {
+				item.Phase = "downloaded"
+			}
 		}
 	}
 	return result, nil

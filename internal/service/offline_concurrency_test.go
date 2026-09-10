@@ -289,3 +289,46 @@ func TestOfflineDuplicateHistoryPreservesRedownloadBehavior(t *testing.T) {
 		})
 	}
 }
+
+func TestOfflinePlayableProcessingStillDeduplicatesUntilWorkflowFinishes(t *testing.T) {
+	service, client := offlineAddFixture(t)
+	ctx := t.Context()
+	source := service.drive.snapshot().source()
+	input := offlinePayload{AccountID: source.AccountID, DirectoryID: source.Directory.ID,
+		Code: "ABP-001", JavDBID: "fixture-movie", Hash: offlineHashA, InfoHash: offlineHashA}
+	encoded, err := encodeTaskPayload(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := service.database.Task.Create().SetType("offline").SetStatus(task.StatusRunning).SetPayload(encoded).SaveX(ctx)
+	if err := service.updateTask(ctx, record, pan.OfflineTask{Status: 2, FileID: "download-folder"}, service.drive.snapshot()); err != nil {
+		t.Fatal(err)
+	}
+	record = service.database.Task.GetX(ctx, record.ID)
+	input, err = decodeTaskPayload[offlinePayload](record.Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	film := service.database.Movie.Create().SetCode(input.Code).SetJavdbID(input.JavDBID).SaveX(ctx)
+	video := service.database.File.Create().SetFileID("video").SetName("ABP-001.mp4").SetSize(1).
+		SetAccountID(source.AccountID).SetRootID(source.Directory.ID).SetMovie(film).SaveX(ctx)
+	record.Payload["file_ids"] = []string{video.FileID}
+	service.database.Task.UpdateOne(record).SetPayload(record.Payload).ExecX(ctx)
+	adds := 0
+	client.addOffline = func(context.Context, string, string, string) (string, error) {
+		adds++
+		return offlineHashA, nil
+	}
+	result, err := service.Add(ctx, input.JavDBID, input.Hash)
+	if err != nil || result.TaskID != record.ID || result.Phase != "in_library" || !result.Processing || adds != 0 {
+		t.Fatalf("playable processing download was resubmitted: %+v adds=%d err=%v", result, adds, err)
+	}
+	if err := service.tasks.Finish(ctx, input.ScanTaskID, nil); err != nil {
+		t.Fatal(err)
+	}
+	service.database.File.DeleteOne(video).ExecX(ctx)
+	result, err = service.Add(ctx, input.JavDBID, input.Hash)
+	if err != nil || result.TaskID == record.ID || result.Phase != "downloading" || adds != 1 {
+		t.Fatalf("deleted video could not be downloaded again: %+v adds=%d err=%v", result, adds, err)
+	}
+}

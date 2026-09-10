@@ -1,4 +1,5 @@
-import type { DiscoverMovie, MovieState } from '@/api/discover'
+import type { DiscoverMovie } from '@/api/discover'
+import { useMovieState } from '@/api/movie-states'
 import { Badge } from '@/components/ui/badge'
 
 export function MovieResourceBadges({ movie }: { movie: DiscoverMovie }) {
@@ -12,7 +13,8 @@ export function MovieResourceBadges({ movie }: { movie: DiscoverMovie }) {
   )
 }
 
-export function MovieStateBadge({ state }: { state: MovieState }) {
+export function MovieStateBadge({ movie }: { movie: DiscoverMovie }) {
+  const { state } = useMovieState(movie)
   if (state === 'in_library') {
     return (
       <Badge className="border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
@@ -22,6 +24,9 @@ export function MovieStateBadge({ state }: { state: MovieState }) {
   }
   if (state === 'saving') {
     return <Badge variant="outline">下载中</Badge>
+  }
+  if (state === 'processing') {
+    return <Badge variant="outline">入库处理中</Badge>
   }
   return null
 }

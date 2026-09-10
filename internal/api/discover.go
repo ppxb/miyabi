@@ -13,6 +13,7 @@ type Discoverer interface {
 	Search(context.Context, string, javdb.SearchOptions) ([]service.DiscoverMovie, error)
 	Browse(context.Context, javdb.BrowseOptions) ([]service.DiscoverMovie, error)
 	MovieDetail(context.Context, string) (service.DiscoverMovieDetail, error)
+	MovieStates(context.Context, []service.MovieIdentity) ([]service.DiscoverMovieState, error)
 	Magnets(context.Context, string) ([]service.DiscoverMagnet, error)
 	Tags(context.Context, javdb.Zone) ([]javdb.TagCategory, error)
 	Media(context.Context, string) (javdb.Media, error)
@@ -47,6 +48,27 @@ type discoverTagsQuery struct {
 
 type movieURI struct {
 	ID string `uri:"id" binding:"required"`
+}
+
+type movieStatesInput struct {
+	Movies []service.MovieIdentity `json:"movies" binding:"required,min=1,max=100,dive"`
+}
+
+func discoverMovieStatesHandler(discover Discoverer) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input movieStatesInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.Error(BadRequest(err))
+			return
+		}
+		states, err := discover.MovieStates(c.Request.Context(), input.Movies)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		c.Header("Cache-Control", "no-store")
+		c.JSON(http.StatusOK, states)
+	}
 }
 
 type imageQuery struct {

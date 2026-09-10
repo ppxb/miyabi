@@ -18,7 +18,7 @@ export function DiscoverMovieCard({ movie }: { movie: DiscoverMovie }) {
       <MovieCard
         movie={movie}
         description={movie.release_date}
-        state={<MovieStateBadge state={movie.state} />}
+        state={<MovieStateBadge movie={movie} />}
       >
         <MovieResourceBadges movie={movie} />
       </MovieCard>

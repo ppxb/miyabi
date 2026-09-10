@@ -1,9 +1,13 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError, apiGet, apiPost } from '@/api/client'
+import { invalidateMovieStates } from '@/api/movie-state-cache'
 import { panKeys, type PanAccountStatus } from '@/api/pan'
 import type { LibrarySource } from '@/api/tasks'
 import { notifyOfflineTask, notifyTaskError } from '@/features/tasks/task-toast'
+import { isOfflineTaskActive } from '@/lib/offline-state'
+
+export { isOfflineTaskActive } from '@/lib/offline-state'
 
 export type OfflineSubmission = {
   task_id: number
@@ -16,6 +20,7 @@ export type OfflineSubmission = {
   hash: string
   status: 'queued' | 'running' | 'done' | 'failed'
   phase: 'available' | 'downloading' | 'processing' | 'in_library' | 'downloaded'
+  processing: boolean
   progress: number
   error?: string
 }
@@ -36,10 +41,6 @@ const activityOptions = queryOptions({
   refetchOnWindowFocus: false
 })
 
-export function isOfflineTaskActive(task: OfflineSubmission) {
-  return task.phase === 'downloading' || task.phase === 'processing'
-}
-
 export function useOfflineActivity() {
   return useQuery({
     ...activityOptions,
@@ -47,12 +48,12 @@ export function useOfflineActivity() {
   })
 }
 
-export function useOfflineTasks(movieID: string, accountID: string) {
+export function useOfflineTasks(movieID: string, accountID: string, directoryID: string) {
   return useQuery({
     ...activityOptions,
-    enabled: accountID !== '',
+    enabled: accountID !== '' && directoryID !== '',
     select: activity =>
-      activity.source?.account_id === accountID
+      activity.source?.account_id === accountID && activity.source.directory.id === directoryID
         ? activity.tasks.filter(task => task.javdb_id === movieID)
         : []
   })
@@ -88,6 +89,7 @@ export function useAddOffline(movieID: string) {
           : activity
       )
       notifyOfflineTask(submission)
+      void invalidateMovieStates(queryClient)
       void queryClient.invalidateQueries({ queryKey: offlineKeys.all })
     },
     onError: error => {

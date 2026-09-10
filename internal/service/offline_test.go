@@ -255,7 +255,7 @@ func TestOfflineActivityKeepsLatestTasksInCurrentSource(t *testing.T) {
 	}
 }
 
-func TestOfflineActivityWaitsForArtworkAndRechecksPlayableFiles(t *testing.T) {
+func TestOfflineActivitySeparatesPlaybackFromArtworkAndRechecksFiles(t *testing.T) {
 	service, download, input, source := offlineFixture(t)
 	ctx := t.Context()
 	if err := service.updateTask(ctx, download, pan.OfflineTask{Status: 2, FileID: "download-folder"}, service.drive.snapshot()); err != nil {
@@ -309,25 +309,25 @@ func TestOfflineActivityWaitsForArtworkAndRechecksPlayableFiles(t *testing.T) {
 	if err := service.tasks.Finish(ctx, input.ScanTaskID, nil); err != nil {
 		t.Fatal(err)
 	}
-	assertPhase := func(want string) {
+	assertPhase := func(want string, processing bool) {
 		t.Helper()
 		activity, err := service.Activity(ctx)
 		if err != nil || len(activity.Tasks) != 1 || activity.Tasks[0].Phase != want ||
-			activity.Tasks[0].ScanTaskID != input.ScanTaskID {
+			activity.Tasks[0].Processing != processing || activity.Tasks[0].ScanTaskID != input.ScanTaskID {
 			t.Fatalf("want %s, activity=%+v err=%v", want, activity, err)
 		}
 	}
-	assertPhase("processing")
+	assertPhase("in_library", true)
 	if err := service.tasks.Finish(ctx, cover.ID, nil); err != nil {
 		t.Fatal(err)
 	}
-	assertPhase("in_library")
+	assertPhase("in_library", false)
 	if _, err := service.database.File.Delete().Where(file.FileIDEQ("matched-video")).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	assertPhase("downloaded")
+	assertPhase("downloaded", false)
 	if _, err := service.database.File.Delete().Where(file.FileIDEQ("unmatched-video")).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	assertPhase("available")
+	assertPhase("available", false)
 }

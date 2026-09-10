@@ -350,6 +350,7 @@ func isVideo(name string) bool {
 
 func (service *LibraryService) indexScanPage(ctx context.Context, taskID int, scanID, directoryPath string, videos []scanVideo, payload *scanPayload) error {
 	indexChanged := false
+	offlineChanged := false
 	err := ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
 		if len(videos) > 0 {
 			ids := make([]string, 0, len(videos))
@@ -447,6 +448,34 @@ func (service *LibraryService) indexScanPage(ctx context.Context, taskID int, sc
 				return err
 			}
 			payload.Scan.RemovedMovies += removed
+			if payload.OfflineTaskID != 0 {
+				// Record each committed page with its download, so playback is
+				// available before the remaining scan and metadata work finishes.
+				record, err := tx.Task.Get(ctx, payload.OfflineTaskID)
+				if err != nil {
+					return err
+				}
+				input, err := decodeTaskPayload[offlinePayload](record.Payload)
+				if err != nil {
+					return err
+				}
+				known := make(map[string]bool, len(input.FileIDs))
+				for _, id := range input.FileIDs {
+					known[id] = true
+				}
+				for _, id := range ids {
+					if !known[id] {
+						input.FileIDs = append(input.FileIDs, id)
+						known[id], offlineChanged = true, true
+					}
+				}
+				if offlineChanged {
+					record.Payload["file_ids"] = input.FileIDs
+					if err := tx.Task.UpdateOneID(record.ID).SetPayload(record.Payload).Exec(ctx); err != nil {
+						return err
+					}
+				}
+			}
 		}
 		return saveScanProgress(ctx, tx.Task, taskID, *payload)
 	})
@@ -455,6 +484,8 @@ func (service *LibraryService) indexScanPage(ctx context.Context, taskID int, sc
 	}
 	if indexChanged {
 		service.tasks.NotifyLibraryChanged()
+	} else if offlineChanged {
+		service.tasks.NotifyOfflineChanged()
 	} else {
 		service.tasks.Notify()
 	}
