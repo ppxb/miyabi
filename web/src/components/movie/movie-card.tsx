@@ -28,11 +28,13 @@ export function DiscoverMovieCard({ movie }: { movie: DiscoverMovie }) {
 
 export function MovieCard({
   movie,
+  titlePlaceholder,
   description,
   state,
   children
 }: {
   movie: { code: string; title: string; cover?: string }
+  titlePlaceholder?: ReactNode
   description: ReactNode
   state?: ReactNode
   children: ReactNode
@@ -52,10 +54,12 @@ export function MovieCard({
         </div>
       </div>
       <CardContent className="min-w-0 space-y-2 p-3">
-        <OverflowTooltip content={title}>
-          <h3 className="truncate text-sm leading-5 font-semibold">{title}</h3>
-        </OverflowTooltip>
-        <p className="text-xs text-muted-foreground">{description}</p>
+        {titlePlaceholder ?? (
+          <OverflowTooltip content={title}>
+            <h3 className="truncate text-sm leading-5 font-semibold">{title}</h3>
+          </OverflowTooltip>
+        )}
+        <div className="text-xs text-muted-foreground">{description}</div>
         <div className="flex flex-wrap gap-1.5">{children}</div>
       </CardContent>
     </Card>

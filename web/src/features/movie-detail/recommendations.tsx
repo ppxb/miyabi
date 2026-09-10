@@ -1,10 +1,12 @@
 import { Link } from '@tanstack/react-router'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 
-import { type MovieReference, useDiscoverMovie } from '@/api/discover'
-import { DiscoverMovieCard, MovieCardSkeleton, MovieGridLayout } from '@/components/movie'
+import { type MovieReference, useRecommendationMovie } from '@/api/discover'
+import { MovieCard, MovieGridLayout } from '@/components/movie'
+import { MovieResourceBadges, MovieStateBadge } from '@/components/movie/movie-badges'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { observeRecommendation } from './recommendation-visibility'
 
 export function MovieRecommendations({
   title,
@@ -33,58 +35,66 @@ export function MovieRecommendations({
 
 function RecommendationCard({ movie }: { movie: MovieReference }) {
   const cardRef = useRef<HTMLDivElement>(null)
-  const [loadDetail, setLoadDetail] = useState(false)
+  const detail = useRecommendationMovie(movie.id)
+  const { request, prioritize } = detail
+  const data = detail.movie
+  const failed = detail.isError && !detail.isFetching
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries.some(entry => entry.isIntersecting)) {
-          setLoadDetail(true)
-          observer.disconnect()
-        }
-      },
-      { rootMargin: '200px 0px' }
-    )
-    observer.observe(cardRef.current!)
-    return () => observer.disconnect()
-  }, [])
+    if (cardRef.current) return observeRecommendation(cardRef.current, request)
+  }, [request])
 
   return (
-    <div ref={cardRef} className="h-full min-w-0">
-      <RecommendationContent movie={movie} loadDetail={loadDetail} />
-    </div>
-  )
-}
-
-function RecommendationContent({
-  movie,
-  loadDetail
-}: {
-  movie: MovieReference
-  loadDetail: boolean
-}) {
-  const detail = useDiscoverMovie(movie.id, loadDetail)
-
-  if (detail.data) return <DiscoverMovieCard movie={detail.data} />
-  if (!detail.isError) return <MovieCardSkeleton />
-
-  return (
-    <Card size="sm" className="h-full gap-0 overflow-hidden py-0">
-      <div className="flex aspect-3/2 items-center justify-center bg-muted text-sm text-muted-foreground">
-        详情加载失败
-      </div>
-      <CardContent className="flex min-h-24 items-center justify-between gap-2 p-3">
-        <Link
-          to="/discover/$movieId"
-          params={{ movieId: movie.id }}
-          className="text-sm outline-ring"
+    <div ref={cardRef} className="relative h-full min-w-0">
+      <Link
+        to="/discover/$movieId"
+        params={{ movieId: movie.id }}
+        aria-label={`查看影片 ${movie.code}`}
+        className="block h-full rounded-2xl outline-ring"
+        onFocus={() => {
+          if (!data && !failed) prioritize()
+        }}
+        onClick={prioritize}
+      >
+        <MovieCard
+          movie={{
+            code: data?.code ?? movie.code,
+            title: data?.title ?? '',
+            cover: data?.cover || data?.thumbnail || movie.thumbnail
+          }}
+          titlePlaceholder={!data && !failed ? <Skeleton className="h-5 w-full" /> : undefined}
+          description={
+            data ? (
+              data.release_date || '\u00a0'
+            ) : failed ? (
+              '详情暂时无法加载'
+            ) : (
+              <Skeleton className="h-4 w-3/4" />
+            )
+          }
+          state={<MovieStateBadge movie={movie} />}
         >
-          {movie.code}
-        </Link>
-        <Button type="button" variant="outline" size="sm" onClick={() => detail.refetch()}>
+          <div className="flex min-h-5 flex-wrap gap-1.5">
+            {data ? (
+              <MovieResourceBadges movie={data} />
+            ) : !failed ? (
+              <Skeleton className="h-5 w-16" />
+            ) : null}
+          </div>
+        </MovieCard>
+      </Link>
+      {!data && failed ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          className="absolute right-3 bottom-2"
+          aria-label={`重新加载 ${movie.code} 的详情`}
+          onClick={prioritize}
+        >
           重试
         </Button>
-      </CardContent>
-    </Card>
+      ) : null}
+    </div>
   )
 }

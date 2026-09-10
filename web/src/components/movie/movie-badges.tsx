@@ -1,4 +1,5 @@
 import type { DiscoverMovie } from '@/api/discover'
+import type { MovieIdentity } from '@/api/movie-state-cache'
 import { useMovieState } from '@/api/movie-states'
 import { Badge } from '@/components/ui/badge'
 
@@ -13,7 +14,7 @@ export function MovieResourceBadges({ movie }: { movie: DiscoverMovie }) {
   )
 }
 
-export function MovieStateBadge({ movie }: { movie: DiscoverMovie }) {
+export function MovieStateBadge({ movie }: { movie: MovieIdentity }) {
   const { state } = useMovieState(movie)
   if (state === 'in_library') {
     return (

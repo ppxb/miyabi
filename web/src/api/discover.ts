@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useSyncExternalStore } from 'react'
 
 import { apiGet, apiPost, apiPut } from '@/api/client'
+import {
+  createMovieDetailLoader,
+  discoverKeys,
+  findCachedMovieCard
+} from '@/api/movie-detail-cache'
 
 export type MovieState = 'not_in_library' | 'saving' | 'processing' | 'in_library'
 export type ReleaseStatus = 'unknown' | 'released' | 'upcoming'
@@ -120,20 +126,14 @@ export type SearchMoviesParams = {
   limit?: number
 }
 
-const discoverKeys = {
-  all: ['discover'] as const,
-  movies: (params: BrowseMoviesParams) => [...discoverKeys.all, 'movies', params] as const,
-  movie: (id: string) => [...discoverKeys.all, 'movie', id] as const,
-  magnets: (id: string) => [...discoverKeys.all, 'movie', id, 'magnets'] as const,
-  search: (params: SearchMoviesParams) => [...discoverKeys.all, 'search', params] as const,
-  tags: (zone: JavDBZone) => [...discoverKeys.all, 'tags', zone] as const,
-  route: ['javdb', 'route'] as const
-}
-
 const discoverQueryDefaults = {
   retry: false,
   refetchOnWindowFocus: false
 } as const
+
+const movieDetails = createMovieDetailLoader((id, signal) =>
+  apiGet<DiscoverMovieDetail>(`/api/discover/movies/${encodeURIComponent(id)}`, undefined, signal)
+)
 
 export function useDiscoverMovies(params: BrowseMoviesParams, enabled = true) {
   return useQuery({
@@ -162,18 +162,47 @@ export function useDiscoverMovies(params: BrowseMoviesParams, enabled = true) {
 }
 
 export function useDiscoverMovie(id: string, enabled = true) {
-  return useQuery({
-    ...discoverQueryDefaults,
-    queryKey: discoverKeys.movie(id),
-    queryFn: ({ signal }) =>
-      apiGet<DiscoverMovieDetail>(
-        `/api/discover/movies/${encodeURIComponent(id)}`,
-        undefined,
-        signal
-      ),
-    enabled,
-    staleTime: 5 * 60_000
-  })
+  const queryClient = useQueryClient()
+  const query = useQuery({ ...movieDetails.options(id), enabled })
+  useEffect(() => {
+    if (enabled) movieDetails.prioritize(queryClient, id)
+  }, [queryClient, id, enabled])
+  return query
+}
+
+export function useRecommendationMovie(id: string) {
+  const queryClient = useQueryClient()
+  const query = useQuery({ ...movieDetails.options(id), enabled: false })
+  const subscribe = useCallback(
+    (notify: () => void) =>
+      queryClient.getQueryCache().subscribe(event => {
+        if (
+          event.type !== 'removed' &&
+          !(event.type === 'updated' && event.action.type === 'success')
+        )
+          return
+        const [namespace, kind, key] = event.query.queryKey
+        if (
+          namespace === 'discover' &&
+          (kind === 'movies' ||
+            kind === 'search' ||
+            (kind === 'movie' && event.query.queryKey.length === 3 && key === id))
+        )
+          notify()
+      }),
+    [queryClient, id]
+  )
+  const snapshot = useCallback(() => findCachedMovieCard(queryClient, id), [queryClient, id])
+  const movie = useSyncExternalStore(subscribe, snapshot, snapshot)
+  const request = useCallback(() => movieDetails.request(queryClient, id), [queryClient, id])
+  const prioritize = useCallback(() => movieDetails.prefetch(queryClient, id), [queryClient, id])
+  return {
+    movie,
+    isError: query.isError,
+    isFetching: query.isFetching,
+    request,
+    prioritize
+  }
 }
 
 export function useDiscoverMagnets(id: string) {
