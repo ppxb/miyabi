@@ -45,15 +45,16 @@ type OfflineActivity struct {
 }
 
 type offlinePayload struct {
-	Code        string   `json:"code"`
-	JavDBID     string   `json:"javdb_id"`
-	Hash        string   `json:"hash"`
-	InfoHash    string   `json:"info_hash"`
-	AccountID   string   `json:"account_id"`
-	DirectoryID string   `json:"directory_id"`
-	FileID      string   `json:"file_id,omitempty"`
-	FileIDs     []string `json:"file_ids,omitempty"`
-	ScanTaskID  int      `json:"scan_task_id,omitempty"`
+	Code             string   `json:"code"`
+	JavDBID          string   `json:"javdb_id"`
+	Hash             string   `json:"hash"`
+	InfoHash         string   `json:"info_hash"`
+	AccountID        string   `json:"account_id"`
+	DirectoryID      string   `json:"directory_id"`
+	FileID           string   `json:"file_id,omitempty"`
+	FileIDs          []string `json:"file_ids,omitempty"`
+	ScanTaskID       int      `json:"scan_task_id,omitempty"`
+	AwaitingLocation bool     `json:"awaiting_location,omitempty"`
 }
 
 type OfflineService struct {
@@ -390,7 +391,9 @@ func (service *OfflineService) submissions(ctx context.Context, records []*ent.T
 			if scan.Error != nil {
 				item.Error = scan.Error
 			}
-		} else if record.Status == task.StatusDone && input.FileID != "" {
+		} else if record.Status == task.StatusDone && (input.FileID != "" || input.AwaitingLocation) {
+			// Remote completion may arrive before its file location. Keep the
+			// indexing workflow active without presenting it as a download.
 			item.Processing = true
 		}
 		if item.Processing {
@@ -495,7 +498,13 @@ func (service *OfflineService) Sync(ctx context.Context) error {
 	records, err := service.database.Task.Query().Where(task.TypeEQ("offline"), task.Or(
 		task.StatusIn(task.StatusQueued, task.StatusRunning),
 		task.And(task.StatusEQ(task.StatusDone), func(s *sql.Selector) {
-			s.Where(sql.Not(sqljson.HasKey(task.FieldPayload, sqljson.Path("scan_task_id"))))
+			s.Where(sql.And(
+				sql.Not(sqljson.HasKey(task.FieldPayload, sqljson.Path("scan_task_id"))),
+				sql.Or(
+					sqljson.HasKey(task.FieldPayload, sqljson.Path("file_id")),
+					sqljson.ValueEQ(task.FieldPayload, true, sqljson.Path("awaiting_location")),
+				),
+			))
 		}),
 	)).Order(ent.Desc(task.FieldID)).All(ctx)
 	if err != nil {
@@ -522,10 +531,12 @@ func (service *OfflineService) Sync(ctx context.Context) error {
 	}
 	wanted := make(map[string]*ent.Task)
 	seen := make(map[string]bool)
+	var syncErrors []error
 	for _, record := range records {
 		input, err := decodeTaskPayload[offlinePayload](record.Payload)
 		if err != nil {
-			return err
+			syncErrors = append(syncErrors, fmt.Errorf("read offline task %d: %w", record.ID, err))
+			continue
 		}
 		if input.AccountID != account.ID {
 			continue
@@ -541,7 +552,7 @@ func (service *OfflineService) Sync(ctx context.Context) error {
 			}
 			if input.FileID != "" {
 				if err := service.updateTask(ctx, record, pan.OfflineTask{Status: 2, FileID: input.FileID, Hash: input.InfoHash}, state); err != nil {
-					return err
+					syncErrors = append(syncErrors, err)
 				}
 				continue
 			}
@@ -555,27 +566,36 @@ func (service *OfflineService) Sync(ctx context.Context) error {
 			})
 		}, func(remote pan.OfflinePage) (bool, error) {
 			for _, download := range remote.Tasks {
+				if err := ctx.Err(); err != nil {
+					return false, err
+				}
 				key := strings.ToLower(download.Hash)
 				record, ok := wanted[key]
 				if !ok {
 					continue
 				}
-				if err := service.updateTask(ctx, record, download, state); err != nil {
-					return false, err
-				}
+				// A task we found is never missing, even if its update fails.
+				// Keep syncing other tasks and retry this one on the next poll.
 				delete(wanted, key)
+				if err := service.updateTask(ctx, record, download, state); err != nil {
+					if errors.Is(err, pan.ErrUnauthorized) {
+						return false, err
+					}
+					syncErrors = append(syncErrors, err)
+				}
 			}
 			return len(wanted) > 0, nil
 		}); err != nil {
-			return fmt.Errorf("sync 115 offline tasks: %w", err)
+			// Do not mark unseen tasks missing after an incomplete listing.
+			return errors.Join(append(syncErrors, fmt.Errorf("sync 115 offline tasks: %w", err))...)
 		}
 	}
 	for _, record := range wanted {
 		if err := service.markMissing(ctx, record, state); err != nil {
-			return err
+			syncErrors = append(syncErrors, err)
 		}
 	}
-	return nil
+	return errors.Join(syncErrors...)
 }
 
 func (service *OfflineService) updateTask(ctx context.Context, record *ent.Task, remote pan.OfflineTask, state panSnapshot) error {
@@ -620,6 +640,10 @@ func (service *OfflineService) updateTask(ctx context.Context, record *ent.Task,
 		switch remote.Status {
 		case 0, 1:
 		case 2:
+			if current.Status == task.StatusDone && (currentInput.ScanTaskID != 0 ||
+				currentInput.FileID == "" && remote.FileID == "") {
+				return nil
+			}
 			notify = true
 			return service.completeTask(ctx, tx, current, currentInput, remote.FileID, state)
 		case -1:
@@ -634,7 +658,7 @@ func (service *OfflineService) updateTask(ctx context.Context, record *ent.Task,
 		if status == task.StatusFailed {
 			update.SetError("115 离线下载失败，请在 115 客户端查看原因")
 		}
-		notify = current.Status != status
+		notify = true
 		return update.Exec(ctx)
 	})
 	if err != nil {
@@ -663,10 +687,37 @@ func (service *OfflineService) markMissing(ctx context.Context, record *ent.Task
 	if _, err := service.drive.credentials(state); err != nil {
 		return err
 	}
-	count, err := service.database.Task.Update().Where(task.IDEQ(record.ID),
-		task.StatusIn(task.StatusQueued, task.StatusRunning)).
-		SetStatus(task.StatusFailed).SetError("115 中未找到该任务，请在 115 客户端确认下载结果").Save(ctx)
-	if err == nil && count > 0 {
+	changed := false
+	err = ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
+		current, err := tx.Task.Get(ctx, record.ID)
+		if err != nil {
+			return err
+		}
+		update := tx.Task.UpdateOneID(current.ID)
+		switch current.Status {
+		case task.StatusQueued, task.StatusRunning:
+			update.SetStatus(task.StatusFailed).SetError("115 中未找到该任务，请在 115 客户端确认下载结果")
+		case task.StatusDone:
+			pending, err := decodeTaskPayload[offlinePayload](current.Payload)
+			if err != nil {
+				return err
+			}
+			if !pending.AwaitingLocation || pending.FileID != "" || pending.ScanTaskID != 0 {
+				return nil
+			}
+			pending.AwaitingLocation = false
+			encoded, err := encodeTaskPayload(pending)
+			if err != nil {
+				return err
+			}
+			update.SetPayload(encoded).SetError("115 已完成下载，但任务记录已移除，无法获取文件位置，请扫描媒体目录确认下载结果")
+		default:
+			return nil
+		}
+		changed = true
+		return update.Exec(ctx)
+	})
+	if err == nil && changed {
 		service.tasks.NotifyOfflineChanged()
 	}
 	return err
@@ -680,13 +731,13 @@ func (service *OfflineService) completeTask(ctx context.Context, tx *ent.Tx, rec
 	if record.Status == task.StatusDone && input.FileID != "" {
 		fileID = input.FileID
 	}
-	if fileID == "" {
-		return fmt.Errorf("115 下载已完成，但尚未返回文件位置")
-	}
 	input.FileID = fileID
+	input.AwaitingLocation = fileID == ""
 	current := service.drive.snapshot()
 	directory := current.directory
-	if input.ScanTaskID == 0 && current.credentialVersion == state.credentialVersion &&
+	// Save remote completion immediately; a later sync will create the scan
+	// once 115 exposes the output location.
+	if fileID != "" && input.ScanTaskID == 0 && current.credentialVersion == state.credentialVersion &&
 		current.matchesSource(state.source(), state.authorizationVersion) &&
 		directory.ID == input.DirectoryID && directory.AccountID == input.AccountID {
 		encoded, err := encodeTaskPayload(scanPayload{

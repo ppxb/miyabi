@@ -1,7 +1,7 @@
 import type { ScanTask } from '@/api/tasks'
 import { Progress } from '@/components/ui/progress'
 
-type TaskStage = ScanTask['scan']['stage'] | 'downloading'
+type TaskStage = ScanTask['scan']['stage'] | 'downloading' | 'locating'
 
 const stages: { id: TaskStage; label: string }[] = [
   { id: 'downloading', label: '正在下载' },
@@ -22,7 +22,7 @@ export function TaskProgress({
   progress?: number
 }) {
   const visible = offline ? stages : stages.slice(1)
-  const stage = current === 'queued' ? 'scanning' : current
+  const stage = current === 'queued' || current === 'locating' ? 'scanning' : current
   const index = visible.findIndex(item => item.id === stage)
   // Completion is the final marker. Each preceding stage occupies one interval;
   // stages without a measurable total advance when the next stage starts.
@@ -31,7 +31,11 @@ export function TaskProgress({
   return (
     <div className="space-y-1">
       <p className="text-xs leading-4 text-muted-foreground">
-        {current === 'queued' ? '等待扫描' : visible[index].label}
+        {current === 'locating'
+          ? '已下载，等待 115 返回文件信息'
+          : current === 'queued'
+            ? '等待扫描'
+            : visible[index].label}
       </p>
       <Progress
         value={value}

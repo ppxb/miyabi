@@ -16,6 +16,30 @@ type OfflineTask struct {
 	DirectoryID string `json:"wp_path_id"`
 }
 
+// 115 can return fractional percentages or numeric strings alongside integer
+// progress. Normalize at the boundary so one download cannot reject a page.
+func (task *OfflineTask) UnmarshalJSON(data []byte) error {
+	type offlineTask OfflineTask
+	var result struct {
+		offlineTask
+		Progress json.Number `json:"percentDone"`
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return err
+	}
+	var progress float64
+	if result.Progress != "" {
+		var err error
+		progress, err = result.Progress.Float64()
+		if err != nil {
+			return fmt.Errorf("decode 115 offline progress: %w", err)
+		}
+	}
+	*task = OfflineTask(result.offlineTask)
+	task.Progress = int(max(0, min(100, progress)))
+	return nil
+}
+
 // RemoveOffline removes download history only. Source files are never deleted.
 func (client *Client) RemoveOffline(ctx context.Context, accessToken, hash string) error {
 	response, err := client.request(

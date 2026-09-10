@@ -89,7 +89,15 @@ export function notifyOfflineTask(
       description: (
         <TaskProgress
           offline
-          current={task.phase === 'downloading' ? 'downloading' : scan ? scanStage(scan) : 'queued'}
+          current={
+            task.phase === 'downloading'
+              ? 'downloading'
+              : scan
+                ? scanStage(scan)
+                : task.scan_task_id
+                  ? 'queued'
+                  : 'locating'
+          }
           progress={
             task.phase === 'downloading'
               ? task.progress

@@ -25,6 +25,10 @@ func TestMovieStatesFollowDownloadThroughIndexingWithoutCatalogueRequests(t *tes
 		}
 	}
 	assertState(MovieSaving, 0)
+	if err := offline.updateTask(ctx, record, pan.OfflineTask{Status: 2}, offline.drive.snapshot()); err != nil {
+		t.Fatal(err)
+	}
+	assertState(MovieProcessing, 0)
 	if err := offline.updateTask(ctx, record, pan.OfflineTask{Status: 2, FileID: "download-folder"}, offline.drive.snapshot()); err != nil {
 		t.Fatal(err)
 	}

@@ -85,7 +85,10 @@ func (service *DiscoverService) MovieStates(ctx context.Context, identities []Mo
 				sql.Or(sql.In(task.FieldStatus, string(task.StatusQueued), string(task.StatusRunning)),
 					sql.And(sql.EQ(task.FieldStatus, string(task.StatusDone)),
 						sql.Not(sqljson.HasKey(task.FieldPayload, sqljson.Path("scan_task_id"))),
-						sqljson.ValueNEQ(task.FieldPayload, "", sqljson.Path("file_id")),
+						sql.Or(
+							sqljson.ValueNEQ(task.FieldPayload, "", sqljson.Path("file_id")),
+							sqljson.ValueEQ(task.FieldPayload, true, sqljson.Path("awaiting_location")),
+						),
 					)),
 			))
 		}),
