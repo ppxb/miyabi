@@ -23,27 +23,26 @@ type panLibraryDirectory struct {
 }
 
 func (service *PanService) Files(ctx context.Context, directoryID string, page int) (pan.FilePage, error) {
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	files, err := withPanToken(ctx, service, func(token string) (pan.FilePage, error) {
+	state := service.snapshot()
+	files, err := withPanToken(ctx, service, state, func(token string) (pan.FilePage, error) {
 		return service.client.List(ctx, token, directoryID, (page-1)*100, 100)
 	})
 	if err != nil {
 		return pan.FilePage{}, fmt.Errorf("list 115 directory: %w", err)
 	}
+	if _, err := service.credentials(state); err != nil {
+		return pan.FilePage{}, err
+	}
 	return files, nil
 }
 
 func (service *PanService) SelectDirectory(ctx context.Context, directoryID string) (PanLibraryDirectory, error) {
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	account, err := withPanToken(ctx, service, func(token string) (pan.Account, error) {
-		return service.client.Account(ctx, token)
-	})
+	state := service.snapshot()
+	account, err := service.account(ctx, state)
 	if err != nil {
 		return PanLibraryDirectory{}, fmt.Errorf("get 115 account for directory: %w", err)
 	}
-	files, err := withPanToken(ctx, service, func(token string) (pan.FilePage, error) {
+	files, err := withPanToken(ctx, service, state, func(token string) (pan.FilePage, error) {
 		return service.client.List(ctx, token, directoryID, 0, 1)
 	})
 	if err != nil {
@@ -60,23 +59,35 @@ func (service *PanService) SelectDirectory(ctx context.Context, directoryID stri
 		Path: "/" + strings.Join(names, "/"),
 	}
 	record := panLibraryDirectory{AccountID: account.ID, PanLibraryDirectory: directory}
+	if err := service.commit.Lock(ctx); err != nil {
+		return PanLibraryDirectory{}, err
+	}
+	defer service.commit.Unlock()
+	if _, err := service.sourceState(state.source(), state.authorizationVersion); err != nil {
+		return PanLibraryDirectory{}, err
+	}
 	if err := saveSetting(ctx, service.database, panDirectorySetting, record); err != nil {
 		return PanLibraryDirectory{}, err
 	}
+	service.mu.Lock()
 	service.directory = record
 	service.authorizationVersion++
+	service.mu.Unlock()
 	return directory, nil
 }
 
 func (service *PanService) ClearDirectory(ctx context.Context) error {
-	service.mu.Lock()
-	defer service.mu.Unlock()
+	if err := service.commit.Lock(ctx); err != nil {
+		return err
+	}
+	defer service.commit.Unlock()
 	return service.clearDirectory(ctx)
 }
 
-// The caller holds mu after verifying the current account with 115.
+// The caller holds commit after verifying the current account with 115.
 func (service *PanService) discardOtherAccountDirectory(ctx context.Context, accountID string) error {
-	if service.directory.ID == "" || service.directory.AccountID == accountID {
+	directory := service.snapshot().directory
+	if directory.ID == "" || directory.AccountID == accountID {
 		return nil
 	}
 	return service.clearDirectory(ctx)
@@ -86,7 +97,9 @@ func (service *PanService) clearDirectory(ctx context.Context) error {
 	if _, err := service.database.Setting.Delete().Where(setting.Key(panDirectorySetting)).Exec(ctx); err != nil {
 		return fmt.Errorf("remove 115 media directory setting: %w", err)
 	}
+	service.mu.Lock()
 	service.directory = panLibraryDirectory{}
 	service.authorizationVersion++
+	service.mu.Unlock()
 	return nil
 }

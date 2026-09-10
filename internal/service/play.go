@@ -85,17 +85,16 @@ func (service *PlayService) Files(ctx context.Context, movieID int) (PlayFiles, 
 
 func (service *PlayService) Start(ctx context.Context, fileID string) (Playback, error) {
 	drive := service.library.drive
-	drive.mu.Lock()
-	defer drive.mu.Unlock()
-	source, err := service.library.verifiedSource(ctx)
+	state, err := drive.verifiedSource(ctx)
 	if err != nil {
 		return Playback{}, err
 	}
+	source := state.source()
 	_, err = service.library.database.File.Query().Where(libraryFiles(source), file.FileIDEQ(fileID)).Only(ctx)
 	if err != nil {
 		return Playback{}, fmt.Errorf("read indexed video: %w", err)
 	}
-	info, err := withPanToken(ctx, drive, func(token string) (pan.FileInfo, error) {
+	info, err := withPanSourceToken(ctx, drive, state, func(token string) (pan.FileInfo, error) {
 		return drive.client.Info(ctx, token, fileID)
 	})
 	if err != nil {
@@ -107,7 +106,10 @@ func (service *PlayService) Start(ctx context.Context, fileID string) (Playback,
 	if info.PickCode == "" {
 		return Playback{}, fmt.Errorf("115 returned no pick code for video")
 	}
-	sources, err := withPanToken(ctx, drive, func(token string) ([]pan.PlaySource, error) {
+	if err := service.library.checkScanSource(source, state.authorizationVersion); err != nil {
+		return Playback{}, err
+	}
+	sources, err := withPanSourceToken(ctx, drive, state, func(token string) ([]pan.PlaySource, error) {
 		return drive.client.PlayURL(ctx, token, info.PickCode)
 	})
 	if err != nil {
@@ -116,7 +118,10 @@ func (service *PlayService) Start(ctx context.Context, fileID string) (Playback,
 	if err := ctx.Err(); err != nil {
 		return Playback{}, err
 	}
-	return service.createSession(source, drive.authorizationVersion, sources)
+	if err := service.library.checkScanSource(source, state.authorizationVersion); err != nil {
+		return Playback{}, err
+	}
+	return service.createSession(source, state.authorizationVersion, sources)
 }
 
 func (service *PlayService) createSession(source LibrarySource, version uint64, sources []pan.PlaySource) (Playback, error) {
@@ -194,11 +199,8 @@ func (service *PlayService) resource(id string, index int) (*playSession, playRe
 	resource := session.resources[index]
 	service.mu.Unlock()
 
-	drive := service.library.drive
-	drive.mu.Lock()
-	valid := drive.authorizationVersion == session.version && drive.tokens.AccessToken != "" &&
-		drive.directory.AccountID == session.source.AccountID && drive.directory.ID == session.source.Directory.ID
-	drive.mu.Unlock()
+	state := service.library.drive.snapshot()
+	valid := !state.closed && state.matchesSource(session.source, session.version) && state.tokens.AccessToken != ""
 	if !valid {
 		service.Release(id)
 		return nil, playResource{}, fmt.Errorf("登录账号或媒体目录已变更，请重新播放: %w", fs.ErrNotExist)

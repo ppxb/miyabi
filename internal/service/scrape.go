@@ -63,16 +63,15 @@ func NewScrapeService(library *LibraryService, discover *DiscoverService, images
 }
 
 func (service *ScrapeService) begin(ctx context.Context, input metadataPayload) (uint64, error) {
-	service.library.drive.mu.Lock()
-	defer service.library.drive.mu.Unlock()
-	source, err := service.library.verifiedSource(ctx)
+	state, err := service.library.drive.verifiedSource(ctx)
 	if err != nil {
 		return 0, err
 	}
+	source := state.source()
 	if source.AccountID != input.Source.AccountID || source.Directory.ID != input.Source.Directory.ID {
 		return 0, fmt.Errorf("媒体目录或登录账号已变更，请重新扫描")
 	}
-	return service.library.drive.authorizationVersion, nil
+	return state.authorizationVersion, nil
 }
 
 func (service *ScrapeService) Scrape(ctx context.Context, job TaskJob) error {
@@ -151,8 +150,10 @@ func (service *ScrapeService) Scrape(ctx context.Context, job TaskJob) error {
 	if err != nil {
 		return err
 	}
-	service.library.drive.mu.Lock()
-	defer service.library.drive.mu.Unlock()
+	if err := service.library.drive.commit.Lock(ctx); err != nil {
+		return err
+	}
+	defer service.library.drive.commit.Unlock()
 	if err := service.library.checkScanSource(input.Source, version); err != nil {
 		return err
 	}

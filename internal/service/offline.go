@@ -56,10 +56,12 @@ type offlinePayload struct {
 }
 
 type OfflineService struct {
-	database *ent.Client
-	discover *DiscoverService
-	drive    *PanService
-	tasks    *TaskService
+	database   *ent.Client
+	discover   *DiscoverService
+	drive      *PanService
+	tasks      *TaskService
+	operations offlineOperations
+	syncing    contextLock
 }
 
 func NewOfflineService(database *ent.Client, discover *DiscoverService, drive *PanService, tasks *TaskService) *OfflineService {
@@ -80,23 +82,24 @@ func (service *OfflineService) Add(ctx context.Context, movieID, hash string) (O
 		return OfflineSubmission{}, err
 	}
 	code := codeid.Normalize(movie.Code)
-	service.drive.mu.Lock()
-	defer service.drive.mu.Unlock()
-	account, err := withPanToken(ctx, service.drive, func(token string) (pan.Account, error) {
-		return service.drive.client.Account(ctx, token)
-	})
+	state, err := service.drive.verifiedSource(ctx)
 	if err != nil {
 		return OfflineSubmission{}, fmt.Errorf("get 115 account for offline download: %w", err)
 	}
-	directory := service.drive.directory
-	if directory.ID == "" || directory.AccountID != account.ID {
-		return OfflineSubmission{}, ErrMediaDirectoryRequired
+	source := state.source()
+	directory := source.Directory
+	unlock, err := service.operations.Lock(ctx, source.AccountID, hash)
+	if err != nil {
+		return OfflineSubmission{}, err
 	}
-	source := LibrarySource{AccountID: account.ID, Directory: directory.PanLibraryDirectory}
+	defer unlock()
+	if _, err := service.drive.sourceState(source, state.authorizationVersion); err != nil {
+		return OfflineSubmission{}, err
+	}
 	existing, err := service.database.Task.Query().Where(task.TypeEQ("offline"),
 		task.StatusIn(task.StatusQueued, task.StatusRunning), func(s *sql.Selector) {
 			s.Where(sql.And(
-				sqljson.ValueEQ(task.FieldPayload, account.ID, sqljson.Path("account_id")),
+				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("account_id")),
 				sqljson.ValueEQ(task.FieldPayload, hash, sqljson.Path("hash")),
 			))
 		}).First(ctx)
@@ -111,7 +114,7 @@ func (service *OfflineService) Add(ctx context.Context, movieID, hash string) (O
 	}
 	previous, err := service.database.Task.Query().Where(task.TypeEQ("offline"), task.StatusEQ(task.StatusDone), func(s *sql.Selector) {
 		s.Where(sql.And(
-			sqljson.ValueEQ(task.FieldPayload, account.ID, sqljson.Path("account_id")),
+			sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("account_id")),
 			sqljson.ValueEQ(task.FieldPayload, directory.ID, sqljson.Path("directory_id")),
 			sqljson.ValueEQ(task.FieldPayload, hash, sqljson.Path("hash")),
 		))
@@ -130,20 +133,27 @@ func (service *OfflineService) Add(ctx context.Context, movieID, hash string) (O
 	if err := ctx.Err(); err != nil {
 		return OfflineSubmission{}, err
 	}
+	if !service.drive.startWork() {
+		return OfflineSubmission{}, context.Canceled
+	}
+	defer service.drive.work.Done()
 	// Once a remote mutation starts, finish recording it even if the tab closes.
 	submitContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Minute)
 	defer cancel()
-	remote, err := service.submit(submitContext, source, hash)
+	remote, err := service.submit(submitContext, state, source, hash)
 	if err != nil {
 		return OfflineSubmission{}, fmt.Errorf("submit 115 offline download: %w", err)
 	}
 	input := offlinePayload{Code: code, JavDBID: movie.ID, Hash: hash, InfoHash: remote.Hash,
-		AccountID: account.ID, DirectoryID: directory.ID}
+		AccountID: source.AccountID, DirectoryID: directory.ID}
 	encoded, err := encodeTaskPayload(input)
 	if err != nil {
 		return OfflineSubmission{}, err
 	}
 	var created *ent.Task
+	if err := service.drive.commit.Lock(submitContext); err != nil {
+		return OfflineSubmission{}, err
+	}
 	if err := ent.WithTx(submitContext, service.database, func(tx *ent.Tx) error {
 		var err error
 		created, err = tx.Task.Create().SetType("offline").SetStatus(task.StatusRunning).SetPayload(encoded).Save(submitContext)
@@ -151,12 +161,14 @@ func (service *OfflineService) Add(ctx context.Context, movieID, hash string) (O
 			return err
 		}
 		if remote.Status == 2 {
-			return service.completeTask(submitContext, tx, created, input, remote.FileID)
+			return service.completeTask(submitContext, tx, created, input, remote.FileID, state)
 		}
 		return nil
 	}); err != nil {
+		service.drive.commit.Unlock()
 		return OfflineSubmission{}, fmt.Errorf("record 115 offline download: %w", err)
 	}
+	service.drive.commit.Unlock()
 	service.tasks.NotifyOfflineChanged()
 	created, err = service.database.Task.Get(submitContext, created.ID)
 	if err != nil {
@@ -167,10 +179,13 @@ func (service *OfflineService) Add(ctx context.Context, movieID, hash string) (O
 
 // submit handles duplicate history by inspecting its real output. Only a
 // terminal task with confirmed absent video content is removed, never files.
-// The caller holds drive.mu throughout account validation and mutations.
-func (service *OfflineService) submit(ctx context.Context, source LibrarySource, hash string) (pan.OfflineTask, error) {
+// The caller holds the account/hash lock, never the shared Pan state lock.
+func (service *OfflineService) submit(ctx context.Context, state panSnapshot, source LibrarySource, hash string) (pan.OfflineTask, error) {
 	add := func() (string, error) {
-		return withPanToken(ctx, service.drive, func(token string) (string, error) {
+		if _, err := service.drive.sourceState(source, state.authorizationVersion); err != nil {
+			return "", err
+		}
+		return withPanSourceToken(ctx, service.drive, state, func(token string) (string, error) {
 			return service.drive.client.AddOffline(ctx, token, "magnet:?xt=urn:btih:"+hash, source.Directory.ID)
 		})
 	}
@@ -181,7 +196,7 @@ func (service *OfflineService) submit(ctx context.Context, source LibrarySource,
 	if !errors.Is(err, pan.ErrOfflineExists) {
 		return pan.OfflineTask{}, err
 	}
-	remote, err := service.findRemoteTask(ctx, hash)
+	remote, err := service.findRemoteTask(ctx, state, hash)
 	if err != nil {
 		return pan.OfflineTask{}, err
 	}
@@ -197,7 +212,7 @@ func (service *OfflineService) submit(ctx context.Context, source LibrarySource,
 	if remote.FileID == "" {
 		return pan.OfflineTask{}, fmt.Errorf("115 的历史任务未提供资源位置，请先在 115 客户端清理该任务记录")
 	}
-	present, err := service.remoteHasVideo(ctx, source, remote.FileID)
+	present, err := service.remoteHasVideo(ctx, state, source, remote.FileID)
 	if err != nil {
 		return pan.OfflineTask{}, err
 	}
@@ -207,7 +222,10 @@ func (service *OfflineService) submit(ctx context.Context, source LibrarySource,
 		}
 		return remote, nil
 	}
-	if _, err := withPanToken(ctx, service.drive, func(token string) (struct{}, error) {
+	if _, err := service.drive.sourceState(source, state.authorizationVersion); err != nil {
+		return pan.OfflineTask{}, err
+	}
+	if _, err := withPanSourceToken(ctx, service.drive, state, func(token string) (struct{}, error) {
 		return struct{}{}, service.drive.client.RemoveOffline(ctx, token, remote.Hash)
 	}); err != nil {
 		return pan.OfflineTask{}, fmt.Errorf("remove stale 115 task history: %w", err)
@@ -216,9 +234,9 @@ func (service *OfflineService) submit(ctx context.Context, source LibrarySource,
 	return pan.OfflineTask{Hash: infoHash}, err
 }
 
-func (service *OfflineService) findRemoteTask(ctx context.Context, hash string) (pan.OfflineTask, error) {
+func (service *OfflineService) findRemoteTask(ctx context.Context, state panSnapshot, hash string) (pan.OfflineTask, error) {
 	for page := 1; ; page++ {
-		remote, err := withPanToken(ctx, service.drive, func(token string) (pan.OfflinePage, error) {
+		remote, err := withPanSourceToken(ctx, service.drive, state, func(token string) (pan.OfflinePage, error) {
 			return service.drive.client.OfflineTasks(ctx, token, page)
 		})
 		if err != nil {
@@ -236,8 +254,8 @@ func (service *OfflineService) findRemoteTask(ctx context.Context, hash string) 
 	return pan.OfflineTask{}, fmt.Errorf("115 提示任务已存在，但任务列表中未找到它，请稍后重试")
 }
 
-func (service *OfflineService) remoteHasVideo(ctx context.Context, source LibrarySource, id string) (bool, error) {
-	info, err := withPanToken(ctx, service.drive, func(token string) (pan.FileInfo, error) {
+func (service *OfflineService) remoteHasVideo(ctx context.Context, state panSnapshot, source LibrarySource, id string) (bool, error) {
+	info, err := withPanSourceToken(ctx, service.drive, state, func(token string) (pan.FileInfo, error) {
 		return service.drive.client.Info(ctx, token, id)
 	})
 	if errors.Is(err, pan.ErrNotFound) {
@@ -257,7 +275,7 @@ func (service *OfflineService) remoteHasVideo(ctx context.Context, source Librar
 	for next := 0; next < len(directories); next++ {
 		total := -1
 		for offset := 0; ; {
-			page, err := withPanToken(ctx, service.drive, func(token string) (pan.FilePage, error) {
+			page, err := withPanSourceToken(ctx, service.drive, state, func(token string) (pan.FilePage, error) {
 				return service.drive.client.List(ctx, token, directories[next], offset, 100)
 			})
 			if err != nil {
@@ -472,38 +490,40 @@ func latestOfflineTasks(records []*ent.Task) ([]*ent.Task, error) {
 }
 
 func (service *OfflineService) Sync(ctx context.Context) error {
+	if err := service.syncing.Lock(ctx); err != nil {
+		return err
+	}
+	defer service.syncing.Unlock()
 	records, err := service.database.Task.Query().Where(task.TypeEQ("offline"), task.Or(
 		task.StatusIn(task.StatusQueued, task.StatusRunning),
 		task.And(task.StatusEQ(task.StatusDone), func(s *sql.Selector) {
 			s.Where(sql.Not(sqljson.HasKey(task.FieldPayload, sqljson.Path("scan_task_id"))))
 		}),
-	)).All(ctx)
+	)).Order(ent.Desc(task.FieldID)).All(ctx)
 	if err != nil {
 		return fmt.Errorf("load offline tasks: %w", err)
 	}
 	if len(records) == 0 {
 		return nil
 	}
-	service.drive.mu.Lock()
-	defer service.drive.mu.Unlock()
-	if service.drive.tokens.AccessToken == "" {
+	state := service.drive.snapshot()
+	if state.tokens.AccessToken == "" {
 		return nil
 	}
 	// Completed jobs awaiting another mount need no remote polling.
 	records = slices.DeleteFunc(records, func(record *ent.Task) bool {
-		return record.Status == task.StatusDone && (record.Payload["directory_id"] != service.drive.directory.ID ||
-			record.Payload["account_id"] != service.drive.directory.AccountID)
+		return record.Status == task.StatusDone && (record.Payload["directory_id"] != state.directory.ID ||
+			record.Payload["account_id"] != state.directory.AccountID)
 	})
 	if len(records) == 0 {
 		return nil
 	}
-	account, err := withPanToken(ctx, service.drive, func(token string) (pan.Account, error) {
-		return service.drive.client.Account(ctx, token)
-	})
+	account, err := service.drive.account(ctx, state)
 	if err != nil {
 		return fmt.Errorf("get 115 account for offline sync: %w", err)
 	}
 	wanted := make(map[string]*ent.Task)
+	seen := make(map[string]bool)
 	for _, record := range records {
 		input, err := decodeTaskPayload[offlinePayload](record.Payload)
 		if err != nil {
@@ -512,12 +532,17 @@ func (service *OfflineService) Sync(ctx context.Context) error {
 		if input.AccountID != account.ID {
 			continue
 		}
+		hash := strings.ToLower(input.Hash)
+		if seen[hash] {
+			continue
+		}
+		seen[hash] = true
 		if record.Status == task.StatusDone {
-			if input.DirectoryID != service.drive.directory.ID || service.drive.directory.AccountID != account.ID {
+			if input.DirectoryID != state.directory.ID || state.directory.AccountID != account.ID {
 				continue
 			}
 			if input.FileID != "" {
-				if err := service.updateTask(ctx, record, pan.OfflineTask{Status: 2, FileID: input.FileID, Hash: input.InfoHash}); err != nil {
+				if err := service.updateTask(ctx, record, pan.OfflineTask{Status: 2, FileID: input.FileID, Hash: input.InfoHash}, state); err != nil {
 					return err
 				}
 				continue
@@ -526,7 +551,7 @@ func (service *OfflineService) Sync(ctx context.Context) error {
 		wanted[strings.ToLower(input.InfoHash)] = record
 	}
 	for page := 1; len(wanted) > 0; page++ {
-		remote, err := withPanToken(ctx, service.drive, func(token string) (pan.OfflinePage, error) {
+		remote, err := withPanToken(ctx, service.drive, state, func(token string) (pan.OfflinePage, error) {
 			return service.drive.client.OfflineTasks(ctx, token, page)
 		})
 		if err != nil {
@@ -538,7 +563,7 @@ func (service *OfflineService) Sync(ctx context.Context) error {
 			if !ok {
 				continue
 			}
-			if err := service.updateTask(ctx, record, download); err != nil {
+			if err := service.updateTask(ctx, record, download, state); err != nil {
 				return err
 			}
 			delete(wanted, key)
@@ -548,63 +573,124 @@ func (service *OfflineService) Sync(ctx context.Context) error {
 		}
 	}
 	for _, record := range wanted {
-		if err := service.database.Task.UpdateOneID(record.ID).SetStatus(task.StatusFailed).
-			SetError("115 中未找到该任务，请在 115 客户端确认下载结果").Exec(ctx); err != nil {
+		if err := service.markMissing(ctx, record, state); err != nil {
 			return err
 		}
 	}
-	if len(wanted) > 0 {
+	return nil
+}
+
+func (service *OfflineService) updateTask(ctx context.Context, record *ent.Task, remote pan.OfflineTask, state panSnapshot) error {
+	input, err := decodeTaskPayload[offlinePayload](record.Payload)
+	if err != nil {
+		return err
+	}
+	unlock, err := service.operations.Lock(ctx, input.AccountID, strings.ToLower(input.Hash))
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	if err := service.drive.commit.Lock(ctx); err != nil {
+		return err
+	}
+	defer service.drive.commit.Unlock()
+	if _, err := service.drive.credentials(state); err != nil {
+		return err
+	}
+	notify := false
+	err = ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
+		current, err := tx.Task.Get(ctx, record.ID)
+		if err != nil {
+			return err
+		}
+		// A remote page may have started loading before another completion
+		// committed. Never regress terminal state or overwrite newer payload.
+		if current.Status == task.StatusFailed || current.Status == task.StatusDone && remote.Status != 2 {
+			return nil
+		}
+		currentInput, err := decodeTaskPayload[offlinePayload](current.Payload)
+		if err != nil {
+			return err
+		}
+		if currentInput.AccountID != input.AccountID || currentInput.InfoHash != input.InfoHash {
+			return fmt.Errorf("offline task identity changed while syncing")
+		}
+		if remote.Hash != "" && !strings.EqualFold(remote.Hash, currentInput.InfoHash) {
+			return fmt.Errorf("115 returned a different offline task than requested")
+		}
+		status := task.StatusRunning
+		switch remote.Status {
+		case 0, 1:
+		case 2:
+			notify = true
+			return service.completeTask(ctx, tx, current, currentInput, remote.FileID, state)
+		case -1:
+			status = task.StatusFailed
+		default:
+			return fmt.Errorf("115 returned unknown offline status %d", remote.Status)
+		}
+		if current.Status == status && current.Progress == remote.Progress {
+			return nil
+		}
+		update := tx.Task.UpdateOneID(current.ID).SetStatus(status).SetProgress(remote.Progress)
+		if status == task.StatusFailed {
+			update.SetError("115 离线下载失败，请在 115 客户端查看原因")
+		}
+		notify = current.Status != status
+		return update.Exec(ctx)
+	})
+	if err != nil {
+		return fmt.Errorf("update offline task %d: %w", record.ID, err)
+	}
+	if notify {
 		service.tasks.NotifyOfflineChanged()
 	}
 	return nil
 }
 
-func (service *OfflineService) updateTask(ctx context.Context, record *ent.Task, remote pan.OfflineTask) error {
-	status, progress := task.StatusRunning, remote.Progress
-	switch remote.Status {
-	case 0, 1:
-	case 2:
-		input, err := decodeTaskPayload[offlinePayload](record.Payload)
-		if err != nil {
-			return err
-		}
-		if err := ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
-			return service.completeTask(ctx, tx, record, input, remote.FileID)
-		}); err != nil {
-			return fmt.Errorf("queue completed download scan: %w", err)
-		}
-		service.tasks.NotifyOfflineChanged()
-		return nil
-	case -1:
-		status = task.StatusFailed
-	default:
-		return fmt.Errorf("115 returned unknown offline status %d", remote.Status)
+func (service *OfflineService) markMissing(ctx context.Context, record *ent.Task, state panSnapshot) error {
+	input, err := decodeTaskPayload[offlinePayload](record.Payload)
+	if err != nil {
+		return err
 	}
-	if record.Status == status && record.Progress == progress {
-		return nil
+	unlock, err := service.operations.Lock(ctx, input.AccountID, strings.ToLower(input.Hash))
+	if err != nil {
+		return err
 	}
-	update := service.database.Task.UpdateOneID(record.ID).SetStatus(status).SetProgress(progress)
-	if status == task.StatusFailed {
-		update.SetError("115 离线下载失败，请在 115 客户端查看原因")
+	defer unlock()
+	if err := service.drive.commit.Lock(ctx); err != nil {
+		return err
 	}
-	if err := update.Exec(ctx); err != nil {
-		return fmt.Errorf("update offline task %d: %w", record.ID, err)
+	defer service.drive.commit.Unlock()
+	if _, err := service.drive.credentials(state); err != nil {
+		return err
 	}
-	if record.Status != status {
+	count, err := service.database.Task.Update().Where(task.IDEQ(record.ID),
+		task.StatusIn(task.StatusQueued, task.StatusRunning)).
+		SetStatus(task.StatusFailed).SetError("115 中未找到该任务，请在 115 客户端确认下载结果").Save(ctx)
+	if err == nil && count > 0 {
 		service.tasks.NotifyOfflineChanged()
 	}
-	return nil
+	return err
 }
 
 // Completion and targeted scan creation are one transaction. Never merge into
 // a running scan: it might already have passed the newly downloaded directory.
-func (service *OfflineService) completeTask(ctx context.Context, tx *ent.Tx, record *ent.Task, input offlinePayload, fileID string) error {
+func (service *OfflineService) completeTask(ctx context.Context, tx *ent.Tx, record *ent.Task, input offlinePayload, fileID string, state panSnapshot) error {
+	// A delayed completion must keep the target already recorded by a newer
+	// result, including when its scan was deferred until the mount returns.
+	if record.Status == task.StatusDone && input.FileID != "" {
+		fileID = input.FileID
+	}
 	if fileID == "" {
 		return fmt.Errorf("115 下载已完成，但尚未返回文件位置")
 	}
 	input.FileID = fileID
-	directory := service.drive.directory
-	if input.ScanTaskID == 0 && directory.ID == input.DirectoryID && directory.AccountID == input.AccountID {
+	current := service.drive.snapshot()
+	directory := current.directory
+	if input.ScanTaskID == 0 && current.credentialVersion == state.credentialVersion &&
+		current.matchesSource(state.source(), state.authorizationVersion) &&
+		directory.ID == input.DirectoryID && directory.AccountID == input.AccountID {
 		encoded, err := encodeTaskPayload(scanPayload{
 			Source:   LibrarySource{AccountID: input.AccountID, Directory: directory.PanLibraryDirectory},
 			Scan:     ScanProgress{Stage: "queued", CurrentPath: directory.Path},

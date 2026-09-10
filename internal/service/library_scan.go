@@ -96,29 +96,18 @@ func (service *LibraryService) identifyScanVideos(ctx context.Context, payload s
 }
 
 func (service *LibraryService) StartScan(ctx context.Context) (TaskInfo, error) {
-	service.drive.mu.Lock()
-	defer service.drive.mu.Unlock()
-	source, err := service.verifiedSource(ctx)
+	state, err := service.drive.verifiedSource(ctx)
 	if err != nil {
 		return TaskInfo{}, err
 	}
-	return service.tasks.enqueueScan(ctx, source)
-}
-
-// The caller holds drive.mu so a login or mount change cannot replace the
-// source between account verification and capturing the task input.
-func (service *LibraryService) verifiedSource(ctx context.Context) (LibrarySource, error) {
-	account, err := withPanToken(ctx, service.drive, func(token string) (pan.Account, error) {
-		return service.drive.client.Account(ctx, token)
-	})
-	if err != nil {
-		return LibrarySource{}, fmt.Errorf("verify library account: %w", err)
+	if err := service.drive.commit.Lock(ctx); err != nil {
+		return TaskInfo{}, err
 	}
-	directory := service.drive.directory
-	if directory.ID == "" || directory.AccountID != account.ID {
-		return LibrarySource{}, ErrMediaDirectoryRequired
+	defer service.drive.commit.Unlock()
+	if err := service.checkScanSource(state.source(), state.authorizationVersion); err != nil {
+		return TaskInfo{}, err
 	}
-	return LibrarySource{AccountID: account.ID, Directory: directory.PanLibraryDirectory}, nil
+	return service.tasks.enqueueScan(ctx, state.source())
 }
 
 func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
@@ -134,13 +123,11 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 	if payload.Scan.Stage == "done" {
 		return nil
 	}
-	service.drive.mu.Lock()
-	source, err := service.verifiedSource(ctx)
-	version := service.drive.authorizationVersion
-	service.drive.mu.Unlock()
+	state, err := service.drive.verifiedSource(ctx)
 	if err != nil {
 		return err
 	}
+	source, version := state.source(), state.authorizationVersion
 	if source.AccountID != payload.Source.AccountID || source.Directory.ID != payload.Source.Directory.ID {
 		return fmt.Errorf("媒体目录或登录账号已变更，请重新扫描")
 	}
@@ -153,6 +140,16 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 	}
 	start := scanDirectory{id: source.Directory.ID, path: source.Directory.Path}
 	observed := make(map[string][]pan.File)
+	savePage := func(directoryPath string, videos []scanVideo) error {
+		return service.drive.commitSource(ctx, source, version, func() error {
+			return service.indexScanPage(ctx, job.ID, scanID, directoryPath, videos, &payload)
+		})
+	}
+	reconcile := func() error {
+		return service.drive.commitSource(ctx, source, version, func() error {
+			return service.reconcileScan(ctx, job.ID, scanID, &payload, observed)
+		})
+	}
 	if payload.TargetID != "" {
 		info, err := service.sourceInfo(ctx, source, version, payload.TargetID)
 		if err != nil {
@@ -178,19 +175,14 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 			} else {
 				payload.Scan.UnmatchedFiles = 1
 			}
-			if err := service.indexScanPage(ctx, job.ID, scanID, path.Dir(payload.TargetPath), []scanVideo{video}, &payload); err != nil {
+			if err := savePage(path.Dir(payload.TargetPath), []scanVideo{video}); err != nil {
 				return err
 			}
 			observed[info.ParentID], err = service.directoryEntries(ctx, source, version, info.ParentID)
 			if err != nil {
 				return err
 			}
-			service.drive.mu.Lock()
-			defer service.drive.mu.Unlock()
-			if err := service.checkScanSource(source, version); err != nil {
-				return err
-			}
-			return service.reconcileScan(ctx, job.ID, scanID, &payload, observed)
+			return reconcile()
 		}
 		start = scanDirectory{id: info.ID, path: payload.TargetPath}
 	}
@@ -264,7 +256,7 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 				payload.Scan.DirectoriesScanned++
 			}
 			payload.Scan.Movies = len(codes)
-			if err := service.indexScanPage(ctx, job.ID, scanID, directory.path, videos, &payload); err != nil {
+			if err := savePage(directory.path, videos); err != nil {
 				return err
 			}
 			if !page.HasMore {
@@ -297,8 +289,7 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 			}
 		}
 		for start := 0; start < len(unidentified); start += 100 {
-			if err := service.indexScanPage(ctx, job.ID, scanID, directory.path,
-				unidentified[start:min(start+100, len(unidentified))], &payload); err != nil {
+			if err := savePage(directory.path, unidentified[start:min(start+100, len(unidentified))]); err != nil {
 				return err
 			}
 		}
@@ -308,32 +299,26 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 	if err := service.reportScan(ctx, job.ID, payload); err != nil {
 		return err
 	}
-	service.drive.mu.Lock()
-	defer service.drive.mu.Unlock()
-	if err := service.checkScanSource(source, version); err != nil {
-		return err
-	}
-	return service.reconcileScan(ctx, job.ID, scanID, &payload, observed)
+	return reconcile()
 }
 
 func (service *LibraryService) checkScanSource(source LibrarySource, version uint64) error {
-	directory := service.drive.directory
-	if service.drive.authorizationVersion != version || directory.AccountID != source.AccountID || directory.ID != source.Directory.ID {
-		return fmt.Errorf("媒体目录或登录账号已变更，请重新扫描")
-	}
-	return nil
+	_, err := service.drive.sourceState(source, version)
+	return err
 }
 
 func (service *LibraryService) scanPage(ctx context.Context, source LibrarySource, version uint64, directoryID string, offset int) (pan.FilePage, error) {
-	service.drive.mu.Lock()
-	defer service.drive.mu.Unlock()
-	if err := service.checkScanSource(source, version); err != nil {
+	state, err := service.drive.sourceState(source, version)
+	if err != nil {
 		return pan.FilePage{}, err
 	}
-	page, err := withPanToken(ctx, service.drive, func(token string) (pan.FilePage, error) {
+	page, err := withPanSourceToken(ctx, service.drive, state, func(token string) (pan.FilePage, error) {
 		return service.drive.client.List(ctx, token, directoryID, offset, 100)
 	})
 	if err != nil {
+		return pan.FilePage{}, err
+	}
+	if err := service.checkScanSource(source, version); err != nil {
 		return pan.FilePage{}, err
 	}
 	if !slices.ContainsFunc(page.Path, func(directory pan.Directory) bool { return directory.ID == source.Directory.ID }) {

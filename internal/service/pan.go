@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -12,9 +12,28 @@ import (
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/setting"
 	"github.com/ppxb/miyabi/internal/pan"
+	"golang.org/x/sync/singleflight"
 )
 
 const panCredentialsSetting = "pan.credentials"
+
+type panClient interface {
+	Close()
+	Account(context.Context, string) (pan.Account, error)
+	BeginLogin(context.Context) (*pan.Login, error)
+	LoginStatus(context.Context, *pan.Login) (pan.LoginState, error)
+	ExchangeToken(context.Context, *pan.Login) (pan.Tokens, error)
+	RefreshToken(context.Context, string) (pan.Tokens, error)
+	List(context.Context, string, string, int, int) (pan.FilePage, error)
+	Info(context.Context, string, string) (pan.FileInfo, error)
+	ReadMetadata(context.Context, string, string, int64) ([]byte, error)
+	UploadMetadata(context.Context, string, string, string, []byte) error
+	AddOffline(context.Context, string, string, string) (string, error)
+	RemoveOffline(context.Context, string, string) error
+	OfflineTasks(context.Context, string, int) (pan.OfflinePage, error)
+	PlayURL(context.Context, string, string) ([]pan.PlaySource, error)
+	OpenMedia(context.Context, string, string, http.Header) (*http.Response, error)
+}
 
 type PanAccountStatus struct {
 	Connected bool                 `json:"connected"`
@@ -36,19 +55,25 @@ type panLoginSession struct {
 	login *pan.Login
 	state pan.LoginState
 	err   error
+	work  singleflight.Group
 }
 
 type PanService struct {
 	database *ent.Client
-	client   *pan.Client
+	client   panClient
 
-	// A single account owns both token rotation and the active login session.
-	mu        sync.Mutex
-	tokens    pan.Tokens
-	session   *panLoginSession
-	directory panLibraryDirectory
-	// Changes with login or mount selection, not when tokens rotate.
-	authorizationVersion uint64
+	// mu protects memory only. commit serializes persistence with publication.
+	mu                   sync.Mutex
+	commit               contextLock
+	tokens               pan.Tokens
+	session              *panLoginSession
+	directory            panLibraryDirectory
+	authorizationVersion uint64 // Login or mount changes invalidate source-bound work.
+	credentialVersion    uint64 // Login or logout invalidates the previous account's work.
+	tokenVersion         uint64 // Rotation groups requests that rejected the same token.
+	refresh              singleflight.Group
+	work                 sync.WaitGroup
+	closed               bool
 }
 
 func NewPanService(ctx context.Context, database *ent.Client, options pan.Options) (*PanService, error) {
@@ -64,95 +89,157 @@ func NewPanService(ctx context.Context, database *ent.Client, options pan.Option
 }
 
 func (service *PanService) Close() {
+	service.mu.Lock()
+	service.closed = true
+	service.mu.Unlock()
+	service.work.Wait()
 	service.client.Close()
 }
 
-func (service *PanService) Account(ctx context.Context) (PanAccountStatus, error) {
+// Register before Close can begin waiting. Shared credential work may outlive
+// its HTTP callers, but must finish persisting before the database closes.
+func (service *PanService) startWork() bool {
 	service.mu.Lock()
 	defer service.mu.Unlock()
-	if service.tokens.AccessToken == "" {
-		return PanAccountStatus{}, nil
+	if service.closed {
+		return false
 	}
+	service.work.Add(1)
+	return true
+}
 
-	account, err := withPanToken(ctx, service, func(token string) (pan.Account, error) {
+func (service *PanService) account(ctx context.Context, state panSnapshot) (pan.Account, error) {
+	account, err := withPanToken(ctx, service, state, func(token string) (pan.Account, error) {
 		return service.client.Account(ctx, token)
 	})
 	if err != nil {
-		return PanAccountStatus{}, fmt.Errorf("get 115 account: %w", err)
+		return pan.Account{}, fmt.Errorf("get 115 account: %w", err)
+	}
+	if _, err := service.credentials(state); err != nil {
+		return pan.Account{}, err
+	}
+	return account, nil
+}
+
+func (service *PanService) Account(ctx context.Context) (PanAccountStatus, error) {
+	state := service.snapshot()
+	if state.tokens.AccessToken == "" {
+		return PanAccountStatus{}, nil
+	}
+	account, err := service.account(ctx, state)
+	if err != nil {
+		return PanAccountStatus{}, err
+	}
+	if err := service.commit.Lock(ctx); err != nil {
+		return PanAccountStatus{}, err
+	}
+	defer service.commit.Unlock()
+	if _, err := service.credentials(state); err != nil {
+		return PanAccountStatus{}, err
 	}
 	if err := service.discardOtherAccountDirectory(ctx, account.ID); err != nil {
 		return PanAccountStatus{}, err
 	}
 	status := PanAccountStatus{Connected: true, Account: &account}
-	if service.directory.AccountID == account.ID {
-		directory := service.directory.PanLibraryDirectory
-		status.Directory = &directory
+	directory := service.snapshot().directory
+	if directory.AccountID == account.ID {
+		value := directory.PanLibraryDirectory
+		status.Directory = &value
 	}
 	return status, nil
 }
 
 func (service *PanService) BeginLogin(ctx context.Context) (PanLoginSession, error) {
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	if err := ctx.Err(); err != nil {
+	if err := service.commit.Lock(ctx); err != nil {
 		return PanLoginSession{}, err
 	}
-	service.session = nil
+	service.mu.Lock()
+	if service.closed {
+		service.mu.Unlock()
+		service.commit.Unlock()
+		return PanLoginSession{}, context.Canceled
+	}
+	session := &panLoginSession{id: uuid.NewString(), state: pan.LoginWaiting}
+	service.session = session
+	service.mu.Unlock()
+	service.commit.Unlock()
+
 	login, err := service.client.BeginLogin(ctx)
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	if service.session != session || service.closed {
+		return PanLoginSession{}, fmt.Errorf("115 登录会话已变更，请重新扫码")
+	}
 	if err != nil {
+		service.session = nil
 		return PanLoginSession{}, fmt.Errorf("start 115 login: %w", err)
 	}
-	session := &panLoginSession{id: uuid.NewString(), login: login, state: pan.LoginWaiting}
-	service.session = session
+	session.login = login
 	return PanLoginSession{
-		ID:     session.id,
-		QRCode: "data:image/png;base64," + base64.StdEncoding.EncodeToString(login.QRCode),
+		ID: session.id, QRCode: "data:image/png;base64," + base64.StdEncoding.EncodeToString(login.QRCode),
 	}, nil
 }
 
 func (service *PanService) LoginStatus(ctx context.Context, id string) (PanLoginStatus, error) {
+	if err := ctx.Err(); err != nil {
+		return PanLoginStatus{}, err
+	}
 	service.mu.Lock()
-	defer service.mu.Unlock()
 	session := service.session
-	if session == nil || session.id != id {
+	if session == nil || session.id != id || session.login == nil && session.err == nil && session.state == pan.LoginWaiting {
+		service.mu.Unlock()
 		return PanLoginStatus{State: pan.LoginExpired}, nil
 	}
-	if session.err != nil {
-		return PanLoginStatus{}, session.err
+	service.mu.Unlock()
+	result := session.work.DoChan("status", func() (any, error) {
+		if !service.startWork() {
+			return PanLoginStatus{}, context.Canceled
+		}
+		defer service.work.Done()
+		return service.pollLogin(ctx, session)
+	})
+	select {
+	case <-ctx.Done():
+		return PanLoginStatus{}, ctx.Err()
+	case completed := <-result:
+		if completed.Err != nil {
+			return PanLoginStatus{}, completed.Err
+		}
+		return completed.Val.(PanLoginStatus), nil
 	}
-	if session.state != pan.LoginWaiting && session.state != pan.LoginScanned {
-		return PanLoginStatus{State: session.state}, nil
+}
+
+func (service *PanService) pollLogin(ctx context.Context, session *panLoginSession) (PanLoginStatus, error) {
+	service.mu.Lock()
+	if service.session != session {
+		service.mu.Unlock()
+		return PanLoginStatus{State: pan.LoginExpired}, nil
 	}
-	state, err := service.client.LoginStatus(ctx, session.login)
+	if session.err != nil || session.state != pan.LoginWaiting && session.state != pan.LoginScanned {
+		state, err := session.state, session.err
+		service.mu.Unlock()
+		return PanLoginStatus{State: state}, err
+	}
+	login := session.login
+	service.mu.Unlock()
+
+	pollContext, stopPoll := context.WithTimeout(context.WithoutCancel(ctx), 35*time.Second)
+	state, err := service.client.LoginStatus(pollContext, login)
+	stopPoll()
 	if err != nil {
 		return PanLoginStatus{}, fmt.Errorf("poll 115 login: %w", err)
 	}
 	if state == pan.LoginAuthorized {
-		// Exchanging a device code consumes it. Finish saving the credentials
-		// even if the browser closes the dialog while the request is running.
-		tokenContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 45*time.Second)
-		defer cancel()
-		tokens, err := service.client.ExchangeToken(tokenContext, session.login)
-		if err != nil {
-			session.err = fmt.Errorf("complete 115 login: %w", err)
-			return PanLoginStatus{}, session.err
-		}
-		if err := service.saveTokens(tokenContext, tokens); err != nil {
-			session.err = err
-			return PanLoginStatus{}, err
-		}
-		service.authorizationVersion++
-		account, err := withPanToken(tokenContext, service, func(token string) (pan.Account, error) {
-			return service.client.Account(tokenContext, token)
-		})
-		if err != nil {
-			session.err = fmt.Errorf("verify 115 login account: %w", err)
-			return PanLoginStatus{}, session.err
-		}
-		if err := service.discardOtherAccountDirectory(tokenContext, account.ID); err != nil {
-			session.err = err
-			return PanLoginStatus{}, err
-		}
+		err = service.completeLogin(ctx, session, login)
+	}
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	if service.session != session {
+		return PanLoginStatus{State: pan.LoginExpired}, nil
+	}
+	if err != nil {
+		session.err = err
+		return PanLoginStatus{}, err
 	}
 	session.state = state
 	if state != pan.LoginWaiting && state != pan.LoginScanned {
@@ -161,59 +248,72 @@ func (service *PanService) LoginStatus(ctx context.Context, id string) (PanLogin
 	return PanLoginStatus{State: state}, nil
 }
 
-func (service *PanService) Disconnect(ctx context.Context) (PanAccountStatus, error) {
+func (service *PanService) completeLogin(ctx context.Context, session *panLoginSession, login *pan.Login) error {
+	// Exchanging a device code consumes it. A departing browser only stops
+	// waiting; the bounded exchange and persistence still finish.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 45*time.Second)
+	defer cancel()
 	service.mu.Lock()
-	defer service.mu.Unlock()
+	current := service.session == session
+	service.mu.Unlock()
+	if !current {
+		return nil
+	}
+	tokens, err := service.client.ExchangeToken(ctx, login)
+	if err != nil {
+		return fmt.Errorf("complete 115 login: %w", err)
+	}
+	if err := service.commit.Lock(ctx); err != nil {
+		return err
+	}
+	service.mu.Lock()
+	current = service.session == session
+	service.mu.Unlock()
+	if !current {
+		service.commit.Unlock()
+		return nil
+	}
+	if err := saveSetting(ctx, service.database, panCredentialsSetting, tokens); err != nil {
+		service.commit.Unlock()
+		return err
+	}
+	service.mu.Lock()
+	service.tokens = tokens
+	service.tokenVersion++
+	service.credentialVersion++
+	service.authorizationVersion++
+	service.mu.Unlock()
+	state := service.snapshot()
+	service.commit.Unlock()
+
+	account, err := service.account(ctx, state)
+	if err != nil {
+		return fmt.Errorf("verify 115 login account: %w", err)
+	}
+	if err := service.commit.Lock(ctx); err != nil {
+		return err
+	}
+	defer service.commit.Unlock()
+	if _, err := service.credentials(state); err != nil {
+		return err
+	}
+	return service.discardOtherAccountDirectory(ctx, account.ID)
+}
+
+func (service *PanService) Disconnect(ctx context.Context) (PanAccountStatus, error) {
+	if err := service.commit.Lock(ctx); err != nil {
+		return PanAccountStatus{}, err
+	}
+	defer service.commit.Unlock()
 	if _, err := service.database.Setting.Delete().Where(setting.Key(panCredentialsSetting)).Exec(ctx); err != nil {
 		return PanAccountStatus{}, fmt.Errorf("remove 115 credentials: %w", err)
 	}
+	service.mu.Lock()
 	service.tokens = pan.Tokens{}
+	service.credentialVersion++
 	service.authorizationVersion++
+	service.tokenVersion++
 	service.session = nil
+	service.mu.Unlock()
 	return PanAccountStatus{}, nil
-}
-
-// Callers hold mu, so concurrent requests reuse the newly persisted token pair.
-func (service *PanService) refreshTokens(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	// Refresh tokens rotate too; a canceled caller must not discard the new pair.
-	tokenContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 45*time.Second)
-	defer cancel()
-	tokens, err := service.client.RefreshToken(tokenContext, service.tokens.RefreshToken)
-	if err != nil {
-		return fmt.Errorf("refresh 115 credentials: %w", err)
-	}
-	return service.saveTokens(tokenContext, tokens)
-}
-
-func (service *PanService) saveTokens(ctx context.Context, tokens pan.Tokens) error {
-	if err := saveSetting(ctx, service.database, panCredentialsSetting, tokens); err != nil {
-		return err
-	}
-	service.tokens = tokens
-	return nil
-}
-
-// Callers hold mu. Only rejected authorization is replayed after refreshing tokens.
-func withPanToken[T any](ctx context.Context, service *PanService, request func(string) (T, error)) (T, error) {
-	var zero T
-	if service.tokens.AccessToken == "" {
-		return zero, pan.ErrUnauthorized
-	}
-	refreshed := time.Until(service.tokens.ExpiresAt) <= 30*time.Second
-	if refreshed {
-		if err := service.refreshTokens(ctx); err != nil {
-			return zero, err
-		}
-	}
-	value, err := request(service.tokens.AccessToken)
-	if errors.Is(err, pan.ErrUnauthorized) && !refreshed {
-		if err := service.refreshTokens(ctx); err != nil {
-			return zero, err
-		}
-		return request(service.tokens.AccessToken)
-	}
-	return value, err
 }

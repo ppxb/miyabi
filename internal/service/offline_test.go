@@ -14,7 +14,7 @@ import (
 func offlineFixture(t *testing.T) (*OfflineService, *ent.Task, offlinePayload, LibrarySource) {
 	t.Helper()
 	library, _, scan := libraryFixture(t)
-	drive := &PanService{directory: panLibraryDirectory{
+	drive := &PanService{tokens: pan.Tokens{AccessToken: "fixture-token"}, directory: panLibraryDirectory{
 		AccountID: scan.Source.AccountID, PanLibraryDirectory: scan.Source.Directory,
 	}}
 	service := NewOfflineService(library.database, nil, drive, library.tasks)
@@ -79,7 +79,7 @@ func TestOfflineCompletionAndTargetedScanCommitTogether(t *testing.T) {
 	ctx := t.Context()
 	rollback := errors.New("fixture rollback")
 	err := ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
-		if err := service.completeTask(ctx, tx, record, input, "download-folder"); err != nil {
+		if err := service.completeTask(ctx, tx, record, input, "download-folder", service.drive.snapshot()); err != nil {
 			return err
 		}
 		return rollback
@@ -97,7 +97,7 @@ func TestOfflineCompletionAndTargetedScanCommitTogether(t *testing.T) {
 	if count, err := service.database.Task.Query().Where(task.TypeEQ("scan")).Count(ctx); err != nil || count != 1 {
 		t.Fatalf("scan escaped rollback: count=%d err=%v", count, err)
 	}
-	if err := service.updateTask(ctx, record, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
+	if err := service.updateTask(ctx, record, pan.OfflineTask{Status: 2, FileID: "download-folder"}, service.drive.snapshot()); err != nil {
 		t.Fatal(err)
 	}
 	done, err := service.database.Task.Get(ctx, record.ID)
@@ -127,7 +127,7 @@ func TestOfflineCompletionAndTargetedScanCommitTogether(t *testing.T) {
 	if count, err := service.database.Task.Query().Where(task.TypeEQ("scan")).Count(ctx); err != nil || count != 2 {
 		t.Fatalf("targeted scan count=%d err=%v", count, err)
 	}
-	if err := service.updateTask(ctx, done, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
+	if err := service.updateTask(ctx, done, pan.OfflineTask{Status: 2, FileID: "download-folder"}, service.drive.snapshot()); err != nil {
 		t.Fatal(err)
 	}
 	if count, err := service.database.Task.Query().Where(task.TypeEQ("scan")).Count(ctx); err != nil || count != 2 {
@@ -138,7 +138,7 @@ func TestOfflineCompletionAndTargetedScanCommitTogether(t *testing.T) {
 func TestOfflineActionDependsOnCurrentFilesRatherThanDownloadHistory(t *testing.T) {
 	service, record, _, source := offlineFixture(t)
 	ctx := t.Context()
-	if err := service.updateTask(ctx, record, pan.OfflineTask{Status: 2, FileID: "video-1"}); err != nil {
+	if err := service.updateTask(ctx, record, pan.OfflineTask{Status: 2, FileID: "video-1"}, service.drive.snapshot()); err != nil {
 		t.Fatal(err)
 	}
 	record, err := service.database.Task.Get(ctx, record.ID)
@@ -191,7 +191,7 @@ func TestOfflineActionDependsOnCurrentFilesRatherThanDownloadHistory(t *testing.
 func TestCompletedOfflineTaskDefersScanForAnotherMount(t *testing.T) {
 	service, record, input, _ := offlineFixture(t)
 	service.drive.directory.ID = "another-root"
-	if err := service.updateTask(t.Context(), record, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
+	if err := service.updateTask(t.Context(), record, pan.OfflineTask{Status: 2, FileID: "download-folder"}, service.drive.snapshot()); err != nil {
 		t.Fatal(err)
 	}
 	record, err := service.database.Task.Get(t.Context(), record.ID)
@@ -258,7 +258,7 @@ func TestOfflineActivityKeepsLatestTasksInCurrentSource(t *testing.T) {
 func TestOfflineActivityWaitsForArtworkAndRechecksPlayableFiles(t *testing.T) {
 	service, download, input, source := offlineFixture(t)
 	ctx := t.Context()
-	if err := service.updateTask(ctx, download, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
+	if err := service.updateTask(ctx, download, pan.OfflineTask{Status: 2, FileID: "download-folder"}, service.drive.snapshot()); err != nil {
 		t.Fatal(err)
 	}
 	download, err := service.database.Task.Get(ctx, download.ID)

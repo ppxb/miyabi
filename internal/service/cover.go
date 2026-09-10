@@ -103,8 +103,10 @@ func (service *ScrapeService) Cover(ctx context.Context, job TaskJob) error {
 	if err != nil {
 		return err
 	}
-	service.library.drive.mu.Lock()
-	defer service.library.drive.mu.Unlock()
+	if err := service.library.drive.commit.Lock(ctx); err != nil {
+		return err
+	}
+	defer service.library.drive.commit.Unlock()
 	if err := service.library.checkScanSource(input.Source, version); err != nil {
 		return err
 	}
@@ -210,12 +212,11 @@ func verifyCoverOrigin(input coverPayload, directoryID string, current nfo.Movie
 }
 
 func (service *ScrapeService) uploadSidecar(ctx context.Context, source LibrarySource, version uint64, directory movieDirectory, name string, body []byte) error {
-	service.library.drive.mu.Lock()
-	defer service.library.drive.mu.Unlock()
-	if err := service.library.checkScanSource(source, version); err != nil {
+	state, err := service.library.drive.sourceState(source, version)
+	if err != nil {
 		return err
 	}
-	_, err := withPanToken(ctx, service.library.drive, func(token string) (struct{}, error) {
+	_, err = withPanSourceToken(ctx, service.library.drive, state, func(token string) (struct{}, error) {
 		// Confirm the video's current ancestry immediately before writing.
 		for _, entry := range directory.Files {
 			if !directory.VideoIDs[entry.ID] {
@@ -227,6 +228,9 @@ func (service *ScrapeService) uploadSidecar(ctx context.Context, source LibraryS
 			}
 			if info.ParentID != directory.ID || !withinSource(info, source) {
 				return struct{}{}, fmt.Errorf("视频已移动，请重新扫描")
+			}
+			if err := service.library.checkScanSource(source, version); err != nil {
+				return struct{}{}, err
 			}
 			return struct{}{}, service.library.drive.client.UploadMetadata(ctx, token, directory.ID, name, body)
 		}

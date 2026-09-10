@@ -27,15 +27,17 @@ func withinSource(info pan.FileInfo, source LibrarySource) bool {
 }
 
 func (service *LibraryService) sourceInfo(ctx context.Context, source LibrarySource, version uint64, id string) (pan.FileInfo, error) {
-	service.drive.mu.Lock()
-	defer service.drive.mu.Unlock()
-	if err := service.checkScanSource(source, version); err != nil {
+	state, err := service.drive.sourceState(source, version)
+	if err != nil {
 		return pan.FileInfo{}, err
 	}
-	info, err := withPanToken(ctx, service.drive, func(token string) (pan.FileInfo, error) {
+	info, err := withPanSourceToken(ctx, service.drive, state, func(token string) (pan.FileInfo, error) {
 		return service.drive.client.Info(ctx, token, id)
 	})
 	if err != nil {
+		return pan.FileInfo{}, err
+	}
+	if err := service.checkScanSource(source, version); err != nil {
 		return pan.FileInfo{}, err
 	}
 	if !withinSource(info, source) {
@@ -45,14 +47,20 @@ func (service *LibraryService) sourceInfo(ctx context.Context, source LibrarySou
 }
 
 func (service *LibraryService) readSidecar(ctx context.Context, source LibrarySource, version uint64, entry pan.File, limit int64) ([]byte, error) {
-	service.drive.mu.Lock()
-	defer service.drive.mu.Unlock()
+	state, err := service.drive.sourceState(source, version)
+	if err != nil {
+		return nil, err
+	}
+	body, err := withPanSourceToken(ctx, service.drive, state, func(token string) ([]byte, error) {
+		return service.drive.client.ReadMetadata(ctx, token, entry.PickCode, limit)
+	})
+	if err != nil {
+		return nil, err
+	}
 	if err := service.checkScanSource(source, version); err != nil {
 		return nil, err
 	}
-	return withPanToken(ctx, service.drive, func(token string) ([]byte, error) {
-		return service.drive.client.ReadMetadata(ctx, token, entry.PickCode, limit)
-	})
+	return body, nil
 }
 
 func (service *LibraryService) directoryEntries(ctx context.Context, source LibrarySource, version uint64, id string) ([]pan.File, error) {
