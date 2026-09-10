@@ -35,5 +35,6 @@ func (Task) Fields() []ent.Field {
 func (Task) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("status", "created_at"),
+		index.Fields("type"),
 	}
 }

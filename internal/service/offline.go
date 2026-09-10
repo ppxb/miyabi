@@ -235,21 +235,25 @@ func (service *OfflineService) submit(ctx context.Context, state panSnapshot, so
 }
 
 func (service *OfflineService) findRemoteTask(ctx context.Context, state panSnapshot, hash string) (pan.OfflineTask, error) {
-	for page := 1; ; page++ {
-		remote, err := withPanSourceToken(ctx, service.drive, state, func(token string) (pan.OfflinePage, error) {
+	var found *pan.OfflineTask
+	err := walkOfflinePages(ctx, func(page int) (pan.OfflinePage, error) {
+		return withPanSourceToken(ctx, service.drive, state, func(token string) (pan.OfflinePage, error) {
 			return service.drive.client.OfflineTasks(ctx, token, page)
 		})
-		if err != nil {
-			return pan.OfflineTask{}, fmt.Errorf("find duplicate 115 task: %w", err)
-		}
+	}, func(remote pan.OfflinePage) (bool, error) {
 		for _, download := range remote.Tasks {
 			if strings.EqualFold(download.Hash, hash) {
-				return download, nil
+				found = &download
+				return false, nil
 			}
 		}
-		if page >= remote.PageCount {
-			break
-		}
+		return true, nil
+	})
+	if err != nil {
+		return pan.OfflineTask{}, fmt.Errorf("find duplicate 115 task: %w", err)
+	}
+	if found != nil {
+		return *found, nil
 	}
 	return pan.OfflineTask{}, fmt.Errorf("115 提示任务已存在，但任务列表中未找到它，请稍后重试")
 }
@@ -272,23 +276,15 @@ func (service *OfflineService) remoteHasVideo(ctx context.Context, state panSnap
 	}
 	directories := []string{info.ID}
 	seen := map[string]bool{info.ID: true}
-	for next := 0; next < len(directories); next++ {
-		total := -1
-		for offset := 0; ; {
-			page, err := withPanSourceToken(ctx, service.drive, state, func(token string) (pan.FilePage, error) {
+	found := false
+	for next := 0; next < len(directories) && !found; next++ {
+		err := walkFilePages(ctx, func(offset int) (pan.FilePage, error) {
+			return withPanSourceToken(ctx, service.drive, state, func(token string) (pan.FilePage, error) {
 				return service.drive.client.List(ctx, token, directories[next], offset, 100)
 			})
-			if err != nil {
-				return false, fmt.Errorf("check downloaded video files: %w", err)
-			}
+		}, func(page pan.FilePage) (bool, error) {
 			if !slices.ContainsFunc(page.Path, func(dir pan.Directory) bool { return dir.ID == source.Directory.ID }) {
 				return false, fmt.Errorf("下载目录已移出媒体目录")
-			}
-			if total == -1 {
-				total = page.Total
-			}
-			if total != page.Total || (page.HasMore && len(page.Files) == 0) {
-				return false, fmt.Errorf("下载目录读取不完整，请稍后重试")
 			}
 			for _, entry := range page.Files {
 				if entry.IsDirectory {
@@ -297,19 +293,17 @@ func (service *OfflineService) remoteHasVideo(ctx context.Context, state panSnap
 						directories = append(directories, entry.ID)
 					}
 				} else if isVideo(entry.Name) {
-					return true, nil
+					found = true
+					return false, nil
 				}
 			}
-			offset += len(page.Files)
-			if !page.HasMore {
-				if offset != total {
-					return false, fmt.Errorf("下载目录分页不完整")
-				}
-				break
-			}
+			return true, nil
+		})
+		if err != nil {
+			return false, fmt.Errorf("check downloaded video files: %w", err)
 		}
 	}
-	return false, nil
+	return found, nil
 }
 
 func (service *OfflineService) submission(ctx context.Context, record *ent.Task, source *LibrarySource) (OfflineSubmission, error) {
@@ -550,26 +544,26 @@ func (service *OfflineService) Sync(ctx context.Context) error {
 		}
 		wanted[strings.ToLower(input.InfoHash)] = record
 	}
-	for page := 1; len(wanted) > 0; page++ {
-		remote, err := withPanToken(ctx, service.drive, state, func(token string) (pan.OfflinePage, error) {
-			return service.drive.client.OfflineTasks(ctx, token, page)
-		})
-		if err != nil {
-			return fmt.Errorf("list 115 offline tasks: %w", err)
-		}
-		for _, download := range remote.Tasks {
-			key := strings.ToLower(download.Hash)
-			record, ok := wanted[key]
-			if !ok {
-				continue
+	if len(wanted) > 0 {
+		if err := walkOfflinePages(ctx, func(page int) (pan.OfflinePage, error) {
+			return withPanToken(ctx, service.drive, state, func(token string) (pan.OfflinePage, error) {
+				return service.drive.client.OfflineTasks(ctx, token, page)
+			})
+		}, func(remote pan.OfflinePage) (bool, error) {
+			for _, download := range remote.Tasks {
+				key := strings.ToLower(download.Hash)
+				record, ok := wanted[key]
+				if !ok {
+					continue
+				}
+				if err := service.updateTask(ctx, record, download, state); err != nil {
+					return false, err
+				}
+				delete(wanted, key)
 			}
-			if err := service.updateTask(ctx, record, download, state); err != nil {
-				return err
-			}
-			delete(wanted, key)
-		}
-		if page >= remote.PageCount {
-			break
+			return len(wanted) > 0, nil
+		}); err != nil {
+			return fmt.Errorf("sync 115 offline tasks: %w", err)
 		}
 	}
 	for _, record := range wanted {

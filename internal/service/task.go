@@ -75,12 +75,9 @@ func (service *TaskService) enqueueScan(ctx context.Context, source LibrarySourc
 	if !ent.IsNotFound(err) {
 		return TaskInfo{}, fmt.Errorf("find active scan: %w", err)
 	}
-	payload, err := encodeTaskPayload(scanPayload{
+	payload := (scanPayload{
 		Source: source, Scan: ScanProgress{Stage: "queued", CurrentPath: source.Directory.Path},
-	})
-	if err != nil {
-		return TaskInfo{}, err
-	}
+	}).taskPayload()
 	record, err = service.database.Task.Create().SetType("scan").SetPayload(payload).Save(ctx)
 	if err != nil {
 		return TaskInfo{}, fmt.Errorf("queue library scan: %w", err)
@@ -159,9 +156,9 @@ type metadataTaskGroup struct {
 // Keep large cover documents inside SQLite instead of decoding every child.
 func (service *TaskService) metadataGroups(ctx context.Context, records []*ent.Task) ([]metadataTaskGroup, error) {
 	children := sql.Table(task.Table)
-	parents := make([]*sql.Predicate, 0, len(records))
+	parents := make([]any, 0, len(records))
 	for _, record := range records {
-		parents = append(parents, sqljson.ValueEQ(children.C(task.FieldPayload), record.ID, sqljson.Path("scan_task_id")))
+		parents = append(parents, record.ID)
 	}
 	parent := "json_extract(" + children.C(task.FieldPayload) + ", '$.scan_task_id')"
 	partition := "PARTITION BY " + parent + ", " + children.C(task.FieldType) + ", " + children.C(task.FieldStatus)
@@ -169,7 +166,8 @@ func (service *TaskService) metadataGroups(ctx context.Context, records []*ent.T
 		children.C(task.FieldID), sql.As(parent, "parent_id"),
 		sql.As("COUNT(*) OVER ("+partition+")", "count"),
 		sql.As("ROW_NUMBER() OVER ("+partition+" ORDER BY "+children.C(task.FieldUpdatedAt)+" DESC, "+children.C(task.FieldID)+" DESC)", "position"),
-	).From(children).Where(sql.And(sql.In(children.C(task.FieldType), "scrape", "cover"), sql.Or(parents...))).As("metadata_groups")
+	).From(children).Where(sql.And(sql.In(children.C(task.FieldType), "scrape", "cover"),
+		sqljson.ValueIn(children.C(task.FieldPayload), parents, sqljson.Path("scan_task_id")))).As("metadata_groups")
 	var result []metadataTaskGroup
 	err := service.database.Task.Query().Where(func(s *sql.Selector) {
 		s.Join(groups).On(s.C(task.FieldID), groups.C(task.FieldID))

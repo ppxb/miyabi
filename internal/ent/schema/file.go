@@ -57,5 +57,6 @@ func (File) Edges() []ent.Edge {
 func (File) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("account_id", "root_id", "scan_id"),
+		index.Fields("movie_id", "account_id", "root_id"),
 	}
 }

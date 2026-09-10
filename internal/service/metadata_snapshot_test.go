@@ -141,7 +141,11 @@ func TestRescanSchedulesOnlyChangedOrIncompleteMetadata(t *testing.T) {
 			if err := f.library.indexScanPage(t.Context(), f.queued.ID, "rescan", "/Movies", f.videos, &f.payload); err != nil {
 				t.Fatal(err)
 			}
-			if err := f.library.reconcileScan(t.Context(), f.queued.ID, "rescan", &f.payload, f.entries); err != nil {
+			observed := make(scanObservations)
+			for id, entries := range f.entries {
+				observed.add(id, entries)
+			}
+			if err := f.library.reconcileScan(t.Context(), f.queued.ID, "rescan", &f.payload, observed); err != nil {
 				t.Fatal(err)
 			}
 			count, err := f.library.database.Task.Query().Where(task.TypeEQ("scrape")).Count(t.Context())

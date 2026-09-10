@@ -61,6 +61,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{FilesColumns[9], FilesColumns[10], FilesColumns[12]},
 			},
+			{
+				Name:    "file_movie_files_account_id_root_id",
+				Unique:  false,
+				Columns: []*schema.Column{FilesColumns[13], FilesColumns[9], FilesColumns[10]},
+			},
 		},
 	}
 	// MoviesColumns holds the columns for the "movies" table.
@@ -142,6 +147,11 @@ var (
 				Name:    "task_status_created_at",
 				Unique:  false,
 				Columns: []*schema.Column{TasksColumns[4], TasksColumns[1]},
+			},
+			{
+				Name:    "task_type",
+				Unique:  false,
+				Columns: []*schema.Column{TasksColumns[3]},
 			},
 		},
 	}

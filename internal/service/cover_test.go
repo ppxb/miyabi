@@ -18,6 +18,18 @@ func TestFindDirectoryNFOMatchesCatalogueAlias(t *testing.T) {
 	}
 }
 
+func TestDirectoryNFOSelectionPrefersExactFileOverAliasesAndFolders(t *testing.T) {
+	directory := movieDirectory{Shared: true, Files: []pan.File{
+		{ID: "folder", Name: "LUXU-1899.nfo", IsDirectory: true},
+		{ID: "alias", Name: "259LUXU-1899.nfo"},
+		{ID: "exact", Name: "luxu-1899.NFO"},
+	}}
+	entry, found := findDirectoryNFO("LUXU-1899", directory)
+	if !found || entry.ID != "exact" {
+		t.Fatalf("NFO selection = %+v, found=%t", entry, found)
+	}
+}
+
 func TestCoverRetryPreservesEditsAndRecognizesItsOwnWriteback(t *testing.T) {
 	poster, fanart := []byte("fixture poster"), []byte("fixture fanart")
 	origin := artworkOrigin{

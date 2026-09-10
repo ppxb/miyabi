@@ -15,7 +15,7 @@ import (
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
-func libraryFixture(t *testing.T) (*LibraryService, TaskInfo, scanPayload) {
+func libraryFixture(t testing.TB) (*LibraryService, TaskInfo, scanPayload) {
 	t.Helper()
 	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {

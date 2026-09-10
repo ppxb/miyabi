@@ -65,27 +65,16 @@ func (service *LibraryService) readSidecar(ctx context.Context, source LibrarySo
 
 func (service *LibraryService) directoryEntries(ctx context.Context, source LibrarySource, version uint64, id string) ([]pan.File, error) {
 	var files []pan.File
-	total := -1
-	for offset := 0; ; {
-		page, err := service.scanPage(ctx, source, version, id, offset)
-		if err != nil {
-			return nil, err
-		}
-		if total == -1 {
-			total = page.Total
-		}
-		if total != page.Total || (page.HasMore && len(page.Files) == 0) {
-			return nil, fmt.Errorf("115 目录内容在读取期间变化，请重新扫描")
-		}
+	err := walkFilePages(ctx, func(offset int) (pan.FilePage, error) {
+		return service.scanPage(ctx, source, version, id, offset)
+	}, func(page pan.FilePage) (bool, error) {
 		files = append(files, page.Files...)
-		offset += len(page.Files)
-		if !page.HasMore {
-			if offset != total {
-				return nil, fmt.Errorf("115 目录分页不完整")
-			}
-			return files, nil
-		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
 	}
+	return files, nil
 }
 
 func sidecarByName(files []pan.File, name string) (pan.File, bool) {

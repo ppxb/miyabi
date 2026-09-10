@@ -213,24 +213,44 @@ func (service *ScrapeService) directories(ctx context.Context, input metadataPay
 }
 
 func findDirectoryNFO(code string, directory movieDirectory) (pan.File, bool) {
-	entry, found := sidecarByName(directory.Files, nfo.FileStem(code)+".nfo")
-	if !found {
-		var candidates []pan.File
-		for _, item := range directory.Files {
-			if !item.IsDirectory && strings.EqualFold(path.Ext(item.Name), ".nfo") {
-				candidateCode, _ := codeid.Parse(item.Name)
-				if candidateCode == code {
-					entry, found = item, true
-					break
-				}
-				candidates = append(candidates, item)
+	return findNFO(code, directory.Shared, directory.Files, func(entry pan.File) string {
+		if entry.IsDirectory {
+			return ""
+		}
+		return entry.Name
+	})
+}
+
+// Live listings and compact scan observations must choose the same NFO:
+// exact filename first, catalogue alias second, sole NFO in a private folder last.
+func findNFO[T any](code string, shared bool, files []T, name func(T) string) (T, bool) {
+	wanted := nfo.FileStem(code) + ".nfo"
+	var alias, candidate T
+	aliasFound, candidates := false, 0
+	for _, entry := range files {
+		filename := name(entry)
+		if strings.EqualFold(filename, wanted) {
+			return entry, true
+		}
+		if !strings.EqualFold(path.Ext(filename), ".nfo") {
+			continue
+		}
+		candidates++
+		candidate = entry
+		if !aliasFound {
+			if candidateCode, _ := codeid.Parse(filename); candidateCode == code {
+				alias, aliasFound = entry, true
 			}
 		}
-		if !found && !directory.Shared && len(candidates) == 1 {
-			entry, found = candidates[0], true
-		}
 	}
-	return entry, found
+	if aliasFound {
+		return alias, true
+	}
+	if !shared && candidates == 1 {
+		return candidate, true
+	}
+	var zero T
+	return zero, false
 }
 
 func (service *ScrapeService) directoryNFO(ctx context.Context, input metadataPayload, version uint64, directory movieDirectory) (nfo.Movie, *artworkOrigin, bool, error) {

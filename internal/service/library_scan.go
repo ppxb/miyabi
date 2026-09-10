@@ -44,6 +44,32 @@ type scanPayload struct {
 	JavDBID       string        `json:"javdb_id,omitempty"`
 }
 
+// Let ent encode the progress once, retaining the existing stored JSON shape.
+// Optional keys must stay absent: task queries use their presence to identify
+// targeted scans, and retries need all of the original download context.
+func (payload scanPayload) taskPayload() map[string]any {
+	values := map[string]any{"source": payload.Source, "scan": payload.Scan}
+	if payload.TargetID != "" {
+		values["target_id"] = payload.TargetID
+	}
+	if payload.TargetPath != "" {
+		values["target_path"] = payload.TargetPath
+	}
+	if payload.TargetFile {
+		values["target_file"] = true
+	}
+	if payload.OfflineTaskID != 0 {
+		values["offline_task_id"] = payload.OfflineTaskID
+	}
+	if payload.Code != "" {
+		values["code"] = payload.Code
+	}
+	if payload.JavDBID != "" {
+		values["javdb_id"] = payload.JavDBID
+	}
+	return values
+}
+
 type scanDirectory struct {
 	id   string
 	path string
@@ -139,7 +165,7 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 		Stage: "scanning", CurrentPath: source.Directory.Path, DirectoriesDiscovered: 1,
 	}
 	start := scanDirectory{id: source.Directory.ID, path: source.Directory.Path}
-	observed := make(map[string][]pan.File)
+	observed := make(scanObservations)
 	savePage := func(directoryPath string, videos []scanVideo) error {
 		return service.drive.commitSource(ctx, source, version, func() error {
 			return service.indexScanPage(ctx, job.ID, scanID, directoryPath, videos, &payload)
@@ -178,16 +204,14 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 			if err := savePage(path.Dir(payload.TargetPath), []scanVideo{video}); err != nil {
 				return err
 			}
-			observed[info.ParentID], err = service.directoryEntries(ctx, source, version, info.ParentID)
+			entries, err := service.directoryEntries(ctx, source, version, info.ParentID)
 			if err != nil {
 				return err
 			}
+			observed.add(info.ParentID, entries)
 			return reconcile()
 		}
 		start = scanDirectory{id: info.ID, path: payload.TargetPath}
-	}
-	if err := service.reportScan(ctx, job.ID, payload); err != nil {
-		return err
 	}
 	directories := []scanDirectory{start}
 	seen := map[string]bool{start.id: true}
@@ -198,30 +222,21 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 		if err := service.reportScan(ctx, job.ID, payload); err != nil {
 			return err
 		}
-		total, offset := -1, 0
 		var unidentified []scanVideo
 		var sidecars []pan.File
 		directoryCodes := make(map[string]bool)
-		for {
-			page, err := service.scanPage(ctx, source, version, directory.id, offset)
-			if err != nil {
-				return fmt.Errorf("scan %s: %w", directory.path, err)
-			}
-			if total == -1 {
-				total = page.Total
-			}
-			if page.Total != total || (len(page.Files) == 0 && page.HasMore) {
-				return fmt.Errorf("目录 %s 的内容在扫描期间发生变化或分页不完整，请重新扫描", directory.path)
-			}
+		err := walkFilePages(ctx, func(offset int) (pan.FilePage, error) {
+			return service.scanPage(ctx, source, version, directory.id, offset)
+		}, func(page pan.FilePage) (bool, error) {
 			identified, err := service.identifyScanVideos(ctx, payload, page.Files)
 			if err != nil {
-				return err
+				return false, err
 			}
 			videos := make([]scanVideo, 0, len(page.Files))
-			observed[directory.id] = append(observed[directory.id], page.Files...)
+			observed.add(directory.id, page.Files)
 			for _, entry := range page.Files {
 				if seen[entry.ID] {
-					return fmt.Errorf("扫描期间重复遇到文件或目录 %s，请重新扫描", path.Join(directory.path, entry.Name))
+					return false, fmt.Errorf("扫描期间重复遇到文件或目录 %s，请重新扫描", path.Join(directory.path, entry.Name))
 				}
 				seen[entry.ID] = true
 				if entry.IsDirectory {
@@ -248,20 +263,17 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 					unidentified = append(unidentified, video)
 				}
 			}
-			offset += len(page.Files)
 			if !page.HasMore {
-				if offset != total {
-					return fmt.Errorf("目录 %s 的分页未返回全部内容，请重新扫描", directory.path)
-				}
 				payload.Scan.DirectoriesScanned++
 			}
 			payload.Scan.Movies = len(codes)
 			if err := savePage(directory.path, videos); err != nil {
-				return err
+				return false, err
 			}
-			if !page.HasMore {
-				break
-			}
+			return true, nil
+		})
+		if err != nil {
+			return fmt.Errorf("scan %s: %w", directory.path, err)
 		}
 		// A single NFO describes a single-movie directory, including videos
 		// whose filenames do not contain a recognizable code.
@@ -353,12 +365,8 @@ func (service *LibraryService) indexScanPage(ctx context.Context, taskID int, sc
 				return fmt.Errorf("load previous file associations: %w", err)
 			}
 			previousFiles := make(map[string]*ent.File, len(previous))
-			var previousMovies []int
 			for _, entry := range previous {
 				previousFiles[entry.FileID] = entry
-				if entry.MovieID != nil {
-					previousMovies = append(previousMovies, *entry.MovieID)
-				}
 			}
 			if len(codes) > 0 && payload.OfflineTaskID != 0 && payload.TargetID != "" {
 				id, err := indexDownloadedMovie(ctx, tx, *payload)
@@ -369,16 +377,9 @@ func (service *LibraryService) indexScanPage(ctx context.Context, taskID int, sc
 					codes[code] = id
 				}
 			} else if len(codes) > 0 {
-				builders := make([]*ent.MovieCreate, 0, len(codes))
 				numbers := make([]string, 0, len(codes))
 				for code := range codes {
-					builders = append(builders, tx.Movie.Create().SetCode(code))
 					numbers = append(numbers, code)
-				}
-				// The scan owns file membership, not metadata. Existing titles,
-				// relationships and scrape status are untouched by this upsert.
-				if err := tx.Movie.CreateBulk(builders...).OnConflictColumns(movie.FieldCode).Ignore().Exec(ctx); err != nil {
-					return fmt.Errorf("index scanned movies: %w", err)
 				}
 				movies, err := tx.Movie.Query().Where(movie.CodeIn(numbers...)).Select(movie.FieldID, movie.FieldCode).All(ctx)
 				if err != nil {
@@ -387,15 +388,39 @@ func (service *LibraryService) indexScanPage(ctx context.Context, taskID int, sc
 				for _, record := range movies {
 					codes[record.Code] = record.ID
 				}
+				// Existing metadata needs no write during a rescan. The SQLite
+				// write transaction also protects the missing-code check.
+				var builders []*ent.MovieCreate
+				for code, id := range codes {
+					if id == 0 {
+						builders = append(builders, tx.Movie.Create().SetCode(code))
+					}
+				}
+				if len(builders) > 0 {
+					created, err := tx.Movie.CreateBulk(builders...).Save(ctx)
+					if err != nil {
+						return fmt.Errorf("index scanned movies: %w", err)
+					}
+					for _, record := range created {
+						codes[record.Code] = record.ID
+					}
+				}
 			}
 			builders := make([]*ent.FileCreate, 0, len(videos))
+			var unchanged []string
+			var previousMovies []int
 			for _, video := range videos {
 				old := previousFiles[video.ID]
-				if old == nil || old.Name != video.Name || old.ParentID != video.ParentID ||
-					old.Size != video.Size || old.Sha1 != video.SHA1 || old.PickCode != video.PickCode ||
-					old.AccountID != payload.Source.AccountID || old.RootID != payload.Source.Directory.ID ||
-					old.Path != path.Join(directoryPath, video.Name) || valueOrZero(old.MovieID) != codes[video.Code] {
-					indexChanged = true
+				if old != nil && old.Name == video.Name && old.ParentID == video.ParentID &&
+					old.Size == video.Size && old.Sha1 == video.SHA1 && old.PickCode == video.PickCode &&
+					old.AccountID == payload.Source.AccountID && old.RootID == payload.Source.Directory.ID &&
+					old.Path == path.Join(directoryPath, video.Name) && valueOrZero(old.MovieID) == codes[video.Code] {
+					unchanged = append(unchanged, video.ID)
+					continue
+				}
+				indexChanged = true
+				if old != nil && old.MovieID != nil && *old.MovieID != codes[video.Code] {
+					previousMovies = append(previousMovies, *old.MovieID)
 				}
 				builder := tx.File.Create().SetFileID(video.ID).SetName(video.Name).SetSize(video.Size).
 					SetPickCode(video.PickCode).SetSha1(video.SHA1).SetParentID(video.ParentID).
@@ -406,9 +431,16 @@ func (service *LibraryService) indexScanPage(ctx context.Context, taskID int, sc
 				}
 				builders = append(builders, builder)
 			}
-			if err := tx.File.CreateBulk(builders...).OnConflictColumns(file.FieldFileID).
-				UpdateNewValues().UpdateMovieID().Exec(ctx); err != nil {
-				return fmt.Errorf("index scanned files: %w", err)
+			if len(builders) > 0 {
+				if err := tx.File.CreateBulk(builders...).OnConflictColumns(file.FieldFileID).
+					UpdateNewValues().UpdateMovieID().Exec(ctx); err != nil {
+					return fmt.Errorf("index scanned files: %w", err)
+				}
+			}
+			if len(unchanged) > 0 {
+				if err := tx.File.Update().Where(file.FileIDIn(unchanged...)).SetScanID(scanID).Exec(ctx); err != nil {
+					return fmt.Errorf("mark unchanged scanned files: %w", err)
+				}
 			}
 			removed, err := removeUnreferencedMovies(ctx, tx, previousMovies)
 			if err != nil {
@@ -452,7 +484,7 @@ func indexDownloadedMovie(ctx context.Context, tx *ent.Tx, payload scanPayload) 
 
 // Reconcile runs only after every directory and page succeeded. Deletions and
 // their progress record commit together, and cannot touch another scan root.
-func (service *LibraryService) reconcileScan(ctx context.Context, taskID int, scanID string, payload *scanPayload, observed map[string][]pan.File) error {
+func (service *LibraryService) reconcileScan(ctx context.Context, taskID int, scanID string, payload *scanPayload, observed scanObservations) error {
 	err := ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
 		stale := file.And(libraryFiles(payload.Source), file.ScanIDNEQ(scanID))
 		if payload.TargetID != "" {
@@ -572,11 +604,7 @@ func (service *LibraryService) reportScan(ctx context.Context, taskID int, paylo
 }
 
 func saveScanProgress(ctx context.Context, tasks *ent.TaskClient, taskID int, payload scanPayload) error {
-	encoded, err := encodeTaskPayload(payload)
-	if err != nil {
-		return err
-	}
-	if err := tasks.UpdateOneID(taskID).SetPayload(encoded).Exec(ctx); err != nil {
+	if err := tasks.UpdateOneID(taskID).SetPayload(payload.taskPayload()).Exec(ctx); err != nil {
 		return fmt.Errorf("save scan progress: %w", err)
 	}
 	return nil

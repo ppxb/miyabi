@@ -55,7 +55,7 @@ func videoFingerprint(files []pan.File) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (snapshot metadataSnapshot) matches(record *ent.Movie, directories map[string][]pan.File) bool {
+func (snapshot metadataSnapshot) matches(record *ent.Movie, directories scanObservations) bool {
 	files := make([]pan.File, 0, len(record.Edges.Files))
 	ids := make(map[string]bool, len(record.Edges.Files))
 	for _, entry := range record.Edges.Files {
@@ -66,16 +66,14 @@ func (snapshot metadataSnapshot) matches(record *ent.Movie, directories map[stri
 		return false
 	}
 	for _, saved := range snapshot.Directories {
-		entries := directories[saved.ID]
-		shared := slices.ContainsFunc(entries, func(entry pan.File) bool {
-			return !entry.IsDirectory && isVideo(entry.Name) && !ids[entry.ID]
-		})
-		nfo, found := findDirectoryNFO(record.Code, movieDirectory{Files: entries, Shared: shared})
+		directory := directories[saved.ID]
+		shared := slices.ContainsFunc(directory, func(entry observedFile) bool { return entry.videoID != "" && !ids[entry.videoID] })
+		nfo, found := findNFO(record.Code, shared, directory, func(entry observedFile) string { return entry.Name })
 		if !found || !strings.EqualFold(nfo.Name, saved.NFO.Name) {
 			return false
 		}
 		for _, sidecar := range []metadataSidecar{saved.NFO, saved.Poster, saved.Fanart} {
-			entry, found := sidecarByName(entries, sidecar.Name)
+			entry, found := directory.sidecar(sidecar.Name)
 			if !found || entry.SHA1 == "" || !strings.EqualFold(entry.SHA1, sidecar.SHA1) {
 				return false
 			}
