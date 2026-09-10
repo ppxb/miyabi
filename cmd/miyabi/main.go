@@ -75,7 +75,7 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	library := service.NewLibraryService(store.Client, drive, tasks, images, cfg.MinVideoSizeMB*(1<<20))
+	library := service.NewLibraryService(store.Client, drive, tasks, images)
 	play := service.NewPlayService(library)
 	defer play.Close()
 	scrape := service.NewScrapeService(library, discover, images)

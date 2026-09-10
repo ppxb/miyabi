@@ -17,11 +17,7 @@ export function MovieResourceBadges({ movie }: { movie: DiscoverMovie }) {
 export function MovieStateBadge({ movie }: { movie: MovieIdentity }) {
   const { state } = useMovieState(movie)
   if (state === 'in_library') {
-    return (
-      <Badge className="border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-        已入库
-      </Badge>
-    )
+    return <Badge variant="success">已入库</Badge>
   }
   if (state === 'saving') {
     return <Badge variant="outline">下载中</Badge>

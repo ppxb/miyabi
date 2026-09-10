@@ -1,5 +1,6 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 
+import { useMarkMovieWatched } from '@/api/library'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useUIStore } from '@/stores/ui'
 import { PlayerLoading } from './player-status'
@@ -9,6 +10,14 @@ const MoviePlayer = lazy(() => import('./movie-player'))
 export function PlayerDialog() {
   const movieID = useUIStore(state => state.playbackMovieID)
   const close = useUIStore(state => state.closePlayer)
+  const { mutate: markWatched } = useMarkMovieWatched()
+  const openedMovieID = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (openedMovieID.current === movieID) return
+    openedMovieID.current = movieID
+    if (movieID !== null) markWatched(movieID)
+  }, [movieID, markWatched])
 
   // Unmount the portal with the player so the exit animation cannot show a collapsed, empty frame.
   if (movieID === null) return null

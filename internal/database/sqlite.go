@@ -44,6 +44,10 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 		client.Close()
 		return nil, fmt.Errorf("migrate database schema: %w", err)
 	}
+	if err := createTaskHistoryIndexes(ctx, db); err != nil {
+		client.Close()
+		return nil, err
+	}
 
 	return &Store{Client: client, db: db}, nil
 }

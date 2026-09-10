@@ -4,6 +4,7 @@ package ent
 
 import (
 	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"strings"
 	"time"
@@ -27,7 +28,7 @@ type Task struct {
 	// Status holds the value of the "status" field.
 	Status task.Status `json:"status,omitempty"`
 	// Payload holds the value of the "payload" field.
-	Payload map[string]interface{} `json:"payload,omitempty"`
+	Payload jsontext.Value `json:"payload,omitempty"`
 	// Progress holds the value of the "progress" field.
 	Progress int `json:"progress,omitempty"`
 	// Error holds the value of the "error" field.

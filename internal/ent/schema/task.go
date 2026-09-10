@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"encoding/json"
+
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -21,8 +23,8 @@ func (Task) Fields() []ent.Field {
 		field.Enum("status").
 			Values("queued", "running", "done", "failed").
 			Default("queued"),
-		field.JSON("payload", map[string]any{}).
-			Default(func() map[string]any { return map[string]any{} }),
+		field.JSON("payload", json.RawMessage{}).
+			Default(func() json.RawMessage { return json.RawMessage(`{}`) }),
 		field.Int("progress").
 			Range(0, 100).
 			Default(0),

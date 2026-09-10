@@ -51,6 +51,8 @@ const (
 	FieldFanarts = "fanarts"
 	// FieldScrapeStatus holds the string denoting the scrape_status field in the database.
 	FieldScrapeStatus = "scrape_status"
+	// FieldWatched holds the string denoting the watched field in the database.
+	FieldWatched = "watched"
 	// EdgeActors holds the string denoting the actors edge name in mutations.
 	EdgeActors = "actors"
 	// EdgeTags holds the string denoting the tags edge name in mutations.
@@ -99,6 +101,7 @@ var Columns = []string{
 	FieldPoster,
 	FieldFanarts,
 	FieldScrapeStatus,
+	FieldWatched,
 }
 
 var (
@@ -133,6 +136,8 @@ var (
 	DefaultTitle string
 	// DefaultFanarts holds the default value on creation for the "fanarts" field.
 	DefaultFanarts func() []string
+	// DefaultWatched holds the default value on creation for the "watched" field.
+	DefaultWatched bool
 )
 
 // ScrapeStatus defines the type for the "scrape_status" enum field.
@@ -253,6 +258,11 @@ func ByPoster(opts ...sql.OrderTermOption) OrderOption {
 // ByScrapeStatus orders the results by the scrape_status field.
 func ByScrapeStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldScrapeStatus, opts...).ToFunc()
+}
+
+// ByWatched orders the results by the watched field.
+func ByWatched(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWatched, opts...).ToFunc()
 }
 
 // ByActorsCount orders the results by actors count.

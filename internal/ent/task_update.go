@@ -4,12 +4,14 @@ package ent
 
 import (
 	"context"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 	"github.com/ppxb/miyabi/internal/ent/task"
@@ -63,8 +65,14 @@ func (_u *TaskUpdate) SetNillableStatus(v *task.Status) *TaskUpdate {
 }
 
 // SetPayload sets the "payload" field.
-func (_u *TaskUpdate) SetPayload(v map[string]interface{}) *TaskUpdate {
+func (_u *TaskUpdate) SetPayload(v jsontext.Value) *TaskUpdate {
 	_u.mutation.SetPayload(v)
+	return _u
+}
+
+// AppendPayload appends value to the "payload" field.
+func (_u *TaskUpdate) AppendPayload(v jsontext.Value) *TaskUpdate {
+	_u.mutation.AppendPayload(v)
 	return _u
 }
 
@@ -194,6 +202,11 @@ func (_u *TaskUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Payload(); ok {
 		_spec.SetField(task.FieldPayload, field.TypeJSON, value)
 	}
+	if value, ok := _u.mutation.AppendedPayload(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, task.FieldPayload, value)
+		})
+	}
 	if value, ok := _u.mutation.Progress(); ok {
 		_spec.SetField(task.FieldProgress, field.TypeInt, value)
 	}
@@ -261,8 +274,14 @@ func (_u *TaskUpdateOne) SetNillableStatus(v *task.Status) *TaskUpdateOne {
 }
 
 // SetPayload sets the "payload" field.
-func (_u *TaskUpdateOne) SetPayload(v map[string]interface{}) *TaskUpdateOne {
+func (_u *TaskUpdateOne) SetPayload(v jsontext.Value) *TaskUpdateOne {
 	_u.mutation.SetPayload(v)
+	return _u
+}
+
+// AppendPayload appends value to the "payload" field.
+func (_u *TaskUpdateOne) AppendPayload(v jsontext.Value) *TaskUpdateOne {
+	_u.mutation.AppendPayload(v)
 	return _u
 }
 
@@ -421,6 +440,11 @@ func (_u *TaskUpdateOne) sqlSave(ctx context.Context) (_node *Task, err error) {
 	}
 	if value, ok := _u.mutation.Payload(); ok {
 		_spec.SetField(task.FieldPayload, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedPayload(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, task.FieldPayload, value)
+		})
 	}
 	if value, ok := _u.mutation.Progress(); ok {
 		_spec.SetField(task.FieldProgress, field.TypeInt, value)

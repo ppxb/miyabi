@@ -18,7 +18,7 @@ type directoryObservation []observedFile
 
 type scanObservations map[string]directoryObservation
 
-func (observed scanObservations) add(id string, files []pan.File, minVideoSize int64) {
+func (observed scanObservations) add(id string, files []pan.File) {
 	directory := observed[id]
 	fileCount := 0
 	for _, entry := range files {
@@ -32,7 +32,7 @@ func (observed scanObservations) add(id string, files []pan.File, minVideoSize i
 			continue
 		}
 		file := observedFile{metadataSidecar: metadataSidecar{Name: entry.Name, SHA1: entry.SHA1}}
-		if isVideo(entry.Name) && entry.Size >= minVideoSize {
+		if canIdentifyVideo(entry) {
 			file.videoID = entry.ID
 		}
 		directory = append(directory, file)

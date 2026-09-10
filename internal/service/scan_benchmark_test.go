@@ -37,7 +37,7 @@ func BenchmarkScanObservations(b *testing.B) {
 		for j, name := range []string{"ABP-001-CD1.mp4", "ABP-001-CD2.mp4", "ABP-001.nfo", "poster.jpg", "fanart.jpg", "subdirectory"} {
 			entries = append(entries, pan.File{
 				ID: fmt.Sprintf("%d-%d", i, j), ParentID: id, Name: name, IsDirectory: j == 5,
-				Size: 1024, PickCode: "fixture-pick-code", SHA1: "0123456789012345678901234567890123456789",
+				Size: 1 << 30, PickCode: "fixture-pick-code", SHA1: "0123456789012345678901234567890123456789",
 			})
 		}
 		pages[id] = entries
@@ -46,7 +46,7 @@ func BenchmarkScanObservations(b *testing.B) {
 	for b.Loop() {
 		observed := make(scanObservations)
 		for id, entries := range pages {
-			observed.add(id, entries, 0)
+			observed.add(id, entries)
 		}
 		scanBenchmarkResult = observed
 	}
@@ -59,7 +59,11 @@ func BenchmarkScanPayload(b *testing.B) {
 	}
 	b.ReportAllocs()
 	for b.Loop() {
-		body, err := json.Marshal(payload.taskPayload())
+		encoded, err := encodeTaskPayload(payload)
+		if err != nil {
+			b.Fatal(err)
+		}
+		body, err := json.Marshal(encoded)
 		if err != nil {
 			b.Fatal(err)
 		}

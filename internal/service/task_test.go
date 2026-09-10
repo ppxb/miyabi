@@ -28,7 +28,10 @@ func TestTaskGroupsFoldChildCountsAndLatestState(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		input["document"] = strings.Repeat("fixture document ", 1000)
+		input, err = setTaskPayloadField(input, "document", strings.Repeat("fixture document ", 1000))
+		if err != nil {
+			t.Fatal(err)
+		}
 		builder := library.database.Task.Create().SetType(child.kind).SetStatus(child.status).
 			SetPayload(input).SetUpdatedAt(latest.Add(time.Duration(i) * time.Second))
 		if child.status == task.StatusFailed {

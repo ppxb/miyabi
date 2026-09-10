@@ -35,9 +35,9 @@ export function MovieCard({
 }: {
   movie: { code: string; title: string; cover?: string }
   titlePlaceholder?: ReactNode
-  description: ReactNode
+  description?: ReactNode
   state?: ReactNode
-  children: ReactNode
+  children?: ReactNode
 }) {
   const title = movie.title || movie.code
   return (
@@ -59,8 +59,10 @@ export function MovieCard({
             <h3 className="truncate text-sm leading-5 font-semibold">{title}</h3>
           </OverflowTooltip>
         )}
-        <div className="text-xs text-muted-foreground">{description}</div>
-        <div className="flex flex-wrap gap-1.5">{children}</div>
+        {description != null ? (
+          <div className="text-xs text-muted-foreground">{description}</div>
+        ) : null}
+        {children ? <div className="flex flex-wrap gap-1.5">{children}</div> : null}
       </CardContent>
     </Card>
   )

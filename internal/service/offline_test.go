@@ -156,7 +156,10 @@ func TestOfflineActionDependsOnCurrentFilesRatherThanDownloadHistory(t *testing.
 	if err := service.tasks.Finish(ctx, input.ScanTaskID, nil); err != nil {
 		t.Fatal(err)
 	}
-	record.Payload["file_ids"] = []string{"video-1"}
+	record.Payload, err = setTaskPayloadField(record.Payload, "file_ids", []string{"video-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	state, err = service.submission(ctx, record, &source)
 	if err != nil || state.Phase != "available" {
 		t.Fatalf("history without file: %#v %v", state, err)

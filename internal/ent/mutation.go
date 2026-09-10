@@ -1935,6 +1935,7 @@ type MovieMutation struct {
 	fanarts       *[]string
 	appendfanarts []string
 	scrape_status *movie.ScrapeStatus
+	watched       *bool
 	clearedFields map[string]struct{}
 	actors        map[int]struct{}
 	removedactors map[int]struct{}
@@ -2909,6 +2910,42 @@ func (m *MovieMutation) ResetScrapeStatus() {
 	m.scrape_status = nil
 }
 
+// SetWatched sets the "watched" field.
+func (m *MovieMutation) SetWatched(b bool) {
+	m.watched = &b
+}
+
+// Watched returns the value of the "watched" field in the mutation.
+func (m *MovieMutation) Watched() (r bool, exists bool) {
+	v := m.watched
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWatched returns the old "watched" field's value of the Movie entity.
+// If the Movie object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MovieMutation) OldWatched(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWatched is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWatched requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWatched: %w", err)
+	}
+	return oldValue.Watched, nil
+}
+
+// ResetWatched resets all changes to the "watched" field.
+func (m *MovieMutation) ResetWatched() {
+	m.watched = nil
+}
+
 // AddActorIDs adds the "actors" edge to the Actor entity by ids.
 func (m *MovieMutation) AddActorIDs(ids ...int) {
 	if m.actors == nil {
@@ -3105,7 +3142,7 @@ func (m *MovieMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MovieMutation) Fields() []string {
-	fields := make([]string, 0, 18)
+	fields := make([]string, 0, 19)
 	if m.created_at != nil {
 		fields = append(fields, movie.FieldCreatedAt)
 	}
@@ -3160,6 +3197,9 @@ func (m *MovieMutation) Fields() []string {
 	if m.scrape_status != nil {
 		fields = append(fields, movie.FieldScrapeStatus)
 	}
+	if m.watched != nil {
+		fields = append(fields, movie.FieldWatched)
+	}
 	return fields
 }
 
@@ -3204,6 +3244,8 @@ func (m *MovieMutation) Field(name string) (ent.Value, bool) {
 		return m.Fanarts()
 	case movie.FieldScrapeStatus:
 		return m.ScrapeStatus()
+	case movie.FieldWatched:
+		return m.Watched()
 	}
 	return nil, false
 }
@@ -3249,6 +3291,8 @@ func (m *MovieMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldFanarts(ctx)
 	case movie.FieldScrapeStatus:
 		return m.OldScrapeStatus(ctx)
+	case movie.FieldWatched:
+		return m.OldWatched(ctx)
 	}
 	return nil, fmt.Errorf("unknown Movie field %s", name)
 }
@@ -3383,6 +3427,13 @@ func (m *MovieMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetScrapeStatus(v)
+		return nil
+	case movie.FieldWatched:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWatched(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Movie field %s", name)
@@ -3588,6 +3639,9 @@ func (m *MovieMutation) ResetField(name string) error {
 		return nil
 	case movie.FieldScrapeStatus:
 		m.ResetScrapeStatus()
+		return nil
+	case movie.FieldWatched:
+		m.ResetWatched()
 		return nil
 	}
 	return fmt.Errorf("unknown Movie field %s", name)
@@ -4954,7 +5008,8 @@ type TaskMutation struct {
 	updated_at    *time.Time
 	_type         *string
 	status        *task.Status
-	payload       *map[string]interface{}
+	payload       *jsontext.Value
+	appendpayload jsontext.Value
 	progress      *int
 	addprogress   *int
 	error         *string
@@ -5207,12 +5262,13 @@ func (m *TaskMutation) ResetStatus() {
 }
 
 // SetPayload sets the "payload" field.
-func (m *TaskMutation) SetPayload(value map[string]interface{}) {
-	m.payload = &value
+func (m *TaskMutation) SetPayload(j jsontext.Value) {
+	m.payload = &j
+	m.appendpayload = nil
 }
 
 // Payload returns the value of the "payload" field in the mutation.
-func (m *TaskMutation) Payload() (r map[string]interface{}, exists bool) {
+func (m *TaskMutation) Payload() (r jsontext.Value, exists bool) {
 	v := m.payload
 	if v == nil {
 		return
@@ -5223,7 +5279,7 @@ func (m *TaskMutation) Payload() (r map[string]interface{}, exists bool) {
 // OldPayload returns the old "payload" field's value of the Task entity.
 // If the Task object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TaskMutation) OldPayload(ctx context.Context) (v map[string]interface{}, err error) {
+func (m *TaskMutation) OldPayload(ctx context.Context) (v jsontext.Value, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldPayload is only allowed on UpdateOne operations")
 	}
@@ -5237,9 +5293,23 @@ func (m *TaskMutation) OldPayload(ctx context.Context) (v map[string]interface{}
 	return oldValue.Payload, nil
 }
 
+// AppendPayload adds j to the "payload" field.
+func (m *TaskMutation) AppendPayload(j jsontext.Value) {
+	m.appendpayload = append(m.appendpayload, j...)
+}
+
+// AppendedPayload returns the list of values that were appended to the "payload" field in this mutation.
+func (m *TaskMutation) AppendedPayload() (jsontext.Value, bool) {
+	if len(m.appendpayload) == 0 {
+		return nil, false
+	}
+	return m.appendpayload, true
+}
+
 // ResetPayload resets all changes to the "payload" field.
 func (m *TaskMutation) ResetPayload() {
 	m.payload = nil
+	m.appendpayload = nil
 }
 
 // SetProgress sets the "progress" field.
@@ -5486,7 +5556,7 @@ func (m *TaskMutation) SetField(name string, value ent.Value) error {
 		m.SetStatus(v)
 		return nil
 	case task.FieldPayload:
-		v, ok := value.(map[string]interface{})
+		v, ok := value.(jsontext.Value)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

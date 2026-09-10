@@ -32,7 +32,7 @@ type TaskInfo struct {
 type TaskJob struct {
 	ID      int
 	Type    string
-	Payload map[string]any
+	Payload json.RawMessage
 }
 
 type TaskRevisions struct {
@@ -88,9 +88,12 @@ func ensureScanTask(ctx context.Context, tasks *ent.TaskClient, source LibrarySo
 	if !ent.IsNotFound(err) {
 		return nil, fmt.Errorf("find active scan: %w", err)
 	}
-	payload := (scanPayload{
+	payload, err := encodeTaskPayload(scanPayload{
 		Source: source, Scan: ScanProgress{Stage: "queued", CurrentPath: source.Directory.Path},
-	}).taskPayload()
+	})
+	if err != nil {
+		return nil, err
+	}
 	record, err = tasks.Create().SetType("scan").SetPayload(payload).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("queue library scan: %w", err)
@@ -403,26 +406,38 @@ func (service *TaskService) notify(library, offline bool) {
 	}
 }
 
-func encodeTaskPayload(value any) (map[string]any, error) {
+// Keep the stored JSON shape while avoiding an intermediate map and its
+// float64 conversion of task IDs. ent writes RawMessage as a JSON object.
+func encodeTaskPayload(value any) (json.RawMessage, error) {
 	encoded, err := json.Marshal(value)
 	if err != nil {
 		return nil, fmt.Errorf("encode task payload: %w", err)
 	}
-	var payload map[string]any
-	if err := json.Unmarshal(encoded, &payload); err != nil {
-		return nil, fmt.Errorf("decode task payload object: %w", err)
-	}
-	return payload, nil
+	return encoded, nil
 }
 
-func decodeTaskPayload[T any](payload map[string]any) (T, error) {
+func decodeTaskPayload[T any](payload json.RawMessage) (T, error) {
 	var value T
-	encoded, err := json.Marshal(payload)
-	if err != nil {
-		return value, fmt.Errorf("encode stored task: %w", err)
-	}
-	if err := json.Unmarshal(encoded, &value); err != nil {
+	if err := json.Unmarshal(payload, &value); err != nil {
 		return value, fmt.Errorf("decode stored task: %w", err)
 	}
 	return value, nil
+}
+
+// Partial progress updates retain unknown fields and copy nested values as JSON
+// instead of decoding large documents that the update does not use.
+func setTaskPayloadField(payload json.RawMessage, key string, value any) (json.RawMessage, error) {
+	fields, err := decodeTaskPayload[map[string]json.RawMessage](payload)
+	if err != nil {
+		return nil, err
+	}
+	if fields == nil {
+		return nil, fmt.Errorf("stored task payload must be an object")
+	}
+	encoded, err := encodeTaskPayload(value)
+	if err != nil {
+		return nil, err
+	}
+	fields[key] = encoded
+	return encodeTaskPayload(fields)
 }

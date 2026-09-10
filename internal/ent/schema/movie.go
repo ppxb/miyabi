@@ -63,6 +63,8 @@ func (Movie) Fields() []ent.Field {
 		field.Enum("scrape_status").
 			Values("pending", "done", "failed").
 			Default("pending"),
+		field.Bool("watched").
+			Default(false),
 	}
 }
 

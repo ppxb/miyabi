@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"entgo.io/ent/dialect/sql"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
+	"github.com/ppxb/miyabi/internal/ent/tag"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 )
 
@@ -23,19 +25,22 @@ type LibraryMovie struct {
 	JavDBID      *string            `json:"javdb_id,omitempty"`
 	Cover        *string            `json:"cover,omitempty"`
 	Poster       *string            `json:"poster,omitempty"`
+	Tags         []LibraryTag       `json:"tags"`
 	ScrapeStatus movie.ScrapeStatus `json:"scrape_status"`
-	FileCount    int                `json:"file_count"`
-	Size         int64              `json:"size"`
+	Watched      bool               `json:"watched"`
+}
+
+type LibraryTag struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
 }
 
 type LibraryPage struct {
-	Source         *LibrarySource `json:"source,omitempty"`
-	Movies         []LibraryMovie `json:"movies"`
-	Total          int            `json:"total"`
-	FileCount      int            `json:"file_count"`
-	UnmatchedFiles int            `json:"unmatched_files"`
-	Page           int            `json:"page"`
-	HasMore        bool           `json:"has_more"`
+	Source  *LibrarySource `json:"source,omitempty"`
+	Movies  []LibraryMovie `json:"movies"`
+	Total   int            `json:"total"`
+	Page    int            `json:"page"`
+	HasMore bool           `json:"has_more"`
 }
 
 type LibraryFile struct {
@@ -45,27 +50,19 @@ type LibraryFile struct {
 	Size int64  `json:"size"`
 }
 
-type LibraryFilePage struct {
-	Files   []LibraryFile `json:"files"`
-	Total   int           `json:"total"`
-	Page    int           `json:"page"`
-	HasMore bool          `json:"has_more"`
-}
-
 type LibraryService struct {
-	images       *mediaimage.Cache
-	database     *ent.Client
-	drive        *PanService
-	tasks        *TaskService
-	minVideoSize int64
+	images   *mediaimage.Cache
+	database *ent.Client
+	drive    *PanService
+	tasks    *TaskService
 }
 
-func NewLibraryService(database *ent.Client, drive *PanService, tasks *TaskService, images *mediaimage.Cache, minVideoSize int64) *LibraryService {
-	return &LibraryService{database: database, drive: drive, tasks: tasks, images: images, minVideoSize: minVideoSize}
+func NewLibraryService(database *ent.Client, drive *PanService, tasks *TaskService, images *mediaimage.Cache) *LibraryService {
+	return &LibraryService{database: database, drive: drive, tasks: tasks, images: images}
 }
 
 // Browsing an existing index only reads SQLite. 115 is contacted when scanning,
-// not on each visit to the library or while paging through indexed files.
+// not on each visit to the library or while paging through indexed movies.
 func loadLibrarySource(ctx context.Context, database *ent.Client) (*LibrarySource, error) {
 	directory, found, err := loadSetting[panLibraryDirectory](ctx, database, panDirectorySetting)
 	if err != nil || !found {
@@ -89,33 +86,34 @@ func (service *LibraryService) Movies(ctx context.Context, page, limit int) (Lib
 	}
 	result.Source = source
 	scope := libraryFiles(*source)
-	query := service.database.Movie.Query().Where(movie.HasFilesWith(scope))
-	result.Total, err = query.Clone().Count(ctx)
+	result.Total, err = service.database.File.Query().Where(scope).Aggregate(func(s *sql.Selector) string {
+		return sql.As("COUNT(DISTINCT "+s.C(file.FieldMovieID)+")", "total")
+	}).Int(ctx)
 	if err != nil {
-		return result, fmt.Errorf("count library movies: %w", err)
+		return result, fmt.Errorf("count library index: %w", err)
 	}
-	result.FileCount, err = service.database.File.Query().Where(scope).Count(ctx)
-	if err != nil {
-		return result, fmt.Errorf("count library files: %w", err)
+	if result.Total == 0 {
+		return result, nil
 	}
-	result.UnmatchedFiles, err = service.database.File.Query().Where(scope, file.Not(file.HasMovie())).Count(ctx)
-	if err != nil {
-		return result, fmt.Errorf("count unidentified videos: %w", err)
-	}
-	records, err := query.Order(ent.Desc(movie.FieldCreatedAt), ent.Desc(movie.FieldID)).
+	records, err := service.database.Movie.Query().Where(movie.HasFilesWith(scope)).
+		Select(movie.FieldID, movie.FieldCode, movie.FieldTitle, movie.FieldJavdbID, movie.FieldCover, movie.FieldPoster,
+			movie.FieldScrapeStatus, movie.FieldWatched).
+		Order(ent.Desc(movie.FieldCreatedAt), ent.Desc(movie.FieldID)).
 		Offset((page - 1) * limit).Limit(limit).
-		WithFiles(func(query *ent.FileQuery) { query.Where(scope).Select(file.FieldID, file.FieldSize) }).All(ctx)
+		WithTags(func(query *ent.TagQuery) {
+			query.Select(tag.FieldID, tag.FieldName).Order(ent.Asc(tag.FieldName), ent.Asc(tag.FieldID))
+		}).All(ctx)
 	if err != nil {
 		return result, fmt.Errorf("list library movies: %w", err)
 	}
 	for _, record := range records {
 		item := LibraryMovie{
-			ID: record.ID, Code: record.Code, Title: record.Title, ScrapeStatus: record.ScrapeStatus,
+			ID: record.ID, Code: record.Code, Title: record.Title,
 			JavDBID: record.JavdbID, Cover: record.Cover, Poster: record.Poster,
-			FileCount: len(record.Edges.Files),
+			Tags: make([]LibraryTag, 0, len(record.Edges.Tags)), ScrapeStatus: record.ScrapeStatus, Watched: record.Watched,
 		}
-		for _, media := range record.Edges.Files {
-			item.Size += media.Size
+		for _, label := range record.Edges.Tags {
+			item.Tags = append(item.Tags, LibraryTag{ID: label.ID, Name: label.Name})
 		}
 		result.Movies = append(result.Movies, item)
 	}
@@ -123,36 +121,37 @@ func (service *LibraryService) Movies(ctx context.Context, page, limit int) (Lib
 	return result, nil
 }
 
-func (service *LibraryService) Files(ctx context.Context, movieID int, unmatched bool, page, limit int) (LibraryFilePage, error) {
-	result := LibraryFilePage{Files: []LibraryFile{}, Page: page}
-	source, err := loadLibrarySource(ctx, service.database)
+// Opening the player counts as watched, independently of upstream playback.
+// Read the mounted source and update its movie in one local transaction.
+func (service *LibraryService) MarkWatched(ctx context.Context, movieID int) error {
+	changed := false
+	err := ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
+		source, err := loadLibrarySource(ctx, tx.Client())
+		if err != nil {
+			return err
+		}
+		if source == nil {
+			return ErrMediaDirectoryRequired
+		}
+		record, err := tx.Movie.Query().Where(movie.IDEQ(movieID), movie.HasFilesWith(libraryFiles(*source))).
+			Select(movie.FieldID, movie.FieldWatched).Only(ctx)
+		if err != nil {
+			return err
+		}
+		if record.Watched {
+			return nil
+		}
+		if err := tx.Movie.UpdateOneID(movieID).SetWatched(true).Exec(ctx); err != nil {
+			return err
+		}
+		changed = true
+		return nil
+	})
 	if err != nil {
-		return result, err
+		return fmt.Errorf("mark library movie watched: %w", err)
 	}
-	if source == nil {
-		return result, nil
+	if changed {
+		service.tasks.NotifyLibraryChanged()
 	}
-	query := service.database.File.Query().Where(libraryFiles(*source))
-	if movieID != 0 {
-		query.Where(file.MovieIDEQ(movieID))
-	}
-	if unmatched {
-		query.Where(file.Not(file.HasMovie()))
-	}
-	result.Total, err = query.Clone().Count(ctx)
-	if err != nil {
-		return result, fmt.Errorf("count indexed files: %w", err)
-	}
-	records, err := query.Order(ent.Asc(file.FieldPath), ent.Asc(file.FieldID)).
-		Offset((page - 1) * limit).Limit(limit).All(ctx)
-	if err != nil {
-		return result, fmt.Errorf("list indexed files: %w", err)
-	}
-	for _, record := range records {
-		result.Files = append(result.Files, LibraryFile{
-			ID: record.FileID, Name: record.Name, Path: record.Path, Size: record.Size,
-		})
-	}
-	result.HasMore = (page-1)*limit+len(result.Files) < result.Total
-	return result, nil
+	return nil
 }

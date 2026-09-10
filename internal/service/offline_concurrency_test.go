@@ -312,7 +312,10 @@ func TestOfflinePlayableProcessingStillDeduplicatesUntilWorkflowFinishes(t *test
 	film := service.database.Movie.Create().SetCode(input.Code).SetJavdbID(input.JavDBID).SaveX(ctx)
 	video := service.database.File.Create().SetFileID("video").SetName("ABP-001.mp4").SetSize(1).
 		SetAccountID(source.AccountID).SetRootID(source.Directory.ID).SetMovie(film).SaveX(ctx)
-	record.Payload["file_ids"] = []string{video.FileID}
+	record.Payload, err = setTaskPayloadField(record.Payload, "file_ids", []string{video.FileID})
+	if err != nil {
+		t.Fatal(err)
+	}
 	service.database.Task.UpdateOne(record).SetPayload(record.Payload).ExecX(ctx)
 	adds := 0
 	client.addOffline = func(context.Context, string, string, string) (string, error) {

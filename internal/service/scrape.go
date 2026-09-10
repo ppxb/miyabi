@@ -197,7 +197,7 @@ func (service *ScrapeService) directories(ctx context.Context, input metadataPay
 		}
 		present := 0
 		for _, entry := range directory.Files {
-			if service.library.canIdentifyVideo(entry) {
+			if canIdentifyVideo(entry) {
 				if directory.VideoIDs[entry.ID] {
 					present++
 				} else {

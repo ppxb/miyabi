@@ -62,7 +62,7 @@ func TestPlayFilesUsesOnlyCurrentLibrarySource(t *testing.T) {
 
 func TestPlayFilesPrefersLargestVideo(t *testing.T) {
 	service, _ := playFixture(t)
-	service.library.database.File.Update().Where(file.FileIDEQ("102")).SetSize(4096).SaveX(t.Context())
+	service.library.database.File.Update().Where(file.FileIDEQ("102")).SetSize(2 << 30).SaveX(t.Context())
 
 	movieID := service.library.database.Movie.Query().Where(movie.CodeEQ("ABP-001")).OnlyIDX(t.Context())
 	files, err := service.Files(t.Context(), movieID)

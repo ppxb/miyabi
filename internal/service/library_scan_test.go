@@ -37,11 +37,34 @@ func libraryFixture(t testing.TB) (*LibraryService, TaskInfo, scanPayload) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return NewLibraryService(store.Client, nil, tasks, images, 0), queued, scanPayload{Source: source, Scan: ScanProgress{Stage: "scanning"}}
+	return NewLibraryService(store.Client, nil, tasks, images), queued, scanPayload{Source: source, Scan: ScanProgress{Stage: "scanning"}}
 }
 
 func fixtureVideo(id, name string) scanVideo {
-	return identifyVideo(pan.File{ID: id, ParentID: "10", Name: name, Size: 1024})
+	return identifyVideo(pan.File{ID: id, ParentID: "10", Name: name, Size: 1 << 30})
+}
+
+func identifyScanVideosForTest(ctx context.Context, library *LibraryService, payload scanPayload, entries []pan.File) (map[string]scanVideo, error) {
+	previous, err := library.database.File.Query().WithMovie().All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	known := make(map[string]*ent.File, len(previous))
+	for _, entry := range previous {
+		known[entry.FileID] = entry
+	}
+	var videos []scanVideo
+	for _, entry := range entries {
+		if !entry.IsDirectory && isVideo(entry.Name) {
+			videos = append(videos, scanVideo{File: entry})
+		}
+	}
+	library.identifyScanVideos(payload, videos, known)
+	result := make(map[string]scanVideo, len(videos))
+	for _, video := range videos {
+		result[video.ID] = video
+	}
+	return result, nil
 }
 
 func TestScanCombinesPartsPreservesMetadataAndRetainsUnmatchedFiles(t *testing.T) {
@@ -66,11 +89,12 @@ func TestScanCombinesPartsPreservesMetadataAndRetainsUnmatchedFiles(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if page.Total != 1 || page.FileCount != 3 || page.UnmatchedFiles != 1 || len(page.Movies) != 1 {
+	if page.Total != 1 || len(page.Movies) != 1 || library.database.File.Query().CountX(ctx) != 3 ||
+		library.database.File.Query().Where(file.MovieIDIsNil()).CountX(ctx) != 1 {
 		t.Fatalf("library = %#v", page)
 	}
 	item := page.Movies[0]
-	if item.ID != metadata.ID || item.Title != metadata.Title || item.ScrapeStatus != movie.ScrapeStatusDone || item.FileCount != 2 || item.Size != 2048 {
+	if item.ID != metadata.ID || item.Title != metadata.Title || library.database.Movie.GetX(ctx, item.ID).ScrapeStatus != movie.ScrapeStatusDone {
 		t.Fatalf("scanned movie = %#v", item)
 	}
 	// A renamed video that no longer identifies a code must not keep a stale
@@ -99,7 +123,7 @@ func TestScanKeepsLetterSerialsDistinctAndDoesNotExtractPartialNumbers(t *testin
 		t.Fatal(err)
 	}
 	page, err := library.Movies(ctx, 1, 24)
-	if err != nil || page.Total != 2 || page.UnmatchedFiles != 1 {
+	if err != nil || page.Total != 2 || library.database.File.Query().Where(file.MovieIDIsNil()).CountX(ctx) != 1 {
 		t.Fatalf("letter serials were lost or merged: %#v, %v", page, err)
 	}
 	ids := make(map[string]int)
@@ -120,7 +144,7 @@ func TestScanCombinesCatalogueAliasesAndReplacesFailedLegacyIndex(t *testing.T) 
 	ctx := t.Context()
 	legacy := library.database.Movie.Create().SetCode("259LUXU-1899").
 		SetScrapeStatus(movie.ScrapeStatusFailed).SaveX(ctx)
-	library.database.File.Create().SetFileID("prefixed").SetName("259LUXU-1899.mp4").SetSize(1024).
+	library.database.File.Create().SetFileID("prefixed").SetName("259LUXU-1899.mp4").SetSize(1 << 30).
 		SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).SetMovie(legacy).SaveX(ctx)
 	known := library.database.Movie.Create().SetCode("LUXU-1899").SetTitle("Catalogue title").
 		SetJavdbID("catalogue-id").SetScrapeStatus(movie.ScrapeStatusDone).SaveX(ctx)
@@ -138,8 +162,8 @@ func TestScanCombinesCatalogueAliasesAndReplacesFailedLegacyIndex(t *testing.T) 
 		t.Fatalf("catalogue aliases created duplicate movies: %#v, %v", page, err)
 	}
 	item := page.Movies[0]
-	if item.ID != known.ID || item.Code != "LUXU-1899" || item.FileCount != 2 ||
-		item.Title != known.Title || item.ScrapeStatus != movie.ScrapeStatusDone {
+	if item.ID != known.ID || item.Code != "LUXU-1899" || library.database.File.Query().CountX(ctx) != 2 ||
+		item.Title != known.Title || library.database.Movie.GetX(ctx, item.ID).ScrapeStatus != movie.ScrapeStatusDone {
 		t.Fatalf("alias scan lost existing metadata or file associations: %#v", item)
 	}
 	if _, err := library.database.Movie.Get(ctx, legacy.ID); !ent.IsNotFound(err) {
@@ -151,7 +175,7 @@ func TestMetadataCanonicalizesLegacyAliasBeforeRescan(t *testing.T) {
 	library, queued, payload := libraryFixture(t)
 	ctx := t.Context()
 	legacy := library.database.Movie.Create().SetCode("259LUXU-1899").SaveX(ctx)
-	library.database.File.Create().SetFileID("prefixed").SetName("259LUXU-1899.mp4").SetSize(1024).
+	library.database.File.Create().SetFileID("prefixed").SetName("259LUXU-1899.mp4").SetSize(1 << 30).
 		SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).SetMovie(legacy).SaveX(ctx)
 	doc := nfo.Movie{Code: "LUXU-1899", Title: "Catalogue title",
 		IDs: []nfo.UniqueID{{Type: "javdb", Default: true, Value: "catalogue-id"}},
@@ -178,11 +202,11 @@ func TestOfflineScanUsesCatalogueIdentityAndKeepsItOnRescan(t *testing.T) {
 	payload.OfflineTaskID, payload.TargetID, payload.TargetPath = offline.ID, "download-folder", "/Movies/release-folder"
 	payload.Code, payload.JavDBID = "LUXU-1899", "catalogue-id"
 	entries := []pan.File{
-		{ID: "prefixed", ParentID: payload.TargetID, Name: "999LUXU-1899.mp4", Size: 1024, SHA1: "first-video"},
-		{ID: "unnamed", ParentID: payload.TargetID, Name: "video.mp4", Size: 512, SHA1: "second-video"},
+		{ID: "prefixed", ParentID: payload.TargetID, Name: "999LUXU-1899.mp4", Size: 1 << 30, SHA1: "first-video"},
+		{ID: "unnamed", ParentID: payload.TargetID, Name: "video.mp4", Size: 512 << 20, SHA1: "second-video"},
 		{ID: "poster", ParentID: payload.TargetID, Name: "poster.jpg"},
 	}
-	identified, err := library.identifyScanVideos(ctx, payload, entries)
+	identified, err := identifyScanVideosForTest(ctx, library, payload, entries)
 	if err != nil || len(identified) != 2 {
 		t.Fatalf("downloaded videos = %#v, %v", identified, err)
 	}
@@ -209,7 +233,7 @@ func TestOfflineScanUsesCatalogueIdentityAndKeepsItOnRescan(t *testing.T) {
 		t.Fatalf("metadata job lost the known JavDB ID: %#v, %v", input, err)
 	}
 	full := scanPayload{Source: payload.Source}
-	restored, err := library.identifyScanVideos(ctx, full, entries)
+	restored, err := identifyScanVideosForTest(ctx, library, full, entries)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +257,7 @@ func TestRescanRestoresOnlyUnchangedFilesFromTheSameAccount(t *testing.T) {
 	library, _, payload := libraryFixture(t)
 	ctx := t.Context()
 	known := library.database.Movie.Create().SetCode("LUXU-1899").SetJavdbID("catalogue-id").SaveX(ctx)
-	library.database.File.Create().SetFileID("video").SetName("999LUXU-1899.mp4").SetSize(1024).SetSha1("original").
+	library.database.File.Create().SetFileID("video").SetName("999LUXU-1899.mp4").SetSize(1 << 30).SetSha1("original").
 		SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).SetMovie(known).SaveX(ctx)
 	for _, scenario := range []struct {
 		name    string
@@ -241,13 +265,13 @@ func TestRescanRestoresOnlyUnchangedFilesFromTheSameAccount(t *testing.T) {
 		account string
 		want    string
 	}{
-		{name: "unchanged", file: pan.File{Name: "999LUXU-1899.mp4", Size: 1024, SHA1: "original"}, want: "LUXU-1899"},
-		{name: "moved", file: pan.File{Name: "999LUXU-1899.mp4", Size: 1024, SHA1: "original", ParentID: "other-folder"}, want: "LUXU-1899"},
-		{name: "renamed", file: pan.File{Name: "ABP-002.mp4", Size: 1024, SHA1: "original"}, want: "ABP-002"},
-		{name: "renamed without number", file: pan.File{Name: "video.mp4", Size: 1024, SHA1: "original"}},
-		{name: "replaced", file: pan.File{Name: "999LUXU-1899.mp4", Size: 1024, SHA1: "replacement"}, want: "999LUXU-1899"},
-		{name: "different size", file: pan.File{Name: "999LUXU-1899.mp4", Size: 512, SHA1: "original"}, want: "999LUXU-1899"},
-		{name: "other account", file: pan.File{Name: "999LUXU-1899.mp4", Size: 1024, SHA1: "original"}, account: "other", want: "999LUXU-1899"},
+		{name: "unchanged", file: pan.File{Name: "999LUXU-1899.mp4", Size: 1 << 30, SHA1: "original"}, want: "LUXU-1899"},
+		{name: "moved", file: pan.File{Name: "999LUXU-1899.mp4", Size: 1 << 30, SHA1: "original", ParentID: "other-folder"}, want: "LUXU-1899"},
+		{name: "renamed", file: pan.File{Name: "ABP-002.mp4", Size: 1 << 30, SHA1: "original"}, want: "ABP-002"},
+		{name: "renamed without number", file: pan.File{Name: "video.mp4", Size: 1 << 30, SHA1: "original"}},
+		{name: "replaced", file: pan.File{Name: "999LUXU-1899.mp4", Size: 1 << 30, SHA1: "replacement"}, want: "999LUXU-1899"},
+		{name: "different size", file: pan.File{Name: "999LUXU-1899.mp4", Size: 512 << 20, SHA1: "original"}, want: "999LUXU-1899"},
+		{name: "other account", file: pan.File{Name: "999LUXU-1899.mp4", Size: 1 << 30, SHA1: "original"}, account: "other", want: "999LUXU-1899"},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			input := payload
@@ -255,7 +279,7 @@ func TestRescanRestoresOnlyUnchangedFilesFromTheSameAccount(t *testing.T) {
 				input.Source.AccountID = scenario.account
 			}
 			scenario.file.ID = "video"
-			videos, err := library.identifyScanVideos(ctx, input, []pan.File{scenario.file})
+			videos, err := identifyScanVideosForTest(ctx, library, input, []pan.File{scenario.file})
 			if err != nil || videos["video"].Code != scenario.want {
 				t.Fatalf("restored video = %#v, want code %q, error = %v", videos["video"], scenario.want, err)
 			}
@@ -318,7 +342,7 @@ func TestScanReconcilesOnlyCompletedRootAndKeepsOtherSources(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, source := range []struct{ id, account, root string }{{"201", "100", "20"}, {"301", "200", "10"}} {
-		if err := library.database.File.Create().SetFileID(source.id).SetName("ABP-002.mp4").SetSize(1024).
+		if err := library.database.File.Create().SetFileID(source.id).SetName("ABP-002.mp4").SetSize(1 << 30).
 			SetAccountID(source.account).SetRootID(source.root).SetScanID("other").SetMovieID(shared.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}

@@ -346,6 +346,20 @@ func (_u *MovieUpdate) SetNillableScrapeStatus(v *movie.ScrapeStatus) *MovieUpda
 	return _u
 }
 
+// SetWatched sets the "watched" field.
+func (_u *MovieUpdate) SetWatched(v bool) *MovieUpdate {
+	_u.mutation.SetWatched(v)
+	return _u
+}
+
+// SetNillableWatched sets the "watched" field if the given value is not nil.
+func (_u *MovieUpdate) SetNillableWatched(v *bool) *MovieUpdate {
+	if v != nil {
+		_u.SetWatched(*v)
+	}
+	return _u
+}
+
 // AddActorIDs adds the "actors" edge to the Actor entity by IDs.
 func (_u *MovieUpdate) AddActorIDs(ids ...int) *MovieUpdate {
 	_u.mutation.AddActorIDs(ids...)
@@ -619,6 +633,9 @@ func (_u *MovieUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.ScrapeStatus(); ok {
 		_spec.SetField(movie.FieldScrapeStatus, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.Watched(); ok {
+		_spec.SetField(movie.FieldWatched, field.TypeBool, value)
 	}
 	if _u.mutation.ActorsCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1089,6 +1106,20 @@ func (_u *MovieUpdateOne) SetNillableScrapeStatus(v *movie.ScrapeStatus) *MovieU
 	return _u
 }
 
+// SetWatched sets the "watched" field.
+func (_u *MovieUpdateOne) SetWatched(v bool) *MovieUpdateOne {
+	_u.mutation.SetWatched(v)
+	return _u
+}
+
+// SetNillableWatched sets the "watched" field if the given value is not nil.
+func (_u *MovieUpdateOne) SetNillableWatched(v *bool) *MovieUpdateOne {
+	if v != nil {
+		_u.SetWatched(*v)
+	}
+	return _u
+}
+
 // AddActorIDs adds the "actors" edge to the Actor entity by IDs.
 func (_u *MovieUpdateOne) AddActorIDs(ids ...int) *MovieUpdateOne {
 	_u.mutation.AddActorIDs(ids...)
@@ -1392,6 +1423,9 @@ func (_u *MovieUpdateOne) sqlSave(ctx context.Context) (_node *Movie, err error)
 	}
 	if value, ok := _u.mutation.ScrapeStatus(); ok {
 		_spec.SetField(movie.FieldScrapeStatus, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.Watched(); ok {
+		_spec.SetField(movie.FieldWatched, field.TypeBool, value)
 	}
 	if _u.mutation.ActorsCleared() {
 		edge := &sqlgraph.EdgeSpec{

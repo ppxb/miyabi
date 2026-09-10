@@ -106,7 +106,11 @@ func (service *OfflineService) Add(ctx context.Context, movieID, hash string) (O
 			))
 		}).First(ctx)
 	if err == nil {
-		if existing.Payload["directory_id"] != directory.ID {
+		input, err := decodeTaskPayload[offlinePayload](existing.Payload)
+		if err != nil {
+			return OfflineSubmission{}, err
+		}
+		if input.DirectoryID != directory.ID {
 			return OfflineSubmission{}, fmt.Errorf("该磁力正在下载到另一个目录，请先在 115 中处理该任务")
 		}
 		return service.submission(ctx, existing, &source)
@@ -327,6 +331,9 @@ func (service *OfflineService) submissions(ctx context.Context, records []*ent.T
 		if err != nil {
 			return nil, err
 		}
+		if input.Hash == "" {
+			return nil, fmt.Errorf("offline task %d is missing magnet hash", record.ID)
+		}
 		inputs[index] = input
 		if source == nil || source.AccountID != input.AccountID || source.Directory.ID != input.DirectoryID ||
 			record.Status == task.StatusQueued || record.Status == task.StatusRunning {
@@ -433,18 +440,14 @@ func (service *OfflineService) Activity(ctx context.Context) (OfflineActivity, e
 	if source == nil {
 		return result, nil
 	}
-	records, err := service.database.Task.Query().Where(task.TypeEQ("offline"), func(s *sql.Selector) {
+	records, err := latestOfflineTasks(ctx, service.database.Task.Query().Where(task.TypeEQ("offline"), func(s *sql.Selector) {
 		s.Where(sql.And(
 			sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("account_id")),
 			sqljson.ValueEQ(task.FieldPayload, source.Directory.ID, sqljson.Path("directory_id")),
 		))
-	}).Order(ent.Desc(task.FieldID)).All(ctx)
+	}))
 	if err != nil {
 		return result, fmt.Errorf("load offline activity: %w", err)
-	}
-	records, err = latestOfflineTasks(records)
-	if err != nil {
-		return result, err
 	}
 	result.Tasks, err = service.submissions(ctx, records, source)
 	return result, err
@@ -453,12 +456,12 @@ func (service *OfflineService) Activity(ctx context.Context) (OfflineActivity, e
 // Tasks projects history through the current file index and workflow. A
 // finished remote task alone never means the resource still exists.
 func (service *OfflineService) Tasks(ctx context.Context, movieID, accountID string) ([]OfflineSubmission, error) {
-	records, err := service.database.Task.Query().Where(task.TypeEQ("offline"), func(s *sql.Selector) {
+	records, err := latestOfflineTasks(ctx, service.database.Task.Query().Where(task.TypeEQ("offline"), func(s *sql.Selector) {
 		s.Where(sql.And(
 			sqljson.ValueEQ(task.FieldPayload, movieID, sqljson.Path("javdb_id")),
 			sqljson.ValueEQ(task.FieldPayload, accountID, sqljson.Path("account_id")),
 		))
-	}).Order(ent.Desc(task.FieldID)).All(ctx)
+	}))
 	if err != nil {
 		return nil, fmt.Errorf("load movie offline tasks: %w", err)
 	}
@@ -466,28 +469,20 @@ func (service *OfflineService) Tasks(ctx context.Context, movieID, accountID str
 	if err != nil {
 		return nil, err
 	}
-	records, err = latestOfflineTasks(records)
-	if err != nil {
-		return nil, err
-	}
 	return service.submissions(ctx, records, source)
 }
 
-func latestOfflineTasks(records []*ent.Task) ([]*ent.Task, error) {
-	result := make([]*ent.Task, 0, len(records))
-	seen := make(map[string]bool)
-	for _, record := range records {
-		hash, ok := record.Payload["hash"].(string)
-		if !ok || hash == "" {
-			return nil, fmt.Errorf("offline task %d is missing magnet hash", record.ID)
-		}
-		if seen[hash] {
-			continue
-		}
-		seen[hash] = true
-		result = append(result, record)
-	}
-	return result, nil
+func latestOfflineTasks(ctx context.Context, query *ent.TaskQuery) ([]*ent.Task, error) {
+	// Apply the same account/movie/directory scope before grouping. No history
+	// limit: a long-running download may be older than every completed task.
+	return query.Where(func(s *sql.Selector) {
+		payload := s.C(task.FieldPayload)
+		// A malformed hash must remain visible to validation even if its JSON
+		// representation matches a newer string hash.
+		latest := s.Clone().Select(sql.Max(s.C(task.FieldID))).
+			GroupBy("json_type("+payload+", '$.hash')", "json_extract("+payload+", '$.hash')")
+		s.Where(sql.In(s.C(task.FieldID), latest))
+	}).Order(ent.Desc(task.FieldID)).All(ctx)
 }
 
 func (service *OfflineService) Sync(ctx context.Context) error {
@@ -495,10 +490,16 @@ func (service *OfflineService) Sync(ctx context.Context) error {
 		return err
 	}
 	defer service.syncing.Unlock()
+	state := service.drive.snapshot()
+	if state.tokens.AccessToken == "" {
+		return nil
+	}
 	records, err := service.database.Task.Query().Where(task.TypeEQ("offline"), task.Or(
 		task.StatusIn(task.StatusQueued, task.StatusRunning),
 		task.And(task.StatusEQ(task.StatusDone), func(s *sql.Selector) {
 			s.Where(sql.And(
+				sqljson.ValueEQ(task.FieldPayload, state.directory.AccountID, sqljson.Path("account_id")),
+				sqljson.ValueEQ(task.FieldPayload, state.directory.ID, sqljson.Path("directory_id")),
 				sql.Not(sqljson.HasKey(task.FieldPayload, sqljson.Path("scan_task_id"))),
 				sql.Or(
 					sqljson.HasKey(task.FieldPayload, sqljson.Path("file_id")),
@@ -510,18 +511,6 @@ func (service *OfflineService) Sync(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("load offline tasks: %w", err)
 	}
-	if len(records) == 0 {
-		return nil
-	}
-	state := service.drive.snapshot()
-	if state.tokens.AccessToken == "" {
-		return nil
-	}
-	// Completed jobs awaiting another mount need no remote polling.
-	records = slices.DeleteFunc(records, func(record *ent.Task) bool {
-		return record.Status == task.StatusDone && (record.Payload["directory_id"] != state.directory.ID ||
-			record.Payload["account_id"] != state.directory.AccountID)
-	})
 	if len(records) == 0 {
 		return nil
 	}

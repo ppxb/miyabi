@@ -110,7 +110,7 @@ func TestProjectMoviesAddsLibraryTaskAndReleaseState(t *testing.T) {
 	}
 	if _, err := store.Client.Task.Create().
 		SetType("offline").
-		SetPayload(map[string]any{"code": "ABP-002", "javdb_id": "two", "account_id": "100", "directory_id": "10"}).
+		SetPayload(taskPayloadJSON(t, map[string]any{"code": "ABP-002", "javdb_id": "two", "account_id": "100", "directory_id": "10"})).
 		Save(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestProjectMoviesAddsLibraryTaskAndReleaseState(t *testing.T) {
 		{"offline", task.StatusQueued, map[string]any{"code": "ABP-999"}},
 		{"offline", task.StatusQueued, map[string]any{"code": 123}},
 	} {
-		if err := store.Client.Task.Create().SetType(item.kind).SetStatus(item.status).SetPayload(item.payload).Exec(t.Context()); err != nil {
+		if err := store.Client.Task.Create().SetType(item.kind).SetStatus(item.status).SetPayload(taskPayloadJSON(t, item.payload)).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -231,10 +231,10 @@ func TestProjectionUsesSourceIDBeforeCatalogueSpelling(t *testing.T) {
 		db.File.Create().SetFileID(fmt.Sprint(index)).SetName("video.mp4").SetSize(1).
 			SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).SetMovieID(id).SaveX(ctx)
 	}
-	db.Task.Create().SetType("offline").SetPayload(map[string]any{
+	db.Task.Create().SetType("offline").SetPayload(taskPayloadJSON(t, map[string]any{
 		"javdb_id": "queued-id", "code": "PREVIOUS-002",
 		"account_id": payload.Source.AccountID, "directory_id": payload.Source.Directory.ID,
-	}).SaveX(ctx)
+	})).SaveX(ctx)
 	service := &DiscoverService{database: db}
 	source := []javdb.Movie{
 		{ID: "known-id", Code: "作品/新版 #001"},
@@ -290,7 +290,7 @@ func TestCachedCatalogueStillReflectsCurrentLibraryAndTaskState(t *testing.T) {
 	if got := project(); got != MovieNotInLibrary {
 		t.Fatalf("initial state = %s", got)
 	}
-	if err := store.Client.Task.Create().SetType("offline").SetPayload(map[string]any{"code": "ABP-001", "javdb_id": "fixture", "account_id": "100", "directory_id": "10"}).Exec(t.Context()); err != nil {
+	if err := store.Client.Task.Create().SetType("offline").SetPayload(taskPayloadJSON(t, map[string]any{"code": "ABP-001", "javdb_id": "fixture", "account_id": "100", "directory_id": "10"})).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	if got := project(); got != MovieSaving {

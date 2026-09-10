@@ -12,7 +12,6 @@ import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { LibraryFilesDialog } from '@/features/library/files-dialog'
 import { LibraryMovieCard } from '@/features/library/movie-card'
 import { useTaskConnection } from '@/features/tasks/task-events'
 
@@ -106,20 +105,7 @@ export function LibraryPage({
         />
       ) : (
         <>
-          {source ? (
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0 flex-1 space-y-1">
-                <p className="text-sm">发现 {library.data.total} 部影片</p>
-              </div>
-              {library.data.unmatched_files > 0 ? (
-                <LibraryFilesDialog>
-                  <Button variant="outline" size="sm">
-                    查看 {library.data.unmatched_files} 个未识别文件
-                  </Button>
-                </LibraryFilesDialog>
-              ) : null}
-            </div>
-          ) : null}
+          {source ? <p className="text-sm">发现 {library.data.total} 部影片</p> : null}
 
           {library.data.movies.length > 0 ? (
             <>

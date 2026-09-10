@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json/jsontext"
 	"time"
 
 	"github.com/ppxb/miyabi/internal/ent/actor"
@@ -123,6 +124,10 @@ func init() {
 	movieDescFanarts := movieFields[14].Descriptor()
 	// movie.DefaultFanarts holds the default value on creation for the fanarts field.
 	movie.DefaultFanarts = movieDescFanarts.Default.(func() []string)
+	// movieDescWatched is the schema descriptor for watched field.
+	movieDescWatched := movieFields[16].Descriptor()
+	// movie.DefaultWatched holds the default value on creation for the watched field.
+	movie.DefaultWatched = movieDescWatched.Default.(bool)
 	settingMixin := schema.Setting{}.Mixin()
 	settingMixinFields0 := settingMixin[0].Fields()
 	_ = settingMixinFields0
@@ -191,7 +196,7 @@ func init() {
 	// taskDescPayload is the schema descriptor for payload field.
 	taskDescPayload := taskFields[2].Descriptor()
 	// task.DefaultPayload holds the default value on creation for the payload field.
-	task.DefaultPayload = taskDescPayload.Default.(func() map[string]interface{})
+	task.DefaultPayload = taskDescPayload.Default.(func() jsontext.Value)
 	// taskDescProgress is the schema descriptor for progress field.
 	taskDescProgress := taskFields[3].Descriptor()
 	// task.DefaultProgress holds the default value on creation for the progress field.

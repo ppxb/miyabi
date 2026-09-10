@@ -33,7 +33,6 @@ func (client *scanMetadataClient) ReadMetadata(_ context.Context, _, pickCode st
 // associations that already acquired a JavDB ID through a directory NFO.
 func TestRescanRepairsAuxiliaryVideosAndSSNISubtitleAlias(t *testing.T) {
 	library, client := panConcurrencyFixture(t)
-	library.minVideoSize = 100 << 20
 	ctx := t.Context()
 	source := library.drive.snapshot().source()
 	records := []struct {
@@ -113,7 +112,8 @@ func TestRescanRepairsAuxiliaryVideosAndSSNISubtitleAlias(t *testing.T) {
 		t.Fatal(err)
 	}
 	page, err := library.Movies(ctx, 1, 24)
-	if err != nil || page.Total != 11 || page.FileCount != 27 || page.UnmatchedFiles != 16 {
+	if err != nil || page.Total != 11 || library.database.File.Query().CountX(ctx) != 27 ||
+		library.database.File.Query().Where(file.MovieIDIsNil()).CountX(ctx) != 16 {
 		t.Fatalf("rescan did not repair the reported library: %+v err=%v", page, err)
 	}
 	if metadata.reads != 0 {
@@ -133,7 +133,11 @@ func TestRescanRepairsAuxiliaryVideosAndSSNISubtitleAlias(t *testing.T) {
 		t.Fatalf("SSNI-748 playback still points at an auxiliary file: %+v", files)
 	}
 	for _, job := range library.database.Task.Query().Where(task.TypeEQ("scrape")).AllX(ctx) {
-		if code := job.Payload["code"]; code == "UUE-29" || code == "UUP-87" || code == "SSNI-748C" {
+		input, err := decodeTaskPayload[metadataPayload](job.Payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if code := input.Code; code == "UUE-29" || code == "UUP-87" || code == "SSNI-748C" {
 			t.Fatalf("incorrect movie was queued again: %v", code)
 		}
 	}
@@ -141,7 +145,6 @@ func TestRescanRepairsAuxiliaryVideosAndSSNISubtitleAlias(t *testing.T) {
 
 func TestNFOIdentifiesOnlyEligibleVideosAndSmallFilesDoNotMakeDirectoryShared(t *testing.T) {
 	library, client := panConcurrencyFixture(t)
-	library.minVideoSize = 100 << 20
 	ctx := t.Context()
 	source := library.drive.snapshot().source()
 	body, err := nfo.Encode(nfo.Movie{Code: "ABP-001", Title: "Fixture"})
@@ -176,7 +179,7 @@ func TestNFOIdentifiesOnlyEligibleVideosAndSmallFilesDoNotMakeDirectoryShared(t 
 	}
 	live, found := findDirectoryNFO(film.Code, directories[0])
 	observed := make(scanObservations)
-	observed.add("10", entries, library.minVideoSize)
+	observed.add("10", entries)
 	compact, compactFound := findNFO(film.Code, false, observed["10"], func(entry observedFile) string { return entry.Name })
 	if !found || !compactFound || live.Name != "movie.nfo" || compact.Name != live.Name {
 		t.Fatal("live metadata reads and scan observations selected different NFOs")
@@ -191,21 +194,23 @@ func TestNFOIdentifiesOnlyEligibleVideosAndSmallFilesDoNotMakeDirectoryShared(t 
 	}
 }
 
-func TestVideoSizeThresholdAlsoAppliesToOfflineIdentityAndCanBeDisabled(t *testing.T) {
+func TestFixedVideoSizeThresholdAppliesToFilenameAndOfflineIdentity(t *testing.T) {
 	library, _, payload := libraryFixture(t)
-	library.minVideoSize = 100 << 20
-	payload.OfflineTaskID, payload.TargetID, payload.Code, payload.JavDBID = 1, "folder", "ABP-001", "catalogue"
 	entries := []pan.File{
-		{ID: "small", Name: "UUE29.mp4", Size: (100 << 20) - 1},
-		{ID: "boundary", Name: "feature.mp4", Size: 100 << 20},
+		{ID: "negative", Name: "ABP-001.mp4", Size: -1},
+		{ID: "unknown-size", Name: "ABP-001.mp4"},
+		{ID: "small", Name: "ABP-001.mp4", Size: (100 << 20) - 1},
+		{ID: "boundary", Name: "ABP-001.mp4", Size: 100 << 20},
+		{ID: "large", Name: "ABP-001.mkv", Size: 1 << 30},
 	}
-	videos, err := library.identifyScanVideos(t.Context(), payload, entries)
-	if err != nil || videos["small"].Code != "" || videos["boundary"].Code != "ABP-001" {
-		t.Fatalf("offline association bypassed the size threshold: %+v err=%v", videos, err)
-	}
-	library.minVideoSize = 0
-	videos, err = library.identifyScanVideos(t.Context(), payload, entries)
-	if err != nil || videos["small"].Code != "ABP-001" {
-		t.Fatalf("disabled threshold still excluded small files: %+v err=%v", videos, err)
+	for _, offline := range []bool{false, true} {
+		if offline {
+			payload.OfflineTaskID, payload.TargetID, payload.Code, payload.JavDBID = 1, "folder", "ABP-001", "catalogue"
+		}
+		videos, err := identifyScanVideosForTest(t.Context(), library, payload, entries)
+		if err != nil || videos["negative"].Code != "" || videos["unknown-size"].Code != "" ||
+			videos["small"].Code != "" || videos["boundary"].Code != "ABP-001" || videos["large"].Code != "ABP-001" {
+			t.Fatalf("fixed size threshold changed for offline=%t: %+v err=%v", offline, videos, err)
+		}
 	}
 }

@@ -43,7 +43,7 @@ func TestMovieStatesFollowDownloadThroughIndexingWithoutCatalogueRequests(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	library := NewLibraryService(offline.database, offline.drive, offline.tasks, nil, 0)
+	library := NewLibraryService(offline.database, offline.drive, offline.tasks, nil)
 	video := fixtureVideo("video-1", input.Code+".mp4")
 	for range 2 {
 		if err := library.indexScanPage(ctx, scan.ID, "first-page", "/Movies/download-folder", []scanVideo{video}, &payload); err != nil {
@@ -125,7 +125,7 @@ func TestMovieStatesScopePendingWorkToTheMountedAccountAndRoot(t *testing.T) {
 func TestOfflinePageFileTrackingRollsBackWithTheIndex(t *testing.T) {
 	offline, record, input, source := offlineFixture(t)
 	ctx := t.Context()
-	library := NewLibraryService(offline.database, offline.drive, offline.tasks, nil, 0)
+	library := NewLibraryService(offline.database, offline.drive, offline.tasks, nil)
 	payload := scanPayload{Source: source, OfflineTaskID: record.ID, TargetID: "download-folder",
 		Code: input.Code, JavDBID: input.JavDBID}
 	// The missing parent fails the final progress write after file tracking.

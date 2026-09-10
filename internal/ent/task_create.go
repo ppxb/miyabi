@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"time"
@@ -71,7 +72,7 @@ func (_c *TaskCreate) SetNillableStatus(v *task.Status) *TaskCreate {
 }
 
 // SetPayload sets the "payload" field.
-func (_c *TaskCreate) SetPayload(v map[string]interface{}) *TaskCreate {
+func (_c *TaskCreate) SetPayload(v jsontext.Value) *TaskCreate {
 	_c.mutation.SetPayload(v)
 	return _c
 }
@@ -340,7 +341,7 @@ func (u *TaskUpsert) UpdateStatus() *TaskUpsert {
 }
 
 // SetPayload sets the "payload" field.
-func (u *TaskUpsert) SetPayload(v map[string]interface{}) *TaskUpsert {
+func (u *TaskUpsert) SetPayload(v jsontext.Value) *TaskUpsert {
 	u.Set(task.FieldPayload, v)
 	return u
 }
@@ -475,7 +476,7 @@ func (u *TaskUpsertOne) UpdateStatus() *TaskUpsertOne {
 }
 
 // SetPayload sets the "payload" field.
-func (u *TaskUpsertOne) SetPayload(v map[string]interface{}) *TaskUpsertOne {
+func (u *TaskUpsertOne) SetPayload(v jsontext.Value) *TaskUpsertOne {
 	return u.Update(func(s *TaskUpsert) {
 		s.SetPayload(v)
 	})
@@ -784,7 +785,7 @@ func (u *TaskUpsertBulk) UpdateStatus() *TaskUpsertBulk {
 }
 
 // SetPayload sets the "payload" field.
-func (u *TaskUpsertBulk) SetPayload(v map[string]interface{}) *TaskUpsertBulk {
+func (u *TaskUpsertBulk) SetPayload(v jsontext.Value) *TaskUpsertBulk {
 	return u.Update(func(s *TaskUpsert) {
 		s.SetPayload(v)
 	})

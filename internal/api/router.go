@@ -47,7 +47,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	authAPI.GET("/config", accessConfigHandler(deps.Access))
 	authAPI.POST("/login", accessLoginHandler(deps.Access))
 	api.GET("/library/movies", libraryMoviesHandler(deps.Library))
-	api.GET("/library/files", libraryFilesHandler(deps.Library))
+	api.PUT("/library/movies/:id/watched", libraryWatchedHandler(deps.Library))
 	api.POST("/library/scan", libraryScanHandler(deps.Library))
 	api.GET("/library/artwork/:key", libraryArtworkHandler(deps.Artwork))
 	playAPI := api.Group("/play", func(c *gin.Context) {

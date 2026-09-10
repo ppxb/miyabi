@@ -3,6 +3,7 @@
 package task
 
 import (
+	"encoding/json/jsontext"
 	"fmt"
 	"time"
 
@@ -64,7 +65,7 @@ var (
 	// TypeValidator is a validator for the "type" field. It is called by the builders before save.
 	TypeValidator func(string) error
 	// DefaultPayload holds the default value on creation for the "payload" field.
-	DefaultPayload func() map[string]interface{}
+	DefaultPayload func() jsontext.Value
 	// DefaultProgress holds the default value on creation for the "progress" field.
 	DefaultProgress int
 	// ProgressValidator is a validator for the "progress" field. It is called by the builders before save.

@@ -143,7 +143,7 @@ func TestRescanSchedulesOnlyChangedOrIncompleteMetadata(t *testing.T) {
 			}
 			observed := make(scanObservations)
 			for id, entries := range f.entries {
-				observed.add(id, entries, f.library.minVideoSize)
+				observed.add(id, entries)
 			}
 			if err := f.library.reconcileScan(t.Context(), f.queued.ID, "rescan", &f.payload, observed); err != nil {
 				t.Fatal(err)

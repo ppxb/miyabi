@@ -1,8 +1,10 @@
 package service
 
 import (
+	"context"
 	"testing"
 
+	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/pan"
@@ -41,7 +43,8 @@ func TestMixedScanPageRollsBackBothChangedFilesAndUnchangedMarkers(t *testing.T)
 	}
 	library.database.Task.DeleteOneID(queued.ID).ExecX(t.Context())
 	videos[1] = fixtureVideo("102", "ABP-003.mp4")
-	if err := library.indexScanPage(t.Context(), queued.ID, "failed", "/Movies", videos, &payload); err == nil {
+	if err := library.processScanPage(t.Context(), queued.ID, "failed", "/Movies", videos, &payload,
+		func(videos []scanVideo) []scanVideo { return videos }); err == nil {
 		t.Fatal("scan page without a progress record unexpectedly committed")
 	}
 	for _, id := range []string{"101", "102"} {
@@ -54,6 +57,40 @@ func TestMixedScanPageRollsBackBothChangedFilesAndUnchangedMarkers(t *testing.T)
 	}
 	if library.database.Movie.Query().CountX(t.Context()) != 2 {
 		t.Fatal("new movie escaped rollback")
+	}
+}
+
+func TestScanResolvesAndIndexesCurrentIdentityWithOneFileRead(t *testing.T) {
+	library, queued, payload := libraryFixture(t)
+	ctx := t.Context()
+	film := library.database.Movie.Create().SetCode("OLD-001").SetJavdbID("catalogue-id").SaveX(ctx)
+	library.database.File.Create().SetFileID("video").SetName("video.mp4").SetParentID("10").SetPath("/Movies/video.mp4").
+		SetSize(1 << 30).SetSha1("original").SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).SetMovie(film).ExecX(ctx)
+	// An already prepared filename/code must not override fresher catalogue data.
+	videos := []scanVideo{{File: pan.File{ID: "video", ParentID: "10", Name: "video.mp4", Size: 1 << 30, SHA1: "original"}, Code: "STALE-001"}}
+	film.Update().SetCode("CURRENT-001").ExecX(ctx)
+	fileReads, movieReads := 0, 0
+	library.database.Intercept(ent.InterceptFunc(func(next ent.Querier) ent.Querier {
+		return ent.QuerierFunc(func(ctx context.Context, query ent.Query) (ent.Value, error) {
+			switch query.(type) {
+			case *ent.FileQuery:
+				fileReads++
+			case *ent.MovieQuery:
+				movieReads++
+			}
+			return next.Query(ctx, query)
+		})
+	}))
+	if err := library.processScanPage(ctx, queued.ID, "current", "/Movies", videos, &payload,
+		func(videos []scanVideo) []scanVideo { return videos }); err != nil {
+		t.Fatal(err)
+	}
+	if fileReads != 1 || movieReads != 1 || videos[0].Code != "CURRENT-001" {
+		t.Fatalf("scan reread or used stale identities: files=%d movies=%d videos=%#v", fileReads, movieReads, videos)
+	}
+	indexed := library.database.File.Query().Where(file.FileIDEQ("video")).OnlyX(ctx)
+	if indexed.MovieID == nil || *indexed.MovieID != film.ID || indexed.ScanID != "current" {
+		t.Fatalf("scan changed a verified association: %#v", indexed)
 	}
 }
 
@@ -75,7 +112,7 @@ func TestCompactScanKeepsSharedDirectoryAndArtworkMatching(t *testing.T) {
 			// A directory ending in .nfo must not become a candidate sidecar.
 			f.entries["10"] = append(f.entries["10"], pan.File{ID: "folder", Name: "other.nfo", IsDirectory: true})
 			if scenario.shared {
-				f.entries["10"] = append(f.entries["10"], pan.File{ID: "unmatched", Name: "recording.mp4"})
+				f.entries["10"] = append(f.entries["10"], pan.File{ID: "unmatched", Name: "recording.mp4", Size: 1 << 30})
 			}
 			encoded, err := encodeTaskPayload(f.input)
 			if err != nil {
@@ -84,7 +121,7 @@ func TestCompactScanKeepsSharedDirectoryAndArtworkMatching(t *testing.T) {
 			f.covered.Update().SetPayload(encoded).ExecX(t.Context())
 			observed := make(scanObservations)
 			for _, entry := range f.entries["10"] {
-				observed.add("10", []pan.File{entry}, f.library.minVideoSize)
+				observed.add("10", []pan.File{entry})
 			}
 			if err := f.library.indexScanPage(t.Context(), f.queued.ID, "rescan", "/Movies", f.videos, &f.payload); err != nil {
 				t.Fatal(err)

@@ -10,7 +10,7 @@ import (
 
 type LibraryManager interface {
 	Movies(context.Context, int, int) (service.LibraryPage, error)
-	Files(context.Context, int, bool, int, int) (service.LibraryFilePage, error)
+	MarkWatched(context.Context, int) error
 	StartScan(context.Context) (service.TaskInfo, error)
 }
 
@@ -42,12 +42,6 @@ type libraryPageQuery struct {
 	Limit int `form:"limit,default=24" binding:"min=1,max=100"`
 }
 
-type libraryFilesQuery struct {
-	libraryPageQuery
-	MovieID   int  `form:"movie_id" binding:"omitempty,min=1"`
-	Unmatched bool `form:"unmatched"`
-}
-
 func libraryMoviesHandler(library LibraryManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var query libraryPageQuery
@@ -64,19 +58,20 @@ func libraryMoviesHandler(library LibraryManager) gin.HandlerFunc {
 	}
 }
 
-func libraryFilesHandler(library LibraryManager) gin.HandlerFunc {
+func libraryWatchedHandler(library LibraryManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var query libraryFilesQuery
-		if err := c.ShouldBindQuery(&query); err != nil {
+		var uri struct {
+			ID int `uri:"id" binding:"required,min=1"`
+		}
+		if err := c.ShouldBindUri(&uri); err != nil {
 			c.Error(BadRequest(err))
 			return
 		}
-		files, err := library.Files(c.Request.Context(), query.MovieID, query.Unmatched, query.Page, query.Limit)
-		if err != nil {
+		if err := library.MarkWatched(c.Request.Context(), uri.ID); err != nil {
 			c.Error(err)
 			return
 		}
-		c.JSON(http.StatusOK, files)
+		c.JSON(http.StatusOK, gin.H{"id": uri.ID, "watched": true})
 	}
 }
 
