@@ -37,7 +37,7 @@ func libraryFixture(t testing.TB) (*LibraryService, TaskInfo, scanPayload) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return NewLibraryService(store.Client, nil, tasks, images), queued, scanPayload{Source: source, Scan: ScanProgress{Stage: "scanning"}}
+	return NewLibraryService(store.Client, nil, tasks, images, 0), queued, scanPayload{Source: source, Scan: ScanProgress{Stage: "scanning"}}
 }
 
 func fixtureVideo(id, name string) scanVideo {

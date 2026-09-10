@@ -46,7 +46,7 @@ func BenchmarkScanObservations(b *testing.B) {
 	for b.Loop() {
 		observed := make(scanObservations)
 		for id, entries := range pages {
-			observed.add(id, entries)
+			observed.add(id, entries, 0)
 		}
 		scanBenchmarkResult = observed
 	}

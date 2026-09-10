@@ -135,7 +135,7 @@ export function LibraryPage({
               emoji="(˙ᯅ˙)"
               title={
                 !source
-                  ? '登录 115 并挂载媒体目录后，即可扫描入库'
+                  ? '登录 115 并挂载媒体目录后，将自动扫描入库'
                   : scanning
                     ? '正在扫描，识别到的影片会陆续显示'
                     : '未识别到影片'

@@ -54,6 +54,9 @@ var (
 	partNoise   = regexp.MustCompile(`([0-9][A-Z0-9]*)[-_. ]+(?:CD|DISC|PART)[0-9]+([^A-Z0-9]|$)`)
 	nameSuffix  = regexp.MustCompile(`^[-_]+([A-Z][A-Z0-9]*)(?:[^A-Z0-9]|$)`)
 	fileMarker  = regexp.MustCompile(`^(?:C|U|UC|CHS|CHT|SUB|HD|FHD|UHD|(?:CD|DISC|PART)[0-9]+)$`)
+	// SSNI releases append C directly to the numeric serial for subtitles.
+	// Limit this filename alias to the known family; other catalogues have real letter variants.
+	ssniSubtitle = regexp.MustCompile(`^(SSNI-[0-9]+)C$`)
 )
 
 // Parse extracts a catalogue number from a filename, discarding website,
@@ -69,6 +72,7 @@ func Parse(name string) (string, bool) {
 		return "", false
 	}
 	code := Normalize(name[match[2]:match[3]])
+	code = ssniSubtitle.ReplaceAllString(code, "$1")
 	// SCUTE includes the model name in its catalogue number. Other studios'
 	// filename titles must not become catalogue suffixes just because they contain dashes.
 	if strings.HasPrefix(code, "SCUTE-") {

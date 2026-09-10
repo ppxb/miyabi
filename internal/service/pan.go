@@ -61,6 +61,7 @@ type panLoginSession struct {
 type PanService struct {
 	database *ent.Client
 	client   panClient
+	tasks    *TaskService
 
 	// mu protects memory only. commit serializes persistence with publication.
 	mu                   sync.Mutex
@@ -76,7 +77,7 @@ type PanService struct {
 	closed               bool
 }
 
-func NewPanService(ctx context.Context, database *ent.Client, options pan.Options) (*PanService, error) {
+func NewPanService(ctx context.Context, database *ent.Client, tasks *TaskService, options pan.Options) (*PanService, error) {
 	tokens, _, err := loadSetting[pan.Tokens](ctx, database, panCredentialsSetting)
 	if err != nil {
 		return nil, err
@@ -85,7 +86,7 @@ func NewPanService(ctx context.Context, database *ent.Client, options pan.Option
 	if err != nil {
 		return nil, err
 	}
-	return &PanService{database: database, client: pan.New(options), tokens: tokens, directory: directory}, nil
+	return &PanService{database: database, client: pan.New(options), tasks: tasks, tokens: tokens, directory: directory}, nil
 }
 
 func (service *PanService) Close() {

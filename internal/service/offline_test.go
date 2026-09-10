@@ -14,7 +14,7 @@ import (
 func offlineFixture(t *testing.T) (*OfflineService, *ent.Task, offlinePayload, LibrarySource) {
 	t.Helper()
 	library, _, scan := libraryFixture(t)
-	drive := &PanService{tokens: pan.Tokens{AccessToken: "fixture-token"}, directory: panLibraryDirectory{
+	drive := &PanService{tasks: library.tasks, tokens: pan.Tokens{AccessToken: "fixture-token"}, directory: panLibraryDirectory{
 		AccountID: scan.Source.AccountID, PanLibraryDirectory: scan.Source.Directory,
 	}}
 	service := NewOfflineService(library.database, nil, drive, library.tasks)

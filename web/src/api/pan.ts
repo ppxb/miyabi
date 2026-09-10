@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 
 import { ApiError, apiDelete, apiGet, apiPost, apiPut } from '@/api/client'
 import { resetMovieStates } from '@/api/movie-state-cache'
+import { taskKeys } from '@/api/tasks'
 
 export type PanDirectory = {
   id: string
@@ -135,6 +136,7 @@ export function useSelectPanDirectory(accountID: string) {
     mutationFn: (id: string) => apiPut<PanDirectory>('/api/pan/directory', { id }),
     onSuccess: directory => {
       invalidatePanSource(queryClient)
+      void queryClient.invalidateQueries({ queryKey: taskKeys.all })
       queryClient.setQueryData<PanAccountStatus>(panKeys.account, status =>
         status?.account?.id === accountID ? { ...status, directory } : status
       )

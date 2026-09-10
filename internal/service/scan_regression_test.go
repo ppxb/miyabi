@@ -84,7 +84,7 @@ func TestCompactScanKeepsSharedDirectoryAndArtworkMatching(t *testing.T) {
 			f.covered.Update().SetPayload(encoded).ExecX(t.Context())
 			observed := make(scanObservations)
 			for _, entry := range f.entries["10"] {
-				observed.add("10", []pan.File{entry})
+				observed.add("10", []pan.File{entry}, f.library.minVideoSize)
 			}
 			if err := f.library.indexScanPage(t.Context(), f.queued.ID, "rescan", "/Movies", f.videos, &f.payload); err != nil {
 				t.Fatal(err)

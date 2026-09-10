@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/setting"
+	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
@@ -63,16 +65,35 @@ func (service *PanService) SelectDirectory(ctx context.Context, directoryID stri
 		return PanLibraryDirectory{}, err
 	}
 	defer service.commit.Unlock()
+	current, err := service.credentials(state)
+	if err != nil {
+		return PanLibraryDirectory{}, err
+	}
+	if current.directory.AccountID == record.AccountID && current.directory.ID == record.ID {
+		// Retried requests for the current mount must not invalidate active work.
+		return current.directory.PanLibraryDirectory, nil
+	}
 	if _, err := service.sourceState(state.source(), state.authorizationVersion); err != nil {
 		return PanLibraryDirectory{}, err
 	}
-	if err := saveSetting(ctx, service.database, panDirectorySetting, record); err != nil {
+	if err := service.tasks.queue.Lock(ctx); err != nil {
 		return PanLibraryDirectory{}, err
+	}
+	defer service.tasks.queue.Unlock()
+	if err := ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
+		if err := saveSetting(ctx, tx.Client(), panDirectorySetting, record); err != nil {
+			return err
+		}
+		_, err := ensureScanTask(ctx, tx.Task, LibrarySource{AccountID: account.ID, Directory: directory}, task.StatusQueued)
+		return err
+	}); err != nil {
+		return PanLibraryDirectory{}, fmt.Errorf("mount media directory and queue scan: %w", err)
 	}
 	service.mu.Lock()
 	service.directory = record
 	service.authorizationVersion++
 	service.mu.Unlock()
+	service.tasks.NotifyLibraryChanged()
 	return directory, nil
 }
 

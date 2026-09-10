@@ -44,12 +44,15 @@ export function PanDirectoryDialog({
       <DialogContent className="max-h-[calc(100dvh-2rem)] grid-cols-1 overflow-x-hidden overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>选择媒体目录</DialogTitle>
-          <DialogDescription>进入目标文件夹后，点击“挂载当前目录”。</DialogDescription>
+          <DialogDescription>
+            进入目标文件夹后，点击“挂载当前目录”，系统会自动扫描媒体文件。
+          </DialogDescription>
         </DialogHeader>
         {/* Keep the picker mounted through DialogContent's exit animation. */}
         <DirectoryPicker
           accountID={accountID}
           initialID={directory?.id ?? '0'}
+          mountedID={directory?.id}
           onSelected={() => setOpen(false)}
         />
       </DialogContent>
@@ -60,15 +63,18 @@ export function PanDirectoryDialog({
 function DirectoryPicker({
   accountID,
   initialID,
+  mountedID,
   onSelected
 }: {
   accountID: string
   initialID: string
+  mountedID?: string
   onSelected: () => void
 }) {
   const [location, setLocation] = useState({ id: initialID, page: 1 })
   const files = usePanFiles(accountID, location.id, location.page)
   const select = useSelectPanDirectory(accountID)
+  const mounted = location.id === mountedID
 
   function navigate(id: string, page = 1) {
     select.reset()
@@ -203,7 +209,7 @@ function DirectoryPicker({
       <div className="flex justify-end">
         <Button
           type="button"
-          disabled={!files.data || files.isError || files.isFetching || select.isPending}
+          disabled={mounted || !files.data || files.isError || files.isFetching || select.isPending}
           onClick={() => select.mutate(location.id, { onSuccess: onSelected })}
         >
           {select.isPending ? (
@@ -211,7 +217,7 @@ function DirectoryPicker({
           ) : (
             <FolderIcon className="size-4" />
           )}
-          挂载当前目录
+          {mounted ? '当前已挂载' : '挂载当前目录'}
         </Button>
       </div>
     </div>

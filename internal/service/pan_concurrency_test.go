@@ -89,7 +89,7 @@ func panConcurrencyFixture(t *testing.T) (*LibraryService, *panStub) {
 		loginStatus: func(context.Context, *pan.Login) (pan.LoginState, error) { return pan.LoginAuthorized, nil },
 	}
 	library.drive = &PanService{
-		database: library.database, client: client, tokens: panTestTokens("original"),
+		database: library.database, client: client, tasks: library.tasks, tokens: panTestTokens("original"),
 		directory: panLibraryDirectory{AccountID: payload.Source.AccountID, PanLibraryDirectory: payload.Source.Directory},
 	}
 	if err := saveSetting(t.Context(), library.database, panCredentialsSetting, library.drive.tokens); err != nil {

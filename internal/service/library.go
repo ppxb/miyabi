@@ -53,14 +53,15 @@ type LibraryFilePage struct {
 }
 
 type LibraryService struct {
-	images   *mediaimage.Cache
-	database *ent.Client
-	drive    *PanService
-	tasks    *TaskService
+	images       *mediaimage.Cache
+	database     *ent.Client
+	drive        *PanService
+	tasks        *TaskService
+	minVideoSize int64
 }
 
-func NewLibraryService(database *ent.Client, drive *PanService, tasks *TaskService, images *mediaimage.Cache) *LibraryService {
-	return &LibraryService{database: database, drive: drive, tasks: tasks, images: images}
+func NewLibraryService(database *ent.Client, drive *PanService, tasks *TaskService, images *mediaimage.Cache, minVideoSize int64) *LibraryService {
+	return &LibraryService{database: database, drive: drive, tasks: tasks, images: images, minVideoSize: minVideoSize}
 }
 
 // Browsing an existing index only reads SQLite. 115 is contacted when scanning,

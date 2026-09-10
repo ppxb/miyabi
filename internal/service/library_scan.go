@@ -92,6 +92,12 @@ func (service *LibraryService) identifyScanVideos(ctx context.Context, payload s
 		if entry.IsDirectory || !isVideo(entry.Name) {
 			continue
 		}
+		if !service.canIdentifyVideo(entry) {
+			// Keep small auxiliary videos in the file index, without carrying
+			// forward old movie associations or guessing a download's identity.
+			videos[entry.ID] = scanVideo{File: entry}
+			continue
+		}
 		if payload.OfflineTaskID != 0 && payload.TargetID != "" {
 			videos[entry.ID] = scanVideo{File: entry, Code: codeid.Normalize(payload.Code)}
 		} else {
@@ -208,7 +214,7 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 			if err != nil {
 				return err
 			}
-			observed.add(info.ParentID, entries)
+			observed.add(info.ParentID, entries, service.minVideoSize)
 			return reconcile()
 		}
 		start = scanDirectory{id: info.ID, path: payload.TargetPath}
@@ -233,7 +239,7 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 				return false, err
 			}
 			videos := make([]scanVideo, 0, len(page.Files))
-			observed.add(directory.id, page.Files)
+			observed.add(directory.id, page.Files, service.minVideoSize)
 			for _, entry := range page.Files {
 				if seen[entry.ID] {
 					return false, fmt.Errorf("扫描期间重复遇到文件或目录 %s，请重新扫描", path.Join(directory.path, entry.Name))
@@ -277,7 +283,9 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 		}
 		// A single NFO describes a single-movie directory, including videos
 		// whose filenames do not contain a recognizable code.
-		if len(unidentified) > 0 && len(sidecars) == 1 && len(directoryCodes) <= 1 {
+		if len(sidecars) == 1 && len(directoryCodes) <= 1 && slices.ContainsFunc(unidentified, func(video scanVideo) bool {
+			return service.canIdentifyVideo(video.File)
+		}) {
 			body, err := service.readSidecar(ctx, source, version, sidecars[0], 2<<20)
 			if err != nil {
 				return fmt.Errorf("read scan NFO: %w", err)
@@ -291,13 +299,17 @@ func (service *LibraryService) Scan(ctx context.Context, job TaskJob) error {
 				code, _ = codeid.Parse(sidecars[0].Name)
 			}
 			if code != "" && (len(directoryCodes) == 0 || directoryCodes[code]) {
+				matched := 0
 				for i := range unidentified {
-					unidentified[i].Code = code
+					if service.canIdentifyVideo(unidentified[i].File) {
+						unidentified[i].Code = code
+						matched++
+					}
 				}
 				codes[code] = true
 				payload.Scan.Movies = len(codes)
-				payload.Scan.MatchedFiles += len(unidentified)
-				payload.Scan.UnmatchedFiles -= len(unidentified)
+				payload.Scan.MatchedFiles += matched
+				payload.Scan.UnmatchedFiles -= matched
 			}
 		}
 		for start := 0; start < len(unidentified); start += 100 {
@@ -346,6 +358,10 @@ func isVideo(name string) bool {
 	default:
 		return false
 	}
+}
+
+func (service *LibraryService) canIdentifyVideo(entry pan.File) bool {
+	return !entry.IsDirectory && isVideo(entry.Name) && entry.Size >= service.minVideoSize
 }
 
 func (service *LibraryService) indexScanPage(ctx context.Context, taskID int, scanID, directoryPath string, videos []scanVideo, payload *scanPayload) error {

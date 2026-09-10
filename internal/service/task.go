@@ -43,7 +43,7 @@ type TaskRevisions struct {
 type TaskService struct {
 	revisions   TaskRevisions
 	database    *ent.Client
-	enqueueMu   sync.Mutex
+	queue       contextLock // Enqueue and claim wait until a new mount is published.
 	wake        chan struct{}
 	mu          sync.Mutex
 	subscribers map[chan struct{}]struct{}
@@ -57,10 +57,23 @@ func NewTaskService(database *ent.Client) *TaskService {
 }
 
 func (service *TaskService) enqueueScan(ctx context.Context, source LibrarySource) (TaskInfo, error) {
-	service.enqueueMu.Lock()
-	defer service.enqueueMu.Unlock()
-	record, err := service.database.Task.Query().Where(
-		task.TypeEQ("scan"), task.StatusIn(task.StatusQueued, task.StatusRunning),
+	if err := service.queue.Lock(ctx); err != nil {
+		return TaskInfo{}, err
+	}
+	defer service.queue.Unlock()
+	record, err := ensureScanTask(ctx, service.database.Task, source, task.StatusQueued, task.StatusRunning)
+	if err != nil {
+		return TaskInfo{}, err
+	}
+	service.Notify()
+	return scanTaskInfo(record)
+}
+
+// A new mount may reuse a queued scan. A running scan captured the previous
+// source version and will stop when that mount changes, even if its ID matches.
+func ensureScanTask(ctx context.Context, tasks *ent.TaskClient, source LibrarySource, reusable ...task.Status) (*ent.Task, error) {
+	record, err := tasks.Query().Where(
+		task.TypeEQ("scan"), task.StatusIn(reusable...),
 		func(selector *sql.Selector) {
 			selector.Where(sql.And(
 				sql.Not(sqljson.HasKey(task.FieldPayload, sqljson.Path("target_id"))),
@@ -70,20 +83,19 @@ func (service *TaskService) enqueueScan(ctx context.Context, source LibrarySourc
 		},
 	).First(ctx)
 	if err == nil {
-		return scanTaskInfo(record)
+		return record, nil
 	}
 	if !ent.IsNotFound(err) {
-		return TaskInfo{}, fmt.Errorf("find active scan: %w", err)
+		return nil, fmt.Errorf("find active scan: %w", err)
 	}
 	payload := (scanPayload{
 		Source: source, Scan: ScanProgress{Stage: "queued", CurrentPath: source.Directory.Path},
 	}).taskPayload()
-	record, err = service.database.Task.Create().SetType("scan").SetPayload(payload).Save(ctx)
+	record, err = tasks.Create().SetType("scan").SetPayload(payload).Save(ctx)
 	if err != nil {
-		return TaskInfo{}, fmt.Errorf("queue library scan: %w", err)
+		return nil, fmt.Errorf("queue library scan: %w", err)
 	}
-	service.Notify()
-	return scanTaskInfo(record)
+	return record, nil
 }
 
 // The UI shows one workflow per scan. Metadata and artwork jobs remain durable
@@ -270,6 +282,10 @@ func (service *TaskService) Recover(ctx context.Context, types []string) error {
 }
 
 func (service *TaskService) Claim(ctx context.Context, types []string) (*TaskJob, error) {
+	if err := service.queue.Lock(ctx); err != nil {
+		return nil, err
+	}
+	defer service.queue.Unlock()
 	for {
 		record, err := service.database.Task.Query().Where(
 			task.TypeIn(types...), task.StatusEQ(task.StatusQueued),

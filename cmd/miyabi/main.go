@@ -62,20 +62,20 @@ func run(args []string) error {
 		return fmt.Errorf("initialize discovery service: %w", err)
 	}
 	defer discover.Close()
-	drive, err := service.NewPanService(context.Background(), store.Client, pan.Options{
+	tasks := service.NewTaskService(store.Client)
+	drive, err := service.NewPanService(context.Background(), store.Client, tasks, pan.Options{
 		Proxy: cfg.Proxy,
 	})
 	if err != nil {
 		return fmt.Errorf("initialize pan service: %w", err)
 	}
 	defer drive.Close()
-	tasks := service.NewTaskService(store.Client)
 	offline := service.NewOfflineService(store.Client, discover, drive, tasks)
 	images, err := mediaimage.NewCache(cfg.DataDir)
 	if err != nil {
 		return err
 	}
-	library := service.NewLibraryService(store.Client, drive, tasks, images)
+	library := service.NewLibraryService(store.Client, drive, tasks, images, cfg.MinVideoSizeMB*(1<<20))
 	play := service.NewPlayService(library)
 	defer play.Close()
 	scrape := service.NewScrapeService(library, discover, images)

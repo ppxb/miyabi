@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
+	"math"
 	"strings"
 
 	"github.com/knadh/koanf/parsers/toml"
@@ -25,6 +26,7 @@ type Config struct {
 	LogLevel       string `koanf:"log_level"`
 	Proxy          string `koanf:"proxy"`
 	AccessPassword string `koanf:"access_password"`
+	MinVideoSizeMB int64  `koanf:"min_video_size_mb"`
 }
 
 type cliOptions struct {
@@ -44,11 +46,12 @@ func Load(args []string) (Config, error) {
 
 	k := koanf.New(".")
 	if err := k.Load(confmap.Provider(map[string]any{
-		"listen":          ":8080",
-		"data_dir":        "./data",
-		"log_level":       "info",
-		"proxy":           "",
-		"access_password": "",
+		"listen":            ":8080",
+		"data_dir":          "./data",
+		"log_level":         "info",
+		"proxy":             "",
+		"access_password":   "",
+		"min_video_size_mb": 100,
 	}, "."), nil); err != nil {
 		return Config{}, fmt.Errorf("load default config: %w", err)
 	}
@@ -122,6 +125,9 @@ func (cfg *Config) validate() error {
 	}
 	if cfg.DataDir == "" {
 		return errors.New("data directory is required")
+	}
+	if cfg.MinVideoSizeMB < 0 || cfg.MinVideoSizeMB > math.MaxInt64/(1<<20) {
+		return errors.New("min_video_size_mb must be a non-negative size that fits in bytes")
 	}
 	switch cfg.LogLevel {
 	case "debug", "info", "warn", "error":

@@ -56,6 +56,9 @@ docker rm miyabi
 | `MIYABI_LOG_LEVEL`       | 日志级别                 | `info`                                |
 | `MIYABI_PROXY`           | 访问上游服务的 HTTP 代理 | 空                                    |
 | `MIYABI_ACCESS_PASSWORD` | Web 入口密码             | 空，关闭门禁                          |
+| `MIYABI_MIN_VIDEO_SIZE_MB` | 自动识别与刮削的视频最小体积（MiB） | `100`，设为 `0` 可关闭大小过滤 |
+
+挂载或更换媒体目录后，系统会自动扫描。小于体积阈值的视频保留在“未识别文件”中，不参与自动刮削，也不会因目录内存在 NFO 而关联到影片。调整阈值后重新扫描即可更新已有索引。
 
 ## NSFW 警告
 

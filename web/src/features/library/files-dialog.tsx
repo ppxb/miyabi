@@ -24,7 +24,7 @@ export function LibraryFilesDialog({ children }: { children: ReactNode }) {
         <DialogHeader className="min-w-0 pr-6">
           <DialogTitle>未识别的视频</DialogTitle>
           <DialogDescription>
-            未从文件名识别出番号。整理 115 中的文件名后可重新扫描。
+            包含未匹配番号或小于自动刮削体积阈值的视频。调整文件名或阈值后可重新扫描。
           </DialogDescription>
         </DialogHeader>
         <LibraryFilesList />
