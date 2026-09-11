@@ -151,11 +151,7 @@ function PlaybackPlayer({
     >
       <PlayerControlsVisibility />
       <MediaProvider />
-      {holdSpeed ? (
-        <div className="pointer-events-none absolute top-3 left-1/2 z-30 -translate-x-1/2 rounded-full bg-background/75 px-3 py-1.5 text-sm font-medium text-white backdrop-blur-xl sm:top-4">
-          3 倍速
-        </div>
-      ) : null}
+      {holdSpeed ? <div className="miyabi-player-feedback">3 倍速</div> : null}
       {loading || playback.isError || failed ? (
         <div className="absolute inset-0 z-20 cursor-auto">
           {loading ? (

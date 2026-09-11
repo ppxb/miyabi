@@ -3,6 +3,7 @@
   --video-border-radius: var(--radius-2xl);
   --video-font-family: var(--font-sans);
   --media-font-family: var(--font-sans);
+  --miyabi-feedback-top: 0.75rem;
   --video-brand: var(--primary);
   --video-controls-color: var(--foreground);
   --video-focus-ring-color: var(--ring);
@@ -84,6 +85,54 @@
 
 .miyabi-player .vds-menu-items[data-root] {
   backdrop-filter: blur(24px);
+}
+
+.miyabi-player .miyabi-player-feedback,
+.miyabi-player .vds-kb-text-wrapper {
+  position: absolute;
+  top: var(--miyabi-feedback-top);
+  right: auto;
+  left: 50%;
+  z-index: 30;
+  display: flex;
+  width: max-content;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.miyabi-player .miyabi-player-feedback,
+.miyabi-player .vds-kb-text {
+  border-radius: 9999px;
+  background-color: color-mix(in oklab, var(--background) 75%, transparent);
+  padding: 0.375rem 0.75rem;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  color: white;
+  backdrop-filter: blur(var(--blur-xl, 24px));
+}
+
+.miyabi-player
+  .vds-kb-action:is(
+    [data-action='volume-up'],
+    [data-action='volume-down'],
+    [data-action='toggle-muted']
+  )
+  .vds-kb-bezel {
+  display: none;
+}
+
+/* Volume feedback temporarily occupies the shared position during a speed hold. */
+.miyabi-player:has(
+    .vds-kb-action:is(
+      [data-action='volume-up'],
+      [data-action='volume-down'],
+      [data-action='toggle-muted']
+    )
+  )
+  .miyabi-player-feedback {
+  visibility: hidden;
 }
 
 .miyabi-player .vds-kb-bezel {
@@ -182,4 +231,10 @@
 .miyabi-player .vds-video-layout[data-sm] {
   --miyabi-toolbar-inset: 0.75rem;
   --miyabi-toolbar-bottom: 0.75rem;
+}
+
+@media (min-width: 40rem) {
+  .miyabi-player {
+    --miyabi-feedback-top: 1rem;
+  }
 }
