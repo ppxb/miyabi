@@ -84,21 +84,18 @@ func TestHealthcheckTimesOut(t *testing.T) {
 	}
 }
 
-func TestHealthcheckModeUsesConfigWithoutStartingServices(t *testing.T) {
+func TestHealthcheckModeUsesEnvironmentWithoutStartingServices(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
 	dataDir := filepath.Join(t.TempDir(), "unused-data")
-	configPath := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(configPath, []byte("listen = ':1'\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	t.Setenv("MIYABI_LISTEN", server.Listener.Addr().String())
 	t.Setenv("MIYABI_DATA_DIR", dataDir)
 	t.Setenv("MIYABI_LOG_LEVEL", "info")
+	t.Setenv("MIYABI_PROXY", "http://127.0.0.1:1")
 	t.Setenv("HTTP_PROXY", "http://127.0.0.1:1")
-	if err := run([]string{"healthcheck", "-config", configPath}); err != nil {
+	if err := run([]string{"healthcheck"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(dataDir); !errors.Is(err, os.ErrNotExist) {

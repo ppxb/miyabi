@@ -32,11 +32,11 @@ func main() {
 }
 
 func run(args []string) error {
-	healthcheck := len(args) > 0 && args[0] == "healthcheck"
-	if healthcheck {
-		args = args[1:]
+	healthcheck := len(args) == 1 && args[0] == "healthcheck"
+	if len(args) > 0 && !healthcheck {
+		return errors.New("usage: miyabi [healthcheck]; configure the application with MIYABI_* environment variables")
 	}
-	cfg, err := config.Load(args)
+	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}

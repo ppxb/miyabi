@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:all": "concurrently --kill-others --names web,api --prefix-colors cyan,magenta \"vite\" \"go -C .. run -tags=dev ./cmd/miyabi\"",
     "prebuild": "tsr generate",
     "build": "tsc && vite build",
     "test": "node --experimental-transform-types --test tests/*.test.mjs",
@@ -41,7 +40,6 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
-    "concurrently": "^10.0.5",
     "oxfmt": "^0.66.0",
     "oxlint": "^1.81.0",
     "tailwindcss": "^4.3.3",
