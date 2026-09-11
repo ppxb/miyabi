@@ -65,7 +65,8 @@ export function useMarkMovieWatched() {
             }
           : page
       )
-      return queryClient.invalidateQueries({ queryKey: libraryKeys.all })
+      // Refresh lists in the background so playback can start with the watch session.
+      void queryClient.invalidateQueries({ queryKey: libraryKeys.all })
     },
     onError: () => {
       toast.error('观看状态保存失败', {
