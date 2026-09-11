@@ -5,6 +5,7 @@ import { useLibraryMovies, useStartLibraryScan } from '@/api/library'
 import { isTaskActive, useTasks } from '@/api/tasks'
 import { AppPage } from '@/components/app-page'
 import { EmptyState } from '@/components/empty-state'
+import { ErrorState, InlineError } from '@/components/error-state'
 import { ListPagination } from '@/components/list-pagination'
 import { MovieGridLayout } from '@/components/movie/movie-grid'
 import { MovieGridSkeleton } from '@/components/movie/movie-grid-skeleton'
@@ -52,7 +53,7 @@ export function LibraryPage({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                className="w-9 cursor-pointer px-0 sm:w-auto sm:px-3"
+                className="w-9 px-0 sm:w-auto sm:px-3"
                 disabled={scanning || startScan.isPending}
                 onClick={() => startScan.mutate(undefined, { onSuccess: () => onPageChange(1) })}
               >
@@ -76,49 +77,36 @@ export function LibraryPage({
       </PageHeader>
 
       {tasks.isError ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm text-muted-foreground">
-            暂时无法获取任务状态，请检查后端服务后重试。
-          </p>
-          <Button
-            variant="link"
-            size="xs"
-            disabled={connection.status === 'connecting'}
-            onClick={connection.reconnect}
-          >
-            重新连接
-          </Button>
-        </div>
+        <InlineError
+          onRetry={connection.reconnect}
+          retrying={connection.status === 'connecting'}
+          retryLabel="重新连接"
+        >
+          暂时无法获取任务状态，请检查后端服务后重试。
+        </InlineError>
       ) : null}
 
       {library.isPending ? (
         <MovieGridSkeleton />
       ) : library.isError ? (
-        <EmptyState
-          emoji="(･o･;)"
-          title="无法读取媒体库，请检查后端服务后重试"
-          actions={
-            <Button variant="outline" onClick={() => void library.refetch()}>
-              重试
-            </Button>
-          }
+        <ErrorState
+          message="无法读取媒体库，请检查后端服务后重试"
+          onRetry={() => void library.refetch()}
+          retrying={library.isFetching}
         />
       ) : (
         <>
           {source ? <p className="text-sm">发现 {library.data.total} 部影片</p> : null}
 
           {library.data.movies.length > 0 ? (
-            <>
-              <MovieGridLayout>
-                {library.data.movies.map(movie => (
-                  <LibraryMovieCard key={movie.id} movie={movie} />
-                ))}
-              </MovieGridLayout>
-            </>
+            <MovieGridLayout>
+              {library.data.movies.map(movie => (
+                <LibraryMovieCard key={movie.id} movie={movie} />
+              ))}
+            </MovieGridLayout>
           ) : (
             <EmptyState
               className="min-h-0 flex-1 py-12"
-              emoji="(˙ᯅ˙)"
               title={
                 !source
                   ? '登录 115 并挂载媒体目录后，将自动扫描入库'

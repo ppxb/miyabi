@@ -12,6 +12,7 @@ import {
   useReselectJavDBRoute,
   useSelectJavDBRoute
 } from '@/api/discover'
+import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
@@ -108,15 +109,15 @@ export function JavDBSection() {
         </div>
       </SettingRow>
       {route.isError ? (
-        <div className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+        <InlineError>
           后端服务暂不可用，请启动后端服务后点击重试。本地显示设置仍可使用。
-        </div>
+        </InlineError>
       ) : selectRoute.isError || reselect.isError ? (
-        <p className="text-sm text-destructive">
+        <InlineError>
           {selectRoute.isError
             ? '线路切换未完成，请稍后重试。'
             : '暂时没有找到可用线路，请稍后重新测速。'}
-        </p>
+        </InlineError>
       ) : status && !status.active ? (
         <p className="text-xs text-muted-foreground">
           尚无缓存线路，首次请求时将完成全部线路测速。
@@ -160,7 +161,7 @@ function formatHost(host: string) {
 }
 
 function latencyTone(latencyMS: number) {
-  if (latencyMS <= 500) return 'text-emerald-600 dark:text-emerald-400'
-  if (latencyMS <= 1500) return 'text-amber-600 dark:text-amber-400'
+  if (latencyMS <= 500) return 'text-success'
+  if (latencyMS <= 1500) return 'text-warning'
   return 'text-orange-600 dark:text-orange-400'
 }

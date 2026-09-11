@@ -3,13 +3,13 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 type EmptyStateProps = {
-  emoji: string
+  emoji?: string
   title: string
   actions?: ReactNode
   className?: string
 }
 
-export function EmptyState({ emoji, title, actions, className }: EmptyStateProps) {
+export function EmptyState({ emoji = '(˙ᯅ˙)', title, actions, className }: EmptyStateProps) {
   return (
     <div
       className={cn(

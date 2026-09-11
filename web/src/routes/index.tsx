@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { AppPage } from '@/components/app-page'
-import { EmptyState } from '@/components/empty-state'
+import { ErrorState } from '@/components/error-state'
 import { LibraryPage } from '@/features/library/page'
 
 export const Route = createFileRoute('/')({
@@ -13,7 +13,7 @@ export const Route = createFileRoute('/')({
   component: LibraryRoute,
   errorComponent: () => (
     <AppPage>
-      <EmptyState emoji="(･o･;)" title="媒体库页码无效" />
+      <ErrorState message="媒体库页码无效" />
     </AppPage>
   )
 })

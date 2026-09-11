@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { cn } from 'cn'
+import { cn } from '@/lib/utils'
 import { Slot } from 'radix-ui'
 import { ChevronRightIcon, MoreHorizontalIcon } from 'lucide-react'
 
@@ -42,7 +42,10 @@ function BreadcrumbLink({
   return (
     <Comp
       data-slot="breadcrumb-link"
-      className={cn('transition-colors hover:text-foreground', className)}
+      className={cn(
+        'cursor-pointer transition-colors hover:text-foreground disabled:cursor-default',
+        className
+      )}
       {...props}
     />
   )

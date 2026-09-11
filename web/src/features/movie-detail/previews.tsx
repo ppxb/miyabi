@@ -14,7 +14,7 @@ export function MoviePreviews({ images }: { images: PreviewImage[] }) {
           {images.map((preview, index) => (
             <div
               key={`${preview.original}:${index}`}
-              className="aspect-video overflow-hidden rounded-lg"
+              className="aspect-video overflow-hidden rounded-2xl"
             >
               <MediaImage
                 source={preview.thumbnail || preview.original}

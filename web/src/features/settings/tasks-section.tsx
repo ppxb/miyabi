@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { ListChecksIcon } from 'lucide-react'
 
 import { useTasks } from '@/api/tasks'
+import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsSection } from '@/features/settings/shared'
 import { ScanProgressView } from '@/features/tasks/scan-progress'
@@ -20,17 +21,9 @@ export function TasksSection() {
       </SettingRow>
       {tasks.isPending ? <p className="text-xs text-muted-foreground">正在读取任务…</p> : null}
       {tasks.isError ? (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">无法读取任务，请启动后端服务后重试。</p>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={connection.status === 'connecting'}
-            onClick={connection.reconnect}
-          >
-            重试
-          </Button>
-        </div>
+        <InlineError onRetry={connection.reconnect} retrying={connection.status === 'connecting'}>
+          无法读取任务，请启动后端服务后重试。
+        </InlineError>
       ) : null}
       {tasks.data?.length === 0 ? (
         <p className="text-xs text-muted-foreground">还没有扫描任务。</p>

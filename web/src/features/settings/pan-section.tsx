@@ -2,6 +2,7 @@ import { CloudIcon, LoaderCircleIcon, LogOutIcon, QrCodeIcon, RefreshCwIcon } fr
 
 import { ApiError } from '@/api/client'
 import { useDisconnectPan, usePanAccount } from '@/api/pan'
+import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { PanLoginDialog } from './pan-login-dialog'
@@ -102,9 +103,7 @@ export function PanSection() {
         </SettingRow>
       )}
       {connected && profile && account.isError ? (
-        <p className="text-xs text-muted-foreground">
-          暂时无法更新账号信息，请检查后端服务和网络后重试。
-        </p>
+        <InlineError>暂时无法更新账号信息，请检查后端服务和网络后重试。</InlineError>
       ) : null}
       {connected && profile ? (
         <>
@@ -118,7 +117,7 @@ export function PanSection() {
         </>
       ) : null}
       {disconnect.isError ? (
-        <p className="text-sm text-destructive">退出登录未完成，请检查后端服务后重试。</p>
+        <InlineError>退出登录未完成，请检查后端服务后重试。</InlineError>
       ) : null}
     </SettingsSection>
   )

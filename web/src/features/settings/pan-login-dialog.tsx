@@ -120,9 +120,7 @@ function LoginContent({
         )}
       </div>
       <p className="flex items-center gap-2 text-center text-sm text-muted-foreground">
-        {state === 'scanned' ? (
-          <CheckCircle2Icon className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-        ) : null}
+        {state === 'scanned' ? <CheckCircle2Icon className="size-4 shrink-0 text-success" /> : null}
         {message}
       </p>
       {unavailable ? (

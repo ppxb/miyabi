@@ -5,7 +5,9 @@ import {
   useDiscoverMovies,
   useDiscoverTags
 } from '@/api/discover'
-import { Button } from '@/components/ui/button'
+import { AppPage } from '@/components/app-page'
+import { InlineError } from '@/components/error-state'
+import { PageHeader } from '@/components/page-header'
 import {
   Select,
   SelectContent,
@@ -25,7 +27,7 @@ const YEAR_CATEGORY = 'year'
 // Month requires a year; duration has no slot in the upstream filter mask.
 const UNSUPPORTED_CATEGORIES = new Set(['month', 'duration'])
 
-export function DiscoverContent() {
+export function DiscoverPage() {
   const view = useDiscoverStore(state => state.view)
   const pages = useDiscoverStore(state => state.pages)
   const setView = useDiscoverStore(state => state.setView)
@@ -33,30 +35,33 @@ export function DiscoverContent() {
   const page = pages[view]
 
   return (
-    <div className="min-w-0 space-y-6">
-      <Tabs value={view} onValueChange={value => setView(value as DiscoverView)}>
-        <TabsList>
-          <TabsTrigger value="released">最新</TabsTrigger>
-          <TabsTrigger value="upcoming">即将发行</TabsTrigger>
-          <TabsTrigger value="category">分类浏览</TabsTrigger>
-        </TabsList>
-      </Tabs>
+    <AppPage>
+      <PageHeader title="发现" description="浏览 JavDB 的最新发行、即将发行和分类内容" />
+      <div className="min-w-0 space-y-6">
+        <Tabs value={view} onValueChange={value => setView(value as DiscoverView)}>
+          <TabsList>
+            <TabsTrigger value="released">最新</TabsTrigger>
+            <TabsTrigger value="upcoming">即将发行</TabsTrigger>
+            <TabsTrigger value="category">分类浏览</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-      {view === 'category' ? (
-        <CategoryContent page={page} onPageChange={next => setPage('category', next)} />
-      ) : (
-        <BrowseResults
-          key={view}
-          params={{
-            page,
-            limit: PAGE_SIZE,
-            order: 'desc',
-            ...(view === 'released' ? { main: ['m'], sort: 'update' } : { sort: 'release' })
-          }}
-          onPageChange={next => setPage(view, next)}
-        />
-      )}
-    </div>
+        {view === 'category' ? (
+          <CategoryContent page={page} onPageChange={next => setPage('category', next)} />
+        ) : (
+          <BrowseResults
+            key={view}
+            params={{
+              page,
+              limit: PAGE_SIZE,
+              order: 'desc',
+              ...(view === 'released' ? { main: ['m'], sort: 'update' } : { sort: 'release' })
+            }}
+            onPageChange={next => setPage(view, next)}
+          />
+        )}
+      </div>
+    </AppPage>
   )
 }
 
@@ -190,12 +195,9 @@ function CategoryFilters({
           <Skeleton className="h-9 w-full rounded-full sm:w-56" />
         </>
       ) : error ? (
-        <div className="flex items-center gap-3 text-sm text-destructive">
-          <span>分类加载失败</span>
-          <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-            重试分类
-          </Button>
-        </div>
+        <InlineError onRetry={onRetry} retryLabel="重试分类">
+          分类加载失败
+        </InlineError>
       ) : (
         <>
           <Select value={categoryID} onValueChange={onCategoryChange}>

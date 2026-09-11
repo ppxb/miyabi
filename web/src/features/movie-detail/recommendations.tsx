@@ -49,7 +49,6 @@ function RecommendationCard({ movie }: { movie: MovieReference }) {
       <Link
         to="/discover/$movieId"
         params={{ movieId: movie.id }}
-        aria-label={`查看影片 ${movie.code}`}
         className="block h-full rounded-2xl outline-ring"
         onFocus={() => {
           if (!data && !failed) prioritize()
@@ -89,7 +88,6 @@ function RecommendationCard({ movie }: { movie: MovieReference }) {
           variant="ghost"
           size="xs"
           className="absolute right-3 bottom-2"
-          aria-label={`重新加载 ${movie.code} 的详情`}
           onClick={prioritize}
         >
           重试

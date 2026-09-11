@@ -41,7 +41,8 @@ export function ScanProgressView({ task }: { task: ScanTask }) {
         )}
         <Progress
           value={value}
-          className="order-last h-1 w-full **:data-[slot=progress-indicator]:bg-emerald-600 sm:order-0 sm:w-auto sm:flex-1 dark:**:data-[slot=progress-indicator]:bg-emerald-500"
+          variant="success"
+          className="order-last h-1 w-full sm:order-0 sm:w-auto sm:flex-1"
         />
         <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">
           {count}

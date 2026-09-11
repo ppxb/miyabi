@@ -11,6 +11,7 @@ import {
   type OfflineSubmission
 } from '@/api/offline'
 import { usePanAccount } from '@/api/pan'
+import { InlineError } from '@/components/error-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -66,12 +67,9 @@ export function MovieMagnets({
         </p>
       ) : null}
       {connected && offline.isError ? (
-        <div className="flex items-center gap-3 text-sm text-destructive">
-          <span>离线任务状态读取失败，请重试。</span>
-          <Button type="button" variant="outline" size="sm" onClick={() => void offline.refetch()}>
-            重试
-          </Button>
-        </div>
+        <InlineError onRetry={() => void offline.refetch()} retrying={offline.isFetching}>
+          离线任务状态读取失败，请重试。
+        </InlineError>
       ) : null}
       {query.isPending ? (
         <div className="space-y-2">
@@ -80,12 +78,9 @@ export function MovieMagnets({
           ))}
         </div>
       ) : query.isError ? (
-        <div className="flex items-center gap-3 text-sm text-destructive">
-          <span>磁力加载失败</span>
-          <Button type="button" variant="outline" size="sm" onClick={() => query.refetch()}>
-            重试
-          </Button>
-        </div>
+        <InlineError onRetry={() => void query.refetch()} retrying={query.isFetching}>
+          磁力加载失败
+        </InlineError>
       ) : query.data.length === 0 ? (
         <p className="text-sm text-muted-foreground">暂无磁力链</p>
       ) : (
@@ -106,7 +101,7 @@ export function MovieMagnets({
           ))}
         </div>
       )}
-      {copyError ? <p className="text-sm text-destructive">复制失败，请重试。</p> : null}
+      {copyError ? <InlineError>复制失败，请重试。</InlineError> : null}
     </section>
   )
 }
@@ -193,7 +188,7 @@ function MagnetCard({
         {task?.phase === 'in_library' && task.processing ? (
           <p className="text-sm text-muted-foreground">文件已入库，后台整理中。</p>
         ) : null}
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {error ? <InlineError>{error}</InlineError> : null}
       </CardContent>
     </Card>
   )

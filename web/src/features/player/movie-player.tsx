@@ -202,7 +202,7 @@ function PlaybackQualitySelect({
         else player?.controls.resume()
       }}
     >
-      <SelectTrigger size="sm" className="max-w-full min-w-0 shrink-0 cursor-pointer px-2 text-xs">
+      <SelectTrigger size="sm" className="max-w-full min-w-0 shrink-0 px-2 text-xs">
         <SelectValue />
       </SelectTrigger>
       <SelectContent

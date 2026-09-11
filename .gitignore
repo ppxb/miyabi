@@ -18,6 +18,7 @@ config.local.*
 /web/node_modules/
 /web/dist/
 /web/.vite/
+/web/.tanstack/
 /web/*.tsbuildinfo
 /web/src/routeTree.gen.ts
 /.pnpm-store/

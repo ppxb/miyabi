@@ -30,7 +30,7 @@ export function MoviePlaybackNavAction() {
             type="button"
             variant="ghost"
             size="icon"
-            className="size-11 cursor-pointer sm:size-9"
+            className="size-11 sm:size-9"
             onClick={() => openPlayer(libraryID)}
           >
             <PlayIcon className="size-5" />

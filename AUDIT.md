@@ -228,10 +228,10 @@ API 客户端使用一致（仅 `api/client.ts:58` 调 fetch），无需整改�
 ### 3.5 依赖与前端工具链
 
 - Go：`go mod tidy` 零 diff，155 个模块，直接依赖全部使用
-- `package.json:30` `shadcn` 作为运行时依赖（CLI，33 个传递包），只为 `globals.css:3` 引入 16 KB 的 `shadcn/tailwind.css`。把该 CSS 拷进 `styles/` 后移除
+- `shadcn` 依赖按用户确认保留，`globals.css` 直接引入官方 `shadcn/tailwind.css`，后续升级继续随包获取状态样式，避免维护复制的 CSS。
 - `@tanstack/router-cli`（`prebuild: tsr generate`）与 `@tanstack/router-plugin` 重叠；只因 `build: "tsc && vite build"` 先跑 tsc 而 `routeTree.gen.ts` 被 gitignore。改为 `vite build && tsc` 可删 router-cli
 - `tsconfig.json:18` `types: ["node"]` 无人使用 node API；`vite-env.d.ts` 与 `types: ["vite/client"]` 重复；缺 `noUncheckedIndexedAccess`（`task-progress.tsx:34` `visible[index].label` 在 index=-1 时会崩）
-- `.oxlintrc.json` 只启用 `correctness`，未加 `react-hooks` 插件，`exhaustive-deps`/`rules-of-hooks` 完全无检查（`task-notifications.tsx:20-116` 这类大 effect 尤其需要）。建议 `plugins` 加 `react-hooks`、`import`，开 `suspicious: warn`
+- 复核更正（2026-09-11）：Oxlint 内置 `react` 插件已提供 `exhaustive-deps` 和 `rules-of-hooks`，原审计关于 Hooks 完全无检查的判断不准确。现显式将两条规则设为 `error`，无需增加插件依赖。
 - `components.json`：`hooks: "@/hooks"` 目录不存在；`utils` 别名与实际 import 不符
 - `vite.config.ts`：已按 hls/movie-player/react 拆包，无需手动 manualChunks；proxy 硬编码 `127.0.0.1:8080`
 
@@ -248,7 +248,7 @@ API 客户端使用一致（仅 `api/client.ts:58` 调 fetch），无需整改�
 7. 前端：api 层去 toast、合并 5 处账号匹配与 2 处 401 处理、QueryClient 默认值、统一空状态/错误组件、补 success/warning token（2.2、2.3）
 8. 配置收敛到环境变量；`worker.Pool` 退化为单循环；api 接口补测试或去掉（1.6、3.1）
 9. 文件删减与 Dockerfile/CI 收紧（3.3、3.4）
-10. 加 `react-hooks` lint、处理 `shadcn` 运行时依赖、Player 去 Radix 双 tooltip 并裁剪 icons/translations（2.6、3.5）
+10. 显式配置 Hooks lint、精简重复的路由构建工具；保留 shadcn 官方样式依赖以及播放器 Tooltip 与图标（2.6、3.5）
 
 ---
 
@@ -289,3 +289,14 @@ go test ./internal/service -run '^$' -bench 'Benchmark(LibraryPage|OfflineActivi
 - 保留 `healthcheck` 子命令，与应用读取相同环境变量。旧配置参数或未知命令在启动服务前明确报错并提示使用环境变量；密码按原样读取，空密码关闭访问门禁。
 - 移除 `pnpm dev:all`、`concurrently` 及其独占依赖，锁文件保留其余依赖的已锁定版本。前后端分别启动：前端使用 `pnpm dev`，后端使用 GoLand 或 `go run -tags=dev ./cmd/miyabi`。README 补充本地开发方式和旧配置迁移说明。
 - 验证：Go 全量测试、`go vet ./...`、开发模式编译、27 个前端测试、TypeScript、lint、格式检查、生产构建及冻结锁文件检查通过。配置回归覆盖默认值、环境变量覆盖与规范化、密码空白保留、可选空值、非法必填值、忽略旧 TOML、拒绝旧参数，以及健康检查不初始化应用数据。
+
+## 七、样式与前端工具链收敛（2026-09-11）
+
+- 新增统一的整页错误和行内错误组件，统一空状态表情、重试按钮尺寸及等待状态。发现页布局收回 feature，与媒体库、搜索页保持一致。设置页统一使用 `Separator`，预览图、骨架和容量条统一圆角，按钮与交互控件集中管理指针样式。
+- 增加 success、warning、info 语义颜色，进度条通过 `variant` 选择颜色。已刮削和已入库仍为 emerald-500，未观看仍为 violet-500，刮削失败继续使用指定的 destructive 色值。删除未使用的 sidebar 变量和无定义的 toast 类名；chart 的五组主题映射及亮暗颜色完整保留，供后续图表使用。组件的 `cn` 导入统一为 `@/lib/utils`。
+- 保留 `shadcn` 依赖及官方 `shadcn/tailwind.css` 导入，后续升级无需手动同步 CSS 副本。保留现有 shadcn/Radix 组件、播放器 Tooltip 和 Lucide 图标。
+- 移除重复的 `@tanstack/router-cli` 和 `prebuild`，构建改为先由 Vite 插件生成路由并打包，再执行 TypeScript 检查。删除无实际作用的 `pnpm-workspace.yaml`，同步 Dockerfile，并忽略 `.tanstack` 缓存。路由 CLI 及其独占依赖共减少 14 个锁定包版本，其余依赖版本保持不变。
+- 声明 Node.js 24 起和 pnpm 10.33.0，README 补充开发检查命令。移除重复的 Vite 类型声明和前端全局 Node 类型注入；开启 `noUncheckedIndexedAccess`，修复首个标签读取及任务阶段索引问题。未知阶段显示“等待进度同步”和不定进度，异常百分比限制在当前阶段范围内；新增四个回归测试。Hooks 检查使用 Oxlint 已有的内置 React 规则。
+- 按用户要求清除 shadcn 组件之外手写的 ARIA/role 属性及相关样式选择器；播放器菜单开关通过颜色变量保留开关状态区分。第三方依赖自动生成的属性仍由各组件库管理。
+
+验证：31 个前端测试、TypeScript、Oxlint、格式检查、Go 全量测试及 `go vet ./...` 通过；冻结锁文件检查通过，剩余 563 个依赖快照的引用全部完整。移除生成的路由文件后，Vite 能重新生成路由并完成生产构建，编译 CSS 包含所需颜色和组件状态变体。本机 Windows 沙箱下默认配置打包遇到子进程 `EPERM`，验证使用 `vite build --configLoader native` 后接 `tsc --noEmit`；仍有已有的播放器大分块提示。页面交互由用户手动测试。

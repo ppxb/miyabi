@@ -15,12 +15,13 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["vite/client", "node"],
+    "types": ["vite/client"],
     "paths": {
       "@/*": ["./src/*"]
     },
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true,
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src", "vite.config.ts"]

@@ -5,7 +5,7 @@ FROM --platform=$BUILDPLATFORM node:24-bookworm-slim AS web-builder
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 WORKDIR /build/web
-COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
+COPY web/package.json web/pnpm-lock.yaml ./
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --store-dir /pnpm/store
 

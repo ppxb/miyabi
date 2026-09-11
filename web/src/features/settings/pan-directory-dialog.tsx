@@ -3,12 +3,12 @@ import {
   ChevronRightIcon,
   FileIcon,
   FolderIcon,
-  LoaderCircleIcon,
-  RefreshCwIcon
+  LoaderCircleIcon
 } from 'lucide-react'
 import { Fragment, useState, type ReactNode } from 'react'
 
 import { usePanFiles, useSelectPanDirectory, type PanDirectory } from '@/api/pan'
+import { InlineError } from '@/components/error-state'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -130,21 +130,13 @@ function DirectoryPicker({
             正在读取目录…
           </div>
         ) : files.isError ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
-            <p className="text-sm text-muted-foreground">
-              目录读取失败，请检查 115 授权和网络后重试。
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void files.refetch()}
-              disabled={files.isFetching}
-            >
-              <RefreshCwIcon className="size-4" />
-              重试
-            </Button>
-          </div>
+          <InlineError
+            className="h-full flex-col justify-center px-4 text-center"
+            onRetry={() => void files.refetch()}
+            retrying={files.isFetching}
+          >
+            目录读取失败，请检查 115 授权和网络后重试。
+          </InlineError>
         ) : files.data.files.length === 0 ? (
           <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
             当前目录为空
@@ -203,9 +195,7 @@ function DirectoryPicker({
           </Button>
         </div>
       </div>
-      {select.isError ? (
-        <p className="text-sm text-destructive">目录挂载未完成，请稍后重试。</p>
-      ) : null}
+      {select.isError ? <InlineError>目录挂载未完成，请稍后重试。</InlineError> : null}
       <div className="flex justify-end">
         <Button
           type="button"

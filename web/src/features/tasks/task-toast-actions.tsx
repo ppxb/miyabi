@@ -21,7 +21,7 @@ export function TaskToastActions({ id, onPlay }: { id: string; onPlay?: () => vo
               type="button"
               variant="ghost"
               size="icon-sm"
-              className="cursor-pointer"
+
               onClick={() => {
                 action.onClick?.()
                 toast.dismiss(id)

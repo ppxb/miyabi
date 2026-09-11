@@ -10,7 +10,7 @@ export function PlayerCloseButton() {
   const close = useUIStore(state => state.closePlayer)
 
   return (
-    <Button variant="ghost" size="icon-sm" className="cursor-pointer" onClick={close}>
+    <Button variant="ghost" size="icon-sm" onClick={close}>
       <XIcon />
     </Button>
   )

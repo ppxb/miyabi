@@ -6,16 +6,17 @@ import { useUIStore } from '@/stores/ui'
 
 export function LibraryMovieCard({ movie }: { movie: LibraryMovie }) {
   const openPlayer = useUIStore(state => state.openPlayer)
+  const firstTag = movie.tags[0]
   return (
     <Button
       variant="ghost"
-      className="block h-auto min-w-0 cursor-pointer rounded-2xl p-0 text-left whitespace-normal hover:bg-transparent hover:text-current dark:hover:bg-transparent"
+      className="block h-auto min-w-0 rounded-2xl p-0 text-left whitespace-normal hover:bg-transparent hover:text-current dark:hover:bg-transparent"
       onClick={() => openPlayer(movie.id)}
     >
       <MovieCard movie={movie}>
-        {movie.tags.length > 0 ? (
+        {firstTag ? (
           <Badge variant="secondary" className="max-w-full min-w-0">
-            <span className="truncate">{movie.tags[0].name}</span>
+            <span className="truncate">{firstTag.name}</span>
             {movie.tags.length > 1 ? (
               <span className="shrink-0">+{movie.tags.length - 1}</span>
             ) : null}

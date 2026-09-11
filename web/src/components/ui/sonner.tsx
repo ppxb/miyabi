@@ -33,7 +33,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }
       toastOptions={{
         classNames: {
-          toast: 'cn-toast p-3!',
+          toast: 'rounded-2xl! p-3!',
           title: 'truncate',
           description: 'text-xs'
         }

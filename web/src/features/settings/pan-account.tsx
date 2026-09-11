@@ -36,8 +36,8 @@ export function PanStorageUsage({ space }: { space: PanAccount['space'] }) {
       <div className="relative">
         <Progress
           value={fill}
-
-          className="h-10 rounded-lg bg-muted/60 ring-1 ring-border/60 **:data-[slot=progress-indicator]:bg-sky-500"
+          variant="info"
+          className="h-10 rounded-2xl bg-muted/60 ring-1 ring-border/60"
         />
         <div
           className="@container pointer-events-none absolute inset-y-0 right-0 flex items-center justify-center overflow-hidden transition-[width]"
@@ -50,7 +50,7 @@ export function PanStorageUsage({ space }: { space: PanAccount['space'] }) {
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
-          <span className="size-2.5 rounded-full bg-sky-500" />
+          <span className="size-2.5 rounded-full bg-info" />
           已使用
         </span>
         <span className="inline-flex items-center gap-1.5">

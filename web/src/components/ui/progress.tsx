@@ -1,13 +1,22 @@
 import * as React from 'react'
-import { cn } from 'cn'
+import { cn } from '@/lib/utils'
 import { Progress as ProgressPrimitive } from 'radix-ui'
+
+const indicatorColors = {
+  default: 'bg-primary',
+  success: 'bg-success',
+  info: 'bg-info'
+}
 
 function Progress({
   className,
   value,
   max = 100,
+  variant = 'default',
   ...props
-}: React.ComponentProps<typeof ProgressPrimitive.Root>) {
+}: React.ComponentProps<typeof ProgressPrimitive.Root> & {
+  variant?: keyof typeof indicatorColors
+}) {
   const percent = value == null ? null : (value / max) * 100
 
   return (
@@ -24,7 +33,8 @@ function Progress({
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"
         className={cn(
-          'size-full flex-1 bg-primary transition-transform',
+          'size-full flex-1 transition-transform',
+          indicatorColors[variant],
           percent === null &&
             'w-1/3 flex-none animate-[progress-indeterminate_1.5s_ease-in-out_infinite]'
         )}

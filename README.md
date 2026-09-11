@@ -65,6 +65,8 @@ docker rm miyabi
 
 ## 本地开发
 
+前端使用 Node.js 24 或更新版本、pnpm 10.33.0，后端使用 Go 1.27。
+
 前后端分别启动。在项目根目录运行后端，也可以在 GoLand 中运行，工作目录设为项目根目录：
 
 ```bash
@@ -79,6 +81,8 @@ pnpm dev
 ```
 
 默认访问 `http://127.0.0.1:5173`，前端将 API 请求转发到 `127.0.0.1:8080`。后端数据保存在项目根目录的 `data` 中；修改 Go 代码后重新运行后端。
+
+在 `web` 目录运行 `pnpm build` 时，Vite 会自动生成路由并构建页面，随后执行 TypeScript 检查。`pnpm lint` 检查代码及 Hooks 用法，`pnpm test` 执行前端回归测试，`pnpm fmt:check` 检查代码格式。
 
 ## NSFW 警告
 

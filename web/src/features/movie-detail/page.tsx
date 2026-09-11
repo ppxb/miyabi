@@ -1,8 +1,7 @@
 import { useDiscoverMagnets, useDiscoverMovie } from '@/api/discover'
 import { AppPage } from '@/components/app-page'
-import { EmptyState } from '@/components/empty-state'
+import { ErrorState, InlineError } from '@/components/error-state'
 import { PageBackButton } from '@/components/page-back-button'
-import { Button } from '@/components/ui/button'
 import { MovieHero } from './hero'
 import { MovieMagnets } from './magnets'
 import { MoviePreviews } from './previews'
@@ -22,7 +21,9 @@ export function MovieDetailPage({ movieId }: { movieId: string }) {
       ) : detail.data ? (
         <div className="space-y-10">
           {detail.isRefetchError ? (
-            <p className="text-sm text-destructive">刷新失败，请重试。</p>
+            <InlineError onRetry={() => void detail.refetch()} retrying={detail.isFetching}>
+              刷新失败，请重试。
+            </InlineError>
           ) : null}
           <MovieHero movie={detail.data} />
           <MoviePreviews images={detail.data.preview_images} />
@@ -31,14 +32,10 @@ export function MovieDetailPage({ movieId }: { movieId: string }) {
           <MovieRecommendations title="你可能也喜欢" movies={detail.data.related_movies} />
         </div>
       ) : (
-        <EmptyState
-          emoji="Ò︵Ó"
-          title="影片详情加载失败"
-          actions={
-            <Button type="button" variant="outline" size="sm" onClick={() => detail.refetch()}>
-              重试
-            </Button>
-          }
+        <ErrorState
+          message="影片详情加载失败"
+          onRetry={() => void detail.refetch()}
+          retrying={detail.isFetching}
         />
       )}
     </AppPage>

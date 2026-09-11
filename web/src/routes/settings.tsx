@@ -5,6 +5,7 @@ import { AppPage } from '@/components/app-page'
 import { PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
 import { AppearanceSection } from '@/features/settings/appearance-section'
 import { JavDBSection } from '@/features/settings/javdb-section'
 import { PanSection } from '@/features/settings/pan-section'
@@ -24,15 +25,15 @@ function SettingsPage() {
       <Card>
         <CardContent className="space-y-8">
           <AppearanceSection />
-          <hr className="border-border" />
+          <Separator />
           <PrivacySection />
-          <hr className="border-border" />
+          <Separator />
           <JavDBSection />
-          <hr className="border-border" />
+          <Separator />
           <PanSection />
-          <hr className="border-border" />
+          <Separator />
           <TasksSection />
-          <hr className="border-border" />
+          <Separator />
           <SettingsSection icon={<DatabaseIcon className="size-4" />} title="数据与缓存">
             <SettingRow title="数据目录" description="管理 SQLite 索引和图片缓存位置">
               <Badge variant="secondary">即将接入</Badge>

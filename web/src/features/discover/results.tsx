@@ -1,8 +1,8 @@
 import type { DiscoverMovie } from '@/api/discover'
 import { EmptyState } from '@/components/empty-state'
+import { ErrorState } from '@/components/error-state'
 import { ListPagination } from '@/components/list-pagination'
 import { MovieGrid, MovieGridSkeleton } from '@/components/movie'
-import { Button } from '@/components/ui/button'
 import { DISCOVER_PAGE_SIZE } from './constants'
 
 export function DiscoverResults({
@@ -25,21 +25,11 @@ export function DiscoverResults({
   onRetry: () => void
 }) {
   if (error) {
-    return (
-      <EmptyState
-        emoji="Ò︵Ó"
-        title="数据加载失败"
-        actions={
-          <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-            重试
-          </Button>
-        }
-      />
-    )
+    return <ErrorState message="数据加载失败" onRetry={onRetry} retrying={fetching} />
   }
   if (loading || !movies) return <MovieGridSkeleton count={DISCOVER_PAGE_SIZE} />
   if (movies.length === 0 && page === 1) {
-    return <EmptyState emoji="(･o･;)" title={searching ? '没有搜索结果' : '暂无内容'} />
+    return <EmptyState title={searching ? '没有搜索结果' : '暂无内容'} />
   }
   return (
     <>

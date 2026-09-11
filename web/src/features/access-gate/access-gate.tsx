@@ -2,6 +2,7 @@ import { LoaderCircleIcon } from 'lucide-react'
 import { useState, type FormEvent, type PropsWithChildren } from 'react'
 
 import { useAccessGateConfig, useAccessGateLogin } from '@/api/auth'
+import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -41,20 +42,13 @@ export function AccessGate({ children }: PropsWithChildren) {
               正在检查访问配置
             </div>
           ) : config.isError ? (
-            <div className="space-y-4 text-center">
-              <p className="text-sm text-muted-foreground">
-                无法读取访问配置，请确认后端服务已启动。
-              </p>
-              <Button
-                variant="outline"
-                className="w-full cursor-pointer"
-                disabled={config.isFetching}
-                onClick={() => void config.refetch()}
-              >
-                {config.isFetching ? <LoaderCircleIcon className="size-4 animate-spin" /> : null}
-                重试
-              </Button>
-            </div>
+            <InlineError
+              className="flex-col text-center"
+              onRetry={() => void config.refetch()}
+              retrying={config.isFetching}
+            >
+              无法读取访问配置，请确认后端服务已启动。
+            </InlineError>
           ) : (
             <form className="space-y-4" onSubmit={handleSubmit}>
               <Input
@@ -66,14 +60,8 @@ export function AccessGate({ children }: PropsWithChildren) {
                 disabled={login.isPending}
                 onChange={event => setPassword(event.target.value)}
               />
-              {login.error ? (
-                <p className="text-sm text-destructive">{login.error.message}</p>
-              ) : null}
-              <Button
-                type="submit"
-                className="w-full cursor-pointer"
-                disabled={!password || login.isPending}
-              >
+              {login.error ? <InlineError>{login.error.message}</InlineError> : null}
+              <Button type="submit" className="w-full" disabled={!password || login.isPending}>
                 {login.isPending ? <LoaderCircleIcon className="size-4 animate-spin" /> : null}
                 进入
               </Button>

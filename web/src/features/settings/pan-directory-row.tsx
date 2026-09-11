@@ -1,6 +1,7 @@
 import { FolderMinusIcon, FolderOpenIcon, LoaderCircleIcon } from 'lucide-react'
 
 import { useClearPanDirectory, type PanDirectory } from '@/api/pan'
+import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -74,9 +75,7 @@ export function PanDirectoryRow({
           ) : null}
         </div>
       </SettingRow>
-      {clear.isError ? (
-        <p className="text-sm text-destructive">取消挂载未完成，请检查后端服务后重试。</p>
-      ) : null}
+      {clear.isError ? <InlineError>取消挂载未完成，请检查后端服务后重试。</InlineError> : null}
     </>
   )
 }

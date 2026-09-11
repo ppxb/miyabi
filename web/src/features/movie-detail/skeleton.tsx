@@ -27,7 +27,7 @@ export function MovieDetailSkeleton() {
         <Skeleton className="h-7 w-20" />
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
           {Array.from({ length: 8 }, (_, index) => (
-            <Skeleton key={index} className="aspect-video rounded-lg" />
+            <Skeleton key={index} className="aspect-video rounded-2xl" />
           ))}
         </div>
       </div>

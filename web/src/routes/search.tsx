@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { AppPage } from '@/components/app-page'
-import { EmptyState } from '@/components/empty-state'
+import { ErrorState } from '@/components/error-state'
 import { SearchPage } from '@/features/search/page'
 
 type SearchParams = { q?: string; page?: number }
@@ -19,7 +19,7 @@ export const Route = createFileRoute('/search')({
   component: SearchRoute,
   errorComponent: () => (
     <AppPage>
-      <EmptyState emoji="(･o･;)" title="搜索条件无效" />
+      <ErrorState message="搜索条件无效" />
     </AppPage>
   )
 })

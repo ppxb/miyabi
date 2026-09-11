@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
 import { AppPage } from '@/components/app-page'
-import { EmptyState } from '@/components/empty-state'
+import { ErrorState } from '@/components/error-state'
 import { PageBackButton } from '@/components/page-back-button'
 import { validateMetadataSearch } from '@/features/discover/metadata-search'
 import { MetadataSearchPage } from '@/features/discover/metadata-search-page'
@@ -17,7 +17,7 @@ export const Route = createFileRoute('/discover_/search')({
   errorComponent: () => (
     <AppPage>
       <PageBackButton />
-      <EmptyState emoji="(･o･;)" title="搜索条件无效" />
+      <ErrorState message="搜索条件无效" />
     </AppPage>
   )
 })

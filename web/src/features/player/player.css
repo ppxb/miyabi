@@ -46,9 +46,9 @@
   --media-menu-item-border-radius: var(--radius-xl);
   --media-menu-item-hover-bg: var(--accent);
   --media-menu-icon-rotate-deg: 0deg;
-  --media-menu-checkbox-bg: var(--input);
+  --media-menu-checkbox-bg: var(--muted-foreground);
   --media-menu-checkbox-bg-active: var(--primary);
-  --media-menu-checkbox-handle-bg: var(--foreground);
+  --media-menu-checkbox-handle-bg: var(--primary-foreground);
   --media-menu-checkbox-width: 32px;
   --media-controls-in-transition: opacity 180ms ease-out, visibility 0s;
   --media-controls-out-transition: opacity 360ms ease-out, visibility 0s linear 360ms;
@@ -89,10 +89,6 @@
 
 .miyabi-player .vds-menu-items[data-root] {
   backdrop-filter: blur(24px);
-}
-
-.miyabi-player .vds-menu-checkbox[aria-checked='true']::after {
-  background-color: var(--primary-foreground);
 }
 
 .miyabi-player .vds-kb-bezel {
