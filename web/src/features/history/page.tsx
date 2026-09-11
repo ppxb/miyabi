@@ -89,7 +89,7 @@ function HistoryContent({
 
   return (
     <AppPage>
-      <PageHeader title="观看历史" description="回顾最近观看的影片，继续上次的进度">
+      <PageHeader title="观看历史" description="回顾最近观看的影片">
         {selecting ? (
           <>
             <Button
@@ -160,7 +160,7 @@ function HistoryContent({
       ) : items.length === 0 ? (
         <EmptyState
           className="min-h-0 flex-1"
-          title={source ? '还没有观看记录，打开一部影片开始观看吧' : '挂载媒体目录后查看观看历史'}
+          title={source ? '还没有观看记录' : '挂载媒体目录后查看观看历史'}
           actions={
             !source ? (
               <Button asChild>

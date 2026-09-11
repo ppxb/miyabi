@@ -53,7 +53,7 @@ export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
   } else {
     toast.success('媒体库处理完成', {
       ...props,
-      description: `识别 ${task.scan.movies} 部影片${task.scan.metadata_total > 0 ? ` · 元数据 ${task.scan.metadata_completed} 部` : ''}`
+      description: `识别到 ${task.scan.movies} 部影片${task.scan.metadata_total > 0 ? ` · 元数据 ${task.scan.metadata_completed} 部` : ''}`
     })
   }
 }
