@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useMediaPlayer, useMediaState } from '@vidstack/react'
+import { useState, type ComponentProps, type ReactNode } from 'react'
+import { useMediaPlayer, useMediaState, useSliderState } from '@vidstack/react'
 import {
   useDefaultLayoutWord,
   type DefaultLayoutIconProps,
@@ -9,12 +9,67 @@ import type { LucideIcon } from 'lucide-react'
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
+export function PlayerTooltipContent(props: ComponentProps<typeof TooltipContent>) {
+  const player = useMediaPlayer()
+
+  return (
+    <TooltipContent
+      container={player?.el}
+      collisionBoundary={player?.el}
+      collisionPadding={8}
+      side="top"
+      align="center"
+      {...props}
+    />
+  )
+}
+
+export function PlayerSliderTooltip({
+  children,
+  orientation = 'horizontal'
+}: {
+  children: ReactNode
+  orientation?: 'horizontal' | 'vertical'
+}) {
+  const active = useSliderState('active')
+  const controlsVisible = useMediaState('controlsVisible')
+  const vertical = orientation === 'vertical'
+
+  return (
+    <Tooltip open={active && controlsVisible} disableHoverableContent>
+      <TooltipTrigger asChild>
+        <span
+          className="pointer-events-none absolute size-(--media-slider-thumb-size)"
+          style={
+            vertical
+              ? {
+                  left: '50%',
+                  bottom: 'var(--slider-pointer)',
+                  transform: 'translate(-50%, 50%)'
+                }
+              : {
+                  left: 'var(--slider-pointer)',
+                  top: '50%',
+                  transform: 'translate(-50%, -50%)'
+                }
+          }
+        />
+      </TooltipTrigger>
+      <PlayerTooltipContent
+        side={vertical ? 'right' : 'top'}
+        updatePositionStrategy="always"
+        className="pointer-events-none"
+      >
+        {children}
+      </PlayerTooltipContent>
+    </Tooltip>
+  )
+}
+
 // Icon slots let the shared Tooltip cover the whole button without replacing Vidstack's controls.
 export function withPlayerTooltip(Icon: LucideIcon, word: DefaultLayoutWord) {
   return function PlayerControlIcon(props: DefaultLayoutIconProps) {
-    const player = useMediaPlayer()
     const controlsVisible = useMediaState('controlsVisible')
-    const fullscreen = useMediaState('fullscreen')
     const label = useDefaultLayoutWord(word)
     const [open, setOpen] = useState(false)
 
@@ -25,9 +80,7 @@ export function withPlayerTooltip(Icon: LucideIcon, word: DefaultLayoutWord) {
             <Icon {...props} />
           </span>
         </TooltipTrigger>
-        <TooltipContent container={fullscreen ? player?.el : undefined} side="top" align="center">
-          {label}
-        </TooltipContent>
+        <PlayerTooltipContent>{label}</PlayerTooltipContent>
       </Tooltip>
     )
   }

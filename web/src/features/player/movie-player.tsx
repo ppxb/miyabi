@@ -29,6 +29,8 @@ import {
   PlayerTitle
 } from './player-status'
 import { playerTranslations } from './translations'
+import { PlayerTimeSlider, PlayerVolumeSlider } from './sliders'
+import { useHoldSpeed } from './use-hold-speed'
 import { useWatchProgress } from './use-watch-progress'
 
 import '@vidstack/react/player/styles/default/theme.css'
@@ -78,6 +80,7 @@ function PlaybackPlayer({
   const playback = usePlayback(fileID)
   const [selectedSrc, setSelectedSrc] = useState<string>()
   const [player, setPlayer] = useState<MediaPlayerInstance | null>(null)
+  const holdSpeed = useHoldSpeed(player)
   const [failed, setFailed] = useState(false)
   const [autoPlay, setAutoPlay] = useState(true)
   const initialPosition = watchResumePosition(history, fileID)
@@ -148,6 +151,11 @@ function PlaybackPlayer({
     >
       <PlayerControlsVisibility />
       <MediaProvider />
+      {holdSpeed ? (
+        <div className="pointer-events-none absolute top-3 left-1/2 z-30 -translate-x-1/2 rounded-full bg-background/75 px-3 py-1.5 text-sm font-medium text-white backdrop-blur-xl sm:top-4">
+          3 倍速
+        </div>
+      ) : null}
       {loading || playback.isError || failed ? (
         <div className="absolute inset-0 z-20 cursor-auto">
           {loading ? (
@@ -167,10 +175,13 @@ function PlaybackPlayer({
             icons={playerIcons}
             translations={playerTranslations}
             colorScheme="dark"
+            seekStep={5}
             noModal
             slots={{
               bufferingIndicator: null,
               googleCastButton: null,
+              timeSlider: <PlayerTimeSlider />,
+              volumeSlider: <PlayerVolumeSlider />,
               topControlsGroupStart: <PlayerTitle title={title} />,
               topControlsGroupEnd: <PlayerCloseButton />,
               chapterTitle: <div className="vds-controls-spacer" />,
