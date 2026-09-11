@@ -64,7 +64,7 @@ export function MovieHero({ movie }: { movie: DiscoverMovieDetail }) {
           ) : null}
           {movie.tags.length > 0 ? (
             <div className="flex items-start gap-4">
-              <dt className="w-10 shrink-0 pt-0.5 text-xs leading-5 text-muted-foreground">标签</dt>
+              <dt className="w-10 shrink-0 pt-0.5 leading-5 text-muted-foreground">标签</dt>
               <dd className="flex min-w-0 flex-wrap gap-2">
                 {movie.tags.map(tag =>
                   movie.zone === 'unknown' ? (

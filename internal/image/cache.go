@@ -11,9 +11,13 @@ import (
 	"strings"
 
 	"github.com/disintegration/imaging"
+	"golang.org/x/sync/singleflight"
 )
 
 const URLPrefix = "/api/library/artwork/"
+
+// Cache instances sharing a destination also share its in-flight write.
+var imageWrites singleflight.Group
 
 type Cache struct{ directory string }
 
@@ -75,29 +79,60 @@ func (cache *Cache) save(source stdimage.Image) (string, error) {
 	}
 	sum := sha256.Sum256(buffer.Bytes())
 	key := hex.EncodeToString(sum[:])
-	destination := filepath.Join(cache.directory, key+".jpg")
-	if _, err := os.Stat(destination); err == nil {
-		return URLPrefix + key, nil
-	} else if !os.IsNotExist(err) {
-		return "", err
-	}
-	temporary, err := os.CreateTemp(cache.directory, "image-*.tmp")
+	destination, err := filepath.Abs(filepath.Join(cache.directory, key+".jpg"))
 	if err != nil {
 		return "", err
 	}
-	defer os.Remove(temporary.Name())
-	_, writeErr := temporary.Write(buffer.Bytes())
-	closeErr := temporary.Close()
-	if writeErr != nil {
-		return "", writeErr
-	}
-	if closeErr != nil {
-		return "", closeErr
-	}
-	if err := os.Rename(temporary.Name(), destination); err != nil {
-		return "", fmt.Errorf("store image cache: %w", err)
+	_, err, _ = imageWrites.Do(destination, func() (any, error) {
+		return nil, cache.write(destination, buffer.Bytes())
+	})
+	if err != nil {
+		return "", err
 	}
 	return URLPrefix + key, nil
+}
+
+func (cache *Cache) write(destination string, body []byte) error {
+	if info, err := os.Stat(destination); err == nil {
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("cached image is not a regular file")
+		}
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	temporary, err := os.CreateTemp(cache.directory, "image-*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(temporary.Name())
+	_, writeErr := temporary.Write(body)
+	closeErr := temporary.Close()
+	if writeErr != nil {
+		return writeErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	if err := publishImage(temporary.Name(), destination, body); err != nil {
+		return fmt.Errorf("store image cache: %w", err)
+	}
+	return nil
+}
+
+func publishImage(temporary, destination string, body []byte) error {
+	err := os.Rename(temporary, destination)
+	if err == nil {
+		return nil
+	}
+	// Concurrent writers can fail to replace the same file on Windows. Accept
+	// another writer's result only when it contains the complete expected image.
+	if info, statErr := os.Stat(destination); statErr == nil && info.Mode().IsRegular() && info.Size() == int64(len(body)) {
+		if saved, readErr := os.ReadFile(destination); readErr == nil && bytes.Equal(saved, body) {
+			return nil
+		}
+	}
+	return err
 }
 
 func (cache *Cache) Read(key string) ([]byte, error) {
