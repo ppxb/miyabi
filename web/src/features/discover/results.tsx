@@ -1,5 +1,3 @@
-import { LoaderCircleIcon } from 'lucide-react'
-
 import type { DiscoverMovie } from '@/api/discover'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
@@ -31,16 +29,7 @@ export function DiscoverResults({
   }
   if (loading || !movies) return <MovieGridSkeleton count={DISCOVER_PAGE_SIZE} />
   return (
-    <div className="relative flex flex-col gap-6" aria-busy={fetching}>
-      {fetching ? (
-        <div
-          role="status"
-          className="pointer-events-none absolute -top-5 right-0 flex items-center gap-1.5 text-xs text-muted-foreground"
-        >
-          <LoaderCircleIcon className="size-3 animate-spin" aria-hidden="true" />
-          正在更新结果…
-        </div>
-      ) : null}
+    <div className="flex flex-col gap-6" aria-busy={fetching}>
       {movies.length === 0 && page === 1 ? (
         <EmptyState title={searching ? '没有搜索结果' : '暂无内容'} />
       ) : (
