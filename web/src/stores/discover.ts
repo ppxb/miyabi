@@ -4,10 +4,11 @@ import type { JavDBZone } from '@/api/discover'
 
 export type DiscoverView = 'released' | 'upcoming' | 'category'
 
-type CategoryFilters = {
+export type CategoryFilters = {
   zone: JavDBZone
   categoryID: string
   tagID: string
+  main: string
 }
 
 type DiscoverState = {
@@ -23,7 +24,7 @@ type DiscoverState = {
 export const useDiscoverStore = create<DiscoverState>(set => ({
   view: 'released',
   pages: { released: 1, upcoming: 1, category: 1 },
-  category: { zone: 'censored', categoryID: '', tagID: '' },
+  category: { zone: 'censored', categoryID: '', tagID: '', main: '' },
   setView: view => set({ view }),
   setPage: (view, page) => set(state => ({ pages: { ...state.pages, [view]: page } })),
   updateCategory: filters =>

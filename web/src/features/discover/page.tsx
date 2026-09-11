@@ -19,11 +19,11 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { type DiscoverView, useDiscoverStore } from '@/stores/discover'
+import { categoryBrowseParams } from './category-params'
 import { DISCOVER_PAGE_SIZE as PAGE_SIZE, DISCOVER_ZONES as zones } from './constants'
 import { DiscoverResults } from './results'
 
 const MAIN_CATEGORY = 'main'
-const YEAR_CATEGORY = 'year'
 // Month requires a year; duration has no slot in the upstream filter mask.
 const UNSUPPORTED_CATEGORIES = new Set(['month', 'duration'])
 
@@ -74,9 +74,12 @@ function CategoryContent({
 }) {
   const category = useDiscoverStore(state => state.category)
   const updateCategory = useDiscoverStore(state => state.updateCategory)
-  const { zone, categoryID, tagID } = category
+  const { zone, categoryID, tagID, main } = category
   const taxonomy = useDiscoverTags(zone)
-  const categories = (taxonomy.data ?? []).filter(item => !UNSUPPORTED_CATEGORIES.has(item.id))
+  const mainOptions = taxonomy.data?.find(item => item.id === MAIN_CATEGORY)?.tags ?? []
+  const categories = (taxonomy.data ?? []).filter(
+    item => item.id !== MAIN_CATEGORY && !UNSUPPORTED_CATEGORIES.has(item.id)
+  )
   const selectedCategory = categories.find(item => item.id === categoryID) ?? categories[0]
 
   return (
@@ -88,7 +91,9 @@ function CategoryContent({
         categories={categories}
         categoryID={selectedCategory?.id ?? ''}
         tagID={tagID}
-        onZoneChange={value => updateCategory({ zone: value, categoryID: '', tagID: '' })}
+        mainOptions={mainOptions}
+        main={main}
+        onZoneChange={value => updateCategory({ zone: value, categoryID: '', tagID: '', main: '' })}
         onCategoryChange={value => updateCategory({ categoryID: value, tagID: '' })}
         onTagChange={value =>
           updateCategory({
@@ -96,16 +101,16 @@ function CategoryContent({
             tagID: value === 'all' ? '' : value
           })
         }
+        onMainChange={value => updateCategory({ main: value === 'all' ? '' : value })}
         onRetry={() => taxonomy.refetch()}
       />
       <BrowseResults
         params={{
-          zone,
           page,
           limit: PAGE_SIZE,
           sort: 'release',
           order: 'desc',
-          ...tagFilter(categoryID || selectedCategory?.id, tagID)
+          ...categoryBrowseParams({ ...category, categoryID: selectedCategory?.id ?? '' })
         }}
         onPageChange={onPageChange}
       />
@@ -135,18 +140,6 @@ function BrowseResults({
   )
 }
 
-function tagFilter(categoryID: string | undefined, tagID: string): BrowseMoviesParams {
-  if (!tagID) return {}
-  switch (categoryID) {
-    case MAIN_CATEGORY:
-      return { main: [tagID] }
-    case YEAR_CATEGORY:
-      return { year: tagID }
-    default:
-      return { tagIds: [tagID] }
-  }
-}
-
 function CategoryFilters({
   zone,
   loading,
@@ -154,9 +147,12 @@ function CategoryFilters({
   categories,
   categoryID,
   tagID,
+  mainOptions,
+  main,
   onZoneChange,
   onCategoryChange,
   onTagChange,
+  onMainChange,
   onRetry
 }: {
   zone: JavDBZone
@@ -165,14 +161,17 @@ function CategoryFilters({
   categories: TagCategory[]
   categoryID: string
   tagID: string
+  mainOptions: TagCategory['tags']
+  main: string
   onZoneChange: (value: JavDBZone) => void
   onCategoryChange: (value: string) => void
   onTagChange: (value: string) => void
+  onMainChange: (value: string) => void
   onRetry: () => void
 }) {
   const selectedCategory = categories.find(category => category.id === categoryID)
   return (
-    <div className="flex flex-col gap-2 sm:flex-row">
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
       <Select value={zone} onValueChange={value => onZoneChange(value as JavDBZone)}>
         <SelectTrigger className="w-full sm:w-32">
           <SelectValue />
@@ -192,6 +191,7 @@ function CategoryFilters({
         <>
           <Skeleton className="h-9 w-full rounded-full sm:w-48" />
           <Skeleton className="h-9 w-full rounded-full sm:w-56" />
+          <Skeleton className="h-9 w-full rounded-full sm:w-48" />
         </>
       ) : error ? (
         <InlineError onRetry={onRetry} retryLabel="重试分类">
@@ -228,6 +228,23 @@ function CategoryFilters({
               </SelectGroup>
             </SelectContent>
           </Select>
+          {mainOptions.length > 0 ? (
+            <Select value={main || 'all'} onValueChange={onMainChange}>
+              <SelectTrigger className="w-full sm:w-48" aria-label="通用筛选">
+                <SelectValue placeholder="全部条件" />
+              </SelectTrigger>
+              <SelectContent position="popper" align="start">
+                <SelectGroup>
+                  <SelectItem value="all">全部条件</SelectItem>
+                  {mainOptions.map(option => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          ) : null}
         </>
       )}
     </div>
