@@ -22,6 +22,10 @@ func (service *ScrapeService) Cover(ctx context.Context, job TaskJob) error {
 	if input.Snapshot != nil {
 		return nil
 	}
+	if err := service.artwork.Lock(ctx); err != nil {
+		return err
+	}
+	defer service.artwork.Unlock()
 	input.Code = codeid.Normalize(input.Code)
 	input.Document.Code = codeid.Normalize(input.Document.Code)
 	version, err := service.begin(ctx, input.metadataPayload)

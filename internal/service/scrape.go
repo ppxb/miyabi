@@ -56,6 +56,7 @@ type ScrapeService struct {
 	library  *LibraryService
 	discover *DiscoverService
 	images   *mediaimage.Cache
+	artwork  contextLock // Keep cache cleanup outside the generation-to-commit window.
 }
 
 func NewScrapeService(library *LibraryService, discover *DiscoverService, images *mediaimage.Cache) *ScrapeService {

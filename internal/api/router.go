@@ -26,6 +26,7 @@ type Dependencies struct {
 	Play     PlayManager
 	Tasks    TaskManager
 	Artwork  ArtworkReader
+	Data     DataManager
 	Frontend fs.FS
 }
 
@@ -46,6 +47,12 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	})
 	authAPI.GET("/config", accessConfigHandler(deps.Access))
 	authAPI.POST("/login", accessLoginHandler(deps.Access))
+	settingsAPI := api.Group("/settings", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		c.Next()
+	})
+	settingsAPI.GET("/system", dataInfoHandler(deps.Data))
+	settingsAPI.DELETE("/cache", dataClearCacheHandler(deps.Data))
 	api.GET("/library/movies", libraryMoviesHandler(deps.Library))
 	api.PUT("/library/movies/:id/watched", libraryWatchedHandler(deps.Library))
 	api.GET("/library/history", libraryHistoryHandler(deps.Library))

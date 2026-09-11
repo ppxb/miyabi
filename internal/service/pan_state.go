@@ -32,6 +32,16 @@ func (lock *contextLock) Lock(ctx context.Context) error {
 
 func (lock *contextLock) Unlock() { <-lock.gate }
 
+func (lock *contextLock) TryLock() bool {
+	lock.once.Do(func() { lock.gate = make(chan struct{}, 1) })
+	select {
+	case lock.gate <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
 type panSnapshot struct {
 	tokens               pan.Tokens
 	directory            panLibraryDirectory

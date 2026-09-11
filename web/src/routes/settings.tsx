@@ -1,16 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { DatabaseIcon } from 'lucide-react'
 
 import { AppPage } from '@/components/app-page'
 import { PageHeader } from '@/components/page-header'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { AppearanceSection } from '@/features/settings/appearance-section'
+import { DataSection } from '@/features/settings/data-section'
 import { JavDBSection } from '@/features/settings/javdb-section'
 import { PanSection } from '@/features/settings/pan-section'
 import { PrivacySection } from '@/features/settings/privacy-section'
-import { SettingRow, SettingsSection } from '@/features/settings/shared'
 import { TasksSection } from '@/features/settings/tasks-section'
 
 export const Route = createFileRoute('/settings')({
@@ -34,11 +32,7 @@ function SettingsPage() {
           <Separator />
           <TasksSection />
           <Separator />
-          <SettingsSection icon={<DatabaseIcon className="size-4" />} title="数据与缓存">
-            <SettingRow title="数据目录" description="管理 SQLite 索引和图片缓存位置">
-              <Badge variant="secondary">即将接入</Badge>
-            </SettingRow>
-          </SettingsSection>
+          <DataSection />
         </CardContent>
       </Card>
     </AppPage>

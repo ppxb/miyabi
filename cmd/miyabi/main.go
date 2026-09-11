@@ -79,6 +79,10 @@ func run(args []string) error {
 	play := service.NewPlayService(library)
 	defer play.Close()
 	scrape := service.NewScrapeService(library, discover, images)
+	data, err := service.NewDataService(cfg.DataDir, scrape)
+	if err != nil {
+		return fmt.Errorf("initialize data service: %w", err)
+	}
 	// Keep scans, metadata writes and directory sidecars ordered.
 	pool := worker.NewPool(tasks, map[string]worker.Handler{
 		"scan": library.Scan, "scrape": scrape.Scrape, "cover": scrape.Cover,
@@ -97,6 +101,7 @@ func run(args []string) error {
 		Play:     play,
 		Tasks:    tasks,
 		Artwork:  scrape,
+		Data:     data,
 		Frontend: miyabi.Frontend(),
 	})
 	server := &http.Server{
