@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react'
-import { TimeSlider, VolumeSlider, type TimeSliderInstance } from '@vidstack/react'
+import {
+  isPointerEvent,
+  TimeSlider,
+  useMediaPlayer,
+  VolumeSlider,
+  type TimeSliderInstance
+} from '@vidstack/react'
 import { useDefaultLayoutContext } from '@vidstack/react/player/layouts/default'
 
 import { PlayerSliderTooltip } from './tooltip'
@@ -11,6 +17,7 @@ export function PlayerTimeSlider() {
     seekStep,
     sliderChaptersMinWidth = 325
   } = useDefaultLayoutContext()
+  const player = useMediaPlayer()
   const [slider, setSlider] = useState<TimeSliderInstance | null>(null)
   const [width, setWidth] = useState(0)
 
@@ -29,6 +36,10 @@ export function PlayerTimeSlider() {
       disabled={disableTimeSlider}
       noSwipeGesture={noScrubGesture}
       keyStep={seekStep}
+      onDragEnd={(_, event) => {
+        // Vidstack also emits this after clicks and drags released outside the slider.
+        if (isPointerEvent(event.trigger)) player?.el?.focus({ preventScroll: true })
+      }}
     >
       <TimeSlider.Chapters
         className="vds-slider-chapters"
