@@ -21,6 +21,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/setting"
 	"github.com/ppxb/miyabi/internal/ent/tag"
 	"github.com/ppxb/miyabi/internal/ent/task"
+	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
 
 // Client is the client that holds all ent builders.
@@ -40,6 +41,8 @@ type Client struct {
 	Tag *TagClient
 	// Task is the client for interacting with the Task builders.
 	Task *TaskClient
+	// WatchHistory is the client for interacting with the WatchHistory builders.
+	WatchHistory *WatchHistoryClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -57,6 +60,7 @@ func (c *Client) init() {
 	c.Setting = NewSettingClient(c.config)
 	c.Tag = NewTagClient(c.config)
 	c.Task = NewTaskClient(c.config)
+	c.WatchHistory = NewWatchHistoryClient(c.config)
 }
 
 type (
@@ -147,14 +151,15 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:     ctx,
-		config:  cfg,
-		Actor:   NewActorClient(cfg),
-		File:    NewFileClient(cfg),
-		Movie:   NewMovieClient(cfg),
-		Setting: NewSettingClient(cfg),
-		Tag:     NewTagClient(cfg),
-		Task:    NewTaskClient(cfg),
+		ctx:          ctx,
+		config:       cfg,
+		Actor:        NewActorClient(cfg),
+		File:         NewFileClient(cfg),
+		Movie:        NewMovieClient(cfg),
+		Setting:      NewSettingClient(cfg),
+		Tag:          NewTagClient(cfg),
+		Task:         NewTaskClient(cfg),
+		WatchHistory: NewWatchHistoryClient(cfg),
 	}, nil
 }
 
@@ -172,14 +177,15 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:     ctx,
-		config:  cfg,
-		Actor:   NewActorClient(cfg),
-		File:    NewFileClient(cfg),
-		Movie:   NewMovieClient(cfg),
-		Setting: NewSettingClient(cfg),
-		Tag:     NewTagClient(cfg),
-		Task:    NewTaskClient(cfg),
+		ctx:          ctx,
+		config:       cfg,
+		Actor:        NewActorClient(cfg),
+		File:         NewFileClient(cfg),
+		Movie:        NewMovieClient(cfg),
+		Setting:      NewSettingClient(cfg),
+		Tag:          NewTagClient(cfg),
+		Task:         NewTaskClient(cfg),
+		WatchHistory: NewWatchHistoryClient(cfg),
 	}, nil
 }
 
@@ -209,7 +215,7 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.Actor, c.File, c.Movie, c.Setting, c.Tag, c.Task,
+		c.Actor, c.File, c.Movie, c.Setting, c.Tag, c.Task, c.WatchHistory,
 	} {
 		n.Use(hooks...)
 	}
@@ -219,7 +225,7 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.Actor, c.File, c.Movie, c.Setting, c.Tag, c.Task,
+		c.Actor, c.File, c.Movie, c.Setting, c.Tag, c.Task, c.WatchHistory,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -240,6 +246,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Tag.mutate(ctx, m)
 	case *TaskMutation:
 		return c.Task.mutate(ctx, m)
+	case *WatchHistoryMutation:
+		return c.WatchHistory.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -699,6 +707,22 @@ func (c *MovieClient) QueryFiles(_m *Movie) *FileQuery {
 	return query
 }
 
+// QueryWatchHistory queries the watch_history edge of a Movie.
+func (c *MovieClient) QueryWatchHistory(_m *Movie) *WatchHistoryQuery {
+	query := (&WatchHistoryClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(movie.Table, movie.FieldID, id),
+			sqlgraph.To(watchhistory.Table, watchhistory.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, movie.WatchHistoryTable, movie.WatchHistoryColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *MovieClient) Hooks() []Hook {
 	return c.hooks.Movie
@@ -1139,12 +1163,161 @@ func (c *TaskClient) mutate(ctx context.Context, m *TaskMutation) (Value, error)
 	}
 }
 
+// WatchHistoryClient is a client for the WatchHistory schema.
+type WatchHistoryClient struct {
+	config
+}
+
+// NewWatchHistoryClient returns a client for the WatchHistory from the given config.
+func NewWatchHistoryClient(c config) *WatchHistoryClient {
+	return &WatchHistoryClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `watchhistory.Hooks(f(g(h())))`.
+func (c *WatchHistoryClient) Use(hooks ...Hook) {
+	c.hooks.WatchHistory = append(c.hooks.WatchHistory, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `watchhistory.Intercept(f(g(h())))`.
+func (c *WatchHistoryClient) Intercept(interceptors ...Interceptor) {
+	c.inters.WatchHistory = append(c.inters.WatchHistory, interceptors...)
+}
+
+// Create returns a builder for creating a WatchHistory entity.
+func (c *WatchHistoryClient) Create() *WatchHistoryCreate {
+	mutation := newWatchHistoryMutation(c.config, OpCreate)
+	return &WatchHistoryCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of WatchHistory entities.
+func (c *WatchHistoryClient) CreateBulk(builders ...*WatchHistoryCreate) *WatchHistoryCreateBulk {
+	return &WatchHistoryCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *WatchHistoryClient) MapCreateBulk(slice any, setFunc func(*WatchHistoryCreate, int)) *WatchHistoryCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &WatchHistoryCreateBulk{err: fmt.Errorf("calling to WatchHistoryClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*WatchHistoryCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &WatchHistoryCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for WatchHistory.
+func (c *WatchHistoryClient) Update() *WatchHistoryUpdate {
+	mutation := newWatchHistoryMutation(c.config, OpUpdate)
+	return &WatchHistoryUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *WatchHistoryClient) UpdateOne(_m *WatchHistory) *WatchHistoryUpdateOne {
+	mutation := newWatchHistoryMutation(c.config, OpUpdateOne, withWatchHistory(_m))
+	return &WatchHistoryUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *WatchHistoryClient) UpdateOneID(id int) *WatchHistoryUpdateOne {
+	mutation := newWatchHistoryMutation(c.config, OpUpdateOne, withWatchHistoryID(id))
+	return &WatchHistoryUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for WatchHistory.
+func (c *WatchHistoryClient) Delete() *WatchHistoryDelete {
+	mutation := newWatchHistoryMutation(c.config, OpDelete)
+	return &WatchHistoryDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *WatchHistoryClient) DeleteOne(_m *WatchHistory) *WatchHistoryDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *WatchHistoryClient) DeleteOneID(id int) *WatchHistoryDeleteOne {
+	builder := c.Delete().Where(watchhistory.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &WatchHistoryDeleteOne{builder}
+}
+
+// Query returns a query builder for WatchHistory.
+func (c *WatchHistoryClient) Query() *WatchHistoryQuery {
+	return &WatchHistoryQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeWatchHistory},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a WatchHistory entity by its id.
+func (c *WatchHistoryClient) Get(ctx context.Context, id int) (*WatchHistory, error) {
+	return c.Query().Where(watchhistory.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *WatchHistoryClient) GetX(ctx context.Context, id int) *WatchHistory {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryMovie queries the movie edge of a WatchHistory.
+func (c *WatchHistoryClient) QueryMovie(_m *WatchHistory) *MovieQuery {
+	query := (&MovieClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(watchhistory.Table, watchhistory.FieldID, id),
+			sqlgraph.To(movie.Table, movie.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, watchhistory.MovieTable, watchhistory.MovieColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *WatchHistoryClient) Hooks() []Hook {
+	return c.hooks.WatchHistory
+}
+
+// Interceptors returns the client interceptors.
+func (c *WatchHistoryClient) Interceptors() []Interceptor {
+	return c.inters.WatchHistory
+}
+
+func (c *WatchHistoryClient) mutate(ctx context.Context, m *WatchHistoryMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&WatchHistoryCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&WatchHistoryUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&WatchHistoryUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&WatchHistoryDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown WatchHistory mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Actor, File, Movie, Setting, Tag, Task []ent.Hook
+		Actor, File, Movie, Setting, Tag, Task, WatchHistory []ent.Hook
 	}
 	inters struct {
-		Actor, File, Movie, Setting, Tag, Task []ent.Interceptor
+		Actor, File, Movie, Setting, Tag, Task, WatchHistory []ent.Interceptor
 	}
 )

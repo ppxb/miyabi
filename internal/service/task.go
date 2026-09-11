@@ -38,6 +38,7 @@ type TaskJob struct {
 type TaskRevisions struct {
 	Library uint64 `json:"library"`
 	Offline uint64 `json:"offline"`
+	History uint64 `json:"history"`
 }
 
 type TaskService struct {
@@ -368,15 +369,19 @@ func (service *TaskService) Subscribe() (<-chan struct{}, func()) {
 }
 
 func (service *TaskService) Notify() {
-	service.notify(false, false)
+	service.notify(false, false, false)
 }
 
 func (service *TaskService) NotifyLibraryChanged() {
-	service.notify(true, false)
+	service.notify(true, false, true)
 }
 
 func (service *TaskService) NotifyOfflineChanged() {
-	service.notify(false, true)
+	service.notify(false, true, false)
+}
+
+func (service *TaskService) NotifyWatchHistoryChanged() {
+	service.notify(false, false, true)
 }
 
 func (service *TaskService) Revisions() TaskRevisions {
@@ -385,10 +390,12 @@ func (service *TaskService) Revisions() TaskRevisions {
 	return service.revisions
 }
 
-func (service *TaskService) notify(library, offline bool) {
-	select {
-	case service.wake <- struct{}{}:
-	default:
+func (service *TaskService) notify(library, offline, history bool) {
+	if !history || library || offline {
+		select {
+		case service.wake <- struct{}{}:
+		default:
+		}
 	}
 	service.mu.Lock()
 	defer service.mu.Unlock()
@@ -397,6 +404,9 @@ func (service *TaskService) notify(library, offline bool) {
 	}
 	if offline {
 		service.revisions.Offline++
+	}
+	if history {
+		service.revisions.History++
 	}
 	for subscriber := range service.subscribers {
 		select {

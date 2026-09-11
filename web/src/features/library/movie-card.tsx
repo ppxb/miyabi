@@ -34,10 +34,7 @@ export function LibraryMovieCard({ movie }: { movie: LibraryMovie }) {
         {movie.watched ? (
           <Badge variant="outline">已观看</Badge>
         ) : (
-          <Badge
-            variant="secondary"
-            className="bg-violet-500/10 text-violet-500 dark:bg-violet-500/20"
-          >
+          <Badge variant="secondary" className="bg-violet-500 text-white">
             未观看
           </Badge>
         )}

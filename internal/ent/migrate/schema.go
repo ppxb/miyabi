@@ -156,6 +156,50 @@ var (
 			},
 		},
 	}
+	// WatchHistoriesColumns holds the columns for the "watch_histories" table.
+	WatchHistoriesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "account_id", Type: field.TypeString},
+		{Name: "root_id", Type: field.TypeString},
+		{Name: "watched_at", Type: field.TypeTime},
+		{Name: "session_id", Type: field.TypeString},
+		{Name: "file_id", Type: field.TypeString, Default: ""},
+		{Name: "position", Type: field.TypeFloat64, Default: 0},
+		{Name: "duration", Type: field.TypeFloat64, Default: 0},
+		{Name: "progress_version", Type: field.TypeInt, Default: 0},
+		{Name: "movie_id", Type: field.TypeInt},
+	}
+	// WatchHistoriesTable holds the schema information for the "watch_histories" table.
+	WatchHistoriesTable = &schema.Table{
+		Name:       "watch_histories",
+		Columns:    WatchHistoriesColumns,
+		PrimaryKey: []*schema.Column{WatchHistoriesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "watch_histories_movies_watch_history",
+				Columns:    []*schema.Column{WatchHistoriesColumns[9]},
+				RefColumns: []*schema.Column{MoviesColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "watchhistory_account_id_root_id_movie_id",
+				Unique:  true,
+				Columns: []*schema.Column{WatchHistoriesColumns[1], WatchHistoriesColumns[2], WatchHistoriesColumns[9]},
+			},
+			{
+				Name:    "watchhistory_account_id_root_id_watched_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{WatchHistoriesColumns[1], WatchHistoriesColumns[2], WatchHistoriesColumns[3], WatchHistoriesColumns[0]},
+			},
+			{
+				Name:    "watchhistory_movie_id",
+				Unique:  false,
+				Columns: []*schema.Column{WatchHistoriesColumns[9]},
+			},
+		},
+	}
 	// MovieActorsColumns holds the columns for the "movie_actors" table.
 	MovieActorsColumns = []*schema.Column{
 		{Name: "movie_id", Type: field.TypeInt},
@@ -214,6 +258,7 @@ var (
 		SettingsTable,
 		TagsTable,
 		TasksTable,
+		WatchHistoriesTable,
 		MovieActorsTable,
 		MovieTagsTable,
 	}
@@ -221,6 +266,7 @@ var (
 
 func init() {
 	FilesTable.ForeignKeys[0].RefTable = MoviesTable
+	WatchHistoriesTable.ForeignKeys[0].RefTable = MoviesTable
 	MovieActorsTable.ForeignKeys[0].RefTable = MoviesTable
 	MovieActorsTable.ForeignKeys[1].RefTable = ActorsTable
 	MovieTagsTable.ForeignKeys[0].RefTable = MoviesTable

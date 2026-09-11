@@ -15,6 +15,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/tag"
+	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
 
 // MovieCreate is the builder for creating a Movie entity.
@@ -320,6 +321,21 @@ func (_c *MovieCreate) AddFiles(v ...*File) *MovieCreate {
 	return _c.AddFileIDs(ids...)
 }
 
+// AddWatchHistoryIDs adds the "watch_history" edge to the WatchHistory entity by IDs.
+func (_c *MovieCreate) AddWatchHistoryIDs(ids ...int) *MovieCreate {
+	_c.mutation.AddWatchHistoryIDs(ids...)
+	return _c
+}
+
+// AddWatchHistory adds the "watch_history" edges to the WatchHistory entity.
+func (_c *MovieCreate) AddWatchHistory(v ...*WatchHistory) *MovieCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddWatchHistoryIDs(ids...)
+}
+
 // Mutation returns the MovieMutation object of the builder.
 func (_c *MovieCreate) Mutation() *MovieMutation {
 	return _c.mutation
@@ -558,6 +574,22 @@ func (_c *MovieCreate) createSpec() (*Movie, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(file.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.WatchHistoryIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   movie.WatchHistoryTable,
+			Columns: []string{movie.WatchHistoryColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(watchhistory.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

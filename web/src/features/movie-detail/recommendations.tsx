@@ -1,11 +1,12 @@
 import { Link } from '@tanstack/react-router'
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { type MovieReference, useRecommendationMovie } from '@/api/discover'
-import { MovieCard, MovieGridLayout } from '@/components/movie'
+import { MovieCard, MovieCardSkeleton, MovieGridLayout } from '@/components/movie'
 import { MovieResourceBadges, MovieStateBadge } from '@/components/movie/movie-badges'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
+import { useSettingsStore } from '@/stores/settings'
 import { observeRecommendation } from './recommendation-visibility'
 
 export function MovieRecommendations({
@@ -35,10 +36,16 @@ export function MovieRecommendations({
 
 function RecommendationCard({ movie }: { movie: MovieReference }) {
   const cardRef = useRef<HTMLDivElement>(null)
+  const [readyCover, setReadyCover] = useState<string>()
+  const nsfwMode = useSettingsStore(state => state.nsfwMode)
   const detail = useRecommendationMovie(movie.id)
   const { request, prioritize } = detail
   const data = detail.movie
   const failed = detail.isError && !detail.isFetching
+  const cover = data || failed ? data?.cover || data?.thumbnail || movie.thumbnail : ''
+  const coverKey = JSON.stringify([cover, nsfwMode])
+  const loading = (!data && !failed) || readyCover !== coverKey
+  const onCoverReady = useCallback(() => setReadyCover(coverKey), [coverKey])
 
   useEffect(() => {
     if (cardRef.current) return observeRecommendation(cardRef.current, request)
@@ -49,38 +56,36 @@ function RecommendationCard({ movie }: { movie: MovieReference }) {
       <Link
         to="/discover/$movieId"
         params={{ movieId: movie.id }}
-        className="block h-full rounded-2xl outline-ring"
+        className="relative block h-full rounded-2xl outline-ring"
         onFocus={() => {
           if (!data && !failed) prioritize()
         }}
         onClick={prioritize}
       >
-        <MovieCard
-          movie={{
-            code: data?.code ?? movie.code,
-            title: data?.title ?? '',
-            cover: data?.cover || data?.thumbnail || movie.thumbnail
-          }}
-          titlePlaceholder={!data && !failed ? <Skeleton className="h-5 w-full" /> : undefined}
-          description={
-            data ? (
-              data.release_date || '\u00a0'
-            ) : failed ? (
-              '详情暂时无法加载'
-            ) : (
-              <Skeleton className="h-4 w-3/4" />
-            )
-          }
-          state={<MovieStateBadge movie={movie} />}
-        >
-          <div className="flex min-h-5 flex-wrap gap-1.5">
-            {data ? (
-              <MovieResourceBadges movie={data} />
-            ) : !failed ? (
-              <Skeleton className="h-5 w-16" />
-            ) : null}
+        <div className={cn('h-full', loading && 'invisible')}>
+          <MovieCard
+            movie={{
+              code: data?.code ?? movie.code,
+              title: data?.title ?? '',
+              cover
+            }}
+            coverLoading="eager"
+            onCoverReady={onCoverReady}
+            description={
+              data ? data.release_date || '\u00a0' : failed ? '详情暂时无法加载' : '\u00a0'
+            }
+            state={<MovieStateBadge movie={movie} />}
+          >
+            <div className="flex min-h-5 flex-wrap gap-1.5">
+              {data ? <MovieResourceBadges movie={data} /> : null}
+            </div>
+          </MovieCard>
+        </div>
+        {loading ? (
+          <div className="absolute inset-0">
+            <MovieCardSkeleton />
           </div>
-        </MovieCard>
+        ) : null}
       </Link>
       {!data && failed ? (
         <Button

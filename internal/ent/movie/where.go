@@ -1274,6 +1274,29 @@ func HasFilesWith(preds ...predicate.File) predicate.Movie {
 	})
 }
 
+// HasWatchHistory applies the HasEdge predicate on the "watch_history" edge.
+func HasWatchHistory() predicate.Movie {
+	return predicate.Movie(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, WatchHistoryTable, WatchHistoryColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasWatchHistoryWith applies the HasEdge predicate on the "watch_history" edge with a given conditions (other predicates).
+func HasWatchHistoryWith(preds ...predicate.WatchHistory) predicate.Movie {
+	return predicate.Movie(func(s *sql.Selector) {
+		step := newWatchHistoryStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.Movie) predicate.Movie {
 	return predicate.Movie(sql.AndPredicates(predicates...))

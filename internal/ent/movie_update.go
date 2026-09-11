@@ -17,6 +17,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 	"github.com/ppxb/miyabi/internal/ent/tag"
+	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
 
 // MovieUpdate is the builder for updating Movie entities.
@@ -405,6 +406,21 @@ func (_u *MovieUpdate) AddFiles(v ...*File) *MovieUpdate {
 	return _u.AddFileIDs(ids...)
 }
 
+// AddWatchHistoryIDs adds the "watch_history" edge to the WatchHistory entity by IDs.
+func (_u *MovieUpdate) AddWatchHistoryIDs(ids ...int) *MovieUpdate {
+	_u.mutation.AddWatchHistoryIDs(ids...)
+	return _u
+}
+
+// AddWatchHistory adds the "watch_history" edges to the WatchHistory entity.
+func (_u *MovieUpdate) AddWatchHistory(v ...*WatchHistory) *MovieUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddWatchHistoryIDs(ids...)
+}
+
 // Mutation returns the MovieMutation object of the builder.
 func (_u *MovieUpdate) Mutation() *MovieMutation {
 	return _u.mutation
@@ -471,6 +487,27 @@ func (_u *MovieUpdate) RemoveFiles(v ...*File) *MovieUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveFileIDs(ids...)
+}
+
+// ClearWatchHistory clears all "watch_history" edges to the WatchHistory entity.
+func (_u *MovieUpdate) ClearWatchHistory() *MovieUpdate {
+	_u.mutation.ClearWatchHistory()
+	return _u
+}
+
+// RemoveWatchHistoryIDs removes the "watch_history" edge to WatchHistory entities by IDs.
+func (_u *MovieUpdate) RemoveWatchHistoryIDs(ids ...int) *MovieUpdate {
+	_u.mutation.RemoveWatchHistoryIDs(ids...)
+	return _u
+}
+
+// RemoveWatchHistory removes "watch_history" edges to WatchHistory entities.
+func (_u *MovieUpdate) RemoveWatchHistory(v ...*WatchHistory) *MovieUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveWatchHistoryIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -765,6 +802,51 @@ func (_u *MovieUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(file.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.WatchHistoryCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   movie.WatchHistoryTable,
+			Columns: []string{movie.WatchHistoryColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(watchhistory.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedWatchHistoryIDs(); len(nodes) > 0 && !_u.mutation.WatchHistoryCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   movie.WatchHistoryTable,
+			Columns: []string{movie.WatchHistoryColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(watchhistory.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.WatchHistoryIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   movie.WatchHistoryTable,
+			Columns: []string{movie.WatchHistoryColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(watchhistory.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -1165,6 +1247,21 @@ func (_u *MovieUpdateOne) AddFiles(v ...*File) *MovieUpdateOne {
 	return _u.AddFileIDs(ids...)
 }
 
+// AddWatchHistoryIDs adds the "watch_history" edge to the WatchHistory entity by IDs.
+func (_u *MovieUpdateOne) AddWatchHistoryIDs(ids ...int) *MovieUpdateOne {
+	_u.mutation.AddWatchHistoryIDs(ids...)
+	return _u
+}
+
+// AddWatchHistory adds the "watch_history" edges to the WatchHistory entity.
+func (_u *MovieUpdateOne) AddWatchHistory(v ...*WatchHistory) *MovieUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddWatchHistoryIDs(ids...)
+}
+
 // Mutation returns the MovieMutation object of the builder.
 func (_u *MovieUpdateOne) Mutation() *MovieMutation {
 	return _u.mutation
@@ -1231,6 +1328,27 @@ func (_u *MovieUpdateOne) RemoveFiles(v ...*File) *MovieUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveFileIDs(ids...)
+}
+
+// ClearWatchHistory clears all "watch_history" edges to the WatchHistory entity.
+func (_u *MovieUpdateOne) ClearWatchHistory() *MovieUpdateOne {
+	_u.mutation.ClearWatchHistory()
+	return _u
+}
+
+// RemoveWatchHistoryIDs removes the "watch_history" edge to WatchHistory entities by IDs.
+func (_u *MovieUpdateOne) RemoveWatchHistoryIDs(ids ...int) *MovieUpdateOne {
+	_u.mutation.RemoveWatchHistoryIDs(ids...)
+	return _u
+}
+
+// RemoveWatchHistory removes "watch_history" edges to WatchHistory entities.
+func (_u *MovieUpdateOne) RemoveWatchHistory(v ...*WatchHistory) *MovieUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveWatchHistoryIDs(ids...)
 }
 
 // Where appends a list predicates to the MovieUpdate builder.
@@ -1555,6 +1673,51 @@ func (_u *MovieUpdateOne) sqlSave(ctx context.Context) (_node *Movie, err error)
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(file.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.WatchHistoryCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   movie.WatchHistoryTable,
+			Columns: []string{movie.WatchHistoryColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(watchhistory.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedWatchHistoryIDs(); len(nodes) > 0 && !_u.mutation.WatchHistoryCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   movie.WatchHistoryTable,
+			Columns: []string{movie.WatchHistoryColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(watchhistory.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.WatchHistoryIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   movie.WatchHistoryTable,
+			Columns: []string{movie.WatchHistoryColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(watchhistory.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

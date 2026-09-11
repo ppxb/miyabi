@@ -120,38 +120,3 @@ func (service *LibraryService) Movies(ctx context.Context, page, limit int) (Lib
 	result.HasMore = (page-1)*limit+len(result.Movies) < result.Total
 	return result, nil
 }
-
-// Opening the player counts as watched, independently of upstream playback.
-// Read the mounted source and update its movie in one local transaction.
-func (service *LibraryService) MarkWatched(ctx context.Context, movieID int) error {
-	changed := false
-	err := ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
-		source, err := loadLibrarySource(ctx, tx.Client())
-		if err != nil {
-			return err
-		}
-		if source == nil {
-			return ErrMediaDirectoryRequired
-		}
-		record, err := tx.Movie.Query().Where(movie.IDEQ(movieID), movie.HasFilesWith(libraryFiles(*source))).
-			Select(movie.FieldID, movie.FieldWatched).Only(ctx)
-		if err != nil {
-			return err
-		}
-		if record.Watched {
-			return nil
-		}
-		if err := tx.Movie.UpdateOneID(movieID).SetWatched(true).Exec(ctx); err != nil {
-			return err
-		}
-		changed = true
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("mark library movie watched: %w", err)
-	}
-	if changed {
-		service.tasks.NotifyLibraryChanged()
-	}
-	return nil
-}

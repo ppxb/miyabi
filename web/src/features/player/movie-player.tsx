@@ -1,14 +1,17 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   isHLSProvider,
   MediaPlayer,
   MediaProvider,
+  useMediaPlayer,
   useMediaState,
   type MediaPlayerInstance
 } from '@vidstack/react'
 import { DefaultVideoLayout } from '@vidstack/react/player/layouts/default'
 
 import { usePlayback, usePlayFiles } from '@/api/play'
+import type { WatchSession } from '@/api/watch-history'
+import { watchResumePosition } from '@/lib/watch-progress'
 import {
   Select,
   SelectContent,
@@ -26,19 +29,28 @@ import {
   PlayerTitle
 } from './player-status'
 import { playerTranslations } from './translations'
+import { useWatchProgress } from './use-watch-progress'
 
 import '@vidstack/react/player/styles/default/theme.css'
 import '@vidstack/react/player/styles/default/layouts/video.css'
 import './player.css'
 
-export default function MoviePlayer({ movieID }: { movieID: number }) {
+export default function MoviePlayer({
+  movieID,
+  history,
+  historyReady
+}: {
+  movieID: number
+  history?: WatchSession
+  historyReady: boolean
+}) {
   const files = usePlayFiles(movieID)
 
-  if (files.isPending) return <PlayerLoading />
+  if (files.isPending || !historyReady) return <PlayerLoading />
   if (files.isError) {
     return <PlayerError error={files.error} onRetry={() => void files.refetch()} />
   }
-  const file = files.data.files[0]
+  const file = files.data.files.find(item => item.id === history?.file_id) ?? files.data.files[0]
   if (!file) {
     return (
       <PlayerError
@@ -49,17 +61,30 @@ export default function MoviePlayer({ movieID }: { movieID: number }) {
     )
   }
 
-  return <PlaybackPlayer key={file.id} title={files.data.title} fileID={file.id} />
+  return (
+    <PlaybackPlayer key={file.id} title={files.data.title} fileID={file.id} history={history} />
+  )
 }
 
-function PlaybackPlayer({ title, fileID }: { title: string; fileID: string }) {
+function PlaybackPlayer({
+  title,
+  fileID,
+  history
+}: {
+  title: string
+  fileID: string
+  history?: WatchSession
+}) {
   const playback = usePlayback(fileID)
   const [selectedSrc, setSelectedSrc] = useState<string>()
   const [player, setPlayer] = useState<MediaPlayerInstance | null>(null)
   const [failed, setFailed] = useState(false)
   const [autoPlay, setAutoPlay] = useState(true)
-  const position = useRef(0)
-  const resumeTime = useRef<number | null>(0)
+  const initialPosition = watchResumePosition(history, fileID)
+  const position = useRef(initialPosition)
+  const resumeTime = useRef<number | null>(initialPosition)
+  const playing = useRef(false)
+  const progress = useWatchProgress(history, fileID)
   const sources = playback.data?.sources ?? []
   const source = sources.find(item => item.src === selectedSrc) ?? sources[0]
   const loading = playback.isPending || playback.isFetching
@@ -83,12 +108,35 @@ function PlaybackPlayer({ title, fileID }: { title: string; fileID: string }) {
       playsInline
       onCanPlay={() => {
         if (player && resumeTime.current !== null) {
-          player.remoteControl.seek(resumeTime.current)
-          resumeTime.current = null
+          const target = Math.min(resumeTime.current, Math.max(0, player.duration - 1))
+          if (target > 0) player.remoteControl.seek(target)
+          else resumeTime.current = null
         }
       }}
       onTimeUpdate={detail => {
-        if (resumeTime.current === null) position.current = detail.currentTime
+        if (resumeTime.current !== null || !player || !playing.current) return
+        position.current = detail.currentTime
+        progress?.update(detail.currentTime, player.duration)
+      }}
+      onPlaying={() => {
+        playing.current = true
+      }}
+      onSeeked={currentTime => {
+        resumeTime.current = null
+        position.current = currentTime
+        if (player) progress?.update(currentTime, player.duration)
+        void progress?.flush(true)
+      }}
+      onPause={() => {
+        playing.current = false
+        if (player && resumeTime.current === null)
+          progress?.update(position.current, player.duration)
+        void progress?.flush(true)
+      }}
+      onEnded={() => {
+        playing.current = false
+        if (player) progress?.update(player.duration, player.duration)
+        void progress?.flush(true)
       }}
       onError={() => {
         resumeTime.current = position.current
@@ -156,6 +204,14 @@ function PlaybackPlayer({ title, fileID }: { title: string; fileID: string }) {
 
 function PlayerReady({ title, children }: { title: string; children: ReactNode }) {
   const canPlay = useMediaState('canPlay')
+  const player = useMediaPlayer()
+  const focused = useRef(false)
+
+  useEffect(() => {
+    if (!canPlay || !player?.el || focused.current) return
+    focused.current = true
+    player.el.focus({ preventScroll: true })
+  }, [canPlay, player])
 
   if (!canPlay) {
     return (

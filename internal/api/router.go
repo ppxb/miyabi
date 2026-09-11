@@ -48,6 +48,10 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	authAPI.POST("/login", accessLoginHandler(deps.Access))
 	api.GET("/library/movies", libraryMoviesHandler(deps.Library))
 	api.PUT("/library/movies/:id/watched", libraryWatchedHandler(deps.Library))
+	api.GET("/library/history", libraryHistoryHandler(deps.Library))
+	api.POST("/library/history/remove", libraryHistoryRemoveHandler(deps.Library))
+	api.DELETE("/library/history", libraryHistoryClearHandler(deps.Library))
+	api.PUT("/library/history/:id/progress", libraryHistoryProgressHandler(deps.Library))
 	api.POST("/library/scan", libraryScanHandler(deps.Library))
 	api.GET("/library/artwork/:key", libraryArtworkHandler(deps.Artwork))
 	playAPI := api.Group("/play", func(c *gin.Context) {

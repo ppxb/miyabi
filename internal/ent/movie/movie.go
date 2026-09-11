@@ -59,6 +59,8 @@ const (
 	EdgeTags = "tags"
 	// EdgeFiles holds the string denoting the files edge name in mutations.
 	EdgeFiles = "files"
+	// EdgeWatchHistory holds the string denoting the watch_history edge name in mutations.
+	EdgeWatchHistory = "watch_history"
 	// Table holds the table name of the movie in the database.
 	Table = "movies"
 	// ActorsTable is the table that holds the actors relation/edge. The primary key declared below.
@@ -78,6 +80,13 @@ const (
 	FilesInverseTable = "files"
 	// FilesColumn is the table column denoting the files relation/edge.
 	FilesColumn = "movie_files"
+	// WatchHistoryTable is the table that holds the watch_history relation/edge.
+	WatchHistoryTable = "watch_histories"
+	// WatchHistoryInverseTable is the table name for the WatchHistory entity.
+	// It exists in this package in order to avoid circular dependency with the "watchhistory" package.
+	WatchHistoryInverseTable = "watch_histories"
+	// WatchHistoryColumn is the table column denoting the watch_history relation/edge.
+	WatchHistoryColumn = "movie_id"
 )
 
 // Columns holds all SQL columns for movie fields.
@@ -306,6 +315,20 @@ func ByFiles(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newFilesStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByWatchHistoryCount orders the results by watch_history count.
+func ByWatchHistoryCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newWatchHistoryStep(), opts...)
+	}
+}
+
+// ByWatchHistory orders the results by watch_history terms.
+func ByWatchHistory(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newWatchHistoryStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newActorsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -325,5 +348,12 @@ func newFilesStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(FilesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, FilesTable, FilesColumn),
+	)
+}
+func newWatchHistoryStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(WatchHistoryInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, WatchHistoryTable, WatchHistoryColumn),
 	)
 }

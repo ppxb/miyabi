@@ -18,6 +18,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/setting"
 	"github.com/ppxb/miyabi/internal/ent/tag"
 	"github.com/ppxb/miyabi/internal/ent/task"
+	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -78,12 +79,13 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			actor.Table:   actor.ValidColumn,
-			file.Table:    file.ValidColumn,
-			movie.Table:   movie.ValidColumn,
-			setting.Table: setting.ValidColumn,
-			tag.Table:     tag.ValidColumn,
-			task.Table:    task.ValidColumn,
+			actor.Table:        actor.ValidColumn,
+			file.Table:         file.ValidColumn,
+			movie.Table:        movie.ValidColumn,
+			setting.Table:      setting.ValidColumn,
+			tag.Table:          tag.ValidColumn,
+			task.Table:         task.ValidColumn,
+			watchhistory.Table: watchhistory.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

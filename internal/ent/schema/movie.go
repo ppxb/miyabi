@@ -2,6 +2,7 @@ package schema
 
 import (
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 )
@@ -73,5 +74,6 @@ func (Movie) Edges() []ent.Edge {
 		edge.To("actors", Actor.Type),
 		edge.To("tags", Tag.Type),
 		edge.To("files", File.Type),
+		edge.To("watch_history", WatchHistory.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
 	}
 }

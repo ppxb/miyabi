@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from 'react'
 import { useRouterState } from '@tanstack/react-router'
-import { CompassIcon, FilmIcon, SearchIcon, SettingsIcon } from 'lucide-react'
+import { CompassIcon, FilmIcon, HistoryIcon, SearchIcon, SettingsIcon } from 'lucide-react'
 
 import { FloatingNav, type FloatingNavItem } from '@/components/floating-nav'
 import { Toaster } from '@/components/ui/sonner'
@@ -11,6 +11,7 @@ import { PlayerDialog } from '@/features/player/player-dialog'
 
 const NAV_ITEMS: FloatingNavItem[] = [
   { id: 'library', label: '媒体库', icon: FilmIcon, to: '/' },
+  { id: 'history', label: '观看历史', icon: HistoryIcon, to: '/history' },
   { id: 'discover', label: '发现', icon: CompassIcon, to: '/discover' },
   { id: 'search', label: '搜索', icon: SearchIcon, to: '/search' },
   { id: 'settings', label: '设置', icon: SettingsIcon, to: '/settings' }

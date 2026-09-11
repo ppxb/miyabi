@@ -76,17 +76,13 @@ export function notifyOfflineTask(
   )
   if (active) {
     const scan = options.scan
-    const label =
-      task.phase === 'downloading'
-        ? '下载中'
-        : task.phase === 'in_library'
-          ? '已入库 · 整理中'
-          : '入库处理中'
-    toast.info(`${task.code} · ${options.waiting ? '等待进度同步' : label}`, {
+    toast.info(task.code, {
       ...props,
       action: actions,
       icon: options.waiting ? undefined : <LoaderCircleIcon className="size-4 animate-spin" />,
-      description: (
+      description: options.waiting ? (
+        '等待进度同步'
+      ) : (
         <TaskProgress
           offline
           current={
@@ -110,15 +106,15 @@ export function notifyOfflineTask(
     })
   } else if (task.phase === 'in_library') {
     const notify = task.error ? toast.warning : toast.success
-    notify(`${task.code} 已入库`, {
+    notify(task.code, {
       ...props,
       description: task.error ? `元数据处理失败：${task.error}` : '下载与入库处理已完成',
       action: actions
     })
   } else if (task.error || task.status === 'failed') {
-    toast.error(`${task.code} 处理失败`, { ...props, description: task.error })
+    toast.error(task.code, { ...props, description: task.error ?? '处理失败，请重试。' })
   } else {
-    toast.warning(`${task.code} 下载完成`, {
+    toast.warning(task.code, {
       ...props,
       description:
         task.phase === 'downloaded'

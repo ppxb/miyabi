@@ -28,14 +28,18 @@ export function DiscoverMovieCard({ movie }: { movie: DiscoverMovie }) {
 
 export function MovieCard({
   movie,
-  titlePlaceholder,
   description,
+  coverLoading = 'lazy',
+  onCoverReady,
+  coverOverlay,
   state,
   children
 }: {
   movie: { code: string; title: string; cover?: string }
-  titlePlaceholder?: ReactNode
   description?: ReactNode
+  coverLoading?: 'eager' | 'lazy'
+  onCoverReady?: () => void
+  coverOverlay?: ReactNode
   state?: ReactNode
   children?: ReactNode
 }) {
@@ -44,7 +48,7 @@ export function MovieCard({
     <Card size="sm" className="h-full gap-0 overflow-hidden py-0">
       <div className="relative flex aspect-3/2 items-center justify-center overflow-hidden bg-muted">
         <div className="absolute inset-0">
-          <MovieCover source={movie.cover ?? ''} />
+          <MovieCover source={movie.cover ?? ''} loading={coverLoading} onReady={onCoverReady} />
         </div>
         <div className="absolute top-2 left-2 flex max-w-[calc(100%-1rem)] flex-wrap gap-1.5">
           <Badge variant="outline" className="max-w-full truncate bg-background/85 backdrop-blur">
@@ -52,13 +56,12 @@ export function MovieCard({
           </Badge>
           {state}
         </div>
+        {coverOverlay}
       </div>
       <CardContent className="min-w-0 space-y-2 p-3">
-        {titlePlaceholder ?? (
-          <OverflowTooltip content={title}>
-            <h3 className="truncate text-sm leading-5 font-semibold">{title}</h3>
-          </OverflowTooltip>
-        )}
+        <OverflowTooltip content={title}>
+          <h3 className="truncate text-sm leading-5 font-semibold">{title}</h3>
+        </OverflowTooltip>
         {description != null ? (
           <div className="text-xs text-muted-foreground">{description}</div>
         ) : null}

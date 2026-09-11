@@ -17,18 +17,20 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 	"github.com/ppxb/miyabi/internal/ent/tag"
+	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
 
 // MovieQuery is the builder for querying Movie entities.
 type MovieQuery struct {
 	config
-	ctx        *QueryContext
-	order      []movie.OrderOption
-	inters     []Interceptor
-	predicates []predicate.Movie
-	withActors *ActorQuery
-	withTags   *TagQuery
-	withFiles  *FileQuery
+	ctx              *QueryContext
+	order            []movie.OrderOption
+	inters           []Interceptor
+	predicates       []predicate.Movie
+	withActors       *ActorQuery
+	withTags         *TagQuery
+	withFiles        *FileQuery
+	withWatchHistory *WatchHistoryQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -124,6 +126,28 @@ func (_q *MovieQuery) QueryFiles() *FileQuery {
 			sqlgraph.From(movie.Table, movie.FieldID, selector),
 			sqlgraph.To(file.Table, file.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, movie.FilesTable, movie.FilesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryWatchHistory chains the current query on the "watch_history" edge.
+func (_q *MovieQuery) QueryWatchHistory() *WatchHistoryQuery {
+	query := (&WatchHistoryClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(movie.Table, movie.FieldID, selector),
+			sqlgraph.To(watchhistory.Table, watchhistory.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, movie.WatchHistoryTable, movie.WatchHistoryColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -318,14 +342,15 @@ func (_q *MovieQuery) Clone() *MovieQuery {
 		return nil
 	}
 	return &MovieQuery{
-		config:     _q.config,
-		ctx:        _q.ctx.Clone(),
-		order:      append([]movie.OrderOption{}, _q.order...),
-		inters:     append([]Interceptor{}, _q.inters...),
-		predicates: append([]predicate.Movie{}, _q.predicates...),
-		withActors: _q.withActors.Clone(),
-		withTags:   _q.withTags.Clone(),
-		withFiles:  _q.withFiles.Clone(),
+		config:           _q.config,
+		ctx:              _q.ctx.Clone(),
+		order:            append([]movie.OrderOption{}, _q.order...),
+		inters:           append([]Interceptor{}, _q.inters...),
+		predicates:       append([]predicate.Movie{}, _q.predicates...),
+		withActors:       _q.withActors.Clone(),
+		withTags:         _q.withTags.Clone(),
+		withFiles:        _q.withFiles.Clone(),
+		withWatchHistory: _q.withWatchHistory.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -362,6 +387,17 @@ func (_q *MovieQuery) WithFiles(opts ...func(*FileQuery)) *MovieQuery {
 		opt(query)
 	}
 	_q.withFiles = query
+	return _q
+}
+
+// WithWatchHistory tells the query-builder to eager-load the nodes that are connected to
+// the "watch_history" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *MovieQuery) WithWatchHistory(opts ...func(*WatchHistoryQuery)) *MovieQuery {
+	query := (&WatchHistoryClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withWatchHistory = query
 	return _q
 }
 
@@ -443,10 +479,11 @@ func (_q *MovieQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Movie,
 	var (
 		nodes       = []*Movie{}
 		_spec       = _q.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [4]bool{
 			_q.withActors != nil,
 			_q.withTags != nil,
 			_q.withFiles != nil,
+			_q.withWatchHistory != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -485,6 +522,13 @@ func (_q *MovieQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Movie,
 		if err := _q.loadFiles(ctx, query, nodes,
 			func(n *Movie) { n.Edges.Files = []*File{} },
 			func(n *Movie, e *File) { n.Edges.Files = append(n.Edges.Files, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withWatchHistory; query != nil {
+		if err := _q.loadWatchHistory(ctx, query, nodes,
+			func(n *Movie) { n.Edges.WatchHistory = []*WatchHistory{} },
+			func(n *Movie, e *WatchHistory) { n.Edges.WatchHistory = append(n.Edges.WatchHistory, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -641,6 +685,36 @@ func (_q *MovieQuery) loadFiles(ctx context.Context, query *FileQuery, nodes []*
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "movie_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *MovieQuery) loadWatchHistory(ctx context.Context, query *WatchHistoryQuery, nodes []*Movie, init func(*Movie), assign func(*Movie, *WatchHistory)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Movie)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(watchhistory.FieldMovieID)
+	}
+	query.Where(predicate.WatchHistory(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(movie.WatchHistoryColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.MovieID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "movie_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}

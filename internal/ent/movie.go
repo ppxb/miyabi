@@ -70,9 +70,11 @@ type MovieEdges struct {
 	Tags []*Tag `json:"tags,omitempty"`
 	// Files holds the value of the files edge.
 	Files []*File `json:"files,omitempty"`
+	// WatchHistory holds the value of the watch_history edge.
+	WatchHistory []*WatchHistory `json:"watch_history,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [4]bool
 }
 
 // ActorsOrErr returns the Actors value or an error if the edge
@@ -100,6 +102,15 @@ func (e MovieEdges) FilesOrErr() ([]*File, error) {
 		return e.Files, nil
 	}
 	return nil, &NotLoadedError{edge: "files"}
+}
+
+// WatchHistoryOrErr returns the WatchHistory value or an error if the edge
+// was not loaded in eager-loading.
+func (e MovieEdges) WatchHistoryOrErr() ([]*WatchHistory, error) {
+	if e.loadedTypes[3] {
+		return e.WatchHistory, nil
+	}
+	return nil, &NotLoadedError{edge: "watch_history"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -294,6 +305,11 @@ func (_m *Movie) QueryTags() *TagQuery {
 // QueryFiles queries the "files" edge of the Movie entity.
 func (_m *Movie) QueryFiles() *FileQuery {
 	return NewMovieClient(_m.config).QueryFiles(_m)
+}
+
+// QueryWatchHistory queries the "watch_history" edge of the Movie entity.
+func (_m *Movie) QueryWatchHistory() *WatchHistoryQuery {
+	return NewMovieClient(_m.config).QueryWatchHistory(_m)
 }
 
 // Update returns a builder for updating this Movie.

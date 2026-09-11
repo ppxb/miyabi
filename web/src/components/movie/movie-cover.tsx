@@ -2,12 +2,20 @@ import { MediaImage } from '@/components/media-image'
 
 export function MovieCover({
   source,
-  loading = 'lazy'
+  loading = 'lazy',
+  onReady
 }: {
   source: string
   loading?: 'eager' | 'lazy'
+  onReady?: () => void
 }) {
   return (
-    <MediaImage source={source} loading={loading} blurredBackground className="object-contain" />
+    <MediaImage
+      source={source}
+      loading={loading}
+      onReady={onReady}
+      blurredBackground
+      className="object-contain"
+    />
   )
 }

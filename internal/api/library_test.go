@@ -20,9 +20,9 @@ type libraryWatchStub struct {
 	err error
 }
 
-func (stub *libraryWatchStub) MarkWatched(_ context.Context, id int) error {
+func (stub *libraryWatchStub) MarkWatched(_ context.Context, id int) (service.WatchSession, error) {
 	stub.id = id
-	return stub.err
+	return service.WatchSession{ID: 7, SessionID: "session", FileID: "video", Position: 60, Duration: 600}, stub.err
 }
 
 func TestLibraryWatchedEndpointValidatesIDsAndReturnsSavedState(t *testing.T) {
@@ -52,10 +52,11 @@ func TestLibraryWatchedEndpointValidatesIDsAndReturnsSavedState(t *testing.T) {
 			}
 			if scenario.status == http.StatusOK {
 				var state struct {
-					ID      int  `json:"id"`
-					Watched bool `json:"watched"`
+					ID      int                  `json:"id"`
+					Watched bool                 `json:"watched"`
+					History service.WatchSession `json:"history"`
 				}
-				if err := json.Unmarshal(response.Body.Bytes(), &state); err != nil || state.ID != 42 || !state.Watched {
+				if err := json.Unmarshal(response.Body.Bytes(), &state); err != nil || state.ID != 42 || !state.Watched || state.History.Position != 60 {
 					t.Fatalf("incorrect watch response: %s, %v", response.Body, err)
 				}
 			}

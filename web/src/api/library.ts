@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { ApiError, apiGet, apiPost, apiPut } from '@/api/client'
 import { panKeys, type PanAccountStatus } from '@/api/pan'
 import { taskKeys, type LibrarySource, type ScanTask } from '@/api/tasks'
+import type { WatchSession } from '@/api/watch-history'
 import { notifyScanTask, notifyTaskError } from '@/features/tasks/task-toast'
 
 export type LibraryMovie = {
@@ -30,6 +31,7 @@ export type LibraryFile = { id: string; name: string; path: string; size: number
 
 export const libraryKeys = {
   all: ['library'] as const,
+  movieLists: ['library', 'movies'] as const,
   movies: (page: number) => ['library', 'movies', page] as const
 }
 
@@ -46,13 +48,16 @@ export function useMarkMovieWatched() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (movieID: number) =>
-      apiPut<{ id: number; watched: boolean }>(`/api/library/movies/${movieID}/watched`, {}),
+      apiPut<{ id: number; watched: boolean; history: WatchSession }>(
+        `/api/library/movies/${movieID}/watched`,
+        {}
+      ),
     retry: (failures, error) =>
       failures < 2 && (!(error instanceof ApiError) || error.status >= 500),
     onSuccess: async ({ id, watched }) => {
       // An older list response must not restore "unwatched" after the write succeeds.
-      await queryClient.cancelQueries({ queryKey: libraryKeys.all })
-      queryClient.setQueriesData<LibraryPage>({ queryKey: libraryKeys.all }, page =>
+      await queryClient.cancelQueries({ queryKey: libraryKeys.movieLists })
+      queryClient.setQueriesData<LibraryPage>({ queryKey: libraryKeys.movieLists }, page =>
         page
           ? {
               ...page,

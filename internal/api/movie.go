@@ -10,7 +10,11 @@ import (
 
 type LibraryManager interface {
 	Movies(context.Context, int, int) (service.LibraryPage, error)
-	MarkWatched(context.Context, int) error
+	MarkWatched(context.Context, int) (service.WatchSession, error)
+	WatchHistory(context.Context, int) (service.WatchHistoryPage, error)
+	SaveWatchProgress(context.Context, int, service.WatchProgress) error
+	RemoveWatchHistory(context.Context, service.WatchHistoryScope, []int) (int, error)
+	ClearWatchHistory(context.Context, service.WatchHistoryScope) (int, error)
 	StartScan(context.Context) (service.TaskInfo, error)
 }
 
@@ -67,11 +71,12 @@ func libraryWatchedHandler(library LibraryManager) gin.HandlerFunc {
 			c.Error(BadRequest(err))
 			return
 		}
-		if err := library.MarkWatched(c.Request.Context(), uri.ID); err != nil {
+		history, err := library.MarkWatched(c.Request.Context(), uri.ID)
+		if err != nil {
 			c.Error(err)
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"id": uri.ID, "watched": true})
+		c.JSON(http.StatusOK, gin.H{"id": uri.ID, "watched": true, "history": history})
 	}
 }
 

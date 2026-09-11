@@ -9,7 +9,7 @@ import (
 	"github.com/ppxb/miyabi/internal/nfo"
 )
 
-func TestMarkWatchedIsLocalAndIdempotent(t *testing.T) {
+func TestMarkWatchedIsLocalAndKeepsMovieStateIdempotent(t *testing.T) {
 	library, queued, payload := libraryFixture(t)
 	ctx := t.Context()
 	if err := library.indexScanPage(ctx, queued.ID, "first", "/Movies",
@@ -22,7 +22,8 @@ func TestMarkWatchedIsLocalAndIdempotent(t *testing.T) {
 	}
 	before := library.tasks.Revisions()
 	// The fixture has no 115 client; recording an open must work locally.
-	if err := library.MarkWatched(ctx, film.ID); err != nil {
+	session, err := library.MarkWatched(ctx, film.ID)
+	if err != nil {
 		t.Fatal(err)
 	}
 	updated := library.database.Movie.GetX(ctx, film.ID)
@@ -34,12 +35,17 @@ func TestMarkWatchedIsLocalAndIdempotent(t *testing.T) {
 	if err != nil || len(page.Movies) != 1 || !page.Movies[0].Watched {
 		t.Fatalf("library did not return the saved watch state: %+v, %v", page, err)
 	}
-	if err := library.MarkWatched(ctx, film.ID); err != nil {
+	nextSession, err := library.MarkWatched(ctx, film.ID)
+	if err != nil {
 		t.Fatal(err)
 	}
 	repeated := library.database.Movie.GetX(ctx, film.ID)
-	if !repeated.UpdatedAt.Equal(updated.UpdatedAt) || library.tasks.Revisions() != after {
-		t.Fatal("opening an already watched movie wrote or broadcast another change")
+	if !repeated.UpdatedAt.Equal(updated.UpdatedAt) || library.tasks.Revisions().Library != after.Library ||
+		library.tasks.Revisions().History != after.History+1 {
+		t.Fatal("reopening must update history without rewriting movie metadata")
+	}
+	if nextSession.ID != session.ID || nextSession.SessionID == session.SessionID || library.database.WatchHistory.Query().CountX(ctx) != 1 {
+		t.Fatal("reopening must retain one history entry and start a new progress session")
 	}
 }
 
@@ -57,18 +63,18 @@ func TestMarkWatchedRequiresAMovieInTheMountedSource(t *testing.T) {
 				SetAccountID(scenario.account).SetRootID(scenario.root).SetMovie(film).ExecX(ctx)
 		}
 		before := library.tasks.Revisions()
-		if err := library.MarkWatched(ctx, film.ID); !ent.IsNotFound(err) {
+		if _, err := library.MarkWatched(ctx, film.ID); !ent.IsNotFound(err) {
 			t.Fatalf("movie %s outside the mounted source was accepted: %v", film.Code, err)
 		}
 		if library.database.Movie.GetX(ctx, film.ID).Watched || library.tasks.Revisions() != before {
 			t.Fatal("rejected watch request changed movie state")
 		}
 	}
-	if err := library.MarkWatched(ctx, 99999); !ent.IsNotFound(err) {
+	if _, err := library.MarkWatched(ctx, 99999); !ent.IsNotFound(err) {
 		t.Fatalf("missing movie was accepted: %v", err)
 	}
 	library.database.Setting.Delete().ExecX(ctx)
-	if err := library.MarkWatched(ctx, 1); !errors.Is(err, ErrMediaDirectoryRequired) {
+	if _, err := library.MarkWatched(ctx, 1); !errors.Is(err, ErrMediaDirectoryRequired) {
 		t.Fatalf("unmounted library was accepted: %v", err)
 	}
 }
@@ -81,7 +87,7 @@ func TestWatchedStateSurvivesScrapingDownloadIndexingAndRescan(t *testing.T) {
 		t.Fatal(err)
 	}
 	film := library.database.Movie.Query().OnlyX(ctx)
-	if err := library.MarkWatched(ctx, film.ID); err != nil {
+	if _, err := library.MarkWatched(ctx, film.ID); err != nil {
 		t.Fatal(err)
 	}
 	doc := nfo.Movie{Code: film.Code, Title: "Updated title",

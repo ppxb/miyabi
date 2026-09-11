@@ -23,3 +23,6 @@ type Tag func(*sql.Selector)
 
 // Task is the predicate function for task builders.
 type Task func(*sql.Selector)
+
+// WatchHistory is the predicate function for watchhistory builders.
+type WatchHistory func(*sql.Selector)

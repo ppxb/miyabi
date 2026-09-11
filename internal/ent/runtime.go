@@ -13,6 +13,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/setting"
 	"github.com/ppxb/miyabi/internal/ent/tag"
 	"github.com/ppxb/miyabi/internal/ent/task"
+	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -203,4 +204,44 @@ func init() {
 	task.DefaultProgress = taskDescProgress.Default.(int)
 	// task.ProgressValidator is a validator for the "progress" field. It is called by the builders before save.
 	task.ProgressValidator = taskDescProgress.Validators[0].(func(int) error)
+	watchhistoryFields := schema.WatchHistory{}.Fields()
+	_ = watchhistoryFields
+	// watchhistoryDescAccountID is the schema descriptor for account_id field.
+	watchhistoryDescAccountID := watchhistoryFields[0].Descriptor()
+	// watchhistory.AccountIDValidator is a validator for the "account_id" field. It is called by the builders before save.
+	watchhistory.AccountIDValidator = watchhistoryDescAccountID.Validators[0].(func(string) error)
+	// watchhistoryDescRootID is the schema descriptor for root_id field.
+	watchhistoryDescRootID := watchhistoryFields[1].Descriptor()
+	// watchhistory.RootIDValidator is a validator for the "root_id" field. It is called by the builders before save.
+	watchhistory.RootIDValidator = watchhistoryDescRootID.Validators[0].(func(string) error)
+	// watchhistoryDescMovieID is the schema descriptor for movie_id field.
+	watchhistoryDescMovieID := watchhistoryFields[2].Descriptor()
+	// watchhistory.MovieIDValidator is a validator for the "movie_id" field. It is called by the builders before save.
+	watchhistory.MovieIDValidator = watchhistoryDescMovieID.Validators[0].(func(int) error)
+	// watchhistoryDescWatchedAt is the schema descriptor for watched_at field.
+	watchhistoryDescWatchedAt := watchhistoryFields[3].Descriptor()
+	// watchhistory.DefaultWatchedAt holds the default value on creation for the watched_at field.
+	watchhistory.DefaultWatchedAt = watchhistoryDescWatchedAt.Default.(func() time.Time)
+	// watchhistoryDescSessionID is the schema descriptor for session_id field.
+	watchhistoryDescSessionID := watchhistoryFields[4].Descriptor()
+	// watchhistory.SessionIDValidator is a validator for the "session_id" field. It is called by the builders before save.
+	watchhistory.SessionIDValidator = watchhistoryDescSessionID.Validators[0].(func(string) error)
+	// watchhistoryDescFileID is the schema descriptor for file_id field.
+	watchhistoryDescFileID := watchhistoryFields[5].Descriptor()
+	// watchhistory.DefaultFileID holds the default value on creation for the file_id field.
+	watchhistory.DefaultFileID = watchhistoryDescFileID.Default.(string)
+	// watchhistoryDescPosition is the schema descriptor for position field.
+	watchhistoryDescPosition := watchhistoryFields[6].Descriptor()
+	// watchhistory.DefaultPosition holds the default value on creation for the position field.
+	watchhistory.DefaultPosition = watchhistoryDescPosition.Default.(float64)
+	// watchhistoryDescDuration is the schema descriptor for duration field.
+	watchhistoryDescDuration := watchhistoryFields[7].Descriptor()
+	// watchhistory.DefaultDuration holds the default value on creation for the duration field.
+	watchhistory.DefaultDuration = watchhistoryDescDuration.Default.(float64)
+	// watchhistoryDescProgressVersion is the schema descriptor for progress_version field.
+	watchhistoryDescProgressVersion := watchhistoryFields[8].Descriptor()
+	// watchhistory.DefaultProgressVersion holds the default value on creation for the progress_version field.
+	watchhistory.DefaultProgressVersion = watchhistoryDescProgressVersion.Default.(int)
+	// watchhistory.ProgressVersionValidator is a validator for the "progress_version" field. It is called by the builders before save.
+	watchhistory.ProgressVersionValidator = watchhistoryDescProgressVersion.Validators[0].(func(int) error)
 }

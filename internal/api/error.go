@@ -56,8 +56,10 @@ func errorMiddleware(logger *slog.Logger) gin.HandlerFunc {
 		switch {
 		case errors.As(err, &invalidRequest):
 			status = http.StatusBadRequest
-		case errors.Is(err, service.ErrMediaDirectoryRequired), errors.Is(err, service.ErrMagnetNotFound):
+		case errors.Is(err, service.ErrMediaDirectoryRequired), errors.Is(err, service.ErrMagnetNotFound), errors.Is(err, service.ErrInvalidWatchProgress):
 			status = http.StatusBadRequest
+		case errors.Is(err, service.ErrWatchHistorySourceChanged):
+			status = http.StatusConflict
 		case ent.IsNotFound(err), errors.Is(err, fs.ErrNotExist):
 			status = http.StatusNotFound
 		case errors.Is(err, pan.ErrUnauthorized), errors.Is(err, service.ErrAccessPassword):

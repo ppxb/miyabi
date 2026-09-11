@@ -14,6 +14,7 @@ import { invalidateMovieStates } from '@/api/movie-state-cache'
 import { libraryKeys } from '@/api/library'
 import { offlineKeys } from '@/api/offline'
 import { taskKeys, type ScanTask, type TaskRevisions } from '@/api/tasks'
+import { watchHistoryKeys } from '@/api/watch-history'
 
 type ConnectionState = 'connecting' | 'connected' | 'disconnected'
 type TaskConnection = { status: ConnectionState; reconnect: () => void }
@@ -44,6 +45,7 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
     let connectionTimer: ReturnType<typeof setTimeout> | undefined
     let libraryChanged = false
     let offlineChanged = false
+    let historyChanged = false
     let refreshing = false
     let disposed = false
 
@@ -75,16 +77,23 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
       try {
         // Refresh immediately, then reconcile once more if changes arrive
         // during the request. Bursts do not cancel each other's responses.
-        while (!disposed && (libraryChanged || offlineChanged)) {
+        while (!disposed && (libraryChanged || offlineChanged || historyChanged)) {
           const refreshLibrary = libraryChanged
+          const refreshMovieStates = libraryChanged || offlineChanged
+          const refreshHistory = historyChanged
           libraryChanged = false
           offlineChanged = false
+          historyChanged = false
           await Promise.all([
-            invalidateMovieStates(queryClient),
-            queryClient.invalidateQueries({ queryKey: offlineKeys.all }),
+            refreshMovieStates ? invalidateMovieStates(queryClient) : Promise.resolve(),
+            refreshMovieStates
+              ? queryClient.invalidateQueries({ queryKey: offlineKeys.all })
+              : Promise.resolve(),
             refreshLibrary
               ? queryClient.invalidateQueries({ queryKey: libraryKeys.all })
-              : Promise.resolve()
+              : refreshHistory
+                ? queryClient.invalidateQueries({ queryKey: watchHistoryKeys.all })
+                : Promise.resolve()
           ])
         }
       } finally {
@@ -107,6 +116,7 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
       waitForActivity()
       libraryChanged ||= revisions?.library !== next.library
       offlineChanged ||= revisions?.offline !== next.offline
+      historyChanged ||= revisions?.history !== next.history
       revisions = next
       void refreshData()
     })
