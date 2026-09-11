@@ -99,7 +99,6 @@ function CategoryContent({
         onRetry={() => taxonomy.refetch()}
       />
       <BrowseResults
-        key={JSON.stringify(category)}
         params={{
           zone,
           page,
