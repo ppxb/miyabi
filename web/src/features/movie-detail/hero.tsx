@@ -1,11 +1,10 @@
 import { CalendarIcon, ClockIcon, StarIcon, type LucideIcon } from 'lucide-react'
-import type { ReactNode } from 'react'
 
 import type { DiscoverMovie, DiscoverMovieDetail } from '@/api/discover'
 import { MovieResourceBadges, MovieStateBadge } from '@/components/movie/movie-badges'
 import { MovieCover } from '@/components/movie/movie-cover'
 import { Badge } from '@/components/ui/badge'
-import { MetadataLink } from './metadata-link'
+import { MovieMetadata } from './metadata'
 
 export function MovieHero({ movie }: { movie: DiscoverMovieDetail }) {
   return (
@@ -36,56 +35,7 @@ export function MovieHero({ movie }: { movie: DiscoverMovieDetail }) {
           <MovieResourceBadges movie={movie} />
         </div>
 
-        <dl className="space-y-3 text-sm">
-          {movie.maker ? (
-            <EntityRow label="厂牌">
-              <MetadataLink kind="maker" {...movie.maker} />
-            </EntityRow>
-          ) : null}
-          {movie.series ? (
-            <EntityRow label="系列">
-              <MetadataLink kind="series" {...movie.series} />
-            </EntityRow>
-          ) : null}
-          {movie.actors.length > 0 ? (
-            <EntityRow label="演员">
-              {movie.actors.map((actor, index) => (
-                <span key={actor.id} className="inline-flex items-center gap-3">
-                  {index > 0 ? <span className="text-muted-foreground">/</span> : null}
-                  <MetadataLink kind="actor" id={actor.id} name={actor.name} />
-                </span>
-              ))}
-            </EntityRow>
-          ) : null}
-          {movie.director ? (
-            <EntityRow label="导演">
-              <MetadataLink kind="director" {...movie.director} />
-            </EntityRow>
-          ) : null}
-          {movie.tags.length > 0 ? (
-            <div className="flex items-start gap-4">
-              <dt className="w-10 shrink-0 pt-0.5 leading-5 text-muted-foreground">标签</dt>
-              <dd className="flex min-w-0 flex-wrap gap-2">
-                {movie.tags.map(tag =>
-                  movie.zone === 'unknown' ? (
-                    <Badge key={tag.id} variant="outline">
-                      {tag.name}
-                    </Badge>
-                  ) : (
-                    <MetadataLink
-                      key={tag.id}
-                      kind="tag"
-                      id={tag.id}
-                      name={tag.name}
-                      zone={movie.zone}
-                      badge
-                    />
-                  )
-                )}
-              </dd>
-            </div>
-          ) : null}
-        </dl>
+        <MovieMetadata movie={movie} />
       </div>
     </section>
   )
@@ -119,14 +69,5 @@ function MovieStats({ movie }: { movie: DiscoverMovie }) {
         </div>
       ))}
     </dl>
-  )
-}
-
-function EntityRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-start gap-4">
-      <dt className="w-10 leading-6 text-muted-foreground">{label}</dt>
-      <dd className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 leading-6">{children}</dd>
-    </div>
   )
 }

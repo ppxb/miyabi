@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { LoaderCircleIcon, RefreshCwIcon, ScanLineIcon } from 'lucide-react'
 
-import { useLibraryMovies, useStartLibraryScan } from '@/api/library'
+import { LIBRARY_PAGE_SIZE, useLibraryMovies, useStartLibraryScan } from '@/api/library'
 import { isTaskActive, useTasks } from '@/api/tasks'
 import { AppPage } from '@/components/app-page'
 import { EmptyState } from '@/components/empty-state'
@@ -87,7 +87,7 @@ export function LibraryPage({
       ) : null}
 
       {library.isPending ? (
-        <MovieGridSkeleton />
+        <MovieGridSkeleton count={LIBRARY_PAGE_SIZE} compact />
       ) : library.isError ? (
         <ErrorState
           message="无法读取媒体库，请检查后端服务后重试"
@@ -96,7 +96,11 @@ export function LibraryPage({
         />
       ) : (
         <>
-          {source ? <p className="text-sm">发现 {library.data.total} 部影片</p> : null}
+          {source ? (
+            <p className="text-sm">
+              共 {library.data.total} 部影片 · 每页 {LIBRARY_PAGE_SIZE} 部
+            </p>
+          ) : null}
 
           {library.data.movies.length > 0 ? (
             <MovieGridLayout>
@@ -116,9 +120,10 @@ export function LibraryPage({
               }
             />
           )}
-          {page > 1 || library.data.has_more ? (
+          {page > 1 || library.data.total > 0 ? (
             <ListPagination
               page={page}
+              totalPages={Math.max(1, Math.ceil(library.data.total / LIBRARY_PAGE_SIZE))}
               hasMore={library.data.has_more}
               disabled={library.isFetching}
               onPageChange={onPageChange}

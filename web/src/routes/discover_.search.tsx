@@ -28,15 +28,19 @@ function MetadataSearchRoute() {
   return (
     <MetadataSearchPage
       key={
-        search.kind === 'tag' ? `tag:${search.id}:${search.zone}` : `${search.kind}:${search.id}`
+        search.kind === 'tag'
+          ? `tag:${search.id}:${search.zone ?? 'all'}`
+          : `${search.kind}:${search.id}`
       }
       search={search}
       onPageChange={page => void navigate({ search: previous => ({ ...previous, page }) })}
       onZoneChange={zone =>
         void navigate({
-          search: previous => (previous.kind === 'tag' ? { ...previous, zone, page: 1 } : previous)
+          search: previous =>
+            previous.kind === 'tag' ? { ...previous, zone, main: '', page: 1 } : previous
         })
       }
+      onMainChange={main => void navigate({ search: previous => ({ ...previous, main, page: 1 }) })}
     />
   )
 }

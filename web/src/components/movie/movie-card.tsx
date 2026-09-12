@@ -32,6 +32,7 @@ export function MovieCard({
   coverLoading = 'lazy',
   onCoverReady,
   coverOverlay,
+  titleTooltip = true,
   state,
   children
 }: {
@@ -40,10 +41,12 @@ export function MovieCard({
   coverLoading?: 'eager' | 'lazy'
   onCoverReady?: () => void
   coverOverlay?: ReactNode
+  titleTooltip?: boolean
   state?: ReactNode
   children?: ReactNode
 }) {
   const title = movie.title || movie.code
+  const heading = <h3 className="truncate text-sm leading-5 font-semibold">{title}</h3>
   return (
     <Card size="sm" className="h-full gap-0 overflow-hidden py-0">
       <div className="relative flex aspect-3/2 items-center justify-center overflow-hidden bg-muted">
@@ -59,9 +62,7 @@ export function MovieCard({
         {coverOverlay}
       </div>
       <CardContent className="min-w-0 space-y-2 p-3">
-        <OverflowTooltip content={title}>
-          <h3 className="truncate text-sm leading-5 font-semibold">{title}</h3>
-        </OverflowTooltip>
+        {titleTooltip ? <OverflowTooltip content={title}>{heading}</OverflowTooltip> : heading}
         {description != null ? (
           <div className="text-xs text-muted-foreground">{description}</div>
         ) : null}

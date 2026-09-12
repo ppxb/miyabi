@@ -127,17 +127,19 @@ func TestBrowseUsesDocumentedFilterMask(t *testing.T) {
 
 func TestBrowseWithoutZoneKeepsTheFilterMask(t *testing.T) {
 	for _, test := range []struct {
-		name string
-		main []string
-		sort string
-		mask string
+		name   string
+		main   []string
+		tagIDs []string
+		sort   string
+		mask   string
 	}{
 		{name: "latest", main: []string{"m"}, sort: "update", mask: ":t:m::::"},
 		{name: "upcoming", sort: "release", mask: ":t:::::"},
+		{name: "local tag search", main: []string{"m"}, tagIDs: []string{"tag-1"}, sort: "release", mask: ":t:m:tag-1:::"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			params, err := buildBrowseParams(BrowseOptions{
-				Main: test.main, Sort: test.sort, Order: "desc", Page: 1, Limit: 20,
+				Main: test.main, TagIDs: test.tagIDs, Sort: test.sort, Order: "desc", Page: 1, Limit: 20,
 			})
 			if err != nil {
 				t.Fatal(err)

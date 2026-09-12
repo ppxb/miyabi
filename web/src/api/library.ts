@@ -7,6 +7,10 @@ import { taskKeys, type LibrarySource, type ScanTask } from '@/api/tasks'
 import type { WatchSession } from '@/api/watch-history'
 import { notifyScanTask, notifyTaskError } from '@/features/tasks/task-toast'
 
+export const LIBRARY_PAGE_SIZE = 20
+
+export type LibraryEntity = { id?: string; name: string }
+
 export type LibraryMovie = {
   id: number
   code: string
@@ -14,7 +18,15 @@ export type LibraryMovie = {
   javdb_id?: string
   cover?: string
   poster?: string
-  tags: Array<{ id: number; name: string }>
+  fanart?: string
+  release_date?: string
+  duration: number
+  rating: number
+  maker?: LibraryEntity
+  series?: LibraryEntity
+  director?: LibraryEntity
+  actors: LibraryEntity[]
+  tags: Array<{ id: number; javdb_id: string; name: string }>
   scrape_status: 'pending' | 'done' | 'failed'
   watched: boolean
 }
@@ -38,7 +50,8 @@ export const libraryKeys = {
 export function useLibraryMovies(page: number) {
   return useQuery({
     queryKey: libraryKeys.movies(page),
-    queryFn: ({ signal }) => apiGet<LibraryPage>('/api/library/movies', { page }, signal),
+    queryFn: ({ signal }) =>
+      apiGet<LibraryPage>('/api/library/movies', { page, limit: LIBRARY_PAGE_SIZE }, signal),
     retry: false,
     refetchOnWindowFocus: false
   })

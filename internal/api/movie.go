@@ -43,7 +43,7 @@ func libraryArtworkHandler(artwork ArtworkReader) gin.HandlerFunc {
 
 type libraryPageQuery struct {
 	Page  int `form:"page,default=1" binding:"min=1"`
-	Limit int `form:"limit,default=24" binding:"min=1,max=100"`
+	Limit int `form:"limit,default=20" binding:"min=1,max=100"`
 }
 
 func libraryMoviesHandler(library LibraryManager) gin.HandlerFunc {

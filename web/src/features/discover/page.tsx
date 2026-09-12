@@ -20,6 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { type DiscoverView, useDiscoverStore } from '@/stores/discover'
 import { categoryBrowseParams } from './category-params'
+import { CommonFilterSelect } from './common-filter-select'
 import { DISCOVER_PAGE_SIZE as PAGE_SIZE, DISCOVER_ZONES as zones } from './constants'
 import { DiscoverResults } from './results'
 
@@ -101,7 +102,7 @@ function CategoryContent({
             tagID: value === 'all' ? '' : value
           })
         }
-        onMainChange={value => updateCategory({ main: value === 'all' ? '' : value })}
+        onMainChange={main => updateCategory({ main })}
         onRetry={() => taxonomy.refetch()}
       />
       <BrowseResults
@@ -229,21 +230,7 @@ function CategoryFilters({
             </SelectContent>
           </Select>
           {mainOptions.length > 0 ? (
-            <Select value={main || 'all'} onValueChange={onMainChange}>
-              <SelectTrigger className="w-full sm:w-48" aria-label="通用筛选">
-                <SelectValue placeholder="全部条件" />
-              </SelectTrigger>
-              <SelectContent position="popper" align="start">
-                <SelectGroup>
-                  <SelectItem value="all">全部条件</SelectItem>
-                  {mainOptions.map(option => (
-                    <SelectItem key={option.id} value={option.id}>
-                      {option.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <CommonFilterSelect options={mainOptions} value={main} onValueChange={onMainChange} />
           ) : null}
         </>
       )}

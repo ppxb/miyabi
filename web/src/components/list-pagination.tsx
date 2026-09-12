@@ -8,12 +8,14 @@ import {
 
 export function ListPagination({
   page,
+  totalPages,
   hasMore,
   disabled,
   scrollToTop = true,
   onPageChange
 }: {
   page: number
+  totalPages?: number
   hasMore: boolean
   disabled: boolean
   scrollToTop?: boolean
@@ -36,7 +38,8 @@ export function ListPagination({
         </PaginationItem>
         <PaginationItem>
           <span className="flex h-9 min-w-20 items-center justify-center px-2 text-sm tabular-nums">
-            第 {page} 页
+            第 {page}
+            {totalPages === undefined ? '' : ` / ${totalPages}`} 页
           </span>
         </PaginationItem>
         <PaginationItem>

@@ -20,6 +20,36 @@ type libraryWatchStub struct {
 	err error
 }
 
+type libraryPageStub struct {
+	LibraryManager
+	page, limit int
+}
+
+func (stub *libraryPageStub) Movies(_ context.Context, page, limit int) (service.LibraryPage, error) {
+	stub.page, stub.limit = page, limit
+	return service.LibraryPage{Page: page, Movies: []service.LibraryMovie{}}, nil
+}
+
+func TestLibraryMoviesDefaultToTwentyPerPage(t *testing.T) {
+	for _, scenario := range []struct {
+		query string
+		page  int
+	}{
+		{query: "", page: 1},
+		{query: "?page=2", page: 2},
+	} {
+		t.Run(scenario.query, func(t *testing.T) {
+			stub := &libraryPageStub{}
+			router := NewRouter(Dependencies{Library: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/library/movies"+scenario.query, nil))
+			if response.Code != http.StatusOK || stub.page != scenario.page || stub.limit != 20 {
+				t.Fatalf("library pagination: status=%d page=%d limit=%d body=%s", response.Code, stub.page, stub.limit, response.Body)
+			}
+		})
+	}
+}
+
 func (stub *libraryWatchStub) MarkWatched(_ context.Context, id int) (service.WatchSession, error) {
 	stub.id = id
 	return service.WatchSession{ID: 7, SessionID: "session", FileID: "video", Position: 60, Duration: 600}, stub.err

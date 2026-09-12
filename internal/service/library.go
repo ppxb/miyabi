@@ -3,9 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
@@ -25,13 +27,27 @@ type LibraryMovie struct {
 	JavDBID      *string            `json:"javdb_id,omitempty"`
 	Cover        *string            `json:"cover,omitempty"`
 	Poster       *string            `json:"poster,omitempty"`
+	Fanart       string             `json:"fanart,omitempty"`
+	ReleaseDate  string             `json:"release_date,omitempty"`
+	Duration     int                `json:"duration"`
+	Rating       float64            `json:"rating"`
+	Director     *LibraryEntity     `json:"director,omitempty"`
+	Maker        *LibraryEntity     `json:"maker,omitempty"`
+	Series       *LibraryEntity     `json:"series,omitempty"`
+	Actors       []LibraryEntity    `json:"actors"`
 	Tags         []LibraryTag       `json:"tags"`
 	ScrapeStatus movie.ScrapeStatus `json:"scrape_status"`
 	Watched      bool               `json:"watched"`
 }
 
 type LibraryTag struct {
-	ID   int    `json:"id"`
+	ID      int    `json:"id"`
+	JavDBID string `json:"javdb_id"`
+	Name    string `json:"name"`
+}
+
+type LibraryEntity struct {
+	ID   string `json:"id,omitempty"`
 	Name string `json:"name"`
 }
 
@@ -97,11 +113,17 @@ func (service *LibraryService) Movies(ctx context.Context, page, limit int) (Lib
 	}
 	records, err := service.database.Movie.Query().Where(movie.HasFilesWith(scope)).
 		Select(movie.FieldID, movie.FieldCode, movie.FieldTitle, movie.FieldJavdbID, movie.FieldCover, movie.FieldPoster,
+			movie.FieldFanarts, movie.FieldReleaseDate, movie.FieldDuration, movie.FieldRating,
+			movie.FieldDirectorID, movie.FieldDirectorName, movie.FieldMakerID, movie.FieldMakerName,
+			movie.FieldSeriesID, movie.FieldSeriesName,
 			movie.FieldScrapeStatus, movie.FieldWatched).
 		Order(ent.Desc(movie.FieldCreatedAt), ent.Desc(movie.FieldID)).
 		Offset((page - 1) * limit).Limit(limit).
+		WithActors(func(query *ent.ActorQuery) {
+			query.Select(actor.FieldID, actor.FieldJavdbID, actor.FieldName).Order(ent.Asc(actor.FieldName), ent.Asc(actor.FieldID))
+		}).
 		WithTags(func(query *ent.TagQuery) {
-			query.Select(tag.FieldID, tag.FieldName).Order(ent.Asc(tag.FieldName), ent.Asc(tag.FieldID))
+			query.Select(tag.FieldID, tag.FieldJavdbID, tag.FieldName).Order(ent.Asc(tag.FieldName), ent.Asc(tag.FieldID))
 		}).All(ctx)
 	if err != nil {
 		return result, fmt.Errorf("list library movies: %w", err)
@@ -110,13 +132,33 @@ func (service *LibraryService) Movies(ctx context.Context, page, limit int) (Lib
 		item := LibraryMovie{
 			ID: record.ID, Code: record.Code, Title: record.Title,
 			JavDBID: record.JavdbID, Cover: record.Cover, Poster: record.Poster,
-			Tags: make([]LibraryTag, 0, len(record.Edges.Tags)), ScrapeStatus: record.ScrapeStatus, Watched: record.Watched,
+			Duration: valueOrZero(record.Duration), Rating: valueOrZero(record.Rating),
+			Director: libraryEntity(record.DirectorID, record.DirectorName),
+			Maker:    libraryEntity(record.MakerID, record.MakerName), Series: libraryEntity(record.SeriesID, record.SeriesName),
+			Actors: make([]LibraryEntity, 0, len(record.Edges.Actors)),
+			Tags:   make([]LibraryTag, 0, len(record.Edges.Tags)), ScrapeStatus: record.ScrapeStatus, Watched: record.Watched,
+		}
+		if record.ReleaseDate != nil {
+			item.ReleaseDate = record.ReleaseDate.Format(time.DateOnly)
+		}
+		if len(record.Fanarts) > 0 {
+			item.Fanart = record.Fanarts[0]
+		}
+		for _, person := range record.Edges.Actors {
+			item.Actors = append(item.Actors, LibraryEntity{ID: person.JavdbID, Name: person.Name})
 		}
 		for _, label := range record.Edges.Tags {
-			item.Tags = append(item.Tags, LibraryTag{ID: label.ID, Name: label.Name})
+			item.Tags = append(item.Tags, LibraryTag{ID: label.ID, JavDBID: label.JavdbID, Name: label.Name})
 		}
 		result.Movies = append(result.Movies, item)
 	}
 	result.HasMore = (page-1)*limit+len(result.Movies) < result.Total
 	return result, nil
+}
+
+func libraryEntity(id, name *string) *LibraryEntity {
+	if name == nil || *name == "" {
+		return nil
+	}
+	return &LibraryEntity{ID: valueOrZero(id), Name: *name}
 }
