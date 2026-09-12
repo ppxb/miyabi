@@ -41,7 +41,10 @@ export function PlayerDialog() {
           const target = content?.querySelector<HTMLElement>('[data-media-player]') ?? content
           target?.focus({ preventScroll: true })
         }}
-        onPointerDownOutside={event => event.preventDefault()}
+        onPointerDownOutside={event => {
+          // Native mobile controls can replace the in-player close button.
+          if (event.detail.originalEvent.pointerType !== 'touch') event.preventDefault()
+        }}
       >
         <Suspense fallback={<PlayerLoading />}>
           <MoviePlayer
