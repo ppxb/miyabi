@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/disintegration/imaging"
+	_ "golang.org/x/image/webp" // Register WebP decoding for covers and NFO artwork.
 	"golang.org/x/sync/singleflight"
 )
 

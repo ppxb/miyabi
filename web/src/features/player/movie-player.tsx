@@ -151,7 +151,7 @@ function PlaybackPlayer({
     >
       <PlayerControlsVisibility />
       <MediaProvider />
-      {holdSpeed ? <div className="miyabi-player-feedback">3 倍速</div> : null}
+      {holdSpeed ? <div className="miyabi-player-feedback">倍速播放中</div> : null}
       {loading || playback.isError || failed ? (
         <div className="absolute inset-0 z-20 cursor-auto">
           {loading ? (
