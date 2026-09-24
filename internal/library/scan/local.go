@@ -152,15 +152,18 @@ func (s *LocalScanner) ingestMedia(
 	result *LocalScanResult,
 ) error {
 	return ent.WithTx(ctx, s.db, func(tx *ent.Tx) error {
-		movieRecord, err := tx.Movie.Query().Where(movie.CodeEQ(code)).First(ctx)
-		if ent.IsNotFound(err) {
-			movieRecord, err = tx.Movie.Create().SetCode(code).SetScrapeStatus(movie.ScrapeStatusPending).Save(ctx)
+		matched, err := MatchMovies(ctx, tx, []string{code})
+		if err != nil {
+			return err
+		}
+		movieID, found := matched[code]
+		if !found {
+			created, err := tx.Movie.Create().SetCode(code).SetScrapeStatus(movie.ScrapeStatusPending).Save(ctx)
 			if err != nil {
 				return err
 			}
+			movieID = created.ID
 			result.MoviesAdded++
-		} else if err != nil {
-			return err
 		}
 
 		if nfoPath != "" {
@@ -169,8 +172,8 @@ func (s *LocalScanner) ingestMedia(
 				doc, decodeErr := nfo.Decode(nfoBytes)
 				if decodeErr == nil {
 					result.NFORead++
-					if err := scrape.SaveMovieMetadata(ctx, tx, movieRecord.ID, doc); err == nil {
-						_ = tx.Movie.UpdateOneID(movieRecord.ID).SetScrapeStatus(movie.ScrapeStatusDone).Exec(ctx)
+					if err := scrape.SaveMovieMetadata(ctx, tx, movieID, doc); err == nil {
+						_ = tx.Movie.UpdateOneID(movieID).SetScrapeStatus(movie.ScrapeStatusDone).Exec(ctx)
 					}
 				}
 			}
@@ -193,7 +196,7 @@ func (s *LocalScanner) ingestMedia(
 					artwork, artErr = s.images.FromCover(posterBytes)
 				}
 				if artErr == nil {
-					update := tx.Movie.UpdateOneID(movieRecord.ID)
+					update := tx.Movie.UpdateOneID(movieID)
 					if artwork.Poster != "" {
 						update.SetPoster(artwork.Poster)
 					}
@@ -230,25 +233,25 @@ func (s *LocalScanner) ingestMedia(
 				SetAccountID("local").
 				SetRootID("local").
 				SetPath(rel).
-				SetMovie(movieRecord).
+				SetMovieID(movieID).
 				Save(ctx)
 			if err != nil {
 				return err
 			}
-		} else if err == nil && (existingFile.MovieID == nil || *existingFile.MovieID != movieRecord.ID) {
-			_ = tx.File.UpdateOneID(existingFile.ID).SetMovie(movieRecord).Exec(ctx)
+		} else if err == nil && (existingFile.MovieID == nil || *existingFile.MovieID != movieID) {
+			_ = tx.File.UpdateOneID(existingFile.ID).SetMovieID(movieID).Exec(ctx)
 		}
 
 		if subPath != "" {
 			subName := filepath.Base(subPath)
 			subExists, _ := tx.Subtitle.Query().Where(
-				subtitle.MovieIDEQ(movieRecord.ID),
+				subtitle.MovieIDEQ(movieID),
 				subtitle.NameEQ(subName),
 			).Exist(ctx)
 			if !subExists {
 				ext := strings.TrimPrefix(filepath.Ext(subName), ".")
 				_, _ = tx.Subtitle.Create().
-					SetMovie(movieRecord).
+					SetMovieID(movieID).
 					SetName(subName).
 					SetDisplayName(subName).
 					SetFormat(ext).

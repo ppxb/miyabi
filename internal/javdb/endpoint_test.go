@@ -561,7 +561,7 @@ func TestResolveMovieIDKeepsLetterVariantsDistinct(t *testing.T) {
 	}
 }
 
-func TestResolveMovieIDSearchesVerifiedCatalogueAlias(t *testing.T) {
+func TestResolveMovieIDMatchesDistributorLabelInSameResults(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
 		"/api/v2/search|zh-TW": []byte(`{"success":1,"data":{"movies":[
 			{"id":"similar","number":"LUXU-1099"},
@@ -573,13 +573,47 @@ func TestResolveMovieIDSearchesVerifiedCatalogueAlias(t *testing.T) {
 	client := clientWithTransport(transport)
 	id, err := client.ResolveMovieID(t.Context(), "259luxu1899")
 	if err != nil || id != "exact" {
-		t.Fatalf("catalogue alias resolved to %q, error = %v", id, err)
+		t.Fatalf("259luxu1899 resolved to %q, error = %v", id, err)
 	}
-	if len(transport.calls) != 1 || transport.calls[0].params.Get("q") != "LUXU-1899" {
-		t.Fatalf("search did not use the JavDB catalogue number: %#v", transport.calls)
+	if len(transport.calls) != 1 || transport.calls[0].params.Get("q") != "259LUXU-1899" {
+		t.Fatalf("search did not use the filename number once: %#v", transport.calls)
 	}
-	if id, err := client.ResolveMovieID(t.Context(), "999LUXU-1899"); err == nil {
-		t.Fatalf("unknown numeric prefix was mistaken for the same movie: %q", id)
+}
+
+func TestResolveMovieIDPrefersExactOverRelaxedCandidate(t *testing.T) {
+	transport := &fixtureTransport{responses: map[string][]byte{
+		"/api/v2/search|zh-TW": []byte(`{"success":1,"data":{"movies":[
+			{"id":"relaxed","number":"GIRI-001"},
+			{"id":"exact","number":"1000GIRI-001"}
+		]}}`),
+	}}
+	client := clientWithTransport(transport)
+	if id, err := client.ResolveMovieID(t.Context(), "1000giri001"); err != nil || id != "exact" {
+		t.Fatalf("1000giri001 resolved to %q, error = %v", id, err)
+	}
+}
+
+func TestResolveMovieIDSearchesRelaxedCandidates(t *testing.T) {
+	empty := []byte(`{"success":1,"data":{"movies":[]}}`)
+	transport := &queryFixtureTransport{responses: map[string][]byte{
+		"326IHD-005":       empty,
+		"IHD-005":          empty,
+		"326IHD-5":         empty,
+		"IHD-5":            []byte(`{"success":1,"data":{"movies":[{"id":"ihd-5","number":"IHD-5"}]}}`),
+		"200GANA-3458":     empty,
+		"GANA-3458":        []byte(`{"success":1,"data":{"movies":[{"id":"gana-3458","number":"GANA-3458"}]}}`),
+		"CARIB-060326-001": empty,
+		"060326-001":       []byte(`{"success":1,"data":{"movies":[{"id":"carib","number":"060326-001"}]}}`),
+	}}
+	client := clientWithTransport(transport)
+	for code, want := range map[string]string{
+		"326IHD-005":       "ihd-5",
+		"200GANA-3458":     "gana-3458",
+		"CARIB-060326-001": "carib",
+	} {
+		if id, err := client.ResolveMovieID(t.Context(), code); err != nil || id != want {
+			t.Errorf("ResolveMovieID(%q) = %q, error = %v; want %q", code, id, err, want)
+		}
 	}
 }
 

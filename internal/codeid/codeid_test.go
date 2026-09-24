@@ -1,6 +1,7 @@
 package codeid
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -13,10 +14,9 @@ func TestParse(t *testing.T) {
 		ok    bool
 	}{
 		{name: "standard", input: "SSIS-589.mkv", want: "SSIS-589", ok: true},
-		{name: "catalogue prefix alias", input: "259LUXU-1899.mp4", want: "LUXU-1899", ok: true},
-		{name: "compact prefix alias with disc", input: "259luxu1899-CD1.mp4", want: "LUXU-1899", ok: true},
-		{name: "prefix alias with subtitle", input: "[example.com] 259LUXU_1899-C.mkv", want: "LUXU-1899", ok: true},
-		{name: "unknown numeric prefix stays intact", input: "999LUXU-1899.mp4", want: "999LUXU-1899", ok: true},
+		{name: "label digits stay intact", input: "259LUXU-1899.mp4", want: "259LUXU-1899", ok: true},
+		{name: "compact label digits with disc", input: "259luxu1899-CD1.mp4", want: "259LUXU-1899", ok: true},
+		{name: "label digits with subtitle", input: "[example.com] 326IHD_005-C.mkv", want: "326IHD-005", ok: true},
 		{name: "four digit sequence", input: "GLOD-0436.mp4", want: "GLOD-0436", ok: true},
 		{name: "letter before sequence", input: "KNB-M014.mp4", want: "KNB-M014", ok: true},
 		{name: "letter serial is not a standalone disc marker", input: "KNB-CD014.mp4", want: "KNB-CD014", ok: true},
@@ -113,12 +113,12 @@ func TestNormalize(t *testing.T) {
 		want  string
 	}{
 		{input: " ssis 589 ", want: "SSIS-589"},
-		{input: "259LUXU-1899", want: "LUXU-1899"},
-		{input: "259luxu1899", want: "LUXU-1899"},
-		{input: "259LUXU_1899", want: "LUXU-1899"},
-		{input: "259LUXU－1899", want: "LUXU-1899"},
-		{input: "259LUXU-01899", want: "LUXU-01899"},
-		{input: "259LUXU-1899-C", want: "LUXU-1899-C"},
+		{input: "259LUXU-1899", want: "259LUXU-1899"},
+		{input: "259luxu1899", want: "259LUXU-1899"},
+		{input: "259LUXU_1899", want: "259LUXU-1899"},
+		{input: "259LUXU－1899", want: "259LUXU-1899"},
+		{input: "259LUXU-01899", want: "259LUXU-01899"},
+		{input: "259LUXU-1899-C", want: "259LUXU-1899-C"},
 		{input: "LUXU-1899", want: "LUXU-1899"},
 		{input: "999LUXU-1899", want: "999LUXU-1899"},
 		{input: "1259LUXU-1899", want: "1259LUXU-1899"},
@@ -243,6 +243,11 @@ func TestIsEquivalent(t *testing.T) {
 		{name: "studio prefix with date code", a: "CARIB-060326-001", b: "060326-001", want: true},
 		{name: "studio prefix with date code reverse", a: "060326-001", b: "CARIB-060326-001", want: true},
 		{name: "1pondo prefix with date code", a: "1PONDO-060326-001", b: "060326-001", want: true},
+		{name: "padding zeros", a: "ABC-00123", b: "abc123", want: true},
+		{name: "distributor prefix with padding", a: "326IHD-005", b: "IHD-5", want: true},
+		{name: "reject different distributor digits", a: "259LUXU-1899", b: "999LUXU-1899", want: false},
+		{name: "reject different studios same date code", a: "CARIB-060326-001", b: "1PONDO-060326-001", want: false},
+		{name: "reject letter serial variant", a: "FJIN-106", b: "FJIN-106C", want: false},
 		{name: "reject different numbers", a: "GANA-3458", b: "GANA-3459", want: false},
 		{name: "reject different studios same number", a: "IPX-123", b: "SSIS-123", want: false},
 		{name: "reject non-digit prefix suffix", a: "AB-123", b: "B-123", want: false},
@@ -293,6 +298,35 @@ func TestIsFormatEquivalent(t *testing.T) {
 	}
 }
 
+func TestCandidates(t *testing.T) {
+	tests := []struct {
+		input string
+		want  []string
+	}{
+		{input: "SSIS-589", want: []string{"SSIS-589"}},
+		{input: "326ihd005", want: []string{"326IHD-005", "IHD-005"}},
+		{input: "200GANA-3458", want: []string{"200GANA-3458", "GANA-3458"}},
+		{input: "259LUXU-1899-C", want: []string{"259LUXU-1899-C", "LUXU-1899-C"}},
+		{input: "1000GIRI-001", want: []string{"1000GIRI-001", "GIRI-001"}},
+		{input: "CARIB-060326-001", want: []string{"CARIB-060326-001", "060326-001"}},
+		{input: "1pondo-060326_001", want: []string{"1PONDO-060326-001", "060326-001"}},
+		{input: "060326-001", want: []string{"060326-001"}},
+		{input: "T28-638", want: []string{"T28-638"}},
+		{input: "FC2-PPV-1234567", want: []string{"FC2-PPV-1234567"}},
+		{input: "HEYDOUGA-4030-2347", want: []string{"HEYDOUGA-4030-2347"}},
+		{input: "21Studio.26.09.05-scene2", want: []string{"21STUDIO.26.09.05-SCENE2"}},
+		{input: "", want: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := Candidates(tt.input); !slices.Equal(got, tt.want) {
+				t.Errorf("Candidates(%q) = %q; want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestUnpaddedNumericCandidate(t *testing.T) {
 	tests := []struct {
 		input     string
@@ -335,4 +369,3 @@ func TestPrefix(t *testing.T) {
 		}
 	}
 }
-

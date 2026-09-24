@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +22,9 @@ const (
 	DefaultRawURL    = "https://raw.githubusercontent.com/gfriends/gfriends/master"
 	CacheExpiration  = 7 * 24 * time.Hour
 )
+
+// mirrors serve the same repository; the CDN is tried before GitHub.
+var mirrors = []string{DefaultFastlyURL, DefaultRawURL}
 
 type FileTree struct {
 	Content map[string]map[string]string `json:"Content"`
@@ -86,13 +91,9 @@ func (c *Client) EnsureIndex(ctx context.Context) error {
 
 	// Download from remote
 	var tree FileTree
-	urls := []string{
-		DefaultFastlyURL + "/Filetree.json",
-		DefaultRawURL + "/Filetree.json",
-	}
-
 	var downloadErr error
-	for _, u := range urls {
+	for _, mirror := range mirrors {
+		u := mirror + "/Filetree.json"
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 		if err != nil {
 			downloadErr = err
@@ -156,10 +157,12 @@ func (c *Client) loadFromFile(path string) error {
 	return nil
 }
 
+// buildIndexLocked indexes folders in name order and keeps the first image per
+// actor, so the chosen avatar does not depend on map iteration order.
 func (c *Client) buildIndexLocked(tree FileTree) {
 	c.index = make(map[string]string)
-	for folder, files := range tree.Content {
-		for alias, target := range files {
+	for _, folder := range slices.Sorted(maps.Keys(tree.Content)) {
+		for alias, target := range tree.Content[folder] {
 			name := strings.TrimSuffix(alias, ".jpg")
 			name = strings.TrimSuffix(name, ".png")
 			norm := normalizeName(name)
@@ -169,11 +172,10 @@ func (c *Client) buildIndexLocked(tree FileTree) {
 
 			// Store relative path e.g. Content/folder/target
 			rel := fmt.Sprintf("Content/%s/%s", folder, target)
-			c.index[norm] = rel
-
-			noSpace := strings.ReplaceAll(norm, " ", "")
-			if noSpace != norm {
-				c.index[noSpace] = rel
+			for _, key := range []string{norm, strings.ReplaceAll(norm, " ", "")} {
+				if _, found := c.index[key]; !found {
+					c.index[key] = rel
+				}
 			}
 		}
 	}
@@ -203,13 +205,9 @@ func (c *Client) FetchAvatar(ctx context.Context, name string) ([]byte, error) {
 	}
 	escapedPath := strings.Join(escapedParts, "/")
 
-	urls := []string{
-		DefaultFastlyURL + "/" + escapedPath,
-		DefaultRawURL + "/" + escapedPath,
-	}
-
 	var lastErr error
-	for _, u := range urls {
+	for _, mirror := range mirrors {
+		u := mirror + "/" + escapedPath
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 		if err != nil {
 			lastErr = err

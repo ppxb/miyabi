@@ -144,6 +144,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Transport: gfriendsTransport,
 	})
 	embySvc.SetGFriends(gfriendsClient)
+	embySvc.SetMediaFetcher(catalogueSvc)
 
 	scrapeSvc.SetEmbyExport(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken)
 	scrapeSvc.SetMediaNotifier(embySvc)

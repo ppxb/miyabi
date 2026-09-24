@@ -123,29 +123,6 @@ func ResolveSingleNFO(ctx context.Context, sess drive.Session, sidecars []pan.Fi
 	return nil
 }
 
-// hasDistributorDigitsOrDate checks whether a candidate code might contain distributor prefix digits
-// (e.g. "200GANA") or a date sequence that benefits from NFO tolerance verification.
-func hasDistributorDigitsOrDate(code string) bool {
-	if code == "" {
-		return false
-	}
-	// If first char is a digit, distributor digits or pure date may be present.
-	first := code[0]
-	if first >= '0' && first <= '9' {
-		return true
-	}
-	// Check if prefix part before '-' starts with or contains digits.
-	if idx := strings.IndexByte(code, '-'); idx > 0 {
-		prefixPart := code[:idx]
-		for i := 0; i < len(prefixPart); i++ {
-			if prefixPart[i] >= '0' && prefixPart[i] <= '9' {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // HasEligibleVideos returns whether the given videos slice contains any eligible feature video.
 func HasEligibleVideos(videos []Video) bool {
 	return slices.ContainsFunc(videos, func(v Video) bool {

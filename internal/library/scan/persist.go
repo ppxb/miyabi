@@ -3,6 +3,7 @@ package scan
 import (
 	"context"
 	"fmt"
+	"maps"
 	"path"
 
 	"github.com/ppxb/miyabi/internal/codeid"
@@ -59,7 +60,8 @@ func ProcessScanPageTx(ctx context.Context, tx *ent.Tx, taskID int, scanID, dire
 			}
 		}
 		for _, entry := range previous {
-			if film := entry.Edges.Movie; film != nil {
+			// A scraped record with the exact number already outranks every equivalent match.
+			if film := entry.Edges.Movie; film != nil && film.JavdbID != nil {
 				if _, needed := codes[film.Code]; needed {
 					codes[film.Code] = film.ID
 				}
@@ -74,36 +76,17 @@ func ProcessScanPageTx(ctx context.Context, tx *ent.Tx, taskID int, scanID, dire
 				codes[code] = id
 			}
 		} else if len(codes) > 0 {
-			numbers := make([]string, 0, len(codes))
+			var numbers []string
 			for code, id := range codes {
 				if id == 0 {
 					numbers = append(numbers, code)
 				}
 			}
-			if len(numbers) > 0 {
-				movies, err := tx.Movie.Query().Where(movie.CodeIn(numbers...)).Select(movie.FieldID, movie.FieldCode).All(ctx)
-				if err != nil {
-					return fmt.Errorf("load scanned movie IDs: %w", err)
-				}
-				for _, record := range movies {
-					codes[record.Code] = record.ID
-				}
+			indexed, err := indexMovies(ctx, tx, numbers)
+			if err != nil {
+				return err
 			}
-			var builders []*ent.MovieCreate
-			for code, id := range codes {
-				if id == 0 {
-					builders = append(builders, tx.Movie.Create().SetCode(code))
-				}
-			}
-			if len(builders) > 0 {
-				created, err := tx.Movie.CreateBulk(builders...).Save(ctx)
-				if err != nil {
-					return fmt.Errorf("index scanned movies: %w", err)
-				}
-				for _, record := range created {
-					codes[record.Code] = record.ID
-				}
-			}
+			maps.Copy(codes, indexed)
 		}
 		builders := make([]*ent.FileCreate, 0, len(videos))
 		var unchanged []string

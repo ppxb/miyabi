@@ -219,7 +219,7 @@ func (service *Service) Scrape(ctx context.Context, job tasks.Job) error {
 			if err != nil {
 				return err
 			}
-			if !knownID && codeid.Normalize(detail.Code) != input.Code {
+			if !knownID && !codeid.IsEquivalent(detail.Code, input.Code) {
 				return domain.E(domain.KindConflict, fmt.Sprintf("JavDB 返回的番号 %s 与媒体文件 %s 不一致", detail.Code, input.Code), nil)
 			}
 			cover.Document = DetailNFO(detail)

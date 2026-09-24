@@ -1,8 +1,11 @@
 package emby
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ppxb/miyabi/internal/database"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/gfriends"
 )
 
@@ -174,6 +178,7 @@ func TestEmbyService_NotifyUpdatedBatch(t *testing.T) {
 
 func TestEmbyService_SyncActorAvatars(t *testing.T) {
 	uploadedAvatars := make(chan string, 1)
+	gfriendsImage := []byte("gfriends-jpeg-data")
 
 	embyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/Persons" && r.Method == http.MethodGet {
@@ -199,6 +204,14 @@ func TestEmbyService_SyncActorAvatars(t *testing.T) {
 			if r.Header.Get("Content-Type") != "image/jpeg" {
 				t.Errorf("expected image/jpeg content type, got %s", r.Header.Get("Content-Type"))
 			}
+			body, _ := io.ReadAll(r.Body)
+			decoded, err := base64.StdEncoding.DecodeString(string(body))
+			if err != nil {
+				t.Errorf("expected valid base64 payload: %v", err)
+			}
+			if !bytes.Equal(decoded, gfriendsImage) {
+				t.Errorf("expected decoded image bytes %q, got %q", gfriendsImage, decoded)
+			}
 			uploadedAvatars <- "person-1"
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -208,7 +221,6 @@ func TestEmbyService_SyncActorAvatars(t *testing.T) {
 	defer embyServer.Close()
 
 	// GFriends mock server
-	gfriendsImage := []byte("gfriends-jpeg-data")
 	tree := map[string]any{
 		"Content": map[string]any{
 			"S": map[string]string{
@@ -267,7 +279,7 @@ func TestEmbyService_SyncActorAvatars(t *testing.T) {
 	}
 
 	// Test UploadPersonAvatar directly
-	if err := svc.UploadPersonAvatar(t.Context(), "person-1", gfriendsImage); err != nil {
+	if err := svc.UploadPersonAvatar(t.Context(), "person-1", domain.Media{ContentType: "image/jpeg", Body: gfriendsImage}); err != nil {
 		t.Fatalf("UploadPersonAvatar failed: %v", err)
 	}
 
@@ -278,5 +290,37 @@ func TestEmbyService_SyncActorAvatars(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("timed out waiting for avatar upload")
+	}
+}
+
+type mediaFetcherFunc func(context.Context, string) (domain.Media, error)
+
+func (f mediaFetcherFunc) Media(ctx context.Context, rawURL string) (domain.Media, error) {
+	return f(ctx, rawURL)
+}
+
+func TestEmbyService_FindAvatarFallsBackToJavDBMedia(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	store.Client.Actor.Create().SetJavdbID("actor-1").SetName("三上悠亜").SetNameZht("三上悠亞").
+		SetAvatar("https://c0.jdbstatic.com/avatars/actor-1.jpg").ExecX(t.Context())
+
+	svc := &Service{db: store.Client}
+	want := domain.Media{ContentType: "image/png", Body: []byte("decoded")}
+	media := mediaFetcherFunc(func(_ context.Context, rawURL string) (domain.Media, error) {
+		if rawURL != "https://c0.jdbstatic.com/avatars/actor-1.jpg" {
+			t.Errorf("fetched %q", rawURL)
+		}
+		return want, nil
+	})
+	got, found := svc.findAvatar(t.Context(), nil, media, "三上悠亞")
+	if !found || got.ContentType != want.ContentType || !bytes.Equal(got.Body, want.Body) {
+		t.Fatalf("findAvatar = %+v, %v", got, found)
+	}
+	if _, found := svc.findAvatar(t.Context(), nil, media, "未知演员"); found {
+		t.Fatal("unknown actor produced an avatar")
 	}
 }

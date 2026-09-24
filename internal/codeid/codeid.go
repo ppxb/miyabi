@@ -20,17 +20,12 @@ const (
 )
 
 var (
-	// Verified catalogue aliases apply to a whole prefix, never arbitrary leading digits.
-	// JavDB lists LUXU while the same entries' media filenames use 259LUXU.
-	prefixAliases = map[string]string{
-		"259LUXU": "LUXU",
-	}
-
 	separators          = strings.NewReplacer("－", "-", "﹣", "-", "–", "-", "—", "-", "＿", "_")
 	delimiters          = regexp.MustCompile(`[-_. ]+`)
 	fc2Pattern          = regexp.MustCompile(`^FC2[-_. ]*(?:PPV)?[-_. ]*([0-9]+)(` + catalogueSuffix + `)$`)
 	westernPattern      = regexp.MustCompile(`^(` + westernNumber + `)(` + catalogueSuffix + `)$`)
 	numericPattern      = regexp.MustCompile(`^([0-9]{6})[-_]([0-9]{2,3})$`)
+	labelPrefix         = regexp.MustCompile(`^[0-9]+[A-Z][A-Z0-9]*$`)
 	heydougaPattern     = regexp.MustCompile(`^(HEYDOUGA)[-_. ]*([0-9]{4}[-_. ]+` + numberSuffix + `)$`)
 	compactDatePattern  = regexp.MustCompile(`^(` + compactPrefix + `)([0-9]{6}[-_][0-9]{2,3})$`)
 	separatedPattern    = regexp.MustCompile(`^(` + prefix + `)[-_. ]+(` + numberSuffix + `)$`)
@@ -113,59 +108,47 @@ func Normalize(raw string) string {
 	// Known multipart formats also accept compact spellings without losing a numeric segment.
 	for _, pattern := range []*regexp.Regexp{heydougaPattern, compactDatePattern, separatedPattern, letterSerialPattern, compactPattern} {
 		if match := pattern.FindStringSubmatch(value); match != nil {
-			prefix := match[1]
-			if alias, found := prefixAliases[prefix]; found {
-				prefix = alias
-			}
-			return prefix + "-" + delimiters.ReplaceAllString(match[2], "-")
+			return match[1] + "-" + delimiters.ReplaceAllString(match[2], "-")
 		}
 	}
 	return value
 }
 
-// IsEquivalent reports whether two catalogue numbers identify the same movie
-// under bidirectional tolerance rules (e.g. distributor-prefixed codes like
-// 200GANA-3458 vs GANA-3458, or studio-prefixed date codes like CARIB-060326-001
-// vs 060326-001).
+// Candidates lists the catalogue numbers that may name the same movie as code,
+// most specific first. Release filenames decorate catalogue numbers in ways
+// catalogue sites omit: distributor label digits before the prefix (259LUXU-1899
+// for LUXU-1899) or a studio before a date code (CARIB-060326-001 for 060326-001).
+// Relaxed forms are guesses; callers must confirm them against a catalogue source.
+func Candidates(code string) []string {
+	norm := Normalize(code)
+	if norm == "" {
+		return nil
+	}
+	candidates := []string{norm}
+	prefix, seq := splitCode(norm)
+	switch {
+	case prefix == "":
+	case numericPattern.MatchString(seq):
+		candidates = append(candidates, seq)
+	case labelPrefix.MatchString(prefix):
+		candidates = append(candidates, strings.TrimLeft(prefix, "0123456789")+"-"+seq)
+	}
+	return candidates
+}
+
+// IsEquivalent reports whether two catalogue numbers may identify the same movie:
+// a candidate of one is format-equivalent to the other (e.g. 200GANA-3458 vs
+// GANA-3458, CARIB-060326-001 vs 060326-001, or ABC-00123 vs ABC-123).
 func IsEquivalent(a, b string) bool {
-	normA := Normalize(a)
-	normB := Normalize(b)
-	if normA == "" || normB == "" {
-		return false
-	}
-	if normA == normB {
-		return true
-	}
+	return relaxesTo(a, b) || relaxesTo(b, a)
+}
 
-	prefixA, seqA := splitCode(normA)
-	prefixB, seqB := splitCode(normB)
-
-	// Core sequence must be non-empty and equal.
-	if seqA == "" || seqA != seqB {
-		return false
-	}
-
-	// Case 1: Pure numeric/date sequence without prefix matched against a studio-prefixed date code.
-	// e.g. "060326-001" vs "CARIB-060326-001"
-	if prefixA == "" || prefixB == "" {
-		return numericPattern.MatchString(seqA)
-	}
-
-	// Case 2: Distributor prepended digits to a catalogue prefix.
-	// e.g. "200GANA" vs "GANA", "259LUXU" vs "LUXU"
-	if strings.HasSuffix(prefixA, prefixB) {
-		leading := strings.TrimSuffix(prefixA, prefixB)
-		if isDigits(leading) {
+func relaxesTo(code, other string) bool {
+	for _, candidate := range Candidates(code) {
+		if IsFormatEquivalent(candidate, other) {
 			return true
 		}
 	}
-	if strings.HasSuffix(prefixB, prefixA) {
-		leading := strings.TrimSuffix(prefixB, prefixA)
-		if isDigits(leading) {
-			return true
-		}
-	}
-
 	return false
 }
 
@@ -265,4 +248,3 @@ func Prefix(code string) string {
 	}
 	return "OTHERS"
 }
-

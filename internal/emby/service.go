@@ -3,6 +3,7 @@ package emby
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,6 +42,7 @@ type Service struct {
 	cancel         context.CancelFunc
 	wg             sync.WaitGroup
 	gfriends       *gfriends.Client
+	media          MediaFetcher
 	actorSyncTimer *time.Timer
 	actorSyncMu    sync.Mutex
 }
@@ -99,6 +101,18 @@ func (s *Service) SetGFriends(g *gfriends.Client) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.gfriends = g
+}
+
+// MediaFetcher downloads catalogue images such as JavDB actor avatars.
+type MediaFetcher interface {
+	Media(ctx context.Context, rawURL string) (domain.Media, error)
+}
+
+// SetMediaFetcher configures the fallback source for actors missing from GFriends.
+func (s *Service) SetMediaFetcher(media MediaFetcher) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.media = media
 }
 
 // ScheduleActorSync schedules an actor avatar sync run after the given delay.
@@ -412,22 +426,24 @@ func (s *Service) ListPersonsWithoutAvatar(ctx context.Context) ([]PersonItem, e
 }
 
 // UploadPersonAvatar uploads an avatar image to an Emby person.
-func (s *Service) UploadPersonAvatar(ctx context.Context, personID string, imageBytes []byte) error {
+// Emby reads the image upload body as base64 text.
+func (s *Service) UploadPersonAvatar(ctx context.Context, personID string, image domain.Media) error {
 	s.mu.RLock()
 	cfg := s.cfg
 	s.mu.RUnlock()
 
-	if !cfg.Enabled || cfg.ServerURL == "" || cfg.APIKey == "" || personID == "" || len(imageBytes) == 0 {
+	if !cfg.Enabled || cfg.ServerURL == "" || cfg.APIKey == "" || personID == "" || len(image.Body) == 0 {
 		return nil
 	}
 
 	reqURL := fmt.Sprintf("%s/Items/%s/Images/Primary?api_key=%s",
 		strings.TrimRight(cfg.ServerURL, "/"), url.PathEscape(personID), url.QueryEscape(cfg.APIKey))
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewReader(imageBytes))
+	encoded := base64.StdEncoding.EncodeToString(image.Body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, strings.NewReader(encoded))
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Type", "image/jpeg")
+	req.Header.Set("Content-Type", image.ContentType)
 	req.Header.Set("X-Emby-Token", cfg.APIKey)
 
 	resp, err := s.client.Do(req)
@@ -447,7 +463,7 @@ func (s *Service) UploadPersonAvatar(ctx context.Context, personID string, image
 func (s *Service) SyncActorAvatars(ctx context.Context) (int, error) {
 	s.mu.RLock()
 	cfg := s.cfg
-	g := s.gfriends
+	g, media := s.gfriends, s.media
 	s.mu.RUnlock()
 
 	if !cfg.Enabled || !cfg.IsSyncActors() || cfg.ServerURL == "" || cfg.APIKey == "" {
@@ -463,6 +479,14 @@ func (s *Service) SyncActorAvatars(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 
+	if g != nil {
+		if err := g.EnsureIndex(ctx); err != nil {
+			// Skip GFriends for this run instead of re-downloading its index per actor.
+			slog.WarnContext(ctx, "gfriends index unavailable; using JavDB avatars only", "error", err)
+			g = nil
+		}
+	}
+
 	slog.InfoContext(ctx, "emby actor avatar sync started", "missing_count", len(missing))
 	uploaded := 0
 
@@ -471,26 +495,9 @@ func (s *Service) SyncActorAvatars(ctx context.Context) (int, error) {
 			return uploaded, err
 		}
 
-		var avatarBytes []byte
-		// 1. Try GFriends
-		if g != nil {
-			data, err := g.FetchAvatar(ctx, person.Name)
-			if err == nil && len(data) > 0 {
-				avatarBytes = data
-			}
-		}
-
-		// 2. Fallback to local DB Actor avatar (from JavDB)
-		if len(avatarBytes) == 0 && s.db != nil {
-			act, err := s.db.Actor.Query().Where(actor.NameEQ(person.Name)).First(ctx)
-			if err == nil && act != nil && act.Avatar != nil && *act.Avatar != "" {
-				avatarBytes, _ = s.downloadImage(ctx, *act.Avatar)
-			}
-		}
-
-		// 3. Upload if found
-		if len(avatarBytes) > 0 {
-			if err := s.UploadPersonAvatar(ctx, person.ID, avatarBytes); err != nil {
+		avatar, found := s.findAvatar(ctx, g, media, person.Name)
+		if found {
+			if err := s.UploadPersonAvatar(ctx, person.ID, avatar); err != nil {
 				slog.WarnContext(ctx, "failed to upload avatar for actor", "name", person.Name, "error", err)
 			} else {
 				uploaded++
@@ -510,18 +517,24 @@ func (s *Service) SyncActorAvatars(ctx context.Context) (int, error) {
 	return uploaded, nil
 }
 
-func (s *Service) downloadImage(ctx context.Context, imgURL string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, imgURL, nil)
+// findAvatar prefers GFriends and falls back to the JavDB avatar of a scraped actor.
+func (s *Service) findAvatar(ctx context.Context, g *gfriends.Client, media MediaFetcher, name string) (domain.Media, bool) {
+	if g != nil {
+		if data, err := g.FetchAvatar(ctx, name); err == nil && len(data) > 0 {
+			return domain.Media{ContentType: http.DetectContentType(data), Body: data}, true
+		}
+	}
+	if media == nil || s.db == nil {
+		return domain.Media{}, false
+	}
+	act, err := s.db.Actor.Query().Where(actor.Or(actor.NameEQ(name), actor.NameZhtEQ(name)), actor.AvatarNotNil()).First(ctx)
+	if err != nil || *act.Avatar == "" {
+		return domain.Media{}, false
+	}
+	image, err := media.Media(ctx, *act.Avatar)
 	if err != nil {
-		return nil, err
+		slog.DebugContext(ctx, "failed to download JavDB actor avatar", "name", name, "error", err)
+		return domain.Media{}, false
 	}
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("download status: %d", resp.StatusCode)
-	}
-	return io.ReadAll(io.LimitReader(resp.Body, 10<<20))
+	return image, true
 }

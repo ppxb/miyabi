@@ -2,10 +2,11 @@ package scan
 
 import (
 	"context"
+	"maps"
+	"slices"
 
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/pan"
 	subpkg "github.com/ppxb/miyabi/internal/subtitle"
 )
@@ -27,17 +28,11 @@ func IndexDirectorySubtitles(ctx context.Context, tx *ent.Tx, videos []Video, su
 		return nil
 	}
 
-	numbers := make([]string, 0, len(codes))
-	for c := range codes {
-		numbers = append(numbers, c)
-	}
-	movieRecords, err := tx.Movie.Query().Where(movie.CodeIn(numbers...)).Select(movie.FieldID, movie.FieldCode).All(ctx)
+	matched, err := MatchMovies(ctx, tx, slices.Collect(maps.Keys(codes)))
 	if err != nil {
 		return err
 	}
-	for _, m := range movieRecords {
-		codes[m.Code] = m.ID
-	}
+	maps.Copy(codes, matched)
 
 	// If there is only one movie in this directory, it is an exclusive directory
 	var exclusiveMovieID int

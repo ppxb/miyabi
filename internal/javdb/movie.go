@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/ppxb/miyabi/internal/codeid"
@@ -80,54 +81,45 @@ func movieReferencesFromWire(ctx context.Context, movieID, field string, source 
 	return result
 }
 
-// ResolveMovieID finds the single distinct movie ID matching the catalogue number
-// under format equivalence rules (accepting delimiter variations and numeric padding zero
-// differences, e.g. ABC00123 vs ABC-123 or ABP-001 vs ABP-1).
-// Duplicate rows for the same ID are allowed; multiple distinct matching candidates are
-// strictly rejected to prevent ambiguity.
+// ResolveMovieID finds the single distinct movie ID matching the catalogue number.
+// Candidates from codeid.Candidates are matched in priority order, so an exact
+// spelling wins over a relaxed one such as 326IHD-005 -> IHD-005. Each candidate
+// accepts format-equivalent numbers (ABC00123 vs ABC-123 or ABP-001 vs ABP-1).
+// Duplicate rows for the same ID are allowed; multiple distinct matching movies
+// for one candidate are strictly rejected to prevent ambiguity.
 func (c *Client) ResolveMovieID(ctx context.Context, number string) (string, error) {
-	wanted := codeid.Normalize(number)
-	if wanted == "" {
+	candidates := codeid.Candidates(number)
+	if len(candidates) == 0 {
 		return "", errors.New("catalogue number is required")
 	}
 
-	movies, err := c.Search(ctx, wanted, domain.SearchOptions{
-		Zone:  domain.ZoneAll,
-		Page:  1,
-		Limit: 100,
-	})
-	if err != nil {
-		return "", err
+	// Search results are fuzzy, so every response is checked against all
+	// candidates before issuing the next query.
+	queries := slices.Clone(candidates)
+	for _, candidate := range candidates {
+		if unpadded, ok := codeid.UnpaddedNumericCandidate(candidate); ok {
+			queries = append(queries, unpadded)
+		}
 	}
-
-	matched, err := matchCandidate(movies, wanted)
-	if err != nil {
-		return "", err
-	}
-	if matched != "" {
-		return matched, nil
-	}
-
-	// If initial search produced no exact or format-equivalent match, attempt fallback
-	// search when wanted has leading zeros in a numeric sequence (e.g. "ABC-00123" -> search "ABC-123").
-	if unpadded, ok := codeid.UnpaddedNumericCandidate(wanted); ok {
-		fallbackMovies, err := c.Search(ctx, unpadded, domain.SearchOptions{
+	var movies []domain.Movie
+	for _, query := range queries {
+		results, err := c.Search(ctx, query, domain.SearchOptions{
 			Zone:  domain.ZoneAll,
 			Page:  1,
 			Limit: 100,
 		})
-		if err == nil {
-			fallbackMatched, err := matchCandidate(fallbackMovies, wanted)
-			if err != nil {
-				return "", err
-			}
-			if fallbackMatched != "" {
-				return fallbackMatched, nil
+		if err != nil {
+			return "", err
+		}
+		movies = append(movies, results...)
+		for _, candidate := range candidates {
+			if matched, err := matchCandidate(movies, candidate); err != nil || matched != "" {
+				return matched, err
 			}
 		}
 	}
 
-	return "", fmt.Errorf("catalogue number %s was not found on JavDB", wanted)
+	return "", fmt.Errorf("catalogue number %s was not found on JavDB", candidates[0])
 }
 
 func matchCandidate(movies []domain.Movie, wanted string) (string, error) {
