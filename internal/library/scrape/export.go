@@ -1,10 +1,12 @@
 package scrape
 
 import (
+	"bytes"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/ppxb/miyabi/internal/codeid"
@@ -16,6 +18,20 @@ import (
 )
 
 const defaultEmbyDir = "./data/emby"
+
+// STRMPlayPath is the API route prefix for media streaming playback in .strm files.
+const STRMPlayPath = "/api/strm/play/"
+
+var strmPlayRegex = regexp.MustCompile(`/api/strm/play/([a-zA-Z0-9_\-]+)`)
+
+// ParseSTRMFileID extracts the 115 file ID from a .strm file's content or URL.
+func ParseSTRMFileID(content string) string {
+	match := strmPlayRegex.FindStringSubmatch(content)
+	if len(match) > 1 {
+		return match[1]
+	}
+	return ""
+}
 
 func defaultPublicURL() string {
 	return fmt.Sprintf("http://%s:8080", netx.OutboundIP())
@@ -36,14 +52,16 @@ func STRMContent(publicURL, fileID, strmToken string) []byte {
 	if publicURL == "" {
 		publicURL = defaultPublicURL()
 	}
-	content := publicURL + "/api/strm/play/" + fileID
+	publicURL = strings.TrimRight(strings.TrimSpace(publicURL), "/")
+	content := publicURL + STRMPlayPath + fileID
 	if strmToken != "" {
 		content += "?token=" + url.QueryEscape(strmToken)
 	}
 	return []byte(content + "\n")
 }
 
-// RewriteSTRM walks the Emby export directory and updates the baseUrl of all existing .strm files.
+// RewriteSTRM walks the Emby export directory and updates all existing .strm files
+// to use the active publicURL and strmToken.
 // It returns the count of rewritten files.
 func RewriteSTRM(embyDir, publicURL, strmToken string) (int, error) {
 	if embyDir == "" {
@@ -66,19 +84,13 @@ func RewriteSTRM(embyDir, publicURL, strmToken string) (int, error) {
 		if err != nil {
 			return nil
 		}
-		line := strings.TrimSpace(string(data))
-		const pattern = "/api/strm/play/"
-		idx := strings.Index(line, pattern)
-		if idx == -1 {
+		fileID := ParseSTRMFileID(string(data))
+		if fileID == "" {
 			return nil
 		}
-		suffix := line[idx:]
-		if strmToken != "" && !strings.Contains(suffix, "?token=") {
-			suffix += "?token=" + url.QueryEscape(strmToken)
-		}
-		newLine := publicURL + suffix + "\n"
-		if line != strings.TrimSpace(newLine) {
-			if err := os.WriteFile(path, []byte(newLine), 0o644); err == nil {
+		newContent := STRMContent(publicURL, fileID, strmToken)
+		if !bytes.Equal(bytes.TrimSpace(data), bytes.TrimSpace(newContent)) {
+			if err := os.WriteFile(path, newContent, 0o644); err == nil {
 				rewritten++
 			}
 		}

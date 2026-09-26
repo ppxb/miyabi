@@ -233,6 +233,52 @@ func TestRewriteSTRM(t *testing.T) {
 	if err != nil || count2 != 0 {
 		t.Fatalf("expected 0 files rewritten on second run, got %d (err: %v)", count2, err)
 	}
+
+	// Token rotation test: rotating token to newtoken
+	count3, err := RewriteSTRM(tempDir, "http://10.32.217.101:8080", "newtoken")
+	if err != nil || count3 != 1 {
+		t.Fatalf("expected 1 file rewritten on token rotation, got %d (err: %v)", count3, err)
+	}
+	updated3, err := os.ReadFile(strmPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedRotated := "http://10.32.217.101:8080/api/strm/play/12345?token=newtoken\n"
+	if string(updated3) != expectedRotated {
+		t.Fatalf("expected %q, got %q", expectedRotated, string(updated3))
+	}
+
+	// Token clearing test: removing token
+	count4, err := RewriteSTRM(tempDir, "http://10.32.217.101:8080", "")
+	if err != nil || count4 != 1 {
+		t.Fatalf("expected 1 file rewritten on token removal, got %d (err: %v)", count4, err)
+	}
+	updated4, err := os.ReadFile(strmPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedNoToken := "http://10.32.217.101:8080/api/strm/play/12345\n"
+	if string(updated4) != expectedNoToken {
+		t.Fatalf("expected %q, got %q", expectedNoToken, string(updated4))
+	}
+}
+
+func TestParseSTRMFileID(t *testing.T) {
+	for _, tc := range []struct {
+		input string
+		want  string
+	}{
+		{"http://127.0.0.1:8080/api/strm/play/12345", "12345"},
+		{"http://127.0.0.1:8080/api/strm/play/12345?token=abc", "12345"},
+		{"http://10.0.0.1:8080/api/strm/play/video-101\n", "video-101"},
+		{"http://10.0.0.1:8080/api/strm/play/local-abcdef123456?token=secret\n", "local-abcdef123456"},
+		{"invalid strm content", ""},
+		{"http://127.0.0.1:8080/api/other/12345", ""},
+	} {
+		if got := ParseSTRMFileID(tc.input); got != tc.want {
+			t.Errorf("ParseSTRMFileID(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
 }
 
 

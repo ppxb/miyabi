@@ -27,7 +27,7 @@
 
 - [x] **1.** ✔ `web/pnpm-lock.yaml` 仍残留 `@vidstack/react`、`hls.js`（7fe1cba 只改了 package.json），Dockerfile `pnpm install --frozen-lockfile` 必然失败 → 本地 `pnpm install` 重新生成锁文件。
 - [x] **2.** ✔ `internal/library/scan/walker.go:98`、`:156` 断点续扫每次生成新 scanID，却只遍历剩余目录；`reconcile.go:47` 的 `ScanIDNEQ` 会把重启前已��目录的文件判为过期删除，连带影片与刮削结果 → scanID 持久化进 payload，续扫沿用。
-- [ ] **3.** ✔ `internal/library/scrape/export.go:76` `RewriteSTRM` 仅在"没有 token"时追加，token 轮换后旧值保留 → 全部 401。应解析 fileID 后用 `STRMContent` 整行重生成；`"/api/strm/play/"` 在 `export.go:39`、`:70`、`scan/local.go:26` 三处硬编码需收敛。
+- [x] **3.** ✔ `internal/library/scrape/export.go:76` `RewriteSTRM` 仅在"没有 token"时追加，token 轮换后旧值保留 → 全部 401。应解析 fileID 后用 `STRMContent` 整行重生成；`"/api/strm/play/"` 在 `export.go:39`、`:70`、`scan/local.go:26` 三处硬编码需收敛。
 - [ ] **4.** 导出配置数据竞争：`internal/emby/service.go:200` `UpdateConfig` 在 HTTP goroutine 无锁写 `scan.Scanner` / `scrape.Service` 的 `embyDir/publicURL/strmToken`，任务 worker 同时在读（`cover.go:266`、`walker.go:115`）。
 - [ ] **5.** 导出目录双来源：`internal/app/app.go:142-154` 用环境变量 `cfg.EmbyDir`，emby 用数据库中的 `LocalDir`（`emby/service.go:70`），修改其一后 Emby 通知路径错误；`translatePath` 兜底返回 `mediaPath/<basename>`（`emby/service.go:474`）也是错误路径，应跳过。
 - [ ] **6.** `internal/app/app.go:152`、`internal/emby/service.go:205` 裸 goroutine 执行 `RewriteSTRM`，不受 ctx / WaitGroup 管理，会与导出任务并发写同一批 .strm。

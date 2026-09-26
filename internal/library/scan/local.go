@@ -8,7 +8,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/ppxb/miyabi/internal/codeid"
@@ -22,8 +21,6 @@ import (
 	"github.com/ppxb/miyabi/internal/nfo"
 	subpkg "github.com/ppxb/miyabi/internal/subtitle"
 )
-
-var playURLRegex = regexp.MustCompile(`/api/strm/play/([a-zA-Z0-9_\-]+)`)
 
 // LocalScanResult summarizes the outcome of a local directory scan.
 type LocalScanResult struct {
@@ -216,9 +213,7 @@ func (s *LocalScanner) ingestMedia(
 		fileID := ""
 		if domain.IsSTRM(mediaName) {
 			content, _ := os.ReadFile(mediaPath)
-			if match := playURLRegex.FindSubmatch(content); len(match) > 1 {
-				fileID = string(match[1])
-			}
+			fileID = scrape.ParseSTRMFileID(string(content))
 		}
 		rel, _ := filepath.Rel(rootDir, mediaPath)
 		if fileID == "" {
