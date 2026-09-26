@@ -400,12 +400,57 @@ func (s *Service) sendBatch(ctx context.Context, localPaths []string) error {
 		return fmt.Errorf("emby returned status %d: %s", resp.StatusCode, string(body))
 	}
 
+	if err := s.RefreshLibrary(ctx); err != nil {
+		slog.WarnContext(ctx, "failed to trigger emby library refresh", "error", err)
+	}
+
+	return nil
+}
+
+// RefreshLibrary requests Emby to immediately scan its media library.
+func (s *Service) RefreshLibrary(ctx context.Context) error {
+	s.mu.RLock()
+	cfg := s.cfg
+	s.mu.RUnlock()
+
+	if !cfg.Enabled || cfg.ServerURL == "" || cfg.APIKey == "" {
+		return nil
+	}
+
+	reqURL := fmt.Sprintf("%s/Library/Refresh", strings.TrimRight(cfg.ServerURL, "/"))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("X-Emby-Token", cfg.APIKey)
+	q := req.URL.Query()
+	q.Set("api_key", cfg.APIKey)
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("emby /Library/Refresh returned status %d: %s", resp.StatusCode, string(body))
+	}
 	return nil
 }
 
 func (s *Service) translatePath(localPath, localDir, mediaPath string) string {
 	localPath = filepath.Clean(localPath)
 	if mediaPath == "" {
+		if !filepath.IsAbs(localPath) && !strings.HasPrefix(localPath, "/") && !strings.HasPrefix(localPath, "\\") {
+			if abs, err := filepath.Abs(localPath); err == nil {
+				localPath = abs
+			}
+		}
+		if filepath.IsAbs(localPath) && filepath.VolumeName(localPath) != "" {
+			return filepath.Clean(localPath)
+		}
 		return filepath.ToSlash(localPath)
 	}
 
@@ -416,6 +461,13 @@ func (s *Service) translatePath(localPath, localDir, mediaPath string) string {
 		if err == nil && !strings.HasPrefix(rel, "..") {
 			slashRel := filepath.ToSlash(rel)
 			return path.Join(mediaPath, slashRel)
+		}
+		if absLocalDir, err1 := filepath.Abs(cleanLocalDir); err1 == nil {
+			if absLocalPath, err2 := filepath.Abs(localPath); err2 == nil {
+				if rel2, err3 := filepath.Rel(absLocalDir, absLocalPath); err3 == nil && !strings.HasPrefix(rel2, "..") {
+					return path.Join(mediaPath, filepath.ToSlash(rel2))
+				}
+			}
 		}
 	}
 

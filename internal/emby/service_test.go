@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -76,6 +77,12 @@ func TestEmbyService_TranslatePath(t *testing.T) {
 	if got != "/app/data/emby/IPX/IPX-123" {
 		t.Errorf("expected /app/data/emby/IPX/IPX-123, got %q", got)
 	}
+
+	// Relative path with empty media path resolves to absolute
+	got = s.translatePath("data/emby/IPX/IPX-123", "data/emby", "")
+	if !filepath.IsAbs(got) {
+		t.Errorf("expected absolute path for relative input with empty media path, got %q", got)
+	}
 }
 
 func TestEmbyService_Ping(t *testing.T) {
@@ -136,6 +143,10 @@ func TestEmbyService_NotifyUpdatedBatch(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
 				receivedUpdates <- req.Updates
 			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if r.URL.Path == "/Library/Refresh" && r.Method == http.MethodPost {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
