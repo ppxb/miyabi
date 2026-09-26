@@ -86,19 +86,29 @@ func TestDownloadURLDecodesMetadataSources(t *testing.T) {
 }
 
 func TestDownloadURLRespectsCallerUserAgent(t *testing.T) {
-	client := New()
-	defer client.Close()
-	const customUA = "VidHub/1.8.0"
-	client.http.SetTransport(offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
-		if request.UserAgent() != customUA {
-			t.Errorf("got User-Agent %q, want %q", request.UserAgent(), customUA)
-		}
-		body := `{"state":true,"code":0,"data":{"42":{"url":{"url":"https://cdn.example/video.mp4"}}}}`
-		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(body)), Request: request}, nil
-	}))
-	address, err := client.DownloadURL(t.Context(), "token", "pick", customUA)
-	if err != nil || address != "https://cdn.example/video.mp4" {
-		t.Fatalf("DownloadURL with custom UA = %q, %v", address, err)
+	for _, tc := range []struct {
+		name    string
+		inputUA string
+		wantUA  string
+	}{
+		{name: "custom UA", inputUA: "VidHub/1.8.0", wantUA: "VidHub/1.8.0"},
+		{name: "empty UA", inputUA: "", wantUA: ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := New()
+			defer client.Close()
+			client.http.SetTransport(offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
+				if request.UserAgent() != tc.wantUA {
+					t.Errorf("got User-Agent %q, want %q", request.UserAgent(), tc.wantUA)
+				}
+				body := `{"state":true,"code":0,"data":{"42":{"url":{"url":"https://cdn.example/video.mp4"}}}}`
+				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(body)), Request: request}, nil
+			}))
+			address, err := client.DownloadURL(t.Context(), "token", "pick", tc.inputUA)
+			if err != nil || address != "https://cdn.example/video.mp4" {
+				t.Fatalf("DownloadURL with UA %q = %q, %v", tc.inputUA, address, err)
+			}
+		})
 	}
 }
 

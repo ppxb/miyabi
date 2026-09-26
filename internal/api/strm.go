@@ -43,6 +43,9 @@ func strmStreamHandler(relay STRMRelay, token string, gate AccessGate) gin.Handl
 						c.Header(name, value)
 					}
 				}
+				if c.Writer.Header().Get("Content-Type") == "" || c.Writer.Header().Get("Content-Type") == "application/octet-stream" {
+					c.Header("Content-Type", "video/mp4")
+				}
 				c.Status(response.StatusCode)
 				return
 			}

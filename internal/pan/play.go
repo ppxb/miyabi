@@ -27,13 +27,16 @@ func (client *Client) DownloadURL(ctx context.Context, accessToken, pickCode, us
 		} `json:"data"`
 	}
 	ua := strings.TrimSpace(userAgent)
-	if ua == "" {
-		ua = mediaUserAgent
+	req := client.http.R().SetContext(ctx).SetAuthToken(accessToken).
+		SetFormData(map[string]string{"pick_code": pickCode})
+	if ua != "" {
+		req.SetHeader("User-Agent", ua)
+	} else {
+		req.SetHeader("User-Agent", "__EMPTY__")
 	}
 	result, err := apiRequest[downloadURLWire](
 		client,
-		client.http.R().SetContext(ctx).SetAuthToken(accessToken).
-			SetHeader("User-Agent", ua).SetFormData(map[string]string{"pick_code": pickCode}),
+		req,
 		http.MethodPost,
 		apiURL+"/open/ufile/downurl",
 		"download URL",

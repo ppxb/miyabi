@@ -56,6 +56,10 @@ func newPanTransport(base http.RoundTripper, limiter *rate.Limiter, maxConcurren
 }
 
 func (t *panTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Header.Get("User-Agent") == "__EMPTY__" {
+		req.Header.Del("User-Agent")
+		req.Header["User-Agent"] = []string{""}
+	}
 	// 1. Limit concurrent in-flight requests
 	select {
 	case t.inFlight <- struct{}{}:

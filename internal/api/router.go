@@ -69,6 +69,8 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	strmHandler := strmStreamHandler(deps.STRM, deps.STRMToken, deps.Access)
 	api.GET("/strm/play/:fileID", noStore(), strmHandler)
 	api.HEAD("/strm/play/:fileID", noStore(), strmHandler)
+	api.GET("/strm/play/:fileID/*filename", noStore(), strmHandler)
+	api.HEAD("/strm/play/:fileID/*filename", noStore(), strmHandler)
 
 	protected := api.Group("", authMiddleware(deps.Access))
 

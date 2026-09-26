@@ -11,6 +11,10 @@ import (
 type offlineRoundTrip func(*http.Request) (*http.Response, error)
 
 func (roundTrip offlineRoundTrip) RoundTrip(request *http.Request) (*http.Response, error) {
+	if request.Header.Get("User-Agent") == "__EMPTY__" {
+		request.Header.Del("User-Agent")
+		request.Header["User-Agent"] = []string{""}
+	}
 	return roundTrip(request)
 }
 
