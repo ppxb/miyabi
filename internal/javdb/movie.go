@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
-	"slices"
 	"strings"
 
 	"github.com/ppxb/miyabi/internal/codeid"
@@ -82,82 +81,96 @@ func movieReferencesFromWire(ctx context.Context, movieID, field string, source 
 }
 
 // ResolveMovieID finds the single distinct movie ID matching the catalogue number.
-// Candidates from codeid.Candidates are matched in priority order, so an exact
-// spelling wins over a relaxed one such as 326IHD-005 -> IHD-005. Each candidate
-// accepts format-equivalent numbers (ABC00123 vs ABC-123 or ABP-001 vs ABP-1).
+// Candidates from codeid.Layers are matched in priority order:
+// Level 0: 完整原貌 (Complete normalized catalogue candidate)
+// Level 1: 前缀回退 (Prefix stripped: distributor label digits or studio prefix removed)
+// Level 2: 后缀回退 (Suffix stripped: video part or subtitle marker removed)
+// Level 3: 双端回退 (Both prefix and suffix stripped)
+//
+// Higher-level candidates strictly win over lower-level ones.
+// In each layer, exact normalized matches strictly win over format-equivalent ones.
 // Duplicate rows for the same ID are allowed; multiple distinct matching movies
-// for one candidate are strictly rejected to prevent ambiguity.
+// for the same level are strictly rejected to prevent ambiguity.
 func (c *Client) ResolveMovieID(ctx context.Context, number string) (string, error) {
-	candidates := codeid.Candidates(number)
-	if len(candidates) == 0 {
+	layers := codeid.Layers(number)
+	if len(layers) == 0 {
 		return "", errors.New("catalogue number is required")
 	}
 
-	// Search results are fuzzy, so every response is checked against all
-	// candidates before issuing the next query.
-	queries := slices.Clone(candidates)
-	for _, candidate := range candidates {
-		if unpadded, ok := codeid.UnpaddedNumericCandidate(candidate); ok {
-			queries = append(queries, unpadded)
-		}
-	}
 	var movies []domain.Movie
-	for _, query := range queries {
-		results, err := c.Search(ctx, query, domain.SearchOptions{
-			Zone:  domain.ZoneAll,
-			Page:  1,
-			Limit: 100,
-		})
-		if err != nil {
-			return "", err
-		}
-		movies = append(movies, results...)
+	queried := make(map[string]bool)
+
+	for level, candidates := range layers {
 		for _, candidate := range candidates {
-			if matched, err := matchCandidate(movies, candidate); err != nil || matched != "" {
-				return matched, err
+			for _, query := range codeid.Queries(candidate) {
+				// If candidate is already satisfied by existing search results,
+				// do not issue redundant network requests.
+				id, err := matchCandidates(movies, []string{candidate}, false)
+				if err != nil {
+					return "", err
+				}
+				if id != "" {
+					break
+				}
+				if queried[query] {
+					continue
+				}
+				queried[query] = true
+
+				results, err := c.Search(ctx, query, domain.SearchOptions{
+					Zone:  domain.ZoneAll,
+					Page:  1,
+					Limit: 100,
+				})
+				if err != nil {
+					return "", err
+				}
+				movies = append(movies, results...)
+			}
+		}
+
+		// Recheck completed levels in priority order.
+		// A later query may uncover a stronger candidate from an earlier layer.
+		for _, completed := range layers[:level+1] {
+			for _, equivalent := range []bool{false, true} {
+				id, err := matchCandidates(movies, completed, equivalent)
+				if err != nil || id != "" {
+					return id, err
+				}
 			}
 		}
 	}
 
-	return "", fmt.Errorf("catalogue number %s was not found on JavDB", candidates[0])
+	return "", fmt.Errorf("catalogue number %s was not found on JavDB", layers[0][0])
 }
 
-func matchCandidate(movies []domain.Movie, wanted string) (string, error) {
-	var exactMatched string
-	exactIDs := make(map[string]struct{})
+func matchCandidates(movies []domain.Movie, candidates []string, equivalent bool) (string, error) {
+	var matchedID string
+	ids := make(map[string]struct{})
 	for _, movie := range movies {
-		if codeid.Normalize(movie.Code) == wanted {
-			if _, ok := exactIDs[movie.ID]; !ok {
-				exactIDs[movie.ID] = struct{}{}
-				exactMatched = movie.ID
+		for _, candidate := range candidates {
+			var matches bool
+			if !equivalent {
+				matches = codeid.Normalize(movie.Code) == candidate
+			} else {
+				matches = codeid.IsFormatEquivalent(movie.Code, candidate)
+			}
+			if matches {
+				if _, ok := ids[movie.ID]; !ok {
+					ids[movie.ID] = struct{}{}
+					matchedID = movie.ID
+				}
 			}
 		}
 	}
-	if len(exactIDs) > 1 {
-		return "", fmt.Errorf("catalogue number %s has multiple exact JavDB matches", wanted)
-	}
-	if len(exactIDs) == 1 {
-		return exactMatched, nil
-	}
-
-	var equivMatched string
-	equivIDs := make(map[string]struct{})
-	for _, movie := range movies {
-		if codeid.IsFormatEquivalent(movie.Code, wanted) {
-			if _, ok := equivIDs[movie.ID]; !ok {
-				equivIDs[movie.ID] = struct{}{}
-				equivMatched = movie.ID
-			}
+	if len(ids) > 1 {
+		kind := "exact"
+		if equivalent {
+			kind = "format-equivalent"
 		}
+		return "", fmt.Errorf("catalogue number %s has multiple %s JavDB matches", candidates[0], kind)
 	}
-	if len(equivIDs) > 1 {
-		return "", fmt.Errorf("catalogue number %s has multiple format-equivalent JavDB matches", wanted)
-	}
-	if len(equivIDs) == 1 {
-		return equivMatched, nil
-	}
-
-	return "", nil
+	return matchedID, nil
 }
 
 func moviesFromWire(ctx context.Context, source []wireMovie) ([]domain.Movie, error) {

@@ -5,73 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
 )
 
-// This experiment is deliberately test-only. Scan and import still use Parse;
+// This experiment tests multi-tier resolution. Scan and import still use Parse;
 // changing their identity/merge semantics requires a separate integration step.
-var (
-	prototypeToken   = regexp.MustCompile(`[A-Z0-9]+(?:[-_.][A-Z0-9]+)*`)
-	prototypeSerial  = regexp.MustCompile(`[A-Z][A-Z0-9]*[-_.]?[0-9]`)
-	prototypeNumeric = regexp.MustCompile(`^[0-9]+[-_][0-9]+(?:[-_][A-Z0-9]+)*$`)
-	prototypePart    = regexp.MustCompile(`^[0-9]{1,2}$`)
-)
 
 func prototypeLayers(filename string) [][]string {
-	name := strings.ToUpper(separators.Replace(filename))
-	for _, ext := range []string{".MP4", ".MKV", ".NFO", ".STRM"} {
-		name = strings.TrimSuffix(name, ext)
-	}
-	name = domainNoise.ReplaceAllString(name, " ")
-	name = codecNoise.ReplaceAllString(name, " ")
-	var complete string
-	for _, token := range prototypeToken.FindAllString(name, -1) {
-		if prototypeSerial.MatchString(token) || prototypeNumeric.MatchString(token) {
-			complete = Normalize(token)
-			break
-		}
-	}
-	if complete == "" {
-		return nil
-	}
-	layers := [][]string{{complete}}
-	seen := map[string]bool{complete: true}
-	for level := 0; level < len(layers); level++ {
-		var next []string
-		for _, code := range layers[level] {
-			var alternatives []string
-			prefix, rest, separated := strings.Cut(code, "-")
-			if separated {
-				if label := strings.TrimLeft(prefix, "0123456789"); label != "" && label != prefix {
-					alternatives = append(alternatives, label+"-"+rest)
-				}
-				if prototypeNumeric.MatchString(rest) {
-					alternatives = append(alternatives, rest)
-				}
-			}
-			if index := strings.LastIndexByte(code, '-'); index > 0 {
-				tail := code[index+1:]
-				// Short numeric tails are only a filename-part hypothesis. The
-				// complete code always gets a chance to resolve before removal.
-				if fileMarker.MatchString(tail) || prototypePart.MatchString(tail) {
-					alternatives = append(alternatives, code[:index])
-				}
-			}
-			for _, alternative := range alternatives {
-				if !seen[alternative] && (prototypeSerial.MatchString(alternative) || prototypeNumeric.MatchString(alternative)) {
-					seen[alternative] = true
-					next = append(next, alternative)
-				}
-			}
-		}
-		if len(next) > 0 {
-			layers = append(layers, next)
-		}
-	}
-	return layers
+	return Layers(filename)
 }
 
 // Query spellings change retrieval only; every returned number is still
@@ -180,6 +123,9 @@ func TestPrototypeLatestLiveSearch(t *testing.T) {
 	responses := catalogueSearchSamples(t)
 	for _, movie := range latestCatalogueSamples(t) {
 		t.Run(movie.ID, func(t *testing.T) {
+			if len(responses[strings.ToUpper(movie.Number)]) == 0 {
+				t.Skipf("no search results captured in fixtures for %s", movie.Number)
+			}
 			id, err := prototypeResolve(movie.Number+".mp4", func(query string) ([]catalogueSample, error) {
 				movies, captured := responses[query]
 				if !captured {
@@ -212,8 +158,18 @@ func TestPrototypeLatestFilenames(t *testing.T) {
 				for _, variant := range catalogueFilenames(movie.Number) {
 					t.Run(movie.ID+"/"+variant.name, func(t *testing.T) {
 						id, err := prototypeResolve(variant.filename, func(string) ([]catalogueSample, error) { return pool, nil })
-						if err != nil || id != movie.ID {
-							t.Errorf("%q resolved to %q, error = %v; want %s", variant.filename, id, err, movie.ID)
+						wantID := movie.ID
+						if variant.name == "numeric_part" {
+							partCode := Normalize(movie.Number + "-02")
+							for _, item := range pool {
+								if Normalize(item.Number) == partCode {
+									wantID = item.ID
+									break
+								}
+							}
+						}
+						if err != nil || id != wantID {
+							t.Errorf("%q resolved to %q, error = %v; want %s", variant.filename, id, err, wantID)
 						}
 					})
 				}
@@ -228,6 +184,15 @@ func TestPrototypeResolutionPriority(t *testing.T) {
 		responses                    map[string][]catalogueSample
 		queries                      []string
 	}{
+		{
+			name: "prefix fallback beats suffix fallback", input: "200START-637-C.mp4", want: "prefix",
+			responses: map[string][]catalogueSample{
+				"200START-637-C": {}, "200START637C": {}, "200START 637 C": {},
+				"START-637-C":   {{"prefix", "START-637-C"}},
+				"200START-637":  {{"suffix", "200START-637"}},
+			},
+			queries: []string{"200START-637-C", "200START637C", "200START 637 C", "START-637-C"},
+		},
 		{
 			name: "complete beats stripped prefix", input: "200GANA-3458.mp4", want: "complete",
 			responses: map[string][]catalogueSample{"200GANA-3458": {{"relaxed", "GANA-3458"}, {"complete", "200GANA-3458"}}},

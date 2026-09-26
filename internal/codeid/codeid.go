@@ -84,8 +84,129 @@ func Parse(name string) (string, bool) {
 			code += "-" + part
 			tail = tail[suffix[3]:]
 		}
+	} else if suffix := versionSuffix.FindStringSubmatch(name[match[3]:]); suffix != nil {
+		if !fileMarker.MatchString(suffix[1]) {
+			code += "-" + suffix[1]
+		}
 	}
 	return code, code != ""
+}
+
+var (
+	versionSuffix = regexp.MustCompile(`^[-_]([A-Z])(?:[^A-Z0-9]|$)`)
+	layerToken    = regexp.MustCompile(`[A-Z0-9]+(?:[-_.][A-Z0-9]+)*`)
+	layerSerial   = regexp.MustCompile(`[A-Z][A-Z0-9]*[-_.]?[0-9]`)
+	layerNumeric  = regexp.MustCompile(`^[0-9]+[-_][0-9]+(?:[-_][A-Z0-9]+)*$`)
+	layerPart     = regexp.MustCompile(`^[0-9]{1,2}$`)
+)
+
+// Layers generates catalogue candidates in priority order:
+// Level 0: 完整原貌 (Complete normalized catalogue candidate)
+// Level 1: 前缀回退 (Prefix stripped: distributor label digits or studio prefix removed)
+// Level 2: 后缀回退 (Suffix stripped: video part or subtitle marker removed)
+// Level 3: 双端回退 (Both prefix and suffix stripped)
+//
+// Each candidate is normalized and validated against valid catalogue formats.
+func Layers(name string) [][]string {
+	name = strings.ToUpper(separators.Replace(name))
+	for _, ext := range []string{".MP4", ".MKV", ".NFO", ".STRM"} {
+		name = strings.TrimSuffix(name, ext)
+	}
+	name = domainNoise.ReplaceAllString(name, " ")
+	name = codecNoise.ReplaceAllString(name, " ")
+	var complete string
+	for _, token := range layerToken.FindAllString(name, -1) {
+		if layerSerial.MatchString(token) || layerNumeric.MatchString(token) {
+			complete = Normalize(token)
+			break
+		}
+	}
+	if complete == "" {
+		if norm := Normalize(name); norm != "" {
+			complete = norm
+		} else {
+			return nil
+		}
+	}
+
+	stripPrefix := func(code string) []string {
+		var alts []string
+		prefix, rest, separated := strings.Cut(code, "-")
+		if separated {
+			if label := strings.TrimLeft(prefix, "0123456789"); label != "" && label != prefix {
+				alts = append(alts, label+"-"+rest)
+			}
+			if layerNumeric.MatchString(rest) {
+				alts = append(alts, rest)
+			}
+		}
+		return alts
+	}
+
+	stripSuffix := func(code string) []string {
+		var alts []string
+		if index := strings.LastIndexByte(code, '-'); index > 0 {
+			tail := code[index+1:]
+			if fileMarker.MatchString(tail) || layerPart.MatchString(tail) {
+				alts = append(alts, code[:index])
+			}
+		}
+		return alts
+	}
+
+	valid := func(code string) bool {
+		return layerSerial.MatchString(code) || layerNumeric.MatchString(code)
+	}
+
+	// Level 0: 完整名称
+	layers := [][]string{{complete}}
+	seen := map[string]bool{complete: true}
+
+	addLayer := func(candidates []string) {
+		var layer []string
+		for _, c := range candidates {
+			if !seen[c] && valid(c) {
+				seen[c] = true
+				layer = append(layer, c)
+			}
+		}
+		if len(layer) > 0 {
+			layers = append(layers, layer)
+		}
+	}
+
+	// Level 1: 前缀回退 (先剥离发行商/渠道前缀，保留尾部)
+	var prefixFallbacks []string
+	for _, code := range layers[0] {
+		prefixFallbacks = append(prefixFallbacks, stripPrefix(code)...)
+	}
+	addLayer(prefixFallbacks)
+
+	// Level 2: 后缀回退 (剥离分卷/字幕后缀)
+	var suffixFallbacks []string
+	for _, code := range layers[0] {
+		suffixFallbacks = append(suffixFallbacks, stripSuffix(code)...)
+	}
+	addLayer(suffixFallbacks)
+
+	// Level 3: 双端回退 (前缀与后缀均剥离)
+	var dualFallbacks []string
+	for _, code := range prefixFallbacks {
+		dualFallbacks = append(dualFallbacks, stripSuffix(code)...)
+	}
+	addLayer(dualFallbacks)
+
+	return layers
+}
+
+// Queries returns the search query candidates for a catalogue code,
+// including its unpadded numeric variant if applicable (e.g. "ABC-00123" -> ["ABC-00123", "ABC-123"]).
+func Queries(candidate string) []string {
+	queries := []string{candidate}
+	if unpadded, ok := UnpaddedNumericCandidate(candidate); ok {
+		queries = append(queries, unpadded)
+	}
+	return queries
 }
 
 // Normalize builds a comparison key for a complete catalogue number, applying
@@ -102,7 +223,11 @@ func Normalize(raw string) string {
 		return "FC2-PPV-" + match[1] + delimiters.ReplaceAllString(match[2], "-")
 	}
 	if match := numericPattern.FindStringSubmatch(value); match != nil {
-		return match[1] + "-" + match[2]
+		sep := "-"
+		if strings.Contains(value, "_") {
+			sep = "_"
+		}
+		return match[1] + sep + match[2]
 	}
 	// Preserve explicit prefixes such as T28 before trying an omitted separator.
 	// Known multipart formats also accept compact spellings without losing a numeric segment.
