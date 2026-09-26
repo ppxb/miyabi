@@ -87,11 +87,13 @@ func (s *Service) Export(ctx context.Context, reader Reader, movieID int, target
 	for _, track := range pending {
 		switch {
 		case track.PickCode != "":
-			ok, err := s.exportPanTrack(ctx, reader, track, target, exported)
-			if ok {
-				written++
+			if reader != nil {
+				ok, err := s.exportPanTrack(ctx, reader, track, target, exported)
+				if ok {
+					written++
+				}
+				errs = append(errs, err)
 			}
-			errs = append(errs, err)
 		case track.SourceURL != "":
 			// The exported file was removed, or predates exports beside the .strm.
 			// Drop the record and any stale copy; the online search replaces it.

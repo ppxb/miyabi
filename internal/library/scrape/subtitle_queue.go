@@ -128,12 +128,7 @@ func (q *SubtitleQueue) process(task SubtitleTask) {
 	ctx, cancel := context.WithTimeout(q.ctx, 2*time.Minute)
 	defer cancel()
 
-	sess, err := q.service.begin(ctx, task.MetaPayload)
-	if err != nil {
-		q.logger.WarnContext(ctx, "open 115 session for subtitle export", "code", task.Target.Code, "error", err)
-		return
-	}
-	written, err := q.service.subtitles.Export(ctx, sess, task.MovieID, task.Target)
+	written, err := q.service.subtitles.Export(ctx, nil, task.MovieID, task.Target)
 	if err != nil {
 		q.logger.WarnContext(ctx, "export subtitles", "code", task.Target.Code, "error", err)
 	}
