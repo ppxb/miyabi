@@ -1,14 +1,11 @@
 package scan
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand/v2"
-	"os"
 	"path"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -19,7 +16,6 @@ import (
 	"github.com/ppxb/miyabi/internal/ent"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scrape"
-	"github.com/ppxb/miyabi/internal/nfo"
 	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -73,29 +69,6 @@ func (s *Scanner) SetPacing(pace func(context.Context) error) {
 
 func (s *Scanner) SetMediaNotifier(notifier MediaNotifier) {
 	s.notifier = notifier
-}
-
-func (s *Scanner) writeFastSTRM(video Video) {
-	if s.embyDir == "" || video.Code == "" || !domain.IsVideo(video.Name) {
-		return
-	}
-	destDir := scrape.EmbyMovieDir(s.embyDir, video.Code)
-	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		return
-	}
-
-	strmPath := filepath.Join(destDir, nfo.FileStem(video.Code)+".strm")
-	newContent := scrape.STRMContent(s.publicURL, video.ID, s.strmToken)
-	if existing, err := os.ReadFile(strmPath); err == nil {
-		if bytes.Equal(bytes.TrimSpace(existing), bytes.TrimSpace(newContent)) {
-			return
-		}
-	}
-	if err := os.WriteFile(strmPath, newContent, 0o644); err == nil {
-		if s.notifier != nil {
-			s.notifier.NotifyUpdated(destDir)
-		}
-	}
 }
 
 // Run executes a library scan job: it walks the media directories, matches NFOs
@@ -161,7 +134,6 @@ func (s *Scanner) Run(ctx context.Context, job tasks.Job) error {
 			if err := savePage(path.Dir(payload.TargetPath), []Video{{File: info.File}}, func(videos []Video) []Video {
 				if videos[0].Code != "" {
 					payload.Scan.MatchedFiles, payload.Scan.Movies = 1, 1
-					s.writeFastSTRM(videos[0])
 				} else {
 					payload.Scan.UnmatchedFiles = 1
 				}
@@ -268,7 +240,6 @@ func (s *Scanner) Run(ctx context.Context, job tasks.Job) error {
 					if video.Code != "" {
 						payload.Scan.MatchedFiles++
 						codes[video.Code] = true
-						s.writeFastSTRM(video)
 					} else {
 						payload.Scan.UnmatchedFiles++
 					}
