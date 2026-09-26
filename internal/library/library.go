@@ -15,6 +15,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 	"github.com/ppxb/miyabi/internal/ent/tag"
+	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scan"
 	"github.com/ppxb/miyabi/internal/tasks"
@@ -147,6 +148,10 @@ func (s *Service) ScanLocal(ctx context.Context, rootDir string) (*scan.LocalSca
 		s.tasks.NotifyLibraryChanged()
 	}
 	return result, nil
+}
+
+func (s *Service) SetExportManager(mgr *export.Manager) {
+	s.scanner.SetExportManager(mgr)
 }
 
 func (s *Service) SetEmbyExport(embyDir, publicURL, strmToken string) {

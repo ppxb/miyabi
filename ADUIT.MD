@@ -28,9 +28,9 @@
 - [x] **1.** ✔ `web/pnpm-lock.yaml` 仍残留 `@vidstack/react`、`hls.js`（7fe1cba 只改了 package.json），Dockerfile `pnpm install --frozen-lockfile` 必然失败 → 本地 `pnpm install` 重新生成锁文件。
 - [x] **2.** ✔ `internal/library/scan/walker.go:98`、`:156` 断点续扫每次生成新 scanID，却只遍历剩余目录；`reconcile.go:47` 的 `ScanIDNEQ` 会把重启前已��目录的文件判为过期删除，连带影片与刮削结果 → scanID 持久化进 payload，续扫沿用。
 - [x] **3.** ✔ `internal/library/scrape/export.go:76` `RewriteSTRM` 仅在"没有 token"时追加，token 轮换后旧值保留 → 全部 401。应解析 fileID 后用 `STRMContent` 整行重生成；`"/api/strm/play/"` 在 `export.go:39`、`:70`、`scan/local.go:26` 三处硬编码需收敛。
-- [ ] **4.** 导出配置数据竞争：`internal/emby/service.go:200` `UpdateConfig` 在 HTTP goroutine 无锁写 `scan.Scanner` / `scrape.Service` 的 `embyDir/publicURL/strmToken`，任务 worker 同时在读（`cover.go:266`、`walker.go:115`）。
-- [ ] **5.** 导出目录双来源：`internal/app/app.go:142-154` 用环境变量 `cfg.EmbyDir`，emby 用数据库中的 `LocalDir`（`emby/service.go:70`），修改其一后 Emby 通知路径错误；`translatePath` 兜底返回 `mediaPath/<basename>`（`emby/service.go:474`）也是错误路径，应跳过。
-- [ ] **6.** `internal/app/app.go:152`、`internal/emby/service.go:205` 裸 goroutine 执行 `RewriteSTRM`，不受 ctx / WaitGroup 管理，会与导出任务并发写同一批 .strm。
+- [x] **4.** 导出配置数据竞争：`internal/emby/service.go:200` `UpdateConfig` 在 HTTP goroutine 无锁写 `scan.Scanner` / `scrape.Service` 的 `embyDir/publicURL/strmToken`，任务 worker 同时在读（`cover.go:266`、`walker.go:115`）。
+- [x] **5.** 导出目录双来源：`internal/app/app.go:142-154` 用环境变量 `cfg.EmbyDir`，emby 用数据库中的 `LocalDir`（`emby/service.go:70`），修改其一后 Emby 通知路径错误；`translatePath` 兜底返回 `mediaPath/<basename>`（`emby/service.go:474`）也是错误路径，应跳过。
+- [x] **6.** `internal/app/app.go:152`、`internal/emby/service.go:205` 裸 goroutine 执行 `RewriteSTRM`，不受 ctx / WaitGroup 管理，会与导出任务并发写同一批 .strm。
 - [ ] **7.** ✔ `internal/magnet/aggregator.go:92` + `internal/catalogue/magnets.go:33`：关闭的 JavBus 返回 `nil, nil` 被计为成功，JavDB 失败时返回空列表不报错，并被缓存 1 分钟（`catalogue/cache.go:85`）；monitor 当作"无磁力"处理甚至标记 stale → 区分"跳过"与"成功为空"，部分失败不入缓存。
 - [ ] **8.** ✔ `internal/netx/ssrf.go:134` SSRF 拨号检查同时作用于代理地址，`127.0.0.1:7890` 等本机 / 局域网代理被拦 → 开代理后字幕下载全部失败。仅在直连时检查。
 - [ ] **9.** ✔ `internal/netx/client.go:39` "Direct" 客户端克隆 `http.DefaultTransport`，自带 `ProxyFromEnvironment`，Docker 设了 `HTTPS_PROXY` 时 115 流量走代理；`netx/client_test.go` 靠 `Setenv` 清空环境变量掩盖了问题 → 显式 `transport.Proxy = nil`。
@@ -66,7 +66,7 @@
 
 ## 二、架构不合理
 
-- [ ] **37.** 导出配置 `(embyDir, publicURL, strmToken)` 复制在 `scan.Scanner`、`scrape.Service`、`library.Service`（仅透传）、`emby.Service`、`app.go` 共 5 处，靠 `SetEmbyExport` / `SetSTRMToken` / `SetSTRMExporters` 扇出同步（4~6 的根源）；scrape 另有 `defaultEmbyDir = "./data/emby"` 与写死 8080 端口的 `defaultPublicURL()`（`export.go:18-22`），与 `config.Load` 推导不一致 → 新建 `internal/export`（或并入 strm），持有��一 `atomic.Pointer[ExportConfig]` 并负责 STRM/NFO/图片目录布局与重写。
+- [x] **37.** 导出配置 `(embyDir, publicURL, strmToken)` 复制在 `scan.Scanner`、`scrape.Service`、`library.Service`（仅透传）、`emby.Service`、`app.go` 共 5 处，靠 `SetEmbyExport` / `SetSTRMToken` / `SetSTRMExporters` 扇出同步（4~6 的根源）；scrape 另有 `defaultEmbyDir = "./data/emby"` 与写死 8080 端口的 `defaultPublicURL()`（`export.go:18-22`），与 `config.Load` 推导不一致 → 新建 `internal/export`（或并入 strm），持有��一 `atomic.Pointer[ExportConfig]` 并负责 STRM/NFO/图片目录布局与重写。
 - [ ] **38.** 依赖方向反转：emby 导入 `library/scrape`（为 `RewriteSTRM`），scrape 又通过 `MediaNotifier` 回调 emby；`internal/database/indexes.go:8` 导入 tasks���仅为常量）；`internal/app/deps_test.go:17-18` 的 business 列表漏了 emby、subtitle，因此未拦截。
 - [ ] **39.** `internal/tasks` 通用包内含业务逻辑：`SubscriptionBatchPayload` / `EnqueueSubscriptionBatch` / `SaveSubscriptionBatch` / `BatchTaskInfo`（batch.go）、`EnsureScanTask` / `EnqueueScan` / `EnqueueFreshScan` / `ScanTaskInfo` / scrape-cover 折叠规则（workflow.go:219-248）、各业务 payload JSON 路径常量（payload.go:10-24）→ 分别迁回 monitor、library。
 - [ ] **40.** offline 下载记录存于 task 表（`KindOffline`，从不进入 pool），依赖 JSON payload + 手写表达式索引（`database/indexes.go`）查询；`scan/persist.go:17` 跨包用字符串 `"file_ids"` 调 `SetPayloadField` 改写 offline payload，而 offline 自身整体重编码 payload，二者前提矛盾；各处 `StatusQueued` 判断（add.go:53、sync.go:38/213、projection.go:86/145）对 offline 永不成立 → 独立 ent 表。

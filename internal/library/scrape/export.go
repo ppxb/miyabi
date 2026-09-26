@@ -1,108 +1,43 @@
 package scrape
 
 import (
-	"bytes"
+	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 
-	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
-	"github.com/ppxb/miyabi/internal/netx"
 	"github.com/ppxb/miyabi/internal/nfo"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
-const defaultEmbyDir = "./data/emby"
+// Re-export constants, types, and functions from internal/export.
+const STRMPlayPath = export.STRMPlayPath
 
-// STRMPlayPath is the API route prefix for media streaming playback in .strm files.
-const STRMPlayPath = "/api/strm/play/"
+type (
+	ExportConfig  = export.Config
+	ExportManager = export.Manager
+	MediaNotifier = export.MediaNotifier
+)
 
-var strmPlayRegex = regexp.MustCompile(`/api/strm/play/([a-zA-Z0-9_\-]+)`)
+var (
+	NewExportManager = export.NewManager
+	ParseSTRMFileID  = export.ParseSTRMFileID
+	EmbyMovieDir     = export.EmbyMovieDir
+	STRMContent      = export.STRMContent
+)
 
-// ParseSTRMFileID extracts the 115 file ID from a .strm file's content or URL.
-func ParseSTRMFileID(content string) string {
-	match := strmPlayRegex.FindStringSubmatch(content)
-	if len(match) > 1 {
-		return match[1]
-	}
-	return ""
-}
-
-func defaultPublicURL() string {
-	return fmt.Sprintf("http://%s:8080", netx.OutboundIP())
-}
-
-// EmbyMovieDir is the directory holding a movie's exported Emby files,
-// bucketed by catalogue prefix: <embyDir>/<prefix>/<code>.
-func EmbyMovieDir(embyDir, code string) string {
-	if embyDir == "" {
-		embyDir = defaultEmbyDir
-	}
-	return filepath.Join(embyDir, codeid.Prefix(code), code)
-}
-
-// STRMContent is the body of a .strm file: the relay URL that resolves the
-// 115 video to a fresh stream whenever Emby plays it.
-func STRMContent(publicURL, fileID, strmToken string) []byte {
-	if publicURL == "" {
-		publicURL = defaultPublicURL()
-	}
-	publicURL = strings.TrimRight(strings.TrimSpace(publicURL), "/")
-	content := publicURL + STRMPlayPath + fileID
-	if strmToken != "" {
-		content += "?token=" + url.QueryEscape(strmToken)
-	}
-	return []byte(content + "\n")
-}
-
-// RewriteSTRM walks the Emby export directory and updates all existing .strm files
-// to use the active publicURL and strmToken.
-// It returns the count of rewritten files.
+// RewriteSTRM forwards to export.RewriteSTRM with a background context.
 func RewriteSTRM(embyDir, publicURL, strmToken string) (int, error) {
-	if embyDir == "" {
-		embyDir = defaultEmbyDir
-	}
-	if publicURL == "" {
-		publicURL = defaultPublicURL()
-	}
-	publicURL = strings.TrimRight(strings.TrimSpace(publicURL), "/")
-
-	rewritten := 0
-	err := filepath.WalkDir(embyDir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() || !strings.EqualFold(filepath.Ext(path), ".strm") {
-			return nil
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-		fileID := ParseSTRMFileID(string(data))
-		if fileID == "" {
-			return nil
-		}
-		newContent := STRMContent(publicURL, fileID, strmToken)
-		if !bytes.Equal(bytes.TrimSpace(data), bytes.TrimSpace(newContent)) {
-			if err := os.WriteFile(path, newContent, 0o644); err == nil {
-				rewritten++
-			}
-		}
-		return nil
-	})
-	return rewritten, err
+	return export.RewriteSTRM(context.Background(), embyDir, publicURL, strmToken)
 }
 
 // ExportEmbyMedia writes .strm, .nfo, poster.jpg, and fanart.jpg files to the Emby directory structure.
 func ExportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, videos []pan.File, poster, fanart []byte) error {
 	stem := nfo.FileStem(code)
-	destDir := EmbyMovieDir(embyDir, code)
+	destDir := export.EmbyMovieDir(embyDir, code)
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return fmt.Errorf("create emby directory %s: %w", destDir, err)
 	}
@@ -138,13 +73,13 @@ func ExportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, 
 	// 3. Write STRM files LAST so media servers (Emby) watching via inotify detect complete assets
 	if len(videos) == 1 {
 		strmPath := filepath.Join(destDir, stem+".strm")
-		if err := os.WriteFile(strmPath, STRMContent(publicURL, videos[0].ID, strmToken), 0o644); err != nil {
+		if err := os.WriteFile(strmPath, export.STRMContent(publicURL, videos[0].ID, strmToken), 0o644); err != nil {
 			return fmt.Errorf("write strm file: %w", err)
 		}
 	} else if len(videos) > 1 {
 		for i, v := range videos {
 			strmPath := filepath.Join(destDir, fmt.Sprintf("%s-cd%d.strm", stem, i+1))
-			if err := os.WriteFile(strmPath, STRMContent(publicURL, v.ID, strmToken), 0o644); err != nil {
+			if err := os.WriteFile(strmPath, export.STRMContent(publicURL, v.ID, strmToken), 0o644); err != nil {
 				return fmt.Errorf("write strm file: %w", err)
 			}
 		}
@@ -153,18 +88,13 @@ func ExportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, 
 	return nil
 }
 
-// MediaNotifier receives notifications when exported media directories are written or updated.
-type MediaNotifier interface {
-	NotifyUpdated(localPath string)
-}
-
 // ExportLocalMovie exports an already-scraped ent.Movie record and cached artwork to the Emby directory if missing.
 func ExportLocalMovie(embyDir, publicURL, strmToken string, record *ent.Movie, images *mediaimage.Cache, notifiers ...MediaNotifier) error {
 	if record == nil || record.Code == "" {
 		return nil
 	}
 
-	destDir := EmbyMovieDir(embyDir, record.Code)
+	destDir := export.EmbyMovieDir(embyDir, record.Code)
 	stem := nfo.FileStem(record.Code)
 	nfoPath := filepath.Join(destDir, stem+".nfo")
 	posterPath := filepath.Join(destDir, "poster.jpg")

@@ -185,7 +185,7 @@ func (service *Service) subtitleTask(input MetadataPayload, videos []pan.File) *
 		MovieID:     input.MovieID,
 		MetaPayload: input,
 		Target: subtitle.Target{
-			Dir:           EmbyMovieDir(service.embyDir, input.Code),
+			Dir:           EmbyMovieDir(service.exportConfig().EmbyDir, input.Code),
 			Stem:          nfo.FileStem(input.Code),
 			Code:          input.Code,
 			Uncensored:    subtitle.IsUncensored(videos[0].Name),
@@ -263,11 +263,12 @@ func (service *Service) exportLocalMedia(ctx context.Context, input CoverPayload
 		}
 	}
 
-	if err := ExportEmbyMedia(service.embyDir, service.publicURL, service.strmToken, input.Code, doc, videos, poster, fanart); err != nil {
+	expCfg := service.exportConfig()
+	if err := ExportEmbyMedia(expCfg.EmbyDir, expCfg.PublicURL, expCfg.STRMToken, input.Code, doc, videos, poster, fanart); err != nil {
 		return err
 	}
-	if service.mediaNotifier != nil && service.embyDir != "" {
-		service.mediaNotifier.NotifyUpdated(EmbyMovieDir(service.embyDir, input.Code))
+	if service.mediaNotifier != nil && expCfg.EmbyDir != "" {
+		service.mediaNotifier.NotifyUpdated(EmbyMovieDir(expCfg.EmbyDir, input.Code))
 	}
 	return nil
 }

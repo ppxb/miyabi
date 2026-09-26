@@ -83,6 +83,12 @@ func TestEmbyService_TranslatePath(t *testing.T) {
 	if !filepath.IsAbs(got) {
 		t.Errorf("expected absolute path for relative input with empty media path, got %q", got)
 	}
+
+	// Path outside localDir returns empty string (should be skipped)
+	got = s.translatePath("/other/folder/movie", "/app/data/emby", "/media")
+	if got != "" {
+		t.Errorf("expected empty string for path outside localDir, got %q", got)
+	}
 }
 
 func TestEmbyService_Ping(t *testing.T) {

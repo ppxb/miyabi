@@ -22,8 +22,8 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/actor"
+	"github.com/ppxb/miyabi/internal/export"
 	"github.com/ppxb/miyabi/internal/gfriends"
-	"github.com/ppxb/miyabi/internal/library/scrape"
 )
 
 // ServerInfo holds basic Emby instance details.
@@ -50,6 +50,8 @@ type Service struct {
 	actorSyncMu      sync.Mutex
 	strmExporters    []STRMExporter
 	strmToken        string
+	exportMgr        *export.Manager
+	rewriteMu        sync.Mutex
 }
 
 // STRMExporter configures the STRM export settings across services.
@@ -143,6 +145,13 @@ func (s *Service) SetSTRMExporters(exporters ...STRMExporter) {
 	s.strmExporters = append(s.strmExporters, exporters...)
 }
 
+// SetExportManager configures the unified export manager.
+func (s *Service) SetExportManager(mgr *export.Manager) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.exportMgr = mgr
+}
+
 // ScheduleActorSync schedules an actor avatar sync run after the given delay.
 func (s *Service) ScheduleActorSync(delay time.Duration) {
 	s.actorSyncMu.Lock()
@@ -195,21 +204,32 @@ func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 
 	s.mu.Lock()
 	s.cfg = cfg
+	exportMgr := s.exportMgr
 	s.mu.Unlock()
 
-	if cfg.PublicURL != "" {
-		for _, exp := range exporters {
-			exp.SetEmbyExport(cfg.LocalDir, cfg.PublicURL, token)
-		}
-		if oldPublicURL != cfg.PublicURL {
-			go func() {
-				count, err := scrape.RewriteSTRM(cfg.LocalDir, cfg.PublicURL, token)
-				if err == nil && count > 0 {
-					slog.Info("rewrote strm files with updated public url", "count", count, "public_url", cfg.PublicURL)
-					s.NotifyUpdated(cfg.LocalDir)
-				}
-			}()
-		}
+	if exportMgr != nil && cfg.LocalDir != "" && cfg.PublicURL != "" {
+		exportMgr.Set(export.Config{
+			EmbyDir:   cfg.LocalDir,
+			PublicURL: cfg.PublicURL,
+			STRMToken: token,
+		})
+	}
+	for _, exp := range exporters {
+		exp.SetEmbyExport(cfg.LocalDir, cfg.PublicURL, token)
+	}
+
+	if cfg.PublicURL != "" && cfg.LocalDir != "" && oldPublicURL != cfg.PublicURL {
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			s.rewriteMu.Lock()
+			defer s.rewriteMu.Unlock()
+			count, err := export.RewriteSTRM(s.ctx, cfg.LocalDir, cfg.PublicURL, token)
+			if err == nil && count > 0 {
+				slog.Info("rewrote strm files with updated public url", "count", count, "public_url", cfg.PublicURL)
+				s.NotifyUpdated(cfg.LocalDir)
+			}
+		}()
 	}
 
 	if cfg.Enabled && cfg.IsSyncActors() {
@@ -217,6 +237,33 @@ func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 	}
 
 	return nil
+}
+
+// StartStartupSTRMRewrite triggers managed STRM rewriting on startup within the service lifecycle.
+func (s *Service) StartStartupSTRMRewrite(embyDir, publicURL, token string, logger *slog.Logger) {
+	if embyDir == "" || publicURL == "" {
+		return
+	}
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.rewriteMu.Lock()
+		defer s.rewriteMu.Unlock()
+		count, err := export.RewriteSTRM(s.ctx, embyDir, publicURL, token)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			if logger != nil {
+				logger.Error("failed to rewrite STRM files on startup", "error", err)
+			} else {
+				slog.Error("failed to rewrite STRM files on startup", "error", err)
+			}
+		} else if count > 0 {
+			if logger != nil {
+				logger.Info("rewrote STRM files on startup", "count", count, "url", publicURL)
+			} else {
+				slog.Info("rewrote STRM files on startup", "count", count, "url", publicURL)
+			}
+		}
+	}()
 }
 
 // Test validates connection parameters by querying /System/Info.
@@ -471,7 +518,7 @@ func (s *Service) translatePath(localPath, localDir, mediaPath string) string {
 		}
 	}
 
-	return path.Join(mediaPath, filepath.ToSlash(filepath.Base(localPath)))
+	return ""
 }
 
 // PersonItem represents an Emby person/actor entry.

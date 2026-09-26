@@ -19,6 +19,7 @@ import (
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/emby"
+	"github.com/ppxb/miyabi/internal/export"
 	"github.com/ppxb/miyabi/internal/gfriends"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/javdb"
@@ -135,29 +136,36 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	embySvc.SetGFriends(gfriendsClient)
 	embySvc.SetMediaFetcher(catalogueSvc)
 
+	activeEmbyDir := cfg.EmbyDir
 	activePublicURL := cfg.PublicURL
-	if embyCfg, err := embySvc.Config(ctx); err == nil && embyCfg.PublicURL != "" {
-		activePublicURL = embyCfg.PublicURL
+	if embyCfg, err := embySvc.Config(ctx); err == nil {
+		if embyCfg.LocalDir != "" {
+			activeEmbyDir = embyCfg.LocalDir
+		}
+		if embyCfg.PublicURL != "" {
+			activePublicURL = embyCfg.PublicURL
+		}
 	}
-	scrapeSvc.SetEmbyExport(cfg.EmbyDir, activePublicURL, cfg.STRMToken)
+
+	exportMgr := export.NewManager(export.Config{
+		EmbyDir:   activeEmbyDir,
+		PublicURL: activePublicURL,
+		STRMToken: cfg.STRMToken,
+	})
+
+	scrapeSvc.SetExportManager(exportMgr)
 	scrapeSvc.SetMediaNotifier(embySvc)
 	scrapeSvc.SetSubtitles(subtitleSvc)
-	libSvc.SetEmbyExport(cfg.EmbyDir, activePublicURL, cfg.STRMToken)
+
+	libSvc.SetExportManager(exportMgr)
 	libSvc.SetMediaNotifier(embySvc)
 	libSvc.SetPacing(scan.DefaultPacing)
 
 	embySvc.SetSTRMToken(cfg.STRMToken)
-	embySvc.SetSTRMExporters(scrapeSvc, libSvc)
+	embySvc.SetExportManager(exportMgr)
 
-	if activePublicURL != "" && cfg.EmbyDir != "" {
-		go func() {
-			count, err := scrape.RewriteSTRM(cfg.EmbyDir, activePublicURL, cfg.STRMToken)
-			if err != nil {
-				logger.Error("failed to rewrite STRM files on startup", "error", err)
-			} else if count > 0 {
-				logger.Info("rewrote STRM files on startup", "count", count, "url", activePublicURL)
-			}
-		}()
+	if activePublicURL != "" && activeEmbyDir != "" {
+		embySvc.StartStartupSTRMRewrite(activeEmbyDir, activePublicURL, cfg.STRMToken, logger)
 	}
 
 	taskRegistry.Register(tasks.NewHandler(tasks.KindScan, libSvc.Scan, libSvc.Finished))

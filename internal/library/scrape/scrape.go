@@ -17,6 +17,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 	"github.com/ppxb/miyabi/internal/ent/task"
+	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/subtitle"
@@ -72,10 +73,15 @@ type Service struct {
 	dirCache map[string]dirCacheEntry
 	dirTTL   time.Duration
 
-	embyDir       string
-	publicURL     string
-	strmToken     string
+	exportMgr     *export.Manager
 	mediaNotifier MediaNotifier
+}
+
+func (service *Service) exportConfig() export.Config {
+	if service.exportMgr != nil {
+		return service.exportMgr.Config()
+	}
+	return export.Config{}
 }
 
 // New creates a new scrape Service.
@@ -93,11 +99,21 @@ func New(db *ent.Client, d *drive.Drive, discover Discoverer, images *mediaimage
 	return service
 }
 
+// SetExportManager configures the unified export manager.
+func (service *Service) SetExportManager(mgr *export.Manager) {
+	service.exportMgr = mgr
+}
+
 // SetEmbyExport configures the local Emby export directory, public URL written into .strm files, and optional STRM token.
 func (service *Service) SetEmbyExport(embyDir, publicURL, strmToken string) {
-	service.embyDir = embyDir
-	service.publicURL = publicURL
-	service.strmToken = strmToken
+	if service.exportMgr == nil {
+		service.exportMgr = export.NewManager(export.Config{})
+	}
+	service.exportMgr.Set(export.Config{
+		EmbyDir:   embyDir,
+		PublicURL: publicURL,
+		STRMToken: strmToken,
+	})
 }
 
 // SetMediaNotifier configures the notifier for Emby media updates.

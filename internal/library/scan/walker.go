@@ -16,6 +16,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/pan"
@@ -42,9 +43,7 @@ type Scanner struct {
 	db        *ent.Client
 	images    *mediaimage.Cache
 	tasksSvc  *tasks.Service
-	embyDir   string
-	publicURL string
-	strmToken string
+	exportMgr *export.Manager
 	pace      func(context.Context) error
 	notifier  MediaNotifier
 }
@@ -59,10 +58,26 @@ func New(driveSvc *drive.Drive, db *ent.Client, images *mediaimage.Cache, tasksS
 	}
 }
 
+func (s *Scanner) exportConfig() export.Config {
+	if s.exportMgr != nil {
+		return s.exportMgr.Config()
+	}
+	return export.Config{}
+}
+
+func (s *Scanner) SetExportManager(mgr *export.Manager) {
+	s.exportMgr = mgr
+}
+
 func (s *Scanner) SetEmbyExport(embyDir, publicURL, strmToken string) {
-	s.embyDir = embyDir
-	s.publicURL = publicURL
-	s.strmToken = strmToken
+	if s.exportMgr == nil {
+		s.exportMgr = export.NewManager(export.Config{})
+	}
+	s.exportMgr.Set(export.Config{
+		EmbyDir:   embyDir,
+		PublicURL: publicURL,
+		STRMToken: strmToken,
+	})
 }
 
 func (s *Scanner) SetPacing(pace func(context.Context) error) {
@@ -122,8 +137,9 @@ func (s *Scanner) Run(ctx context.Context, job tasks.Job) error {
 		})
 	}
 	reconcile := func() error {
+		expCfg := s.exportConfig()
 		return sess.Commit(ctx, func(tx *ent.Tx) error {
-			return ReconcileScanTx(ctx, tx, job.ID, scanID, &payload, observed, images, tasksSvc, s.embyDir, s.publicURL, s.strmToken, s.notifier)
+			return ReconcileScanTx(ctx, tx, job.ID, scanID, &payload, observed, images, tasksSvc, expCfg.EmbyDir, expCfg.PublicURL, expCfg.STRMToken, s.notifier)
 		})
 	}
 

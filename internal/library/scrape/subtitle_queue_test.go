@@ -72,7 +72,8 @@ func TestSubtitleQueue_GracefulShutdown(t *testing.T) {
 }
 
 func TestSubtitleTaskTargetsTheExportedSTRM(t *testing.T) {
-	service := &Service{embyDir: "emby"}
+	service := &Service{}
+	service.SetEmbyExport("emby", "", "")
 	input := MetadataPayload{MovieID: 7, Code: "SSIS-589"}
 
 	task := service.subtitleTask(input, []pan.File{{ID: "video", Name: "SSIS-589-UC.mp4"}})

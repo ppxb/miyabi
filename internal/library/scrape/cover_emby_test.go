@@ -12,11 +12,8 @@ import (
 
 func TestExportLocalMediaSingleVideo(t *testing.T) {
 	tempDir := t.TempDir()
-	service := &Service{
-		embyDir:   tempDir,
-		publicURL: "http://192.168.1.50:8080",
-		strmToken: "my-token",
-	}
+	service := &Service{}
+	service.SetEmbyExport(tempDir, "http://192.168.1.50:8080", "my-token")
 
 	doc := nfo.Movie{
 		Code:  "IPX-123",
@@ -81,10 +78,8 @@ func TestExportLocalMediaSingleVideo(t *testing.T) {
 
 func TestExportLocalMediaMultiVideo(t *testing.T) {
 	tempDir := t.TempDir()
-	service := &Service{
-		embyDir:   tempDir,
-		publicURL: "http://127.0.0.1:8080",
-	}
+	service := &Service{}
+	service.SetEmbyExport(tempDir, "http://127.0.0.1:8080", "")
 
 	doc := nfo.Movie{
 		Code:  "SSIS-456",
