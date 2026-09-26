@@ -14,6 +14,8 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/ent/file"
+	"github.com/ppxb/miyabi/internal/ent/movie"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/pan"
@@ -93,15 +95,24 @@ func (s *Scanner) Run(ctx context.Context, job tasks.Job) error {
 		return err
 	}
 	source := sess.Source()
-	// Each execution gets a fresh marker, including after a server restart. An
-	// interrupted attempt must not make unvisited files look present on retry.
-	scanID := uuid.NewString()
-	payload.Source = source
-	payload.Scan = domain.ScanProgress{
-		Stage:                 "scanning",
-		CurrentPath:           source.Directory.Path,
-		DirectoriesDiscovered: 1,
+	// A fresh scan gets a new marker; a resumed scan reuses its marker so files
+	// indexed before an interruption remain valid during reconciliation.
+	isResume := payload.ScanID != ""
+	if !isResume {
+		payload.ScanID = uuid.NewString()
+		payload.Scan = domain.ScanProgress{
+			Stage:                 "scanning",
+			CurrentPath:           source.Directory.Path,
+			DirectoriesDiscovered: 1,
+		}
+	} else {
+		payload.Scan.Stage = "scanning"
+		if payload.Scan.CurrentPath == "" {
+			payload.Scan.CurrentPath = source.Directory.Path
+		}
 	}
+	scanID := payload.ScanID
+	payload.Source = source
 	start := Directory{ID: source.Directory.ID, Path: source.Directory.Path}
 	observed := make(scrape.DirectoryObservations)
 
@@ -164,6 +175,13 @@ func (s *Scanner) Run(ctx context.Context, job tasks.Job) error {
 		seen[start.ID] = true
 	}
 	codes := make(map[string]bool)
+	if isResume {
+		if existing, err := db.Movie.Query().Where(movie.HasFilesWith(file.ScanIDEQ(scanID))).Select(movie.FieldCode).Strings(ctx); err == nil {
+			for _, code := range existing {
+				codes[code] = true
+			}
+		}
+	}
 	lastReport := time.Time{}
 
 	for next := 0; next < len(directories); next++ {
