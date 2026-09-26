@@ -48,7 +48,6 @@ type Movie struct {
 	Actors       []Entity           `json:"actors"`
 	Tags         []Tag              `json:"tags"`
 	ScrapeStatus movie.ScrapeStatus `json:"scrape_status"`
-	Watched      bool               `json:"watched"`
 }
 
 type Page struct {
@@ -219,7 +218,7 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 			movie.FieldFanarts, movie.FieldReleaseDate, movie.FieldDuration, movie.FieldRating,
 			movie.FieldDirectorID, movie.FieldDirectorName, movie.FieldMakerID, movie.FieldMakerName,
 			movie.FieldSeriesID, movie.FieldSeriesName,
-			movie.FieldScrapeStatus, movie.FieldWatched).
+			movie.FieldScrapeStatus).
 		Order(ent.Desc(movie.FieldCreatedAt), ent.Desc(movie.FieldID)).
 		Offset((page - 1) * limit).Limit(limit).
 		WithActors(func(query *ent.ActorQuery) {
@@ -239,7 +238,7 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 			Director: libraryEntity(record.DirectorID, record.DirectorName),
 			Maker:    libraryEntity(record.MakerID, record.MakerName), Series: libraryEntity(record.SeriesID, record.SeriesName),
 			Actors: make([]Entity, 0, len(record.Edges.Actors)),
-			Tags:   make([]Tag, 0, len(record.Edges.Tags)), ScrapeStatus: record.ScrapeStatus, Watched: record.Watched,
+			Tags:   make([]Tag, 0, len(record.Edges.Tags)), ScrapeStatus: record.ScrapeStatus,
 		}
 		if record.ReleaseDate != nil {
 			item.ReleaseDate = record.ReleaseDate.Format(time.DateOnly)

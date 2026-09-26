@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { ApiError, apiGet, apiPost, apiPut } from '@/api/client'
+import { ApiError, apiGet, apiPost } from '@/api/client'
 import { panKeys, type PanAccountStatus } from '@/api/pan'
 import { taskKeys, type LibrarySource, type ScanTask, type Task } from '@/api/tasks'
-import type { WatchHistoryScope, WatchSession } from '@/api/watch-history'
 
 export const LIBRARY_PAGE_SIZE = 20
 
@@ -26,7 +25,6 @@ export type LibraryMovie = {
   actors: LibraryEntity[]
   tags: Array<{ id: number; javdb_id: string; name: string }>
   scrape_status: 'pending' | 'done' | 'failed'
-  watched: boolean
 }
 
 type LibraryPage = {
@@ -36,8 +34,6 @@ type LibraryPage = {
   page: number
   has_more: boolean
 }
-
-export type LibraryFile = { id: string; name: string; path: string; size: number }
 
 export const libraryKeys = {
   all: ['library'] as const,
@@ -50,34 +46,6 @@ export function useLibraryMovies(page: number) {
     queryKey: libraryKeys.movies(page),
     queryFn: ({ signal }) =>
       apiGet<LibraryPage>('/api/library/movies', { page, limit: LIBRARY_PAGE_SIZE }, signal)
-  })
-}
-
-export function useMarkMovieWatched() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: ({ movieID, source }: { movieID: number; source: WatchHistoryScope }) =>
-      apiPut<{ id: number; watched: boolean; history: WatchSession }>(
-        `/api/library/movies/${movieID}/watched`,
-        source,
-        { signal: AbortSignal.timeout(10_000) }
-      ),
-    retry: (failures, error) =>
-      failures < 2 && (!(error instanceof ApiError) || error.status >= 500),
-    onSuccess: async ({ id, watched }) => {
-      // An older list response must not restore "unwatched" after the write succeeds.
-      await queryClient.cancelQueries({ queryKey: libraryKeys.movieLists })
-      queryClient.setQueriesData<LibraryPage>({ queryKey: libraryKeys.movieLists }, page =>
-        page
-          ? {
-              ...page,
-              movies: page.movies.map(movie => (movie.id === id ? { ...movie, watched } : movie))
-            }
-          : page
-      )
-      // Refresh lists in the background so playback can start with the watch session.
-      void queryClient.invalidateQueries({ queryKey: libraryKeys.all })
-    }
   })
 }
 

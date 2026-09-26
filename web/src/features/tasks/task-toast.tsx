@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 import type { OfflineSubmission } from '@/api/offline'
 import { isTaskActive, type BatchTask, type ScanTask } from '@/api/tasks'
 import { isOfflineTaskActive } from '@/lib/offline-state'
-import { useUIStore } from '@/stores/ui'
 import { scanStage } from './scan-status'
 import { TaskProgress } from './task-progress'
 import { TaskToastActions } from './task-toast-actions'
@@ -65,20 +64,10 @@ export function notifyOfflineTask(
   const active = isOfflineTaskActive(task)
   const id = offlineToastID(task.task_id)
   const props = taskToastOptions(id, active, options)
-  const libraryID = task.phase === 'in_library' ? task.library_id : undefined
-  const actions = (
-    <TaskToastActions
-      id={id}
-      onPlay={
-        libraryID === undefined ? undefined : () => useUIStore.getState().openPlayer(libraryID)
-      }
-    />
-  )
   if (active) {
     const scan = options.scan
     toast.info(task.code, {
       ...props,
-      action: actions,
       icon: options.waiting ? undefined : <LoaderCircleIcon className="size-4 animate-spin" />,
       description: options.waiting ? (
         '等待进度同步'
@@ -108,8 +97,7 @@ export function notifyOfflineTask(
     const notify = task.error ? toast.warning : toast.success
     notify(task.code, {
       ...props,
-      description: task.error ? `元数据处理失败：${task.error}` : '下载与入库处理已完成',
-      action: actions
+      description: task.error ? `元数据处理失败：${task.error}` : '下载与入库处理已完成'
     })
   } else if (task.error || task.status === 'failed') {
     toast.error(task.code, { ...props, description: task.error ?? '处理失败，请重试。' })

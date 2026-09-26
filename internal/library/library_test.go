@@ -25,7 +25,7 @@ func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 		SetFanarts([]string{"/api/library/artwork/fanart"}).SetReleaseDate(releaseDate).SetDuration(125).SetRating(4.5).
 		SetMakerID("maker-id").SetMakerName("Studio").SetSeriesID("series-id").SetSeriesName("Series").
 		SetDirectorID("director-id").SetDirectorName("Director").AddActors(actorB, actorA).
-		SetScrapeStatus(movie.ScrapeStatusDone).SetWatched(true).AddTags(tagB, tagA).SaveX(ctx)
+		SetScrapeStatus(movie.ScrapeStatusDone).AddTags(tagB, tagA).SaveX(ctx)
 	empty := database.Movie.Create().SetCode("ABP-002").SetMakerName("Legacy studio").SaveX(ctx)
 	hidden := database.Movie.Create().SetCode("ABP-003").SetTitle("Other source").AddTags(tagB).SaveX(ctx)
 	for index, entry := range []struct {
@@ -65,7 +65,7 @@ func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 	for _, item := range page.Movies {
 		if item.ID == film.ID {
 			if item.Title != film.Title || item.Cover == nil || *item.Cover != "/cover" ||
-				item.ScrapeStatus != movie.ScrapeStatusDone || !item.Watched ||
+				item.ScrapeStatus != movie.ScrapeStatusDone ||
 				!reflect.DeepEqual(item.Tags, []Tag{{ID: tagA.ID, JavDBID: tagA.JavdbID, Name: tagA.Name}, {ID: tagB.ID, JavDBID: tagB.JavdbID, Name: tagB.Name}}) {
 				t.Fatalf("card lost or reordered catalogue data: %#v", item)
 			}
@@ -77,7 +77,7 @@ func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 				t.Fatalf("local hover details were omitted or lost their search IDs: %#v", item)
 			}
 		} else if item.ID != empty.ID || item.Title != "" || item.Code != empty.Code || item.Tags == nil || len(item.Tags) != 0 ||
-			item.Actors == nil || len(item.Actors) != 0 || item.ScrapeStatus != movie.ScrapeStatusPending || item.Watched ||
+			item.Actors == nil || len(item.Actors) != 0 || item.ScrapeStatus != movie.ScrapeStatusPending ||
 			!reflect.DeepEqual(item.Maker, &Entity{Name: "Legacy studio"}) {
 			t.Fatalf("unscraped card is not usable: %#v", item)
 		}
@@ -89,12 +89,12 @@ func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 		if err := json.Unmarshal(body, &fields); err != nil {
 			t.Fatal(err)
 		}
-		for _, removed := range []string{"file_count", "size"} {
+		for _, removed := range []string{"file_count", "size", "watched"} {
 			if _, exists := fields[removed]; exists {
 				t.Errorf("card still exposes unused field %s", removed)
 			}
 		}
-		for _, required := range []string{"scrape_status", "watched"} {
+		for _, required := range []string{"scrape_status"} {
 			if _, exists := fields[required]; !exists {
 				t.Errorf("card omits badge field %s", required)
 			}

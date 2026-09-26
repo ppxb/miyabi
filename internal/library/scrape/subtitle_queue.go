@@ -6,17 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/subtitle"
 )
 
-// SubtitleTask captures the parameters needed to asynchronously fetch subtitles for a movie.
+// SubtitleTask exports the subtitles of one movie after its artwork and .strm are written.
 type SubtitleTask struct {
-	MovieID      int
-	Code         string
-	DirectoryID  string
-	IsUncensored bool
-	MetaPayload  MetadataPayload
+	MovieID     int
+	MetaPayload MetadataPayload
+	Target      subtitle.Target
 }
 
 // SubtitleQueue is a bounded, concurrency-controlled background worker queue for subtitle processing.
@@ -91,7 +88,7 @@ func (q *SubtitleQueue) Enqueue(task SubtitleTask) bool {
 		q.mu.Unlock()
 		if q.logger != nil {
 			q.logger.WarnContext(q.ctx, "subtitle task queue is full; dropping task",
-				"code", task.Code,
+				"code", task.Target.Code,
 				"movie_id", task.MovieID,
 			)
 		}
@@ -127,38 +124,20 @@ func (q *SubtitleQueue) process(task SubtitleTask) {
 	if q.service.subtitles == nil {
 		return
 	}
-
-	// Bound individual task runtime to 2 minutes
-	taskCtx, cancel := context.WithTimeout(q.ctx, 2*time.Minute)
+	// Online providers are slow; one movie must not hold a worker indefinitely.
+	ctx, cancel := context.WithTimeout(q.ctx, 2*time.Minute)
 	defer cancel()
 
-	sess, err := q.service.begin(taskCtx, task.MetaPayload)
+	sess, err := q.service.begin(ctx, task.MetaPayload)
 	if err != nil {
-		if q.logger != nil {
-			q.logger.WarnContext(taskCtx, "failed to open session for subtitle auto-fetch",
-				"code", task.Code,
-				"error", err,
-			)
-		}
+		q.logger.WarnContext(ctx, "open 115 session for subtitle export", "code", task.Target.Code, "error", err)
 		return
 	}
-
-	if err := q.service.subtitles.AutoFetchAndUpload(taskCtx, sess, task.DirectoryID, task.MovieID, task.Code, task.IsUncensored); err != nil {
-		if q.logger != nil {
-			q.logger.WarnContext(taskCtx, "subtitle auto-fetch error",
-				"code", task.Code,
-				"error", err,
-			)
-		}
+	written, err := q.service.subtitles.Export(ctx, sess, task.MovieID, task.Target)
+	if err != nil {
+		q.logger.WarnContext(ctx, "export subtitles", "code", task.Target.Code, "error", err)
 	}
-}
-
-// isUncensoredVideo detects uncensored indicators from video filenames.
-func isUncensoredVideo(videos []pan.File) bool {
-	for _, v := range videos {
-		if subtitle.IsUncensored(v.Name) {
-			return true
-		}
+	if written > 0 && q.service.mediaNotifier != nil {
+		q.service.mediaNotifier.NotifyUpdated(task.Target.Dir)
 	}
-	return false
 }

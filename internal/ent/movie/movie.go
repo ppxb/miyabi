@@ -51,16 +51,12 @@ const (
 	FieldFanarts = "fanarts"
 	// FieldScrapeStatus holds the string denoting the scrape_status field in the database.
 	FieldScrapeStatus = "scrape_status"
-	// FieldWatched holds the string denoting the watched field in the database.
-	FieldWatched = "watched"
 	// EdgeActors holds the string denoting the actors edge name in mutations.
 	EdgeActors = "actors"
 	// EdgeTags holds the string denoting the tags edge name in mutations.
 	EdgeTags = "tags"
 	// EdgeFiles holds the string denoting the files edge name in mutations.
 	EdgeFiles = "files"
-	// EdgeWatchHistory holds the string denoting the watch_history edge name in mutations.
-	EdgeWatchHistory = "watch_history"
 	// EdgeSubtitles holds the string denoting the subtitles edge name in mutations.
 	EdgeSubtitles = "subtitles"
 	// Table holds the table name of the movie in the database.
@@ -82,13 +78,6 @@ const (
 	FilesInverseTable = "files"
 	// FilesColumn is the table column denoting the files relation/edge.
 	FilesColumn = "movie_files"
-	// WatchHistoryTable is the table that holds the watch_history relation/edge.
-	WatchHistoryTable = "watch_histories"
-	// WatchHistoryInverseTable is the table name for the WatchHistory entity.
-	// It exists in this package in order to avoid circular dependency with the "watchhistory" package.
-	WatchHistoryInverseTable = "watch_histories"
-	// WatchHistoryColumn is the table column denoting the watch_history relation/edge.
-	WatchHistoryColumn = "movie_id"
 	// SubtitlesTable is the table that holds the subtitles relation/edge.
 	SubtitlesTable = "subtitles"
 	// SubtitlesInverseTable is the table name for the Subtitle entity.
@@ -119,7 +108,6 @@ var Columns = []string{
 	FieldPoster,
 	FieldFanarts,
 	FieldScrapeStatus,
-	FieldWatched,
 }
 
 var (
@@ -154,8 +142,6 @@ var (
 	DefaultTitle string
 	// DefaultFanarts holds the default value on creation for the "fanarts" field.
 	DefaultFanarts func() []string
-	// DefaultWatched holds the default value on creation for the "watched" field.
-	DefaultWatched bool
 )
 
 // ScrapeStatus defines the type for the "scrape_status" enum field.
@@ -278,11 +264,6 @@ func ByScrapeStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldScrapeStatus, opts...).ToFunc()
 }
 
-// ByWatched orders the results by the watched field.
-func ByWatched(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldWatched, opts...).ToFunc()
-}
-
 // ByActorsCount orders the results by actors count.
 func ByActorsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -325,20 +306,6 @@ func ByFiles(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
-// ByWatchHistoryCount orders the results by watch_history count.
-func ByWatchHistoryCount(opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newWatchHistoryStep(), opts...)
-	}
-}
-
-// ByWatchHistory orders the results by watch_history terms.
-func ByWatchHistory(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newWatchHistoryStep(), append([]sql.OrderTerm{term}, terms...)...)
-	}
-}
-
 // BySubtitlesCount orders the results by subtitles count.
 func BySubtitlesCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -371,13 +338,6 @@ func newFilesStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(FilesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, FilesTable, FilesColumn),
-	)
-}
-func newWatchHistoryStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(WatchHistoryInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.O2M, false, WatchHistoryTable, WatchHistoryColumn),
 	)
 }
 func newSubtitlesStep() *sqlgraph.Step {

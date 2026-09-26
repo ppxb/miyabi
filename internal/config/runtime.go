@@ -16,8 +16,6 @@ type Runtime struct {
 	// OfflineSubmitTimeout bounds one 115 offline submission after the
 	// request context has been detached from the caller.
 	OfflineSubmitTimeout time.Duration
-	// PlaybackSessionTTL is how long an unused playback session stays open.
-	PlaybackSessionTTL time.Duration
 }
 
 // DefaultRuntime returns the production values.
@@ -27,6 +25,5 @@ func DefaultRuntime() Runtime {
 		OfflineSyncInterval:  30 * time.Second,
 		MonitorCheckInterval: 5 * time.Minute,
 		OfflineSubmitTimeout: 2 * time.Minute,
-		PlaybackSessionTTL:   8 * time.Hour,
 	}
 }

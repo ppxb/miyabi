@@ -70,7 +70,7 @@ func TestExistingLibraryGainsIndexesWithoutChangingRecords(t *testing.T) {
 	}
 }
 
-func TestMovieWatchStateMigratesAndSurvivesReopen(t *testing.T) {
+func TestPlayerStorageIsDroppedWithoutChangingLibraryRecords(t *testing.T) {
 	directory := t.TempDir()
 	ctx := t.Context()
 	store, err := Open(ctx, directory)
@@ -83,11 +83,22 @@ func TestMovieWatchStateMigratesAndSurvivesReopen(t *testing.T) {
 		}
 	})
 	film := store.Client.Movie.Create().SetCode("ABP-001").SetTitle("Existing title").SaveX(ctx)
-	video := store.Client.File.Create().SetFileID("video").SetName("ABP-001.mp4").SetSize(1 << 30).
-		SetAccountID("100").SetRootID("10").SetMovie(film).SaveX(ctx)
-	// An existing installation has movies and files but no watch-state column.
-	if _, err := store.db.ExecContext(ctx, "ALTER TABLE movies DROP COLUMN watched"); err != nil {
-		t.Fatal(err)
+	track := store.Client.Subtitle.Create().SetMovie(film).SetName("ABP-001.zh-CN.srt").SetSource("115").
+		SetFileID("sub").SetPickCode("pick").SaveX(ctx)
+	// Installations with the in-app player stored watch state and player-only subtitle settings.
+	for _, statement := range []string{
+		"ALTER TABLE movies ADD COLUMN watched bool NOT NULL DEFAULT false",
+		"ALTER TABLE subtitles ADD COLUMN display_name text NOT NULL DEFAULT '简体中文'",
+		"ALTER TABLE subtitles ADD COLUMN offset_ms integer NOT NULL DEFAULT 0",
+		"ALTER TABLE subtitles ADD COLUMN is_default bool NOT NULL DEFAULT false",
+		"CREATE INDEX subtitle_movie_id_is_default ON subtitles (movie_id, is_default)",
+		`CREATE TABLE watch_histories (id integer PRIMARY KEY AUTOINCREMENT, movie_id integer NOT NULL,
+			CONSTRAINT watch_histories_movies_watch_history FOREIGN KEY (movie_id) REFERENCES movies (id) ON DELETE CASCADE)`,
+		"INSERT INTO watch_histories (movie_id) VALUES (1)",
+	} {
+		if _, err := store.db.ExecContext(ctx, statement); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := store.Close(); err != nil {
 		t.Fatal(err)
@@ -96,23 +107,22 @@ func TestMovieWatchStateMigratesAndSurvivesReopen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := store.Client.Movie.GetX(ctx, film.ID); got.Watched || got.Title != film.Title {
-		t.Fatalf("migration lost movie data or invented watch history: %+v", got)
+	var leftovers int
+	if err := store.db.QueryRowContext(ctx, `SELECT
+		(SELECT COUNT(*) FROM sqlite_master WHERE name IN ('watch_histories', 'subtitle_movie_id_is_default')) +
+		(SELECT COUNT(*) FROM pragma_table_info('movies') WHERE name = 'watched') +
+		(SELECT COUNT(*) FROM pragma_table_info('subtitles') WHERE name IN ('display_name', 'offset_ms', 'is_default'))`,
+	).Scan(&leftovers); err != nil || leftovers != 0 {
+		t.Fatalf("player storage survived migration: %d, %v", leftovers, err)
 	}
-	if got := store.Client.File.GetX(ctx, video.ID); got.MovieID == nil || *got.MovieID != film.ID {
-		t.Fatal("watch-state migration changed the file association")
+	if got := store.Client.Movie.GetX(ctx, film.ID); got.Title != film.Title {
+		t.Fatalf("migration changed movie metadata: %+v", got)
 	}
-	store.Client.Movie.UpdateOneID(film.ID).SetWatched(true).ExecX(ctx)
-	if err := store.Close(); err != nil {
-		t.Fatal(err)
+	if got := store.Client.Subtitle.GetX(ctx, track.ID); got.PickCode != "pick" || got.Name != track.Name {
+		t.Fatalf("migration changed a subtitle track: %+v", got)
 	}
-	store, err = Open(ctx, directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !store.Client.Movie.GetX(ctx, film.ID).Watched {
-		t.Fatal("restart discarded saved watch state")
-	}
+	// New tracks no longer supply the dropped NOT NULL columns.
+	store.Client.Subtitle.Create().SetMovie(film).SetName("ABP-001.zh-TW.srt").ExecX(ctx)
 }
 
 func TestStoredTaskJSONSurvivesReopenWithoutReencoding(t *testing.T) {

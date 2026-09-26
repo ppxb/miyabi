@@ -21,7 +21,6 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/tag"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/ent/viewedmovie"
-	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -91,7 +90,6 @@ func checkColumn(t, c string) error {
 			tag.Table:          tag.ValidColumn,
 			task.Table:         task.ValidColumn,
 			viewedmovie.Table:  viewedmovie.ValidColumn,
-			watchhistory.Table: watchhistory.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

@@ -19,6 +19,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/task"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/pan"
+	"github.com/ppxb/miyabi/internal/subtitle"
 	"github.com/ppxb/miyabi/internal/syncx"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -44,9 +45,9 @@ type Notifier interface {
 	NotifyLibraryChanged()
 }
 
-// SubtitleFetcher handles automated subtitle discovery and upload.
-type SubtitleFetcher interface {
-	AutoFetchAndUpload(ctx context.Context, sess drive.Session, directoryID string, movieID int, code string, isUncensored bool) error
+// SubtitleExporter writes a movie's subtitles beside its exported .strm file.
+type SubtitleExporter interface {
+	Export(ctx context.Context, reader subtitle.Reader, movieID int, target subtitle.Target) (int, error)
 }
 
 const defaultDirCacheTTL = 45 * time.Second
@@ -63,7 +64,7 @@ type Service struct {
 	discover      Discoverer
 	images        *mediaimage.Cache
 	notifier      Notifier
-	subtitles     SubtitleFetcher
+	subtitles     SubtitleExporter
 	subtitleQueue *SubtitleQueue
 	artwork       syncx.ContextLock
 
@@ -92,7 +93,7 @@ func New(db *ent.Client, d *drive.Drive, discover Discoverer, images *mediaimage
 	return service
 }
 
-// SetEmbyExport configures the local Emby export directory, public playback URL, and optional STRM token.
+// SetEmbyExport configures the local Emby export directory, public URL written into .strm files, and optional STRM token.
 func (service *Service) SetEmbyExport(embyDir, publicURL, strmToken string) {
 	service.embyDir = embyDir
 	service.publicURL = publicURL
@@ -114,8 +115,8 @@ func (service *Service) Close() {
 	}
 }
 
-// SetSubtitles sets the optional subtitle fetcher.
-func (service *Service) SetSubtitles(subtitles SubtitleFetcher) {
+// SetSubtitles sets the optional subtitle exporter.
+func (service *Service) SetSubtitles(subtitles SubtitleExporter) {
 	service.subtitles = subtitles
 }
 
@@ -264,7 +265,7 @@ func (service *Service) Finished(ctx context.Context, tx *ent.Tx, job tasks.Job,
 	).SetScrapeStatus(movie.ScrapeStatusFailed).Exec(ctx); err != nil {
 		return 0, err
 	}
-	return tasks.ChangeLibrary | tasks.ChangeHistory, nil
+	return tasks.ChangeLibrary, nil
 }
 
 // Directories returns all directories containing media files for the movie.

@@ -16,7 +16,6 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/ent/tag"
-	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
 
 // MovieCreate is the builder for creating a Movie entity.
@@ -263,20 +262,6 @@ func (_c *MovieCreate) SetNillableScrapeStatus(v *movie.ScrapeStatus) *MovieCrea
 	return _c
 }
 
-// SetWatched sets the "watched" field.
-func (_c *MovieCreate) SetWatched(v bool) *MovieCreate {
-	_c.mutation.SetWatched(v)
-	return _c
-}
-
-// SetNillableWatched sets the "watched" field if the given value is not nil.
-func (_c *MovieCreate) SetNillableWatched(v *bool) *MovieCreate {
-	if v != nil {
-		_c.SetWatched(*v)
-	}
-	return _c
-}
-
 // AddActorIDs adds the "actors" edge to the Actor entity by IDs.
 func (_c *MovieCreate) AddActorIDs(ids ...int) *MovieCreate {
 	_c.mutation.AddActorIDs(ids...)
@@ -320,21 +305,6 @@ func (_c *MovieCreate) AddFiles(v ...*File) *MovieCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddFileIDs(ids...)
-}
-
-// AddWatchHistoryIDs adds the "watch_history" edge to the WatchHistory entity by IDs.
-func (_c *MovieCreate) AddWatchHistoryIDs(ids ...int) *MovieCreate {
-	_c.mutation.AddWatchHistoryIDs(ids...)
-	return _c
-}
-
-// AddWatchHistory adds the "watch_history" edges to the WatchHistory entity.
-func (_c *MovieCreate) AddWatchHistory(v ...*WatchHistory) *MovieCreate {
-	ids := make([]int, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _c.AddWatchHistoryIDs(ids...)
 }
 
 // AddSubtitleIDs adds the "subtitles" edge to the Subtitle entity by IDs.
@@ -407,10 +377,6 @@ func (_c *MovieCreate) defaults() {
 		v := movie.DefaultScrapeStatus
 		_c.mutation.SetScrapeStatus(v)
 	}
-	if _, ok := _c.mutation.Watched(); !ok {
-		v := movie.DefaultWatched
-		_c.mutation.SetWatched(v)
-	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -442,9 +408,6 @@ func (_c *MovieCreate) check() error {
 		if err := movie.ScrapeStatusValidator(v); err != nil {
 			return &ValidationError{Name: "scrape_status", err: fmt.Errorf(`ent: validator failed for field "Movie.scrape_status": %w`, err)}
 		}
-	}
-	if _, ok := _c.mutation.Watched(); !ok {
-		return &ValidationError{Name: "watched", err: errors.New(`ent: missing required field "Movie.watched"`)}
 	}
 	return nil
 }
@@ -545,10 +508,6 @@ func (_c *MovieCreate) createSpec() (*Movie, *sqlgraph.CreateSpec) {
 		_spec.SetField(movie.FieldScrapeStatus, field.TypeEnum, value)
 		_node.ScrapeStatus = value
 	}
-	if value, ok := _c.mutation.Watched(); ok {
-		_spec.SetField(movie.FieldWatched, field.TypeBool, value)
-		_node.Watched = value
-	}
 	if nodes := _c.mutation.ActorsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
@@ -590,22 +549,6 @@ func (_c *MovieCreate) createSpec() (*Movie, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(file.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.WatchHistoryIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   movie.WatchHistoryTable,
-			Columns: []string{movie.WatchHistoryColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(watchhistory.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -966,18 +909,6 @@ func (u *MovieUpsert) SetScrapeStatus(v movie.ScrapeStatus) *MovieUpsert {
 // UpdateScrapeStatus sets the "scrape_status" field to the value that was provided on create.
 func (u *MovieUpsert) UpdateScrapeStatus() *MovieUpsert {
 	u.SetExcluded(movie.FieldScrapeStatus)
-	return u
-}
-
-// SetWatched sets the "watched" field.
-func (u *MovieUpsert) SetWatched(v bool) *MovieUpsert {
-	u.Set(movie.FieldWatched, v)
-	return u
-}
-
-// UpdateWatched sets the "watched" field to the value that was provided on create.
-func (u *MovieUpsert) UpdateWatched() *MovieUpsert {
-	u.SetExcluded(movie.FieldWatched)
 	return u
 }
 
@@ -1359,20 +1290,6 @@ func (u *MovieUpsertOne) SetScrapeStatus(v movie.ScrapeStatus) *MovieUpsertOne {
 func (u *MovieUpsertOne) UpdateScrapeStatus() *MovieUpsertOne {
 	return u.Update(func(s *MovieUpsert) {
 		s.UpdateScrapeStatus()
-	})
-}
-
-// SetWatched sets the "watched" field.
-func (u *MovieUpsertOne) SetWatched(v bool) *MovieUpsertOne {
-	return u.Update(func(s *MovieUpsert) {
-		s.SetWatched(v)
-	})
-}
-
-// UpdateWatched sets the "watched" field to the value that was provided on create.
-func (u *MovieUpsertOne) UpdateWatched() *MovieUpsertOne {
-	return u.Update(func(s *MovieUpsert) {
-		s.UpdateWatched()
 	})
 }
 
@@ -1920,20 +1837,6 @@ func (u *MovieUpsertBulk) SetScrapeStatus(v movie.ScrapeStatus) *MovieUpsertBulk
 func (u *MovieUpsertBulk) UpdateScrapeStatus() *MovieUpsertBulk {
 	return u.Update(func(s *MovieUpsert) {
 		s.UpdateScrapeStatus()
-	})
-}
-
-// SetWatched sets the "watched" field.
-func (u *MovieUpsertBulk) SetWatched(v bool) *MovieUpsertBulk {
-	return u.Update(func(s *MovieUpsert) {
-		s.SetWatched(v)
-	})
-}
-
-// UpdateWatched sets the "watched" field to the value that was provided on create.
-func (u *MovieUpsertBulk) UpdateWatched() *MovieUpsertBulk {
-	return u.Update(func(s *MovieUpsert) {
-		s.UpdateWatched()
 	})
 }
 

@@ -91,12 +91,6 @@ func (_c *SubtitleCreate) SetName(v string) *SubtitleCreate {
 	return _c
 }
 
-// SetDisplayName sets the "display_name" field.
-func (_c *SubtitleCreate) SetDisplayName(v string) *SubtitleCreate {
-	_c.mutation.SetDisplayName(v)
-	return _c
-}
-
 // SetLanguage sets the "language" field.
 func (_c *SubtitleCreate) SetLanguage(v string) *SubtitleCreate {
 	_c.mutation.SetLanguage(v)
@@ -163,34 +157,6 @@ func (_c *SubtitleCreate) SetSourceURL(v string) *SubtitleCreate {
 func (_c *SubtitleCreate) SetNillableSourceURL(v *string) *SubtitleCreate {
 	if v != nil {
 		_c.SetSourceURL(*v)
-	}
-	return _c
-}
-
-// SetOffsetMs sets the "offset_ms" field.
-func (_c *SubtitleCreate) SetOffsetMs(v int) *SubtitleCreate {
-	_c.mutation.SetOffsetMs(v)
-	return _c
-}
-
-// SetNillableOffsetMs sets the "offset_ms" field if the given value is not nil.
-func (_c *SubtitleCreate) SetNillableOffsetMs(v *int) *SubtitleCreate {
-	if v != nil {
-		_c.SetOffsetMs(*v)
-	}
-	return _c
-}
-
-// SetIsDefault sets the "is_default" field.
-func (_c *SubtitleCreate) SetIsDefault(v bool) *SubtitleCreate {
-	_c.mutation.SetIsDefault(v)
-	return _c
-}
-
-// SetNillableIsDefault sets the "is_default" field if the given value is not nil.
-func (_c *SubtitleCreate) SetNillableIsDefault(v *bool) *SubtitleCreate {
-	if v != nil {
-		_c.SetIsDefault(*v)
 	}
 	return _c
 }
@@ -285,14 +251,6 @@ func (_c *SubtitleCreate) defaults() {
 		v := subtitle.DefaultSourceURL
 		_c.mutation.SetSourceURL(v)
 	}
-	if _, ok := _c.mutation.OffsetMs(); !ok {
-		v := subtitle.DefaultOffsetMs
-		_c.mutation.SetOffsetMs(v)
-	}
-	if _, ok := _c.mutation.IsDefault(); !ok {
-		v := subtitle.DefaultIsDefault
-		_c.mutation.SetIsDefault(v)
-	}
 	if _, ok := _c.mutation.StoragePath(); !ok {
 		v := subtitle.DefaultStoragePath
 		_c.mutation.SetStoragePath(v)
@@ -329,14 +287,6 @@ func (_c *SubtitleCreate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Subtitle.name": %w`, err)}
 		}
 	}
-	if _, ok := _c.mutation.DisplayName(); !ok {
-		return &ValidationError{Name: "display_name", err: errors.New(`ent: missing required field "Subtitle.display_name"`)}
-	}
-	if v, ok := _c.mutation.DisplayName(); ok {
-		if err := subtitle.DisplayNameValidator(v); err != nil {
-			return &ValidationError{Name: "display_name", err: fmt.Errorf(`ent: validator failed for field "Subtitle.display_name": %w`, err)}
-		}
-	}
 	if _, ok := _c.mutation.Language(); !ok {
 		return &ValidationError{Name: "language", err: errors.New(`ent: missing required field "Subtitle.language"`)}
 	}
@@ -351,12 +301,6 @@ func (_c *SubtitleCreate) check() error {
 	}
 	if _, ok := _c.mutation.SourceURL(); !ok {
 		return &ValidationError{Name: "source_url", err: errors.New(`ent: missing required field "Subtitle.source_url"`)}
-	}
-	if _, ok := _c.mutation.OffsetMs(); !ok {
-		return &ValidationError{Name: "offset_ms", err: errors.New(`ent: missing required field "Subtitle.offset_ms"`)}
-	}
-	if _, ok := _c.mutation.IsDefault(); !ok {
-		return &ValidationError{Name: "is_default", err: errors.New(`ent: missing required field "Subtitle.is_default"`)}
 	}
 	if _, ok := _c.mutation.StoragePath(); !ok {
 		return &ValidationError{Name: "storage_path", err: errors.New(`ent: missing required field "Subtitle.storage_path"`)}
@@ -411,10 +355,6 @@ func (_c *SubtitleCreate) createSpec() (*Subtitle, *sqlgraph.CreateSpec) {
 		_spec.SetField(subtitle.FieldName, field.TypeString, value)
 		_node.Name = value
 	}
-	if value, ok := _c.mutation.DisplayName(); ok {
-		_spec.SetField(subtitle.FieldDisplayName, field.TypeString, value)
-		_node.DisplayName = value
-	}
 	if value, ok := _c.mutation.Language(); ok {
 		_spec.SetField(subtitle.FieldLanguage, field.TypeString, value)
 		_node.Language = value
@@ -434,14 +374,6 @@ func (_c *SubtitleCreate) createSpec() (*Subtitle, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.SourceURL(); ok {
 		_spec.SetField(subtitle.FieldSourceURL, field.TypeString, value)
 		_node.SourceURL = value
-	}
-	if value, ok := _c.mutation.OffsetMs(); ok {
-		_spec.SetField(subtitle.FieldOffsetMs, field.TypeInt, value)
-		_node.OffsetMs = value
-	}
-	if value, ok := _c.mutation.IsDefault(); ok {
-		_spec.SetField(subtitle.FieldIsDefault, field.TypeBool, value)
-		_node.IsDefault = value
 	}
 	if value, ok := _c.mutation.StoragePath(); ok {
 		_spec.SetField(subtitle.FieldStoragePath, field.TypeString, value)
@@ -576,18 +508,6 @@ func (u *SubtitleUpsert) UpdateName() *SubtitleUpsert {
 	return u
 }
 
-// SetDisplayName sets the "display_name" field.
-func (u *SubtitleUpsert) SetDisplayName(v string) *SubtitleUpsert {
-	u.Set(subtitle.FieldDisplayName, v)
-	return u
-}
-
-// UpdateDisplayName sets the "display_name" field to the value that was provided on create.
-func (u *SubtitleUpsert) UpdateDisplayName() *SubtitleUpsert {
-	u.SetExcluded(subtitle.FieldDisplayName)
-	return u
-}
-
 // SetLanguage sets the "language" field.
 func (u *SubtitleUpsert) SetLanguage(v string) *SubtitleUpsert {
 	u.Set(subtitle.FieldLanguage, v)
@@ -645,36 +565,6 @@ func (u *SubtitleUpsert) SetSourceURL(v string) *SubtitleUpsert {
 // UpdateSourceURL sets the "source_url" field to the value that was provided on create.
 func (u *SubtitleUpsert) UpdateSourceURL() *SubtitleUpsert {
 	u.SetExcluded(subtitle.FieldSourceURL)
-	return u
-}
-
-// SetOffsetMs sets the "offset_ms" field.
-func (u *SubtitleUpsert) SetOffsetMs(v int) *SubtitleUpsert {
-	u.Set(subtitle.FieldOffsetMs, v)
-	return u
-}
-
-// UpdateOffsetMs sets the "offset_ms" field to the value that was provided on create.
-func (u *SubtitleUpsert) UpdateOffsetMs() *SubtitleUpsert {
-	u.SetExcluded(subtitle.FieldOffsetMs)
-	return u
-}
-
-// AddOffsetMs adds v to the "offset_ms" field.
-func (u *SubtitleUpsert) AddOffsetMs(v int) *SubtitleUpsert {
-	u.Add(subtitle.FieldOffsetMs, v)
-	return u
-}
-
-// SetIsDefault sets the "is_default" field.
-func (u *SubtitleUpsert) SetIsDefault(v bool) *SubtitleUpsert {
-	u.Set(subtitle.FieldIsDefault, v)
-	return u
-}
-
-// UpdateIsDefault sets the "is_default" field to the value that was provided on create.
-func (u *SubtitleUpsert) UpdateIsDefault() *SubtitleUpsert {
-	u.SetExcluded(subtitle.FieldIsDefault)
 	return u
 }
 
@@ -805,20 +695,6 @@ func (u *SubtitleUpsertOne) UpdateName() *SubtitleUpsertOne {
 	})
 }
 
-// SetDisplayName sets the "display_name" field.
-func (u *SubtitleUpsertOne) SetDisplayName(v string) *SubtitleUpsertOne {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.SetDisplayName(v)
-	})
-}
-
-// UpdateDisplayName sets the "display_name" field to the value that was provided on create.
-func (u *SubtitleUpsertOne) UpdateDisplayName() *SubtitleUpsertOne {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.UpdateDisplayName()
-	})
-}
-
 // SetLanguage sets the "language" field.
 func (u *SubtitleUpsertOne) SetLanguage(v string) *SubtitleUpsertOne {
 	return u.Update(func(s *SubtitleUpsert) {
@@ -886,41 +762,6 @@ func (u *SubtitleUpsertOne) SetSourceURL(v string) *SubtitleUpsertOne {
 func (u *SubtitleUpsertOne) UpdateSourceURL() *SubtitleUpsertOne {
 	return u.Update(func(s *SubtitleUpsert) {
 		s.UpdateSourceURL()
-	})
-}
-
-// SetOffsetMs sets the "offset_ms" field.
-func (u *SubtitleUpsertOne) SetOffsetMs(v int) *SubtitleUpsertOne {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.SetOffsetMs(v)
-	})
-}
-
-// AddOffsetMs adds v to the "offset_ms" field.
-func (u *SubtitleUpsertOne) AddOffsetMs(v int) *SubtitleUpsertOne {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.AddOffsetMs(v)
-	})
-}
-
-// UpdateOffsetMs sets the "offset_ms" field to the value that was provided on create.
-func (u *SubtitleUpsertOne) UpdateOffsetMs() *SubtitleUpsertOne {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.UpdateOffsetMs()
-	})
-}
-
-// SetIsDefault sets the "is_default" field.
-func (u *SubtitleUpsertOne) SetIsDefault(v bool) *SubtitleUpsertOne {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.SetIsDefault(v)
-	})
-}
-
-// UpdateIsDefault sets the "is_default" field to the value that was provided on create.
-func (u *SubtitleUpsertOne) UpdateIsDefault() *SubtitleUpsertOne {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.UpdateIsDefault()
 	})
 }
 
@@ -1219,20 +1060,6 @@ func (u *SubtitleUpsertBulk) UpdateName() *SubtitleUpsertBulk {
 	})
 }
 
-// SetDisplayName sets the "display_name" field.
-func (u *SubtitleUpsertBulk) SetDisplayName(v string) *SubtitleUpsertBulk {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.SetDisplayName(v)
-	})
-}
-
-// UpdateDisplayName sets the "display_name" field to the value that was provided on create.
-func (u *SubtitleUpsertBulk) UpdateDisplayName() *SubtitleUpsertBulk {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.UpdateDisplayName()
-	})
-}
-
 // SetLanguage sets the "language" field.
 func (u *SubtitleUpsertBulk) SetLanguage(v string) *SubtitleUpsertBulk {
 	return u.Update(func(s *SubtitleUpsert) {
@@ -1300,41 +1127,6 @@ func (u *SubtitleUpsertBulk) SetSourceURL(v string) *SubtitleUpsertBulk {
 func (u *SubtitleUpsertBulk) UpdateSourceURL() *SubtitleUpsertBulk {
 	return u.Update(func(s *SubtitleUpsert) {
 		s.UpdateSourceURL()
-	})
-}
-
-// SetOffsetMs sets the "offset_ms" field.
-func (u *SubtitleUpsertBulk) SetOffsetMs(v int) *SubtitleUpsertBulk {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.SetOffsetMs(v)
-	})
-}
-
-// AddOffsetMs adds v to the "offset_ms" field.
-func (u *SubtitleUpsertBulk) AddOffsetMs(v int) *SubtitleUpsertBulk {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.AddOffsetMs(v)
-	})
-}
-
-// UpdateOffsetMs sets the "offset_ms" field to the value that was provided on create.
-func (u *SubtitleUpsertBulk) UpdateOffsetMs() *SubtitleUpsertBulk {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.UpdateOffsetMs()
-	})
-}
-
-// SetIsDefault sets the "is_default" field.
-func (u *SubtitleUpsertBulk) SetIsDefault(v bool) *SubtitleUpsertBulk {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.SetIsDefault(v)
-	})
-}
-
-// UpdateIsDefault sets the "is_default" field to the value that was provided on create.
-func (u *SubtitleUpsertBulk) UpdateIsDefault() *SubtitleUpsertBulk {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.UpdateIsDefault()
 	})
 }
 

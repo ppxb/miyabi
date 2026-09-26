@@ -1,84 +1,6 @@
 package subtitle
 
-import (
-	"testing"
-)
-
-func TestBuildDisplayName(t *testing.T) {
-	tests := []struct {
-		name    string
-		lang    Language
-		ver     VersionTag
-		isLocal bool
-		want    string
-	}{
-		{
-			name: "simplified standard",
-			lang: LangSimplifiedChinese,
-			ver:  VersionStandard,
-			want: "简体中文",
-		},
-		{
-			name: "traditional standard",
-			lang: LangTraditionalChinese,
-			ver:  VersionStandard,
-			want: "繁体中文",
-		},
-		{
-			name: "simplified uncensored",
-			lang: LangSimplifiedChinese,
-			ver:  VersionUncensored,
-			want: "简体中文（无码版）",
-		},
-		{
-			name: "traditional uncensored",
-			lang: LangTraditionalChinese,
-			ver:  VersionUncensored,
-			want: "繁体中文（无码版）",
-		},
-		{
-			name: "simplified extended",
-			lang: LangSimplifiedChinese,
-			ver:  VersionExtended,
-			want: "简体中文（加长版）",
-		},
-		{
-			name: "traditional extended",
-			lang: LangTraditionalChinese,
-			ver:  VersionExtended,
-			want: "繁体中文（加长版）",
-		},
-		{
-			name: "simplified leaked",
-			lang: LangSimplifiedChinese,
-			ver:  VersionLeaked,
-			want: "简体中文（流出版）",
-		},
-		{
-			name:    "simplified local standard",
-			lang:    LangSimplifiedChinese,
-			ver:     VersionStandard,
-			isLocal: true,
-			want:    "简体中文（本地）",
-		},
-		{
-			name:    "simplified local uncensored retains uncensored tag",
-			lang:    LangSimplifiedChinese,
-			ver:     VersionUncensored,
-			isLocal: true,
-			want:    "简体中文（无码版）",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := BuildDisplayName(tt.lang, tt.ver, tt.isLocal)
-			if got != tt.want {
-				t.Errorf("BuildDisplayName(%q, %q, %v) = %q; want %q", tt.lang, tt.ver, tt.isLocal, got, tt.want)
-			}
-		})
-	}
-}
+import "testing"
 
 func TestDetectVersion(t *testing.T) {
 	tests := []struct {
@@ -93,6 +15,9 @@ func TestDetectVersion(t *testing.T) {
 		{name: "leaked", filename: "ABP-001.流出完整版.srt", want: VersionLeaked},
 		{name: "extended", filename: "ABP-001.extended.cut.srt", want: VersionExtended},
 		{name: "extended chinese", filename: "ABP-001.加长版.srt", want: VersionExtended},
+		{name: "uncensored suffix", filename: "SSIS-589-U.mp4", want: VersionUncensored},
+		{name: "uncensored subtitled suffix", filename: "SSIS-589-UC.mp4", want: VersionUncensored},
+		{name: "subtitled suffix", filename: "SSIS-589-C.mp4", want: VersionStandard},
 	}
 
 	for _, tt := range tests {
@@ -105,46 +30,45 @@ func TestDetectVersion(t *testing.T) {
 	}
 }
 
-func TestDetectChineseLanguage(t *testing.T) {
+func TestDetectLanguage(t *testing.T) {
 	tests := []struct {
-		name   string
-		sample string
-		hint   string
-		want   Language
+		name, hint, text string
+		want             Language
 	}{
-		{
-			name:   "hint zh-tw",
-			sample: "",
-			hint:   "zh-TW",
-			want:   LangTraditionalChinese,
-		},
-		{
-			name:   "hint chs",
-			sample: "",
-			hint:   "chs",
-			want:   LangSimplifiedChinese,
-		},
-		{
-			name:   "simplified text sample",
-			sample: "这是一个关于开发的问题，这个开关还在这里。",
-			hint:   "",
-			want:   LangSimplifiedChinese,
-		},
-		{
-			name:   "traditional text sample",
-			sample: "這是一個關於開發的問題，這個開關還在這裡。",
-			hint:   "",
-			want:   LangTraditionalChinese,
-		},
+		{name: "hint zh-tw", hint: "zh-TW", want: LangTraditionalChinese},
+		{name: "hint chs in file name", hint: "ABP-001.chs.srt", want: LangSimplifiedChinese},
+		{name: "hint cht wins over text", hint: "ABP-001.cht.ass", text: "这是一个关于开发的问题", want: LangTraditionalChinese},
+		{name: "simplified text", text: "这是一个关于开发的问题，这个开关还在这里。", want: LangSimplifiedChinese},
+		{name: "traditional text", text: "這是一個關於開發的問題，這個開關還在這裡。", want: LangTraditionalChinese},
+		{name: "no evidence", want: LangSimplifiedChinese},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := DetectChineseLanguage(tt.sample, tt.hint)
-			if got != tt.want {
-				t.Errorf("DetectChineseLanguage(%q, %q) = %q; want %q", tt.sample, tt.hint, got, tt.want)
+			if got := DetectLanguage(tt.hint, tt.text); got != tt.want {
+				t.Errorf("DetectLanguage(%q, %q) = %q; want %q", tt.hint, tt.text, got, tt.want)
 			}
 		})
+	}
+	// A code prefix must not read as a language marker.
+	if got := LanguageHint("SSIS-589.srt"); got != LangUnknown {
+		t.Errorf("LanguageHint without markers = %q", got)
+	}
+}
+
+func TestHasHardSubtitle(t *testing.T) {
+	for name, want := range map[string]bool{
+		"SSIS-589-C.mp4":   true,
+		"SSIS-589-UC.mkv":  true,
+		"SSIS-589_ch.mp4":  true,
+		"SSIS-589 中字.mp4":  true,
+		"SSIS-589.mp4":     false,
+		"SSIS-589-CD1.mp4": false,
+		"CAWD-123.mp4":     false,
+		"SSIS-589-4K.mp4":  false,
+	} {
+		if got := HasHardSubtitle(name); got != want {
+			t.Errorf("HasHardSubtitle(%q) = %v; want %v", name, got, want)
+		}
 	}
 }
 
@@ -162,6 +86,8 @@ func TestIsUncensored(t *testing.T) {
 		{"ABP-123.mosaic.mp4", true},
 		{"ABP-123.standard.mp4", false},
 		{"ABP-123.chs.srt", false},
+		{"ABP-123-UC.mp4", true},
+		{"ABP-123-C.mp4", false},
 	}
 
 	for _, tc := range cases {

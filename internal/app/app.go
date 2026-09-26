@@ -28,7 +28,7 @@ import (
 	"github.com/ppxb/miyabi/internal/maintenance"
 	"github.com/ppxb/miyabi/internal/monitor"
 	"github.com/ppxb/miyabi/internal/offline"
-	"github.com/ppxb/miyabi/internal/playback"
+	"github.com/ppxb/miyabi/internal/strm"
 	"github.com/ppxb/miyabi/internal/subtitle"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -44,7 +44,6 @@ type App struct {
 	monitors  *monitor.Service
 	driveSvc  *drive.Drive
 	catalogue *catalogue.Service
-	play      *playback.Service
 	scrape    *scrape.Service
 	embySvc   *emby.Service
 }
@@ -96,26 +95,16 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 
 	offlineSvc := offline.New(store.Client, catalogueSvc, driveSvc, taskSvc, libSvc, cfg.Runtime.OfflineSubmitTimeout)
 	monitorSvc := monitor.New(store.Client, catalogueSvc, offlineSvc, taskSvc)
-	playSvc := playback.New(store.Client, driveSvc, cfg.Runtime.PlaybackSessionTTL)
 	scrapeSvc := scrape.New(store.Client, driveSvc, catalogueSvc, images, taskSvc)
 	maintenanceSvc, err := maintenance.New(cfg.DataDir, store.Client, images, scrapeSvc)
 	if err != nil {
-		playSvc.Close()
 		catalogueSvc.Close()
 		driveSvc.Close()
 		_ = store.Close()
 		return nil, fmt.Errorf("initialize maintenance service: %w", err)
 	}
 
-	subtitleAggregator := subtitle.NewAggregator(network.ProxyManager())
-	subtitleSvc, err := subtitle.NewService(store.Client, subtitleAggregator, driveSvc, cfg.DataDir)
-	if err != nil {
-		playSvc.Close()
-		catalogueSvc.Close()
-		driveSvc.Close()
-		_ = store.Close()
-		return nil, fmt.Errorf("initialize subtitle service: %w", err)
-	}
+	subtitleSvc := subtitle.NewService(store.Client, subtitle.NewFinder(network.ProxyManager()))
 	syncActors := cfg.EmbySyncActors
 	embySvc, err := emby.NewService(ctx, store.Client, emby.Config{
 		Enabled:    cfg.EmbyEnabled,
@@ -126,7 +115,6 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		SyncActors: &syncActors,
 	})
 	if err != nil {
-		playSvc.Close()
 		catalogueSvc.Close()
 		driveSvc.Close()
 		_ = store.Close()
@@ -149,7 +137,6 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	scrapeSvc.SetEmbyExport(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken)
 	scrapeSvc.SetMediaNotifier(embySvc)
 	scrapeSvc.SetSubtitles(subtitleSvc)
-	subtitleSvc.SetEmbyDir(cfg.EmbyDir)
 	libSvc.SetEmbyExport(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken)
 	libSvc.SetMediaNotifier(embySvc)
 	libSvc.SetPacing(scan.DefaultPacing)
@@ -162,21 +149,20 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	pool := tasks.NewPool(taskSvc.Queue(), taskSvc.Bus(), taskRegistry, cfg.Runtime.TaskPoolWorkers, logger)
 
 	router := api.NewRouter(api.Dependencies{
-		Logger:      logger,
-		Health:      store,
-		Access:      api.NewAccessGateService(cfg.AccessPassword, cfg.JWTSecret),
-		Catalogue:   catalogueSvc,
-		Drive:       driveSvc,
-		Offline:     offlineSvc,
-		Monitor:     monitorSvc,
-		Library:     libSvc,
-		Play:        playSvc,
-		Tasks:       taskSvc,
-		Artwork:     scrapeSvc,
-		Maintenance: maintenanceSvc,
-		Network:     network,
-		Subtitle:    subtitleSvc,
-		Emby:        embySvc,
+		Logger:         logger,
+		Health:         store,
+		Access:         api.NewAccessGateService(cfg.AccessPassword, cfg.JWTSecret),
+		Catalogue:      catalogueSvc,
+		Drive:          driveSvc,
+		Offline:        offlineSvc,
+		Monitor:        monitorSvc,
+		Library:        libSvc,
+		STRM:           strm.New(store.Client, driveSvc),
+		Tasks:          taskSvc,
+		Artwork:        scrapeSvc,
+		Maintenance:    maintenanceSvc,
+		Network:        network,
+		Emby:           embySvc,
 		Frontend:       miyabi.Frontend(),
 		STRMToken:      cfg.STRMToken,
 		EmbyDir:        cfg.EmbyDir,
@@ -200,7 +186,6 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		monitors:  monitorSvc,
 		driveSvc:  driveSvc,
 		catalogue: catalogueSvc,
-		play:      playSvc,
 		scrape:    scrapeSvc,
 		embySvc:   embySvc,
 	}, nil
@@ -267,9 +252,6 @@ func (a *App) Close() error {
 	}
 	if a.scrape != nil {
 		a.scrape.Close()
-	}
-	if a.play != nil {
-		a.play.Close()
 	}
 	if a.catalogue != nil {
 		a.catalogue.Close()

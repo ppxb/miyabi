@@ -10,378 +10,179 @@ import (
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/database"
-	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
-func setupTestService(t *testing.T) (*Service, int) {
+const (
+	simplifiedSRT  = "1\n00:00:01,000 --> 00:00:02,000\n这是一个关于开发的问题\n"
+	traditionalSRT = "1\n00:00:01,000 --> 00:00:02,000\n這是一個關於開發的問題\n"
+	simplifiedASS  = "[Events]\nFormat: Layer, Start, End, Style, Text\nDialogue: 0,0:00:01.00,0:00:02.00,Default,这是\n"
+)
+
+type fixedProvider []Candidate
+
+func (fixedProvider) Name() string { return "fixture" }
+
+func (provider fixedProvider) Search(context.Context, string) ([]Candidate, error) {
+	return provider, nil
+}
+
+type panReader map[string]string
+
+func (reader panReader) Read(_ context.Context, pickCode string, _ int64) ([]byte, error) {
+	return []byte(reader[pickCode]), nil
+}
+
+// exportFixture serves subtitle bodies by path and returns a service whose
+// only provider offers the given candidates, with URLs resolved against the server.
+func exportFixture(t *testing.T, bodies map[string]string, candidates ...Candidate) (*Service, *ent.Client, int, Target) {
 	t.Helper()
-	store, err := database.Open(context.Background(), t.TempDir())
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, ok := bodies[r.URL.Path]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(server.Close)
+	for i := range candidates {
+		candidates[i].URL = server.URL + candidates[i].URL
+	}
+	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
-
-	movie, err := store.Client.Movie.Create().SetCode("ABP-123").Save(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	aggregator := NewAggregator(nil, WithAllowLoopbackForTesting(true))
-	svc, err := NewService(store.Client, aggregator, nil, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return svc, movie.ID
+	film := store.Client.Movie.Create().SetCode("ABP-123").SaveX(t.Context())
+	finder := NewFinder(nil, WithAllowLoopbackForTesting(true), WithProviders(fixedProvider(candidates)))
+	target := Target{Dir: filepath.Join(t.TempDir(), "ABP", "ABP-123"), Stem: "ABP-123", Code: "ABP-123"}
+	return NewService(store.Client, finder), store.Client, film.ID, target
 }
 
-func TestServiceApplyAndList(t *testing.T) {
-	svc, movieID := setupTestService(t)
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = w.Write([]byte("1\n00:00:01,000 --> 00:00:04,000\nHello world\n"))
-	}))
-	defer ts.Close()
-
-	candidate := domain.SubtitleCandidate{
-		Source:      "xunlei",
-		Name:        "ABP-123.chs.srt",
-		DisplayName: "简体中文",
-		Language:    "zh-CN",
-		Version:     "standard",
-		URL:         ts.URL,
-		Ext:         "srt",
-		Score:       100,
-	}
-
-	track, err := svc.ApplyCandidate(context.Background(), movieID, candidate)
+func exportedFiles(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		t.Fatalf("apply candidate failed: %v", err)
+		t.Fatal(err)
 	}
-
-	if track.DisplayName != "简体中文" || !track.IsDefault {
-		t.Errorf("unexpected track: %+v", track)
+	var names []string
+	for _, entry := range entries {
+		names = append(names, entry.Name())
 	}
+	return names
+}
 
-	list, err := svc.ListByMovie(context.Background(), movieID)
+func TestExportWritesPanSubtitlesThenOnlineSubtitlesOfOtherKinds(t *testing.T) {
+	service, db, movieID, target := exportFixture(t, map[string]string{
+		"/same-kind.srt":   simplifiedSRT + "different upload\n",
+		"/traditional.srt": traditionalSRT,
+		"/duplicate.srt":   traditionalSRT,
+		"/styled.ass":      simplifiedASS,
+		"/extra.vtt":       "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\n这是\n",
+	},
+		Candidate{Name: "ABP-123.chs.srt", URL: "/same-kind.srt", Format: "srt", Language: LangSimplifiedChinese, Version: VersionStandard},
+		Candidate{Name: "ABP-123.srt", URL: "/traditional.srt", Format: "srt", Version: VersionStandard},
+		Candidate{Name: "ABP-123 copy.srt", URL: "/duplicate.srt", Format: "srt", Version: VersionStandard},
+		Candidate{Name: "ABP-123.ass", URL: "/styled.ass", Format: "ass", Language: LangSimplifiedChinese, Version: VersionStandard},
+		Candidate{Name: "ABP-123.vtt", URL: "/extra.vtt", Format: "vtt", Language: LangSimplifiedChinese, Version: VersionStandard},
+	)
+	ctx := t.Context()
+	tx, err := db.Tx(ctx)
 	if err != nil {
-		t.Fatalf("list subtitles failed: %v", err)
+		t.Fatal(err)
 	}
-	if len(list) != 1 {
-		t.Fatalf("expected 1 subtitle, got %d", len(list))
+	if err := IndexPanTrack(ctx, tx, movieID, pan.File{ID: "sub", PickCode: "pick", Name: "ABP-123.srt"}); err != nil {
+		t.Fatal(err)
 	}
-
-	vttBytes, err := svc.GetTrackVTT(context.Background(), track.ID, nil)
-	if err != nil {
-		t.Fatalf("get track vtt failed: %v", err)
-	}
-	if !strings.HasPrefix(string(vttBytes), "WEBVTT") {
-		t.Errorf("expected WebVTT content, got: %s", string(vttBytes))
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
 	}
 
-	// Apply another candidate with the SAME language and version
-	// It MUST replace the existing track and keep total count as 1.
-	candidate2 := candidate
-	candidate2.Source = "subtitlecat"
-	track2, err := svc.ApplyCandidate(context.Background(), movieID, candidate2)
-	if err != nil {
-		t.Fatalf("apply second candidate failed: %v", err)
+	written, err := service.Export(ctx, panReader{"pick": simplifiedSRT}, movieID, target)
+	if err != nil || written != MaxTracks {
+		t.Fatalf("Export = %d, %v", written, err)
+	}
+	// The 115 subtitle claims zh-CN SRT, so the online SRT of that kind is skipped.
+	// The unlabelled download is detected as Traditional; its byte-identical copy is skipped.
+	want := []string{"ABP-123.zh-CN.ass", "ABP-123.zh-CN.srt", "ABP-123.zh-TW.srt"}
+	if got := exportedFiles(t, target.Dir); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("exported files = %v; want %v", got, want)
+	}
+	body, err := os.ReadFile(filepath.Join(target.Dir, "ABP-123.zh-CN.srt"))
+	if err != nil || string(body) != "\uFEFF"+simplifiedSRT {
+		t.Fatalf("115 subtitle was not exported as UTF-8: %q, %v", body, err)
+	}
+	pan := db.Subtitle.Query().Where(subtitle.FileIDEQ("sub")).OnlyX(ctx)
+	if pan.StoragePath != filepath.Join(target.Dir, "ABP-123.zh-CN.srt") || pan.Source != SourcePan {
+		t.Fatalf("115 subtitle record = %+v", pan)
+	}
+	if count := db.Subtitle.Query().Where(subtitle.SourceURLNEQ("")).CountX(ctx); count != 2 {
+		t.Fatalf("online subtitle records = %d", count)
 	}
 
-	list2, err := svc.ListByMovie(context.Background(), movieID)
-	if err != nil {
-		t.Fatalf("list subtitles failed: %v", err)
-	}
-	if len(list2) != 1 {
-		t.Fatalf("expected 1 subtitle after replacement, got %d", len(list2))
-	}
-	if list2[0].ID != track2.ID {
-		t.Errorf("expected new track ID %d, got %d", track2.ID, list2[0].ID)
+	// A second export finds every kind in place and downloads nothing.
+	if written, err := service.Export(ctx, panReader{}, movieID, target); err != nil || written != 0 {
+		t.Fatalf("repeat Export = %d, %v", written, err)
 	}
 }
 
-func TestServiceOffset(t *testing.T) {
-	svc, movieID := setupTestService(t)
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("1\n00:00:01,000 --> 00:00:04,000\nHello\n"))
-	}))
-	defer ts.Close()
-
-	track, err := svc.ApplyCandidate(context.Background(), movieID, domain.SubtitleCandidate{
-		Source:      "xunlei",
-		Name:        "test.srt",
-		DisplayName: "简体中文",
-		Language:    "zh-CN",
-		Version:     "standard",
-		URL:         ts.URL,
-		Ext:         "srt",
-	})
-	if err != nil {
+func TestExportReplacesRemovedOnlineSubtitles(t *testing.T) {
+	service, db, movieID, target := exportFixture(t, map[string]string{"/first.srt": simplifiedSRT},
+		Candidate{Name: "ABP-123.chs.srt", URL: "/first.srt", Format: "srt", Language: LangSimplifiedChinese, Version: VersionStandard})
+	ctx := t.Context()
+	if written, err := service.Export(ctx, panReader{}, movieID, target); err != nil || written != 1 {
+		t.Fatalf("Export = %d, %v", written, err)
+	}
+	path := filepath.Join(target.Dir, "ABP-123.zh-CN.srt")
+	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := svc.UpdateOffset(context.Background(), track.ID, 500); err != nil {
-		t.Fatal(err)
+	if written, err := service.Export(ctx, panReader{}, movieID, target); err != nil || written != 1 {
+		t.Fatalf("Export after removal = %d, %v", written, err)
 	}
-
-	vttBytes, err := svc.GetTrackVTT(context.Background(), track.ID, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(vttBytes), "00:00:01.500 --> 00:00:04.500") {
-		t.Errorf("offset not applied, got: %s", string(vttBytes))
-	}
-
-	// Test offset override
-	override := 1000
-	overrideBytes, err := svc.GetTrackVTT(context.Background(), track.ID, &override)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(overrideBytes), "00:00:02.000 --> 00:00:05.000") {
-		t.Errorf("offset override not applied, got: %s", string(overrideBytes))
+	if !fileExists(path) || db.Subtitle.Query().CountX(ctx) != 1 {
+		t.Fatalf("removed subtitle was not replaced exactly once: %v", exportedFiles(t, target.Dir))
 	}
 }
 
-func TestServiceSetDefaultAndToggle(t *testing.T) {
-	svc, movieID := setupTestService(t)
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("1\n00:00:01,000 --> 00:00:04,000\nTest\n"))
-	}))
-	defer ts.Close()
-
-	t1, err := svc.ApplyCandidate(context.Background(), movieID, domain.SubtitleCandidate{
-		Source:      "xunlei",
-		Name:        "1.srt",
-		DisplayName: "简体中文",
-		Language:    "zh-CN",
-		Version:     "standard",
-		URL:         ts.URL,
-		Ext:         "srt",
-	})
-	if err != nil {
-		t.Fatal(err)
+func TestExportSkipsOnlineSearchForHardSubtitledVideos(t *testing.T) {
+	service, db, movieID, target := exportFixture(t, map[string]string{"/first.srt": simplifiedSRT},
+		Candidate{Name: "ABP-123.chs.srt", URL: "/first.srt", Format: "srt", Language: LangSimplifiedChinese, Version: VersionStandard})
+	target.HardSubtitled = true
+	if written, err := service.Export(t.Context(), panReader{}, movieID, target); err != nil || written != 0 {
+		t.Fatalf("Export = %d, %v", written, err)
 	}
-
-	t2, err := svc.ApplyCandidate(context.Background(), movieID, domain.SubtitleCandidate{
-		Source:      "subtitlecat",
-		Name:        "2.srt",
-		DisplayName: "繁体中文（无码版）",
-		Language:    "zh-TW",
-		Version:     "uncensored",
-		URL:         ts.URL,
-		Ext:         "srt",
-	})
-	if err != nil {
-		t.Fatal(err)
+	if db.Subtitle.Query().CountX(t.Context()) != 0 {
+		t.Fatal("hard-subtitled video fetched online subtitles")
 	}
+}
 
-	if err := svc.SetDefault(context.Background(), movieID, t1.ID); err != nil {
-		t.Fatal(err)
-	}
-
-	list, err := svc.ListByMovie(context.Background(), movieID)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, item := range list {
-		if item.ID == t1.ID && !item.IsDefault {
-			t.Errorf("expected t1 to be default")
-		}
-		if item.ID == t2.ID && item.IsDefault {
-			t.Errorf("expected t2 not to be default")
+func TestTargetPathNamesVersionAndLanguageForEmby(t *testing.T) {
+	target := Target{Dir: "emby", Stem: "ABP-123"}
+	for kind, want := range map[Kind]string{
+		{Language: LangSimplifiedChinese, Version: VersionStandard, Format: "srt"}:    "ABP-123.zh-CN.srt",
+		{Language: LangTraditionalChinese, Version: VersionUncensored, Format: "ass"}: "ABP-123.uncensored.zh-TW.ass",
+	} {
+		if got := target.Path(kind); got != filepath.Join("emby", want) {
+			t.Errorf("Path(%+v) = %s; want %s", kind, got, want)
 		}
 	}
 }
 
-func TestServiceIndexLocalSubtitle(t *testing.T) {
-	svc, movieID := setupTestService(t)
-
-	err := svc.IndexLocalSubtitle(context.Background(), movieID, pan.File{
-		ID:       "file-123",
-		PickCode: "pick-123",
-		Name:     "ABP-123.uncensored.chs.srt",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	list, err := svc.ListByMovie(context.Background(), movieID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(list) != 1 {
-		t.Fatalf("expected 1 subtitle, got %d", len(list))
-	}
-	if list[0].DisplayName != "简体中文（无码版）" {
-		t.Errorf("expected '简体中文（无码版）', got %q", list[0].DisplayName)
-	}
-	if list[0].Source != "local" {
-		t.Errorf("expected source 'local', got %q", list[0].Source)
-	}
-}
-
-func TestServiceSingleDefaultInvariant(t *testing.T) {
-	svc, movieID := setupTestService(t)
-	ctx := context.Background()
-
-	// 1. Add first subtitle
-	err := svc.IndexLocalSubtitle(ctx, movieID, pan.File{
-		ID:       "file-1",
-		PickCode: "pick-1",
-		Name:     "ABP-123.chs.srt",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// 2. Add second subtitle as default
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = w.Write([]byte("1\n00:00:01,000 --> 00:00:04,000\nHello world\n"))
+func TestFinderBlocksLoopbackDownloads(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(simplifiedSRT))
 	}))
-	defer ts.Close()
+	defer server.Close()
 
-	_, err = svc.ApplyCandidate(ctx, movieID, domain.SubtitleCandidate{
-		Source:      "xunlei",
-		Name:        "ABP-123.uncensored.chs.srt",
-		DisplayName: "简体中文（无码版）",
-		Language:    "zh-CN",
-		Version:     "uncensored",
-		URL:         ts.URL,
-		Ext:         "srt",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	list, err := svc.ListByMovie(ctx, movieID)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defaultCount := 0
-	for _, track := range list {
-		if track.IsDefault {
-			defaultCount++
-		}
-	}
-	if defaultCount != 1 {
-		t.Fatalf("expected exactly 1 default subtitle, got %d out of %d tracks", defaultCount, len(list))
-	}
-}
-
-func TestAggregatorSSRFBlocked(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain")
-		_, _ = w.Write([]byte("1\n00:00:01,000 --> 00:00:02,000\nHello\n"))
-	}))
-	defer ts.Close()
-
-	// Default aggregator without allowLoopback
-	agg := NewAggregator(nil)
-	_, err := agg.DownloadAndConvert(context.Background(), Candidate{
-		URL: ts.URL,
-		Ext: "srt",
-	})
+	_, _, err := NewFinder(nil).Download(t.Context(), Candidate{URL: server.URL, Format: "srt"})
 	if err == nil {
-		t.Fatalf("expected SSRF error when accessing loopback server, got nil")
+		t.Fatal("expected SSRF error when accessing loopback server")
 	}
 	if !strings.Contains(err.Error(), "prohibited") && !strings.Contains(err.Error(), "blocked") {
 		t.Errorf("unexpected error message: %v", err)
 	}
 }
-
-func TestConvertToWebVTT_RejectsInvalidContent(t *testing.T) {
-	invalidContents := []struct {
-		name    string
-		content string
-		ext     string
-	}{
-		{"json error", `{"status": 500, "message": "internal server error"}`, "srt"},
-		{"html error", `<!DOCTYPE html><html><body>Access Denied</body></html>`, "srt"},
-		{"empty content", ``, "srt"},
-		{"arbitrary text without cues", `this is just some plain text without any timestamps`, "vtt"},
-	}
-
-	for _, tt := range invalidContents {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := ConvertToWebVTT(tt.content, tt.ext)
-			if err == nil {
-				t.Errorf("expected error for %s, got nil", tt.name)
-			}
-		})
-	}
-}
-
-func TestServiceDelete_SharedFileRefCounts(t *testing.T) {
-	svc, movieID := setupTestService(t)
-	ctx := context.Background()
-
-	// Create a shared dummy cache file
-	sharedPath := filepath.Join(svc.cacheDir, "shared.vtt")
-	if err := os.WriteFile(sharedPath, []byte("WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nShared\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	// Create track 1 pointing to sharedPath
-	t1, err := svc.db.Subtitle.Create().
-		SetMovieID(movieID).
-		SetName("sub1.vtt").
-		SetDisplayName("Track 1").
-		SetLanguage("zh-CN").
-		SetFormat("vtt").
-		SetVersionTag("standard").
-		SetSource("local").
-		SetStoragePath(sharedPath).
-		SetOffsetMs(0).
-		SetIsDefault(true).
-		Save(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create track 2 pointing to the same sharedPath
-	t2, err := svc.db.Subtitle.Create().
-		SetMovieID(movieID).
-		SetName("sub2.vtt").
-		SetDisplayName("Track 2").
-		SetLanguage("zh-TW").
-		SetFormat("vtt").
-		SetVersionTag("standard").
-		SetSource("local").
-		SetStoragePath(sharedPath).
-		SetOffsetMs(0).
-		SetIsDefault(false).
-		Save(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// 1. Delete track 1
-	if err := svc.Delete(ctx, t1.ID); err != nil {
-		t.Fatalf("delete track 1 failed: %v", err)
-	}
-
-	// File MUST still exist because track 2 references it!
-	if _, err := os.Stat(sharedPath); os.IsNotExist(err) {
-		t.Fatalf("shared file was incorrectly deleted while track 2 still references it")
-	}
-
-	// 2. Delete track 2
-	if err := svc.Delete(ctx, t2.ID); err != nil {
-		t.Fatalf("delete track 2 failed: %v", err)
-	}
-
-	// Now file MUST be deleted because refcount reached 0
-	if _, err := os.Stat(sharedPath); !os.IsNotExist(err) {
-		t.Fatalf("shared file should be removed after all referencing tracks are deleted")
-	}
-}
-
-

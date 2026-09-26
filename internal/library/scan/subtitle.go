@@ -65,7 +65,7 @@ func IndexDirectorySubtitles(ctx context.Context, tx *ent.Tx, videos []Video, su
 			continue
 		}
 
-		if err := subpkg.IndexLocalSubtitleTx(ctx, tx, targetMovieID, sub); err != nil {
+		if err := subpkg.IndexPanTrack(ctx, tx, targetMovieID, sub); err != nil {
 			return err
 		}
 	}

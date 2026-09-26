@@ -20,6 +20,7 @@ import (
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/nfo"
+	subpkg "github.com/ppxb/miyabi/internal/subtitle"
 )
 
 var playURLRegex = regexp.MustCompile(`/api/strm/play/([a-zA-Z0-9_\-]+)`)
@@ -132,9 +133,9 @@ func (s *LocalScanner) Scan(ctx context.Context, rootDir string) (*LocalScanResu
 
 			nfoPath := findMatchingNFO(dir, stem, code, group.nfoFiles)
 			posterPath, fanartPath := findMatchingArtwork(dir, stem, group.imageFiles)
-			subPath := findMatchingSubtitle(stem, group.subFiles)
+			subPaths := findMatchingSubtitles(stem, group.subFiles)
 
-			if err := s.ingestMedia(ctx, rootDir, mediaPath, media.Name(), media.Size(), code, nfoPath, posterPath, fanartPath, subPath, result); err != nil {
+			if err := s.ingestMedia(ctx, rootDir, mediaPath, media.Name(), media.Size(), code, nfoPath, posterPath, fanartPath, subPaths, result); err != nil {
 				return nil, fmt.Errorf("ingest %s: %w", mediaPath, err)
 			}
 		}
@@ -148,7 +149,8 @@ func (s *LocalScanner) ingestMedia(
 	rootDir, mediaPath, mediaName string,
 	mediaSize int64,
 	code string,
-	nfoPath, posterPath, fanartPath, subPath string,
+	nfoPath, posterPath, fanartPath string,
+	subPaths []string,
 	result *LocalScanResult,
 ) error {
 	return ent.WithTx(ctx, s.db, func(tx *ent.Tx) error {
@@ -242,22 +244,9 @@ func (s *LocalScanner) ingestMedia(
 			_ = tx.File.UpdateOneID(existingFile.ID).SetMovieID(movieID).Exec(ctx)
 		}
 
-		if subPath != "" {
-			subName := filepath.Base(subPath)
-			subExists, _ := tx.Subtitle.Query().Where(
-				subtitle.MovieIDEQ(movieID),
-				subtitle.NameEQ(subName),
-			).Exist(ctx)
-			if !subExists {
-				ext := strings.TrimPrefix(filepath.Ext(subName), ".")
-				_, _ = tx.Subtitle.Create().
-					SetMovieID(movieID).
-					SetName(subName).
-					SetDisplayName(subName).
-					SetFormat(ext).
-					SetSource("local").
-					SetStoragePath(subPath).
-					Save(ctx)
+		for _, subPath := range subPaths {
+			if err := indexLocalSubtitle(ctx, tx, movieID, subPath); err != nil {
+				return err
 			}
 		}
 		if s.notifier != nil {
@@ -330,15 +319,35 @@ func findMatchingArtwork(dir, stem string, imageFiles []string) (posterPath, fan
 	return posterPath, fanartPath
 }
 
-func findMatchingSubtitle(stem string, subFiles []string) string {
+// findMatchingSubtitles returns the subtitles named after a media file, such
+// as IPX-123.zh-CN.srt for IPX-123.strm. A lone subtitle belongs to the lone
+// media file in its directory.
+func findMatchingSubtitles(stem string, subFiles []string) []string {
+	var matches []string
 	for _, f := range subFiles {
-		subStem := nfo.FileStem(filepath.Base(f))
-		if strings.EqualFold(subStem, stem) || strings.HasPrefix(strings.ToLower(subStem), strings.ToLower(stem)) {
-			return f
+		if strings.HasPrefix(strings.ToLower(filepath.Base(f)), strings.ToLower(stem)+".") {
+			matches = append(matches, f)
 		}
 	}
-	if len(subFiles) == 1 {
-		return subFiles[0]
+	if len(matches) == 0 && len(subFiles) == 1 {
+		return subFiles
 	}
-	return ""
+	return matches
+}
+
+// indexLocalSubtitle records a subtitle already beside a local .strm so its
+// kind is not exported again.
+func indexLocalSubtitle(ctx context.Context, tx *ent.Tx, movieID int, subPath string) error {
+	name := filepath.Base(subPath)
+	format := subpkg.Format(filepath.Ext(name))
+	if format == "" {
+		return nil
+	}
+	exists, err := tx.Subtitle.Query().Where(subtitle.MovieIDEQ(movieID), subtitle.StoragePathEQ(subPath)).Exist(ctx)
+	if err != nil || exists {
+		return err
+	}
+	return tx.Subtitle.Create().SetMovieID(movieID).SetName(name).SetFormat(format).
+		SetLanguage(string(subpkg.DetectLanguage(name, ""))).SetVersionTag(string(subpkg.DetectVersion(name))).
+		SetSource(subpkg.SourceLocal).SetStoragePath(subPath).Exec(ctx)
 }

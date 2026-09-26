@@ -132,7 +132,7 @@ func TestRescanRepairsAuxiliaryVideosAndSSNISubtitleAlias(t *testing.T) {
 	}
 	files := lib.database.File.Query().Where(file.MovieIDEQ(canonical.ID)).AllX(ctx)
 	if len(files) != 1 || files[0].Name != "SSNI748C.mp4" {
-		t.Fatalf("SSNI-748 playback still points at an auxiliary file: %+v", files)
+		t.Fatalf("SSNI-748 still indexes an auxiliary file: %+v", files)
 	}
 	for _, job := range lib.database.Task.Query().Where(task.TypeEQ("scrape")).AllX(ctx) {
 		input, err := tasks.DecodePayload[scrape.MetadataPayload](job.Payload)

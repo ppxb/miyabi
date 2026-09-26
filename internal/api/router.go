@@ -18,22 +18,21 @@ type HealthChecker interface {
 }
 
 type Dependencies struct {
-	Logger      *slog.Logger
-	Health      HealthChecker
-	Access      AccessGate
-	Catalogue   CatalogueManager
-	Drive       DriveManager
-	Offline     OfflineManager
-	Monitor     SubscriptionManager
-	Library     LibraryManager
-	Play        PlayManager
-	Tasks       TaskManager
-	Artwork     ArtworkReader
-	Maintenance MaintenanceManager
-	Network     NetworkManager
-	Subtitle    SubtitleManager
-	Emby        EmbyManager
-	Frontend    fs.FS
+	Logger         *slog.Logger
+	Health         HealthChecker
+	Access         AccessGate
+	Catalogue      CatalogueManager
+	Drive          DriveManager
+	Offline        OfflineManager
+	Monitor        SubscriptionManager
+	Library        LibraryManager
+	STRM           STRMRelay
+	Tasks          TaskManager
+	Artwork        ArtworkReader
+	Maintenance    MaintenanceManager
+	Network        NetworkManager
+	Emby           EmbyManager
+	Frontend       fs.FS
 	STRMToken      string
 	EmbyDir        string
 	TrustedProxies []string
@@ -66,7 +65,8 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	authAPI.POST("/login", accessLoginHandler(deps.Access, loginLimiter))
 	authAPI.POST("/logout", accessLogoutHandler())
 
-	strmHandler := playSTRMHandler(deps.Play, deps.STRMToken, deps.Access)
+	// Exported .strm files keep this path; it must stay stable across releases.
+	strmHandler := strmStreamHandler(deps.STRM, deps.STRMToken, deps.Access)
 	api.GET("/strm/play/:fileID", noStore(), strmHandler)
 	api.HEAD("/strm/play/:fileID", noStore(), strmHandler)
 
@@ -87,29 +87,9 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	settingsAPI.PUT("/subscription", subscriptionSettingsUpdateHandler(deps.Monitor))
 
 	protected.GET("/library/movies", libraryMoviesHandler(deps.Library))
-	protected.PUT("/library/movies/:id/watched", libraryWatchedHandler(deps.Library))
-	protected.GET("/library/history", libraryHistoryHandler(deps.Library))
-	protected.POST("/library/history/remove", libraryHistoryRemoveHandler(deps.Library))
-	protected.DELETE("/library/history", libraryHistoryClearHandler(deps.Library))
-	protected.PUT("/library/history/:id/progress", libraryHistoryProgressHandler(deps.Library))
 	protected.POST("/library/scan", libraryScanHandler(deps.Library))
 	protected.POST("/library/scan/local", libraryLocalScanHandler(deps.Library, deps.EmbyDir))
 	protected.GET("/library/artwork/:key", libraryArtworkHandler(deps.Artwork))
-
-	playAPI := protected.Group("/play", noStore())
-	playAPI.GET("/files", playFilesHandler(deps.Play))
-	playAPI.GET("/subtitles/:id", subtitleVTTHandler(deps.Subtitle))
-	playAPI.GET("/:id", playStartHandler(deps.Play))
-	playAPI.DELETE("/:id", playReleaseHandler(deps.Play))
-	playAPI.GET("/:id/stream/:resource", playStreamHandler(deps.Play))
-	playAPI.HEAD("/:id/stream/:resource", playStreamHandler(deps.Play))
-
-	subtitlesAPI := protected.Group("/subtitles", noStore())
-	subtitlesAPI.GET("/search", subtitleSearchHandler(deps.Subtitle))
-	subtitlesAPI.POST("/apply", subtitleApplyHandler(deps.Subtitle))
-	subtitlesAPI.PATCH("/:id/offset", subtitleOffsetHandler(deps.Subtitle))
-	subtitlesAPI.PUT("/:id/default", subtitleSetDefaultHandler(deps.Subtitle))
-	subtitlesAPI.DELETE("/:id", subtitleDeleteHandler(deps.Subtitle))
 
 	protected.GET("/tasks", noStore(), tasksHandler(deps.Tasks))
 	protected.GET("/tasks/events", taskEventsHandler(deps.Tasks))
@@ -183,4 +163,3 @@ func securityHeadersMiddleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
-

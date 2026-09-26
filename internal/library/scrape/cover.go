@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/ppxb/miyabi/internal/codeid"
@@ -16,6 +15,7 @@ import (
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/nfo"
 	"github.com/ppxb/miyabi/internal/pan"
+	"github.com/ppxb/miyabi/internal/subtitle"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -165,20 +165,33 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 	}
 
 	var subTask *SubtitleTask
-	if service.subtitles != nil && len(directories) > 0 {
-		subTask = &SubtitleTask{
-			MovieID:      input.MovieID,
-			Code:         input.Code,
-			DirectoryID:  directories[0].ID,
-			IsUncensored: isUncensoredVideo(videos),
-			MetaPayload:  input.MetadataPayload,
-		}
+	if service.subtitles != nil {
+		subTask = service.subtitleTask(input.MetadataPayload, videos)
 	}
 
 	if service.notifier != nil {
 		service.notifier.NotifyLibraryChanged()
 	}
 	return subTask, nil
+}
+
+// subtitleTask targets the .strm exported for a movie's video. Multi-part
+// movies export one .strm per part, and whole-movie subtitles fit none of them.
+func (service *Service) subtitleTask(input MetadataPayload, videos []pan.File) *SubtitleTask {
+	if len(videos) != 1 {
+		return nil
+	}
+	return &SubtitleTask{
+		MovieID:     input.MovieID,
+		MetaPayload: input,
+		Target: subtitle.Target{
+			Dir:           EmbyMovieDir(service.embyDir, input.Code),
+			Stem:          nfo.FileStem(input.Code),
+			Code:          input.Code,
+			Uncensored:    subtitle.IsUncensored(videos[0].Name),
+			HardSubtitled: subtitle.HasHardSubtitle(videos[0].Name),
+		},
+	}
 }
 
 func (service *Service) verifyVideoPositions(ctx context.Context, sess drive.Session, directory MovieDirectory) error {
@@ -254,14 +267,10 @@ func (service *Service) exportLocalMedia(ctx context.Context, input CoverPayload
 		return err
 	}
 	if service.mediaNotifier != nil && service.embyDir != "" {
-		prefix := codeid.Prefix(input.Code)
-		destDir := filepath.Join(service.embyDir, prefix, input.Code)
-		service.mediaNotifier.NotifyUpdated(destDir)
+		service.mediaNotifier.NotifyUpdated(EmbyMovieDir(service.embyDir, input.Code))
 	}
 	return nil
 }
-
-
 
 // VerifyCoverOrigin validates that existing sidecars have not changed concurrently.
 func VerifyCoverOrigin(input CoverPayload, directoryID string, current nfo.Movie, origin ArtworkOrigin, poster, fanart []byte) error {

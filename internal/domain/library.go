@@ -1,28 +1,5 @@
 package domain
 
-// LibraryFile is an indexed video file inside the mounted media directory.
-type LibraryFile struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Path string `json:"path"`
-	Size int64  `json:"size"`
-}
-
-// WatchHistoryScope pins a watch-history operation to the account and
-// directory the history was recorded under.
-type WatchHistoryScope struct {
-	AccountID   string `json:"account_id" form:"account_id" binding:"required,max=128"`
-	DirectoryID string `json:"directory_id" form:"directory_id" binding:"required,max=128"`
-}
-
-// WatchResume is the last saved playback position of a movie.
-type WatchResume struct {
-	ID       int     `json:"id"`
-	FileID   string  `json:"file_id"`
-	Position float64 `json:"position"`
-	Duration float64 `json:"duration"`
-}
-
 // MovieSummary is the subset of catalogue metadata a subscription keeps.
 type MovieSummary struct {
 	ID          string

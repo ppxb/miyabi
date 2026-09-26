@@ -1,6 +1,7 @@
 package scrape
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/pan"
@@ -16,9 +17,9 @@ func TestSubtitleQueue_DeduplicationAndCapacity(t *testing.T) {
 		ctx:     t.Context(),
 	}
 
-	task1 := SubtitleTask{MovieID: 101, Code: "TEST-001"}
-	task2 := SubtitleTask{MovieID: 102, Code: "TEST-002"}
-	task3 := SubtitleTask{MovieID: 103, Code: "TEST-003"}
+	task1 := SubtitleTask{MovieID: 101}
+	task2 := SubtitleTask{MovieID: 102}
+	task3 := SubtitleTask{MovieID: 103}
 
 	// 1. Initial enqueue succeeds
 	if !q.Enqueue(task1) {
@@ -55,7 +56,7 @@ func TestSubtitleQueue_GracefulShutdown(t *testing.T) {
 	service := &Service{}
 	q := newSubtitleQueue(service, 2, 8, nil)
 
-	task := SubtitleTask{MovieID: 201, Code: "TEST-201"}
+	task := SubtitleTask{MovieID: 201}
 	if !q.Enqueue(task) {
 		t.Fatal("expected task to be enqueued")
 	}
@@ -64,45 +65,27 @@ func TestSubtitleQueue_GracefulShutdown(t *testing.T) {
 	q.Close()
 
 	// After close, enqueue must return false
-	taskAfterClose := SubtitleTask{MovieID: 202, Code: "TEST-202"}
+	taskAfterClose := SubtitleTask{MovieID: 202}
 	if q.Enqueue(taskAfterClose) {
 		t.Fatal("enqueue after close should return false")
 	}
 }
 
-func TestIsUncensoredVideo(t *testing.T) {
-	tests := []struct {
-		name     string
-		files    []pan.File
-		expected bool
-	}{
-		{
-			name:     "standard censored",
-			files:    []pan.File{{Name: "ABP-001.mp4"}, {Name: "ABP-001.nfo"}},
-			expected: false,
-		},
-		{
-			name:     "contains uncensored keyword",
-			files:    []pan.File{{Name: "ABP-001.Uncensored.mp4"}},
-			expected: true,
-		},
-		{
-			name:     "contains chinese uncensored keyword",
-			files:    []pan.File{{Name: "ABP-001-无码破解.mkv"}},
-			expected: true,
-		},
-		{
-			name:     "empty list",
-			files:    []pan.File{},
-			expected: false,
-		},
-	}
+func TestSubtitleTaskTargetsTheExportedSTRM(t *testing.T) {
+	service := &Service{embyDir: "emby"}
+	input := MetadataPayload{MovieID: 7, Code: "SSIS-589"}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isUncensoredVideo(tt.files); got != tt.expected {
-				t.Fatalf("isUncensoredVideo() = %v, expected %v", got, tt.expected)
-			}
-		})
+	task := service.subtitleTask(input, []pan.File{{ID: "video", Name: "SSIS-589-UC.mp4"}})
+	if task == nil || task.MovieID != 7 || task.Target.Dir != filepath.Join("emby", "SSIS", "SSIS-589") ||
+		task.Target.Stem != "SSIS-589" || task.Target.Code != "SSIS-589" ||
+		!task.Target.Uncensored || !task.Target.HardSubtitled {
+		t.Fatalf("subtitle task = %+v", task)
+	}
+	if task := service.subtitleTask(input, []pan.File{{Name: "SSIS-589.mp4"}}); task == nil || task.Target.Uncensored || task.Target.HardSubtitled {
+		t.Fatalf("plain release task = %+v", task)
+	}
+	parts := []pan.File{{Name: "SSIS-589-CD1.mp4"}, {Name: "SSIS-589-CD2.mp4"}}
+	if task := service.subtitleTask(input, parts); task != nil {
+		t.Fatalf("multi-part movie received a single subtitle target: %+v", task)
 	}
 }

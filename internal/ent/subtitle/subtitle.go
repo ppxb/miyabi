@@ -26,8 +26,6 @@ const (
 	FieldPickCode = "pick_code"
 	// FieldName holds the string denoting the name field in the database.
 	FieldName = "name"
-	// FieldDisplayName holds the string denoting the display_name field in the database.
-	FieldDisplayName = "display_name"
 	// FieldLanguage holds the string denoting the language field in the database.
 	FieldLanguage = "language"
 	// FieldFormat holds the string denoting the format field in the database.
@@ -38,10 +36,6 @@ const (
 	FieldSource = "source"
 	// FieldSourceURL holds the string denoting the source_url field in the database.
 	FieldSourceURL = "source_url"
-	// FieldOffsetMs holds the string denoting the offset_ms field in the database.
-	FieldOffsetMs = "offset_ms"
-	// FieldIsDefault holds the string denoting the is_default field in the database.
-	FieldIsDefault = "is_default"
 	// FieldStoragePath holds the string denoting the storage_path field in the database.
 	FieldStoragePath = "storage_path"
 	// EdgeMovie holds the string denoting the movie edge name in mutations.
@@ -66,14 +60,11 @@ var Columns = []string{
 	FieldFileID,
 	FieldPickCode,
 	FieldName,
-	FieldDisplayName,
 	FieldLanguage,
 	FieldFormat,
 	FieldVersionTag,
 	FieldSource,
 	FieldSourceURL,
-	FieldOffsetMs,
-	FieldIsDefault,
 	FieldStoragePath,
 }
 
@@ -102,8 +93,6 @@ var (
 	DefaultPickCode string
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
-	// DisplayNameValidator is a validator for the "display_name" field. It is called by the builders before save.
-	DisplayNameValidator func(string) error
 	// DefaultLanguage holds the default value on creation for the "language" field.
 	DefaultLanguage string
 	// DefaultFormat holds the default value on creation for the "format" field.
@@ -114,10 +103,6 @@ var (
 	DefaultSource string
 	// DefaultSourceURL holds the default value on creation for the "source_url" field.
 	DefaultSourceURL string
-	// DefaultOffsetMs holds the default value on creation for the "offset_ms" field.
-	DefaultOffsetMs int
-	// DefaultIsDefault holds the default value on creation for the "is_default" field.
-	DefaultIsDefault bool
 	// DefaultStoragePath holds the default value on creation for the "storage_path" field.
 	DefaultStoragePath string
 )
@@ -160,11 +145,6 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldName, opts...).ToFunc()
 }
 
-// ByDisplayName orders the results by the display_name field.
-func ByDisplayName(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldDisplayName, opts...).ToFunc()
-}
-
 // ByLanguage orders the results by the language field.
 func ByLanguage(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLanguage, opts...).ToFunc()
@@ -188,16 +168,6 @@ func BySource(opts ...sql.OrderTermOption) OrderOption {
 // BySourceURL orders the results by the source_url field.
 func BySourceURL(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSourceURL, opts...).ToFunc()
-}
-
-// ByOffsetMs orders the results by the offset_ms field.
-func ByOffsetMs(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldOffsetMs, opts...).ToFunc()
-}
-
-// ByIsDefault orders the results by the is_default field.
-func ByIsDefault(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldIsDefault, opts...).ToFunc()
 }
 
 // ByStoragePath orders the results by the storage_path field.

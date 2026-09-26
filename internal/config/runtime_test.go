@@ -14,7 +14,6 @@ func TestDefaultRuntime(t *testing.T) {
 		"OfflineSyncInterval":  rt.OfflineSyncInterval,
 		"MonitorCheckInterval": rt.MonitorCheckInterval,
 		"OfflineSubmitTimeout": rt.OfflineSubmitTimeout,
-		"PlaybackSessionTTL":   rt.PlaybackSessionTTL,
 	} {
 		if value <= 0 {
 			t.Fatalf("%s must be positive, got %v", name, value)

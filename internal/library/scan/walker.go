@@ -2,10 +2,9 @@ package scan
 
 import (
 	"context"
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"math/rand/v2"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -14,7 +13,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
@@ -80,28 +78,16 @@ func (s *Scanner) writeFastSTRM(video Video) {
 	if s.embyDir == "" || video.Code == "" || !domain.IsVideo(video.Name) {
 		return
 	}
-	prefix := codeid.Prefix(video.Code)
-	destDir := filepath.Join(s.embyDir, prefix, video.Code)
+	destDir := scrape.EmbyMovieDir(s.embyDir, video.Code)
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return
 	}
 
-	stem := nfo.FileStem(video.Code)
-	strmPath := filepath.Join(destDir, stem+".strm")
+	strmPath := filepath.Join(destDir, nfo.FileStem(video.Code)+".strm")
 	if _, err := os.Stat(strmPath); err == nil {
 		return
 	}
-
-	publicURL := s.publicURL
-	if publicURL == "" {
-		publicURL = "http://127.0.0.1:8080"
-	}
-	tokenParam := ""
-	if s.strmToken != "" {
-		tokenParam = "?token=" + url.QueryEscape(s.strmToken)
-	}
-	content := fmt.Sprintf("%s/api/strm/play/%s%s\n", publicURL, video.ID, tokenParam)
-	if err := os.WriteFile(strmPath, []byte(content), 0o644); err == nil {
+	if err := os.WriteFile(strmPath, scrape.STRMContent(s.publicURL, video.ID, s.strmToken), 0o644); err == nil {
 		if s.notifier != nil {
 			s.notifier.NotifyUpdated(destDir)
 		}
@@ -152,7 +138,6 @@ func (s *Scanner) Run(ctx context.Context, job tasks.Job) error {
 			return ReconcileScanTx(ctx, tx, job.ID, scanID, &payload, observed, images, tasksSvc, s.embyDir, s.publicURL, s.strmToken, s.notifier)
 		})
 	}
-
 
 	if payload.TargetID != "" {
 		info, err := drive.SourceInfo(ctx, sess, payload.TargetID)

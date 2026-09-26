@@ -50,6 +50,10 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 		opts = append(opts, ent.Debug())
 	}
 	client := ent.NewClient(opts...)
+	if err := dropPlayerStorage(ctx, db); err != nil {
+		client.Close()
+		return nil, fmt.Errorf("drop player storage: %w", err)
+	}
 	if err := client.Schema.Create(ctx); err != nil {
 		client.Close()
 		return nil, fmt.Errorf("migrate database schema: %w", err)
@@ -84,6 +88,41 @@ func migrateSubscriptions(ctx context.Context, db *sql.DB) error {
 		DROP TABLE monitors;
 	`)
 	return err
+}
+
+// dropPlayerStorage removes the watch history and player-only columns left by
+// the in-app player. Legacy NOT NULL columns would otherwise reject new rows.
+func dropPlayerStorage(ctx context.Context, db *sql.DB) error {
+	statements := []string{
+		"DROP TABLE IF EXISTS watch_histories",
+		"DROP INDEX IF EXISTS subtitle_movie_id_is_default",
+	}
+	for _, column := range []struct{ table, name string }{
+		{"movies", "watched"},
+		{"subtitles", "display_name"},
+		{"subtitles", "offset_ms"},
+		{"subtitles", "is_default"},
+	} {
+		var count int
+		if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?",
+			column.table, column.name).Scan(&count); err != nil {
+			return err
+		}
+		if count > 0 {
+			statements = append(statements, fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", column.table, column.name))
+		}
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (store *Store) Ping(ctx context.Context) error {

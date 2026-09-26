@@ -89,7 +89,6 @@ var (
 		{Name: "poster", Type: field.TypeString, Nullable: true},
 		{Name: "fanarts", Type: field.TypeJSON},
 		{Name: "scrape_status", Type: field.TypeEnum, Enums: []string{"pending", "done", "failed"}, Default: "pending"},
-		{Name: "watched", Type: field.TypeBool, Default: false},
 	}
 	// MoviesTable holds the schema information for the "movies" table.
 	MoviesTable = &schema.Table{
@@ -160,14 +159,11 @@ var (
 		{Name: "file_id", Type: field.TypeString, Default: ""},
 		{Name: "pick_code", Type: field.TypeString, Default: ""},
 		{Name: "name", Type: field.TypeString},
-		{Name: "display_name", Type: field.TypeString},
 		{Name: "language", Type: field.TypeString, Default: "zh-CN"},
-		{Name: "format", Type: field.TypeString, Default: "vtt"},
+		{Name: "format", Type: field.TypeString, Default: "srt"},
 		{Name: "version_tag", Type: field.TypeString, Default: "standard"},
 		{Name: "source", Type: field.TypeString, Default: "local"},
 		{Name: "source_url", Type: field.TypeString, Default: ""},
-		{Name: "offset_ms", Type: field.TypeInt, Default: 0},
-		{Name: "is_default", Type: field.TypeBool, Default: false},
 		{Name: "storage_path", Type: field.TypeString, Default: ""},
 		{Name: "movie_id", Type: field.TypeInt},
 	}
@@ -179,7 +175,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "subtitles_movies_subtitles",
-				Columns:    []*schema.Column{SubtitlesColumns[15]},
+				Columns:    []*schema.Column{SubtitlesColumns[12]},
 				RefColumns: []*schema.Column{MoviesColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -188,17 +184,12 @@ var (
 			{
 				Name:    "subtitle_movie_id",
 				Unique:  false,
-				Columns: []*schema.Column{SubtitlesColumns[15]},
+				Columns: []*schema.Column{SubtitlesColumns[12]},
 			},
 			{
 				Name:    "subtitle_file_id",
 				Unique:  false,
 				Columns: []*schema.Column{SubtitlesColumns[3]},
-			},
-			{
-				Name:    "subtitle_movie_id_is_default",
-				Unique:  false,
-				Columns: []*schema.Column{SubtitlesColumns[15], SubtitlesColumns[13]},
 			},
 		},
 	}
@@ -266,50 +257,6 @@ var (
 			},
 		},
 	}
-	// WatchHistoriesColumns holds the columns for the "watch_histories" table.
-	WatchHistoriesColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "account_id", Type: field.TypeString},
-		{Name: "root_id", Type: field.TypeString},
-		{Name: "watched_at", Type: field.TypeTime},
-		{Name: "session_id", Type: field.TypeString},
-		{Name: "file_id", Type: field.TypeString, Default: ""},
-		{Name: "position", Type: field.TypeFloat64, Default: 0},
-		{Name: "duration", Type: field.TypeFloat64, Default: 0},
-		{Name: "progress_version", Type: field.TypeInt, Default: 0},
-		{Name: "movie_id", Type: field.TypeInt},
-	}
-	// WatchHistoriesTable holds the schema information for the "watch_histories" table.
-	WatchHistoriesTable = &schema.Table{
-		Name:       "watch_histories",
-		Columns:    WatchHistoriesColumns,
-		PrimaryKey: []*schema.Column{WatchHistoriesColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "watch_histories_movies_watch_history",
-				Columns:    []*schema.Column{WatchHistoriesColumns[9]},
-				RefColumns: []*schema.Column{MoviesColumns[0]},
-				OnDelete:   schema.Cascade,
-			},
-		},
-		Indexes: []*schema.Index{
-			{
-				Name:    "watchhistory_account_id_root_id_movie_id",
-				Unique:  true,
-				Columns: []*schema.Column{WatchHistoriesColumns[1], WatchHistoriesColumns[2], WatchHistoriesColumns[9]},
-			},
-			{
-				Name:    "watchhistory_account_id_root_id_watched_at_id",
-				Unique:  false,
-				Columns: []*schema.Column{WatchHistoriesColumns[1], WatchHistoriesColumns[2], WatchHistoriesColumns[3], WatchHistoriesColumns[0]},
-			},
-			{
-				Name:    "watchhistory_movie_id",
-				Unique:  false,
-				Columns: []*schema.Column{WatchHistoriesColumns[9]},
-			},
-		},
-	}
 	// MovieActorsColumns holds the columns for the "movie_actors" table.
 	MovieActorsColumns = []*schema.Column{
 		{Name: "movie_id", Type: field.TypeInt},
@@ -371,7 +318,6 @@ var (
 		TagsTable,
 		TasksTable,
 		ViewedMoviesTable,
-		WatchHistoriesTable,
 		MovieActorsTable,
 		MovieTagsTable,
 	}
@@ -380,7 +326,6 @@ var (
 func init() {
 	FilesTable.ForeignKeys[0].RefTable = MoviesTable
 	SubtitlesTable.ForeignKeys[0].RefTable = MoviesTable
-	WatchHistoriesTable.ForeignKeys[0].RefTable = MoviesTable
 	MovieActorsTable.ForeignKeys[0].RefTable = MoviesTable
 	MovieActorsTable.ForeignKeys[1].RefTable = ActorsTable
 	MovieTagsTable.ForeignKeys[0].RefTable = MoviesTable

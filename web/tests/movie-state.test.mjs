@@ -99,13 +99,13 @@ test('newly opened and previously inactive movies read current state after a mis
   assert.deepEqual(reopened.getCurrentResult().data, { state: 'not_in_library' })
 
   const newMovie = observe(t, client, movieStateOptions(load, { ...identity, id: 'two' }))
-  // Old catalogue projections never provide playback before local verification.
+  // Old catalogue projections never report library state before local verification.
   assert.deepEqual(newMovie.getCurrentResult().data, { state: 'not_in_library' })
   await settled(newMovie)
   assert.deepEqual(newMovie.getCurrentResult().data, { state: 'not_in_library' })
 })
 
-test('switching source clears playback and late responses cannot restore it', async t => {
+test('switching source clears library state and late responses cannot restore it', async t => {
   const client = queryClient(t)
   const requests = []
   const load = createMovieStateLoader(movies => {

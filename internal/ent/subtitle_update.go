@@ -91,20 +91,6 @@ func (_u *SubtitleUpdate) SetNillableName(v *string) *SubtitleUpdate {
 	return _u
 }
 
-// SetDisplayName sets the "display_name" field.
-func (_u *SubtitleUpdate) SetDisplayName(v string) *SubtitleUpdate {
-	_u.mutation.SetDisplayName(v)
-	return _u
-}
-
-// SetNillableDisplayName sets the "display_name" field if the given value is not nil.
-func (_u *SubtitleUpdate) SetNillableDisplayName(v *string) *SubtitleUpdate {
-	if v != nil {
-		_u.SetDisplayName(*v)
-	}
-	return _u
-}
-
 // SetLanguage sets the "language" field.
 func (_u *SubtitleUpdate) SetLanguage(v string) *SubtitleUpdate {
 	_u.mutation.SetLanguage(v)
@@ -171,41 +157,6 @@ func (_u *SubtitleUpdate) SetSourceURL(v string) *SubtitleUpdate {
 func (_u *SubtitleUpdate) SetNillableSourceURL(v *string) *SubtitleUpdate {
 	if v != nil {
 		_u.SetSourceURL(*v)
-	}
-	return _u
-}
-
-// SetOffsetMs sets the "offset_ms" field.
-func (_u *SubtitleUpdate) SetOffsetMs(v int) *SubtitleUpdate {
-	_u.mutation.ResetOffsetMs()
-	_u.mutation.SetOffsetMs(v)
-	return _u
-}
-
-// SetNillableOffsetMs sets the "offset_ms" field if the given value is not nil.
-func (_u *SubtitleUpdate) SetNillableOffsetMs(v *int) *SubtitleUpdate {
-	if v != nil {
-		_u.SetOffsetMs(*v)
-	}
-	return _u
-}
-
-// AddOffsetMs adds value to the "offset_ms" field.
-func (_u *SubtitleUpdate) AddOffsetMs(v int) *SubtitleUpdate {
-	_u.mutation.AddOffsetMs(v)
-	return _u
-}
-
-// SetIsDefault sets the "is_default" field.
-func (_u *SubtitleUpdate) SetIsDefault(v bool) *SubtitleUpdate {
-	_u.mutation.SetIsDefault(v)
-	return _u
-}
-
-// SetNillableIsDefault sets the "is_default" field if the given value is not nil.
-func (_u *SubtitleUpdate) SetNillableIsDefault(v *bool) *SubtitleUpdate {
-	if v != nil {
-		_u.SetIsDefault(*v)
 	}
 	return _u
 }
@@ -288,11 +239,6 @@ func (_u *SubtitleUpdate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Subtitle.name": %w`, err)}
 		}
 	}
-	if v, ok := _u.mutation.DisplayName(); ok {
-		if err := subtitle.DisplayNameValidator(v); err != nil {
-			return &ValidationError{Name: "display_name", err: fmt.Errorf(`ent: validator failed for field "Subtitle.display_name": %w`, err)}
-		}
-	}
 	if _u.mutation.MovieCleared() && len(_u.mutation.MovieIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "Subtitle.movie"`)
 	}
@@ -323,9 +269,6 @@ func (_u *SubtitleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(subtitle.FieldName, field.TypeString, value)
 	}
-	if value, ok := _u.mutation.DisplayName(); ok {
-		_spec.SetField(subtitle.FieldDisplayName, field.TypeString, value)
-	}
 	if value, ok := _u.mutation.Language(); ok {
 		_spec.SetField(subtitle.FieldLanguage, field.TypeString, value)
 	}
@@ -340,15 +283,6 @@ func (_u *SubtitleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.SourceURL(); ok {
 		_spec.SetField(subtitle.FieldSourceURL, field.TypeString, value)
-	}
-	if value, ok := _u.mutation.OffsetMs(); ok {
-		_spec.SetField(subtitle.FieldOffsetMs, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.AddedOffsetMs(); ok {
-		_spec.AddField(subtitle.FieldOffsetMs, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.IsDefault(); ok {
-		_spec.SetField(subtitle.FieldIsDefault, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.StoragePath(); ok {
 		_spec.SetField(subtitle.FieldStoragePath, field.TypeString, value)
@@ -464,20 +398,6 @@ func (_u *SubtitleUpdateOne) SetNillableName(v *string) *SubtitleUpdateOne {
 	return _u
 }
 
-// SetDisplayName sets the "display_name" field.
-func (_u *SubtitleUpdateOne) SetDisplayName(v string) *SubtitleUpdateOne {
-	_u.mutation.SetDisplayName(v)
-	return _u
-}
-
-// SetNillableDisplayName sets the "display_name" field if the given value is not nil.
-func (_u *SubtitleUpdateOne) SetNillableDisplayName(v *string) *SubtitleUpdateOne {
-	if v != nil {
-		_u.SetDisplayName(*v)
-	}
-	return _u
-}
-
 // SetLanguage sets the "language" field.
 func (_u *SubtitleUpdateOne) SetLanguage(v string) *SubtitleUpdateOne {
 	_u.mutation.SetLanguage(v)
@@ -544,41 +464,6 @@ func (_u *SubtitleUpdateOne) SetSourceURL(v string) *SubtitleUpdateOne {
 func (_u *SubtitleUpdateOne) SetNillableSourceURL(v *string) *SubtitleUpdateOne {
 	if v != nil {
 		_u.SetSourceURL(*v)
-	}
-	return _u
-}
-
-// SetOffsetMs sets the "offset_ms" field.
-func (_u *SubtitleUpdateOne) SetOffsetMs(v int) *SubtitleUpdateOne {
-	_u.mutation.ResetOffsetMs()
-	_u.mutation.SetOffsetMs(v)
-	return _u
-}
-
-// SetNillableOffsetMs sets the "offset_ms" field if the given value is not nil.
-func (_u *SubtitleUpdateOne) SetNillableOffsetMs(v *int) *SubtitleUpdateOne {
-	if v != nil {
-		_u.SetOffsetMs(*v)
-	}
-	return _u
-}
-
-// AddOffsetMs adds value to the "offset_ms" field.
-func (_u *SubtitleUpdateOne) AddOffsetMs(v int) *SubtitleUpdateOne {
-	_u.mutation.AddOffsetMs(v)
-	return _u
-}
-
-// SetIsDefault sets the "is_default" field.
-func (_u *SubtitleUpdateOne) SetIsDefault(v bool) *SubtitleUpdateOne {
-	_u.mutation.SetIsDefault(v)
-	return _u
-}
-
-// SetNillableIsDefault sets the "is_default" field if the given value is not nil.
-func (_u *SubtitleUpdateOne) SetNillableIsDefault(v *bool) *SubtitleUpdateOne {
-	if v != nil {
-		_u.SetIsDefault(*v)
 	}
 	return _u
 }
@@ -674,11 +559,6 @@ func (_u *SubtitleUpdateOne) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Subtitle.name": %w`, err)}
 		}
 	}
-	if v, ok := _u.mutation.DisplayName(); ok {
-		if err := subtitle.DisplayNameValidator(v); err != nil {
-			return &ValidationError{Name: "display_name", err: fmt.Errorf(`ent: validator failed for field "Subtitle.display_name": %w`, err)}
-		}
-	}
 	if _u.mutation.MovieCleared() && len(_u.mutation.MovieIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "Subtitle.movie"`)
 	}
@@ -726,9 +606,6 @@ func (_u *SubtitleUpdateOne) sqlSave(ctx context.Context) (_node *Subtitle, err 
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(subtitle.FieldName, field.TypeString, value)
 	}
-	if value, ok := _u.mutation.DisplayName(); ok {
-		_spec.SetField(subtitle.FieldDisplayName, field.TypeString, value)
-	}
 	if value, ok := _u.mutation.Language(); ok {
 		_spec.SetField(subtitle.FieldLanguage, field.TypeString, value)
 	}
@@ -743,15 +620,6 @@ func (_u *SubtitleUpdateOne) sqlSave(ctx context.Context) (_node *Subtitle, err 
 	}
 	if value, ok := _u.mutation.SourceURL(); ok {
 		_spec.SetField(subtitle.FieldSourceURL, field.TypeString, value)
-	}
-	if value, ok := _u.mutation.OffsetMs(); ok {
-		_spec.SetField(subtitle.FieldOffsetMs, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.AddedOffsetMs(); ok {
-		_spec.AddField(subtitle.FieldOffsetMs, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.IsDefault(); ok {
-		_spec.SetField(subtitle.FieldIsDefault, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.StoragePath(); ok {
 		_spec.SetField(subtitle.FieldStoragePath, field.TypeString, value)

@@ -30,8 +30,6 @@ type Subtitle struct {
 	PickCode string `json:"pick_code,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
-	// DisplayName holds the value of the "display_name" field.
-	DisplayName string `json:"display_name,omitempty"`
 	// Language holds the value of the "language" field.
 	Language string `json:"language,omitempty"`
 	// Format holds the value of the "format" field.
@@ -42,10 +40,6 @@ type Subtitle struct {
 	Source string `json:"source,omitempty"`
 	// SourceURL holds the value of the "source_url" field.
 	SourceURL string `json:"source_url,omitempty"`
-	// OffsetMs holds the value of the "offset_ms" field.
-	OffsetMs int `json:"offset_ms,omitempty"`
-	// IsDefault holds the value of the "is_default" field.
-	IsDefault bool `json:"is_default,omitempty"`
 	// StoragePath holds the value of the "storage_path" field.
 	StoragePath string `json:"storage_path,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -79,11 +73,9 @@ func (*Subtitle) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case subtitle.FieldIsDefault:
-			values[i] = new(sql.NullBool)
-		case subtitle.FieldID, subtitle.FieldMovieID, subtitle.FieldOffsetMs:
+		case subtitle.FieldID, subtitle.FieldMovieID:
 			values[i] = new(sql.NullInt64)
-		case subtitle.FieldFileID, subtitle.FieldPickCode, subtitle.FieldName, subtitle.FieldDisplayName, subtitle.FieldLanguage, subtitle.FieldFormat, subtitle.FieldVersionTag, subtitle.FieldSource, subtitle.FieldSourceURL, subtitle.FieldStoragePath:
+		case subtitle.FieldFileID, subtitle.FieldPickCode, subtitle.FieldName, subtitle.FieldLanguage, subtitle.FieldFormat, subtitle.FieldVersionTag, subtitle.FieldSource, subtitle.FieldSourceURL, subtitle.FieldStoragePath:
 			values[i] = new(sql.NullString)
 		case subtitle.FieldCreatedAt, subtitle.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -144,12 +136,6 @@ func (_m *Subtitle) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Name = value.String
 			}
-		case subtitle.FieldDisplayName:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field display_name", values[i])
-			} else if value.Valid {
-				_m.DisplayName = value.String
-			}
 		case subtitle.FieldLanguage:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field language", values[i])
@@ -179,18 +165,6 @@ func (_m *Subtitle) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field source_url", values[i])
 			} else if value.Valid {
 				_m.SourceURL = value.String
-			}
-		case subtitle.FieldOffsetMs:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field offset_ms", values[i])
-			} else if value.Valid {
-				_m.OffsetMs = int(value.Int64)
-			}
-		case subtitle.FieldIsDefault:
-			if value, ok := values[i].(*sql.NullBool); !ok {
-				return fmt.Errorf("unexpected type %T for field is_default", values[i])
-			} else if value.Valid {
-				_m.IsDefault = value.Bool
 			}
 		case subtitle.FieldStoragePath:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -257,9 +231,6 @@ func (_m *Subtitle) String() string {
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)
 	builder.WriteString(", ")
-	builder.WriteString("display_name=")
-	builder.WriteString(_m.DisplayName)
-	builder.WriteString(", ")
 	builder.WriteString("language=")
 	builder.WriteString(_m.Language)
 	builder.WriteString(", ")
@@ -274,12 +245,6 @@ func (_m *Subtitle) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("source_url=")
 	builder.WriteString(_m.SourceURL)
-	builder.WriteString(", ")
-	builder.WriteString("offset_ms=")
-	builder.WriteString(fmt.Sprintf("%v", _m.OffsetMs))
-	builder.WriteString(", ")
-	builder.WriteString("is_default=")
-	builder.WriteString(fmt.Sprintf("%v", _m.IsDefault))
 	builder.WriteString(", ")
 	builder.WriteString("storage_path=")
 	builder.WriteString(_m.StoragePath)

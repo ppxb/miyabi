@@ -13,25 +13,39 @@ import (
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
+const (
+	defaultEmbyDir   = "./data/emby"
+	defaultPublicURL = "http://127.0.0.1:8080"
+)
+
+// EmbyMovieDir is the directory holding a movie's exported Emby files,
+// bucketed by catalogue prefix: <embyDir>/<prefix>/<code>.
+func EmbyMovieDir(embyDir, code string) string {
+	if embyDir == "" {
+		embyDir = defaultEmbyDir
+	}
+	return filepath.Join(embyDir, codeid.Prefix(code), code)
+}
+
+// STRMContent is the body of a .strm file: the relay URL that resolves the
+// 115 video to a fresh stream whenever Emby plays it.
+func STRMContent(publicURL, fileID, strmToken string) []byte {
+	if publicURL == "" {
+		publicURL = defaultPublicURL
+	}
+	content := publicURL + "/api/strm/play/" + fileID
+	if strmToken != "" {
+		content += "?token=" + url.QueryEscape(strmToken)
+	}
+	return []byte(content + "\n")
+}
+
 // ExportEmbyMedia writes .strm, .nfo, poster.jpg, and fanart.jpg files to the Emby directory structure.
 func ExportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, videos []pan.File, poster, fanart []byte) error {
-	if embyDir == "" {
-		embyDir = "./data/emby"
-	}
-	if publicURL == "" {
-		publicURL = "http://127.0.0.1:8080"
-	}
-
 	stem := nfo.FileStem(code)
-	prefix := codeid.Prefix(code)
-	destDir := filepath.Join(embyDir, prefix, code)
+	destDir := EmbyMovieDir(embyDir, code)
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return fmt.Errorf("create emby directory %s: %w", destDir, err)
-	}
-
-	tokenParam := ""
-	if strmToken != "" {
-		tokenParam = "?token=" + url.QueryEscape(strmToken)
 	}
 
 	// 1. Write poster and fanart FIRST
@@ -65,15 +79,13 @@ func ExportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, 
 	// 3. Write STRM files LAST so media servers (Emby) watching via inotify detect complete assets
 	if len(videos) == 1 {
 		strmPath := filepath.Join(destDir, stem+".strm")
-		content := fmt.Sprintf("%s/api/strm/play/%s%s\n", publicURL, videos[0].ID, tokenParam)
-		if err := os.WriteFile(strmPath, []byte(content), 0o644); err != nil {
+		if err := os.WriteFile(strmPath, STRMContent(publicURL, videos[0].ID, strmToken), 0o644); err != nil {
 			return fmt.Errorf("write strm file: %w", err)
 		}
 	} else if len(videos) > 1 {
 		for i, v := range videos {
 			strmPath := filepath.Join(destDir, fmt.Sprintf("%s-cd%d.strm", stem, i+1))
-			content := fmt.Sprintf("%s/api/strm/play/%s%s\n", publicURL, v.ID, tokenParam)
-			if err := os.WriteFile(strmPath, []byte(content), 0o644); err != nil {
+			if err := os.WriteFile(strmPath, STRMContent(publicURL, v.ID, strmToken), 0o644); err != nil {
 				return fmt.Errorf("write strm file: %w", err)
 			}
 		}
@@ -92,12 +104,8 @@ func ExportLocalMovie(embyDir, publicURL, strmToken string, record *ent.Movie, i
 	if record == nil || record.Code == "" {
 		return nil
 	}
-	if embyDir == "" {
-		embyDir = "./data/emby"
-	}
 
-	prefix := codeid.Prefix(record.Code)
-	destDir := filepath.Join(embyDir, prefix, record.Code)
+	destDir := EmbyMovieDir(embyDir, record.Code)
 	stem := nfo.FileStem(record.Code)
 	nfoPath := filepath.Join(destDir, stem+".nfo")
 	posterPath := filepath.Join(destDir, "poster.jpg")

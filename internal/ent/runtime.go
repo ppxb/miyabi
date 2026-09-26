@@ -16,7 +16,6 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/tag"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/ent/viewedmovie"
-	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -128,10 +127,6 @@ func init() {
 	movieDescFanarts := movieFields[14].Descriptor()
 	// movie.DefaultFanarts holds the default value on creation for the fanarts field.
 	movie.DefaultFanarts = movieDescFanarts.Default.(func() []string)
-	// movieDescWatched is the schema descriptor for watched field.
-	movieDescWatched := movieFields[16].Descriptor()
-	// movie.DefaultWatched holds the default value on creation for the watched field.
-	movie.DefaultWatched = movieDescWatched.Default.(bool)
 	settingMixin := schema.Setting{}.Mixin()
 	settingMixinFields0 := settingMixin[0].Fields()
 	_ = settingMixinFields0
@@ -239,40 +234,28 @@ func init() {
 	subtitleDescName := subtitleFields[3].Descriptor()
 	// subtitle.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	subtitle.NameValidator = subtitleDescName.Validators[0].(func(string) error)
-	// subtitleDescDisplayName is the schema descriptor for display_name field.
-	subtitleDescDisplayName := subtitleFields[4].Descriptor()
-	// subtitle.DisplayNameValidator is a validator for the "display_name" field. It is called by the builders before save.
-	subtitle.DisplayNameValidator = subtitleDescDisplayName.Validators[0].(func(string) error)
 	// subtitleDescLanguage is the schema descriptor for language field.
-	subtitleDescLanguage := subtitleFields[5].Descriptor()
+	subtitleDescLanguage := subtitleFields[4].Descriptor()
 	// subtitle.DefaultLanguage holds the default value on creation for the language field.
 	subtitle.DefaultLanguage = subtitleDescLanguage.Default.(string)
 	// subtitleDescFormat is the schema descriptor for format field.
-	subtitleDescFormat := subtitleFields[6].Descriptor()
+	subtitleDescFormat := subtitleFields[5].Descriptor()
 	// subtitle.DefaultFormat holds the default value on creation for the format field.
 	subtitle.DefaultFormat = subtitleDescFormat.Default.(string)
 	// subtitleDescVersionTag is the schema descriptor for version_tag field.
-	subtitleDescVersionTag := subtitleFields[7].Descriptor()
+	subtitleDescVersionTag := subtitleFields[6].Descriptor()
 	// subtitle.DefaultVersionTag holds the default value on creation for the version_tag field.
 	subtitle.DefaultVersionTag = subtitleDescVersionTag.Default.(string)
 	// subtitleDescSource is the schema descriptor for source field.
-	subtitleDescSource := subtitleFields[8].Descriptor()
+	subtitleDescSource := subtitleFields[7].Descriptor()
 	// subtitle.DefaultSource holds the default value on creation for the source field.
 	subtitle.DefaultSource = subtitleDescSource.Default.(string)
 	// subtitleDescSourceURL is the schema descriptor for source_url field.
-	subtitleDescSourceURL := subtitleFields[9].Descriptor()
+	subtitleDescSourceURL := subtitleFields[8].Descriptor()
 	// subtitle.DefaultSourceURL holds the default value on creation for the source_url field.
 	subtitle.DefaultSourceURL = subtitleDescSourceURL.Default.(string)
-	// subtitleDescOffsetMs is the schema descriptor for offset_ms field.
-	subtitleDescOffsetMs := subtitleFields[10].Descriptor()
-	// subtitle.DefaultOffsetMs holds the default value on creation for the offset_ms field.
-	subtitle.DefaultOffsetMs = subtitleDescOffsetMs.Default.(int)
-	// subtitleDescIsDefault is the schema descriptor for is_default field.
-	subtitleDescIsDefault := subtitleFields[11].Descriptor()
-	// subtitle.DefaultIsDefault holds the default value on creation for the is_default field.
-	subtitle.DefaultIsDefault = subtitleDescIsDefault.Default.(bool)
 	// subtitleDescStoragePath is the schema descriptor for storage_path field.
-	subtitleDescStoragePath := subtitleFields[12].Descriptor()
+	subtitleDescStoragePath := subtitleFields[9].Descriptor()
 	// subtitle.DefaultStoragePath holds the default value on creation for the storage_path field.
 	subtitle.DefaultStoragePath = subtitleDescStoragePath.Default.(string)
 	tagMixin := schema.Tag{}.Mixin()
@@ -341,44 +324,4 @@ func init() {
 	viewedmovieDescViewedAt := viewedmovieFields[1].Descriptor()
 	// viewedmovie.DefaultViewedAt holds the default value on creation for the viewed_at field.
 	viewedmovie.DefaultViewedAt = viewedmovieDescViewedAt.Default.(func() time.Time)
-	watchhistoryFields := schema.WatchHistory{}.Fields()
-	_ = watchhistoryFields
-	// watchhistoryDescAccountID is the schema descriptor for account_id field.
-	watchhistoryDescAccountID := watchhistoryFields[0].Descriptor()
-	// watchhistory.AccountIDValidator is a validator for the "account_id" field. It is called by the builders before save.
-	watchhistory.AccountIDValidator = watchhistoryDescAccountID.Validators[0].(func(string) error)
-	// watchhistoryDescRootID is the schema descriptor for root_id field.
-	watchhistoryDescRootID := watchhistoryFields[1].Descriptor()
-	// watchhistory.RootIDValidator is a validator for the "root_id" field. It is called by the builders before save.
-	watchhistory.RootIDValidator = watchhistoryDescRootID.Validators[0].(func(string) error)
-	// watchhistoryDescMovieID is the schema descriptor for movie_id field.
-	watchhistoryDescMovieID := watchhistoryFields[2].Descriptor()
-	// watchhistory.MovieIDValidator is a validator for the "movie_id" field. It is called by the builders before save.
-	watchhistory.MovieIDValidator = watchhistoryDescMovieID.Validators[0].(func(int) error)
-	// watchhistoryDescWatchedAt is the schema descriptor for watched_at field.
-	watchhistoryDescWatchedAt := watchhistoryFields[3].Descriptor()
-	// watchhistory.DefaultWatchedAt holds the default value on creation for the watched_at field.
-	watchhistory.DefaultWatchedAt = watchhistoryDescWatchedAt.Default.(func() time.Time)
-	// watchhistoryDescSessionID is the schema descriptor for session_id field.
-	watchhistoryDescSessionID := watchhistoryFields[4].Descriptor()
-	// watchhistory.SessionIDValidator is a validator for the "session_id" field. It is called by the builders before save.
-	watchhistory.SessionIDValidator = watchhistoryDescSessionID.Validators[0].(func(string) error)
-	// watchhistoryDescFileID is the schema descriptor for file_id field.
-	watchhistoryDescFileID := watchhistoryFields[5].Descriptor()
-	// watchhistory.DefaultFileID holds the default value on creation for the file_id field.
-	watchhistory.DefaultFileID = watchhistoryDescFileID.Default.(string)
-	// watchhistoryDescPosition is the schema descriptor for position field.
-	watchhistoryDescPosition := watchhistoryFields[6].Descriptor()
-	// watchhistory.DefaultPosition holds the default value on creation for the position field.
-	watchhistory.DefaultPosition = watchhistoryDescPosition.Default.(float64)
-	// watchhistoryDescDuration is the schema descriptor for duration field.
-	watchhistoryDescDuration := watchhistoryFields[7].Descriptor()
-	// watchhistory.DefaultDuration holds the default value on creation for the duration field.
-	watchhistory.DefaultDuration = watchhistoryDescDuration.Default.(float64)
-	// watchhistoryDescProgressVersion is the schema descriptor for progress_version field.
-	watchhistoryDescProgressVersion := watchhistoryFields[8].Descriptor()
-	// watchhistory.DefaultProgressVersion holds the default value on creation for the progress_version field.
-	watchhistory.DefaultProgressVersion = watchhistoryDescProgressVersion.Default.(int)
-	// watchhistory.ProgressVersionValidator is a validator for the "progress_version" field. It is called by the builders before save.
-	watchhistory.ProgressVersionValidator = watchhistoryDescProgressVersion.Validators[0].(func(int) error)
 }

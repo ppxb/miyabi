@@ -1,24 +1,14 @@
 import type { PropsWithChildren } from 'react'
 import { useRouterState } from '@tanstack/react-router'
-import {
-  BellIcon,
-  CompassIcon,
-  FilmIcon,
-  HistoryIcon,
-  SearchIcon,
-  SettingsIcon
-} from 'lucide-react'
+import { BellIcon, CompassIcon, FilmIcon, SearchIcon, SettingsIcon } from 'lucide-react'
 
 import { FloatingNav, type FloatingNavItem } from '@/components/floating-nav'
 import { Toaster } from '@/components/ui/sonner'
-import { MoviePlaybackNavAction } from '@/features/movie-detail/playback-nav-action'
 import { TaskEventsProvider } from '@/features/tasks/task-events'
 import { TaskNotifications } from '@/features/tasks/task-notifications'
-import { PlayerDialog } from '@/features/player/player-dialog'
 
 const NAV_ITEMS: FloatingNavItem[] = [
   { id: 'library', label: '媒体库', icon: FilmIcon, to: '/' },
-  { id: 'history', label: '观看历史', icon: HistoryIcon, to: '/history' },
   { id: 'subscriptions', label: '订阅', icon: BellIcon, to: '/subscriptions' },
   { id: 'discover', label: '发现', icon: CompassIcon, to: '/discover' },
   { id: 'search', label: '搜索', icon: SearchIcon, to: '/search' },
@@ -36,11 +26,8 @@ export function AppShell({ children }: PropsWithChildren) {
   return (
     <TaskEventsProvider>
       <div className="relative min-h-dvh">
-        <FloatingNav items={NAV_ITEMS} activeId={activeId}>
-          <MoviePlaybackNavAction />
-        </FloatingNav>
+        <FloatingNav items={NAV_ITEMS} activeId={activeId} />
         {children}
-        <PlayerDialog />
         <Toaster position="top-right" closeButton duration={6000} />
         <TaskNotifications />
       </div>

@@ -97,15 +97,13 @@ func TestDataCleanupPreservesAllLibraryAndUnfinishedTaskReferences(t *testing.T)
 	filmImages := dataArtwork(t, service, 10)
 	additional := dataArtwork(t, service, 20)
 	unused := dataArtwork(t, service, 30)
-	film := db.Movie.Create().SetCode("ABP-001").SetTitle("Preserved film").SetWatched(true).
+	film := db.Movie.Create().SetCode("ABP-001").SetTitle("Preserved film").
 		SetCover(filmImages.Thumbnail).SetPoster(filmImages.Poster).
 		SetFanarts([]string{filmImages.Fanart, additional.Fanart}).SaveX(ctx)
 	// This movie has no files; another belongs to a different account/directory.
 	other := db.Movie.Create().SetCode("ABP-002").SetCover(additional.Thumbnail).SetPoster(additional.Poster).SaveX(ctx)
 	file := db.File.Create().SetFileID("other-video").SetName("video.mp4").SetSize(123).
 		SetAccountID("other-account").SetRootID("other-directory").SetMovie(other).SaveX(ctx)
-	history := db.WatchHistory.Create().SetAccountID("account").SetRootID("directory").SetMovie(film).
-		SetSessionID("session").SetPosition(120).SetDuration(600).SaveX(ctx)
 	if err := saveTestSetting(ctx, db, "preserved.setting", "unchanged"); err != nil {
 		t.Fatal(err)
 	}
@@ -156,14 +154,11 @@ func TestDataCleanupPreservesAllLibraryAndUnfinishedTaskReferences(t *testing.T)
 			t.Fatalf("unused image was not removed: %s %v", url, err)
 		}
 	}
-	if got := db.Movie.GetX(ctx, film.ID); got.Title != film.Title || !got.Watched || *got.Cover != *film.Cover {
+	if got := db.Movie.GetX(ctx, film.ID); got.Title != film.Title || *got.Cover != *film.Cover {
 		t.Fatal("cache cleanup changed movie metadata")
 	}
 	if got := db.File.GetX(ctx, file.ID); got.FileID != file.FileID || got.Size != file.Size {
 		t.Fatal("cache cleanup changed the file index")
-	}
-	if got := db.WatchHistory.GetX(ctx, history.ID); got.Position != 120 || got.SessionID != "session" {
-		t.Fatal("cache cleanup changed watch progress")
 	}
 	if value, found, err := loadTestSetting[string](ctx, db, "preserved.setting"); err != nil || !found || value != "unchanged" {
 		t.Fatalf("cache cleanup changed settings: %s %t %v", value, found, err)

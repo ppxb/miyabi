@@ -8,10 +8,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
-type strmPlayStub struct {
-	PlayManager
+type strmRelayStub struct {
 	streamURL   string
 	streamErr   error
 	headHeaders http.Header
@@ -19,14 +19,14 @@ type strmPlayStub struct {
 	headErr     error
 }
 
-func (s *strmPlayStub) StreamURL(ctx context.Context, fileID string) (string, error) {
+func (s *strmRelayStub) StreamURL(ctx context.Context, fileID string) (string, error) {
 	if s.streamErr != nil {
 		return "", s.streamErr
 	}
 	return s.streamURL, nil
 }
 
-func (s *strmPlayStub) OpenMedia(ctx context.Context, method, address string, headers http.Header) (*http.Response, error) {
+func (s *strmRelayStub) Probe(ctx context.Context, address string, headers http.Header) (*http.Response, error) {
 	if s.headErr != nil {
 		return nil, s.headErr
 	}
@@ -41,12 +41,12 @@ func (s *strmPlayStub) OpenMedia(ctx context.Context, method, address string, he
 	return res, nil
 }
 
-func TestSTRMPlayHandlerRedirectsGET(t *testing.T) {
-	stub := &strmPlayStub{
+func TestSTRMStreamHandlerRedirectsGET(t *testing.T) {
+	stub := &strmRelayStub{
 		streamURL: "https://cdn.115.com/video/original.mp4?token=sig",
 	}
 	router := NewRouter(Dependencies{
-		Play:   stub,
+		STRM:   stub,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 
@@ -62,19 +62,19 @@ func TestSTRMPlayHandlerRedirectsGET(t *testing.T) {
 	}
 }
 
-func TestSTRMPlayHandlerForwardsHEAD(t *testing.T) {
+func TestSTRMStreamHandlerForwardsHEAD(t *testing.T) {
 	headers := make(http.Header)
 	headers.Set("Content-Type", "video/mp4")
 	headers.Set("Content-Length", "104857600")
 	headers.Set("Accept-Ranges", "bytes")
 
-	stub := &strmPlayStub{
+	stub := &strmRelayStub{
 		streamURL:   "https://cdn.115.com/video/original.mp4",
 		headHeaders: headers,
 		headStatus:  http.StatusOK,
 	}
 	router := NewRouter(Dependencies{
-		Play:   stub,
+		STRM:   stub,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 
@@ -96,12 +96,12 @@ func TestSTRMPlayHandlerForwardsHEAD(t *testing.T) {
 	}
 }
 
-func TestSTRMPlayHandlerTokenAuthentication(t *testing.T) {
-	stub := &strmPlayStub{
+func TestSTRMStreamHandlerTokenAuthentication(t *testing.T) {
+	stub := &strmRelayStub{
 		streamURL: "https://cdn.115.com/video/original.mp4",
 	}
 	router := NewRouter(Dependencies{
-		Play:      stub,
+		STRM:      stub,
 		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 		STRMToken: "secret123",
 	})
@@ -137,5 +137,41 @@ func TestSTRMPlayHandlerTokenAuthentication(t *testing.T) {
 		if location := rec.Header().Get("Location"); location != stub.streamURL {
 			t.Fatalf("expected Location %s, got %s", stub.streamURL, location)
 		}
+	}
+}
+
+func TestSTRMStreamHandlerAcceptsSignedInSessionsBehindTheAccessGate(t *testing.T) {
+	stub := &strmRelayStub{streamURL: "https://cdn.115.com/video/original.mp4"}
+	gate := NewAccessGateService("password", "secret")
+	router := NewRouter(Dependencies{
+		STRM:      stub,
+		Access:    gate,
+		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+		STRMToken: "secret123",
+	})
+	session, _, err := gate.GenerateToken("miyabi", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, scenario := range []struct {
+		name, path, authorization string
+		status                    int
+	}{
+		{name: "anonymous", path: "/api/strm/play/12345", status: http.StatusUnauthorized},
+		{name: "strm token", path: "/api/strm/play/12345?token=secret123", status: http.StatusFound},
+		{name: "signed in", path: "/api/strm/play/12345", authorization: "Bearer " + session, status: http.StatusFound},
+		{name: "forged session", path: "/api/strm/play/12345", authorization: "Bearer forged", status: http.StatusUnauthorized},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, scenario.path, nil)
+			if scenario.authorization != "" {
+				request.Header.Set("Authorization", scenario.authorization)
+			}
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+			if response.Code != scenario.status {
+				t.Fatalf("status = %d, want %d", response.Code, scenario.status)
+			}
+		})
 	}
 }

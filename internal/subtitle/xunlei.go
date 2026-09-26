@@ -80,23 +80,17 @@ func (p *XunleiProvider) Search(ctx context.Context, code string) ([]Candidate, 
 		if name == "" {
 			name = item.Title
 		}
-		ext := strings.ToLower(item.Ext)
+		ext := item.Ext
 		if ext == "" {
 			ext = "srt"
 		}
-
-		langHint := strings.Join(item.Languages, " ")
-		lang := DetectChineseLanguage("", langHint)
-		ver := DetectVersion(name)
-
 		candidates = append(candidates, Candidate{
-			Provider:    p.Name(),
-			Name:        name,
-			URL:         item.URL,
-			Ext:         ext,
-			Language:    lang,
-			Version:     ver,
-			DisplayName: BuildDisplayName(lang, ver, false),
+			Provider: p.Name(),
+			Name:     name,
+			URL:      item.URL,
+			Format:   Format(ext),
+			Language: LanguageHint(strings.Join(item.Languages, " ") + " " + name),
+			Version:  DetectVersion(name),
 		})
 	}
 

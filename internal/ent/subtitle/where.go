@@ -85,11 +85,6 @@ func Name(v string) predicate.Subtitle {
 	return predicate.Subtitle(sql.FieldEQ(FieldName, v))
 }
 
-// DisplayName applies equality check predicate on the "display_name" field. It's identical to DisplayNameEQ.
-func DisplayName(v string) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldEQ(FieldDisplayName, v))
-}
-
 // Language applies equality check predicate on the "language" field. It's identical to LanguageEQ.
 func Language(v string) predicate.Subtitle {
 	return predicate.Subtitle(sql.FieldEQ(FieldLanguage, v))
@@ -113,16 +108,6 @@ func Source(v string) predicate.Subtitle {
 // SourceURL applies equality check predicate on the "source_url" field. It's identical to SourceURLEQ.
 func SourceURL(v string) predicate.Subtitle {
 	return predicate.Subtitle(sql.FieldEQ(FieldSourceURL, v))
-}
-
-// OffsetMs applies equality check predicate on the "offset_ms" field. It's identical to OffsetMsEQ.
-func OffsetMs(v int) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldEQ(FieldOffsetMs, v))
-}
-
-// IsDefault applies equality check predicate on the "is_default" field. It's identical to IsDefaultEQ.
-func IsDefault(v bool) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldEQ(FieldIsDefault, v))
 }
 
 // StoragePath applies equality check predicate on the "storage_path" field. It's identical to StoragePathEQ.
@@ -423,71 +408,6 @@ func NameEqualFold(v string) predicate.Subtitle {
 // NameContainsFold applies the ContainsFold predicate on the "name" field.
 func NameContainsFold(v string) predicate.Subtitle {
 	return predicate.Subtitle(sql.FieldContainsFold(FieldName, v))
-}
-
-// DisplayNameEQ applies the EQ predicate on the "display_name" field.
-func DisplayNameEQ(v string) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldEQ(FieldDisplayName, v))
-}
-
-// DisplayNameNEQ applies the NEQ predicate on the "display_name" field.
-func DisplayNameNEQ(v string) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldNEQ(FieldDisplayName, v))
-}
-
-// DisplayNameIn applies the In predicate on the "display_name" field.
-func DisplayNameIn(vs ...string) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldIn(FieldDisplayName, vs...))
-}
-
-// DisplayNameNotIn applies the NotIn predicate on the "display_name" field.
-func DisplayNameNotIn(vs ...string) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldNotIn(FieldDisplayName, vs...))
-}
-
-// DisplayNameGT applies the GT predicate on the "display_name" field.
-func DisplayNameGT(v string) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldGT(FieldDisplayName, v))
-}
-
-// DisplayNameGTE applies the GTE predicate on the "display_name" field.
-func DisplayNameGTE(v string) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldGTE(FieldDisplayName, v))
-}
-
-// DisplayNameLT applies the LT predicate on the "display_name" field.
-func DisplayNameLT(v string) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldLT(FieldDisplayName, v))
-}
-
-// DisplayNameLTE applies the LTE predicate on the "display_name" field.
-func DisplayNameLTE(v string) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldLTE(FieldDisplayName, v))
-}
-
-// DisplayNameContains applies the Contains predicate on the "display_name" field.
-func DisplayNameContains(v string) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldContains(FieldDisplayName, v))
-}
-
-// DisplayNameHasPrefix applies the HasPrefix predicate on the "display_name" field.
-func DisplayNameHasPrefix(v string) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldHasPrefix(FieldDisplayName, v))
-}
-
-// DisplayNameHasSuffix applies the HasSuffix predicate on the "display_name" field.
-func DisplayNameHasSuffix(v string) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldHasSuffix(FieldDisplayName, v))
-}
-
-// DisplayNameEqualFold applies the EqualFold predicate on the "display_name" field.
-func DisplayNameEqualFold(v string) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldEqualFold(FieldDisplayName, v))
-}
-
-// DisplayNameContainsFold applies the ContainsFold predicate on the "display_name" field.
-func DisplayNameContainsFold(v string) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldContainsFold(FieldDisplayName, v))
 }
 
 // LanguageEQ applies the EQ predicate on the "language" field.
@@ -813,56 +733,6 @@ func SourceURLEqualFold(v string) predicate.Subtitle {
 // SourceURLContainsFold applies the ContainsFold predicate on the "source_url" field.
 func SourceURLContainsFold(v string) predicate.Subtitle {
 	return predicate.Subtitle(sql.FieldContainsFold(FieldSourceURL, v))
-}
-
-// OffsetMsEQ applies the EQ predicate on the "offset_ms" field.
-func OffsetMsEQ(v int) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldEQ(FieldOffsetMs, v))
-}
-
-// OffsetMsNEQ applies the NEQ predicate on the "offset_ms" field.
-func OffsetMsNEQ(v int) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldNEQ(FieldOffsetMs, v))
-}
-
-// OffsetMsIn applies the In predicate on the "offset_ms" field.
-func OffsetMsIn(vs ...int) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldIn(FieldOffsetMs, vs...))
-}
-
-// OffsetMsNotIn applies the NotIn predicate on the "offset_ms" field.
-func OffsetMsNotIn(vs ...int) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldNotIn(FieldOffsetMs, vs...))
-}
-
-// OffsetMsGT applies the GT predicate on the "offset_ms" field.
-func OffsetMsGT(v int) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldGT(FieldOffsetMs, v))
-}
-
-// OffsetMsGTE applies the GTE predicate on the "offset_ms" field.
-func OffsetMsGTE(v int) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldGTE(FieldOffsetMs, v))
-}
-
-// OffsetMsLT applies the LT predicate on the "offset_ms" field.
-func OffsetMsLT(v int) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldLT(FieldOffsetMs, v))
-}
-
-// OffsetMsLTE applies the LTE predicate on the "offset_ms" field.
-func OffsetMsLTE(v int) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldLTE(FieldOffsetMs, v))
-}
-
-// IsDefaultEQ applies the EQ predicate on the "is_default" field.
-func IsDefaultEQ(v bool) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldEQ(FieldIsDefault, v))
-}
-
-// IsDefaultNEQ applies the NEQ predicate on the "is_default" field.
-func IsDefaultNEQ(v bool) predicate.Subtitle {
-	return predicate.Subtitle(sql.FieldNEQ(FieldIsDefault, v))
 }
 
 // StoragePathEQ applies the EQ predicate on the "storage_path" field.

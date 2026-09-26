@@ -135,11 +135,6 @@ func Poster(v string) predicate.Movie {
 	return predicate.Movie(sql.FieldEQ(FieldPoster, v))
 }
 
-// Watched applies equality check predicate on the "watched" field. It's identical to WatchedEQ.
-func Watched(v bool) predicate.Movie {
-	return predicate.Movie(sql.FieldEQ(FieldWatched, v))
-}
-
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.Movie {
 	return predicate.Movie(sql.FieldEQ(FieldCreatedAt, v))
@@ -1195,16 +1190,6 @@ func ScrapeStatusNotIn(vs ...ScrapeStatus) predicate.Movie {
 	return predicate.Movie(sql.FieldNotIn(FieldScrapeStatus, vs...))
 }
 
-// WatchedEQ applies the EQ predicate on the "watched" field.
-func WatchedEQ(v bool) predicate.Movie {
-	return predicate.Movie(sql.FieldEQ(FieldWatched, v))
-}
-
-// WatchedNEQ applies the NEQ predicate on the "watched" field.
-func WatchedNEQ(v bool) predicate.Movie {
-	return predicate.Movie(sql.FieldNEQ(FieldWatched, v))
-}
-
 // HasActors applies the HasEdge predicate on the "actors" edge.
 func HasActors() predicate.Movie {
 	return predicate.Movie(func(s *sql.Selector) {
@@ -1266,29 +1251,6 @@ func HasFiles() predicate.Movie {
 func HasFilesWith(preds ...predicate.File) predicate.Movie {
 	return predicate.Movie(func(s *sql.Selector) {
 		step := newFilesStep()
-		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
-			for _, p := range preds {
-				p(s)
-			}
-		})
-	})
-}
-
-// HasWatchHistory applies the HasEdge predicate on the "watch_history" edge.
-func HasWatchHistory() predicate.Movie {
-	return predicate.Movie(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, WatchHistoryTable, WatchHistoryColumn),
-		)
-		sqlgraph.HasNeighbors(s, step)
-	})
-}
-
-// HasWatchHistoryWith applies the HasEdge predicate on the "watch_history" edge with a given conditions (other predicates).
-func HasWatchHistoryWith(preds ...predicate.WatchHistory) predicate.Movie {
-	return predicate.Movie(func(s *sql.Selector) {
-		step := newWatchHistoryStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

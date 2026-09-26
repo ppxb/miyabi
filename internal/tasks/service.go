@@ -71,5 +71,4 @@ func (s *Service) Revisions() TaskRevisions             { return s.bus.Revisions
 func (s *Service) Notify()                              { s.bus.Notify() }
 func (s *Service) NotifyLibraryChanged()                { s.bus.NotifyLibraryChanged() }
 func (s *Service) NotifyOfflineChanged()                { s.bus.NotifyOfflineChanged() }
-func (s *Service) NotifyWatchHistoryChanged()           { s.bus.NotifyWatchHistoryChanged() }
 func (s *Service) NotifyMonitorChanged()                { s.bus.NotifyMonitorChanged() }

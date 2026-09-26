@@ -65,7 +65,7 @@ export function DataSection() {
           <RefreshCwIcon className={cn('size-4', info.isFetching && 'animate-spin')} />
         </Button>
       </SettingRow>
-      <SettingRow title="数据库" description="包含媒体库索引、观看记录、应用设置以及日志">
+      <SettingRow title="数据库" description="包含媒体库索引、应用设置以及日志">
         {info.isPending ? (
           <Skeleton className="h-5 w-24" />
         ) : (
@@ -108,7 +108,7 @@ export function DataSection() {
           <DialogHeader>
             <DialogTitle>清理未使用的图片缓存？</DialogTitle>
             <DialogDescription>
-              仅删除未被影片或未完成任务引用的图片。媒体库封面、观看记录和 115 网盘文件会保留。
+              仅删除未被影片或未完成任务引用的图片。媒体库封面和 115 网盘文件会保留。
             </DialogDescription>
           </DialogHeader>
           {clearCache.error ? <InlineError>{clearCache.error.message}</InlineError> : null}

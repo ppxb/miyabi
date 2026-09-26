@@ -13,7 +13,7 @@ import (
 )
 
 // MovieStates only reads the local index and tasks. Catalogue cache lifetimes
-// and upstream availability must not delay admission badges or playback.
+// and upstream availability must not delay admission badges.
 func (service *Service) MovieStates(ctx context.Context, identities []MovieIdentity) ([]MovieStateItem, error) {
 	result := make([]MovieStateItem, len(identities))
 	if len(identities) == 0 {

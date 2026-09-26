@@ -5,18 +5,17 @@ import (
 	"strings"
 )
 
-// Language represents the recognized spoken/written language of a subtitle.
+// Language identifies the Chinese variant of a subtitle. Values are the
+// culture codes Emby reads from subtitle file names.
 type Language string
 
 const (
 	LangSimplifiedChinese  Language = "zh-CN"
 	LangTraditionalChinese Language = "zh-TW"
-	LangJapanese           Language = "ja"
-	LangEnglish            Language = "en"
-	LangUnknown            Language = "unknown"
+	LangUnknown            Language = ""
 )
 
-// VersionTag identifies release/cut variations of a video or subtitle.
+// VersionTag identifies the release cut a subtitle was timed against.
 type VersionTag string
 
 const (
@@ -27,52 +26,20 @@ const (
 )
 
 var (
-	uncensoredPattern = regexp.MustCompile(`(?i)(uncensored|无码|無碼|破解|流出|mosaic|步兵)`)
+	// U and UC suffixes mark uncensored releases, as in SSIS-589-UC.mp4.
+	uncensoredPattern = regexp.MustCompile(`(?i)(uncensored|无码|無碼|破解|流出|mosaic|步兵|[-_]uc?(?:[-_. ]|$))`)
 	leakedPattern     = regexp.MustCompile(`(?i)(流出|leaked)`)
 	extendedPattern   = regexp.MustCompile(`(?i)(extended|加长|加長|完整版|完全版)`)
+	// C, UC and CH suffixes mark releases with burned-in Chinese subtitles.
+	hardSubtitlePattern = regexp.MustCompile(`(?i)([-_](?:u?c|ch)(?:[-_. ]|$)|中字|中文字幕)`)
+
+	traditionalHint = regexp.MustCompile(`(?i)(zh[-_]?(tw|hk|hant)|\bcht\b|繁)`)
+	simplifiedHint  = regexp.MustCompile(`(?i)(zh[-_]?(cn|hans)|\bchs\b|简|簡)`)
 
 	// Frequency counters for discriminating Simplified vs Traditional Chinese.
 	simplifiedMarkers  = []rune("为与个么开关东风头后发这边过还进时样气应实话说问题现经体万台农国门书车云")
 	traditionalMarkers = []rune("為與個麼開關東風頭後發這邊過還進時樣氣應實話說問題現經體萬臺農國門書車雲")
 )
-
-// BuildDisplayName constructs a standardized human-readable track label
-// according to product rules (e.g. "简体中文", "繁体中文（无码版）", "简体中文（加长版）").
-func BuildDisplayName(lang Language, ver VersionTag, isLocal bool) string {
-	base := LangDisplayName(lang)
-	var suffix string
-
-	switch ver {
-	case VersionUncensored:
-		suffix = "（无码版）"
-	case VersionExtended:
-		suffix = "（加长版）"
-	case VersionLeaked:
-		suffix = "（流出版）"
-	}
-
-	if isLocal && suffix == "" {
-		suffix = "（本地）"
-	}
-
-	return base + suffix
-}
-
-// LangDisplayName returns the standard Chinese description of the language.
-func LangDisplayName(lang Language) string {
-	switch lang {
-	case LangSimplifiedChinese:
-		return "简体中文"
-	case LangTraditionalChinese:
-		return "繁体中文"
-	case LangJapanese:
-		return "日本语"
-	case LangEnglish:
-		return "英语"
-	default:
-		return "中文字幕"
-	}
-}
 
 // DetectVersion inspects a filename or metadata title for cut/version markers.
 func DetectVersion(name string) VersionTag {
@@ -90,69 +57,69 @@ func DetectVersion(name string) VersionTag {
 
 // IsUncensored reports whether a video or subtitle name indicates an uncensored or leaked release.
 func IsUncensored(name string) bool {
-	ver := DetectVersion(name)
-	return ver == VersionUncensored || ver == VersionLeaked
+	version := DetectVersion(name)
+	return version == VersionUncensored || version == VersionLeaked
 }
 
-// DetectChineseLanguage inspects sample text or hints to determine whether
-// Chinese text is Simplified or Traditional.
-func DetectChineseLanguage(sample string, hint string) Language {
-	hintLower := strings.ToLower(hint)
+// HasHardSubtitle reports whether a video name marks burned-in Chinese subtitles.
+func HasHardSubtitle(name string) bool {
+	return hardSubtitlePattern.MatchString(name)
+}
+
+// LanguageHint recognizes an explicit Chinese variant in a file name or
+// provider metadata, returning LangUnknown when there is none.
+func LanguageHint(hint string) Language {
 	switch {
-	case strings.Contains(hintLower, "zh-tw") || strings.Contains(hintLower, "cht") || strings.Contains(hintLower, "繁"):
+	case traditionalHint.MatchString(hint):
 		return LangTraditionalChinese
-	case strings.Contains(hintLower, "zh-cn") || strings.Contains(hintLower, "chs") || strings.Contains(hintLower, "简"):
+	case simplifiedHint.MatchString(hint):
 		return LangSimplifiedChinese
+	default:
+		return LangUnknown
 	}
+}
 
-	if sample == "" {
-		return LangSimplifiedChinese
+// DetectLanguage prefers an explicit hint, then counts characters that differ
+// between Simplified and Traditional Chinese. It defaults to Simplified.
+func DetectLanguage(hint, text string) Language {
+	if language := LanguageHint(hint); language != LangUnknown {
+		return language
 	}
-
-	// Truncate to first 15000 characters to ensure fast inspection.
-	runes := []rune(sample)
+	// The first 15000 characters are enough to tell the variants apart.
+	runes := []rune(text)
 	if len(runes) > 15000 {
 		runes = runes[:15000]
 	}
-
-	var simpCount, tradCount int
+	var simplified, traditional int
 	for _, r := range runes {
-		for _, sm := range simplifiedMarkers {
-			if r == sm {
-				simpCount++
-				break
-			}
-		}
-		for _, tm := range traditionalMarkers {
-			if r == tm {
-				tradCount++
-				break
-			}
+		if containsRune(simplifiedMarkers, r) {
+			simplified++
+		} else if containsRune(traditionalMarkers, r) {
+			traditional++
 		}
 	}
-
-	if tradCount > simpCount {
+	if traditional > simplified {
 		return LangTraditionalChinese
 	}
-	if simpCount > 0 {
-		return LangSimplifiedChinese
-	}
-
 	return LangSimplifiedChinese
 }
 
-// FormatVersionDescription returns a concise version label for UI badges.
-func FormatVersionDescription(ver VersionTag) string {
-	switch ver {
-	case VersionUncensored:
-		return "无码版"
-	case VersionExtended:
-		return "加长版"
-	case VersionLeaked:
-		return "流出版"
-	case VersionStandard:
-		return "标准版"
+func containsRune(set []rune, r rune) bool {
+	for _, candidate := range set {
+		if candidate == r {
+			return true
+		}
+	}
+	return false
+}
+
+// Format returns the normalized subtitle format of a file extension, or ""
+// when Emby cannot load it as an external text subtitle.
+func Format(ext string) string {
+	switch format := strings.ToLower(strings.TrimPrefix(ext, ".")); format {
+	case "srt", "ass", "ssa", "vtt":
+		return format
 	default:
-		return string(ver)
+		return ""
 	}
 }

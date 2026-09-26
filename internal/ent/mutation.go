@@ -22,7 +22,6 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/tag"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/ent/viewedmovie"
-	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
 
 const (
@@ -43,7 +42,6 @@ const (
 	TypeTag          = "Tag"
 	TypeTask         = "Task"
 	TypeViewedMovie  = "ViewedMovie"
-	TypeWatchHistory = "WatchHistory"
 )
 
 // ActorMutation represents an operation that mutates the Actor nodes in the graph.
@@ -1919,50 +1917,46 @@ func (m *FileMutation) ResetEdge(name string) error {
 // MovieMutation represents an operation that mutates the Movie nodes in the graph.
 type MovieMutation struct {
 	config
-	op                   Op
-	typ                  string
-	id                   *int
-	created_at           *time.Time
-	updated_at           *time.Time
-	code                 *string
-	javdb_id             *string
-	title                *string
-	release_date         *time.Time
-	duration             *int
-	addduration          *int
-	director_id          *string
-	director_name        *string
-	maker_id             *string
-	maker_name           *string
-	series_id            *string
-	series_name          *string
-	rating               *float64
-	addrating            *float64
-	cover                *string
-	poster               *string
-	fanarts              *[]string
-	appendfanarts        []string
-	scrape_status        *movie.ScrapeStatus
-	watched              *bool
-	clearedFields        map[string]struct{}
-	actors               map[int]struct{}
-	removedactors        map[int]struct{}
-	clearedactors        bool
-	tags                 map[int]struct{}
-	removedtags          map[int]struct{}
-	clearedtags          bool
-	files                map[int]struct{}
-	removedfiles         map[int]struct{}
-	clearedfiles         bool
-	watch_history        map[int]struct{}
-	removedwatch_history map[int]struct{}
-	clearedwatch_history bool
-	subtitles            map[int]struct{}
-	removedsubtitles     map[int]struct{}
-	clearedsubtitles     bool
-	done                 bool
-	oldValue             func(context.Context) (*Movie, error)
-	predicates           []predicate.Movie
+	op               Op
+	typ              string
+	id               *int
+	created_at       *time.Time
+	updated_at       *time.Time
+	code             *string
+	javdb_id         *string
+	title            *string
+	release_date     *time.Time
+	duration         *int
+	addduration      *int
+	director_id      *string
+	director_name    *string
+	maker_id         *string
+	maker_name       *string
+	series_id        *string
+	series_name      *string
+	rating           *float64
+	addrating        *float64
+	cover            *string
+	poster           *string
+	fanarts          *[]string
+	appendfanarts    []string
+	scrape_status    *movie.ScrapeStatus
+	clearedFields    map[string]struct{}
+	actors           map[int]struct{}
+	removedactors    map[int]struct{}
+	clearedactors    bool
+	tags             map[int]struct{}
+	removedtags      map[int]struct{}
+	clearedtags      bool
+	files            map[int]struct{}
+	removedfiles     map[int]struct{}
+	clearedfiles     bool
+	subtitles        map[int]struct{}
+	removedsubtitles map[int]struct{}
+	clearedsubtitles bool
+	done             bool
+	oldValue         func(context.Context) (*Movie, error)
+	predicates       []predicate.Movie
 }
 
 var _ ent.Mutation = (*MovieMutation)(nil)
@@ -2924,42 +2918,6 @@ func (m *MovieMutation) ResetScrapeStatus() {
 	m.scrape_status = nil
 }
 
-// SetWatched sets the "watched" field.
-func (m *MovieMutation) SetWatched(b bool) {
-	m.watched = &b
-}
-
-// Watched returns the value of the "watched" field in the mutation.
-func (m *MovieMutation) Watched() (r bool, exists bool) {
-	v := m.watched
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldWatched returns the old "watched" field's value of the Movie entity.
-// If the Movie object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *MovieMutation) OldWatched(ctx context.Context) (v bool, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldWatched is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldWatched requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldWatched: %w", err)
-	}
-	return oldValue.Watched, nil
-}
-
-// ResetWatched resets all changes to the "watched" field.
-func (m *MovieMutation) ResetWatched() {
-	m.watched = nil
-}
-
 // AddActorIDs adds the "actors" edge to the Actor entity by ids.
 func (m *MovieMutation) AddActorIDs(ids ...int) {
 	if m.actors == nil {
@@ -3122,60 +3080,6 @@ func (m *MovieMutation) ResetFiles() {
 	m.removedfiles = nil
 }
 
-// AddWatchHistoryIDs adds the "watch_history" edge to the WatchHistory entity by ids.
-func (m *MovieMutation) AddWatchHistoryIDs(ids ...int) {
-	if m.watch_history == nil {
-		m.watch_history = make(map[int]struct{})
-	}
-	for i := range ids {
-		m.watch_history[ids[i]] = struct{}{}
-	}
-}
-
-// ClearWatchHistory clears the "watch_history" edge to the WatchHistory entity.
-func (m *MovieMutation) ClearWatchHistory() {
-	m.clearedwatch_history = true
-}
-
-// WatchHistoryCleared reports if the "watch_history" edge to the WatchHistory entity was cleared.
-func (m *MovieMutation) WatchHistoryCleared() bool {
-	return m.clearedwatch_history
-}
-
-// RemoveWatchHistoryIDs removes the "watch_history" edge to the WatchHistory entity by IDs.
-func (m *MovieMutation) RemoveWatchHistoryIDs(ids ...int) {
-	if m.removedwatch_history == nil {
-		m.removedwatch_history = make(map[int]struct{})
-	}
-	for i := range ids {
-		delete(m.watch_history, ids[i])
-		m.removedwatch_history[ids[i]] = struct{}{}
-	}
-}
-
-// RemovedWatchHistory returns the removed IDs of the "watch_history" edge to the WatchHistory entity.
-func (m *MovieMutation) RemovedWatchHistoryIDs() (ids []int) {
-	for id := range m.removedwatch_history {
-		ids = append(ids, id)
-	}
-	return
-}
-
-// WatchHistoryIDs returns the "watch_history" edge IDs in the mutation.
-func (m *MovieMutation) WatchHistoryIDs() (ids []int) {
-	for id := range m.watch_history {
-		ids = append(ids, id)
-	}
-	return
-}
-
-// ResetWatchHistory resets all changes to the "watch_history" edge.
-func (m *MovieMutation) ResetWatchHistory() {
-	m.watch_history = nil
-	m.clearedwatch_history = false
-	m.removedwatch_history = nil
-}
-
 // AddSubtitleIDs adds the "subtitles" edge to the Subtitle entity by ids.
 func (m *MovieMutation) AddSubtitleIDs(ids ...int) {
 	if m.subtitles == nil {
@@ -3264,7 +3168,7 @@ func (m *MovieMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MovieMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 18)
 	if m.created_at != nil {
 		fields = append(fields, movie.FieldCreatedAt)
 	}
@@ -3319,9 +3223,6 @@ func (m *MovieMutation) Fields() []string {
 	if m.scrape_status != nil {
 		fields = append(fields, movie.FieldScrapeStatus)
 	}
-	if m.watched != nil {
-		fields = append(fields, movie.FieldWatched)
-	}
 	return fields
 }
 
@@ -3366,8 +3267,6 @@ func (m *MovieMutation) Field(name string) (ent.Value, bool) {
 		return m.Fanarts()
 	case movie.FieldScrapeStatus:
 		return m.ScrapeStatus()
-	case movie.FieldWatched:
-		return m.Watched()
 	}
 	return nil, false
 }
@@ -3413,8 +3312,6 @@ func (m *MovieMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldFanarts(ctx)
 	case movie.FieldScrapeStatus:
 		return m.OldScrapeStatus(ctx)
-	case movie.FieldWatched:
-		return m.OldWatched(ctx)
 	}
 	return nil, fmt.Errorf("unknown Movie field %s", name)
 }
@@ -3549,13 +3446,6 @@ func (m *MovieMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetScrapeStatus(v)
-		return nil
-	case movie.FieldWatched:
-		v, ok := value.(bool)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetWatched(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Movie field %s", name)
@@ -3762,16 +3652,13 @@ func (m *MovieMutation) ResetField(name string) error {
 	case movie.FieldScrapeStatus:
 		m.ResetScrapeStatus()
 		return nil
-	case movie.FieldWatched:
-		m.ResetWatched()
-		return nil
 	}
 	return fmt.Errorf("unknown Movie field %s", name)
 }
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *MovieMutation) AddedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 4)
 	if m.actors != nil {
 		edges = append(edges, movie.EdgeActors)
 	}
@@ -3780,9 +3667,6 @@ func (m *MovieMutation) AddedEdges() []string {
 	}
 	if m.files != nil {
 		edges = append(edges, movie.EdgeFiles)
-	}
-	if m.watch_history != nil {
-		edges = append(edges, movie.EdgeWatchHistory)
 	}
 	if m.subtitles != nil {
 		edges = append(edges, movie.EdgeSubtitles)
@@ -3812,12 +3696,6 @@ func (m *MovieMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
-	case movie.EdgeWatchHistory:
-		ids := make([]ent.Value, 0, len(m.watch_history))
-		for id := range m.watch_history {
-			ids = append(ids, id)
-		}
-		return ids
 	case movie.EdgeSubtitles:
 		ids := make([]ent.Value, 0, len(m.subtitles))
 		for id := range m.subtitles {
@@ -3830,7 +3708,7 @@ func (m *MovieMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *MovieMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 4)
 	if m.removedactors != nil {
 		edges = append(edges, movie.EdgeActors)
 	}
@@ -3839,9 +3717,6 @@ func (m *MovieMutation) RemovedEdges() []string {
 	}
 	if m.removedfiles != nil {
 		edges = append(edges, movie.EdgeFiles)
-	}
-	if m.removedwatch_history != nil {
-		edges = append(edges, movie.EdgeWatchHistory)
 	}
 	if m.removedsubtitles != nil {
 		edges = append(edges, movie.EdgeSubtitles)
@@ -3871,12 +3746,6 @@ func (m *MovieMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
-	case movie.EdgeWatchHistory:
-		ids := make([]ent.Value, 0, len(m.removedwatch_history))
-		for id := range m.removedwatch_history {
-			ids = append(ids, id)
-		}
-		return ids
 	case movie.EdgeSubtitles:
 		ids := make([]ent.Value, 0, len(m.removedsubtitles))
 		for id := range m.removedsubtitles {
@@ -3889,7 +3758,7 @@ func (m *MovieMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *MovieMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 4)
 	if m.clearedactors {
 		edges = append(edges, movie.EdgeActors)
 	}
@@ -3898,9 +3767,6 @@ func (m *MovieMutation) ClearedEdges() []string {
 	}
 	if m.clearedfiles {
 		edges = append(edges, movie.EdgeFiles)
-	}
-	if m.clearedwatch_history {
-		edges = append(edges, movie.EdgeWatchHistory)
 	}
 	if m.clearedsubtitles {
 		edges = append(edges, movie.EdgeSubtitles)
@@ -3918,8 +3784,6 @@ func (m *MovieMutation) EdgeCleared(name string) bool {
 		return m.clearedtags
 	case movie.EdgeFiles:
 		return m.clearedfiles
-	case movie.EdgeWatchHistory:
-		return m.clearedwatch_history
 	case movie.EdgeSubtitles:
 		return m.clearedsubtitles
 	}
@@ -3946,9 +3810,6 @@ func (m *MovieMutation) ResetEdge(name string) error {
 		return nil
 	case movie.EdgeFiles:
 		m.ResetFiles()
-		return nil
-	case movie.EdgeWatchHistory:
-		m.ResetWatchHistory()
 		return nil
 	case movie.EdgeSubtitles:
 		m.ResetSubtitles()
@@ -5972,15 +5833,11 @@ type SubtitleMutation struct {
 	file_id       *string
 	pick_code     *string
 	name          *string
-	display_name  *string
 	language      *string
 	format        *string
 	version_tag   *string
 	source        *string
 	source_url    *string
-	offset_ms     *int
-	addoffset_ms  *int
-	is_default    *bool
 	storage_path  *string
 	clearedFields map[string]struct{}
 	movie         *int
@@ -6304,42 +6161,6 @@ func (m *SubtitleMutation) ResetName() {
 	m.name = nil
 }
 
-// SetDisplayName sets the "display_name" field.
-func (m *SubtitleMutation) SetDisplayName(s string) {
-	m.display_name = &s
-}
-
-// DisplayName returns the value of the "display_name" field in the mutation.
-func (m *SubtitleMutation) DisplayName() (r string, exists bool) {
-	v := m.display_name
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldDisplayName returns the old "display_name" field's value of the Subtitle entity.
-// If the Subtitle object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SubtitleMutation) OldDisplayName(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldDisplayName is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldDisplayName requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldDisplayName: %w", err)
-	}
-	return oldValue.DisplayName, nil
-}
-
-// ResetDisplayName resets all changes to the "display_name" field.
-func (m *SubtitleMutation) ResetDisplayName() {
-	m.display_name = nil
-}
-
 // SetLanguage sets the "language" field.
 func (m *SubtitleMutation) SetLanguage(s string) {
 	m.language = &s
@@ -6520,98 +6341,6 @@ func (m *SubtitleMutation) ResetSourceURL() {
 	m.source_url = nil
 }
 
-// SetOffsetMs sets the "offset_ms" field.
-func (m *SubtitleMutation) SetOffsetMs(i int) {
-	m.offset_ms = &i
-	m.addoffset_ms = nil
-}
-
-// OffsetMs returns the value of the "offset_ms" field in the mutation.
-func (m *SubtitleMutation) OffsetMs() (r int, exists bool) {
-	v := m.offset_ms
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldOffsetMs returns the old "offset_ms" field's value of the Subtitle entity.
-// If the Subtitle object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SubtitleMutation) OldOffsetMs(ctx context.Context) (v int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldOffsetMs is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldOffsetMs requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldOffsetMs: %w", err)
-	}
-	return oldValue.OffsetMs, nil
-}
-
-// AddOffsetMs adds i to the "offset_ms" field.
-func (m *SubtitleMutation) AddOffsetMs(i int) {
-	if m.addoffset_ms != nil {
-		*m.addoffset_ms += i
-	} else {
-		m.addoffset_ms = &i
-	}
-}
-
-// AddedOffsetMs returns the value that was added to the "offset_ms" field in this mutation.
-func (m *SubtitleMutation) AddedOffsetMs() (r int, exists bool) {
-	v := m.addoffset_ms
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetOffsetMs resets all changes to the "offset_ms" field.
-func (m *SubtitleMutation) ResetOffsetMs() {
-	m.offset_ms = nil
-	m.addoffset_ms = nil
-}
-
-// SetIsDefault sets the "is_default" field.
-func (m *SubtitleMutation) SetIsDefault(b bool) {
-	m.is_default = &b
-}
-
-// IsDefault returns the value of the "is_default" field in the mutation.
-func (m *SubtitleMutation) IsDefault() (r bool, exists bool) {
-	v := m.is_default
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldIsDefault returns the old "is_default" field's value of the Subtitle entity.
-// If the Subtitle object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SubtitleMutation) OldIsDefault(ctx context.Context) (v bool, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldIsDefault is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldIsDefault requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldIsDefault: %w", err)
-	}
-	return oldValue.IsDefault, nil
-}
-
-// ResetIsDefault resets all changes to the "is_default" field.
-func (m *SubtitleMutation) ResetIsDefault() {
-	m.is_default = nil
-}
-
 // SetStoragePath sets the "storage_path" field.
 func (m *SubtitleMutation) SetStoragePath(s string) {
 	m.storage_path = &s
@@ -6709,7 +6438,7 @@ func (m *SubtitleMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SubtitleMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 12)
 	if m.created_at != nil {
 		fields = append(fields, subtitle.FieldCreatedAt)
 	}
@@ -6728,9 +6457,6 @@ func (m *SubtitleMutation) Fields() []string {
 	if m.name != nil {
 		fields = append(fields, subtitle.FieldName)
 	}
-	if m.display_name != nil {
-		fields = append(fields, subtitle.FieldDisplayName)
-	}
 	if m.language != nil {
 		fields = append(fields, subtitle.FieldLanguage)
 	}
@@ -6745,12 +6471,6 @@ func (m *SubtitleMutation) Fields() []string {
 	}
 	if m.source_url != nil {
 		fields = append(fields, subtitle.FieldSourceURL)
-	}
-	if m.offset_ms != nil {
-		fields = append(fields, subtitle.FieldOffsetMs)
-	}
-	if m.is_default != nil {
-		fields = append(fields, subtitle.FieldIsDefault)
 	}
 	if m.storage_path != nil {
 		fields = append(fields, subtitle.FieldStoragePath)
@@ -6775,8 +6495,6 @@ func (m *SubtitleMutation) Field(name string) (ent.Value, bool) {
 		return m.PickCode()
 	case subtitle.FieldName:
 		return m.Name()
-	case subtitle.FieldDisplayName:
-		return m.DisplayName()
 	case subtitle.FieldLanguage:
 		return m.Language()
 	case subtitle.FieldFormat:
@@ -6787,10 +6505,6 @@ func (m *SubtitleMutation) Field(name string) (ent.Value, bool) {
 		return m.Source()
 	case subtitle.FieldSourceURL:
 		return m.SourceURL()
-	case subtitle.FieldOffsetMs:
-		return m.OffsetMs()
-	case subtitle.FieldIsDefault:
-		return m.IsDefault()
 	case subtitle.FieldStoragePath:
 		return m.StoragePath()
 	}
@@ -6814,8 +6528,6 @@ func (m *SubtitleMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldPickCode(ctx)
 	case subtitle.FieldName:
 		return m.OldName(ctx)
-	case subtitle.FieldDisplayName:
-		return m.OldDisplayName(ctx)
 	case subtitle.FieldLanguage:
 		return m.OldLanguage(ctx)
 	case subtitle.FieldFormat:
@@ -6826,10 +6538,6 @@ func (m *SubtitleMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldSource(ctx)
 	case subtitle.FieldSourceURL:
 		return m.OldSourceURL(ctx)
-	case subtitle.FieldOffsetMs:
-		return m.OldOffsetMs(ctx)
-	case subtitle.FieldIsDefault:
-		return m.OldIsDefault(ctx)
 	case subtitle.FieldStoragePath:
 		return m.OldStoragePath(ctx)
 	}
@@ -6883,13 +6591,6 @@ func (m *SubtitleMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetName(v)
 		return nil
-	case subtitle.FieldDisplayName:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetDisplayName(v)
-		return nil
 	case subtitle.FieldLanguage:
 		v, ok := value.(string)
 		if !ok {
@@ -6925,20 +6626,6 @@ func (m *SubtitleMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetSourceURL(v)
 		return nil
-	case subtitle.FieldOffsetMs:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetOffsetMs(v)
-		return nil
-	case subtitle.FieldIsDefault:
-		v, ok := value.(bool)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetIsDefault(v)
-		return nil
 	case subtitle.FieldStoragePath:
 		v, ok := value.(string)
 		if !ok {
@@ -6954,9 +6641,6 @@ func (m *SubtitleMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *SubtitleMutation) AddedFields() []string {
 	var fields []string
-	if m.addoffset_ms != nil {
-		fields = append(fields, subtitle.FieldOffsetMs)
-	}
 	return fields
 }
 
@@ -6965,8 +6649,6 @@ func (m *SubtitleMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *SubtitleMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
-	case subtitle.FieldOffsetMs:
-		return m.AddedOffsetMs()
 	}
 	return nil, false
 }
@@ -6976,13 +6658,6 @@ func (m *SubtitleMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *SubtitleMutation) AddField(name string, value ent.Value) error {
 	switch name {
-	case subtitle.FieldOffsetMs:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddOffsetMs(v)
-		return nil
 	}
 	return fmt.Errorf("unknown Subtitle numeric field %s", name)
 }
@@ -7028,9 +6703,6 @@ func (m *SubtitleMutation) ResetField(name string) error {
 	case subtitle.FieldName:
 		m.ResetName()
 		return nil
-	case subtitle.FieldDisplayName:
-		m.ResetDisplayName()
-		return nil
 	case subtitle.FieldLanguage:
 		m.ResetLanguage()
 		return nil
@@ -7045,12 +6717,6 @@ func (m *SubtitleMutation) ResetField(name string) error {
 		return nil
 	case subtitle.FieldSourceURL:
 		m.ResetSourceURL()
-		return nil
-	case subtitle.FieldOffsetMs:
-		m.ResetOffsetMs()
-		return nil
-	case subtitle.FieldIsDefault:
-		m.ResetIsDefault()
 		return nil
 	case subtitle.FieldStoragePath:
 		m.ResetStoragePath()
@@ -8946,918 +8612,4 @@ func (m *ViewedMovieMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *ViewedMovieMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown ViewedMovie edge %s", name)
-}
-
-// WatchHistoryMutation represents an operation that mutates the WatchHistory nodes in the graph.
-type WatchHistoryMutation struct {
-	config
-	op                  Op
-	typ                 string
-	id                  *int
-	account_id          *string
-	root_id             *string
-	watched_at          *time.Time
-	session_id          *string
-	file_id             *string
-	position            *float64
-	addposition         *float64
-	duration            *float64
-	addduration         *float64
-	progress_version    *int
-	addprogress_version *int
-	clearedFields       map[string]struct{}
-	movie               *int
-	clearedmovie        bool
-	done                bool
-	oldValue            func(context.Context) (*WatchHistory, error)
-	predicates          []predicate.WatchHistory
-}
-
-var _ ent.Mutation = (*WatchHistoryMutation)(nil)
-
-// watchhistoryOption allows management of the mutation configuration using functional options.
-type watchhistoryOption func(*WatchHistoryMutation)
-
-// newWatchHistoryMutation creates new mutation for the WatchHistory entity.
-func newWatchHistoryMutation(c config, op Op, opts ...watchhistoryOption) *WatchHistoryMutation {
-	m := &WatchHistoryMutation{
-		config:        c,
-		op:            op,
-		typ:           TypeWatchHistory,
-		clearedFields: make(map[string]struct{}),
-	}
-	for _, opt := range opts {
-		opt(m)
-	}
-	return m
-}
-
-// withWatchHistoryID sets the ID field of the mutation.
-func withWatchHistoryID(id int) watchhistoryOption {
-	return func(m *WatchHistoryMutation) {
-		var (
-			err   error
-			once  sync.Once
-			value *WatchHistory
-		)
-		m.oldValue = func(ctx context.Context) (*WatchHistory, error) {
-			once.Do(func() {
-				if m.done {
-					err = errors.New("querying old values post mutation is not allowed")
-				} else {
-					value, err = m.Client().WatchHistory.Get(ctx, id)
-				}
-			})
-			return value, err
-		}
-		m.id = &id
-	}
-}
-
-// withWatchHistory sets the old WatchHistory of the mutation.
-func withWatchHistory(node *WatchHistory) watchhistoryOption {
-	return func(m *WatchHistoryMutation) {
-		m.oldValue = func(context.Context) (*WatchHistory, error) {
-			return node, nil
-		}
-		m.id = &node.ID
-	}
-}
-
-// Client returns a new `ent.Client` from the mutation. If the mutation was
-// executed in a transaction (ent.Tx), a transactional client is returned.
-func (m WatchHistoryMutation) Client() *Client {
-	client := &Client{config: m.config}
-	client.init()
-	return client
-}
-
-// Tx returns an `ent.Tx` for mutations that were executed in transactions;
-// it returns an error otherwise.
-func (m WatchHistoryMutation) Tx() (*Tx, error) {
-	if _, ok := m.driver.(*txDriver); !ok {
-		return nil, errors.New("ent: mutation is not running in a transaction")
-	}
-	tx := &Tx{config: m.config}
-	tx.init()
-	return tx, nil
-}
-
-// ID returns the ID value in the mutation. Note that the ID is only available
-// if it was provided to the builder or after it was returned from the database.
-func (m *WatchHistoryMutation) ID() (id int, exists bool) {
-	if m.id == nil {
-		return
-	}
-	return *m.id, true
-}
-
-// IDs queries the database and returns the entity ids that match the mutation's predicate.
-// That means, if the mutation is applied within a transaction with an isolation level such
-// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
-// or updated by the mutation.
-func (m *WatchHistoryMutation) IDs(ctx context.Context) ([]int, error) {
-	switch {
-	case m.op.Is(OpUpdateOne | OpDeleteOne):
-		id, exists := m.ID()
-		if exists {
-			return []int{id}, nil
-		}
-		fallthrough
-	case m.op.Is(OpUpdate | OpDelete):
-		return m.Client().WatchHistory.Query().Where(m.predicates...).IDs(ctx)
-	default:
-		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
-	}
-}
-
-// SetAccountID sets the "account_id" field.
-func (m *WatchHistoryMutation) SetAccountID(s string) {
-	m.account_id = &s
-}
-
-// AccountID returns the value of the "account_id" field in the mutation.
-func (m *WatchHistoryMutation) AccountID() (r string, exists bool) {
-	v := m.account_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldAccountID returns the old "account_id" field's value of the WatchHistory entity.
-// If the WatchHistory object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *WatchHistoryMutation) OldAccountID(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldAccountID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldAccountID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldAccountID: %w", err)
-	}
-	return oldValue.AccountID, nil
-}
-
-// ResetAccountID resets all changes to the "account_id" field.
-func (m *WatchHistoryMutation) ResetAccountID() {
-	m.account_id = nil
-}
-
-// SetRootID sets the "root_id" field.
-func (m *WatchHistoryMutation) SetRootID(s string) {
-	m.root_id = &s
-}
-
-// RootID returns the value of the "root_id" field in the mutation.
-func (m *WatchHistoryMutation) RootID() (r string, exists bool) {
-	v := m.root_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldRootID returns the old "root_id" field's value of the WatchHistory entity.
-// If the WatchHistory object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *WatchHistoryMutation) OldRootID(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldRootID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldRootID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldRootID: %w", err)
-	}
-	return oldValue.RootID, nil
-}
-
-// ResetRootID resets all changes to the "root_id" field.
-func (m *WatchHistoryMutation) ResetRootID() {
-	m.root_id = nil
-}
-
-// SetMovieID sets the "movie_id" field.
-func (m *WatchHistoryMutation) SetMovieID(i int) {
-	m.movie = &i
-}
-
-// MovieID returns the value of the "movie_id" field in the mutation.
-func (m *WatchHistoryMutation) MovieID() (r int, exists bool) {
-	v := m.movie
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldMovieID returns the old "movie_id" field's value of the WatchHistory entity.
-// If the WatchHistory object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *WatchHistoryMutation) OldMovieID(ctx context.Context) (v int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldMovieID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldMovieID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldMovieID: %w", err)
-	}
-	return oldValue.MovieID, nil
-}
-
-// ResetMovieID resets all changes to the "movie_id" field.
-func (m *WatchHistoryMutation) ResetMovieID() {
-	m.movie = nil
-}
-
-// SetWatchedAt sets the "watched_at" field.
-func (m *WatchHistoryMutation) SetWatchedAt(t time.Time) {
-	m.watched_at = &t
-}
-
-// WatchedAt returns the value of the "watched_at" field in the mutation.
-func (m *WatchHistoryMutation) WatchedAt() (r time.Time, exists bool) {
-	v := m.watched_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldWatchedAt returns the old "watched_at" field's value of the WatchHistory entity.
-// If the WatchHistory object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *WatchHistoryMutation) OldWatchedAt(ctx context.Context) (v time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldWatchedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldWatchedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldWatchedAt: %w", err)
-	}
-	return oldValue.WatchedAt, nil
-}
-
-// ResetWatchedAt resets all changes to the "watched_at" field.
-func (m *WatchHistoryMutation) ResetWatchedAt() {
-	m.watched_at = nil
-}
-
-// SetSessionID sets the "session_id" field.
-func (m *WatchHistoryMutation) SetSessionID(s string) {
-	m.session_id = &s
-}
-
-// SessionID returns the value of the "session_id" field in the mutation.
-func (m *WatchHistoryMutation) SessionID() (r string, exists bool) {
-	v := m.session_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldSessionID returns the old "session_id" field's value of the WatchHistory entity.
-// If the WatchHistory object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *WatchHistoryMutation) OldSessionID(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldSessionID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldSessionID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldSessionID: %w", err)
-	}
-	return oldValue.SessionID, nil
-}
-
-// ResetSessionID resets all changes to the "session_id" field.
-func (m *WatchHistoryMutation) ResetSessionID() {
-	m.session_id = nil
-}
-
-// SetFileID sets the "file_id" field.
-func (m *WatchHistoryMutation) SetFileID(s string) {
-	m.file_id = &s
-}
-
-// FileID returns the value of the "file_id" field in the mutation.
-func (m *WatchHistoryMutation) FileID() (r string, exists bool) {
-	v := m.file_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldFileID returns the old "file_id" field's value of the WatchHistory entity.
-// If the WatchHistory object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *WatchHistoryMutation) OldFileID(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldFileID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldFileID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldFileID: %w", err)
-	}
-	return oldValue.FileID, nil
-}
-
-// ResetFileID resets all changes to the "file_id" field.
-func (m *WatchHistoryMutation) ResetFileID() {
-	m.file_id = nil
-}
-
-// SetPosition sets the "position" field.
-func (m *WatchHistoryMutation) SetPosition(f float64) {
-	m.position = &f
-	m.addposition = nil
-}
-
-// Position returns the value of the "position" field in the mutation.
-func (m *WatchHistoryMutation) Position() (r float64, exists bool) {
-	v := m.position
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldPosition returns the old "position" field's value of the WatchHistory entity.
-// If the WatchHistory object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *WatchHistoryMutation) OldPosition(ctx context.Context) (v float64, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldPosition is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldPosition requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldPosition: %w", err)
-	}
-	return oldValue.Position, nil
-}
-
-// AddPosition adds f to the "position" field.
-func (m *WatchHistoryMutation) AddPosition(f float64) {
-	if m.addposition != nil {
-		*m.addposition += f
-	} else {
-		m.addposition = &f
-	}
-}
-
-// AddedPosition returns the value that was added to the "position" field in this mutation.
-func (m *WatchHistoryMutation) AddedPosition() (r float64, exists bool) {
-	v := m.addposition
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetPosition resets all changes to the "position" field.
-func (m *WatchHistoryMutation) ResetPosition() {
-	m.position = nil
-	m.addposition = nil
-}
-
-// SetDuration sets the "duration" field.
-func (m *WatchHistoryMutation) SetDuration(f float64) {
-	m.duration = &f
-	m.addduration = nil
-}
-
-// Duration returns the value of the "duration" field in the mutation.
-func (m *WatchHistoryMutation) Duration() (r float64, exists bool) {
-	v := m.duration
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldDuration returns the old "duration" field's value of the WatchHistory entity.
-// If the WatchHistory object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *WatchHistoryMutation) OldDuration(ctx context.Context) (v float64, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldDuration is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldDuration requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldDuration: %w", err)
-	}
-	return oldValue.Duration, nil
-}
-
-// AddDuration adds f to the "duration" field.
-func (m *WatchHistoryMutation) AddDuration(f float64) {
-	if m.addduration != nil {
-		*m.addduration += f
-	} else {
-		m.addduration = &f
-	}
-}
-
-// AddedDuration returns the value that was added to the "duration" field in this mutation.
-func (m *WatchHistoryMutation) AddedDuration() (r float64, exists bool) {
-	v := m.addduration
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetDuration resets all changes to the "duration" field.
-func (m *WatchHistoryMutation) ResetDuration() {
-	m.duration = nil
-	m.addduration = nil
-}
-
-// SetProgressVersion sets the "progress_version" field.
-func (m *WatchHistoryMutation) SetProgressVersion(i int) {
-	m.progress_version = &i
-	m.addprogress_version = nil
-}
-
-// ProgressVersion returns the value of the "progress_version" field in the mutation.
-func (m *WatchHistoryMutation) ProgressVersion() (r int, exists bool) {
-	v := m.progress_version
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldProgressVersion returns the old "progress_version" field's value of the WatchHistory entity.
-// If the WatchHistory object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *WatchHistoryMutation) OldProgressVersion(ctx context.Context) (v int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldProgressVersion is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldProgressVersion requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldProgressVersion: %w", err)
-	}
-	return oldValue.ProgressVersion, nil
-}
-
-// AddProgressVersion adds i to the "progress_version" field.
-func (m *WatchHistoryMutation) AddProgressVersion(i int) {
-	if m.addprogress_version != nil {
-		*m.addprogress_version += i
-	} else {
-		m.addprogress_version = &i
-	}
-}
-
-// AddedProgressVersion returns the value that was added to the "progress_version" field in this mutation.
-func (m *WatchHistoryMutation) AddedProgressVersion() (r int, exists bool) {
-	v := m.addprogress_version
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetProgressVersion resets all changes to the "progress_version" field.
-func (m *WatchHistoryMutation) ResetProgressVersion() {
-	m.progress_version = nil
-	m.addprogress_version = nil
-}
-
-// ClearMovie clears the "movie" edge to the Movie entity.
-func (m *WatchHistoryMutation) ClearMovie() {
-	m.clearedmovie = true
-	m.clearedFields[watchhistory.FieldMovieID] = struct{}{}
-}
-
-// MovieCleared reports if the "movie" edge to the Movie entity was cleared.
-func (m *WatchHistoryMutation) MovieCleared() bool {
-	return m.clearedmovie
-}
-
-// MovieIDs returns the "movie" edge IDs in the mutation.
-// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
-// MovieID instead. It exists only for internal usage by the builders.
-func (m *WatchHistoryMutation) MovieIDs() (ids []int) {
-	if id := m.movie; id != nil {
-		ids = append(ids, *id)
-	}
-	return
-}
-
-// ResetMovie resets all changes to the "movie" edge.
-func (m *WatchHistoryMutation) ResetMovie() {
-	m.movie = nil
-	m.clearedmovie = false
-}
-
-// Where appends a list predicates to the WatchHistoryMutation builder.
-func (m *WatchHistoryMutation) Where(ps ...predicate.WatchHistory) {
-	m.predicates = append(m.predicates, ps...)
-}
-
-// WhereP appends storage-level predicates to the WatchHistoryMutation builder. Using this method,
-// users can use type-assertion to append predicates that do not depend on any generated package.
-func (m *WatchHistoryMutation) WhereP(ps ...func(*sql.Selector)) {
-	p := make([]predicate.WatchHistory, len(ps))
-	for i := range ps {
-		p[i] = ps[i]
-	}
-	m.Where(p...)
-}
-
-// Op returns the operation name.
-func (m *WatchHistoryMutation) Op() Op {
-	return m.op
-}
-
-// SetOp allows setting the mutation operation.
-func (m *WatchHistoryMutation) SetOp(op Op) {
-	m.op = op
-}
-
-// Type returns the node type of this mutation (WatchHistory).
-func (m *WatchHistoryMutation) Type() string {
-	return m.typ
-}
-
-// Fields returns all fields that were changed during this mutation. Note that in
-// order to get all numeric fields that were incremented/decremented, call
-// AddedFields().
-func (m *WatchHistoryMutation) Fields() []string {
-	fields := make([]string, 0, 9)
-	if m.account_id != nil {
-		fields = append(fields, watchhistory.FieldAccountID)
-	}
-	if m.root_id != nil {
-		fields = append(fields, watchhistory.FieldRootID)
-	}
-	if m.movie != nil {
-		fields = append(fields, watchhistory.FieldMovieID)
-	}
-	if m.watched_at != nil {
-		fields = append(fields, watchhistory.FieldWatchedAt)
-	}
-	if m.session_id != nil {
-		fields = append(fields, watchhistory.FieldSessionID)
-	}
-	if m.file_id != nil {
-		fields = append(fields, watchhistory.FieldFileID)
-	}
-	if m.position != nil {
-		fields = append(fields, watchhistory.FieldPosition)
-	}
-	if m.duration != nil {
-		fields = append(fields, watchhistory.FieldDuration)
-	}
-	if m.progress_version != nil {
-		fields = append(fields, watchhistory.FieldProgressVersion)
-	}
-	return fields
-}
-
-// Field returns the value of a field with the given name. The second boolean
-// return value indicates that this field was not set, or was not defined in the
-// schema.
-func (m *WatchHistoryMutation) Field(name string) (ent.Value, bool) {
-	switch name {
-	case watchhistory.FieldAccountID:
-		return m.AccountID()
-	case watchhistory.FieldRootID:
-		return m.RootID()
-	case watchhistory.FieldMovieID:
-		return m.MovieID()
-	case watchhistory.FieldWatchedAt:
-		return m.WatchedAt()
-	case watchhistory.FieldSessionID:
-		return m.SessionID()
-	case watchhistory.FieldFileID:
-		return m.FileID()
-	case watchhistory.FieldPosition:
-		return m.Position()
-	case watchhistory.FieldDuration:
-		return m.Duration()
-	case watchhistory.FieldProgressVersion:
-		return m.ProgressVersion()
-	}
-	return nil, false
-}
-
-// OldField returns the old value of the field from the database. An error is
-// returned if the mutation operation is not UpdateOne, or the query to the
-// database failed.
-func (m *WatchHistoryMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
-	switch name {
-	case watchhistory.FieldAccountID:
-		return m.OldAccountID(ctx)
-	case watchhistory.FieldRootID:
-		return m.OldRootID(ctx)
-	case watchhistory.FieldMovieID:
-		return m.OldMovieID(ctx)
-	case watchhistory.FieldWatchedAt:
-		return m.OldWatchedAt(ctx)
-	case watchhistory.FieldSessionID:
-		return m.OldSessionID(ctx)
-	case watchhistory.FieldFileID:
-		return m.OldFileID(ctx)
-	case watchhistory.FieldPosition:
-		return m.OldPosition(ctx)
-	case watchhistory.FieldDuration:
-		return m.OldDuration(ctx)
-	case watchhistory.FieldProgressVersion:
-		return m.OldProgressVersion(ctx)
-	}
-	return nil, fmt.Errorf("unknown WatchHistory field %s", name)
-}
-
-// SetField sets the value of a field with the given name. It returns an error if
-// the field is not defined in the schema, or if the type mismatched the field
-// type.
-func (m *WatchHistoryMutation) SetField(name string, value ent.Value) error {
-	switch name {
-	case watchhistory.FieldAccountID:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetAccountID(v)
-		return nil
-	case watchhistory.FieldRootID:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetRootID(v)
-		return nil
-	case watchhistory.FieldMovieID:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetMovieID(v)
-		return nil
-	case watchhistory.FieldWatchedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetWatchedAt(v)
-		return nil
-	case watchhistory.FieldSessionID:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetSessionID(v)
-		return nil
-	case watchhistory.FieldFileID:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetFileID(v)
-		return nil
-	case watchhistory.FieldPosition:
-		v, ok := value.(float64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetPosition(v)
-		return nil
-	case watchhistory.FieldDuration:
-		v, ok := value.(float64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetDuration(v)
-		return nil
-	case watchhistory.FieldProgressVersion:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetProgressVersion(v)
-		return nil
-	}
-	return fmt.Errorf("unknown WatchHistory field %s", name)
-}
-
-// AddedFields returns all numeric fields that were incremented/decremented during
-// this mutation.
-func (m *WatchHistoryMutation) AddedFields() []string {
-	var fields []string
-	if m.addposition != nil {
-		fields = append(fields, watchhistory.FieldPosition)
-	}
-	if m.addduration != nil {
-		fields = append(fields, watchhistory.FieldDuration)
-	}
-	if m.addprogress_version != nil {
-		fields = append(fields, watchhistory.FieldProgressVersion)
-	}
-	return fields
-}
-
-// AddedField returns the numeric value that was incremented/decremented on a field
-// with the given name. The second boolean return value indicates that this field
-// was not set, or was not defined in the schema.
-func (m *WatchHistoryMutation) AddedField(name string) (ent.Value, bool) {
-	switch name {
-	case watchhistory.FieldPosition:
-		return m.AddedPosition()
-	case watchhistory.FieldDuration:
-		return m.AddedDuration()
-	case watchhistory.FieldProgressVersion:
-		return m.AddedProgressVersion()
-	}
-	return nil, false
-}
-
-// AddField adds the value to the field with the given name. It returns an error if
-// the field is not defined in the schema, or if the type mismatched the field
-// type.
-func (m *WatchHistoryMutation) AddField(name string, value ent.Value) error {
-	switch name {
-	case watchhistory.FieldPosition:
-		v, ok := value.(float64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddPosition(v)
-		return nil
-	case watchhistory.FieldDuration:
-		v, ok := value.(float64)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddDuration(v)
-		return nil
-	case watchhistory.FieldProgressVersion:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddProgressVersion(v)
-		return nil
-	}
-	return fmt.Errorf("unknown WatchHistory numeric field %s", name)
-}
-
-// ClearedFields returns all nullable fields that were cleared during this
-// mutation.
-func (m *WatchHistoryMutation) ClearedFields() []string {
-	return nil
-}
-
-// FieldCleared returns a boolean indicating if a field with the given name was
-// cleared in this mutation.
-func (m *WatchHistoryMutation) FieldCleared(name string) bool {
-	_, ok := m.clearedFields[name]
-	return ok
-}
-
-// ClearField clears the value of the field with the given name. It returns an
-// error if the field is not defined in the schema.
-func (m *WatchHistoryMutation) ClearField(name string) error {
-	return fmt.Errorf("unknown WatchHistory nullable field %s", name)
-}
-
-// ResetField resets all changes in the mutation for the field with the given name.
-// It returns an error if the field is not defined in the schema.
-func (m *WatchHistoryMutation) ResetField(name string) error {
-	switch name {
-	case watchhistory.FieldAccountID:
-		m.ResetAccountID()
-		return nil
-	case watchhistory.FieldRootID:
-		m.ResetRootID()
-		return nil
-	case watchhistory.FieldMovieID:
-		m.ResetMovieID()
-		return nil
-	case watchhistory.FieldWatchedAt:
-		m.ResetWatchedAt()
-		return nil
-	case watchhistory.FieldSessionID:
-		m.ResetSessionID()
-		return nil
-	case watchhistory.FieldFileID:
-		m.ResetFileID()
-		return nil
-	case watchhistory.FieldPosition:
-		m.ResetPosition()
-		return nil
-	case watchhistory.FieldDuration:
-		m.ResetDuration()
-		return nil
-	case watchhistory.FieldProgressVersion:
-		m.ResetProgressVersion()
-		return nil
-	}
-	return fmt.Errorf("unknown WatchHistory field %s", name)
-}
-
-// AddedEdges returns all edge names that were set/added in this mutation.
-func (m *WatchHistoryMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
-	if m.movie != nil {
-		edges = append(edges, watchhistory.EdgeMovie)
-	}
-	return edges
-}
-
-// AddedIDs returns all IDs (to other nodes) that were added for the given edge
-// name in this mutation.
-func (m *WatchHistoryMutation) AddedIDs(name string) []ent.Value {
-	switch name {
-	case watchhistory.EdgeMovie:
-		if id := m.movie; id != nil {
-			return []ent.Value{*id}
-		}
-	}
-	return nil
-}
-
-// RemovedEdges returns all edge names that were removed in this mutation.
-func (m *WatchHistoryMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
-	return edges
-}
-
-// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
-// the given name in this mutation.
-func (m *WatchHistoryMutation) RemovedIDs(name string) []ent.Value {
-	return nil
-}
-
-// ClearedEdges returns all edge names that were cleared in this mutation.
-func (m *WatchHistoryMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
-	if m.clearedmovie {
-		edges = append(edges, watchhistory.EdgeMovie)
-	}
-	return edges
-}
-
-// EdgeCleared returns a boolean which indicates if the edge with the given name
-// was cleared in this mutation.
-func (m *WatchHistoryMutation) EdgeCleared(name string) bool {
-	switch name {
-	case watchhistory.EdgeMovie:
-		return m.clearedmovie
-	}
-	return false
-}
-
-// ClearEdge clears the value of the edge with the given name. It returns an error
-// if that edge is not defined in the schema.
-func (m *WatchHistoryMutation) ClearEdge(name string) error {
-	switch name {
-	case watchhistory.EdgeMovie:
-		m.ClearMovie()
-		return nil
-	}
-	return fmt.Errorf("unknown WatchHistory unique edge %s", name)
-}
-
-// ResetEdge resets all changes to the edge with the given name in this mutation.
-// It returns an error if the edge is not defined in the schema.
-func (m *WatchHistoryMutation) ResetEdge(name string) error {
-	switch name {
-	case watchhistory.EdgeMovie:
-		m.ResetMovie()
-		return nil
-	}
-	return fmt.Errorf("unknown WatchHistory edge %s", name)
 }

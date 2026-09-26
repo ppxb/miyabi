@@ -44,8 +44,7 @@
           "name": "Tag"
         }
       ],
-      "scrape_status": "done",
-      "watched": true
+      "scrape_status": "done"
     },
     {
       "id": 8,
@@ -55,8 +54,7 @@
       "rating": 0,
       "actors": [],
       "tags": [],
-      "scrape_status": "failed",
-      "watched": false
+      "scrape_status": "failed"
     }
   ],
   "total": 2,

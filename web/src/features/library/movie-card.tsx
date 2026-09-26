@@ -1,10 +1,9 @@
+import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import type { LibraryMovie } from '@/api/library'
 import { MovieCard } from '@/components/movie'
-import { Button } from '@/components/ui/button'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
-import { useUIStore } from '@/stores/ui'
 import { LibraryMovieHoverDetails } from './movie-hover-details'
 import { LibraryMovieStatus } from './movie-status'
 import { useDesktopHover } from './use-desktop-hover'
@@ -21,8 +20,12 @@ export function LibraryMovieCard({ movie }: { movie: LibraryMovie }) {
 }
 
 function LibraryMovieCardContent({ movie, canHover }: { movie: LibraryMovie; canHover: boolean }) {
-  const openPlayer = useUIStore(state => state.openPlayer)
   const [open, setOpen] = useState(false)
+  const card = (
+    <MovieCard movie={movie} titleTooltip={!canHover}>
+      <LibraryMovieStatus movie={movie} />
+    </MovieCard>
+  )
 
   return (
     <HoverCard
@@ -32,19 +35,18 @@ function LibraryMovieCardContent({ movie, canHover }: { movie: LibraryMovie; can
       closeDelay={180}
     >
       <HoverCardTrigger asChild>
-        <Button
-          variant="ghost"
-          className="block h-auto min-w-0 rounded-2xl p-0 text-left whitespace-normal hover:bg-transparent hover:text-current dark:hover:bg-transparent"
-          aria-label={`播放 ${movie.code}${movie.title ? `：${movie.title}` : ''}`}
-          onClick={() => {
-            setOpen(false)
-            openPlayer(movie.id)
-          }}
-        >
-          <MovieCard movie={movie} titleTooltip={!canHover}>
-            <LibraryMovieStatus movie={movie} />
-          </MovieCard>
-        </Button>
+        {movie.javdb_id ? (
+          <Link
+            to="/discover/$movieId"
+            params={{ movieId: movie.javdb_id }}
+            className="block min-w-0 rounded-2xl outline-ring"
+            onClick={() => setOpen(false)}
+          >
+            {card}
+          </Link>
+        ) : (
+          <div className="min-w-0">{card}</div>
+        )}
       </HoverCardTrigger>
       {canHover ? (
         <HoverCardContent

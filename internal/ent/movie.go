@@ -54,8 +54,6 @@ type Movie struct {
 	Fanarts []string `json:"fanarts,omitempty"`
 	// ScrapeStatus holds the value of the "scrape_status" field.
 	ScrapeStatus movie.ScrapeStatus `json:"scrape_status,omitempty"`
-	// Watched holds the value of the "watched" field.
-	Watched bool `json:"watched,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the MovieQuery when eager-loading is set.
 	Edges        MovieEdges `json:"edges"`
@@ -70,13 +68,11 @@ type MovieEdges struct {
 	Tags []*Tag `json:"tags,omitempty"`
 	// Files holds the value of the files edge.
 	Files []*File `json:"files,omitempty"`
-	// WatchHistory holds the value of the watch_history edge.
-	WatchHistory []*WatchHistory `json:"watch_history,omitempty"`
 	// Subtitles holds the value of the subtitles edge.
 	Subtitles []*Subtitle `json:"subtitles,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [5]bool
+	loadedTypes [4]bool
 }
 
 // ActorsOrErr returns the Actors value or an error if the edge
@@ -106,19 +102,10 @@ func (e MovieEdges) FilesOrErr() ([]*File, error) {
 	return nil, &NotLoadedError{edge: "files"}
 }
 
-// WatchHistoryOrErr returns the WatchHistory value or an error if the edge
-// was not loaded in eager-loading.
-func (e MovieEdges) WatchHistoryOrErr() ([]*WatchHistory, error) {
-	if e.loadedTypes[3] {
-		return e.WatchHistory, nil
-	}
-	return nil, &NotLoadedError{edge: "watch_history"}
-}
-
 // SubtitlesOrErr returns the Subtitles value or an error if the edge
 // was not loaded in eager-loading.
 func (e MovieEdges) SubtitlesOrErr() ([]*Subtitle, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[3] {
 		return e.Subtitles, nil
 	}
 	return nil, &NotLoadedError{edge: "subtitles"}
@@ -131,8 +118,6 @@ func (*Movie) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case movie.FieldFanarts:
 			values[i] = new([]byte)
-		case movie.FieldWatched:
-			values[i] = new(sql.NullBool)
 		case movie.FieldRating:
 			values[i] = new(sql.NullFloat64)
 		case movie.FieldID, movie.FieldDuration:
@@ -284,12 +269,6 @@ func (_m *Movie) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ScrapeStatus = movie.ScrapeStatus(value.String)
 			}
-		case movie.FieldWatched:
-			if value, ok := values[i].(*sql.NullBool); !ok {
-				return fmt.Errorf("unexpected type %T for field watched", values[i])
-			} else if value.Valid {
-				_m.Watched = value.Bool
-			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -316,11 +295,6 @@ func (_m *Movie) QueryTags() *TagQuery {
 // QueryFiles queries the "files" edge of the Movie entity.
 func (_m *Movie) QueryFiles() *FileQuery {
 	return NewMovieClient(_m.config).QueryFiles(_m)
-}
-
-// QueryWatchHistory queries the "watch_history" edge of the Movie entity.
-func (_m *Movie) QueryWatchHistory() *WatchHistoryQuery {
-	return NewMovieClient(_m.config).QueryWatchHistory(_m)
 }
 
 // QuerySubtitles queries the "subtitles" edge of the Movie entity.
@@ -428,9 +402,6 @@ func (_m *Movie) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("scrape_status=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ScrapeStatus))
-	builder.WriteString(", ")
-	builder.WriteString("watched=")
-	builder.WriteString(fmt.Sprintf("%v", _m.Watched))
 	builder.WriteByte(')')
 	return builder.String()
 }

@@ -7,7 +7,6 @@ import "sync"
 type TaskRevisions struct {
 	Library uint64 `json:"library"`
 	Offline uint64 `json:"offline"`
-	History uint64 `json:"history"`
 	Monitor uint64 `json:"monitor"`
 }
 
@@ -17,7 +16,6 @@ type Change uint8
 const (
 	ChangeLibrary Change = 1 << iota
 	ChangeOffline
-	ChangeHistory
 	ChangeMonitor
 )
 
@@ -54,13 +52,12 @@ func (b *Bus) Notify() { b.publish(0) }
 
 // Changed bumps the named revisions and notifies subscribers. The pool is
 // woken only for library or offline changes, which may have queued work;
-// history and monitor changes never do.
+// monitor changes never do.
 func (b *Bus) Changed(change Change) { b.publish(change) }
 
-func (b *Bus) NotifyLibraryChanged()      { b.publish(ChangeLibrary | ChangeHistory) }
-func (b *Bus) NotifyOfflineChanged()      { b.publish(ChangeOffline) }
-func (b *Bus) NotifyWatchHistoryChanged() { b.publish(ChangeHistory) }
-func (b *Bus) NotifyMonitorChanged()      { b.publish(ChangeMonitor) }
+func (b *Bus) NotifyLibraryChanged() { b.publish(ChangeLibrary) }
+func (b *Bus) NotifyOfflineChanged() { b.publish(ChangeOffline) }
+func (b *Bus) NotifyMonitorChanged() { b.publish(ChangeMonitor) }
 
 func (b *Bus) Revisions() TaskRevisions {
 	b.mu.Lock()
@@ -82,9 +79,6 @@ func (b *Bus) publish(change Change) {
 	}
 	if change&ChangeOffline != 0 {
 		b.revisions.Offline++
-	}
-	if change&ChangeHistory != 0 {
-		b.revisions.History++
 	}
 	if change&ChangeMonitor != 0 {
 		b.revisions.Monitor++

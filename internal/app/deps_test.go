@@ -15,7 +15,7 @@ import (
 // shared kernel (drive, tasks, database) must not import any of them.
 func TestBusinessPackagesDoNotImportEachOther(t *testing.T) {
 	const module = "github.com/ppxb/miyabi/internal/"
-	business := []string{"catalogue", "library", "library/scan", "library/scrape", "offline", "monitor", "playback", "maintenance"}
+	business := []string{"catalogue", "library", "library/scan", "library/scrape", "offline", "monitor", "strm", "maintenance"}
 	kernel := []string{"drive", "tasks", "database"}
 	// Subpackages of one bounded context may share code downward only.
 	allowed := map[string][]string{

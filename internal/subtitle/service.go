@@ -3,486 +3,236 @@ package subtitle
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
-	"github.com/ppxb/miyabi/internal/codeid"
-	"github.com/ppxb/miyabi/internal/domain"
-	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
-// Service coordinates subtitle discovery, retrieval, caching, and persistence.
+const (
+	// MaxTracks bounds the subtitles exported per movie, one of each Kind.
+	MaxTracks = 3
+	// maxDownloads bounds the subtitles downloaded per export: a candidate
+	// without a language hint may turn out to repeat an exported kind.
+	maxDownloads = 8
+
+	// SourcePan marks tracks indexed from subtitle files beside the 115 videos.
+	SourcePan = "115"
+	// SourceLocal marks tracks found beside existing local .strm files.
+	SourceLocal = "local"
+)
+
+// Reader reads files from the mounted 115 directory.
+type Reader interface {
+	Read(ctx context.Context, pickCode string, limit int64) ([]byte, error)
+}
+
+// Target locates the exported .strm file a movie's subtitles accompany.
+type Target struct {
+	Dir  string
+	Stem string
+	Code string
+	// Uncensored selects subtitles timed for uncensored cuts.
+	Uncensored bool
+	// HardSubtitled videos already show Chinese subtitles; no online search is made.
+	HardSubtitled bool
+}
+
+// Path names a subtitle so Emby attaches it to the .strm and reads its
+// language: <stem>[.<version>].<language>.<format>.
+func (target Target) Path(kind Kind) string {
+	parts := []string{target.Stem}
+	if kind.Version != VersionStandard && kind.Version != "" {
+		parts = append(parts, string(kind.Version))
+	}
+	parts = append(parts, string(kind.Language), kind.Format)
+	return filepath.Join(target.Dir, strings.Join(parts, "."))
+}
+
+// Service exports movie subtitles beside their Emby .strm files.
 type Service struct {
-	db         *ent.Client
-	aggregator *Aggregator
-	drive      *drive.Drive
-	cacheDir   string
-	embyDir    string
+	db     *ent.Client
+	finder *Finder
 }
 
-// NewService creates a new subtitle service.
-func NewService(db *ent.Client, aggregator *Aggregator, driveSvc *drive.Drive, dataDir string) (*Service, error) {
-	cacheDir := filepath.Join(dataDir, "subtitles")
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
-		return nil, fmt.Errorf("create subtitle cache directory: %w", err)
-	}
-	return &Service{
-		db:         db,
-		aggregator: aggregator,
-		drive:      driveSvc,
-		cacheDir:   cacheDir,
-	}, nil
+func NewService(db *ent.Client, finder *Finder) *Service {
+	return &Service{db: db, finder: finder}
 }
 
-// SetEmbyDir sets the directory for exporting subtitles to local Emby media library.
-func (s *Service) SetEmbyDir(embyDir string) {
-	s.embyDir = embyDir
-}
-
-// ToTrack converts an ent.Subtitle record to a domain.SubtitleTrack.
-func ToTrack(r *ent.Subtitle) domain.SubtitleTrack {
-	return domain.SubtitleTrack{
-		ID:          r.ID,
-		MovieID:     r.MovieID,
-		FileID:      r.FileID,
-		Name:        r.Name,
-		DisplayName: r.DisplayName,
-		Language:    r.Language,
-		Format:      r.Format,
-		VersionTag:  r.VersionTag,
-		Source:      r.Source,
-		OffsetMs:    r.OffsetMs,
-		IsDefault:   r.IsDefault,
-		Src:         domain.SubtitleTrackURL(r.ID),
-	}
-}
-
-// ToTracks converts a slice of ent.Subtitle records to domain.SubtitleTracks.
-func ToTracks(records []*ent.Subtitle) []domain.SubtitleTrack {
-	tracks := make([]domain.SubtitleTrack, len(records))
-	for i, r := range records {
-		tracks[i] = ToTrack(r)
-	}
-	return tracks
-}
-
-// ListByMovie retrieves all subtitle tracks associated with a movie ordered by default status.
-func (s *Service) ListByMovie(ctx context.Context, movieID int) ([]domain.SubtitleTrack, error) {
-	records, err := s.db.Subtitle.Query().
-		Where(subtitle.MovieIDEQ(movieID)).
-		Order(ent.Desc(subtitle.FieldIsDefault), ent.Asc(subtitle.FieldID)).
-		All(ctx)
+// Export writes a movie's subtitles beside its .strm file and returns how many
+// files it wrote. Subtitles stored with the 115 videos come first; online
+// subtitles then fill the remaining kinds up to MaxTracks.
+func (s *Service) Export(ctx context.Context, reader Reader, movieID int, target Target) (int, error) {
+	tracks, err := s.db.Subtitle.Query().Where(subtitle.MovieIDEQ(movieID)).Order(ent.Asc(subtitle.FieldID)).All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("list subtitles for movie %d: %w", movieID, err)
+		return 0, fmt.Errorf("list movie subtitles: %w", err)
 	}
-	return ToTracks(records), nil
+	exported := make(map[Kind]bool)
+	var pending []*ent.Subtitle
+	for _, track := range tracks {
+		if filepath.Dir(track.StoragePath) == target.Dir && fileExists(track.StoragePath) {
+			exported[trackKind(track)] = true
+		} else {
+			pending = append(pending, track)
+		}
+	}
+	written := 0
+	var errs []error
+	for _, track := range pending {
+		switch {
+		case track.PickCode != "":
+			ok, err := s.exportPanTrack(ctx, reader, track, target, exported)
+			if ok {
+				written++
+			}
+			errs = append(errs, err)
+		case track.SourceURL != "":
+			// The exported file was removed, or predates exports beside the .strm.
+			// Drop the record and any stale copy; the online search replaces it.
+			if kind := trackKind(track); kind.Format != "" && !exported[kind] {
+				_ = os.Remove(target.Path(kind))
+			}
+			errs = append(errs, s.db.Subtitle.DeleteOne(track).Exec(ctx))
+		}
+	}
+	if !target.HardSubtitled && len(exported) < MaxTracks {
+		count, err := s.exportOnline(ctx, movieID, target, exported)
+		written += count
+		errs = append(errs, err)
+	}
+	return written, errors.Join(errs...)
 }
 
-// Search queries online providers for subtitle candidates matching a movie code.
-func (s *Service) Search(ctx context.Context, code string, isUncensored bool) ([]domain.SubtitleCandidate, error) {
-	candidates, err := s.aggregator.Search(ctx, code, isUncensored)
+func (s *Service) exportPanTrack(ctx context.Context, reader Reader, track *ent.Subtitle, target Target, exported map[Kind]bool) (bool, error) {
+	format := Format(track.Format)
+	if format == "" {
+		return false, nil
+	}
+	raw, err := reader.Read(ctx, track.PickCode, maxSize)
 	if err != nil {
-		return nil, err
+		return false, fmt.Errorf("read 115 subtitle %s: %w", track.Name, err)
 	}
-
-	results := make([]domain.SubtitleCandidate, 0, len(candidates))
-	for _, c := range candidates {
-		results = append(results, domain.SubtitleCandidate{
-			Source:      c.Provider,
-			Name:        c.Name,
-			DisplayName: c.DisplayName,
-			Language:    string(c.Language),
-			Version:     string(c.Version),
-			URL:         c.URL,
-			Ext:         c.Ext,
-			Score:       c.Score,
-		})
+	body, text, err := Normalize(raw, format)
+	if err != nil {
+		return false, fmt.Errorf("115 subtitle %s: %w", track.Name, err)
 	}
-	return results, nil
+	kind := Kind{Language: DetectLanguage(track.Name, text), Version: VersionTag(track.VersionTag), Format: format}
+	if exported[kind] {
+		return false, nil
+	}
+	destination := target.Path(kind)
+	if err := writeFile(destination, body); err != nil {
+		return false, err
+	}
+	exported[kind] = true
+	return true, s.db.Subtitle.UpdateOne(track).SetLanguage(string(kind.Language)).SetStoragePath(destination).Exec(ctx)
 }
 
-func (s *Service) cacheVTT(movieID int, content string) (string, error) {
-	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(content)))[:12]
-	fileName := fmt.Sprintf("%d_%s.vtt", movieID, hash)
-	filePath := filepath.Join(s.cacheDir, fileName)
-	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-		return "", err
-	}
-	return filePath, nil
+type download struct {
+	body     []byte
+	language Language
+	err      error
 }
 
-type saveTrackInput struct {
-	MovieID     int
-	FileID      string
-	PickCode    string
-	Name        string
-	DisplayName string
-	Language    string
-	VersionTag  string
-	Source      string
-	SourceURL   string
-	StoragePath string
-	IsDefault   bool
-}
-
-func (s *Service) saveTrackTx(ctx context.Context, tx *ent.Tx, input saveTrackInput) (*ent.Subtitle, error) {
-	// 1. Remove any existing subtitle with the same language and version tag for this movie
-	oldSubs, err := tx.Subtitle.Query().
-		Where(
-			subtitle.MovieIDEQ(input.MovieID),
-			subtitle.LanguageEQ(input.Language),
-			subtitle.VersionTagEQ(input.VersionTag),
-		).All(ctx)
-	if err == nil {
-		for _, old := range oldSubs {
-			_ = tx.Subtitle.DeleteOneID(old.ID).Exec(ctx)
-			if old.StoragePath != "" && old.StoragePath != input.StoragePath {
-				otherCount, _ := tx.Subtitle.Query().
-					Where(subtitle.StoragePathEQ(old.StoragePath), subtitle.IDNEQ(old.ID)).
-					Count(ctx)
-				if otherCount == 0 {
-					_ = os.Remove(old.StoragePath)
+// exportOnline fills the remaining kinds in two passes: first a language or
+// cut the movie lacks, then another format of one it has.
+func (s *Service) exportOnline(ctx context.Context, movieID int, target Target, exported map[Kind]bool) (int, error) {
+	candidates := s.finder.Search(ctx, target.Code, target.Uncensored)
+	downloads := make(map[string]download)
+	written := make(map[[sha256.Size]byte]bool)
+	for _, distinctLanguage := range []bool{true, false} {
+		for _, candidate := range candidates {
+			if len(exported) >= MaxTracks {
+				return len(written), nil
+			}
+			if candidate.Language != LangUnknown && !wanted(candidate.Kind(), exported, distinctLanguage) {
+				continue
+			}
+			result, fetched := downloads[candidate.URL]
+			if !fetched {
+				if len(downloads) >= maxDownloads {
+					continue
 				}
+				result.body, result.language, result.err = s.finder.Download(ctx, candidate)
+				downloads[candidate.URL] = result
+			}
+			if result.err != nil {
+				continue
+			}
+			candidate.Language = result.language
+			digest := sha256.Sum256(result.body)
+			if !wanted(candidate.Kind(), exported, distinctLanguage) || written[digest] {
+				continue
+			}
+			destination := target.Path(candidate.Kind())
+			if err := writeFile(destination, result.body); err != nil {
+				return len(written), err
+			}
+			exported[candidate.Kind()] = true
+			written[digest] = true
+			if err := s.db.Subtitle.Create().SetMovieID(movieID).SetName(filepath.Base(destination)).
+				SetLanguage(string(candidate.Language)).SetFormat(candidate.Format).SetVersionTag(string(candidate.Version)).
+				SetSource(candidate.Provider).SetSourceURL(candidate.URL).SetStoragePath(destination).Exec(ctx); err != nil {
+				return len(written), fmt.Errorf("record online subtitle: %w", err)
 			}
 		}
 	}
-
-	// 2. Set previous subtitles as non-default if setting default
-	if input.IsDefault {
-		if err := tx.Subtitle.Update().
-			Where(subtitle.MovieIDEQ(input.MovieID)).
-			SetIsDefault(false).
-			Exec(ctx); err != nil {
-			return nil, err
-		}
-	}
-
-	// 3. Insert the new subtitle track
-	record, err := tx.Subtitle.Create().
-		SetMovieID(input.MovieID).
-		SetFileID(input.FileID).
-		SetPickCode(input.PickCode).
-		SetName(input.Name).
-		SetDisplayName(input.DisplayName).
-		SetLanguage(input.Language).
-		SetFormat("vtt").
-		SetVersionTag(input.VersionTag).
-		SetSource(input.Source).
-		SetSourceURL(input.SourceURL).
-		SetStoragePath(input.StoragePath).
-		SetOffsetMs(0).
-		SetIsDefault(input.IsDefault).
-		Save(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("create subtitle record: %w", err)
-	}
-	return record, nil
+	return len(written), nil
 }
 
-// ApplyCandidate downloads a candidate subtitle, converts it to WebVTT, caches it,
-// optionally uploads it to 115 directory, and records it in the database while ensuring
-// only one subtitle of the same language & version exists per movie.
-func (s *Service) ApplyCandidate(ctx context.Context, movieID int, candidate domain.SubtitleCandidate) (*domain.SubtitleTrack, error) {
-	vttContent, err := s.aggregator.DownloadAndConvert(ctx, Candidate{
-		Provider:    candidate.Source,
-		Name:        candidate.Name,
-		URL:         candidate.URL,
-		Ext:         candidate.Ext,
-		Language:    Language(candidate.Language),
-		Version:     VersionTag(candidate.Version),
-		DisplayName: candidate.DisplayName,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("download and convert subtitle: %w", err)
+// wanted reports whether kind adds a track. With distinctLanguage, the movie
+// must also lack any format of the kind's language and cut.
+func wanted(kind Kind, exported map[Kind]bool, distinctLanguage bool) bool {
+	if exported[kind] {
+		return false
 	}
-
-	filePath, err := s.cacheVTT(movieID, vttContent)
-	if err != nil {
-		return nil, fmt.Errorf("save subtitle cache: %w", err)
-	}
-
-	// Determine movie code and 115 directory for upload
-	movieRecord, err := s.db.Movie.Get(ctx, movieID)
-	if err != nil {
-		return nil, fmt.Errorf("find movie %d: %w", movieID, err)
-	}
-	code := movieRecord.Code
-
-	var directoryID string
-	fileRecord, _ := s.db.File.Query().Where(file.MovieIDEQ(movieID)).First(ctx)
-	if fileRecord != nil {
-		directoryID = fileRecord.ParentID
-	}
-
-	subUploadName := fmt.Sprintf("%s.%s.vtt", code, candidate.Language)
-	if candidate.Version != "" && candidate.Version != "standard" {
-		subUploadName = fmt.Sprintf("%s.%s.%s.vtt", code, candidate.Version, candidate.Language)
-	}
-
-	var fileID string
-	var pickCode string
-	if s.drive != nil && directoryID != "" {
-		sess, err := s.drive.Open(ctx)
-		if err == nil {
-			if err := sess.Upload(ctx, directoryID, subUploadName, []byte(vttContent)); err == nil {
-				entries, _ := drive.DirectoryEntries(ctx, sess, directoryID)
-				for _, entry := range entries {
-					if entry.Name == subUploadName {
-						fileID = entry.ID
-						pickCode = entry.PickCode
-						break
-					}
-				}
+	if distinctLanguage {
+		for other := range exported {
+			if other.Language == kind.Language && other.Version == kind.Version {
+				return false
 			}
 		}
 	}
-
-	var track domain.SubtitleTrack
-	err = ent.WithTx(ctx, s.db, func(tx *ent.Tx) error {
-		record, err := s.saveTrackTx(ctx, tx, saveTrackInput{
-			MovieID:     movieID,
-			FileID:      fileID,
-			PickCode:    pickCode,
-			Name:        subUploadName,
-			DisplayName: candidate.DisplayName,
-			Language:    candidate.Language,
-			VersionTag:  candidate.Version,
-			Source:      candidate.Source,
-			SourceURL:   candidate.URL,
-			StoragePath: filePath,
-			IsDefault:   true,
-		})
-		if err != nil {
-			return err
-		}
-		track = ToTrack(record)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &track, nil
+	return true
 }
 
-// AutoFetchAndUpload finds the highest-scoring subtitle online, uploads it to 115 if possible, caches it locally, and stores it in the database.
-func (s *Service) AutoFetchAndUpload(ctx context.Context, sess drive.Session, directoryID string, movieID int, code string, isUncensored bool) error {
-	hasSub, err := s.db.Subtitle.Query().Where(subtitle.MovieIDEQ(movieID)).Exist(ctx)
-	if err != nil {
-		return fmt.Errorf("check existing subtitles: %w", err)
-	}
-	if hasSub {
+// IndexPanTrack records a subtitle file found beside a movie's 115 videos.
+// Export copies it into the Emby directory.
+func IndexPanTrack(ctx context.Context, tx *ent.Tx, movieID int, file pan.File) error {
+	format := Format(path.Ext(file.Name))
+	if format == "" {
 		return nil
 	}
-
-	candidates, err := s.aggregator.Search(ctx, code, isUncensored)
-	if err != nil || len(candidates) == 0 {
-		return nil
-	}
-
-	best := candidates[0]
-	vttContent, err := s.aggregator.DownloadAndConvert(ctx, best)
-	if err != nil {
-		return fmt.Errorf("download best subtitle %s: %w", best.Name, err)
-	}
-
-	filePath, err := s.cacheVTT(movieID, vttContent)
-	if err != nil {
-		return fmt.Errorf("save subtitle cache: %w", err)
-	}
-
-	subUploadName := fmt.Sprintf("%s.%s.vtt", code, best.Language)
-	if best.Version != VersionStandard {
-		subUploadName = fmt.Sprintf("%s.%s.%s.vtt", code, best.Version, best.Language)
-	}
-
-	if s.embyDir != "" {
-		prefix := codeid.Prefix(code)
-		destDir := filepath.Join(s.embyDir, prefix, code)
-		if err := os.MkdirAll(destDir, 0o755); err == nil {
-			_ = os.WriteFile(filepath.Join(destDir, subUploadName), []byte(vttContent), 0o644)
-		}
-	}
-
-	var fileID string
-	var pickCode string
-	if sess != nil && directoryID != "" {
-		if err := sess.Upload(ctx, directoryID, subUploadName, []byte(vttContent)); err == nil {
-			// Find the uploaded file entry to acquire its pick code if available
-			entries, _ := drive.DirectoryEntries(ctx, sess, directoryID)
-			for _, entry := range entries {
-				if entry.Name == subUploadName {
-					fileID = entry.ID
-					pickCode = entry.PickCode
-					break
-				}
-			}
-		}
-	}
-
-	return ent.WithTx(ctx, s.db, func(tx *ent.Tx) error {
-		_, err := s.saveTrackTx(ctx, tx, saveTrackInput{
-			MovieID:     movieID,
-			FileID:      fileID,
-			PickCode:    pickCode,
-			Name:        subUploadName,
-			DisplayName: best.DisplayName,
-			Language:    string(best.Language),
-			VersionTag:  string(best.Version),
-			Source:      best.Provider,
-			SourceURL:   best.URL,
-			StoragePath: filePath,
-			IsDefault:   true,
-		})
-		return err
-	})
-}
-
-// IndexLocalSubtitleTx records an existing subtitle file discovered on 115 during scanning within a transaction.
-func IndexLocalSubtitleTx(ctx context.Context, tx *ent.Tx, movieID int, file pan.File) error {
-	exists, err := tx.Subtitle.Query().
-		Where(subtitle.MovieIDEQ(movieID), subtitle.FileIDEQ(file.ID)).
-		Exist(ctx)
+	exists, err := tx.Subtitle.Query().Where(subtitle.MovieIDEQ(movieID), subtitle.FileIDEQ(file.ID)).Exist(ctx)
 	if err != nil || exists {
 		return err
 	}
-
-	ext := strings.ToLower(strings.TrimPrefix(path.Ext(file.Name), "."))
-	lang := DetectChineseLanguage(file.Name, "")
-	ver := DetectVersion(file.Name)
-	displayName := BuildDisplayName(lang, ver, true)
-
-	hasDefault, err := tx.Subtitle.Query().
-		Where(subtitle.MovieIDEQ(movieID), subtitle.IsDefault(true)).
-		Exist(ctx)
-	if err != nil {
-		return err
-	}
-
-	return tx.Subtitle.Create().
-		SetMovieID(movieID).
-		SetFileID(file.ID).
-		SetPickCode(file.PickCode).
-		SetName(file.Name).
-		SetDisplayName(displayName).
-		SetLanguage(string(lang)).
-		SetFormat(ext).
-		SetVersionTag(string(ver)).
-		SetSource("local").
-		SetOffsetMs(0).
-		SetIsDefault(!hasDefault).
-		Exec(ctx)
+	return tx.Subtitle.Create().SetMovieID(movieID).SetFileID(file.ID).SetPickCode(file.PickCode).
+		SetName(file.Name).SetLanguage(string(DetectLanguage(file.Name, ""))).SetFormat(format).
+		SetVersionTag(string(DetectVersion(file.Name))).SetSource(SourcePan).Exec(ctx)
 }
 
-// IndexLocalSubtitle records an existing subtitle file discovered on 115 during scanning.
-func (s *Service) IndexLocalSubtitle(ctx context.Context, movieID int, file pan.File) error {
-	return ent.WithTx(ctx, s.db, func(tx *ent.Tx) error {
-		return IndexLocalSubtitleTx(ctx, tx, movieID, file)
-	})
+func trackKind(track *ent.Subtitle) Kind {
+	return Kind{Language: Language(track.Language), Version: VersionTag(track.VersionTag), Format: Format(track.Format)}
 }
 
-// GetTrackVTT retrieves WebVTT content for a given subtitle ID, applying any configured time offset
-// or an optional query-level offsetOverride.
-func (s *Service) GetTrackVTT(ctx context.Context, id int, offsetOverride *int) ([]byte, error) {
-	record, err := s.db.Subtitle.Get(ctx, id)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, domain.E(domain.KindNotFound, "字幕不存在", err)
-		}
-		return nil, fmt.Errorf("read subtitle %d: %w", id, err)
-	}
-
-	var rawContent string
-	if record.StoragePath != "" {
-		if contentBytes, err := os.ReadFile(record.StoragePath); err == nil {
-			rawContent = string(contentBytes)
-		}
-	}
-
-	if rawContent == "" && record.PickCode != "" && s.drive != nil {
-		sess, err := s.drive.Open(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("open drive for subtitle: %w", err)
-		}
-		data, err := sess.Read(ctx, record.PickCode, 10<<20)
-		if err != nil {
-			return nil, fmt.Errorf("read subtitle from 115: %w", err)
-		}
-		utf8Text, err := DecodeToUTF8(data)
-		if err != nil {
-			return nil, fmt.Errorf("decode subtitle charset: %w", err)
-		}
-		ext := record.Format
-		if ext == "" {
-			ext = strings.ToLower(strings.TrimPrefix(path.Ext(record.Name), "."))
-		}
-		vtt, err := ConvertToWebVTT(utf8Text, ext)
-		if err != nil {
-			return nil, fmt.Errorf("convert subtitle to vtt: %w", err)
-		}
-		rawContent = vtt
-
-		// Cache to disk
-		if filePath, err := s.cacheVTT(record.MovieID, vtt); err == nil {
-			_ = s.db.Subtitle.UpdateOneID(record.ID).SetStoragePath(filePath).Exec(ctx)
-		}
-	}
-
-	if rawContent == "" {
-		return nil, domain.E(domain.KindNotFound, "字幕内容不可用", nil)
-	}
-
-	effectiveOffset := record.OffsetMs
-	if offsetOverride != nil {
-		effectiveOffset = *offsetOverride
-	}
-
-	if effectiveOffset != 0 {
-		rawContent = ApplyTimeOffset(rawContent, effectiveOffset)
-	}
-
-	return []byte(rawContent), nil
+func fileExists(name string) bool {
+	info, err := os.Stat(name)
+	return err == nil && !info.IsDir()
 }
 
-// UpdateOffset updates the time offset (in milliseconds) for a subtitle track.
-func (s *Service) UpdateOffset(ctx context.Context, id int, offsetMs int) error {
-	return s.db.Subtitle.UpdateOneID(id).SetOffsetMs(offsetMs).Exec(ctx)
-}
-
-// SetDefault sets a specific subtitle as default for its movie, unsetting all other subtitles for that movie.
-func (s *Service) SetDefault(ctx context.Context, movieID int, subID int) error {
-	return ent.WithTx(ctx, s.db, func(tx *ent.Tx) error {
-		if err := tx.Subtitle.Update().
-			Where(subtitle.MovieIDEQ(movieID)).
-			SetIsDefault(false).
-			Exec(ctx); err != nil {
-			return err
-		}
-		return tx.Subtitle.UpdateOneID(subID).SetIsDefault(true).Exec(ctx)
-	})
-}
-
-// Delete removes a subtitle record and its local cache file only when no other records share the same file.
-func (s *Service) Delete(ctx context.Context, id int) error {
-	record, err := s.db.Subtitle.Get(ctx, id)
-	if err != nil {
-		return err
+func writeFile(name string, body []byte) error {
+	if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
+		return fmt.Errorf("create subtitle directory: %w", err)
 	}
-	if record.StoragePath != "" {
-		// Only remove local file if no other subtitle record references this path
-		otherCount, err := s.db.Subtitle.Query().
-			Where(subtitle.StoragePathEQ(record.StoragePath), subtitle.IDNEQ(id)).
-			Count(ctx)
-		if err == nil && otherCount == 0 {
-			_ = os.Remove(record.StoragePath)
-		}
+	if err := os.WriteFile(name, body, 0o644); err != nil {
+		return fmt.Errorf("write subtitle: %w", err)
 	}
-	return s.db.Subtitle.DeleteOneID(id).Exec(ctx)
+	return nil
 }

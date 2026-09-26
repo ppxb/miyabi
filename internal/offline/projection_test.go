@@ -15,7 +15,7 @@ import (
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
-func TestOfflineProjectionUsesMovieIdentityAndExposesPlaybackID(t *testing.T) {
+func TestOfflineProjectionUsesMovieIdentityAndExposesLibraryID(t *testing.T) {
 	for _, test := range []struct {
 		name    string
 		code    string
@@ -52,7 +52,7 @@ func TestOfflineProjectionUsesMovieIdentityAndExposesPlaybackID(t *testing.T) {
 				wantID = local.ID
 			}
 			if result.LibraryID != wantID {
-				t.Fatalf("playback ID = %d, want %d", result.LibraryID, wantID)
+				t.Fatalf("library ID = %d, want %d", result.LibraryID, wantID)
 			}
 		})
 	}
@@ -253,7 +253,7 @@ func TestOfflineActivityKeepsLatestTasksInCurrentSource(t *testing.T) {
 	}
 }
 
-func TestOfflineActivitySeparatesPlaybackFromArtworkAndRechecksFiles(t *testing.T) {
+func TestOfflineActivitySeparatesLibraryEntryFromArtworkAndRechecksFiles(t *testing.T) {
 	service, download, input, source := offlineFixture(t)
 	ctx := t.Context()
 	sess, err := service.drive.OpenSource(ctx, source)

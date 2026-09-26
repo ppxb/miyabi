@@ -14,11 +14,6 @@ import (
 type LibraryManager interface {
 	ViewedManager
 	Movies(context.Context, int, int) (lib.Page, error)
-	MarkWatched(context.Context, int, domain.WatchHistoryScope) (lib.WatchSession, error)
-	WatchHistory(context.Context, int) (lib.WatchHistoryPage, error)
-	SaveWatchProgress(context.Context, int, lib.WatchProgress) error
-	RemoveWatchHistory(context.Context, domain.WatchHistoryScope, []int) (int, error)
-	ClearWatchHistory(context.Context, domain.WatchHistoryScope) (int, error)
 	StartScan(context.Context) (tasks.TaskInfo, error)
 	ScanLocal(context.Context, string) (*scan.LocalScanResult, error)
 }
@@ -61,23 +56,6 @@ func libraryMoviesHandler(library LibraryManager) gin.HandlerFunc {
 	}
 }
 
-func libraryWatchedHandler(library LibraryManager) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		uri, ok := bindURI[struct {
-			ID int `uri:"id" binding:"required,min=1"`
-		}](c)
-		if !ok {
-			return
-		}
-		scope, ok := bindJSON[domain.WatchHistoryScope](c)
-		if !ok {
-			return
-		}
-		history, err := library.MarkWatched(c.Request.Context(), uri.ID, scope)
-		respond(c, gin.H{"id": uri.ID, "watched": true, "history": history}, err)
-	}
-}
-
 func libraryScanHandler(library LibraryManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		task, err := library.StartScan(c.Request.Context())
@@ -104,4 +82,3 @@ func libraryLocalScanHandler(library LibraryManager, defaultDir string) gin.Hand
 		respond(c, res, err)
 	}
 }
-

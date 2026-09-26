@@ -26,7 +26,6 @@ import (
 	"github.com/ppxb/miyabi/internal/monitor"
 	"github.com/ppxb/miyabi/internal/offline"
 	"github.com/ppxb/miyabi/internal/pan"
-	"github.com/ppxb/miyabi/internal/playback"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -131,16 +130,8 @@ func (goldenLibrary) Movies(context.Context, int, int) (library.Page, error) {
 			Director: &library.Entity{ID: "director-1", Name: "Director"}, Maker: &library.Entity{ID: "maker-1", Name: "Maker"},
 			Series: &library.Entity{ID: "series-1", Name: "Series"},
 			Actors: []library.Entity{{ID: "actor-1", Name: "Actor"}}, Tags: []library.Tag{{ID: 3, JavDBID: "tag-1", Name: "Tag"}},
-			ScrapeStatus: movie.ScrapeStatusDone, Watched: true},
+			ScrapeStatus: movie.ScrapeStatusDone},
 		{ID: 8, Code: "ZZZ-999", Actors: []library.Entity{}, Tags: []library.Tag{}, ScrapeStatus: movie.ScrapeStatusFailed},
-	}}, nil
-}
-
-func (goldenLibrary) WatchHistory(context.Context, int) (library.WatchHistoryPage, error) {
-	source := goldenSource()
-	cover := "/api/library/artwork/aa.jpg"
-	return library.WatchHistoryPage{Source: &source, Total: 1, Page: 1, Items: []library.WatchHistoryItem{
-		{ID: 1, MovieID: 7, Code: "ABP-123", Title: "Localized title", Cover: &cover, WatchedAt: goldenTime(), Position: 61.5, Duration: 7200},
 	}}, nil
 }
 
@@ -168,7 +159,7 @@ func (goldenTasks) List(context.Context) ([]tasks.TaskInfo, error) {
 }
 
 func (goldenTasks) Revisions() tasks.TaskRevisions {
-	return tasks.TaskRevisions{Library: 4, Offline: 2, History: 1, Monitor: 3}
+	return tasks.TaskRevisions{Library: 4, Offline: 2, Monitor: 3}
 }
 
 type goldenOffline struct {
@@ -215,24 +206,6 @@ func (goldenPan) Account(context.Context) (drive.AccountStatus, error) {
 	}}, nil
 }
 
-type goldenPlay struct {
-	PlayManager
-}
-
-func (goldenPlay) Files(context.Context, int) (playback.PlayFiles, error) {
-	return playback.PlayFiles{Code: "ABP-123", Title: "Localized title",
-		Files:  []domain.LibraryFile{{ID: "101", Name: "ABP-123.mp4", Path: "/Movies/ABP-123/ABP-123.mp4", Size: 2 << 30}},
-		Source: domain.WatchHistoryScope{AccountID: "100", DirectoryID: "10"},
-		Resume: &domain.WatchResume{ID: 1, FileID: "101", Position: 61.5, Duration: 7200}}, nil
-}
-
-func (goldenPlay) Start(context.Context, string) (playback.Playback, error) {
-	return playback.Playback{ID: "session-1", Sources: []playback.MediaSource{
-		{Src: "/api/play/session-1/stream/0", Type: "application/x-mpegurl", Label: "原画 · 1080p"},
-		{Src: "/api/play/session-1/stream/1", Type: "application/x-mpegurl", Label: "720p"},
-	}}, nil
-}
-
 type goldenData struct {
 	MaintenanceManager
 }
@@ -242,21 +215,10 @@ func (goldenData) Info(context.Context) (maintenance.Info, error) {
 		Cache: mediaimage.CacheStats{SizeBytes: 3 << 20, EntryCount: 12, UnusedSizeBytes: 1 << 20, UnusedEntryCount: 2}}, nil
 }
 
-type goldenSubtitle struct {
-	SubtitleManager
-}
-
-func (goldenSubtitle) Search(context.Context, string, bool) ([]domain.SubtitleCandidate, error) {
-	return []domain.SubtitleCandidate{
-		{Source: "xunlei", Name: "ABP-123.chs.srt", DisplayName: "简体中文", Language: "zh-CN", Version: "standard", URL: "http://example.com/abp123.srt", Ext: "srt", Score: 100},
-	}, nil
-}
-
 func goldenRouter() http.Handler {
 	return NewRouter(Dependencies{
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Catalogue: goldenDiscover{}, Library: goldenLibrary{},
-		Tasks: goldenTasks{}, Offline: goldenOffline{}, Monitor: goldenSubscription{}, Drive: goldenPan{}, Play: goldenPlay{}, Maintenance: goldenData{},
-		Subtitle: goldenSubtitle{},
+		Tasks: goldenTasks{}, Offline: goldenOffline{}, Monitor: goldenSubscription{}, Drive: goldenPan{}, Maintenance: goldenData{},
 	})
 }
 
@@ -275,13 +237,10 @@ func TestResponseContractsMatchGoldenFiles(t *testing.T) {
 		{name: "discover_tags", method: http.MethodGet, path: "/api/discover/tags?zone=censored"},
 		{name: "javdb_route", method: http.MethodGet, path: "/api/javdb/route"},
 		{name: "library_movies", method: http.MethodGet, path: "/api/library/movies"},
-		{name: "library_history", method: http.MethodGet, path: "/api/library/history"},
 		{name: "tasks", method: http.MethodGet, path: "/api/tasks"},
 		{name: "offline_tasks", method: http.MethodGet, path: "/api/offline/tasks"},
 		{name: "subscriptions", method: http.MethodGet, path: "/api/subscriptions"},
 		{name: "pan_account", method: http.MethodGet, path: "/api/pan/account"},
-		{name: "play_files", method: http.MethodGet, path: "/api/play/files?movie_id=7"},
-		{name: "play_start", method: http.MethodGet, path: "/api/play/101"},
 		{name: "settings_system", method: http.MethodGet, path: "/api/settings/system"},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {

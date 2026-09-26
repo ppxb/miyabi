@@ -162,16 +162,14 @@ func parseSubtitleCatDetail(body []byte, movieName string, origin string) []Cand
 					lang = LangTraditionalChinese
 				}
 
-				if lang == LangSimplifiedChinese || lang == LangTraditionalChinese {
-					ver := DetectVersion(movieName)
+				if lang != LangUnknown {
 					candidates = append(candidates, Candidate{
-						Provider:    "SubtitleCat",
-						Name:        movieName,
-						URL:         downloadURL,
-						Ext:         "srt",
-						Language:    lang,
-						Version:     ver,
-						DisplayName: BuildDisplayName(lang, ver, false),
+						Provider: "SubtitleCat",
+						Name:     movieName,
+						URL:      downloadURL,
+						Format:   "srt",
+						Language: lang,
+						Version:  DetectVersion(movieName),
 					})
 				}
 			}
