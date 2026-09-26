@@ -19,7 +19,7 @@ type strmRelayStub struct {
 	headErr     error
 }
 
-func (s *strmRelayStub) StreamURL(ctx context.Context, fileID string) (string, error) {
+func (s *strmRelayStub) StreamURL(ctx context.Context, fileID, userAgent string) (string, error) {
 	if s.streamErr != nil {
 		return "", s.streamErr
 	}

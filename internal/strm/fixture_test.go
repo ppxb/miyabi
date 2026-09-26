@@ -2,6 +2,7 @@ package strm
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -15,9 +16,10 @@ import (
 // Any other call panics through the nil embedded client.
 type panStub struct {
 	drive.Client
-	info      func(context.Context, string, string) (pan.FileInfo, error)
-	playURL   func(context.Context, string, string) ([]pan.PlaySource, error)
-	openMedia func(context.Context, string, string, http.Header) (*http.Response, error)
+	info        func(context.Context, string, string) (pan.FileInfo, error)
+	downloadURL func(context.Context, string, string, string) (string, error)
+	playURL     func(context.Context, string, string) ([]pan.PlaySource, error)
+	openMedia   func(context.Context, string, string, http.Header) (*http.Response, error)
 }
 
 func (*panStub) Close() {}
@@ -48,6 +50,13 @@ func (client *panStub) Info(ctx context.Context, token, id string) (pan.FileInfo
 
 func (client *panStub) PlayURL(ctx context.Context, token, pickCode string) ([]pan.PlaySource, error) {
 	return client.playURL(ctx, token, pickCode)
+}
+
+func (client *panStub) DownloadURL(ctx context.Context, token, pickCode, userAgent string) (string, error) {
+	if client.downloadURL != nil {
+		return client.downloadURL(ctx, token, pickCode, userAgent)
+	}
+	return "", errors.New("download url not stubbed")
 }
 
 func (client *panStub) OpenMedia(ctx context.Context, method, address string, headers http.Header) (*http.Response, error) {

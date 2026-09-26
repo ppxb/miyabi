@@ -113,6 +113,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		MediaPath:  cfg.EmbyMediaPath,
 		LocalDir:   cfg.EmbyDir,
 		SyncActors: &syncActors,
+		PublicURL:  cfg.PublicURL,
 	})
 	if err != nil {
 		catalogueSvc.Close()
@@ -134,12 +135,30 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	embySvc.SetGFriends(gfriendsClient)
 	embySvc.SetMediaFetcher(catalogueSvc)
 
-	scrapeSvc.SetEmbyExport(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken)
+	activePublicURL := cfg.PublicURL
+	if embyCfg, err := embySvc.Config(ctx); err == nil && embyCfg.PublicURL != "" {
+		activePublicURL = embyCfg.PublicURL
+	}
+	scrapeSvc.SetEmbyExport(cfg.EmbyDir, activePublicURL, cfg.STRMToken)
 	scrapeSvc.SetMediaNotifier(embySvc)
 	scrapeSvc.SetSubtitles(subtitleSvc)
-	libSvc.SetEmbyExport(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken)
+	libSvc.SetEmbyExport(cfg.EmbyDir, activePublicURL, cfg.STRMToken)
 	libSvc.SetMediaNotifier(embySvc)
 	libSvc.SetPacing(scan.DefaultPacing)
+
+	embySvc.SetSTRMToken(cfg.STRMToken)
+	embySvc.SetSTRMExporters(scrapeSvc, libSvc)
+
+	if activePublicURL != "" && cfg.EmbyDir != "" {
+		go func() {
+			count, err := scrape.RewriteSTRM(cfg.EmbyDir, activePublicURL, cfg.STRMToken)
+			if err != nil {
+				logger.Error("failed to rewrite STRM files on startup", "error", err)
+			} else if count > 0 {
+				logger.Info("rewrote STRM files on startup", "count", count, "url", activePublicURL)
+			}
+		}()
+	}
 
 	taskRegistry.Register(tasks.NewHandler(tasks.KindScan, libSvc.Scan, libSvc.Finished))
 	taskRegistry.Register(tasks.NewHandler(tasks.KindScrape, scrapeSvc.Scrape, scrapeSvc.Finished))

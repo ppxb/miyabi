@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/ppxb/miyabi/internal/logging"
+	"github.com/ppxb/miyabi/internal/netx"
 )
 
 type Config struct {
@@ -42,7 +43,7 @@ func Load() (Config, error) {
 		if _, p, err := net.SplitHostPort(strings.TrimSpace(listen)); err == nil && p != "" {
 			port = p
 		}
-		publicURL = "http://127.0.0.1:" + port
+		publicURL = fmt.Sprintf("http://%s:%s", netx.OutboundIP(), port)
 	}
 	embyServerURL := strings.TrimRight(strings.TrimSpace(os.Getenv("MIYABI_EMBY_SERVER_URL")), "/")
 	if embyServerURL == "" {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { LoaderCircleIcon, RefreshCwIcon, TvMinimalIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -8,7 +8,31 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
+import { combineServerUrl, splitServerUrl } from './emby-url'
 import { SettingRow, SettingsSection } from './shared'
+
+interface EmbyFormData {
+  enabled: boolean
+  host: string
+  port: string
+  api_key: string
+  media_path: string
+  sync_actors: boolean
+  public_url: string
+}
+
+function configToFormData(config?: EmbyConfig | null): EmbyFormData {
+  const { host, port } = splitServerUrl(config?.server_url ?? '')
+  return {
+    enabled: config?.enabled ?? false,
+    host,
+    port,
+    api_key: config?.api_key ?? '',
+    media_path: config?.media_path ?? '',
+    sync_actors: config?.sync_actors ?? true,
+    public_url: config?.public_url ?? ''
+  }
+}
 
 export function EmbySection() {
   const emby = useEmbyConfig()
@@ -16,47 +40,49 @@ export function EmbySection() {
   const testConfig = useTestEmbyConfig()
 
   const config = emby.data
-  const [form, setForm] = useState<EmbyConfig | null>(null)
+  const initial = useMemo(() => configToFormData(config), [config])
+  const [form, setForm] = useState<EmbyFormData | null>(null)
 
-  const current: EmbyConfig = form ??
-    config ?? {
-      enabled: false,
-      server_url: '',
-      api_key: '',
-      media_path: '',
-      sync_actors: true
-    }
+  const current = form ?? initial
 
   const isDirty =
     Boolean(config) &&
     form !== null &&
-    (form.enabled !== config!.enabled ||
-      form.server_url !== config!.server_url ||
-      form.api_key !== config!.api_key ||
-      form.media_path !== config!.media_path ||
-      (form.sync_actors ?? true) !== (config!.sync_actors ?? true))
+    (current.enabled !== initial.enabled ||
+      current.host !== initial.host ||
+      current.port !== initial.port ||
+      current.api_key !== initial.api_key ||
+      current.media_path !== initial.media_path ||
+      current.public_url !== initial.public_url ||
+      current.sync_actors !== initial.sync_actors)
 
   const disabled = emby.isLoading || emby.isError || updateConfig.isPending
 
-  function updateField<K extends keyof EmbyConfig>(key: K, value: EmbyConfig[K]) {
+  function updateField<K extends keyof EmbyFormData>(key: K, value: EmbyFormData[K]) {
     setForm(prev => ({
-      ...(prev ??
-        config ?? {
-          enabled: false,
-          server_url: '',
-          api_key: '',
-          media_path: '',
-          sync_actors: true
-        }),
+      ...(prev ?? initial),
       [key]: value
     }))
   }
 
+  function handleHostBlur() {
+    const raw = current.host.trim()
+    if (!raw) return
+    const { host, port } = splitServerUrl(raw)
+    if (host !== raw) {
+      setForm(prev => ({
+        ...(prev ?? initial),
+        host,
+        port
+      }))
+    }
+  }
+
   function handleTest() {
-    const trimmedUrl = current.server_url.trim()
+    const trimmedHost = current.host.trim()
     const trimmedKey = current.api_key.trim()
 
-    if (!trimmedUrl) {
+    if (!trimmedHost) {
       toast.error('请填写 Emby 服务器地址')
       return
     }
@@ -65,8 +91,10 @@ export function EmbySection() {
       return
     }
 
+    const serverUrl = combineServerUrl(trimmedHost, current.port)
+
     testConfig.mutate(
-      { server_url: trimmedUrl, api_key: trimmedKey },
+      { server_url: serverUrl, api_key: trimmedKey },
       {
         onSuccess: data => {
           toast.success('Emby 连接成功', {
@@ -81,11 +109,11 @@ export function EmbySection() {
   }
 
   function handleSave() {
-    const trimmedUrl = current.server_url.trim()
+    const trimmedHost = current.host.trim()
     const trimmedKey = current.api_key.trim()
 
     if (current.enabled) {
-      if (!trimmedUrl) {
+      if (!trimmedHost) {
         toast.error('启用 Emby 集成时必须填写服务器地址')
         return
       }
@@ -95,12 +123,15 @@ export function EmbySection() {
       }
     }
 
+    const serverUrl = combineServerUrl(trimmedHost, current.port)
+
     const payload: EmbyConfig = {
       enabled: current.enabled,
-      server_url: trimmedUrl,
+      server_url: serverUrl,
       api_key: trimmedKey,
       media_path: current.media_path.trim(),
-      sync_actors: current.sync_actors ?? true
+      sync_actors: current.sync_actors,
+      public_url: current.public_url.trim()
     }
 
     updateConfig.mutate(payload, {
@@ -134,18 +165,40 @@ export function EmbySection() {
         inline
       >
         <Switch
-          checked={current.sync_actors ?? true}
+          checked={current.sync_actors}
           disabled={disabled || !current.enabled}
           onCheckedChange={checked => updateField('sync_actors', checked)}
         />
       </SettingRow>
 
-      <SettingRow title="服务器地址" description="Emby 服务的访问地址">
+      <SettingRow title="服务器地址" description="Emby 服务的 IP 或域名">
         <Input
-          value={current.server_url}
-          placeholder="http://192.168.1.100:8096"
+          value={current.host}
+          placeholder="http://192.168.1.100"
           disabled={disabled}
-          onChange={e => updateField('server_url', e.target.value)}
+          onChange={e => updateField('host', e.target.value)}
+          onBlur={handleHostBlur}
+        />
+      </SettingRow>
+
+      <SettingRow title="端口" description="Emby 服务端口，默认 8096">
+        <Input
+          value={current.port}
+          placeholder="8096"
+          disabled={disabled}
+          onChange={e => updateField('port', e.target.value)}
+        />
+      </SettingRow>
+
+      <SettingRow
+        title="Miyabi 对外服务地址"
+        description="生成 STRM 播放文件时写入的对外地址，供播放器直接访问。留空自动使用局域网 IP"
+      >
+        <Input
+          value={current.public_url}
+          placeholder="http://<局域网IP>:8080"
+          disabled={disabled}
+          onChange={e => updateField('public_url', e.target.value)}
         />
       </SettingRow>
 

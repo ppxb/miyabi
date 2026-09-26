@@ -24,6 +24,7 @@ type Session interface {
 	CommitAccount(ctx context.Context, fn func(tx *ent.Tx) error) error
 
 	PlayURL(ctx context.Context, pickCode string) ([]pan.PlaySource, error)
+	DownloadURL(ctx context.Context, pickCode, userAgent string) (string, error)
 	AddOffline(ctx context.Context, magnet string) (string, error)
 	RemoveOffline(ctx context.Context, hash string) error
 	OfflineTasks(ctx context.Context, page int) (pan.OfflinePage, error)
@@ -155,6 +156,23 @@ func (s *sourceSession) PlayURL(ctx context.Context, pickCode string) ([]pan.Pla
 		return nil, err
 	}
 	return sources, nil
+}
+
+func (s *sourceSession) DownloadURL(ctx context.Context, pickCode, userAgent string) (string, error) {
+	state, err := s.drive.sourceState(s.source, s.version)
+	if err != nil {
+		return "", err
+	}
+	downloadURL, err := withPanSourceToken(ctx, s.drive, state, func(token string) (string, error) {
+		return s.drive.client.DownloadURL(ctx, token, pickCode, userAgent)
+	})
+	if err != nil {
+		return "", err
+	}
+	if err := s.checkSource(); err != nil {
+		return "", err
+	}
+	return downloadURL, nil
 }
 
 func (s *sourceSession) AddOffline(ctx context.Context, magnet string) (string, error) {

@@ -5,18 +5,21 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/ent"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
+	"github.com/ppxb/miyabi/internal/netx"
 	"github.com/ppxb/miyabi/internal/nfo"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
-const (
-	defaultEmbyDir   = "./data/emby"
-	defaultPublicURL = "http://127.0.0.1:8080"
-)
+const defaultEmbyDir = "./data/emby"
+
+func defaultPublicURL() string {
+	return fmt.Sprintf("http://%s:8080", netx.OutboundIP())
+}
 
 // EmbyMovieDir is the directory holding a movie's exported Emby files,
 // bucketed by catalogue prefix: <embyDir>/<prefix>/<code>.
@@ -31,13 +34,57 @@ func EmbyMovieDir(embyDir, code string) string {
 // 115 video to a fresh stream whenever Emby plays it.
 func STRMContent(publicURL, fileID, strmToken string) []byte {
 	if publicURL == "" {
-		publicURL = defaultPublicURL
+		publicURL = defaultPublicURL()
 	}
 	content := publicURL + "/api/strm/play/" + fileID
 	if strmToken != "" {
 		content += "?token=" + url.QueryEscape(strmToken)
 	}
 	return []byte(content + "\n")
+}
+
+// RewriteSTRM walks the Emby export directory and updates the baseUrl of all existing .strm files.
+// It returns the count of rewritten files.
+func RewriteSTRM(embyDir, publicURL, strmToken string) (int, error) {
+	if embyDir == "" {
+		embyDir = defaultEmbyDir
+	}
+	if publicURL == "" {
+		publicURL = defaultPublicURL()
+	}
+	publicURL = strings.TrimRight(strings.TrimSpace(publicURL), "/")
+
+	rewritten := 0
+	err := filepath.WalkDir(embyDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() || !strings.EqualFold(filepath.Ext(path), ".strm") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		line := strings.TrimSpace(string(data))
+		const pattern = "/api/strm/play/"
+		idx := strings.Index(line, pattern)
+		if idx == -1 {
+			return nil
+		}
+		suffix := line[idx:]
+		if strmToken != "" && !strings.Contains(suffix, "?token=") {
+			suffix += "?token=" + url.QueryEscape(strmToken)
+		}
+		newLine := publicURL + suffix + "\n"
+		if line != strings.TrimSpace(newLine) {
+			if err := os.WriteFile(path, []byte(newLine), 0o644); err == nil {
+				rewritten++
+			}
+		}
+		return nil
+	})
+	return rewritten, err
 }
 
 // ExportEmbyMedia writes .strm, .nfo, poster.jpg, and fanart.jpg files to the Emby directory structure.

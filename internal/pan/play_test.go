@@ -74,7 +74,7 @@ func TestDownloadURLDecodesMetadataSources(t *testing.T) {
 				}
 				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(test.body)), Request: request}, nil
 			}))
-			address, err := client.DownloadURL(t.Context(), "fixture-token", "fixture-pick")
+			address, err := client.DownloadURL(t.Context(), "fixture-token", "fixture-pick", mediaUserAgent)
 			if (err != nil) != test.wantErr {
 				t.Fatalf("DownloadURL error = %v, want error = %t", err, test.wantErr)
 			}
@@ -82,6 +82,23 @@ func TestDownloadURLDecodesMetadataSources(t *testing.T) {
 				t.Fatalf("download URL = %q", address)
 			}
 		})
+	}
+}
+
+func TestDownloadURLRespectsCallerUserAgent(t *testing.T) {
+	client := New()
+	defer client.Close()
+	const customUA = "VidHub/1.8.0"
+	client.http.SetTransport(offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
+		if request.UserAgent() != customUA {
+			t.Errorf("got User-Agent %q, want %q", request.UserAgent(), customUA)
+		}
+		body := `{"state":true,"code":0,"data":{"42":{"url":{"url":"https://cdn.example/video.mp4"}}}}`
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(body)), Request: request}, nil
+	}))
+	address, err := client.DownloadURL(t.Context(), "token", "pick", customUA)
+	if err != nil || address != "https://cdn.example/video.mp4" {
+		t.Fatalf("DownloadURL with custom UA = %q, %v", address, err)
 	}
 }
 

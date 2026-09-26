@@ -17,6 +17,7 @@ type Config struct {
 	MediaPath  string `json:"media_path"`
 	LocalDir   string `json:"local_dir"`
 	SyncActors *bool  `json:"sync_actors,omitempty"`
+	PublicURL  string `json:"public_url,omitempty"`
 }
 
 // IsSyncActors returns whether actor avatar synchronization is enabled (defaults to true).
@@ -33,6 +34,7 @@ func (c *Config) Normalize() error {
 	c.APIKey = strings.TrimSpace(c.APIKey)
 	c.MediaPath = strings.TrimSpace(c.MediaPath)
 	c.LocalDir = strings.TrimSpace(c.LocalDir)
+	c.PublicURL = strings.TrimRight(strings.TrimSpace(c.PublicURL), "/")
 	if c.SyncActors == nil {
 		defaultSync := true
 		c.SyncActors = &defaultSync

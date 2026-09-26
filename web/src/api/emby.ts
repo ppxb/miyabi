@@ -9,6 +9,7 @@ export type EmbyConfig = {
   media_path: string
   local_dir?: string
   sync_actors?: boolean
+  public_url?: string
 }
 
 export type EmbyServerInfo = {

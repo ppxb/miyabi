@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/ppxb/miyabi/internal/netx"
 )
 
 func clearConfigEnvironment(t *testing.T) {
@@ -36,8 +38,8 @@ func TestLoadDefaultsAndEnvironment(t *testing.T) {
 				Listen:    ":8080",
 				DataDir:   "./data",
 				EmbyDir:   filepath.Join("./data", "emby"),
-				PublicURL: "http://127.0.0.1:8080",
-				LogLevel:       "info",
+				PublicURL: "http://" + netx.OutboundIP() + ":8080",
+				LogLevel:  "info",
 				Runtime:        DefaultRuntime(),
 				EmbySyncActors: true,
 			},
@@ -81,7 +83,7 @@ func TestLoadDefaultsAndEnvironment(t *testing.T) {
 				Listen:         ":8080",
 				DataDir:        "./data",
 				EmbyDir:        filepath.Join("./data", "emby"),
-				PublicURL:      "http://127.0.0.1:8080",
+				PublicURL:      "http://" + netx.OutboundIP() + ":8080",
 				LogLevel:       "info",
 				Runtime:        DefaultRuntime(),
 				EmbySyncActors: true,

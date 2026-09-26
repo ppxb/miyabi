@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -84,10 +85,13 @@ func (s *Scanner) writeFastSTRM(video Video) {
 	}
 
 	strmPath := filepath.Join(destDir, nfo.FileStem(video.Code)+".strm")
-	if _, err := os.Stat(strmPath); err == nil {
-		return
+	newContent := scrape.STRMContent(s.publicURL, video.ID, s.strmToken)
+	if existing, err := os.ReadFile(strmPath); err == nil {
+		if bytes.Equal(bytes.TrimSpace(existing), bytes.TrimSpace(newContent)) {
+			return
+		}
 	}
-	if err := os.WriteFile(strmPath, scrape.STRMContent(s.publicURL, video.ID, s.strmToken), 0o644); err == nil {
+	if err := os.WriteFile(strmPath, newContent, 0o644); err == nil {
 		if s.notifier != nil {
 			s.notifier.NotifyUpdated(destDir)
 		}

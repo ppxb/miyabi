@@ -31,7 +31,7 @@ func New(database *ent.Client, d *drive.Drive) *Relay {
 // StreamURL returns the best 115 stream for a video: the original quality,
 // otherwise the highest transcoded resolution. 115 signs these URLs for a
 // short time, so every request resolves a fresh one.
-func (relay *Relay) StreamURL(ctx context.Context, fileID string) (string, error) {
+func (relay *Relay) StreamURL(ctx context.Context, fileID, userAgent string) (string, error) {
 	if relay.drive == nil {
 		return "", drive.ErrMediaDirectoryRequired
 	}
@@ -42,6 +42,10 @@ func (relay *Relay) StreamURL(ctx context.Context, fileID string) (string, error
 	pickCode, err := relay.pickCode(ctx, sess, fileID)
 	if err != nil {
 		return "", err
+	}
+	// Prefer the direct download URL for full CDN throughput and instant seeking.
+	if downloadURL, err := sess.DownloadURL(ctx, pickCode, userAgent); err == nil && downloadURL != "" {
+		return downloadURL, nil
 	}
 	sources, err := sess.PlayURL(ctx, pickCode)
 	if err != nil {

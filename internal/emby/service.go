@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/gfriends"
+	"github.com/ppxb/miyabi/internal/library/scrape"
 )
 
 // ServerInfo holds basic Emby instance details.
@@ -33,18 +35,26 @@ type ServerInfo struct {
 
 // Service manages communication, configuration persistence, and batch notification to Emby.
 type Service struct {
-	db             *ent.Client
-	mu             sync.RWMutex
-	cfg            Config
-	client         *http.Client
-	queue          chan string
-	ctx            context.Context
-	cancel         context.CancelFunc
-	wg             sync.WaitGroup
-	gfriends       *gfriends.Client
-	media          MediaFetcher
-	actorSyncTimer *time.Timer
-	actorSyncMu    sync.Mutex
+	db               *ent.Client
+	mu               sync.RWMutex
+	cfg              Config
+	defaultPublicURL string
+	client           *http.Client
+	queue            chan string
+	ctx              context.Context
+	cancel           context.CancelFunc
+	wg               sync.WaitGroup
+	gfriends         *gfriends.Client
+	media            MediaFetcher
+	actorSyncTimer   *time.Timer
+	actorSyncMu      sync.Mutex
+	strmExporters    []STRMExporter
+	strmToken        string
+}
+
+// STRMExporter configures the STRM export settings across services.
+type STRMExporter interface {
+	SetEmbyExport(embyDir, publicURL, strmToken string)
 }
 
 // NewService instantiates an Emby service, restoring config from database or using defaults.
@@ -60,12 +70,16 @@ func NewService(ctx context.Context, db *ent.Client, initial Config) (*Service, 
 		if cfg.LocalDir == "" {
 			cfg.LocalDir = initial.LocalDir
 		}
+		if cfg.PublicURL == "" && initial.PublicURL != "" {
+			cfg.PublicURL = initial.PublicURL
+		}
 	}
 
 	subCtx, cancel := context.WithCancel(context.Background())
 	s := &Service{
-		db:  db,
-		cfg: cfg,
+		db:               db,
+		cfg:              cfg,
+		defaultPublicURL: initial.PublicURL,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -115,6 +129,20 @@ func (s *Service) SetMediaFetcher(media MediaFetcher) {
 	s.media = media
 }
 
+// SetSTRMToken configures the playback authorization token written into .strm files.
+func (s *Service) SetSTRMToken(token string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.strmToken = token
+}
+
+// SetSTRMExporters registers downstream services that need notification when PublicURL changes.
+func (s *Service) SetSTRMExporters(exporters ...STRMExporter) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.strmExporters = append(s.strmExporters, exporters...)
+}
+
 // ScheduleActorSync schedules an actor avatar sync run after the given delay.
 func (s *Service) ScheduleActorSync(delay time.Duration) {
 	s.actorSyncMu.Lock()
@@ -136,7 +164,11 @@ func (s *Service) ScheduleActorSync(delay time.Duration) {
 func (s *Service) Config(context.Context) (Config, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.cfg, nil
+	cfg := s.cfg
+	if cfg.PublicURL == "" && s.defaultPublicURL != "" {
+		cfg.PublicURL = s.defaultPublicURL
+	}
+	return cfg, nil
 }
 
 // UpdateConfig validates and persists the new configuration to the database.
@@ -145,6 +177,12 @@ func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 	if cfg.LocalDir == "" {
 		cfg.LocalDir = s.cfg.LocalDir
 	}
+	if cfg.PublicURL == "" {
+		cfg.PublicURL = s.defaultPublicURL
+	}
+	oldPublicURL := s.cfg.PublicURL
+	token := s.strmToken
+	exporters := slices.Clone(s.strmExporters)
 	s.mu.Unlock()
 
 	if err := cfg.Normalize(); err != nil {
@@ -158,6 +196,21 @@ func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 	s.mu.Lock()
 	s.cfg = cfg
 	s.mu.Unlock()
+
+	if cfg.PublicURL != "" {
+		for _, exp := range exporters {
+			exp.SetEmbyExport(cfg.LocalDir, cfg.PublicURL, token)
+		}
+		if oldPublicURL != cfg.PublicURL {
+			go func() {
+				count, err := scrape.RewriteSTRM(cfg.LocalDir, cfg.PublicURL, token)
+				if err == nil && count > 0 {
+					slog.Info("rewrote strm files with updated public url", "count", count, "public_url", cfg.PublicURL)
+					s.NotifyUpdated(cfg.LocalDir)
+				}
+			}()
+		}
+	}
 
 	if cfg.Enabled && cfg.IsSyncActors() {
 		s.ScheduleActorSync(2 * time.Second)

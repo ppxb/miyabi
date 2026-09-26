@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 const mediaUserAgent = "Miyabi/1.0"
@@ -16,7 +17,7 @@ type PlaySource struct {
 	Definition int    `json:"definition"`
 }
 
-func (client *Client) DownloadURL(ctx context.Context, accessToken, pickCode string) (string, error) {
+func (client *Client) DownloadURL(ctx context.Context, accessToken, pickCode, userAgent string) (string, error) {
 	type downloadURLWire struct {
 		apiResponse
 		Data map[string]struct {
@@ -25,10 +26,14 @@ func (client *Client) DownloadURL(ctx context.Context, accessToken, pickCode str
 			} `json:"url"`
 		} `json:"data"`
 	}
+	ua := strings.TrimSpace(userAgent)
+	if ua == "" {
+		ua = mediaUserAgent
+	}
 	result, err := apiRequest[downloadURLWire](
 		client,
 		client.http.R().SetContext(ctx).SetAuthToken(accessToken).
-			SetHeader("User-Agent", mediaUserAgent).SetFormData(map[string]string{"pick_code": pickCode}),
+			SetHeader("User-Agent", ua).SetFormData(map[string]string{"pick_code": pickCode}),
 		http.MethodPost,
 		apiURL+"/open/ufile/downurl",
 		"download URL",
@@ -81,8 +86,12 @@ func (client *Client) PlayURL(ctx context.Context, accessToken, pickCode string)
 // OpenMedia streams CDN responses without the API rate limiter or OAuth headers.
 // The caller owns the body, including for unsuccessful HTTP responses.
 func (client *Client) OpenMedia(ctx context.Context, method, address string, headers http.Header) (*http.Response, error) {
+	ua := headers.Get("User-Agent")
+	if ua == "" {
+		ua = mediaUserAgent
+	}
 	request := client.media.R().SetContext(ctx).SetDoNotParseResponse(true).
-		SetHeader("User-Agent", mediaUserAgent).SetHeader("Accept-Encoding", "identity")
+		SetHeader("User-Agent", ua).SetHeader("Accept-Encoding", "identity")
 	for _, name := range []string{"Range", "If-Range"} {
 		if value := headers.Get(name); value != "" {
 			request.SetHeader(name, value)

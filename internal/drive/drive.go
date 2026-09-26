@@ -35,6 +35,7 @@ type Client interface {
 	RemoveOffline(context.Context, string, string) error
 	OfflineTasks(context.Context, string, int) (pan.OfflinePage, error)
 	PlayURL(context.Context, string, string) ([]pan.PlaySource, error)
+	DownloadURL(context.Context, string, string, string) (string, error)
 	OpenMedia(context.Context, string, string, http.Header) (*http.Response, error)
 }
 

@@ -24,7 +24,7 @@ func TestStreamURLPrefersOriginalQuality(t *testing.T) {
 			{URL: "https://cdn.example/480p.m3u8", Height: 480, Definition: 2},
 		}, nil
 	}
-	got, err := relay.StreamURL(t.Context(), "101")
+	got, err := relay.StreamURL(t.Context(), "101", "")
 	if err != nil || got != "https://cdn.example/original.mp4" {
 		t.Fatalf("StreamURL = %q, %v; want the original stream", got, err)
 	}
@@ -41,7 +41,7 @@ func TestStreamURLAsks115WhenThePickCodeWasNotIndexed(t *testing.T) {
 		}
 		return []pan.PlaySource{{URL: "https://cdn.example/video.m3u8", Height: 1080, Definition: 3}}, nil
 	}
-	got, err := relay.StreamURL(t.Context(), "101")
+	got, err := relay.StreamURL(t.Context(), "101", "")
 	if err != nil || got != "https://cdn.example/video.m3u8" {
 		t.Fatalf("StreamURL = %q, %v", got, err)
 	}
@@ -52,13 +52,13 @@ func TestStreamURLReportsMissingStreams(t *testing.T) {
 	client.playURL = func(context.Context, string, string) ([]pan.PlaySource, error) {
 		return []pan.PlaySource{{Height: 1080}}, nil
 	}
-	if _, err := relay.StreamURL(t.Context(), "101"); err == nil {
+	if _, err := relay.StreamURL(t.Context(), "101", ""); err == nil {
 		t.Fatal("a source list without URLs resolved to a stream")
 	}
 	client.playURL = func(context.Context, string, string) ([]pan.PlaySource, error) {
 		return nil, pan.ErrTranscodeUnavailable
 	}
-	if _, err := relay.StreamURL(t.Context(), "101"); !errors.Is(err, drive.ErrTranscodeUnavailable) {
+	if _, err := relay.StreamURL(t.Context(), "101", ""); !errors.Is(err, drive.ErrTranscodeUnavailable) {
 		t.Fatalf("missing transcodes = %v, want drive.ErrTranscodeUnavailable", err)
 	}
 }
@@ -79,5 +79,26 @@ func TestProbeSendsHEADToTheCDN(t *testing.T) {
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK || response.Header.Get("Content-Type") != "video/mp4" {
 		t.Fatalf("unexpected probe response: %+v", response)
+	}
+}
+
+func TestStreamURLPrefersDownloadURL(t *testing.T) {
+	relay, client := relayFixture(t, "pick-101")
+	client.downloadURL = func(_ context.Context, _, pickCode, userAgent string) (string, error) {
+		if pickCode != "pick-101" {
+			t.Fatalf("unexpected pick code: %s", pickCode)
+		}
+		if userAgent != "VidHub/1.0" {
+			t.Fatalf("unexpected userAgent: %s", userAgent)
+		}
+		return "https://cdn.example/raw-download.mp4", nil
+	}
+	client.playURL = func(context.Context, string, string) ([]pan.PlaySource, error) {
+		t.Fatal("PlayURL should not be called when DownloadURL succeeds")
+		return nil, nil
+	}
+	got, err := relay.StreamURL(t.Context(), "101", "VidHub/1.0")
+	if err != nil || got != "https://cdn.example/raw-download.mp4" {
+		t.Fatalf("StreamURL = %q, %v; want raw download URL", got, err)
 	}
 }

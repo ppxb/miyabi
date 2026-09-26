@@ -11,7 +11,7 @@ import (
 
 // STRMRelay resolves the fixed URLs written into exported .strm files.
 type STRMRelay interface {
-	StreamURL(context.Context, string) (string, error)
+	StreamURL(ctx context.Context, fileID, userAgent string) (string, error)
 	Probe(context.Context, string, http.Header) (*http.Response, error)
 }
 
@@ -30,7 +30,7 @@ func strmStreamHandler(relay STRMRelay, token string, gate AccessGate) gin.Handl
 			c.Error(domain.E(domain.KindUnauthorized, "无效的播放令牌", nil))
 			return
 		}
-		streamURL, err := relay.StreamURL(c.Request.Context(), uri.FileID)
+		streamURL, err := relay.StreamURL(c.Request.Context(), uri.FileID, c.Request.UserAgent())
 		if err != nil {
 			c.Error(err)
 			return

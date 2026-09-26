@@ -199,3 +199,40 @@ func TestExportEmbyMedia_WritesSTRMLast(t *testing.T) {
 	}
 }
 
+func TestRewriteSTRM(t *testing.T) {
+	tempDir := t.TempDir()
+	strmDir := filepath.Join(tempDir, "TEST-001")
+	if err := os.MkdirAll(strmDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	strmPath := filepath.Join(strmDir, "TEST-001.strm")
+	oldContent := "http://127.0.0.1:8080/api/strm/play/12345?token=mytoken\n"
+	if err := os.WriteFile(strmPath, []byte(oldContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := RewriteSTRM(tempDir, "http://10.32.217.101:8080", "mytoken")
+	if err != nil {
+		t.Fatalf("RewriteSTRM error: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 file rewritten, got %d", count)
+	}
+
+	updated, err := os.ReadFile(strmPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := "http://10.32.217.101:8080/api/strm/play/12345?token=mytoken\n"
+	if string(updated) != expected {
+		t.Fatalf("expected %q, got %q", expected, string(updated))
+	}
+
+	// Idempotent test: second run rewrites 0 files
+	count2, err := RewriteSTRM(tempDir, "http://10.32.217.101:8080", "mytoken")
+	if err != nil || count2 != 0 {
+		t.Fatalf("expected 0 files rewritten on second run, got %d (err: %v)", count2, err)
+	}
+}
+
+

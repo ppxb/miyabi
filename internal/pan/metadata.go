@@ -74,7 +74,7 @@ func (client *Client) Info(ctx context.Context, accessToken, fileID string) (Fil
 // ReadMetadata reads a small sidecar, never the video itself. The signed URL
 // request uses the same User-Agent as downurl and carries no access token.
 func (client *Client) ReadMetadata(ctx context.Context, accessToken, pickCode string, limit int64) ([]byte, error) {
-	downloadURL, err := client.DownloadURL(ctx, accessToken, pickCode)
+	downloadURL, err := client.DownloadURL(ctx, accessToken, pickCode, mediaUserAgent)
 	if err != nil {
 		return nil, err
 	}
