@@ -37,6 +37,7 @@ func NewDirectRestyClient(options RestyOptions) *resty.Client {
 
 func newTransport(options RestyOptions) *http.Transport {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
 	transport.ResponseHeaderTimeout = options.ResponseHeaderTimeout
 	return transport
 }

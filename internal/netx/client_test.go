@@ -29,13 +29,12 @@ func TestRestyClientResolvesProxyPerRequest(t *testing.T) {
 }
 
 func TestDirectRestyClientIgnoresManager(t *testing.T) {
-	t.Setenv("HTTPS_PROXY", "")
-	t.Setenv("HTTP_PROXY", "")
+	t.Setenv("HTTPS_PROXY", "http://127.0.0.1:8888")
+	t.Setenv("HTTP_PROXY", "http://127.0.0.1:8888")
 	client := NewDirectRestyClient(RestyOptions{})
 	transport := client.GetClient().Transport.(*http.Transport)
-	request, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
-	if proxy, _ := transport.Proxy(request); proxy != nil {
-		t.Fatalf("direct client resolved proxy %v", proxy)
+	if transport.Proxy != nil {
+		t.Fatalf("direct client transport.Proxy must be nil, got non-nil proxy function")
 	}
 }
 
