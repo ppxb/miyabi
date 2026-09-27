@@ -90,3 +90,29 @@ func TestSafeDownload_BlocksLoopback(t *testing.T) {
 		t.Errorf("expected prohibition error, got: %v", err)
 	}
 }
+
+func TestSafeDownload_PermitsLocalProxy(t *testing.T) {
+	proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("proxied subtitle content"))
+	}))
+	defer proxyServer.Close()
+
+	proxyManager, err := NewProxyManager(ProxyConfig{Enabled: true, URL: proxyServer.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client := NewSafeDownloadClient(proxyManager, 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Downloading a public IP target via the local 127.0.0.1 proxy must succeed
+	body, err := SafeDownload(ctx, client, "http://93.184.216.34/sub.srt")
+	if err != nil {
+		t.Fatalf("SafeDownload through local proxy should succeed, got: %v", err)
+	}
+	if string(body) != "proxied subtitle content" {
+		t.Fatalf("expected proxied subtitle content, got: %s", string(body))
+	}
+}

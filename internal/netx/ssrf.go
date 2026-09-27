@@ -132,6 +132,13 @@ func NewSafeTransport(proxyManager *ProxyManager, options RestyOptions) *http.Tr
 
 	// Enforce SSRF protection at TCP dial time to prevent DNS rebinding attacks
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		// When traffic is routed through a proxy, addr is the proxy server itself
+		// (e.g. 127.0.0.1:7890 or a LAN proxy). Direct SSRF checks apply strictly
+		// to direct connections, as the proxy handles upstream resolution.
+		if proxyManager != nil && proxyManager.Resolve() != nil {
+			return dialer.DialContext(ctx, network, addr)
+		}
+
 		host, port, err := net.SplitHostPort(addr)
 		if err != nil {
 			return nil, err
