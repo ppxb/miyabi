@@ -32,7 +32,7 @@ type gatedSource struct {
 
 func (s gatedSource) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Magnet, error) {
 	if !s.enabled.Load() {
-		return nil, nil
+		return nil, magnet.ErrSkipped
 	}
 	return s.Source.Find(ctx, ref)
 }
@@ -67,7 +67,14 @@ func (service *Service) Magnets(ctx context.Context, movieID string) ([]Magnet, 
 		if detail, err := service.CatalogueDetail(ctx, movieID); err == nil {
 			ref.Code, ref.Zone = detail.Code, detail.Zone
 		}
-		return service.aggregator.Find(ctx, ref)
+		magnets, partial, err := service.aggregator.FindDetailed(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		if partial {
+			return magnets, ErrDoNotCache
+		}
+		return magnets, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("get magnets: %w", err)

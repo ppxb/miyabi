@@ -2,11 +2,13 @@ package catalogue
 
 import (
 	"context"
+	"errors"
 	"sync/atomic"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/magnet"
 	"github.com/ppxb/miyabi/internal/netx"
 )
 
@@ -25,8 +27,8 @@ func TestGatedSourceFollowsSwitch(t *testing.T) {
 	source := gatedSource{Source: inner, enabled: &enabled}
 
 	magnets, err := source.Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
-	if err != nil || len(magnets) != 0 || inner.calls.Load() != 0 {
-		t.Fatalf("disabled source must not be queried: %v %v calls=%d", magnets, err, inner.calls.Load())
+	if !errors.Is(err, magnet.ErrSkipped) || len(magnets) != 0 || inner.calls.Load() != 0 {
+		t.Fatalf("disabled source must return ErrSkipped: %v %v calls=%d", magnets, err, inner.calls.Load())
 	}
 	enabled.Store(true)
 	magnets, err = source.Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})

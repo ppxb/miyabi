@@ -3,9 +3,14 @@ package catalogue
 import (
 	"container/list"
 	"context"
+	"errors"
 	"sync"
 	"time"
 )
+
+// ErrDoNotCache indicates the loaded value should be returned to waiters
+// but not stored in the cache (e.g. on partial upstream failure).
+var ErrDoNotCache = errors.New("do not cache")
 
 // responseCache holds immutable upstream models, never projected library/task state.
 // Pending loads are shared; the last departing caller cancels the upstream request.
@@ -90,6 +95,9 @@ func (cache *responseCache[T]) load(key string, call *cacheLoad[T], load func(co
 				key: key, value: value, expires: time.Now().Add(cache.ttl),
 			})
 		}
+	}
+	if errors.Is(call.err, ErrDoNotCache) {
+		call.err = nil
 	}
 	close(call.done)
 	call.cancel()

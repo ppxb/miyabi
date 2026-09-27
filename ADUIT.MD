@@ -31,7 +31,7 @@
 - [x] **4.** 导出配置数据竞争：`internal/emby/service.go:200` `UpdateConfig` 在 HTTP goroutine 无锁写 `scan.Scanner` / `scrape.Service` 的 `embyDir/publicURL/strmToken`，任务 worker 同时在读（`cover.go:266`、`walker.go:115`）。
 - [x] **5.** 导出目录双来源：`internal/app/app.go:142-154` 用环境变量 `cfg.EmbyDir`，emby 用数据库中的 `LocalDir`（`emby/service.go:70`），修改其一后 Emby 通知路径错误；`translatePath` 兜底返回 `mediaPath/<basename>`（`emby/service.go:474`）也是错误路径，应跳过。
 - [x] **6.** `internal/app/app.go:152`、`internal/emby/service.go:205` 裸 goroutine 执行 `RewriteSTRM`，不受 ctx / WaitGroup 管理，会与导出任务并发写同一批 .strm。
-- [ ] **7.** ✔ `internal/magnet/aggregator.go:92` + `internal/catalogue/magnets.go:33`：关闭的 JavBus 返回 `nil, nil` 被计为成功，JavDB 失败时返回空列表不报错，并被缓存 1 分钟（`catalogue/cache.go:85`）；monitor 当作"无磁力"处理甚至标记 stale → 区分"跳过"与"成功为空"，部分失败不入缓存。
+- [x] **7.** ✔ `internal/magnet/aggregator.go:92` + `internal/catalogue/magnets.go:33`：关闭的 JavBus 返回 `nil, nil` 被计为成功，JavDB 失败时返回空列表不报错，并被缓存 1 分钟（`catalogue/cache.go:85`）；monitor 当作"无磁力"处理甚至标记 stale → 区分"跳过"与"成功为空"，部分失败不入缓存。
 - [ ] **8.** ✔ `internal/netx/ssrf.go:134` SSRF 拨号检查同时作用于代理地址，`127.0.0.1:7890` 等本机 / 局域网代理被拦 → 开代理后字幕下载全部失败。仅在直连时检查。
 - [ ] **9.** ✔ `internal/netx/client.go:39` "Direct" 客户端克隆 `http.DefaultTransport`，自带 `ProxyFromEnvironment`，Docker 设了 `HTTPS_PROXY` 时 115 流量走代理；`netx/client_test.go` 靠 `Setenv` 清空环境变量掩盖了问题 → 显式 `transport.Proxy = nil`。
 - [ ] **10.** ✔ `internal/pan/client.go:147` resty 对 POST 同样重试：`/open/refreshToken` 超时重试会用已轮换的旧 refresh_token → 凭证丢失；`add_task_urls` 重试返回 10008 被当成冲突；`upload/init` 同理 → 只对 GET / 429 重试，或对 token/离线/上传请求关闭重试。

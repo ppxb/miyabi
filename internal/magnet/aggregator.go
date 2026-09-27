@@ -41,11 +41,22 @@ type queryResult struct {
 	err     error
 }
 
+// ErrSkipped indicates a source was skipped and did not participate in querying.
+var ErrSkipped = errors.New("magnet source skipped")
+
 // Find returns the merged magnets of all sources. One failing source is only
-// logged; the call fails when every source failed.
+// logged; the call fails when every source failed or when no magnets were found
+// despite failures.
 func (a *Aggregator) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Magnet, error) {
+	magnets, _, err := a.FindDetailed(ctx, ref)
+	return magnets, err
+}
+
+// FindDetailed returns the merged magnets, whether any active source failed (partial),
+// and any fatal error.
+func (a *Aggregator) FindDetailed(ctx context.Context, ref domain.MovieRef) ([]domain.Magnet, bool, error) {
 	if len(a.sources) == 0 {
-		return nil, nil
+		return nil, false, nil
 	}
 
 	results := make([]queryResult, len(a.sources))
@@ -63,9 +74,14 @@ func (a *Aggregator) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Ma
 	wg.Wait()
 
 	var failures []error
+	var skipped int
 	merged := make(map[string]*domain.Magnet)
 	var order []string
 	for _, res := range results {
+		if errors.Is(res.err, ErrSkipped) {
+			skipped++
+			continue
+		}
 		if res.err != nil {
 			a.logger.WarnContext(ctx, "magnet source query failed", "source", res.source, "code", ref.Code, "error", res.err)
 			failures = append(failures, fmt.Errorf("%s: %w", res.source, res.err))
@@ -89,8 +105,13 @@ func (a *Aggregator) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Ma
 			order = append(order, hash)
 		}
 	}
-	if len(failures) == len(a.sources) {
-		return nil, domain.E(domain.KindUpstream, "所有磁力来源均不可用", errors.Join(failures...))
+
+	activeSources := len(a.sources) - skipped
+	if activeSources > 0 && len(failures) == activeSources {
+		return nil, false, domain.E(domain.KindUpstream, "所有磁力来源均不可用", errors.Join(failures...))
+	}
+	if len(merged) == 0 && len(failures) > 0 {
+		return nil, false, domain.E(domain.KindUpstream, "部分磁力来源失败且未找到磁力", errors.Join(failures...))
 	}
 
 	result := make([]domain.Magnet, 0, len(merged))
@@ -116,7 +137,7 @@ func (a *Aggregator) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Ma
 		}
 		return compareMagnets(a, b)
 	})
-	return result, nil
+	return result, len(failures) > 0, nil
 }
 
 // mergeMagnet folds a second record of the same infohash into existing:

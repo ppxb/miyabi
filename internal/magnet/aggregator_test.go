@@ -119,3 +119,45 @@ func TestAggregatorAllSourcesFailed(t *testing.T) {
 		t.Fatalf("expected KindUpstream when all sources fail, got %v", err)
 	}
 }
+
+func TestAggregatorSkippedSourceDoesNotMaskFailure(t *testing.T) {
+	sources := []Source{
+		&stubSource{name: domain.MagnetSourceJavDB, err: errors.New("javdb down")},
+		&stubSource{name: domain.MagnetSourceJavBus, err: ErrSkipped},
+	}
+	_, err := NewAggregator(sources, time.Second, nil).Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
+	if !domain.IsKind(err, domain.KindUpstream) {
+		t.Fatalf("expected KindUpstream when the only active source fails, got %v", err)
+	}
+}
+
+func TestAggregatorEmptyResultWithPartialFailureFails(t *testing.T) {
+	sources := []Source{
+		&stubSource{name: domain.MagnetSourceJavDB, err: errors.New("javdb down")},
+		&stubSource{name: domain.MagnetSourceJavBus, magnets: nil},
+	}
+	_, err := NewAggregator(sources, time.Second, nil).Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
+	if !domain.IsKind(err, domain.KindUpstream) {
+		t.Fatalf("expected KindUpstream when zero magnets found and a source failed, got %v", err)
+	}
+}
+
+func TestAggregatorFindDetailedReportsPartialFailure(t *testing.T) {
+	ok := &stubSource{name: domain.MagnetSourceJavDB, magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "Item 1"}}}
+	broken := &stubSource{name: domain.MagnetSourceJavBus, err: errors.New("network timeout")}
+	results, partial, err := NewAggregator([]Source{ok, broken}, time.Second, nil).FindDetailed(t.Context(), domain.MovieRef{Code: "SSIS-001"})
+	if err != nil || len(results) != 1 || !partial {
+		t.Fatalf("expected 1 result with partial=true and err=nil, got results=%d partial=%v err=%v", len(results), partial, err)
+	}
+}
+
+func TestAggregatorAllSourcesSkipped(t *testing.T) {
+	sources := []Source{
+		&stubSource{name: domain.MagnetSourceJavDB, err: ErrSkipped},
+		&stubSource{name: domain.MagnetSourceJavBus, err: ErrSkipped},
+	}
+	results, err := NewAggregator(sources, time.Second, nil).Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
+	if err != nil || len(results) != 0 {
+		t.Fatalf("expected 0 results and nil err when all skipped, got results=%d err=%v", len(results), err)
+	}
+}

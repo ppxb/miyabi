@@ -103,3 +103,30 @@ func TestResponseCacheEvictsLeastRecentlyUsedAtCapacity(t *testing.T) {
 		t.Fatal("b was not evicted")
 	}
 }
+
+func TestResponseCacheDoNotCacheBypassesStorage(t *testing.T) {
+	cache := newResponseCache[string](2, time.Hour)
+	ctx := t.Context()
+	var loadCalls int
+	load := func(context.Context) (string, error) {
+		loadCalls++
+		return "partial-val", ErrDoNotCache
+	}
+
+	val, err := cache.get(ctx, "partial", load)
+	if err != nil {
+		t.Fatalf("expected nil error for caller, got %v", err)
+	}
+	if val != "partial-val" {
+		t.Fatalf("expected partial-val, got %s", val)
+	}
+	if len(cache.entries) != 0 {
+		t.Fatalf("cache should not store entries when ErrDoNotCache is returned, got %d", len(cache.entries))
+	}
+
+	// Subsequent request should invoke load again
+	val2, err := cache.get(ctx, "partial", load)
+	if err != nil || val2 != "partial-val" || loadCalls != 2 {
+		t.Fatalf("expected second load call, loadCalls=%d val2=%s err=%v", loadCalls, val2, err)
+	}
+}
