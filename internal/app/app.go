@@ -40,7 +40,7 @@ type App struct {
 	logger    *slog.Logger
 	store     *database.Store
 	server    *http.Server
-	pool      *tasks.Pool
+	pools     []*tasks.Pool
 	offline   *offline.Service
 	monitors  *monitor.Service
 	driveSvc  *drive.Drive
@@ -173,7 +173,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	taskRegistry.Register(tasks.NewHandler(tasks.KindCover, scrapeSvc.Cover, scrapeSvc.Finished))
 	taskRegistry.Register(tasks.NewHandler(tasks.KindSubscriptionBatch, monitorSvc.BatchHandler, monitorSvc.BatchFinished))
 
-	pool := tasks.NewPool(taskSvc.Queue(), taskSvc.Bus(), taskRegistry, cfg.Runtime.TaskPoolWorkers, logger)
+	pools := newTaskPools(taskSvc, cfg.Runtime.TaskPoolWorkers, logger)
 
 	router := api.NewRouter(api.Dependencies{
 		Logger:         logger,
@@ -208,7 +208,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		logger:    logger,
 		store:     store,
 		server:    server,
-		pool:      pool,
+		pools:     pools,
 		offline:   offlineSvc,
 		monitors:  monitorSvc,
 		driveSvc:  driveSvc,
@@ -218,7 +218,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	}, nil
 }
 
-// Run starts the task pool, the periodic workers and the HTTP server, then
+// Run starts the task pools, the periodic workers and the HTTP server, then
 // blocks until ctx is cancelled or one of them fails. Every exit path shuts
 // the server down gracefully and waits for the workers before returning.
 func (a *App) Run(ctx context.Context) error {
@@ -227,12 +227,14 @@ func (a *App) Run(ctx context.Context) error {
 	a.server.BaseContext = func(net.Listener) context.Context { return ctx }
 
 	var workers sync.WaitGroup
-	poolError := make(chan error, 1)
-	workers.Add(3)
-	go func() {
-		defer workers.Done()
-		poolError <- a.pool.Run(ctx)
-	}()
+	poolError := make(chan error, len(a.pools))
+	workers.Add(len(a.pools) + 2)
+	for _, pool := range a.pools {
+		go func() {
+			defer workers.Done()
+			poolError <- pool.Run(ctx)
+		}()
+	}
 	go func() {
 		defer workers.Done()
 		tasks.RunPeriodic(ctx, a.logger, "sync 115 offline tasks", a.cfg.Runtime.OfflineSyncInterval, nil, a.offline.Sync)

@@ -19,22 +19,18 @@ const (
 	ChangeMonitor
 )
 
-// Bus fans task notifications out to the worker pool and SSE subscribers.
+// Bus fans task notifications out to the worker pools and SSE subscribers.
 type Bus struct {
 	mu          sync.Mutex
 	revisions   TaskRevisions
-	wake        chan struct{}
 	subscribers map[chan struct{}]struct{}
 }
 
 func NewBus() *Bus {
-	return &Bus{wake: make(chan struct{}, 1), subscribers: make(map[chan struct{}]struct{})}
+	return &Bus{subscribers: make(map[chan struct{}]struct{})}
 }
 
-// Pending signals the pool that queued work may exist.
-func (b *Bus) Pending() <-chan struct{} { return b.wake }
-
-// Subscribe registers an SSE listener. Notifications are coalesced.
+// Subscribe registers a worker pool or SSE listener. Notifications are coalesced.
 func (b *Bus) Subscribe() (<-chan struct{}, func()) {
 	updates := make(chan struct{}, 1)
 	b.mu.Lock()
@@ -47,12 +43,10 @@ func (b *Bus) Subscribe() (<-chan struct{}, func()) {
 	}
 }
 
-// Notify wakes the pool and subscribers without bumping any revision.
+// Notify wakes all subscribers without bumping any revision.
 func (b *Bus) Notify() { b.publish(0) }
 
-// Changed bumps the named revisions and notifies subscribers. The pool is
-// woken only for library or offline changes, which may have queued work;
-// monitor changes never do.
+// Changed bumps the named revisions and notifies all subscribers.
 func (b *Bus) Changed(change Change) { b.publish(change) }
 
 func (b *Bus) NotifyLibraryChanged() { b.publish(ChangeLibrary) }
@@ -66,12 +60,6 @@ func (b *Bus) Revisions() TaskRevisions {
 }
 
 func (b *Bus) publish(change Change) {
-	if change == 0 || change&(ChangeLibrary|ChangeOffline) != 0 {
-		select {
-		case b.wake <- struct{}{}:
-		default:
-		}
-	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if change&ChangeLibrary != 0 {

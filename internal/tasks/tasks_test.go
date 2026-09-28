@@ -250,7 +250,7 @@ func TestPoolWorkerExecution(t *testing.T) {
 
 	svc := tasks.NewService(store.Client, registry)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	pool := tasks.NewPool(svc.Queue(), svc.Bus(), registry, 1, logger)
+	pool := tasks.NewPool(svc.Queue(), svc.Bus(), registry, []tasks.Kind{tasks.KindScan}, 1, logger)
 
 	info, err := store.Client.Task.Create().SetType(string(tasks.KindScan)).SetPayload(json.RawMessage(`{}`)).Save(ctx)
 	if err != nil {

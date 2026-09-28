@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -20,7 +21,7 @@ type PoolQueue interface {
 
 // PoolBus defines the notification wake operations required by the worker Pool.
 type PoolBus interface {
-	Pending() <-chan struct{}
+	Subscribe() (<-chan struct{}, func())
 }
 
 // Pool coordinates concurrent background workers executing registered task handlers.
@@ -28,12 +29,13 @@ type Pool struct {
 	queue    PoolQueue
 	bus      PoolBus
 	registry *Registry
+	kinds    []Kind
 	size     int
 	logger   *slog.Logger
 }
 
-// NewPool initializes a new worker Pool.
-func NewPool(queue PoolQueue, bus PoolBus, registry *Registry, size int, logger *slog.Logger) *Pool {
+// NewPool initializes a worker pool that only recovers and claims the given kinds.
+func NewPool(queue PoolQueue, bus PoolBus, registry *Registry, kinds []Kind, size int, logger *slog.Logger) *Pool {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -41,6 +43,7 @@ func NewPool(queue PoolQueue, bus PoolBus, registry *Registry, size int, logger 
 		queue:    queue,
 		bus:      bus,
 		registry: registry,
+		kinds:    slices.Clone(kinds),
 		size:     size,
 		logger:   logger,
 	}
@@ -48,20 +51,26 @@ func NewPool(queue PoolQueue, bus PoolBus, registry *Registry, size int, logger 
 
 // Run starts the worker goroutines and waits for context cancellation.
 func (pool *Pool) Run(ctx context.Context) error {
-	kinds := pool.registry.Kinds()
-	if err := pool.queue.Recover(ctx, kinds); err != nil {
+	// Subscribe before recovery and claiming so an enqueue cannot be missed.
+	// Each pool needs its own notification; sharing a channel can wake the wrong pool.
+	pending, unsubscribe := pool.bus.Subscribe()
+	defer unsubscribe()
+	if err := pool.queue.Recover(ctx, pool.kinds); err != nil {
+		if ctx.Err() != nil {
+			return nil
+		}
 		return err
 	}
 	group, ctx := errgroup.WithContext(ctx)
 	for range pool.size {
-		group.Go(func() error { return pool.runWorker(ctx, kinds) })
+		group.Go(func() error { return pool.runWorker(ctx, pending) })
 	}
 	return group.Wait()
 }
 
-func (pool *Pool) runWorker(ctx context.Context, kinds []Kind) error {
+func (pool *Pool) runWorker(ctx context.Context, pending <-chan struct{}) error {
 	for ctx.Err() == nil {
-		job, err := pool.queue.Claim(ctx, kinds)
+		job, err := pool.queue.Claim(ctx, pool.kinds)
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -78,7 +87,7 @@ func (pool *Pool) runWorker(ctx context.Context, kinds []Kind) error {
 			select {
 			case <-ctx.Done():
 				return nil
-			case <-pool.bus.Pending():
+			case <-pending:
 				continue
 			}
 		}

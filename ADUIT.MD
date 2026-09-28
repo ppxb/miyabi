@@ -63,6 +63,8 @@
 - [x] **36.** ✔ `internal/emby/service.go:443-475` `translatePath` 中 `strings.HasPrefix(rel, "..")` 会把 `..foo` 目录误判为越界；方法未使用 receiver。
 - [x] **241.** ✔ `internal/library/scan/reconcile.go:58-71`、`persist.go:197-210`：用户在 115 删除影片后重新扫描，仅删除了 SQLite 的 `File` 与无引用 `Movie` 记录，未清理 `EmbyDir` 本地对应的影片目录（`.strm`、`.nfo`、海报等），且未向 Emby 发送删除/变更通知，导致 Emby 媒体库残留死链幽灵影片。
 - [x] **242.** ✔ 废除 JavBus 强制绑定代理限制，移除冗余的手动设置项，改为全自动连通性健康探测与自适应降级：删除后端 `/api/settings/javbus`（连同 `internal/api/javbus.go`）及前端 JavBus 开关与 API；`javbus.Client` 内部自适应维护连通性探测与熔断状态，网络可达时自动聚合磁力，不可达时 0ms 静默跳过（`ErrSkipped`），代理配置变更时自动重探自愈（一并解决第 175、178、223 条）。
+- [ ] **243.** `internal/javdb/client.go:260-281` + `transport.go:84-87`：JavDB 客户端对 HTTP 429（Too Many Requests）无退避重试与 Retry-After 响应头处理，遭遇突发限流后请求立即报错；且扫库与订阅任务层对失败项缺乏细粒度重试与断点恢复机制，单次限流即导致整个任务终态失败（只能全量重新扫描）→ 增加 429 退避重试与 Retry-After 解析（对照组：`internal/pan/client.go:129-145`），并在任务层支持失败项重试或断点续扫。
+- [ ] **244.** `internal/codeid/codeid.go:38-55,59-93` `filenamePattern`：正则前缀匹配规则对个别非番号文件名存在误提取（如相机默认命名的 `VID-20220326`、`IMG-XXXX`、包含分辨率标签的 `MAYLI-1080P` 等被当作番号提取并提交上游查询）→ 建立常见非番号前缀黑名单（如 `VID`, `IMG`, `DSC`, `MOV` 等）与分辨率标记过滤，避免无效请求与限流损耗。
 
 
 
@@ -75,7 +77,7 @@
 - [x] **39.** `internal/tasks` 通用包内含业务逻辑：`SubscriptionBatchPayload` / `EnqueueSubscriptionBatch` / `SaveSubscriptionBatch` / `BatchTaskInfo`（batch.go）、`EnsureScanTask` / `EnqueueScan` / `EnqueueFreshScan` / `ScanTaskInfo` / scrape-cover 折叠规则（workflow.go:219-248）、各业务 payload JSON 路径常量（payload.go:10-24）→ 分别迁回 monitor、library。
 - [x] **40.** offline 下载记录存于 task 表（`KindOffline`，从不进入 pool），依赖 JSON payload + 手写表达式索引（`database/indexes.go`）查询；`scan/persist.go:17` 跨包用字符串 `"file_ids"` 调 `SetPayloadField` 改写 offline payload，而 offline 自身整体重编码 payload，二者前提矛盾；各处 `StatusQueued` 判断（add.go:53、sync.go:38/213、projection.go:86/145）对 offline 永不成立 → 独立 ent 表。
 - [x] **41.** cover 快照存于已完成 cover 任务的 payload（`scrape/snapshot.go:153-190`、`scrape.go:167-169`），导致 task 表永远不能清理、每次扫描需对全表 `json_extract` → 快照 / `videos_fingerprint` 存到 movie 行。
-- [ ] **42.** `internal/config/runtime.go:24` `TaskPoolWorkers: 1` 硬编码：订阅批量（每条 sleep 1.5-3s，500 条约 30 分钟）与 scan/scrape/cover 共用唯一 worker，阻塞所有扫描（含离线完成后的 `EnqueueTargetedScan`）→ 批量任务独立执行。
+- [x] **42.** `internal/config/runtime.go:24` `TaskPoolWorkers: 1` 硬编码：订阅批量（每条 sleep 1.5-3s，500 条约 30 分钟）与 scan/scrape/cover 共用唯一 worker，阻塞所有扫描（含离线完成后的 `EnqueueTargetedScan`）→ 批量任务独立执行。
 - [ ] **43.** `POST /api/library/scan/local`（`internal/api/movie.go:70-84`）在 HTTP 请求中同步 `WalkDir` 并写库，绕过"扫描必须串行"的队列约束，路径任意，前端无入口 → 删除或改为入队任务并限制在 EmbyDir 内。
 - [ ] **44.** 认证三通道并存：HttpOnly cookie（`api/auth.go:97`）+ JSON 返回 token 存 localStorage 加 Bearer（`web/src/api/client.ts:63-96`、`auth.ts:34-36`）+ `?token=` query（`auth.go:155`）。EventSource / img / beacon 已依赖 cookie，localStorage 这份多余且抵消 HttpOnly 的防 XSS 作用 → 只保留 cookie。
 - [ ] **45.** HTTP 客户端三套栈用法混乱：resty（pan、subtitle、javdb/media）、tls-client（javdb、javbus）、net/http（emby、gfriends）；`app.go:125-134` 手工复刻 `NewRestyClient` 的动态代理逻辑；"有 manager 用 NewRestyClient 否则 Direct"在 `subtitlecat.go`、`xunlei.go`、`javdb/media.go` 各写一遍（media.go:18-20 先建 Direct 再覆盖）；`SafeDownload`、`OpenMedia` 只取原始流却用 resty → netx 提供 `NewTransport(manager)`，nil 安全。

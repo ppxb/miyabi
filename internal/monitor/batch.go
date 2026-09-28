@@ -89,7 +89,7 @@ func (service *Service) EnqueueBatch(ctx context.Context, req BatchEnqueueReques
 	return service.enqueueSubscriptionBatch(ctx, ids)
 }
 
-// BatchHandler runs a subscription batch task on the single-worker pool.
+// BatchHandler runs a subscription batch on its dedicated single-worker pool.
 func (service *Service) BatchHandler(ctx context.Context, job tasks.Job) error {
 	payload, err := tasks.DecodePayload[batchPayload](job.Payload)
 	if err != nil {

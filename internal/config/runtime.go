@@ -6,8 +6,8 @@ import "time"
 // services. Only values that app.New actually passes on live here; upstream
 // clients (pan, javdb) and caches keep their own named constants.
 type Runtime struct {
-	// TaskPoolWorkers is the number of concurrent task handlers. Scans,
-	// metadata writes and sidecar uploads must stay ordered, so it is 1.
+	// TaskPoolWorkers controls the library pool. Scans and metadata writes
+	// must stay ordered, so it is 1. Subscription batches use a separate worker.
 	TaskPoolWorkers int
 	// OfflineSyncInterval is how often 115 offline tasks are polled.
 	OfflineSyncInterval time.Duration
