@@ -51,7 +51,7 @@
 - [x] **24.** ✔ `internal/drive/account.go:54-74` 账号缓存未绑定 `credentialVersion`，旧凭证的在途 fetch 可能在重新登录后写回旧账号 → 60s 内误清新账号挂载。
 - [x] **25.** ✔ `internal/netx/proxy.go:83-97` `Update` 的 Load / Store 非原子；`internal/app/network.go` 的 `UpdateNetwork` 先写 DB 再更新内存，不在同一把锁内；`Normalize` 调用两次。
 - [x] **26.** ✔ `internal/catalogue/cache.go:113-121` 上游成功后 `persistActiveRoute` 写库失败，会让本次成功的数据变成错误返回且不入缓存 → 记日志后忽略。
-- [ ] **27.** ✔ `internal/domain/error.go:132-143` `PublicMessage` 无公开消息时返回 `err.Error()` → 500 把 SQL、文件路径、validator 原文（如 `Key: 'discoverSearchQuery.Query' Error:...`）返回前端 → Unexpected/Internal 一律返回默认文案。
+- [x] **27.** ✔ `internal/domain/error.go:132-143` `PublicMessage` 无公开消息时返回 `err.Error()` → 500 把 SQL、文件路径、validator 原文（如 `Key: 'discoverSearchQuery.Query' Error:...`）返回前端 → Unexpected/Internal 一律返回默认文案。
 - [ ] **28.** `internal/api/movie.go:72` `req, _ := bindJSON(...)` 忽略绑定失败，`c.Errors` 已挂 400 仍去扫默认目录。
 - [ ] **29.** `internal/api/subscription.go:171-179` PUT 返回用户原始输入，而非 `normalized()` 后实际保存的值（如 `check_time` 为空存 "00:00" 却返回 ""）。
 - [ ] **30.** `internal/subtitle/service.go:87-105` 既无 PickCode 也无 SourceURL 的 pending 记录不进任何分支，永远不清理 → 增加 default 分支删除。

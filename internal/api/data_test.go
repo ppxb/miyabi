@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/ppxb/miyabi/internal/domain"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/maintenance"
 )
@@ -64,7 +65,8 @@ func TestDataEndpointsReturnUncachedStatsAndCleanupErrors(t *testing.T) {
 				var failure struct {
 					Error string `json:"error"`
 				}
-				if err := json.Unmarshal(response.Body.Bytes(), &failure); err != nil || failure.Error != scenario.err.Error() {
+				wantMsg := domain.PublicMessage(scenario.err)
+				if err := json.Unmarshal(response.Body.Bytes(), &failure); err != nil || failure.Error != wantMsg {
 					t.Fatalf("error response=%s %v", response.Body, err)
 				}
 			} else {

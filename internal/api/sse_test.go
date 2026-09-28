@@ -160,7 +160,7 @@ func TestTaskEventsFailsBeforeStreamingWhenSnapshotIsUnavailable(t *testing.T) {
 	router := NewRouter(Dependencies{Tasks: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/tasks/events", nil))
-	if response.Code != http.StatusInternalServerError || !strings.Contains(response.Body.String(), "database locked") {
+	if response.Code != http.StatusInternalServerError || !strings.Contains(response.Body.String(), "内部服务错误") {
 		t.Fatalf("response = %d %s", response.Code, response.Body)
 	}
 	if !stub.unsubscribed {

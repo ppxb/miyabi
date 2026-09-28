@@ -35,6 +35,24 @@ func TestDomainError(t *testing.T) {
 		}
 	})
 
+	t.Run("public message masking for unexpected and internal errors", func(t *testing.T) {
+		if got := PublicMessage(nil); got != "" {
+			t.Errorf("PublicMessage(nil) = %q, want empty", got)
+		}
+		if got := PublicMessage(errors.New("UNIQUE constraint failed: movies.code")); got != "内部服务错误" {
+			t.Errorf("PublicMessage(unknown) = %q, want %q", got, "内部服务错误")
+		}
+		if got := PublicMessage(E(KindInternal, "", errors.New("db crash"))); got != "内部服务错误" {
+			t.Errorf("PublicMessage(KindInternal) = %q, want %q", got, "内部服务错误")
+		}
+		if got := PublicMessage(E(KindUnexpected, "", errors.New("panic"))); got != "内部服务错误" {
+			t.Errorf("PublicMessage(KindUnexpected) = %q, want %q", got, "内部服务错误")
+		}
+		if got := PublicMessage(E(KindNotFound, "", nil)); got != "资源不存在" {
+			t.Errorf("PublicMessage(KindNotFound) = %q, want %q", got, "资源不存在")
+		}
+	})
+
 	t.Run("Is and IsKind", func(t *testing.T) {
 		sentinel := E(KindInvalid, "参数无效", nil)
 		wrapped := fmt.Errorf("wrap: %w", sentinel)

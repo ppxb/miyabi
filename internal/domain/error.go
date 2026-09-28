@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 )
 
 // Kind classifies a domain error to determine response status and handling behavior.
@@ -92,6 +93,10 @@ func (e *Error) PublicMessage() string {
 	if e == nil {
 		return ""
 	}
+	switch e.Kind {
+	case KindUnexpected, KindInternal:
+		return "内部服务错误"
+	}
 	if e.Message != "" {
 		return e.Message
 	}
@@ -130,16 +135,23 @@ type HasKind interface {
 }
 
 // PublicMessage returns the user-facing text for any error: the first
-// PublicMessage() in the unwrap chain, or the raw error text when none exists.
+// PublicMessage() in the unwrap chain, or a default safe message for unexpected/internal errors.
 func PublicMessage(err error) string {
 	if err == nil {
 		return ""
 	}
 	var public interface{ PublicMessage() string }
 	if errors.As(err, &public) {
-		return public.PublicMessage()
+		if msg := public.PublicMessage(); msg != "" {
+			return msg
+		}
 	}
-	return err.Error()
+	switch KindOf(err) {
+	case KindUnexpected, KindInternal:
+		return "内部服务错误"
+	default:
+		return err.Error()
+	}
 }
 
 // KindOf returns the domain Kind of the error, or KindUnexpected if not recognized.
@@ -154,6 +166,9 @@ func KindOf(err error) Kind {
 	var hk HasKind
 	if errors.As(err, &hk) {
 		return hk.DomainKind()
+	}
+	if errors.Is(err, fs.ErrNotExist) {
+		return KindNotFound
 	}
 	return KindUnexpected
 }

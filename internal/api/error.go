@@ -34,7 +34,16 @@ func (err *requestError) DomainKind() domain.Kind {
 }
 
 func (err *requestError) PublicMessage() string {
-	return domain.PublicMessage(err.err)
+	var public interface{ PublicMessage() string }
+	if errors.As(err.err, &public) {
+		if msg := public.PublicMessage(); msg != "" {
+			return msg
+		}
+	}
+	if err.err != nil && err.err.Error() != "" {
+		return err.err.Error()
+	}
+	return "请求参数无效"
 }
 
 func BadRequest(err error) error {
@@ -95,6 +104,9 @@ func errorMiddleware(logger *slog.Logger) gin.HandlerFunc {
 
 		status, kind := mapErrorStatus(err)
 		message := domain.PublicMessage(err)
+		if status == http.StatusNotFound && message == "内部服务错误" {
+			message = "资源不存在"
+		}
 
 		attrs := []any{
 			"method", c.Request.Method,
