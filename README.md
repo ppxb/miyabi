@@ -2,13 +2,11 @@
 
 配合 115 网盘的一站式 Jav & Emby 管理平台。
 
-Miyabi 支持直接对接 115 进行刮削、订阅、播放，也可由 Miyabi 作为底层服务，对 Emby 提供支持。
+Miyabi 支持直接对接 115 进行刮削、订阅，也可由 Miyabi 作为底层服务，对 Emby 提供支持。
 
 ## 项目预览
 
 ![媒体库](./screenshots/ScreenShot_2026-09-19_131853_357.png)
-![播放器](./screenshots/ScreenShot_2026-09-19_131853_237.png)
-![字幕](./screenshots/ScreenShot_2026-09-23_131948_796.png)
 ![发现](./screenshots/ScreenShot_2026-09-19_132213_340.png)
 ![搜索](./screenshots/ScreenShot_2026-09-19_132227_063.png)
 ![设置](./screenshots/ScreenShot_2026-09-19_132249_331.png)
