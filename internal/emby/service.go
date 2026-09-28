@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ppxb/miyabi/internal/database"
@@ -49,6 +50,9 @@ type Service struct {
 	media            MediaFetcher
 	actorSyncTimer   *time.Timer
 	actorSyncMu      sync.Mutex
+	syncing          atomic.Bool
+	avatarNotFoundMu sync.Mutex
+	avatarNotFound   map[string]time.Time
 	strmExporters    []STRMExporter
 	strmToken        string
 	exportMgr        *export.Manager
@@ -86,9 +90,10 @@ func NewService(ctx context.Context, db *ent.Client, initial Config) (*Service, 
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		queue:  make(chan string, 1000),
-		ctx:    subCtx,
-		cancel: cancel,
+		queue:          make(chan string, 1000),
+		ctx:            subCtx,
+		cancel:         cancel,
+		avatarNotFound: make(map[string]time.Time),
 	}
 
 	s.wg.Add(1)
@@ -162,6 +167,14 @@ func (s *Service) ScheduleActorSync(delay time.Duration) {
 		s.actorSyncTimer.Stop()
 	}
 	s.actorSyncTimer = time.AfterFunc(delay, func() {
+		if s.ctx.Err() != nil {
+			return
+		}
+		if s.syncing.Load() {
+			// A sync run is already in progress; reschedule so new additions aren't missed.
+			s.ScheduleActorSync(10 * time.Second)
+			return
+		}
 		ctx, cancel := context.WithTimeout(s.ctx, 15*time.Minute)
 		defer cancel()
 		if _, err := s.SyncActorAvatars(ctx); err != nil && !errors.Is(err, context.Canceled) {
@@ -618,6 +631,12 @@ func (s *Service) UploadPersonAvatar(ctx context.Context, personID string, image
 
 // SyncActorAvatars scans Emby for persons without avatars and uploads matching GFriends or JavDB avatars.
 func (s *Service) SyncActorAvatars(ctx context.Context) (int, error) {
+	if !s.syncing.CompareAndSwap(false, true) {
+		slog.DebugContext(ctx, "emby actor avatar sync already in progress, skipping")
+		return 0, nil
+	}
+	defer s.syncing.Store(false)
+
 	s.mu.RLock()
 	cfg := s.cfg
 	g, media := s.gfriends, s.media
@@ -652,6 +671,10 @@ func (s *Service) SyncActorAvatars(ctx context.Context) (int, error) {
 			return uploaded, err
 		}
 
+		if s.isAvatarNotFound(person.Name) {
+			continue
+		}
+
 		avatar, found := s.findAvatar(ctx, g, media, person.Name)
 		if found {
 			if err := s.UploadPersonAvatar(ctx, person.ID, avatar); err != nil {
@@ -660,6 +683,8 @@ func (s *Service) SyncActorAvatars(ctx context.Context) (int, error) {
 				uploaded++
 				slog.DebugContext(ctx, "uploaded actor avatar to emby", "name", person.Name)
 			}
+		} else {
+			s.markAvatarNotFound(person.Name)
 		}
 
 		// Rate limiting: sleep 200ms
@@ -674,8 +699,54 @@ func (s *Service) SyncActorAvatars(ctx context.Context) (int, error) {
 	return uploaded, nil
 }
 
+const defaultAvatarNotFoundTTL = 24 * time.Hour
+
+func (s *Service) isAvatarNotFound(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	s.avatarNotFoundMu.Lock()
+	defer s.avatarNotFoundMu.Unlock()
+	if s.avatarNotFound == nil {
+		return false
+	}
+	expiresAt, ok := s.avatarNotFound[name]
+	if !ok {
+		return false
+	}
+	if time.Now().After(expiresAt) {
+		delete(s.avatarNotFound, name)
+		return false
+	}
+	return true
+}
+
+func (s *Service) markAvatarNotFound(name string) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
+	s.avatarNotFoundMu.Lock()
+	defer s.avatarNotFoundMu.Unlock()
+	if s.avatarNotFound == nil {
+		s.avatarNotFound = make(map[string]time.Time)
+	}
+	s.avatarNotFound[name] = time.Now().Add(defaultAvatarNotFoundTTL)
+}
+
+// ClearAvatarNotFoundCache empties the negative cache for actor avatar resolution.
+func (s *Service) ClearAvatarNotFoundCache() {
+	s.avatarNotFoundMu.Lock()
+	defer s.avatarNotFoundMu.Unlock()
+	clear(s.avatarNotFound)
+}
+
 // findAvatar prefers GFriends and falls back to the JavDB avatar of a scraped actor.
 func (s *Service) findAvatar(ctx context.Context, g *gfriends.Client, media MediaFetcher, name string) (domain.Media, bool) {
+	if s.isAvatarNotFound(name) {
+		return domain.Media{}, false
+	}
 	if g != nil {
 		if data, err := g.FetchAvatar(ctx, name); err == nil && len(data) > 0 {
 			return domain.Media{ContentType: http.DetectContentType(data), Body: data}, true

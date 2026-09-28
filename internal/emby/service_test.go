@@ -409,3 +409,76 @@ func TestEmbyService_FindAvatarFallsBackToJavDBMedia(t *testing.T) {
 		t.Fatal("unknown actor produced an avatar")
 	}
 }
+
+func TestEmbyService_SyncActorAvatars_SingleFlight(t *testing.T) {
+	svc := &Service{}
+	svc.syncing.Store(true)
+
+	// Since syncing is already true, SyncActorAvatars must immediately return (0, nil).
+	uploaded, err := svc.SyncActorAvatars(t.Context())
+	if err != nil || uploaded != 0 {
+		t.Fatalf("expected (0, nil) for single-flight contention, got (%d, %v)", uploaded, err)
+	}
+}
+
+func TestEmbyService_AvatarNegativeCache(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	svc := &Service{db: store.Client}
+	actorName := "nonexistent-actor"
+
+	// Initially not cached
+	if svc.isAvatarNotFound(actorName) {
+		t.Fatal("expected actor not in negative cache initially")
+	}
+
+	callCount := 0
+	media := mediaFetcherFunc(func(_ context.Context, _ string) (domain.Media, error) {
+		callCount++
+		return domain.Media{}, nil
+	})
+
+	// First lookup: not found, marks negative cache
+	_, found := svc.findAvatar(t.Context(), nil, media, actorName)
+	if found {
+		t.Fatal("expected avatar not found")
+	}
+	svc.markAvatarNotFound(actorName)
+
+	if !svc.isAvatarNotFound(actorName) {
+		t.Fatal("expected actor to be in negative cache after marking")
+	}
+
+	// Now add actor to DB
+	store.Client.Actor.Create().SetJavdbID("act-new").SetName(actorName).SetNameZht(actorName).
+		SetAvatar("https://example.com/avatar.jpg").ExecX(t.Context())
+
+	// Second lookup: hits negative cache, does not query DB or media fetcher
+	_, found = svc.findAvatar(t.Context(), nil, media, actorName)
+	if found {
+		t.Fatal("expected negative cache to return false without looking up")
+	}
+	if callCount != 0 {
+		t.Fatalf("expected 0 media calls due to negative cache, got %d", callCount)
+	}
+
+	// Clear negative cache
+	svc.ClearAvatarNotFoundCache()
+	if svc.isAvatarNotFound(actorName) {
+		t.Fatal("expected negative cache cleared")
+	}
+
+	// Third lookup: cache cleared, finds actor
+	_, found = svc.findAvatar(t.Context(), nil, media, actorName)
+	if !found {
+		t.Fatal("expected avatar found after clearing negative cache")
+	}
+	if callCount != 1 {
+		t.Fatalf("expected 1 media call after cache cleared, got %d", callCount)
+	}
+}
+
