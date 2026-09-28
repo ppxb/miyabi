@@ -20,8 +20,6 @@ type CatalogueManager interface {
 	Route() catalogue.RouteStatus
 	Reselect(context.Context) (catalogue.RouteStatus, error)
 	SelectRoute(context.Context, string) (catalogue.RouteStatus, error)
-	JavBus(context.Context) (catalogue.JavBusConfig, error)
-	UpdateJavBus(context.Context, catalogue.JavBusConfig) error
 }
 
 type ViewedManager interface {

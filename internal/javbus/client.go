@@ -10,10 +10,12 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	http "github.com/bogdanfinn/fhttp"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/magnet"
 	"github.com/ppxb/miyabi/internal/netx"
 	"golang.org/x/time/rate"
 )
@@ -22,13 +24,14 @@ import (
 const (
 	baseURL        = "https://www.javbus.com"
 	defaultTimeout = 15 * time.Second
+	probeInterval  = 2 * time.Minute
 	defaultRate    = 1
 	defaultBurst   = 2
 	detailCacheTTL = 5 * time.Minute
 	userAgent      = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
 
-type httpClient interface {
+type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 	CloseIdleConnections()
 }
@@ -38,7 +41,7 @@ type Options struct {
 	Timeout time.Duration
 	Proxy   *netx.ProxyManager
 
-	testClient httpClient
+	testClient HTTPClient
 }
 
 // Client accesses JavBus for movie magnets and metadata.
@@ -49,12 +52,27 @@ type Client struct {
 	limiter      *rate.Limiter
 	cache        *detailCache
 
+	available atomic.Bool
+
 	clientMu sync.RWMutex
-	client   httpClient
+	client   HTTPClient
+	isTest   bool
 
 	ctx    context.Context
 	cancel context.CancelFunc
 }
+
+type defaultTestHTTPClient struct{}
+
+func (defaultTestHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: 404,
+		Body:       io.NopCloser(strings.NewReader("not found")),
+		Header:     make(http.Header),
+	}, nil
+}
+
+func (defaultTestHTTPClient) CloseIdleConnections() {}
 
 // New creates a JavBus client.
 func New(options Options) (*Client, error) {
@@ -75,6 +93,8 @@ func New(options Options) (*Client, error) {
 
 	if options.testClient != nil {
 		client.client = options.testClient
+		client.isTest = true
+		client.available.Store(true)
 		return client, nil
 	}
 
@@ -87,10 +107,35 @@ func New(options Options) (*Client, error) {
 
 	if options.Proxy != nil {
 		client.proxyChanges = options.Proxy.Subscribe()
-		go client.watchProxy()
 	}
 
+	go client.runHealthLoop()
+
 	return client, nil
+}
+
+// NewForTest creates a JavBus client for testing with a specified availability.
+func NewForTest(available bool, testClients ...HTTPClient) *Client {
+	ctx, cancel := context.WithCancel(context.Background())
+	var cl HTTPClient = defaultTestHTTPClient{}
+	if len(testClients) > 0 && testClients[0] != nil {
+		cl = testClients[0]
+	}
+	client := &Client{
+		isTest:  true,
+		client:  cl,
+		limiter: rate.NewLimiter(rate.Inf, 0),
+		cache:   newDetailCache(detailCacheTTL),
+		ctx:     ctx,
+		cancel:  cancel,
+	}
+	client.available.Store(available)
+	return client
+}
+
+// SetAvailableForTest sets the client's availability for testing.
+func (c *Client) SetAvailableForTest(available bool) {
+	c.available.Store(available)
 }
 
 // Name identifies the magnet source.
@@ -98,8 +143,52 @@ func (c *Client) Name() string {
 	return domain.MagnetSourceJavBus
 }
 
+// Available reports whether JavBus is currently reachable.
+func (c *Client) Available() bool {
+	return c.available.Load()
+}
+
+func (c *Client) setAvailable(next bool) {
+	prev := c.available.Swap(next)
+	if prev != next {
+		if next {
+			slog.InfoContext(c.ctx, "JavBus source is reachable, magnet aggregation enabled")
+		} else {
+			slog.WarnContext(c.ctx, "JavBus source is unreachable, magnet aggregation degraded")
+		}
+	}
+}
+
+func (c *Client) probe() bool {
+	ctx, cancel := context.WithTimeout(c.ctx, 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL, nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Cookie", "dv=1")
+
+	client := c.getHTTPClient()
+	if client == nil {
+		return false
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	_, _ = io.CopyN(io.Discard, resp.Body, 512)
+	return resp.StatusCode >= 200 && resp.StatusCode < 400
+}
+
 // Find retrieves magnets for the specified movie reference.
 func (c *Client) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Magnet, error) {
+	if !c.available.Load() {
+		return nil, magnet.ErrSkipped
+	}
+
 	code := strings.TrimSpace(ref.Code)
 	if code == "" {
 		return nil, nil
@@ -149,6 +238,9 @@ func (c *Client) ensureDetailParams(ctx context.Context, code string) (gid, uc, 
 		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return "", "", "", ctx.Err()
 		}
+		if !c.isTest {
+			c.setAvailable(false)
+		}
 		return "", "", "", domain.E(domain.KindUpstream, "JavBus detail request failed", err)
 	}
 	defer resp.Body.Close()
@@ -172,6 +264,9 @@ func (c *Client) ensureDetailParams(ctx context.Context, code string) (gid, uc, 
 	}
 
 	if isCloudflareChallenge(bodyStr) || resp.StatusCode == 403 || resp.StatusCode == 503 {
+		if !c.isTest {
+			c.setAvailable(false)
+		}
 		return "", "", "", domain.E(domain.KindUpstream, "JavBus Cloudflare challenge encountered", nil)
 	}
 	if isDriverVerify(bodyStr) {
@@ -214,6 +309,9 @@ func (c *Client) fetchMagnets(ctx context.Context, code, gid, uc, img string) ([
 		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return nil, ctx.Err()
 		}
+		if !c.isTest {
+			c.setAvailable(false)
+		}
 		return nil, domain.E(domain.KindUpstream, "JavBus ajax magnets request failed", err)
 	}
 	defer resp.Body.Close()
@@ -229,6 +327,9 @@ func (c *Client) fetchMagnets(ctx context.Context, code, gid, uc, img string) ([
 	bodyStr := string(body)
 
 	if isCloudflareChallenge(bodyStr) || resp.StatusCode == 403 || resp.StatusCode == 503 {
+		if !c.isTest {
+			c.setAvailable(false)
+		}
 		return nil, domain.E(domain.KindUpstream, "JavBus Cloudflare challenge encountered", nil)
 	}
 	if isDriverVerify(bodyStr) {
@@ -241,7 +342,7 @@ func (c *Client) fetchMagnets(ctx context.Context, code, gid, uc, img string) ([
 	return parseMagnetsHTML(bodyStr)
 }
 
-func (c *Client) getHTTPClient() httpClient {
+func (c *Client) getHTTPClient() HTTPClient {
 	c.clientMu.RLock()
 	defer c.clientMu.RUnlock()
 	return c.client
@@ -254,7 +355,7 @@ func (c *Client) resolveProxy() *url.URL {
 	return c.proxyManager.Resolve()
 }
 
-func (c *Client) buildHTTPClient(proxy *url.URL) (httpClient, error) {
+func (c *Client) buildHTTPClient(proxy *url.URL) (HTTPClient, error) {
 	return netx.NewFingerprintClient(netx.FingerprintOptions{
 		Timeout:   c.timeout,
 		Proxy:     proxy,
@@ -262,11 +363,18 @@ func (c *Client) buildHTTPClient(proxy *url.URL) (httpClient, error) {
 	})
 }
 
-func (c *Client) watchProxy() {
+func (c *Client) runHealthLoop() {
+	c.setAvailable(c.probe())
+
+	ticker := time.NewTicker(probeInterval)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-c.ctx.Done():
 			return
+		case <-ticker.C:
+			c.setAvailable(c.probe())
 		case _, ok := <-c.proxyChanges:
 			if !ok {
 				return
@@ -283,6 +391,7 @@ func (c *Client) watchProxy() {
 			if oldClient != nil {
 				oldClient.CloseIdleConnections()
 			}
+			c.setAvailable(c.probe())
 		}
 	}
 }

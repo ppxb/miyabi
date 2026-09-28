@@ -5,16 +5,12 @@ import {
   RefreshCwIcon,
   XCircleIcon
 } from 'lucide-react'
-import { toast } from 'sonner'
-
 import {
   type JavDBRouteCandidate,
   useJavDBRoute,
   useReselectJavDBRoute,
   useSelectJavDBRoute
 } from '@/api/discover'
-import { useJavBusConfig, useUpdateJavBusConfig } from '@/api/javbus'
-import { useNetworkConfig } from '@/api/network'
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { SettingRow, SettingsSection } from './shared'
@@ -42,15 +37,6 @@ export function DataSourceSection() {
   const activeCandidate = status?.candidates.find(candidate => candidate.host === status.host)
   const busy = route.isFetching || reselect.isPending || selectRoute.isPending
 
-  // JavBus
-  const javbusConfig = useJavBusConfig()
-  const updateJavbus = useUpdateJavBusConfig()
-  const network = useNetworkConfig()
-
-  const javbusEnabled = javbusConfig.data?.enabled ?? false
-  const isProxyEnabled = Boolean(network.data?.enabled)
-  const javbusDisabled = javbusConfig.isLoading || javbusConfig.isError || network.isLoading
-
   function changeRoute(next: string) {
     reselect.reset()
     selectRoute.mutate(next === AUTO_ROUTE_VALUE ? '' : next)
@@ -64,23 +50,6 @@ export function DataSourceSection() {
     } else {
       reselect.mutate()
     }
-  }
-
-  function handleJavbusToggle(next: boolean) {
-    if (next && !isProxyEnabled) {
-      toast.error('请先开启网络代理以使用 JavBus 数据源')
-      return
-    }
-
-    updateJavbus.mutate(
-      { enabled: next },
-      {
-        onSuccess: saved =>
-          toast.success(saved.enabled ? '已开启 JavBus 磁力源' : '已关闭 JavBus 磁力源'),
-        onError: error =>
-          toast.error(error instanceof Error ? error.message : '保存 JavBus 设置失败')
-      }
-    )
   }
 
   return (
@@ -157,21 +126,6 @@ export function DataSourceSection() {
         <p className="text-xs text-muted-foreground">
           尚无缓存线路，首次请求时将完成全部线路测速。
         </p>
-      ) : null}
-
-      <SettingRow
-        title="JavBus 磁力源"
-        description="开启后磁力列表将合并 JavBus 的资源（需要网络代理）"
-        inline
-      >
-        <Switch
-          checked={javbusEnabled}
-          disabled={javbusDisabled}
-          onCheckedChange={handleJavbusToggle}
-        />
-      </SettingRow>
-      {javbusConfig.isError ? (
-        <InlineError>后端服务暂不可用，无法读取 JavBus 设置。</InlineError>
       ) : null}
     </SettingsSection>
   )

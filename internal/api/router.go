@@ -83,8 +83,6 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	settingsAPI.GET("/emby", embyConfigHandler(deps.Emby))
 	settingsAPI.PUT("/emby", embyUpdateHandler(deps.Emby))
 	settingsAPI.POST("/emby/test", embyTestHandler(deps.Emby))
-	settingsAPI.GET("/javbus", javbusConfigHandler(deps.Catalogue))
-	settingsAPI.PUT("/javbus", javbusUpdateHandler(deps.Catalogue))
 	settingsAPI.GET("/subscription", subscriptionSettingsGetHandler(deps.Monitor))
 	settingsAPI.PUT("/subscription", subscriptionSettingsUpdateHandler(deps.Monitor))
 

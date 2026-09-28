@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ppxb/miyabi/internal/database"
@@ -37,13 +36,11 @@ type Service struct {
 	javbus     *javbus.Client
 	aggregator *magnet.Aggregator
 
-	// javbusEnabled gates the JavBus source at query time; see UpdateJavBus.
-	javbusEnabled atomic.Bool
-	proxy         *netx.ProxyManager
-	lists         *responseCache[[]domain.Movie]
-	details       *responseCache[domain.MovieDetail]
-	tags          *responseCache[[]domain.TagCategory]
-	magnets       *responseCache[[]domain.Magnet]
+	proxy   *netx.ProxyManager
+	lists   *responseCache[[]domain.Movie]
+	details *responseCache[domain.MovieDetail]
+	tags    *responseCache[[]domain.TagCategory]
+	magnets *responseCache[[]domain.Magnet]
 
 	routeMu sync.RWMutex
 	route   RouteStatus
@@ -95,20 +92,13 @@ func New(
 		client.Close()
 		return nil, fmt.Errorf("initialize JavBus client: %w", err)
 	}
-	javbusEnabled, _, err := database.LoadSetting[bool](ctx, db, javbusEnabledSetting)
-	if err != nil {
-		javbusClient.Close()
-		client.Close()
-		return nil, err
-	}
 
 	service := newService(db, client, local, route)
 	service.proxy = proxy
 	service.javbus = javbusClient
-	service.javbusEnabled.Store(javbusEnabled)
 	service.aggregator = magnet.NewAggregator([]magnet.Source{
 		client,
-		gatedSource{Source: javbusClient, enabled: &service.javbusEnabled},
+		javbusClient,
 	}, aggregatorTimeout, nil)
 	return service, nil
 }

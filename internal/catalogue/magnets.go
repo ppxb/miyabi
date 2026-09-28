@@ -4,56 +4,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync/atomic"
 	"time"
 
-	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
-	"github.com/ppxb/miyabi/internal/magnet"
 )
 
-const (
-	javbusEnabledSetting = "javbus.enabled"
-	aggregatorTimeout    = 8 * time.Second
-)
-
-// JavBusConfig is the JavBus settings section: one switch. JavBus has a single
-// public endpoint, so there is nothing else to configure.
-type JavBusConfig struct {
-	Enabled bool `json:"enabled"`
-}
-
-// gatedSource hides a magnet source behind a runtime switch so the aggregator
-// is assembled once and toggled without rebuilding clients.
-type gatedSource struct {
-	magnet.Source
-	enabled *atomic.Bool
-}
-
-func (s gatedSource) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Magnet, error) {
-	if !s.enabled.Load() {
-		return nil, magnet.ErrSkipped
-	}
-	return s.Source.Find(ctx, ref)
-}
-
-func (service *Service) JavBus(context.Context) (JavBusConfig, error) {
-	return JavBusConfig{Enabled: service.javbusEnabled.Load()}, nil
-}
-
-// UpdateJavBus persists the switch and drops cached magnet lists so the next
-// lookup reflects it.
-func (service *Service) UpdateJavBus(ctx context.Context, config JavBusConfig) error {
-	if config.Enabled && service.proxy != nil && service.proxy.Resolve() == nil {
-		return domain.E(domain.KindInvalid, "请先开启网络代理以启用 JavBus 数据源", nil)
-	}
-	if err := database.SaveSetting(ctx, service.database, javbusEnabledSetting, config.Enabled); err != nil {
-		return err
-	}
-	service.javbusEnabled.Store(config.Enabled)
-	service.magnets.reset()
-	return nil
-}
+const aggregatorTimeout = 8 * time.Second
 
 // Magnets returns the aggregated, cached magnet list of a movie. The detail
 // lookup supplies the code and zone JavBus needs; when it fails the
@@ -64,8 +20,10 @@ func (service *Service) Magnets(ctx context.Context, movieID string) ([]Magnet, 
 			return service.javdb.Magnets(ctx, movieID)
 		}
 		ref := domain.MovieRef{JavDBID: movieID}
-		if detail, err := service.CatalogueDetail(ctx, movieID); err == nil {
-			ref.Code, ref.Zone = detail.Code, detail.Zone
+		if service.javbus != nil && service.javbus.Available() {
+			if detail, err := service.CatalogueDetail(ctx, movieID); err == nil {
+				ref.Code, ref.Zone = detail.Code, detail.Zone
+			}
 		}
 		magnets, partial, err := service.aggregator.FindDetailed(ctx, ref)
 		if err != nil {

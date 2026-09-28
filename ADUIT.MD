@@ -62,6 +62,8 @@
 - [ ] **35.** `internal/javbus/parser.go:19,203-214` 正则允许 `PB`，switch 中无 PB 分支，倍率落到 1。
 - [ ] **36.** `internal/emby/service.go:443-475` `translatePath` 中 `strings.HasPrefix(rel, "..")` 会把 `..foo` 目录误判为越界；方法未使用 receiver。
 - [x] **241.** ✔ `internal/library/scan/reconcile.go:58-71`、`persist.go:197-210`：用户在 115 删除影片后重新扫描，仅删除了 SQLite 的 `File` 与无引用 `Movie` 记录，未清理 `EmbyDir` 本地对应的影片目录（`.strm`、`.nfo`、海报等），且未向 Emby 发送删除/变更通知，导致 Emby 媒体库残留死链幽灵影片。
+- [x] **242.** ✔ 废除 JavBus 强制绑定代理限制，移除冗余的手动设置项，改为全自动连通性健康探测与自适应降级：删除后端 `/api/settings/javbus`（连同 `internal/api/javbus.go`）及前端 JavBus 开关与 API；`javbus.Client` 内部自适应维护连通性探测与熔断状态，网络可达时自动聚合磁力，不可达时 0ms 静默跳过（`ErrSkipped`），代理配置变更时自动重探自愈（一并解决第 175、178、223 条）。
+
 
 
 ---
@@ -215,7 +217,7 @@
 - [ ] **140.** `internal/api/strm.go:33-39` Emby / 播放器每次 HEAD、GET、Range 都走 DB + downurl（限流 4rps / 2 并发）+ CDN HEAD → 按 `(pickCode, UA)` 做短 TTL 缓存。
 - [ ] **141.** `internal/netx/ssrf.go:103-119,152,206` 同一主机 3 次 DNS 解析（请求前 `ValidateSafeURL`、每���重定向、拨号时），拨号那次已覆盖 DNS 重绑定 → `ValidateSafeURL` 只做语法校验。
 - [ ] **142.** `internal/drive/account.go` 缓存未命中无 singleflight，并发 `Open()` 同时请求 `/open/user/info`；`accountCacheMu` 可并入 `d.mu`；`internal/drive/token.go:13-57` refresh_token 被吊销后不标记凭证失效，每个请求都发起一次注定失败的刷新。
-- [ ] **143.** `internal/catalogue/magnets.go:67` 无论 JavBus 是否启用都先调 `CatalogueDetail`（可能连带最多 5 次 Tags），monitor 批量检查时 JavDB 限流请求翻倍 → 仅在 `javbusEnabled.Load()` 时查询。
+- [x] **143.** ✔ `internal/catalogue/magnets.go:67` 无论 JavBus 是否启用都先调 `CatalogueDetail`（可能连带最多 5 次 Tags），monitor 批量检查时 JavDB 限流请求翻倍 → 仅在 JavBus 可达时查询（`service.javbus != nil && service.javbus.Available()`）。
 - [ ] **144.** `internal/catalogue/service.go:239-251` `MovieSummary`、`:254-264` `BrowseMovies` 走完整 `projectMovies → MovieStates`（2 次 DB 查询）后丢弃投影结果。
 - [ ] **145.** `internal/javdb/movie.go:105-141,147-174` `ResolveMovieID` 每次查询前对累积的数百候选全量 `matchCandidates`，`codeid.Normalize` 每次最多 8 个正则，`IsFormatEquivalent` 两边重复 Normalize → 预计算 `normCode`。
 - [ ] **146.** `internal/javdb/route.go:112` 非 full 模式用 5ms ticker 轮询（最长 60s，每秒唤醒 200 次）→ 按最早截止时间的单个 `time.Timer`。

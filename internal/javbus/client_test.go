@@ -2,6 +2,7 @@ package javbus
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/url"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	http "github.com/bogdanfinn/fhttp"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/magnet"
 	"github.com/ppxb/miyabi/internal/netx"
 )
 
@@ -281,5 +283,41 @@ func TestClient_ProxyManagerIntegration(t *testing.T) {
 	parsed, _ := url.Parse("http://127.0.0.1:18888")
 	if client.resolveProxy().String() != parsed.String() {
 		t.Fatalf("expected proxy to be resolved as %v, got %v", parsed, client.resolveProxy())
+	}
+}
+
+func TestClient_AvailabilityAndSkipping(t *testing.T) {
+	mock := newMockHTTPClient()
+	client, err := New(Options{testClient: mock})
+	if err != nil {
+		t.Fatalf("unexpected error creating client: %v", err)
+	}
+	defer client.Close()
+
+	if !client.Available() {
+		t.Fatal("expected testClient to start as available")
+	}
+
+	// Flip available to false; Find must return magnet.ErrSkipped with 0 calls made.
+	client.setAvailable(false)
+	if client.Available() {
+		t.Fatal("expected Available() to be false")
+	}
+
+	magnets, err := client.Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
+	if !errors.Is(err, magnet.ErrSkipped) {
+		t.Fatalf("expected ErrSkipped when unavailable, got %v", err)
+	}
+	if len(magnets) != 0 {
+		t.Fatalf("expected nil magnets, got %d", len(magnets))
+	}
+	if len(mock.calls) != 0 {
+		t.Fatalf("expected zero HTTP requests when skipped, got %v", mock.calls)
+	}
+
+	// Restore availability; requests proceed.
+	client.setAvailable(true)
+	if !client.Available() {
+		t.Fatal("expected Available() to be true")
 	}
 }
