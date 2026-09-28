@@ -37,7 +37,7 @@
 - [x] **10.** ✔ `internal/pan/client.go:147` resty 对 POST 同样重试：`/open/refreshToken` 超时重试会用已轮换的旧 refresh_token → 凭证丢失；`add_task_urls` 重试返回 10008 被当成冲突；`upload/init` 同理 → 只对 GET / 429 重试，或对 token/离线/上传请求关闭重试。
 - [x] **11.** ✔ `internal/monitor/batch.go:102` 批量任务重启后从 index 0 重跑，`Processed` 在旧值上继续累加 → 进度 >100 触发 schema `Range(0,100)` 校验，之后进度永远保存失败 → 从 `payload.Batch.Processed` 处继续。
 - [x] **12.** ✔ `internal/tasks/pool.go:66`、`:87` Claim / Finish 遇到一次数据库临时错误（SQLITE_BUSY）就 `return err` → errgroup 取消 → `App.Run` 关闭整个 HTTP 服务 → 记录日志并退避重试，仅 ctx 结束时退出。
-- [ ] **13.** ✔ `web/src/api/client.ts:104` 所有非 `/api/auth/` 的 401 都会 `clearAuthToken()` 并派发 `miyabi:unauthorized`，而 115 登录失效（`pan.ErrUnauthorized`）、Emby API Key 错误也返回 401 → 仅在后端 `code: "UNAUTHORIZED"`（访问密码失效）时触发，或 115 失效改用独立状态码。
+- [x] **13.** ✔ `web/src/api/client.ts:104` 所有非 `/api/auth/` 的 401 都会 `clearAuthToken()` 并派发 `miyabi:unauthorized`，而 115 登录失效（`pan.ErrUnauthorized`）、Emby API Key 错误也返回 401 → 仅在后端 `code: "UNAUTHORIZED"`（访问密码失效）时触发，或 115 失效改用独立状态码。
 - [ ] **14.** `web/src/api/movie-state-cache.ts:73` 用 `initialData` 伪造 `not_in_library`，加载中 / 失败时被当成真实数据 → `features/subscriptions/subscription-card.tsx:56` 可对已入库影片点"入库" → 改 `placeholderData`，`resetMovieStates` 同理。
 - [ ] **15.** `web/src/api/subscriptions.ts:52` 订阅列表固定 `limit: 100` 只取第 1 页，`useSubscription`（:57-63）用 `find` 查找 → 第 101 条起显示"未订阅"，订阅页也显示不全。
 - [ ] **16.** `internal/library/scrape/cover.go:130-149` 同一影片分布在多个 115 目录时，每个目录各导出一次到同一 `EmbyMovieDir` → `stem.strm` 互相覆盖、cd 编号错乱；`ExportLocalMovie`（`export.go:150`）不排序 → 先收集全部视频、排序后统一导出一次。

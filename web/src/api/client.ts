@@ -101,30 +101,31 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   })
 
   if (!response.ok) {
-    if (response.status === 401 && !path.startsWith('/api/auth/')) {
-      clearAuthToken()
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('miyabi:unauthorized'))
-      }
-    }
-
     let message = response.statusText || `请求失败（HTTP ${response.status}）`
+    let code: string | undefined
     try {
       const payload: unknown = await response.json()
-      if (
-        payload !== null &&
-        typeof payload === 'object' &&
-        'error' in payload &&
-        typeof payload.error === 'string' &&
-        payload.error.trim()
-      ) {
-        message = payload.error.trim()
+      if (payload !== null && typeof payload === 'object') {
+        if ('error' in payload && typeof payload.error === 'string' && payload.error.trim()) {
+          message = payload.error.trim()
+        }
+        if ('code' in payload && typeof payload.code === 'string' && payload.code.trim()) {
+          code = payload.code.trim()
+        }
       }
     } catch (error) {
       if (init?.signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
         throw error
       }
     }
+
+    if (response.status === 401 && code === 'UNAUTHORIZED' && !path.startsWith('/api/auth/')) {
+      clearAuthToken()
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('miyabi:unauthorized'))
+      }
+    }
+
     throw new ApiError(message, response.status)
   }
   return response.json() as Promise<T>
