@@ -200,14 +200,20 @@ func Layers(name string) [][]string {
 }
 
 // Queries returns the search query candidates for a catalogue code,
-// including its unpadded numeric variant if applicable (e.g. "ABC-00123" -> ["ABC-00123", "ABC-123"]).
+// including provider variants such as "FC2-1234567" for "FC2-PPV-1234567",
+// and its unpadded numeric variant if applicable (e.g. "ABC-00123" -> ["ABC-00123", "ABC-123"]).
 func Queries(candidate string) []string {
-	queries := []string{candidate}
+	var queries []string
+	if strings.HasPrefix(candidate, "FC2-PPV-") {
+		queries = append(queries, "FC2-"+strings.TrimPrefix(candidate, "FC2-PPV-"))
+	}
+	queries = append(queries, candidate)
 	if unpadded, ok := UnpaddedNumericCandidate(candidate); ok {
 		queries = append(queries, unpadded)
 	}
 	return queries
 }
+
 
 // Normalize builds a comparison key for a complete catalogue number, applying
 // known equivalent spellings and preserving unfamiliar formats. It does not

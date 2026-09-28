@@ -501,6 +501,24 @@ func TestResolveMovieIDFallbackSearch(t *testing.T) {
 	}
 }
 
+func TestResolveMovieIDFC2ProviderVariant(t *testing.T) {
+	// JavDB catalogues FC2 titles with "FC2-" prefix instead of "FC2-PPV-".
+	// The client queries the provider spelling "FC2-1234567" and normalizes the match.
+	transport := &queryFixtureTransport{responses: map[string][]byte{
+		"FC2-1234567": []byte(`{"success":1,"data":{"movies":[
+			{"id":"fc2-movie","number":"FC2-1234567"}
+		]}}`),
+	}}
+	client := clientWithTransport(transport)
+	id, err := client.ResolveMovieID(t.Context(), "FC2-PPV-1234567")
+	if err != nil || id != "fc2-movie" {
+		t.Fatalf("id = %q, error = %v; want %q", id, err, "fc2-movie")
+	}
+	if len(transport.calls) != 1 {
+		t.Fatalf("expected 1 call (direct FC2- query), got %d: %#v", len(transport.calls), transport.calls)
+	}
+}
+
 func TestAnimeDetailAndCatalogueQueriesUseTheAnimeSection(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
 		"/api/v4/movies/anime|zh-TW": []byte(`{"success":1,"data":{"movie":{"id":"anime","number":"GLOD-0436","type":4}}}`),

@@ -369,3 +369,24 @@ func TestPrefix(t *testing.T) {
 		}
 	}
 }
+
+func TestQueries(t *testing.T) {
+	tests := []struct {
+		candidate string
+		want      []string
+	}{
+		{candidate: "SSIS-589", want: []string{"SSIS-589"}},
+		{candidate: "ABC-00123", want: []string{"ABC-00123", "ABC-123"}},
+		{candidate: "FC2-PPV-1234567", want: []string{"FC2-1234567", "FC2-PPV-1234567"}},
+		{candidate: "FC2-PPV-4778943", want: []string{"FC2-4778943", "FC2-PPV-4778943"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.candidate, func(t *testing.T) {
+			if got := Queries(tt.candidate); !slices.Equal(got, tt.want) {
+				t.Errorf("Queries(%q) = %q; want %q", tt.candidate, got, tt.want)
+			}
+		})
+	}
+}
+
