@@ -74,4 +74,31 @@ func TestLibraryLocalScanHandler(t *testing.T) {
 	if lib.scannedPath != "/default/emby/dir" {
 		t.Fatalf("expected default path /default/emby/dir, got %s", lib.scannedPath)
 	}
+
+	// 3. Invalid JSON fails with 400 and does not trigger scan
+	lib.scannedPath = ""
+	req3 := httptest.NewRequest(http.MethodPost, "/api/library/scan/local", bytes.NewReader([]byte("{invalid-json")))
+	req3.Header.Set("Content-Type", "application/json")
+	w3 := httptest.NewRecorder()
+	router.ServeHTTP(w3, req3)
+
+	if w3.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid JSON, got %d: %s", w3.Code, w3.Body.String())
+	}
+	if lib.scannedPath != "" {
+		t.Fatalf("expected scan not to be invoked on invalid JSON, got %s", lib.scannedPath)
+	}
+
+	// 4. Empty/nil body falls back to default path without error
+	lib.scannedPath = ""
+	req4 := httptest.NewRequest(http.MethodPost, "/api/library/scan/local", nil)
+	w4 := httptest.NewRecorder()
+	router.ServeHTTP(w4, req4)
+
+	if w4.Code != http.StatusOK {
+		t.Fatalf("expected 200 for empty body, got %d: %s", w4.Code, w4.Body.String())
+	}
+	if lib.scannedPath != "/default/emby/dir" {
+		t.Fatalf("expected default path /default/emby/dir for empty body, got %s", lib.scannedPath)
+	}
 }

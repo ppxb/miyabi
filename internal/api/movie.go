@@ -69,7 +69,14 @@ type localScanRequest struct {
 
 func libraryLocalScanHandler(library LibraryManager, defaultDir string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		req, _ := bindJSON[localScanRequest](c)
+		var req localScanRequest
+		if c.Request.Body != nil && c.Request.ContentLength != 0 {
+			var ok bool
+			req, ok = bindJSON[localScanRequest](c)
+			if !ok {
+				return
+			}
+		}
 		scanPath := req.Path
 		if scanPath == "" {
 			scanPath = defaultDir
