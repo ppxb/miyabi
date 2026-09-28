@@ -90,7 +90,7 @@ export function DataSection() {
           onClick={openConfirmation}
         >
           {clearCache.isPending ? <LoaderCircleIcon className="animate-spin" /> : <Trash2Icon />}
-          清理所有缓存
+          清理未使用缓存
         </Button>
       </SettingRow>
       {info.isError ? (
