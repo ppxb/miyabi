@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/ppxb/miyabi/internal/nfo"
 )
 
 func TestRewriteSTRM(t *testing.T) {
@@ -127,3 +129,42 @@ func TestExportManager(t *testing.T) {
 		t.Fatalf("unexpected atomic update: %+v", cfg3)
 	}
 }
+
+func TestEmbyMovieDir(t *testing.T) {
+	tempDir := t.TempDir()
+
+	for _, tc := range []struct {
+		embyDir string
+		code    string
+		wantRel string
+	}{
+		{"", "SSIS-001", filepath.Join("./data/emby", "SSIS", "SSIS-001")},
+		{tempDir, "ALDN-613", filepath.Join(tempDir, "ALDN", "ALDN-613")},
+		{tempDir, "A/B", filepath.Join(tempDir, "OTHERS", "A%2FB")},
+		{tempDir, `A\B`, filepath.Join(tempDir, "OTHERS", "A%5CB")},
+		{tempDir, "ABC:001", filepath.Join(tempDir, "OTHERS", "ABC%3A001")},
+		{tempDir, "作品/限定 #007", filepath.Join(tempDir, "OTHERS", nfo.FileStem("作品/限定 #007"))},
+	} {
+		got := EmbyMovieDir(tc.embyDir, tc.code)
+		if got != tc.wantRel {
+			t.Errorf("EmbyMovieDir(%q, %q) = %q, want %q", tc.embyDir, tc.code, got, tc.wantRel)
+		}
+
+		// Verify the directory name is a single component under prefix directory (no sub-nesting)
+		prefixDir := filepath.Dir(got)
+		if filepath.Base(got) != nfo.FileStem(tc.code) {
+			t.Errorf("expected leaf dir to be %q, got %q", nfo.FileStem(tc.code), filepath.Base(got))
+		}
+		if tc.embyDir != "" && filepath.Dir(prefixDir) != tc.embyDir {
+			t.Errorf("expected parent to be prefix under %q, got %q", tc.embyDir, prefixDir)
+		}
+
+		// Ensure the directory can be created on the local file system without illegal path errors
+		if tc.embyDir != "" {
+			if err := os.MkdirAll(got, 0o755); err != nil {
+				t.Errorf("os.MkdirAll(%q) failed for code %q: %v", got, tc.code, err)
+			}
+		}
+	}
+}
+

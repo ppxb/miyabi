@@ -41,7 +41,7 @@
 - [x] **14.** `web/src/api/movie-state-cache.ts:73` 用 `initialData` 伪造 `not_in_library`，加载中 / 失败时被当成真实数据 → `features/subscriptions/subscription-card.tsx:56` 可对已入库影片点"入库" → 改 `placeholderData`，`resetMovieStates` 同理。
 - [x] **15.** ✔ `web/src/api/subscriptions.ts:52` 订阅列表固定 `limit: 100` 只取第 1 页，`useSubscription`（:57-63）用 `find` 查找 → 第 101 条起显示"未订阅"，订阅页也显示不全。
 - [x] **16.** ✔ `internal/library/scrape/cover.go:130-149` 同一影片分布在多个 115 目录时，每个目录各导出一次到同一 `EmbyMovieDir` → `stem.strm` 互相覆盖、cd 编号错乱；`ExportLocalMovie`（`export.go:150`）不排序 → 先收集全部视频、排序后统一导出一次。
-- [ ] **17.** `internal/library/scrape/export.go:26` `EmbyMovieDir` 直接用原始 code 作目录名，含 `/` `\` `:` 时产生嵌套或非法路径 → 使用 `nfo.FileStem(code)`。
+- [x] **17.** ✔ `internal/export/export.go:39`（原 `library/scrape/export.go:26`）`EmbyMovieDir` 直接用原始 code 作目录名，含 `/` `\` `:` 时产生嵌套或非法路径 → 使用 `nfo.FileStem(code)`。
 - [ ] **18.** `internal/library/scan/local.go:177` 本地 NFO 未做 `codeid.Normalize` 且无空值回退，`SetCode("")` 违反 NotEmpty；同段多处 `_ =` 吞错（含 `:244`）。
 - [ ] **19.** `internal/monitor/subscribe.go:51`、`actor.go:71` 遇 `ent.IsConstraintError` 无限递归自身，外键约束也会命中 → 栈溢出风险 → 只重查一次。
 - [ ] **20.** `internal/monitor/actor.go:37-69` + `check.go:140-143` 空作品演员 `SeenMovieIDs` 为空，被当成"尚无基线"，首批新作只记基线不生成订阅 → 增加显式"已初始化"标记。

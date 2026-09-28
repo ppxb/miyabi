@@ -12,6 +12,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/netx"
+	"github.com/ppxb/miyabi/internal/nfo"
 )
 
 const defaultEmbyDir = "./data/emby"
@@ -35,12 +36,12 @@ func defaultPublicURL() string {
 }
 
 // EmbyMovieDir is the directory holding a movie's exported Emby files,
-// bucketed by catalogue prefix: <embyDir>/<prefix>/<code>.
+// bucketed by catalogue prefix: <embyDir>/<prefix>/<safe-stem>.
 func EmbyMovieDir(embyDir, code string) string {
 	if embyDir == "" {
 		embyDir = defaultEmbyDir
 	}
-	return filepath.Join(embyDir, codeid.Prefix(code), code)
+	return filepath.Join(embyDir, codeid.Prefix(code), nfo.FileStem(code))
 }
 
 // STRMContent is the body of a .strm file: the relay URL that resolves the
