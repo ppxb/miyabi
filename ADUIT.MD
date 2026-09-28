@@ -34,7 +34,7 @@
 - [x] **7.** ✔ `internal/magnet/aggregator.go:92` + `internal/catalogue/magnets.go:33`：关闭的 JavBus 返回 `nil, nil` 被计为成功，JavDB 失败时返回空列表不报错，并被缓存 1 分钟（`catalogue/cache.go:85`）；monitor 当作"无磁力"处理甚至标记 stale → 区分"跳过"与"成功为空"，部分失败不入缓存。
 - [x] **8.** ✔ `internal/netx/ssrf.go:134` SSRF 拨号检查同时作用于代理地址，`127.0.0.1:7890` 等本机 / 局域网代理被拦 → 开代理后字幕下载全部失败。仅在直连时检查。
 - [x] **9.** ✔ `internal/netx/client.go:39` "Direct" 客户端克隆 `http.DefaultTransport`，自带 `ProxyFromEnvironment`，Docker 设了 `HTTPS_PROXY` 时 115 流量走代理；`netx/client_test.go` 靠 `Setenv` 清空环境变量掩盖了问题 → 显式 `transport.Proxy = nil`。
-- [ ] **10.** ✔ `internal/pan/client.go:147` resty 对 POST 同样重试：`/open/refreshToken` 超时重试会用已轮换的旧 refresh_token → 凭证丢失；`add_task_urls` 重试返回 10008 被当成冲突；`upload/init` 同理 → 只对 GET / 429 重试，或对 token/离线/上传请求关闭重试。
+- [x] **10.** ✔ `internal/pan/client.go:147` resty 对 POST 同样重试：`/open/refreshToken` 超时重试会用已轮换的旧 refresh_token → 凭证丢失；`add_task_urls` 重试返回 10008 被当成冲突；`upload/init` 同理 → 只对 GET / 429 重试，或对 token/离线/上传请求关闭重试。
 - [ ] **11.** ✔ `internal/monitor/batch.go:102` 批量任务重启后从 index 0 重跑，`Processed` 在旧值上继续累加 → 进度 >100 触发 schema `Range(0,100)` 校验，之后进度永远保存失败 → 从 `payload.Batch.Processed` 处继续。
 - [ ] **12.** ✔ `internal/tasks/pool.go:66`、`:87` Claim / Finish 遇到一次数据库临时错误（SQLITE_BUSY）就 `return err` → errgroup 取消 → `App.Run` 关闭整个 HTTP 服务 → 记录日志并退避重试，仅 ctx 结束时退出。
 - [ ] **13.** ✔ `web/src/api/client.ts:104` 所有非 `/api/auth/` 的 401 都会 `clearAuthToken()` 并派发 `miyabi:unauthorized`，而 115 登录失效（`pan.ErrUnauthorized`）、Emby API Key 错误也返回 401 → 仅在后端 `code: "UNAUTHORIZED"`（访问密码失效）时触发，或 115 失效改用独立状态码。
@@ -133,7 +133,7 @@
 
 - [ ] **82.** `internal/library/scrape/cover.go:126-128` 固定 `LocalExport: true`，而 `snapshot.go:124` `Matches` 此时直接 `return true` → `DirectorySnapshot`、`NewDirectorySnapshot`、`Sidecar`、`ObservedDirectory.Sidecar`、`Matches` 比对逻辑，以及 `walker.go:106` 全库 `DirectoryObservations`（每文件名 + SHA1 常驻内存）只服务老数据；每次 cover 仍计算 `nfo.Encode` + 两次 SHA1；`writeSidecars` 名不副实。
 - [ ] **83.** `internal/library/scrape/cover.go:131,226-233` 已不回写 115，但每个 cover 仍重读 115 NFO（`DirectoryNFO`）、执行 `VerifyCoverOrigin`、逐视频 `sess.Info`（`verifyVideoPositions`），与"减轻网盘负担"目标相反 → 直接使用 payload 中的 `Document/Origin`。
-- [ ] **84.** `internal/library/scrape/cover.go:304` `UploadSidecar` 零生产调用，仅 `library_concurrency_test.go:78` 测一条已不存在的上传路径。
+- [x] **84.** `internal/library/scrape/cover.go:304` `UploadSidecar` 零生产调用，仅 `library_concurrency_test.go:78` 测一条已不存在的上传路径。
 - [ ] **85.** `internal/library/scrape/cover.go:255-264` `exportLocalMedia` 的 DB 兜底永远走不到（`directories()` 保证至少一个视频），且查询不按 source 过滤、`records, _ :=` 吞错。
 
 ### 其它死代码（已 grep 确认）

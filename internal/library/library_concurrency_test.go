@@ -3,14 +3,12 @@ package library
 import (
 	"context"
 	"errors"
-	"sync/atomic"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/domain"
 	drivePkg "github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/library/scan"
-	scrapePkg "github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -52,42 +50,3 @@ func TestScanDiscardsLatePageAfterSourceChange(t *testing.T) {
 	}
 }
 
-func TestMetadataSourceChangeAfterInfoPreventsUpload(t *testing.T) {
-	lib, client := panConcurrencyFixture(t)
-	source := *lib.drive.Source()
-	started := make(chan struct{}, 1)
-	hold, release := panTestGate(t)
-	video := pan.File{ID: "video", ParentID: source.Directory.ID, Name: "ABP-001.mp4"}
-	client.info = func(context.Context, string, string) (pan.FileInfo, error) {
-		started <- struct{}{}
-		<-hold
-		return pan.FileInfo{File: video, Path: []pan.Directory{{ID: source.Directory.ID}}}, nil
-	}
-	var uploads atomic.Int32
-	client.uploadMetadata = func(context.Context, string, string, string, []byte) error {
-		uploads.Add(1)
-		return nil
-	}
-	finished := make(chan error, 1)
-	go func() {
-		sess, err := lib.drive.OpenSource(t.Context(), source)
-		if err != nil {
-			finished <- err
-			return
-		}
-		finished <- scrapePkg.UploadSidecar(t.Context(), sess, scrapePkg.MovieDirectory{
-			ID: source.Directory.ID, Files: []pan.File{video}, VideoIDs: map[string]bool{video.ID: true},
-		}, "movie.nfo", []byte("fixture"))
-	}()
-	awaitPan(t, started)
-	if err := lib.drive.ClearDirectory(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	release()
-	if err := awaitPan(t, finished); !errors.Is(err, drivePkg.ErrSourceChanged) {
-		t.Fatalf("stale metadata upload = %v", err)
-	}
-	if uploads.Load() != 0 {
-		t.Fatal("metadata was uploaded after the directory changed")
-	}
-}

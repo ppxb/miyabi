@@ -30,7 +30,7 @@ type CoverPayload struct {
 	Snapshot     *Snapshot           `json:"snapshot,omitempty"`
 }
 
-// Cover processes the cover download, generation, and upload of artwork and NFO sidecars.
+// Cover processes the cover download, generation, and export of artwork and NFO sidecars.
 func (service *Service) Cover(ctx context.Context, job tasks.Job) error {
 	input, err := tasks.DecodePayload[CoverPayload](job.Payload)
 	if err != nil {
@@ -301,20 +301,3 @@ func VerifyCoverOrigin(input CoverPayload, directoryID string, current nfo.Movie
 	return nil
 }
 
-// UploadSidecar writes a sidecar file into a movie's directory on 115 storage.
-func UploadSidecar(ctx context.Context, sess drive.Session, directory MovieDirectory, name string, body []byte) error {
-	for _, entry := range directory.Files {
-		if !directory.VideoIDs[entry.ID] {
-			continue
-		}
-		info, err := sess.Info(ctx, entry.ID)
-		if err != nil {
-			return err
-		}
-		if info.ParentID != directory.ID || !drive.WithinSource(info, sess.Source()) {
-			return domain.E(domain.KindConflict, "视频已移动，请重新扫描", nil)
-		}
-		return sess.Upload(ctx, directory.ID, name, body)
-	}
-	return domain.E(domain.KindInvalid, "没有可写入元数据的视频目录", nil)
-}

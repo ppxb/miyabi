@@ -19,7 +19,6 @@ type Session interface {
 	List(ctx context.Context, dirID string, offset int) (pan.FilePage, error)
 	Info(ctx context.Context, fileID string) (pan.FileInfo, error)
 	Read(ctx context.Context, pickCode string, limit int64) ([]byte, error)
-	Upload(ctx context.Context, dirID, name string, body []byte) error
 	Commit(ctx context.Context, fn func(tx *ent.Tx) error) error
 	CommitAccount(ctx context.Context, fn func(tx *ent.Tx) error) error
 
@@ -125,20 +124,6 @@ func (s *sourceSession) Read(ctx context.Context, pickCode string, limit int64) 
 		return nil, err
 	}
 	return body, nil
-}
-
-func (s *sourceSession) Upload(ctx context.Context, dirID, name string, body []byte) error {
-	state, err := s.drive.sourceState(s.source, s.version)
-	if err != nil {
-		return err
-	}
-	_, err = withPanSourceToken(ctx, s.drive, state, func(token string) (struct{}, error) {
-		return struct{}{}, s.drive.client.UploadMetadata(ctx, token, dirID, name, body)
-	})
-	if err != nil {
-		return err
-	}
-	return s.checkSource()
 }
 
 func (s *sourceSession) PlayURL(ctx context.Context, pickCode string) ([]pan.PlaySource, error) {

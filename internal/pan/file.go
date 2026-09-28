@@ -2,10 +2,13 @@ package pan
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 type Directory struct {
@@ -91,3 +94,10 @@ func (client *Client) List(ctx context.Context, accessToken, directoryID string,
 	}
 	return page, nil
 }
+
+// SHA1 computes the uppercase hexadecimal SHA-1 digest for a byte slice.
+func SHA1(body []byte) string {
+	sum := sha1.Sum(body)
+	return strings.ToUpper(hex.EncodeToString(sum[:]))
+}
+

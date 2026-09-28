@@ -30,7 +30,6 @@ type Client interface {
 	List(context.Context, string, string, int, int) (pan.FilePage, error)
 	Info(context.Context, string, string) (pan.FileInfo, error)
 	ReadMetadata(context.Context, string, string, int64) ([]byte, error)
-	UploadMetadata(context.Context, string, string, string, []byte) error
 	AddOffline(context.Context, string, string, string) (string, error)
 	RemoveOffline(context.Context, string, string) error
 	OfflineTasks(context.Context, string, int) (pan.OfflinePage, error)

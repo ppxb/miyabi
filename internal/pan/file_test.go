@@ -1,11 +1,11 @@
 package pan
 
 import (
-	"bytes"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestFileListDecodesNumericAndStringCountsAndSizes(t *testing.T) {
@@ -54,37 +54,86 @@ func TestFileListDecodesNumericAndStringCountsAndSizes(t *testing.T) {
 	}
 }
 
-func TestUploadMetadataReusesSHA1ForSmallBody(t *testing.T) {
-	client := New()
-	defer client.Close()
+func TestClientRetryPolicy(t *testing.T) {
+	t.Run("POST does not retry on network error", func(t *testing.T) {
+		client := New()
+		defer client.Close()
+		client.http.SetRetryWaitTime(1 * time.Millisecond)
 
-	body := bytes.Repeat([]byte("a"), 1024) // 1KiB <= 128KiB
-	expectedHash := SHA1(body)
+		var calls int
+		client.http.SetTransport(offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
+			calls++
+			return nil, io.ErrUnexpectedEOF
+		}))
 
-	client.http.SetTransport(offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
-		if request.URL.Path == "/open/upload/init" {
-			if err := request.ParseForm(); err != nil {
-				t.Fatal(err)
+		_, err := client.RefreshToken(t.Context(), "sample-refresh-token")
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if calls != 1 {
+			t.Fatalf("expected POST to not retry on error (calls = %d, want 1)", calls)
+		}
+	})
+
+	t.Run("GET retries on network error", func(t *testing.T) {
+		client := New()
+		defer client.Close()
+		client.http.SetRetryWaitTime(1 * time.Millisecond)
+
+		var calls int
+		client.http.SetTransport(offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
+			calls++
+			if calls < 3 {
+				return nil, io.ErrUnexpectedEOF
 			}
-			fileid := request.Form.Get("fileid")
-			preid := request.Form.Get("preid")
-			if fileid != expectedHash || preid != expectedHash {
-				t.Errorf("fileid=%s preid=%s, want both=%s", fileid, preid, expectedHash)
-			}
-			// Status 2 means fast instant upload completed
 			return &http.Response{
 				StatusCode: http.StatusOK,
 				Header:     http.Header{"Content-Type": {"application/json"}},
-				Body:       io.NopCloser(strings.NewReader(`{"state":true,"code":0,"data":{"status":2}}`)),
+				Body:       io.NopCloser(strings.NewReader(`{"state":true,"code":0,"cid":"1","count":0,"data":[],"path":[{"cid":"1","name":"root"}]}`)),
 				Request:    request,
 			}, nil
-		}
-		t.Fatalf("unexpected request: %s %s", request.Method, request.URL.Path)
-		return nil, nil
-	}))
+		}))
 
-	err := client.UploadMetadata(t.Context(), "token", "123", "meta.nfo", body)
-	if err != nil {
-		t.Fatalf("UploadMetadata error = %v", err)
-	}
+		_, err := client.List(t.Context(), "token", "1", 0, 10)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if calls != 3 {
+			t.Fatalf("expected GET to retry (calls = %d, want 3)", calls)
+		}
+	})
+
+	t.Run("POST retries on 429", func(t *testing.T) {
+		client := New()
+		defer client.Close()
+		client.http.SetRetryWaitTime(1 * time.Millisecond)
+
+		var calls int
+		client.http.SetTransport(offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
+			calls++
+			if calls == 1 {
+				return &http.Response{
+					StatusCode: http.StatusTooManyRequests,
+					Header:     http.Header{"Retry-After": {"0"}},
+					Body:       io.NopCloser(strings.NewReader(`too many requests`)),
+					Request:    request,
+				}, nil
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": {"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(`{"state":1,"code":0,"data":{"access_token":"a","refresh_token":"r","expires_in":3600}}`)),
+				Request:    request,
+			}, nil
+		}))
+
+		tokens, err := client.RefreshToken(t.Context(), "sample-refresh-token")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if calls != 2 || tokens.AccessToken != "a" {
+			t.Fatalf("expected POST to retry on 429 (calls = %d, want 2)", calls)
+		}
+	})
 }
+

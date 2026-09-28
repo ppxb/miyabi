@@ -39,9 +39,6 @@ func (m *mockSession) Info(ctx context.Context, fileID string) (pan.FileInfo, er
 func (m *mockSession) Read(ctx context.Context, pickCode string, limit int64) ([]byte, error) {
 	return nil, nil
 }
-func (m *mockSession) Upload(ctx context.Context, dirID, name string, body []byte) error {
-	return nil
-}
 func (m *mockSession) Commit(ctx context.Context, fn func(tx *ent.Tx) error) error {
 	return nil
 }

@@ -236,9 +236,6 @@ func TestSessionsTrackTheMountTheyWereIssuedAgainst(t *testing.T) {
 	if body, err := sess.Read(ctx, "pick-f1", 1024); err != nil || len(body) == 0 {
 		t.Fatalf("read = %q, %v", body, err)
 	}
-	if err := sess.Upload(ctx, testSource.Directory.ID, "movie.nfo", []byte("x")); err != nil {
-		t.Fatal(err)
-	}
 	committed := false
 	if err := sess.Commit(ctx, func(*ent.Tx) error { committed = true; return nil }); err != nil || !committed {
 		t.Fatalf("commit ran=%t err=%v", committed, err)
@@ -248,7 +245,6 @@ func TestSessionsTrackTheMountTheyWereIssuedAgainst(t *testing.T) {
 		"list":   func() error { _, err := sess.List(ctx, testSource.Directory.ID, 0); return err },
 		"info":   func() error { _, err := sess.Info(ctx, "f1"); return err },
 		"read":   func() error { _, err := sess.Read(ctx, "pick-f1", 1024); return err },
-		"upload": func() error { return sess.Upload(ctx, testSource.Directory.ID, "movie.nfo", nil) },
 		"play":   func() error { _, err := sess.PlayURL(ctx, "pick-f1"); return err },
 		"commit": func() error { return sess.Commit(ctx, func(*ent.Tx) error { return nil }) },
 	} {

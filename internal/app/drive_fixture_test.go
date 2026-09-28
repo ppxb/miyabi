@@ -31,7 +31,6 @@ type panStub struct {
 	list           func(context.Context, string, string, int, int) (pan.FilePage, error)
 	info           func(context.Context, string, string) (pan.FileInfo, error)
 	readMetadata   func(context.Context, string, string, int64) ([]byte, error)
-	uploadMetadata func(context.Context, string, string, string, []byte) error
 	addOffline     func(context.Context, string, string, string) (string, error)
 	removeOffline  func(context.Context, string, string) error
 	offlineTasks   func(context.Context, string, int) (pan.OfflinePage, error)
@@ -123,16 +122,6 @@ func (client *panStub) ReadMetadata(ctx context.Context, token, pickCode string,
 		return client.Client.ReadMetadata(ctx, token, pickCode, limit)
 	}
 	return nil, nil
-}
-
-func (client *panStub) UploadMetadata(ctx context.Context, token, directory, name string, body []byte) error {
-	if client.uploadMetadata != nil {
-		return client.uploadMetadata(ctx, token, directory, name, body)
-	}
-	if client.Client != nil {
-		return client.Client.UploadMetadata(ctx, token, directory, name, body)
-	}
-	return nil
 }
 
 func (client *panStub) AddOffline(ctx context.Context, token, uri, directory string) (string, error) {

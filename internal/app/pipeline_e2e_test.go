@@ -38,17 +38,11 @@ type fakeDrive struct {
 	dirs      map[string]fakeDirectory
 	files     map[string]pan.File
 	contents  map[string][]byte
-	uploads   []fakeUpload
 	nextID    int
 }
 
 type fakeDirectory struct {
 	name, parentID string
-}
-
-type fakeUpload struct {
-	directory, name string
-	body            []byte
 }
 
 func newFakeDrive(accountID string) *fakeDrive {
@@ -151,33 +145,6 @@ func (drive *fakeDrive) ReadMetadata(_ context.Context, _ string, pickCode strin
 		return nil, fmt.Errorf("fixture sidecar exceeds %d bytes", limit)
 	}
 	return body, nil
-}
-
-func (drive *fakeDrive) UploadMetadata(_ context.Context, _ string, directoryID, name string, body []byte) error {
-	drive.mu.Lock()
-	defer drive.mu.Unlock()
-	if _, ok := drive.dirs[directoryID]; !ok {
-		return pan.ErrNotFound
-	}
-	drive.nextID++
-	id := fmt.Sprint(drive.nextID)
-	entry := pan.File{ID: id, ParentID: directoryID, Name: name, Size: int64(len(body)), PickCode: "pc-" + id, SHA1: pan.SHA1(body)}
-	drive.files[id] = entry
-	drive.contents[entry.PickCode] = bytes.Clone(body)
-	drive.uploads = append(drive.uploads, fakeUpload{directory: directoryID, name: name, body: bytes.Clone(body)})
-	return nil
-}
-
-func (drive *fakeDrive) uploadedNames(directoryID string) []string {
-	drive.mu.Lock()
-	defer drive.mu.Unlock()
-	var names []string
-	for _, upload := range drive.uploads {
-		if upload.directory == directoryID {
-			names = append(names, upload.name)
-		}
-	}
-	return names
 }
 
 // fakeCatalogue answers JavDB lookups from memory and counts upstream calls.
@@ -296,7 +263,7 @@ func newPipelineFixture(t *testing.T) *pipelineFixture {
 	taskSvc := tasks.NewService(store.Client, tasks.NewRegistry())
 	d := newMountedDrive(t, store.Client, &panStub{
 		account: drive.Account, list: drive.List, info: drive.Info,
-		readMetadata: drive.ReadMetadata, uploadMetadata: drive.UploadMetadata,
+		readMetadata: drive.ReadMetadata,
 	}, source)
 
 	images, err := mediaimage.NewCache(t.TempDir())
@@ -463,10 +430,6 @@ func TestPipelineScansScrapesAndWritesSidecarsEndToEnd(t *testing.T) {
 	if err != nil || err2 != nil || !bytes.Equal(poster, posterBytes) {
 		t.Fatalf("local poster differs from cached poster: %v, %v", err, err2)
 	}
-	// Verify no sidecars were uploaded to 115
-	if names := fixture.drive.uploadedNames("11"); len(names) != 0 {
-		t.Fatalf("expected 0 uploads to 115, got %v", names)
-	}
 
 	// The scan workflow reports the metadata chain as complete.
 	infos, err := fixture.tasks.List(ctx)
@@ -542,9 +505,6 @@ func TestPipelineReusesUserNFOInsteadOfCatalogue(t *testing.T) {
 	}
 	if record.Title != "User title" || domain.ValueOrZero(record.JavdbID) != "movie-user" || len(record.Edges.Actors) != 1 || record.ScrapeStatus != movie.ScrapeStatusDone {
 		t.Fatalf("movie from NFO = %+v actors %d", record, len(record.Edges.Actors))
-	}
-	if uploads := fixture.drive.uploadedNames("11"); len(uploads) != 0 {
-		t.Fatalf("existing sidecars were rewritten: %v", uploads)
 	}
 }
 

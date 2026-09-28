@@ -30,7 +30,6 @@ type stubClient struct {
 	list           func(context.Context, string, string, int, int) (pan.FilePage, error)
 	info           func(context.Context, string, string) (pan.FileInfo, error)
 	readMetadata   func(context.Context, string, string, int64) ([]byte, error)
-	uploadMetadata func(context.Context, string, string, string, []byte) error
 	addOffline     func(context.Context, string, string, string) (string, error)
 	removeOffline  func(context.Context, string, string) error
 	offlineTasks   func(context.Context, string, int) (pan.OfflinePage, error)
@@ -94,13 +93,6 @@ func (c *stubClient) ReadMetadata(ctx context.Context, token, pickCode string, l
 		return c.readMetadata(ctx, token, pickCode, limit)
 	}
 	return []byte("<movie/>"), nil
-}
-
-func (c *stubClient) UploadMetadata(ctx context.Context, token, directory, name string, body []byte) error {
-	if c.uploadMetadata != nil {
-		return c.uploadMetadata(ctx, token, directory, name, body)
-	}
-	return nil
 }
 
 func (c *stubClient) AddOffline(ctx context.Context, token, uri, directory string) (string, error) {

@@ -145,6 +145,16 @@ func New() *Client {
 		return 0, nil
 	})
 	httpClient.AddRetryCondition(func(r *resty.Response, err error) bool {
+		if r != nil && r.StatusCode() == http.StatusTooManyRequests {
+			return true
+		}
+		var method string
+		if r != nil && r.Request != nil {
+			method = r.Request.Method
+		}
+		if method != http.MethodGet && method != http.MethodHead {
+			return false
+		}
 		if err != nil {
 			return true
 		}
@@ -152,11 +162,11 @@ func New() *Client {
 			status := r.StatusCode()
 			return status == http.StatusBadGateway ||
 				status == http.StatusServiceUnavailable ||
-				status == http.StatusGatewayTimeout ||
-				status == http.StatusTooManyRequests
+				status == http.StatusGatewayTimeout
 		}
 		return false
 	})
+
 
 	return &Client{
 		http:    httpClient,
