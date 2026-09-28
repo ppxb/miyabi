@@ -53,7 +53,8 @@ export function SubscriptionCard({
   const remove = useRemoveSubscription()
   const state = useMovieState({ id: item.target_id, code: item.code })
   const busy = disabled || enqueue.isPending || remove.isPending
-  const canEnqueue = isPendingSubscription(item) && state.state === 'not_in_library'
+  const canEnqueue =
+    isPendingSubscription(item) && !state.isPlaceholderData && state.state === 'not_in_library'
 
   const card = (
     <MovieCard

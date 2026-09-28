@@ -70,7 +70,7 @@ export function movieStateOptions(load: StateLoader, movie?: MovieIdentity) {
     enabled: Boolean(movie?.id),
     // Catalogue responses may predate a scan or account switch. They never
     // seed this cache or overwrite a more recent local-state response.
-    initialData: emptyState,
+    placeholderData: emptyState,
     staleTime: Infinity,
     refetchOnMount: 'always'
   })
@@ -82,6 +82,5 @@ export function invalidateMovieStates(queryClient: QueryClient) {
 
 export async function resetMovieStates(queryClient: QueryClient) {
   await queryClient.cancelQueries({ queryKey: movieStateKeys.all })
-  queryClient.setQueriesData<MovieLocalState>({ queryKey: movieStateKeys.all }, emptyState)
-  return invalidateMovieStates(queryClient)
+  return queryClient.resetQueries({ queryKey: movieStateKeys.all })
 }

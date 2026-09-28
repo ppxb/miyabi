@@ -100,8 +100,10 @@ test('newly opened and previously inactive movies read current state after a mis
 
   const newMovie = observe(t, client, movieStateOptions(load, { ...identity, id: 'two' }))
   // Old catalogue projections never report library state before local verification.
+  assert.equal(newMovie.getCurrentResult().isPlaceholderData, true)
   assert.deepEqual(newMovie.getCurrentResult().data, { state: 'not_in_library' })
   await settled(newMovie)
+  assert.equal(newMovie.getCurrentResult().isPlaceholderData, false)
   assert.deepEqual(newMovie.getCurrentResult().data, { state: 'not_in_library' })
 })
 
@@ -124,6 +126,7 @@ test('switching source clears library state and late responses cannot restore it
   const reset = resetMovieStates(client)
   await setImmediate()
   assert.equal(requests.length, 3)
+  assert.equal(observer.getCurrentResult().isPlaceholderData, true)
   assert.deepEqual(observer.getCurrentResult().data, { state: 'not_in_library' })
 
   requests[2].resolve([{ id: 'one', state: 'not_in_library' }])

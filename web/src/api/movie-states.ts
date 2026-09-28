@@ -13,5 +13,9 @@ const loadMovieState = createMovieStateLoader(movies =>
 )
 
 export function useMovieState(movie?: MovieIdentity) {
-  return useQuery(movieStateOptions(loadMovieState, movie)).data
+  const query = useQuery(movieStateOptions(loadMovieState, movie))
+  return {
+    ...query.data,
+    isPlaceholderData: query.isPlaceholderData
+  }
 }
