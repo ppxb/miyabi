@@ -27,7 +27,7 @@ func TestPlayURLDecodesOfficialResponses(t *testing.T) {
 			calls := 0
 			client.http.SetTransport(offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
 				calls++
-				if request.UserAgent() != mediaUserAgent || request.Header.Get("Authorization") != "Bearer fixture-token" {
+				if request.UserAgent() != MediaUserAgent || request.Header.Get("Authorization") != "Bearer fixture-token" {
 					t.Error("play URL request must use the media UA and OAuth token")
 				}
 				if request.Method != http.MethodGet || request.URL.Path != "/open/video/play" || request.URL.Query().Get("pick_code") != "fixture-pick" {
@@ -35,7 +35,7 @@ func TestPlayURLDecodesOfficialResponses(t *testing.T) {
 				}
 				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(test.body)), Request: request}, nil
 			}))
-			sources, err := client.PlayURL(t.Context(), "fixture-token", "fixture-pick")
+			sources, err := client.PlayURL(t.Context(), "fixture-token", "fixture-pick", "")
 			if (err != nil) != test.wantErr {
 				t.Fatalf("PlayURL error = %v, want error = %t", err, test.wantErr)
 			}
@@ -69,12 +69,12 @@ func TestDownloadURLDecodesMetadataSources(t *testing.T) {
 				if request.Method != http.MethodPost || request.URL.Path != "/open/ufile/downurl" || request.PostForm.Get("pick_code") != "fixture-pick" {
 					t.Errorf("unexpected download URL request: %s %s", request.Method, request.URL.Path)
 				}
-				if request.UserAgent() != mediaUserAgent || request.Header.Get("Authorization") != "Bearer fixture-token" {
+				if request.UserAgent() != MediaUserAgent || request.Header.Get("Authorization") != "Bearer fixture-token" {
 					t.Error("download URL request must use the media UA and OAuth token")
 				}
 				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(test.body)), Request: request}, nil
 			}))
-			address, err := client.DownloadURL(t.Context(), "fixture-token", "fixture-pick", mediaUserAgent)
+			address, err := client.DownloadURL(t.Context(), "fixture-token", "fixture-pick", MediaUserAgent)
 			if (err != nil) != test.wantErr {
 				t.Fatalf("DownloadURL error = %v, want error = %t", err, test.wantErr)
 			}
@@ -112,6 +112,33 @@ func TestDownloadURLRespectsCallerUserAgent(t *testing.T) {
 	}
 }
 
+func TestPlayURLRespectsCallerUserAgent(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		inputUA string
+		wantUA  string
+	}{
+		{name: "custom UA", inputUA: "VidHub/1.8.0", wantUA: "VidHub/1.8.0"},
+		{name: "empty UA falls back to MediaUserAgent", inputUA: "", wantUA: MediaUserAgent},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := New()
+			defer client.Close()
+			client.http.SetTransport(offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
+				if request.UserAgent() != tc.wantUA {
+					t.Errorf("got User-Agent %q, want %q", request.UserAgent(), tc.wantUA)
+				}
+				body := `{"state":true,"code":0,"data":{"video_url":[{"url":"https://cdn.example/video.m3u8","height":1080}]}}`
+				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(body)), Request: request}, nil
+			}))
+			sources, err := client.PlayURL(t.Context(), "token", "pick", tc.inputUA)
+			if err != nil || len(sources) != 1 || sources[0].URL != "https://cdn.example/video.m3u8" {
+				t.Fatalf("PlayURL with UA %q = %#v, %v", tc.inputUA, sources, err)
+			}
+		})
+	}
+}
+
 type observedMediaBody struct {
 	io.Reader
 	reads  int
@@ -135,7 +162,7 @@ func TestOpenMediaStreamsRangeAndHeadWithoutCredentials(t *testing.T) {
 			defer client.Close()
 			body := &observedMediaBody{Reader: strings.NewReader("fixture video")}
 			client.media.SetTransport(offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
-				if request.Method != method || request.UserAgent() != mediaUserAgent || request.Header.Get("Range") != "bytes=2-5" || request.Header.Get("If-Range") != `"fixture-etag"` {
+				if request.Method != method || request.UserAgent() != MediaUserAgent || request.Header.Get("Range") != "bytes=2-5" || request.Header.Get("If-Range") != `"fixture-etag"` {
 					t.Errorf("method or media headers were lost: %s %#v", request.Method, request.Header)
 				}
 				if request.Header.Get("Authorization") != "" || request.Header.Get("Cookie") != "" {

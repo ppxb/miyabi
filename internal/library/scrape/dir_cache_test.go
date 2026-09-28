@@ -45,7 +45,7 @@ func (m *mockSession) Commit(ctx context.Context, fn func(tx *ent.Tx) error) err
 func (m *mockSession) CommitAccount(ctx context.Context, fn func(tx *ent.Tx) error) error {
 	return nil
 }
-func (m *mockSession) PlayURL(ctx context.Context, pickCode string) ([]pan.PlaySource, error) {
+func (m *mockSession) PlayURL(ctx context.Context, pickCode, userAgent string) ([]pan.PlaySource, error) {
 	return nil, nil
 }
 func (m *mockSession) DownloadURL(ctx context.Context, pickCode, userAgent string) (string, error) {

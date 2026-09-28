@@ -18,7 +18,7 @@ type panStub struct {
 	drive.Client
 	info        func(context.Context, string, string) (pan.FileInfo, error)
 	downloadURL func(context.Context, string, string, string) (string, error)
-	playURL     func(context.Context, string, string) ([]pan.PlaySource, error)
+	playURL     func(context.Context, string, string, string) ([]pan.PlaySource, error)
 	openMedia   func(context.Context, string, string, http.Header) (*http.Response, error)
 }
 
@@ -48,8 +48,11 @@ func (client *panStub) Info(ctx context.Context, token, id string) (pan.FileInfo
 	return client.info(ctx, token, id)
 }
 
-func (client *panStub) PlayURL(ctx context.Context, token, pickCode string) ([]pan.PlaySource, error) {
-	return client.playURL(ctx, token, pickCode)
+func (client *panStub) PlayURL(ctx context.Context, token, pickCode, userAgent string) ([]pan.PlaySource, error) {
+	if client.playURL != nil {
+		return client.playURL(ctx, token, pickCode, userAgent)
+	}
+	return nil, nil
 }
 
 func (client *panStub) DownloadURL(ctx context.Context, token, pickCode, userAgent string) (string, error) {

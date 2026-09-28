@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
@@ -35,6 +36,10 @@ func (relay *Relay) StreamURL(ctx context.Context, fileID, userAgent string) (st
 	if relay.drive == nil {
 		return "", drive.ErrMediaDirectoryRequired
 	}
+	ua := strings.TrimSpace(userAgent)
+	if ua == "" {
+		ua = pan.MediaUserAgent
+	}
 	sess, err := relay.drive.Open(ctx)
 	if err != nil {
 		return "", err
@@ -44,10 +49,10 @@ func (relay *Relay) StreamURL(ctx context.Context, fileID, userAgent string) (st
 		return "", err
 	}
 	// Prefer the direct download URL for full CDN throughput and instant seeking.
-	if downloadURL, err := sess.DownloadURL(ctx, pickCode, userAgent); err == nil && downloadURL != "" {
+	if downloadURL, err := sess.DownloadURL(ctx, pickCode, ua); err == nil && downloadURL != "" {
 		return downloadURL, nil
 	}
-	sources, err := sess.PlayURL(ctx, pickCode)
+	sources, err := sess.PlayURL(ctx, pickCode, ua)
 	if err != nil {
 		// pan reports the raw condition; the user-facing text lives in drive.
 		if errors.Is(err, pan.ErrTranscodeUnavailable) {
@@ -78,7 +83,14 @@ func (relay *Relay) Probe(ctx context.Context, address string, headers http.Head
 	if relay.drive == nil {
 		return nil, drive.ErrMediaDirectoryRequired
 	}
-	return relay.drive.OpenMedia(ctx, http.MethodHead, address, headers)
+	h := headers.Clone()
+	if h == nil {
+		h = make(http.Header)
+	}
+	if strings.TrimSpace(h.Get("User-Agent")) == "" {
+		h.Set("User-Agent", pan.MediaUserAgent)
+	}
+	return relay.drive.OpenMedia(ctx, http.MethodHead, address, h)
 }
 
 // pickCode prefers the indexed pick code and asks 115 only for videos indexed

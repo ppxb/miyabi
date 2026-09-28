@@ -22,7 +22,7 @@ type Session interface {
 	Commit(ctx context.Context, fn func(tx *ent.Tx) error) error
 	CommitAccount(ctx context.Context, fn func(tx *ent.Tx) error) error
 
-	PlayURL(ctx context.Context, pickCode string) ([]pan.PlaySource, error)
+	PlayURL(ctx context.Context, pickCode, userAgent string) ([]pan.PlaySource, error)
 	DownloadURL(ctx context.Context, pickCode, userAgent string) (string, error)
 	AddOffline(ctx context.Context, magnet string) (string, error)
 	RemoveOffline(ctx context.Context, hash string) error
@@ -126,13 +126,13 @@ func (s *sourceSession) Read(ctx context.Context, pickCode string, limit int64) 
 	return body, nil
 }
 
-func (s *sourceSession) PlayURL(ctx context.Context, pickCode string) ([]pan.PlaySource, error) {
+func (s *sourceSession) PlayURL(ctx context.Context, pickCode, userAgent string) ([]pan.PlaySource, error) {
 	state, err := s.drive.sourceState(s.source, s.version)
 	if err != nil {
 		return nil, err
 	}
 	sources, err := withPanSourceToken(ctx, s.drive, state, func(token string) ([]pan.PlaySource, error) {
-		return s.drive.client.PlayURL(ctx, token, pickCode)
+		return s.drive.client.PlayURL(ctx, token, pickCode, userAgent)
 	})
 	if err != nil {
 		return nil, err

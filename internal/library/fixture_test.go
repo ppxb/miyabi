@@ -33,7 +33,7 @@ type panStub struct {
 	addOffline     func(context.Context, string, string, string) (string, error)
 	removeOffline  func(context.Context, string, string) error
 	offlineTasks   func(context.Context, string, int) (pan.OfflinePage, error)
-	playURL        func(context.Context, string, string) ([]pan.PlaySource, error)
+	playURL        func(context.Context, string, string, string) ([]pan.PlaySource, error)
 	openMedia      func(context.Context, string, string, http.Header) (*http.Response, error)
 }
 
@@ -157,12 +157,12 @@ func (client *panStub) OfflineTasks(ctx context.Context, token string, page int)
 	return pan.OfflinePage{}, nil
 }
 
-func (client *panStub) PlayURL(ctx context.Context, token, pickCode string) ([]pan.PlaySource, error) {
+func (client *panStub) PlayURL(ctx context.Context, token, pickCode, userAgent string) ([]pan.PlaySource, error) {
 	if client.playURL != nil {
-		return client.playURL(ctx, token, pickCode)
+		return client.playURL(ctx, token, pickCode, userAgent)
 	}
 	if client.Client != nil {
-		return client.Client.PlayURL(ctx, token, pickCode)
+		return client.Client.PlayURL(ctx, token, pickCode, userAgent)
 	}
 	return []pan.PlaySource{{URL: "https://example.com/video.mp4"}}, nil
 }

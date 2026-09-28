@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const mediaUserAgent = "Miyabi/1.0"
+const MediaUserAgent = "Miyabi/1.0"
 
 type PlaySource struct {
 	URL        string `json:"url"`
@@ -57,17 +57,21 @@ func (client *Client) DownloadURL(ctx context.Context, accessToken, pickCode, us
 	return address, nil
 }
 
-func (client *Client) PlayURL(ctx context.Context, accessToken, pickCode string) ([]PlaySource, error) {
+func (client *Client) PlayURL(ctx context.Context, accessToken, pickCode, userAgent string) ([]PlaySource, error) {
 	type playURLWire struct {
 		apiResponse
 		Data struct {
 			Sources []PlaySource `json:"video_url"`
 		} `json:"data"`
 	}
+	ua := strings.TrimSpace(userAgent)
+	if ua == "" {
+		ua = MediaUserAgent
+	}
 	result, err := apiRequest[playURLWire](
 		client,
 		client.http.R().SetContext(ctx).SetAuthToken(accessToken).
-			SetHeader("User-Agent", mediaUserAgent).SetQueryParam("pick_code", pickCode),
+			SetHeader("User-Agent", ua).SetQueryParam("pick_code", pickCode),
 		http.MethodGet,
 		apiURL+"/open/video/play",
 		"playback URLs",
@@ -91,7 +95,7 @@ func (client *Client) PlayURL(ctx context.Context, accessToken, pickCode string)
 func (client *Client) OpenMedia(ctx context.Context, method, address string, headers http.Header) (*http.Response, error) {
 	ua := headers.Get("User-Agent")
 	if ua == "" {
-		ua = mediaUserAgent
+		ua = MediaUserAgent
 	}
 	request := client.media.R().SetContext(ctx).SetDoNotParseResponse(true).
 		SetHeader("User-Agent", ua).SetHeader("Accept-Encoding", "identity")

@@ -74,14 +74,14 @@ func (client *Client) Info(ctx context.Context, accessToken, fileID string) (Fil
 // ReadMetadata reads a small sidecar, never the video itself. The signed URL
 // request uses the same User-Agent as downurl and carries no access token.
 func (client *Client) ReadMetadata(ctx context.Context, accessToken, pickCode string, limit int64) ([]byte, error) {
-	downloadURL, err := client.DownloadURL(ctx, accessToken, pickCode, mediaUserAgent)
+	downloadURL, err := client.DownloadURL(ctx, accessToken, pickCode, MediaUserAgent)
 	if err != nil {
 		return nil, err
 	}
 	if err := client.limiter.Wait(ctx); err != nil {
 		return nil, err
 	}
-	download, err := client.http.R().SetContext(ctx).SetHeader("User-Agent", mediaUserAgent).
+	download, err := client.http.R().SetContext(ctx).SetHeader("User-Agent", MediaUserAgent).
 		SetDoNotParseResponse(true).Get(downloadURL)
 	if err != nil {
 		return nil, err

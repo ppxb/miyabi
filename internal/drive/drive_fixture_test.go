@@ -33,7 +33,7 @@ type stubClient struct {
 	addOffline     func(context.Context, string, string, string) (string, error)
 	removeOffline  func(context.Context, string, string) error
 	offlineTasks   func(context.Context, string, int) (pan.OfflinePage, error)
-	playURL        func(context.Context, string, string) ([]pan.PlaySource, error)
+	playURL        func(context.Context, string, string, string) ([]pan.PlaySource, error)
 	downloadURL    func(context.Context, string, string) (string, error)
 }
 
@@ -116,9 +116,9 @@ func (c *stubClient) OfflineTasks(ctx context.Context, token string, page int) (
 	return pan.OfflinePage{PageCount: 1}, nil
 }
 
-func (c *stubClient) PlayURL(ctx context.Context, token, pickCode string) ([]pan.PlaySource, error) {
+func (c *stubClient) PlayURL(ctx context.Context, token, pickCode, userAgent string) ([]pan.PlaySource, error) {
 	if c.playURL != nil {
-		return c.playURL(ctx, token, pickCode)
+		return c.playURL(ctx, token, pickCode, userAgent)
 	}
 	return []pan.PlaySource{{URL: "https://cdn.example/video.m3u8", Height: 1080}}, nil
 }

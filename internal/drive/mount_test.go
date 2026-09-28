@@ -245,7 +245,7 @@ func TestSessionsTrackTheMountTheyWereIssuedAgainst(t *testing.T) {
 		"list":   func() error { _, err := sess.List(ctx, testSource.Directory.ID, 0); return err },
 		"info":   func() error { _, err := sess.Info(ctx, "f1"); return err },
 		"read":   func() error { _, err := sess.Read(ctx, "pick-f1", 1024); return err },
-		"play":   func() error { _, err := sess.PlayURL(ctx, "pick-f1"); return err },
+		"play":   func() error { _, err := sess.PlayURL(ctx, "pick-f1", ""); return err },
 		"commit": func() error { return sess.Commit(ctx, func(*ent.Tx) error { return nil }) },
 	} {
 		if err := call(); !errors.Is(err, ErrSourceChanged) {
