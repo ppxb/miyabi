@@ -11,9 +11,11 @@ import (
 	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/task"
+	"github.com/ppxb/miyabi/internal/library/scan"
 	"github.com/ppxb/miyabi/internal/pan"
-	"github.com/ppxb/miyabi/internal/tasks"
 )
 
 type offlineAddResult struct {
@@ -72,7 +74,7 @@ func TestOfflineConcurrentAddsDeduplicateWithoutBlockingOtherHashes(t *testing.T
 	if added.err != nil || repeated.err != nil || added.submission.TaskID != repeated.submission.TaskID {
 		t.Fatalf("duplicate submissions: first=%+v repeated=%+v", added, repeated)
 	}
-	if addsA.Load() != 1 || addsB.Load() != 1 || service.database.Task.Query().Where(task.TypeEQ("offline")).CountX(t.Context()) != 2 {
+	if addsA.Load() != 1 || addsB.Load() != 1 || service.database.OfflineDownload.Query().CountX(t.Context()) != 2 {
 		t.Fatalf("remote add counts: first=%d second=%d", addsA.Load(), addsB.Load())
 	}
 	if len(service.operations.entries) != 0 {
@@ -115,11 +117,11 @@ func TestOfflineStartedSubmissionKeepsOriginalSourceAfterCancellation(t *testing
 			if result.err != nil {
 				t.Fatal(result.err)
 			}
-			record := service.database.Task.GetX(t.Context(), result.submission.TaskID)
-			input, err := tasks.DecodePayload[offlinePayload](record.Payload)
-			if err != nil || input.AccountID != source.AccountID || input.DirectoryID != source.Directory.ID ||
-				input.InfoHash != offlineHashA || record.Status != task.StatusRunning || input.ScanTaskID != 0 {
-				t.Fatalf("started submission was lost or moved: %+v %+v %v", record, input, err)
+			record := service.database.OfflineDownload.GetX(t.Context(), result.submission.TaskID)
+			input := *record
+			if input.AccountID != source.AccountID || input.DirectoryID != source.Directory.ID ||
+				input.InfoHash != offlineHashA || record.Status != offlinedownload.StatusRunning || input.ScanTaskID != 0 {
+				t.Fatalf("started submission was lost or moved: %+v %+v", record, input)
 			}
 		})
 	}
@@ -152,9 +154,9 @@ func TestOfflineSyncRespectsSourceChangesDuringRemotePolling(t *testing.T) {
 			}
 			release()
 			err := awaitPan(t, finished)
-			current := service.database.Task.GetX(t.Context(), record.ID)
+			current := service.database.OfflineDownload.GetX(t.Context(), record.ID)
 			if action == "disconnect" {
-				if !errors.Is(err, pan.ErrUnauthorized) || current.Status != task.StatusRunning {
+				if !errors.Is(err, pan.ErrUnauthorized) || current.Status != offlinedownload.StatusRunning {
 					t.Fatalf("old account sync changed state: %+v, %v", current, err)
 				}
 				return
@@ -162,9 +164,9 @@ func TestOfflineSyncRespectsSourceChangesDuringRemotePolling(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			saved, err := tasks.DecodePayload[offlinePayload](current.Payload)
-			if err != nil || current.Status != task.StatusDone || saved.FileID != "download-folder" || saved.ScanTaskID != 0 {
-				t.Fatalf("completion on replaced mount = %+v, %v", saved, err)
+			saved := *current
+			if current.Status != offlinedownload.StatusDone || saved.FileID != "download-folder" || saved.ScanTaskID != 0 {
+				t.Fatalf("completion on replaced mount = %+v", saved)
 			}
 			if _, err := service.drive.SelectDirectory(t.Context(), source.Directory.ID); err != nil {
 				t.Fatal(err)
@@ -172,16 +174,16 @@ func TestOfflineSyncRespectsSourceChangesDuringRemotePolling(t *testing.T) {
 			if err := service.Sync(t.Context()); err != nil {
 				t.Fatal(err)
 			}
-			current = service.database.Task.GetX(t.Context(), record.ID)
-			saved, err = tasks.DecodePayload[offlinePayload](current.Payload)
-			if err != nil || saved.ScanTaskID == 0 || service.database.Task.Query().Where(task.TypeEQ("scan")).CountX(t.Context()) != 2 {
-				t.Fatalf("remount did not resume targeted scan: %+v, %v", saved, err)
+			current = service.database.OfflineDownload.GetX(t.Context(), record.ID)
+			saved = *current
+			if saved.ScanTaskID == 0 || service.database.Task.Query().Where(task.TypeEQ("scan")).CountX(t.Context()) != 2 {
+				t.Fatalf("remount did not resume targeted scan: %+v", saved)
 			}
 		})
 	}
 }
 
-func TestOfflineStaleResultsPreserveCompletionAndNewerPayload(t *testing.T) {
+func TestOfflineStaleResultsPreserveCompletionAndIndexedFiles(t *testing.T) {
 	service, record, _, source := offlineFixture(t)
 	sess, err := service.drive.OpenSource(t.Context(), source)
 	if err != nil {
@@ -197,17 +199,11 @@ func TestOfflineStaleResultsPreserveCompletionAndNewerPayload(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	current := service.database.Task.GetX(t.Context(), record.ID)
-	saved, err := tasks.DecodePayload[offlinePayload](current.Payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	saved.FileIDs = []string{"newly-indexed-video"}
-	encoded, err := tasks.EncodePayload(saved)
-	if err != nil {
-		t.Fatal(err)
-	}
-	service.database.Task.UpdateOneID(record.ID).SetPayload(encoded).ExecX(t.Context())
+	current := service.database.OfflineDownload.GetX(t.Context(), record.ID)
+	saved := *current
+
+	saved.FileIds = []string{"newly-indexed-video"}
+	service.database.OfflineDownload.UpdateOneID(record.ID).SetFileIds(saved.FileIds).ExecX(t.Context())
 	for _, remote := range []pan.OfflineTask{{Status: 1, Progress: 20}, {Status: -1}, {Status: 2, FileID: "old-download-folder"}} {
 		if err := service.UpdateTask(t.Context(), sess, record, remote); err != nil {
 			t.Fatal(err)
@@ -216,11 +212,11 @@ func TestOfflineStaleResultsPreserveCompletionAndNewerPayload(t *testing.T) {
 	if err := service.markMissing(t.Context(), sess, record); err != nil {
 		t.Fatal(err)
 	}
-	current = service.database.Task.GetX(t.Context(), record.ID)
-	latest, err := tasks.DecodePayload[offlinePayload](current.Payload)
-	if err != nil || current.Status != task.StatusDone || current.Progress != 100 || current.Error != nil ||
-		latest.ScanTaskID != saved.ScanTaskID || latest.FileID != saved.FileID || !slices.Equal(latest.FileIDs, saved.FileIDs) {
-		t.Fatalf("stale result changed completion: %+v %+v, %v", current, latest, err)
+	current = service.database.OfflineDownload.GetX(t.Context(), record.ID)
+	latest := *current
+	if current.Status != offlinedownload.StatusDone || current.Progress != 100 || current.Error != nil ||
+		latest.ScanTaskID != saved.ScanTaskID || latest.FileID != saved.FileID || !slices.Equal(latest.FileIds, saved.FileIds) {
+		t.Fatalf("stale result changed completion: %+v %+v", current, latest)
 	}
 	if count := service.database.Task.Query().Where(task.TypeEQ("scan")).CountX(t.Context()); count != 2 {
 		t.Fatalf("concurrent completion created duplicate targeted scans: %d", count)
@@ -254,10 +250,10 @@ func TestOfflineDuplicateHistoryPreservesRedownloadBehavior(t *testing.T) {
 				t.Fatal(err)
 			}
 			if present {
-				if adds != 1 || removes != 0 || result.Status != string(task.StatusDone) || result.ScanTaskID == 0 {
+				if adds != 1 || removes != 0 || result.Status != string(offlinedownload.StatusDone) || result.ScanTaskID == 0 {
 					t.Fatalf("existing video was resubmitted: adds=%d removes=%d result=%+v", adds, removes, result)
 				}
-			} else if adds != 2 || removes != 1 || result.Status != string(task.StatusRunning) || result.ScanTaskID != 0 {
+			} else if adds != 2 || removes != 1 || result.Status != string(offlinedownload.StatusRunning) || result.ScanTaskID != 0 {
 				t.Fatalf("missing video was not resubmitted: adds=%d removes=%d result=%+v", adds, removes, result)
 			}
 		})
@@ -272,35 +268,27 @@ func TestOfflinePlayableProcessingStillDeduplicatesUntilWorkflowFinishes(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	input := offlinePayload{AccountID: source.AccountID, DirectoryID: source.Directory.ID,
-		Code: "ABP-001", JavDBID: "fixture-movie", Hash: offlineHashA, InfoHash: offlineHashA}
-	encoded, err := tasks.EncodePayload(input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	record := service.database.Task.Create().SetType("offline").SetStatus(task.StatusRunning).SetPayload(encoded).SaveX(ctx)
+	input := ent.OfflineDownload{AccountID: source.AccountID, DirectoryID: source.Directory.ID,
+		Code: "ABP-001", JavdbID: "fixture-movie", Hash: offlineHashA, InfoHash: offlineHashA}
+
+	record := createDownload(service.database, input).SetStatus(offlinedownload.StatusRunning).SaveX(ctx)
 	if err := service.UpdateTask(ctx, sess, record, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
 		t.Fatal(err)
 	}
-	record = service.database.Task.GetX(ctx, record.ID)
-	input, err = tasks.DecodePayload[offlinePayload](record.Payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	film := service.database.Movie.Create().SetCode(input.Code).SetJavdbID(input.JavDBID).SaveX(ctx)
+	record = service.database.OfflineDownload.GetX(ctx, record.ID)
+	input = *record
+
+	film := service.database.Movie.Create().SetCode(input.Code).SetJavdbID(input.JavdbID).SaveX(ctx)
 	video := service.database.File.Create().SetFileID("video").SetName("ABP-001.mp4").SetSize(1).
 		SetAccountID(source.AccountID).SetRootID(source.Directory.ID).SetMovie(film).SaveX(ctx)
-	record.Payload, err = tasks.SetPayloadField(record.Payload, "file_ids", []string{video.FileID})
-	if err != nil {
-		t.Fatal(err)
-	}
-	service.database.Task.UpdateOne(record).SetPayload(record.Payload).ExecX(ctx)
+	record.FileIds = []string{video.FileID}
+	service.database.OfflineDownload.UpdateOne(record).SetFileIds(record.FileIds).ExecX(ctx)
 	adds := 0
 	client.addOffline = func(context.Context, string, string, string) (string, error) {
 		adds++
 		return offlineHashA, nil
 	}
-	result, err := service.Add(ctx, input.JavDBID, input.Hash)
+	result, err := service.Add(ctx, input.JavdbID, input.Hash)
 	if err != nil || result.TaskID != record.ID || result.Phase != "in_library" || !result.Processing || adds != 0 {
 		t.Fatalf("playable processing download was resubmitted: %+v adds=%d err=%v", result, adds, err)
 	}
@@ -308,8 +296,43 @@ func TestOfflinePlayableProcessingStillDeduplicatesUntilWorkflowFinishes(t *test
 		t.Fatal(err)
 	}
 	service.database.File.DeleteOne(video).ExecX(ctx)
-	result, err = service.Add(ctx, input.JavDBID, input.Hash)
+	result, err = service.Add(ctx, input.JavdbID, input.Hash)
 	if err != nil || result.TaskID == record.ID || result.Phase != "downloading" || adds != 1 {
 		t.Fatalf("deleted video could not be downloaded again: %+v adds=%d err=%v", result, adds, err)
+	}
+}
+
+func TestOfflineCompletionAndScanPagePreserveEachOthersFields(t *testing.T) {
+	service, record, input, source := offlineFixture(t)
+	ctx := t.Context()
+	sess, err := service.drive.OpenSource(ctx, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := service.database.Task.Query().Where(task.TypeEQ("scan")).OnlyX(ctx)
+	payload := scan.Payload{Source: source, OfflineTaskID: record.ID, TargetID: "download-folder",
+		Code: input.Code, JavDBID: input.JavdbID}
+	video := scan.IdentifyVideo(pan.File{ID: "video", ParentID: payload.TargetID, Name: input.Code + ".mp4", Size: 1 << 30})
+	start := make(chan struct{})
+	finished := make(chan error, 2)
+	go func() {
+		<-start
+		finished <- service.UpdateTask(ctx, sess, record, pan.OfflineTask{Status: 2, FileID: payload.TargetID})
+	}()
+	go func() {
+		<-start
+		finished <- scan.ProcessScanPage(ctx, service.database, parent.ID, "concurrent-scan", "/Movies/download-folder",
+			[]scan.Video{video}, &payload, nil, service.tasks)
+	}()
+	close(start)
+	for range 2 {
+		if err := awaitPan(t, finished); err != nil {
+			t.Fatal(err)
+		}
+	}
+	saved := service.database.OfflineDownload.GetX(ctx, record.ID)
+	if saved.Status != offlinedownload.StatusDone || saved.Progress != 100 || saved.FileID != "download-folder" ||
+		saved.ScanTaskID == 0 || !slices.Equal(saved.FileIds, []string{"video"}) {
+		t.Fatalf("completion and indexing overwrote each other: %+v", saved)
 	}
 }

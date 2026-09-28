@@ -11,6 +11,7 @@ import (
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/setting"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/javdb"
@@ -144,28 +145,16 @@ func TestProjectMoviesAddsLibraryTaskAndReleaseState(t *testing.T) {
 		movies: []domain.LocalMovie{{ID: 42, Code: "ABP-001"}},
 	}
 
-	if _, err := store.Client.Task.Create().
-		SetType("offline").
-		SetPayload(taskPayloadJSON(t, map[string]any{"code": "ABP-002", "javdb_id": "two", "account_id": "100", "directory_id": "10"})).
-		Save(t.Context()); err != nil {
-		t.Fatal(err)
+	store.Client.OfflineDownload.Create().SetHash("saving").SetCode("ABP-002").SetJavdbID("two").
+		SetAccountID(source.AccountID).SetDirectoryID(source.Directory.ID).SaveX(t.Context())
+	store.Client.Task.Create().SetType("scrape").SetStatus(task.StatusRunning).
+		SetPayload(taskPayloadJSON(t, map[string]any{"code": "ABP-003"})).SaveX(t.Context())
+	for _, status := range []offlinedownload.Status{offlinedownload.StatusDone, offlinedownload.StatusFailed} {
+		store.Client.OfflineDownload.Create().SetHash(string(status)).SetCode("ABP-003").SetJavdbID("three").
+			SetAccountID(source.AccountID).SetDirectoryID(source.Directory.ID).SetStatus(status).SaveX(t.Context())
 	}
-
-	for _, item := range []struct {
-		kind    string
-		status  task.Status
-		payload map[string]any
-	}{
-		{"scrape", task.StatusRunning, map[string]any{"code": "ABP-003"}},
-		{"offline", task.StatusDone, map[string]any{"code": "ABP-003"}},
-		{"offline", task.StatusFailed, map[string]any{"code": "ABP-003"}},
-		{"offline", task.StatusQueued, map[string]any{"code": "ABP-999"}},
-		{"offline", task.StatusQueued, map[string]any{"code": 123}},
-	} {
-		if err := store.Client.Task.Create().SetType(item.kind).SetStatus(item.status).SetPayload(taskPayloadJSON(t, item.payload)).Exec(t.Context()); err != nil {
-			t.Fatal(err)
-		}
-	}
+	store.Client.OfflineDownload.Create().SetHash("unrelated").SetCode("ABP-999").SetJavdbID("unrelated").
+		SetAccountID(source.AccountID).SetDirectoryID(source.Directory.ID).SaveX(t.Context())
 
 	today := time.Now().In(time.Local)
 	tomorrow := today.AddDate(0, 0, 1).Format("2006-01-02")
@@ -278,10 +267,8 @@ func TestProjectionUsesSourceIDBeforeCatalogueSpelling(t *testing.T) {
 		},
 	}
 
-	store.Client.Task.Create().SetType("offline").SetPayload(taskPayloadJSON(t, map[string]any{
-		"javdb_id": "queued-id", "code": "PREVIOUS-002",
-		"account_id": source.AccountID, "directory_id": source.Directory.ID,
-	})).SaveX(ctx)
+	store.Client.OfflineDownload.Create().SetHash("fixture-hash").SetJavdbID("queued-id").SetCode("PREVIOUS-002").
+		SetAccountID(source.AccountID).SetDirectoryID(source.Directory.ID).SaveX(ctx)
 
 	service := &Service{database: store.Client, local: localState}
 	sourceMovies := []domain.Movie{

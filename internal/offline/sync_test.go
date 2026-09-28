@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/library/scan"
 	"github.com/ppxb/miyabi/internal/pan"
@@ -17,21 +18,13 @@ import (
 func TestOfflineSyncContinuesPastIndividualFailures(t *testing.T) {
 	service, first, input, _ := offlineFixture(t)
 	ctx := t.Context()
-	records := []*ent.Task{first}
+	records := []*ent.OfflineDownload{first}
 	for index := 1; index < 5; index++ {
 		payload := input
 		payload.Hash = fmt.Sprintf("download-%d", index)
 		payload.InfoHash = payload.Hash
-		encoded, err := tasks.EncodePayload(payload)
-		if err != nil {
-			t.Fatal(err)
-		}
-		status := task.StatusQueued
-		if index == 3 {
-			status = task.StatusRunning
-		}
-		records = append(records, service.database.Task.Create().SetType("offline").
-			SetStatus(status).SetPayload(encoded).SaveX(ctx))
+
+		records = append(records, createDownload(service.database, payload).SetStatus(offlinedownload.StatusRunning).SaveX(ctx))
 	}
 	fetched := 0
 	stubOf(t, service.drive).offlineTasks = func(_ context.Context, _ string, page int) (pan.OfflinePage, error) {
@@ -52,15 +45,14 @@ func TestOfflineSyncContinuesPastIndividualFailures(t *testing.T) {
 		t.Fatalf("individual sync failure was lost: %v", err)
 	}
 	for index, record := range records {
-		current := service.database.Task.GetX(ctx, record.ID)
-		want := []task.Status{task.StatusRunning, task.StatusDone, task.StatusDone, task.StatusRunning, task.StatusFailed}[index]
+		current := service.database.OfflineDownload.GetX(ctx, record.ID)
+		want := []offlinedownload.Status{offlinedownload.StatusRunning, offlinedownload.StatusDone, offlinedownload.StatusDone, offlinedownload.StatusRunning, offlinedownload.StatusFailed}[index]
 		if current.Status != want {
 			t.Errorf("task %d status = %s, want %s", record.ID, current.Status, want)
 		}
 		if index == 1 || index == 2 {
-			payload, err := tasks.DecodePayload[offlinePayload](current.Payload)
-			if err != nil || payload.ScanTaskID == 0 || current.Progress != 100 {
-				t.Errorf("completed download did not queue its scan: %+v, %v", current, err)
+			if current.ScanTaskID == 0 || current.Progress != 100 {
+				t.Errorf("completed download did not queue its scan: %+v", current)
 			}
 		}
 		if index == 3 && current.Progress != 65 {
@@ -84,8 +76,8 @@ func TestOfflineSyncKeepsUnseenTasksWhenLaterPageFails(t *testing.T) {
 	if err := service.Sync(t.Context()); !errors.Is(err, pageError) {
 		t.Fatalf("page failure = %v", err)
 	}
-	current := service.database.Task.GetX(t.Context(), record.ID)
-	if current.Status != task.StatusRunning || current.Error != nil {
+	current := service.database.OfflineDownload.GetX(t.Context(), record.ID)
+	if current.Status != offlinedownload.StatusRunning || current.Error != nil {
 		t.Fatalf("incomplete listing failed an unseen task: %+v", current)
 	}
 }
@@ -102,8 +94,8 @@ func TestOfflineCompletionWaitsForLocationAcrossRestart(t *testing.T) {
 	if err := service.Sync(ctx); err != nil {
 		t.Fatal(err)
 	}
-	current := service.database.Task.GetX(ctx, record.ID)
-	if current.Status != task.StatusDone || current.Progress != 100 {
+	current := service.database.OfflineDownload.GetX(ctx, record.ID)
+	if current.Status != offlinedownload.StatusDone || current.Progress != 100 {
 		t.Fatalf("remote completion was not persisted: %+v", current)
 	}
 	notifications, cancel := service.tasks.Subscribe()
@@ -147,10 +139,10 @@ func TestOfflineCompletionWaitsForLocationAcrossRestart(t *testing.T) {
 	if err := service.Sync(ctx); err != nil {
 		t.Fatal(err)
 	}
-	current = service.database.Task.GetX(ctx, record.ID)
-	saved, err := tasks.DecodePayload[offlinePayload](current.Payload)
-	if err != nil || saved.ScanTaskID == 0 || saved.FileID != fileID || saved.AwaitingLocation {
-		t.Fatalf("available file location did not resume indexing: %+v, %v", saved, err)
+	current = service.database.OfflineDownload.GetX(ctx, record.ID)
+	saved := *current
+	if saved.ScanTaskID == 0 || saved.FileID != fileID || saved.AwaitingLocation {
+		t.Fatalf("available file location did not resume indexing: %+v", saved)
 	}
 	if err := service.Sync(ctx); err != nil {
 		t.Fatal(err)
@@ -158,15 +150,11 @@ func TestOfflineCompletionWaitsForLocationAcrossRestart(t *testing.T) {
 	if count := service.database.Task.Query().Where(task.TypeEQ("scan")).CountX(ctx); count != 2 {
 		t.Fatalf("resuming completion duplicated scans: %d", count)
 	}
-	film := service.database.Movie.Create().SetCode(input.Code).SetJavdbID(input.JavDBID).SaveX(ctx)
+	film := service.database.Movie.Create().SetCode(input.Code).SetJavdbID(input.JavdbID).SaveX(ctx)
 	service.database.File.Create().SetFileID("video").SetName("video.mp4").SetSize(1).
 		SetAccountID(source.AccountID).SetRootID(source.Directory.ID).SetMovie(film).SaveX(ctx)
-	saved.FileIDs = []string{"video"}
-	encoded, err := tasks.EncodePayload(saved)
-	if err != nil {
-		t.Fatal(err)
-	}
-	service.database.Task.UpdateOneID(record.ID).SetPayload(encoded).ExecX(ctx)
+	saved.FileIds = []string{"video"}
+	service.database.OfflineDownload.UpdateOneID(record.ID).SetFileIds(saved.FileIds).ExecX(ctx)
 	if err := service.tasks.Queue().Finish(ctx, saved.ScanTaskID, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +187,7 @@ func TestOfflineMissingLocationStopsPendingWorkflow(t *testing.T) {
 		t.Fatalf("read activity: %+v, %v", activity, err)
 	}
 	state := activity.Tasks[0]
-	if state.Status != string(task.StatusDone) || state.Processing || state.Error == nil {
+	if state.Status != string(offlinedownload.StatusDone) || state.Processing || state.Error == nil {
 		t.Fatalf("removed remote history kept an endless pending workflow: %+v", state)
 	}
 	service = New(service.database, nil, service.drive, tasks.NewService(service.database, tasks.NewRegistry()), service.library, service.submitTimeout)
@@ -244,7 +232,7 @@ func TestOfflinePageFileTrackingRollsBackWithTheIndex(t *testing.T) {
 	service, record, input, source := offlineFixture(t)
 	ctx := t.Context()
 	payload := scan.Payload{Source: source, OfflineTaskID: record.ID, TargetID: "download-folder",
-		Code: input.Code, JavDBID: input.JavDBID}
+		Code: input.Code, JavDBID: input.JavdbID}
 	video := scan.IdentifyVideo(pan.File{ID: "video", ParentID: "download-folder", Name: input.Code + ".mp4", Size: 1 << 30})
 	// The missing parent fails the final progress write after file tracking.
 	if err := scan.ProcessScanPage(ctx, service.database, -1, "rolled-back", "/Movies/download-folder",
@@ -254,8 +242,8 @@ func TestOfflinePageFileTrackingRollsBackWithTheIndex(t *testing.T) {
 	if service.database.File.Query().CountX(ctx) != 0 {
 		t.Fatal("file index escaped rollback")
 	}
-	saved, err := tasks.DecodePayload[offlinePayload](service.database.Task.GetX(ctx, record.ID).Payload)
-	if err != nil || len(saved.FileIDs) != 0 {
-		t.Fatalf("download file tracking escaped rollback: %+v err=%v", saved, err)
+	saved := *service.database.OfflineDownload.GetX(ctx, record.ID)
+	if len(saved.FileIds) != 0 {
+		t.Fatalf("download file tracking escaped rollback: %+v", saved)
 	}
 }

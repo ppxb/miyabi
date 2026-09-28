@@ -96,6 +96,48 @@ var (
 		Columns:    MoviesColumns,
 		PrimaryKey: []*schema.Column{MoviesColumns[0]},
 	}
+	// OfflineDownloadsColumns holds the columns for the "offline_downloads" table.
+	OfflineDownloadsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "code", Type: field.TypeString, Default: ""},
+		{Name: "javdb_id", Type: field.TypeString, Default: ""},
+		{Name: "hash", Type: field.TypeString},
+		{Name: "info_hash", Type: field.TypeString, Default: ""},
+		{Name: "account_id", Type: field.TypeString, Default: ""},
+		{Name: "directory_id", Type: field.TypeString, Default: ""},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"running", "done", "failed"}, Default: "running"},
+		{Name: "progress", Type: field.TypeInt, Default: 0},
+		{Name: "error", Type: field.TypeString, Nullable: true},
+		{Name: "file_id", Type: field.TypeString, Default: ""},
+		{Name: "file_ids", Type: field.TypeJSON},
+		{Name: "scan_task_id", Type: field.TypeInt, Default: 0},
+		{Name: "awaiting_location", Type: field.TypeBool, Default: false},
+	}
+	// OfflineDownloadsTable holds the schema information for the "offline_downloads" table.
+	OfflineDownloadsTable = &schema.Table{
+		Name:       "offline_downloads",
+		Columns:    OfflineDownloadsColumns,
+		PrimaryKey: []*schema.Column{OfflineDownloadsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "offlinedownload_account_id_status_hash",
+				Unique:  false,
+				Columns: []*schema.Column{OfflineDownloadsColumns[7], OfflineDownloadsColumns[9], OfflineDownloadsColumns[5]},
+			},
+			{
+				Name:    "offlinedownload_account_id_directory_id_hash_id",
+				Unique:  false,
+				Columns: []*schema.Column{OfflineDownloadsColumns[7], OfflineDownloadsColumns[8], OfflineDownloadsColumns[5], OfflineDownloadsColumns[0]},
+			},
+			{
+				Name:    "offlinedownload_account_id_javdb_id_hash_id",
+				Unique:  false,
+				Columns: []*schema.Column{OfflineDownloadsColumns[7], OfflineDownloadsColumns[4], OfflineDownloadsColumns[5], OfflineDownloadsColumns[0]},
+			},
+		},
+	}
 	// SettingsColumns holds the columns for the "settings" table.
 	SettingsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -312,6 +354,7 @@ var (
 		ActorsTable,
 		FilesTable,
 		MoviesTable,
+		OfflineDownloadsTable,
 		SettingsTable,
 		SubscriptionsTable,
 		SubtitlesTable,

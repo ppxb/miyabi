@@ -5,8 +5,7 @@ import (
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/ent/task"
-	"github.com/ppxb/miyabi/internal/tasks"
+	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 )
 
 var offlineBenchmarkResult any
@@ -15,20 +14,17 @@ func BenchmarkOfflineActivityHistory(b *testing.B) {
 	service, _, _, payload := offlineFixture(b)
 	if err := ent.WithTx(b.Context(), service.database, func(tx *ent.Tx) error {
 		for batch := range 10 {
-			var jobs []*ent.TaskCreate
+			var jobs []*ent.OfflineDownloadCreate
 			for i := range 500 {
-				input, err := tasks.EncodePayload(offlinePayload{
-					Code: "ABP-001", JavDBID: "movie", Hash: fmt.Sprintf("%040d", i%50),
+				input := ent.OfflineDownload{
+					Code: "ABP-001", JavdbID: "movie", Hash: fmt.Sprintf("%040d", i%50),
 					InfoHash: fmt.Sprintf("%040d", i%50), AccountID: payload.AccountID,
 					DirectoryID: payload.Directory.ID,
-				})
-				if err != nil {
-					return err
 				}
-				jobs = append(jobs, tx.Task.Create().SetType("offline").SetStatus(task.StatusDone).
-					SetProgress(batch*10).SetPayload(input))
+				jobs = append(jobs, createDownload(tx.Client(), input).SetStatus(offlinedownload.StatusDone).
+					SetProgress(batch*10))
 			}
-			if err := tx.Task.CreateBulk(jobs...).Exec(b.Context()); err != nil {
+			if err := tx.OfflineDownload.CreateBulk(jobs...).Exec(b.Context()); err != nil {
 				return err
 			}
 		}

@@ -15,6 +15,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 	"github.com/ppxb/miyabi/internal/ent/setting"
 	"github.com/ppxb/miyabi/internal/ent/subscription"
@@ -33,15 +34,16 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
-	TypeActor        = "Actor"
-	TypeFile         = "File"
-	TypeMovie        = "Movie"
-	TypeSetting      = "Setting"
-	TypeSubscription = "Subscription"
-	TypeSubtitle     = "Subtitle"
-	TypeTag          = "Tag"
-	TypeTask         = "Task"
-	TypeViewedMovie  = "ViewedMovie"
+	TypeActor           = "Actor"
+	TypeFile            = "File"
+	TypeMovie           = "Movie"
+	TypeOfflineDownload = "OfflineDownload"
+	TypeSetting         = "Setting"
+	TypeSubscription    = "Subscription"
+	TypeSubtitle        = "Subtitle"
+	TypeTag             = "Tag"
+	TypeTask            = "Task"
+	TypeViewedMovie     = "ViewedMovie"
 )
 
 // ActorMutation represents an operation that mutates the Actor nodes in the graph.
@@ -3816,6 +3818,1195 @@ func (m *MovieMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown Movie edge %s", name)
+}
+
+// OfflineDownloadMutation represents an operation that mutates the OfflineDownload nodes in the graph.
+type OfflineDownloadMutation struct {
+	config
+	op                Op
+	typ               string
+	id                *int
+	created_at        *time.Time
+	updated_at        *time.Time
+	code              *string
+	javdb_id          *string
+	hash              *string
+	info_hash         *string
+	account_id        *string
+	directory_id      *string
+	status            *offlinedownload.Status
+	progress          *int
+	addprogress       *int
+	error             *string
+	file_id           *string
+	file_ids          *[]string
+	appendfile_ids    []string
+	scan_task_id      *int
+	addscan_task_id   *int
+	awaiting_location *bool
+	clearedFields     map[string]struct{}
+	done              bool
+	oldValue          func(context.Context) (*OfflineDownload, error)
+	predicates        []predicate.OfflineDownload
+}
+
+var _ ent.Mutation = (*OfflineDownloadMutation)(nil)
+
+// offlinedownloadOption allows management of the mutation configuration using functional options.
+type offlinedownloadOption func(*OfflineDownloadMutation)
+
+// newOfflineDownloadMutation creates new mutation for the OfflineDownload entity.
+func newOfflineDownloadMutation(c config, op Op, opts ...offlinedownloadOption) *OfflineDownloadMutation {
+	m := &OfflineDownloadMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeOfflineDownload,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withOfflineDownloadID sets the ID field of the mutation.
+func withOfflineDownloadID(id int) offlinedownloadOption {
+	return func(m *OfflineDownloadMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *OfflineDownload
+		)
+		m.oldValue = func(ctx context.Context) (*OfflineDownload, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().OfflineDownload.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withOfflineDownload sets the old OfflineDownload of the mutation.
+func withOfflineDownload(node *OfflineDownload) offlinedownloadOption {
+	return func(m *OfflineDownloadMutation) {
+		m.oldValue = func(context.Context) (*OfflineDownload, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m OfflineDownloadMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m OfflineDownloadMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *OfflineDownloadMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *OfflineDownloadMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().OfflineDownload.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *OfflineDownloadMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *OfflineDownloadMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *OfflineDownloadMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *OfflineDownloadMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *OfflineDownloadMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *OfflineDownloadMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetCode sets the "code" field.
+func (m *OfflineDownloadMutation) SetCode(s string) {
+	m.code = &s
+}
+
+// Code returns the value of the "code" field in the mutation.
+func (m *OfflineDownloadMutation) Code() (r string, exists bool) {
+	v := m.code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCode returns the old "code" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldCode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCode: %w", err)
+	}
+	return oldValue.Code, nil
+}
+
+// ResetCode resets all changes to the "code" field.
+func (m *OfflineDownloadMutation) ResetCode() {
+	m.code = nil
+}
+
+// SetJavdbID sets the "javdb_id" field.
+func (m *OfflineDownloadMutation) SetJavdbID(s string) {
+	m.javdb_id = &s
+}
+
+// JavdbID returns the value of the "javdb_id" field in the mutation.
+func (m *OfflineDownloadMutation) JavdbID() (r string, exists bool) {
+	v := m.javdb_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldJavdbID returns the old "javdb_id" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldJavdbID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldJavdbID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldJavdbID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldJavdbID: %w", err)
+	}
+	return oldValue.JavdbID, nil
+}
+
+// ResetJavdbID resets all changes to the "javdb_id" field.
+func (m *OfflineDownloadMutation) ResetJavdbID() {
+	m.javdb_id = nil
+}
+
+// SetHash sets the "hash" field.
+func (m *OfflineDownloadMutation) SetHash(s string) {
+	m.hash = &s
+}
+
+// Hash returns the value of the "hash" field in the mutation.
+func (m *OfflineDownloadMutation) Hash() (r string, exists bool) {
+	v := m.hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHash returns the old "hash" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHash: %w", err)
+	}
+	return oldValue.Hash, nil
+}
+
+// ResetHash resets all changes to the "hash" field.
+func (m *OfflineDownloadMutation) ResetHash() {
+	m.hash = nil
+}
+
+// SetInfoHash sets the "info_hash" field.
+func (m *OfflineDownloadMutation) SetInfoHash(s string) {
+	m.info_hash = &s
+}
+
+// InfoHash returns the value of the "info_hash" field in the mutation.
+func (m *OfflineDownloadMutation) InfoHash() (r string, exists bool) {
+	v := m.info_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInfoHash returns the old "info_hash" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldInfoHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInfoHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInfoHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInfoHash: %w", err)
+	}
+	return oldValue.InfoHash, nil
+}
+
+// ResetInfoHash resets all changes to the "info_hash" field.
+func (m *OfflineDownloadMutation) ResetInfoHash() {
+	m.info_hash = nil
+}
+
+// SetAccountID sets the "account_id" field.
+func (m *OfflineDownloadMutation) SetAccountID(s string) {
+	m.account_id = &s
+}
+
+// AccountID returns the value of the "account_id" field in the mutation.
+func (m *OfflineDownloadMutation) AccountID() (r string, exists bool) {
+	v := m.account_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountID returns the old "account_id" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldAccountID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountID: %w", err)
+	}
+	return oldValue.AccountID, nil
+}
+
+// ResetAccountID resets all changes to the "account_id" field.
+func (m *OfflineDownloadMutation) ResetAccountID() {
+	m.account_id = nil
+}
+
+// SetDirectoryID sets the "directory_id" field.
+func (m *OfflineDownloadMutation) SetDirectoryID(s string) {
+	m.directory_id = &s
+}
+
+// DirectoryID returns the value of the "directory_id" field in the mutation.
+func (m *OfflineDownloadMutation) DirectoryID() (r string, exists bool) {
+	v := m.directory_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDirectoryID returns the old "directory_id" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldDirectoryID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDirectoryID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDirectoryID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDirectoryID: %w", err)
+	}
+	return oldValue.DirectoryID, nil
+}
+
+// ResetDirectoryID resets all changes to the "directory_id" field.
+func (m *OfflineDownloadMutation) ResetDirectoryID() {
+	m.directory_id = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *OfflineDownloadMutation) SetStatus(o offlinedownload.Status) {
+	m.status = &o
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *OfflineDownloadMutation) Status() (r offlinedownload.Status, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldStatus(ctx context.Context) (v offlinedownload.Status, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *OfflineDownloadMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetProgress sets the "progress" field.
+func (m *OfflineDownloadMutation) SetProgress(i int) {
+	m.progress = &i
+	m.addprogress = nil
+}
+
+// Progress returns the value of the "progress" field in the mutation.
+func (m *OfflineDownloadMutation) Progress() (r int, exists bool) {
+	v := m.progress
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProgress returns the old "progress" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldProgress(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProgress is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProgress requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProgress: %w", err)
+	}
+	return oldValue.Progress, nil
+}
+
+// AddProgress adds i to the "progress" field.
+func (m *OfflineDownloadMutation) AddProgress(i int) {
+	if m.addprogress != nil {
+		*m.addprogress += i
+	} else {
+		m.addprogress = &i
+	}
+}
+
+// AddedProgress returns the value that was added to the "progress" field in this mutation.
+func (m *OfflineDownloadMutation) AddedProgress() (r int, exists bool) {
+	v := m.addprogress
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetProgress resets all changes to the "progress" field.
+func (m *OfflineDownloadMutation) ResetProgress() {
+	m.progress = nil
+	m.addprogress = nil
+}
+
+// SetError sets the "error" field.
+func (m *OfflineDownloadMutation) SetError(s string) {
+	m.error = &s
+}
+
+// Error returns the value of the "error" field in the mutation.
+func (m *OfflineDownloadMutation) Error() (r string, exists bool) {
+	v := m.error
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldError returns the old "error" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldError(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldError is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldError requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldError: %w", err)
+	}
+	return oldValue.Error, nil
+}
+
+// ClearError clears the value of the "error" field.
+func (m *OfflineDownloadMutation) ClearError() {
+	m.error = nil
+	m.clearedFields[offlinedownload.FieldError] = struct{}{}
+}
+
+// ErrorCleared returns if the "error" field was cleared in this mutation.
+func (m *OfflineDownloadMutation) ErrorCleared() bool {
+	_, ok := m.clearedFields[offlinedownload.FieldError]
+	return ok
+}
+
+// ResetError resets all changes to the "error" field.
+func (m *OfflineDownloadMutation) ResetError() {
+	m.error = nil
+	delete(m.clearedFields, offlinedownload.FieldError)
+}
+
+// SetFileID sets the "file_id" field.
+func (m *OfflineDownloadMutation) SetFileID(s string) {
+	m.file_id = &s
+}
+
+// FileID returns the value of the "file_id" field in the mutation.
+func (m *OfflineDownloadMutation) FileID() (r string, exists bool) {
+	v := m.file_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFileID returns the old "file_id" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldFileID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFileID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFileID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFileID: %w", err)
+	}
+	return oldValue.FileID, nil
+}
+
+// ResetFileID resets all changes to the "file_id" field.
+func (m *OfflineDownloadMutation) ResetFileID() {
+	m.file_id = nil
+}
+
+// SetFileIds sets the "file_ids" field.
+func (m *OfflineDownloadMutation) SetFileIds(s []string) {
+	m.file_ids = &s
+	m.appendfile_ids = nil
+}
+
+// FileIds returns the value of the "file_ids" field in the mutation.
+func (m *OfflineDownloadMutation) FileIds() (r []string, exists bool) {
+	v := m.file_ids
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFileIds returns the old "file_ids" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldFileIds(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFileIds is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFileIds requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFileIds: %w", err)
+	}
+	return oldValue.FileIds, nil
+}
+
+// AppendFileIds adds s to the "file_ids" field.
+func (m *OfflineDownloadMutation) AppendFileIds(s []string) {
+	m.appendfile_ids = append(m.appendfile_ids, s...)
+}
+
+// AppendedFileIds returns the list of values that were appended to the "file_ids" field in this mutation.
+func (m *OfflineDownloadMutation) AppendedFileIds() ([]string, bool) {
+	if len(m.appendfile_ids) == 0 {
+		return nil, false
+	}
+	return m.appendfile_ids, true
+}
+
+// ResetFileIds resets all changes to the "file_ids" field.
+func (m *OfflineDownloadMutation) ResetFileIds() {
+	m.file_ids = nil
+	m.appendfile_ids = nil
+}
+
+// SetScanTaskID sets the "scan_task_id" field.
+func (m *OfflineDownloadMutation) SetScanTaskID(i int) {
+	m.scan_task_id = &i
+	m.addscan_task_id = nil
+}
+
+// ScanTaskID returns the value of the "scan_task_id" field in the mutation.
+func (m *OfflineDownloadMutation) ScanTaskID() (r int, exists bool) {
+	v := m.scan_task_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScanTaskID returns the old "scan_task_id" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldScanTaskID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScanTaskID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScanTaskID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScanTaskID: %w", err)
+	}
+	return oldValue.ScanTaskID, nil
+}
+
+// AddScanTaskID adds i to the "scan_task_id" field.
+func (m *OfflineDownloadMutation) AddScanTaskID(i int) {
+	if m.addscan_task_id != nil {
+		*m.addscan_task_id += i
+	} else {
+		m.addscan_task_id = &i
+	}
+}
+
+// AddedScanTaskID returns the value that was added to the "scan_task_id" field in this mutation.
+func (m *OfflineDownloadMutation) AddedScanTaskID() (r int, exists bool) {
+	v := m.addscan_task_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetScanTaskID resets all changes to the "scan_task_id" field.
+func (m *OfflineDownloadMutation) ResetScanTaskID() {
+	m.scan_task_id = nil
+	m.addscan_task_id = nil
+}
+
+// SetAwaitingLocation sets the "awaiting_location" field.
+func (m *OfflineDownloadMutation) SetAwaitingLocation(b bool) {
+	m.awaiting_location = &b
+}
+
+// AwaitingLocation returns the value of the "awaiting_location" field in the mutation.
+func (m *OfflineDownloadMutation) AwaitingLocation() (r bool, exists bool) {
+	v := m.awaiting_location
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAwaitingLocation returns the old "awaiting_location" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldAwaitingLocation(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAwaitingLocation is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAwaitingLocation requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAwaitingLocation: %w", err)
+	}
+	return oldValue.AwaitingLocation, nil
+}
+
+// ResetAwaitingLocation resets all changes to the "awaiting_location" field.
+func (m *OfflineDownloadMutation) ResetAwaitingLocation() {
+	m.awaiting_location = nil
+}
+
+// Where appends a list predicates to the OfflineDownloadMutation builder.
+func (m *OfflineDownloadMutation) Where(ps ...predicate.OfflineDownload) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the OfflineDownloadMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *OfflineDownloadMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.OfflineDownload, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *OfflineDownloadMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *OfflineDownloadMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (OfflineDownload).
+func (m *OfflineDownloadMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *OfflineDownloadMutation) Fields() []string {
+	fields := make([]string, 0, 15)
+	if m.created_at != nil {
+		fields = append(fields, offlinedownload.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, offlinedownload.FieldUpdatedAt)
+	}
+	if m.code != nil {
+		fields = append(fields, offlinedownload.FieldCode)
+	}
+	if m.javdb_id != nil {
+		fields = append(fields, offlinedownload.FieldJavdbID)
+	}
+	if m.hash != nil {
+		fields = append(fields, offlinedownload.FieldHash)
+	}
+	if m.info_hash != nil {
+		fields = append(fields, offlinedownload.FieldInfoHash)
+	}
+	if m.account_id != nil {
+		fields = append(fields, offlinedownload.FieldAccountID)
+	}
+	if m.directory_id != nil {
+		fields = append(fields, offlinedownload.FieldDirectoryID)
+	}
+	if m.status != nil {
+		fields = append(fields, offlinedownload.FieldStatus)
+	}
+	if m.progress != nil {
+		fields = append(fields, offlinedownload.FieldProgress)
+	}
+	if m.error != nil {
+		fields = append(fields, offlinedownload.FieldError)
+	}
+	if m.file_id != nil {
+		fields = append(fields, offlinedownload.FieldFileID)
+	}
+	if m.file_ids != nil {
+		fields = append(fields, offlinedownload.FieldFileIds)
+	}
+	if m.scan_task_id != nil {
+		fields = append(fields, offlinedownload.FieldScanTaskID)
+	}
+	if m.awaiting_location != nil {
+		fields = append(fields, offlinedownload.FieldAwaitingLocation)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *OfflineDownloadMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case offlinedownload.FieldCreatedAt:
+		return m.CreatedAt()
+	case offlinedownload.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case offlinedownload.FieldCode:
+		return m.Code()
+	case offlinedownload.FieldJavdbID:
+		return m.JavdbID()
+	case offlinedownload.FieldHash:
+		return m.Hash()
+	case offlinedownload.FieldInfoHash:
+		return m.InfoHash()
+	case offlinedownload.FieldAccountID:
+		return m.AccountID()
+	case offlinedownload.FieldDirectoryID:
+		return m.DirectoryID()
+	case offlinedownload.FieldStatus:
+		return m.Status()
+	case offlinedownload.FieldProgress:
+		return m.Progress()
+	case offlinedownload.FieldError:
+		return m.Error()
+	case offlinedownload.FieldFileID:
+		return m.FileID()
+	case offlinedownload.FieldFileIds:
+		return m.FileIds()
+	case offlinedownload.FieldScanTaskID:
+		return m.ScanTaskID()
+	case offlinedownload.FieldAwaitingLocation:
+		return m.AwaitingLocation()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *OfflineDownloadMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case offlinedownload.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case offlinedownload.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case offlinedownload.FieldCode:
+		return m.OldCode(ctx)
+	case offlinedownload.FieldJavdbID:
+		return m.OldJavdbID(ctx)
+	case offlinedownload.FieldHash:
+		return m.OldHash(ctx)
+	case offlinedownload.FieldInfoHash:
+		return m.OldInfoHash(ctx)
+	case offlinedownload.FieldAccountID:
+		return m.OldAccountID(ctx)
+	case offlinedownload.FieldDirectoryID:
+		return m.OldDirectoryID(ctx)
+	case offlinedownload.FieldStatus:
+		return m.OldStatus(ctx)
+	case offlinedownload.FieldProgress:
+		return m.OldProgress(ctx)
+	case offlinedownload.FieldError:
+		return m.OldError(ctx)
+	case offlinedownload.FieldFileID:
+		return m.OldFileID(ctx)
+	case offlinedownload.FieldFileIds:
+		return m.OldFileIds(ctx)
+	case offlinedownload.FieldScanTaskID:
+		return m.OldScanTaskID(ctx)
+	case offlinedownload.FieldAwaitingLocation:
+		return m.OldAwaitingLocation(ctx)
+	}
+	return nil, fmt.Errorf("unknown OfflineDownload field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *OfflineDownloadMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case offlinedownload.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case offlinedownload.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case offlinedownload.FieldCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCode(v)
+		return nil
+	case offlinedownload.FieldJavdbID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetJavdbID(v)
+		return nil
+	case offlinedownload.FieldHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHash(v)
+		return nil
+	case offlinedownload.FieldInfoHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInfoHash(v)
+		return nil
+	case offlinedownload.FieldAccountID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountID(v)
+		return nil
+	case offlinedownload.FieldDirectoryID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDirectoryID(v)
+		return nil
+	case offlinedownload.FieldStatus:
+		v, ok := value.(offlinedownload.Status)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case offlinedownload.FieldProgress:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProgress(v)
+		return nil
+	case offlinedownload.FieldError:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetError(v)
+		return nil
+	case offlinedownload.FieldFileID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFileID(v)
+		return nil
+	case offlinedownload.FieldFileIds:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFileIds(v)
+		return nil
+	case offlinedownload.FieldScanTaskID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScanTaskID(v)
+		return nil
+	case offlinedownload.FieldAwaitingLocation:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAwaitingLocation(v)
+		return nil
+	}
+	return fmt.Errorf("unknown OfflineDownload field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *OfflineDownloadMutation) AddedFields() []string {
+	var fields []string
+	if m.addprogress != nil {
+		fields = append(fields, offlinedownload.FieldProgress)
+	}
+	if m.addscan_task_id != nil {
+		fields = append(fields, offlinedownload.FieldScanTaskID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *OfflineDownloadMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case offlinedownload.FieldProgress:
+		return m.AddedProgress()
+	case offlinedownload.FieldScanTaskID:
+		return m.AddedScanTaskID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *OfflineDownloadMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case offlinedownload.FieldProgress:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddProgress(v)
+		return nil
+	case offlinedownload.FieldScanTaskID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddScanTaskID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown OfflineDownload numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *OfflineDownloadMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(offlinedownload.FieldError) {
+		fields = append(fields, offlinedownload.FieldError)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *OfflineDownloadMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *OfflineDownloadMutation) ClearField(name string) error {
+	switch name {
+	case offlinedownload.FieldError:
+		m.ClearError()
+		return nil
+	}
+	return fmt.Errorf("unknown OfflineDownload nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *OfflineDownloadMutation) ResetField(name string) error {
+	switch name {
+	case offlinedownload.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case offlinedownload.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case offlinedownload.FieldCode:
+		m.ResetCode()
+		return nil
+	case offlinedownload.FieldJavdbID:
+		m.ResetJavdbID()
+		return nil
+	case offlinedownload.FieldHash:
+		m.ResetHash()
+		return nil
+	case offlinedownload.FieldInfoHash:
+		m.ResetInfoHash()
+		return nil
+	case offlinedownload.FieldAccountID:
+		m.ResetAccountID()
+		return nil
+	case offlinedownload.FieldDirectoryID:
+		m.ResetDirectoryID()
+		return nil
+	case offlinedownload.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case offlinedownload.FieldProgress:
+		m.ResetProgress()
+		return nil
+	case offlinedownload.FieldError:
+		m.ResetError()
+		return nil
+	case offlinedownload.FieldFileID:
+		m.ResetFileID()
+		return nil
+	case offlinedownload.FieldFileIds:
+		m.ResetFileIds()
+		return nil
+	case offlinedownload.FieldScanTaskID:
+		m.ResetScanTaskID()
+		return nil
+	case offlinedownload.FieldAwaitingLocation:
+		m.ResetAwaitingLocation()
+		return nil
+	}
+	return fmt.Errorf("unknown OfflineDownload field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *OfflineDownloadMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *OfflineDownloadMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *OfflineDownloadMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *OfflineDownloadMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *OfflineDownloadMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *OfflineDownloadMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *OfflineDownloadMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown OfflineDownload unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *OfflineDownloadMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown OfflineDownload edge %s", name)
 }
 
 // SettingMutation represents an operation that mutates the Setting nodes in the graph.

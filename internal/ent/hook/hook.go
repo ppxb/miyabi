@@ -45,6 +45,18 @@ func (f MovieFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.MovieMutation", m)
 }
 
+// The OfflineDownloadFunc type is an adapter to allow the use of ordinary
+// function as OfflineDownload mutator.
+type OfflineDownloadFunc func(context.Context, *ent.OfflineDownloadMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f OfflineDownloadFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.OfflineDownloadMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.OfflineDownloadMutation", m)
+}
+
 // The SettingFunc type is an adapter to allow the use of ordinary
 // function as Setting mutator.
 type SettingFunc func(context.Context, *ent.SettingMutation) (ent.Value, error)

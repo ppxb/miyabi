@@ -2,7 +2,6 @@ package offline
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -14,7 +13,7 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/ent/task"
+	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library"
 	scrapePkg "github.com/ppxb/miyabi/internal/library/scrape"
@@ -252,25 +251,19 @@ func libraryBaseFixture(t testing.TB) (*Service, *drive.Drive, *ent.Client, doma
 	return service, driveSvc, store.Client, source
 }
 
-func offlineFixture(t testing.TB) (*Service, *ent.Task, offlinePayload, domain.LibrarySource) {
+func offlineFixture(t testing.TB) (*Service, *ent.OfflineDownload, ent.OfflineDownload, domain.LibrarySource) {
 	t.Helper()
 	service, _, db, source := libraryBaseFixture(t)
-	input := offlinePayload{
+	input := ent.OfflineDownload{
 		AccountID:   source.AccountID,
 		DirectoryID: source.Directory.ID,
 		Code:        "ABP-001",
-		JavDBID:     "fixture-movie",
+		JavdbID:     "fixture-movie",
 		Hash:        "fixture-hash",
 		InfoHash:    "fixture-hash",
 	}
-	encoded, err := tasks.EncodePayload(input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	record, err := db.Task.Create().
-		SetType(tasks.KindOffline.String()).
-		SetStatus(task.StatusRunning).
-		SetPayload(encoded).
+
+	record, err := createDownload(db, input).SetStatus(offlinedownload.StatusRunning).
 		Save(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -319,15 +312,6 @@ func offlineAddFixture(t *testing.T) (*Service, *panStub) {
 	return service, stubOf(t, driveSvc)
 }
 
-func taskPayloadJSON(t testing.TB, value any) json.RawMessage {
-	t.Helper()
-	encoded, err := tasks.EncodePayload(value)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return encoded
-}
-
 func panTestGate(t *testing.T) (<-chan struct{}, func()) {
 	t.Helper()
 	gate := make(chan struct{})
@@ -361,4 +345,10 @@ func awaitPanCondition(t *testing.T, ready func() bool) {
 			t.Fatal("concurrent 115 operation did not reach the expected state")
 		}
 	}
+}
+
+func createDownload(db *ent.Client, input ent.OfflineDownload) *ent.OfflineDownloadCreate {
+	return db.OfflineDownload.Create().SetCode(input.Code).SetJavdbID(input.JavdbID).
+		SetHash(input.Hash).SetInfoHash(input.InfoHash).SetAccountID(input.AccountID).SetDirectoryID(input.DirectoryID).
+		SetFileID(input.FileID).SetFileIds(input.FileIds).SetScanTaskID(input.ScanTaskID).SetAwaitingLocation(input.AwaitingLocation)
 }

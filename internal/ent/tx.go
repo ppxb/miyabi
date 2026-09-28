@@ -18,6 +18,8 @@ type Tx struct {
 	File *FileClient
 	// Movie is the client for interacting with the Movie builders.
 	Movie *MovieClient
+	// OfflineDownload is the client for interacting with the OfflineDownload builders.
+	OfflineDownload *OfflineDownloadClient
 	// Setting is the client for interacting with the Setting builders.
 	Setting *SettingClient
 	// Subscription is the client for interacting with the Subscription builders.
@@ -164,6 +166,7 @@ func (tx *Tx) init() {
 	tx.Actor = NewActorClient(tx.config)
 	tx.File = NewFileClient(tx.config)
 	tx.Movie = NewMovieClient(tx.config)
+	tx.OfflineDownload = NewOfflineDownloadClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)
 	tx.Subscription = NewSubscriptionClient(tx.config)
 	tx.Subtitle = NewSubtitleClient(tx.config)

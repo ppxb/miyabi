@@ -18,6 +18,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/setting"
 	"github.com/ppxb/miyabi/internal/ent/subscription"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
@@ -37,6 +38,8 @@ type Client struct {
 	File *FileClient
 	// Movie is the client for interacting with the Movie builders.
 	Movie *MovieClient
+	// OfflineDownload is the client for interacting with the OfflineDownload builders.
+	OfflineDownload *OfflineDownloadClient
 	// Setting is the client for interacting with the Setting builders.
 	Setting *SettingClient
 	// Subscription is the client for interacting with the Subscription builders.
@@ -63,6 +66,7 @@ func (c *Client) init() {
 	c.Actor = NewActorClient(c.config)
 	c.File = NewFileClient(c.config)
 	c.Movie = NewMovieClient(c.config)
+	c.OfflineDownload = NewOfflineDownloadClient(c.config)
 	c.Setting = NewSettingClient(c.config)
 	c.Subscription = NewSubscriptionClient(c.config)
 	c.Subtitle = NewSubtitleClient(c.config)
@@ -159,17 +163,18 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:          ctx,
-		config:       cfg,
-		Actor:        NewActorClient(cfg),
-		File:         NewFileClient(cfg),
-		Movie:        NewMovieClient(cfg),
-		Setting:      NewSettingClient(cfg),
-		Subscription: NewSubscriptionClient(cfg),
-		Subtitle:     NewSubtitleClient(cfg),
-		Tag:          NewTagClient(cfg),
-		Task:         NewTaskClient(cfg),
-		ViewedMovie:  NewViewedMovieClient(cfg),
+		ctx:             ctx,
+		config:          cfg,
+		Actor:           NewActorClient(cfg),
+		File:            NewFileClient(cfg),
+		Movie:           NewMovieClient(cfg),
+		OfflineDownload: NewOfflineDownloadClient(cfg),
+		Setting:         NewSettingClient(cfg),
+		Subscription:    NewSubscriptionClient(cfg),
+		Subtitle:        NewSubtitleClient(cfg),
+		Tag:             NewTagClient(cfg),
+		Task:            NewTaskClient(cfg),
+		ViewedMovie:     NewViewedMovieClient(cfg),
 	}, nil
 }
 
@@ -187,17 +192,18 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:          ctx,
-		config:       cfg,
-		Actor:        NewActorClient(cfg),
-		File:         NewFileClient(cfg),
-		Movie:        NewMovieClient(cfg),
-		Setting:      NewSettingClient(cfg),
-		Subscription: NewSubscriptionClient(cfg),
-		Subtitle:     NewSubtitleClient(cfg),
-		Tag:          NewTagClient(cfg),
-		Task:         NewTaskClient(cfg),
-		ViewedMovie:  NewViewedMovieClient(cfg),
+		ctx:             ctx,
+		config:          cfg,
+		Actor:           NewActorClient(cfg),
+		File:            NewFileClient(cfg),
+		Movie:           NewMovieClient(cfg),
+		OfflineDownload: NewOfflineDownloadClient(cfg),
+		Setting:         NewSettingClient(cfg),
+		Subscription:    NewSubscriptionClient(cfg),
+		Subtitle:        NewSubtitleClient(cfg),
+		Tag:             NewTagClient(cfg),
+		Task:            NewTaskClient(cfg),
+		ViewedMovie:     NewViewedMovieClient(cfg),
 	}, nil
 }
 
@@ -227,8 +233,8 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.Actor, c.File, c.Movie, c.Setting, c.Subscription, c.Subtitle, c.Tag, c.Task,
-		c.ViewedMovie,
+		c.Actor, c.File, c.Movie, c.OfflineDownload, c.Setting, c.Subscription,
+		c.Subtitle, c.Tag, c.Task, c.ViewedMovie,
 	} {
 		n.Use(hooks...)
 	}
@@ -238,8 +244,8 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.Actor, c.File, c.Movie, c.Setting, c.Subscription, c.Subtitle, c.Tag, c.Task,
-		c.ViewedMovie,
+		c.Actor, c.File, c.Movie, c.OfflineDownload, c.Setting, c.Subscription,
+		c.Subtitle, c.Tag, c.Task, c.ViewedMovie,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -254,6 +260,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.File.mutate(ctx, m)
 	case *MovieMutation:
 		return c.Movie.mutate(ctx, m)
+	case *OfflineDownloadMutation:
+		return c.OfflineDownload.mutate(ctx, m)
 	case *SettingMutation:
 		return c.Setting.mutate(ctx, m)
 	case *SubscriptionMutation:
@@ -763,6 +771,139 @@ func (c *MovieClient) mutate(ctx context.Context, m *MovieMutation) (Value, erro
 		return (&MovieDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Movie mutation op: %q", m.Op())
+	}
+}
+
+// OfflineDownloadClient is a client for the OfflineDownload schema.
+type OfflineDownloadClient struct {
+	config
+}
+
+// NewOfflineDownloadClient returns a client for the OfflineDownload from the given config.
+func NewOfflineDownloadClient(c config) *OfflineDownloadClient {
+	return &OfflineDownloadClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `offlinedownload.Hooks(f(g(h())))`.
+func (c *OfflineDownloadClient) Use(hooks ...Hook) {
+	c.hooks.OfflineDownload = append(c.hooks.OfflineDownload, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `offlinedownload.Intercept(f(g(h())))`.
+func (c *OfflineDownloadClient) Intercept(interceptors ...Interceptor) {
+	c.inters.OfflineDownload = append(c.inters.OfflineDownload, interceptors...)
+}
+
+// Create returns a builder for creating a OfflineDownload entity.
+func (c *OfflineDownloadClient) Create() *OfflineDownloadCreate {
+	mutation := newOfflineDownloadMutation(c.config, OpCreate)
+	return &OfflineDownloadCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of OfflineDownload entities.
+func (c *OfflineDownloadClient) CreateBulk(builders ...*OfflineDownloadCreate) *OfflineDownloadCreateBulk {
+	return &OfflineDownloadCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *OfflineDownloadClient) MapCreateBulk(slice any, setFunc func(*OfflineDownloadCreate, int)) *OfflineDownloadCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &OfflineDownloadCreateBulk{err: fmt.Errorf("calling to OfflineDownloadClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*OfflineDownloadCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &OfflineDownloadCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for OfflineDownload.
+func (c *OfflineDownloadClient) Update() *OfflineDownloadUpdate {
+	mutation := newOfflineDownloadMutation(c.config, OpUpdate)
+	return &OfflineDownloadUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *OfflineDownloadClient) UpdateOne(_m *OfflineDownload) *OfflineDownloadUpdateOne {
+	mutation := newOfflineDownloadMutation(c.config, OpUpdateOne, withOfflineDownload(_m))
+	return &OfflineDownloadUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *OfflineDownloadClient) UpdateOneID(id int) *OfflineDownloadUpdateOne {
+	mutation := newOfflineDownloadMutation(c.config, OpUpdateOne, withOfflineDownloadID(id))
+	return &OfflineDownloadUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for OfflineDownload.
+func (c *OfflineDownloadClient) Delete() *OfflineDownloadDelete {
+	mutation := newOfflineDownloadMutation(c.config, OpDelete)
+	return &OfflineDownloadDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *OfflineDownloadClient) DeleteOne(_m *OfflineDownload) *OfflineDownloadDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *OfflineDownloadClient) DeleteOneID(id int) *OfflineDownloadDeleteOne {
+	builder := c.Delete().Where(offlinedownload.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &OfflineDownloadDeleteOne{builder}
+}
+
+// Query returns a query builder for OfflineDownload.
+func (c *OfflineDownloadClient) Query() *OfflineDownloadQuery {
+	return &OfflineDownloadQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeOfflineDownload},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a OfflineDownload entity by its id.
+func (c *OfflineDownloadClient) Get(ctx context.Context, id int) (*OfflineDownload, error) {
+	return c.Query().Where(offlinedownload.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *OfflineDownloadClient) GetX(ctx context.Context, id int) *OfflineDownload {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *OfflineDownloadClient) Hooks() []Hook {
+	return c.hooks.OfflineDownload
+}
+
+// Interceptors returns the client interceptors.
+func (c *OfflineDownloadClient) Interceptors() []Interceptor {
+	return c.inters.OfflineDownload
+}
+
+func (c *OfflineDownloadClient) mutate(ctx context.Context, m *OfflineDownloadMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&OfflineDownloadCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&OfflineDownloadUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&OfflineDownloadUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&OfflineDownloadDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown OfflineDownload mutation op: %q", m.Op())
 	}
 }
 
@@ -1599,11 +1740,11 @@ func (c *ViewedMovieClient) mutate(ctx context.Context, m *ViewedMovieMutation) 
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Actor, File, Movie, Setting, Subscription, Subtitle, Tag, Task,
+		Actor, File, Movie, OfflineDownload, Setting, Subscription, Subtitle, Tag, Task,
 		ViewedMovie []ent.Hook
 	}
 	inters struct {
-		Actor, File, Movie, Setting, Subscription, Subtitle, Tag, Task,
+		Actor, File, Movie, OfflineDownload, Setting, Subscription, Subtitle, Tag, Task,
 		ViewedMovie []ent.Interceptor
 	}
 )

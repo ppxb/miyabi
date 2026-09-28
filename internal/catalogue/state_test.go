@@ -5,6 +5,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -26,18 +27,10 @@ func TestMovieStatesScopeWorkflowsToSource(t *testing.T) {
 		movies: nil, // initially not in library
 	}
 
-	// Create offline task in saving state (running)
-	input := map[string]any{
-		"account_id":   source.AccountID,
-		"directory_id": source.Directory.ID,
-		"code":         "ABP-001",
-		"javdb_id":     knownJavDBID,
-	}
-	record, err := store.Client.Task.Create().
-		SetType(tasks.KindOffline.String()).
-		SetStatus(task.StatusRunning).
-		SetPayload(taskPayloadJSON(t, input)).
-		Save(ctx)
+	// Create an active download in the mounted source.
+	record, err := store.Client.OfflineDownload.Create().
+		SetHash("fixture-hash").SetAccountID(source.AccountID).SetDirectoryID(source.Directory.ID).
+		SetCode("ABP-001").SetJavdbID(knownJavDBID).Save(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,11 +45,8 @@ func TestMovieStatesScopeWorkflowsToSource(t *testing.T) {
 	}
 
 	// 2. Offline task completed (status done) awaiting location/scan -> MovieProcessing
-	input["file_id"] = "download-folder"
-	input["awaiting_location"] = true
-	store.Client.Task.UpdateOne(record).
-		SetStatus(task.StatusDone).
-		SetPayload(taskPayloadJSON(t, input)).
+	store.Client.OfflineDownload.UpdateOne(record).
+		SetStatus(offlinedownload.StatusDone).SetFileID("download-folder").SetAwaitingLocation(true).
 		ExecX(ctx)
 
 	states, err = service.MovieStates(ctx, identities)
@@ -112,29 +102,12 @@ func TestMovieStatesDifferentAccountOrDirectoryIgnored(t *testing.T) {
 	local := &stubLocalState{source: &source}
 	service := &Service{database: store.Client, local: local}
 
-	// Task from different account
-	store.Client.Task.Create().
-		SetType(tasks.KindOffline.String()).
-		SetStatus(task.StatusRunning).
-		SetPayload(taskPayloadJSON(t, map[string]any{
-			"account_id":   "other-account",
-			"directory_id": source.Directory.ID,
-			"javdb_id":     "other-acc-movie",
-			"code":         "ABP-101",
-		})).
-		SaveX(ctx)
-
-	// Task from different directory
-	store.Client.Task.Create().
-		SetType(tasks.KindOffline.String()).
-		SetStatus(task.StatusRunning).
-		SetPayload(taskPayloadJSON(t, map[string]any{
-			"account_id":   source.AccountID,
-			"directory_id": "other-dir",
-			"javdb_id":     "other-dir-movie",
-			"code":         "ABP-102",
-		})).
-		SaveX(ctx)
+	store.Client.OfflineDownload.Create().SetHash("other-account-hash").
+		SetAccountID("other-account").SetDirectoryID(source.Directory.ID).
+		SetJavdbID("other-acc-movie").SetCode("ABP-101").SaveX(ctx)
+	store.Client.OfflineDownload.Create().SetHash("other-directory-hash").
+		SetAccountID(source.AccountID).SetDirectoryID("other-dir").
+		SetJavdbID("other-dir-movie").SetCode("ABP-102").SaveX(ctx)
 
 	states, err := service.MovieStates(ctx, []MovieIdentity{
 		{ID: "other-acc-movie", Code: "ABP-101"},

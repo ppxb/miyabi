@@ -7,32 +7,32 @@ import (
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/ent/task"
+	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 )
 
 func TestOfflineHistoryLoadsOnlyLatestTasksAndRetainsOldDownloads(t *testing.T) {
 	service, pending, input, _ := offlineFixture(t)
 	ctx := t.Context()
-	service.database.Task.UpdateOne(pending).SetProgress(17).ExecX(ctx)
+	service.database.OfflineDownload.UpdateOne(pending).SetProgress(17).ExecX(ctx)
 	var latestID int
 	for version := range 4 {
-		var jobs []*ent.TaskCreate
+		var jobs []*ent.OfflineDownloadCreate
 		for number := range 50 {
 			payload := input
 			payload.Hash, payload.InfoHash = fmt.Sprintf("history-%d", number), fmt.Sprintf("history-%d", number)
-			jobs = append(jobs, service.database.Task.Create().SetType("offline").SetStatus(task.StatusDone).
-				SetProgress(100).SetPayload(taskPayloadJSON(t, payload)))
+			jobs = append(jobs, createDownload(service.database, payload).SetStatus(offlinedownload.StatusDone).
+				SetProgress(100))
 		}
-		records := service.database.Task.CreateBulk(jobs...).SaveX(ctx)
+		records := service.database.OfflineDownload.CreateBulk(jobs...).SaveX(ctx)
 		if version == 3 {
 			latestID = records[len(records)-1].ID
 		}
 	}
 	rowsRead := 0
-	service.database.Task.Intercept(ent.InterceptFunc(func(next ent.Querier) ent.Querier {
+	service.database.OfflineDownload.Intercept(ent.InterceptFunc(func(next ent.Querier) ent.Querier {
 		return ent.QuerierFunc(func(ctx context.Context, query ent.Query) (ent.Value, error) {
 			value, err := next.Query(ctx, query)
-			if records, ok := value.([]*ent.Task); ok {
+			if records, ok := value.([]*ent.OfflineDownload); ok {
 				rowsRead += len(records)
 			}
 			return value, err
@@ -43,7 +43,7 @@ func TestOfflineHistoryLoadsOnlyLatestTasksAndRetainsOldDownloads(t *testing.T) 
 			activity, err := service.Activity(ctx)
 			return activity.Tasks, err
 		},
-		func() ([]domain.OfflineSubmission, error) { return service.Tasks(ctx, input.JavDBID, input.AccountID) },
+		func() ([]domain.OfflineSubmission, error) { return service.Tasks(ctx, input.JavdbID, input.AccountID) },
 	} {
 		rowsRead = 0
 		records, err := read()
@@ -51,7 +51,7 @@ func TestOfflineHistoryLoadsOnlyLatestTasksAndRetainsOldDownloads(t *testing.T) 
 			t.Fatalf("history was hydrated or limited before grouping: %d records, %d rows, %v", len(records), rowsRead, err)
 		}
 		old := records[len(records)-1]
-		if old.TaskID != pending.ID || old.Status != string(task.StatusRunning) || old.Progress != 17 || old.Phase != "downloading" {
+		if old.TaskID != pending.ID || old.Status != string(offlinedownload.StatusRunning) || old.Progress != 17 || old.Phase != "downloading" {
 			t.Fatalf("old download disappeared behind completed history: %#v", old)
 		}
 	}
@@ -59,33 +59,24 @@ func TestOfflineHistoryLoadsOnlyLatestTasksAndRetainsOldDownloads(t *testing.T) 
 
 func TestOfflineHistoryScopesMovieAndAccountBeforeGrouping(t *testing.T) {
 	service, original, input, _ := offlineFixture(t)
-	for _, change := range []func(*offlinePayload){
-		func(payload *offlinePayload) { payload.JavDBID = "other-movie" },
-		func(payload *offlinePayload) { payload.AccountID = "other-account" },
+	for _, change := range []func(*ent.OfflineDownload){
+		func(payload *ent.OfflineDownload) { payload.JavdbID = "other-movie" },
+		func(payload *ent.OfflineDownload) { payload.AccountID = "other-account" },
 	} {
 		payload := input
 		change(&payload)
-		service.database.Task.Create().SetType("offline").SetStatus(task.StatusDone).
-			SetPayload(taskPayloadJSON(t, payload)).ExecX(t.Context())
+		createDownload(service.database, payload).SetStatus(offlinedownload.StatusDone).ExecX(t.Context())
 	}
-	records, err := service.Tasks(t.Context(), input.JavDBID, input.AccountID)
+	records, err := service.Tasks(t.Context(), input.JavdbID, input.AccountID)
 	if err != nil || len(records) != 1 || records[0].TaskID != original.ID {
 		t.Fatalf("newer foreign task hid the movie's download: %#v, %v", records, err)
 	}
 }
 
-func TestOfflineHistoryDoesNotHideMalformedHashBehindValidString(t *testing.T) {
-	for _, hash := range []any{nil, 42, map[string]any{}, []any{}} {
-		t.Run(fmt.Sprintf("%T", hash), func(t *testing.T) {
-			service, _, input, _ := offlineFixture(t)
-			bad := map[string]any{"account_id": input.AccountID, "directory_id": input.DirectoryID,
-				"javdb_id": input.JavDBID, "hash": hash}
-			service.database.Task.Create().SetType("offline").SetPayload(taskPayloadJSON(t, bad)).ExecX(t.Context())
-			input.Hash = string(taskPayloadJSON(t, hash))
-			service.database.Task.Create().SetType("offline").SetPayload(taskPayloadJSON(t, input)).ExecX(t.Context())
-			if _, err := service.Activity(t.Context()); err == nil {
-				t.Fatal("SQL grouping hid a malformed task identity")
-			}
-		})
+func TestOfflineDownloadRejectsEmptyHash(t *testing.T) {
+	service, _, input, _ := offlineFixture(t)
+	input.Hash = ""
+	if err := createDownload(service.database, input).Exec(t.Context()); err == nil {
+		t.Fatal("empty download identity accepted")
 	}
 }

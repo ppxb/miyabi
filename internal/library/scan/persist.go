@@ -14,10 +14,6 @@ import (
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
-type offlineTaskPayload struct {
-	FileIDs []string `json:"file_ids,omitempty"`
-}
-
 // ProcessScanPage persists file associations and movie records for a scanned page within a transaction.
 func ProcessScanPage(ctx context.Context, db *ent.Client, taskID int, scanID, directoryPath string, videos []Video, payload *Payload, prepare func([]Video) []Video, tasksSvc *tasks.Service) error {
 	return ent.WithTx(ctx, db, func(tx *ent.Tx) error {
@@ -130,30 +126,22 @@ func ProcessScanPageTx(ctx context.Context, tx *ent.Tx, taskID int, scanID, dire
 		}
 		payload.Scan.RemovedMovies += len(removed)
 		if len(videos) > 0 && payload.OfflineTaskID != 0 {
-			record, err := tx.Task.Get(ctx, payload.OfflineTaskID)
+			record, err := tx.OfflineDownload.Get(ctx, payload.OfflineTaskID)
 			if err != nil {
 				return err
 			}
-			input, err := tasks.DecodePayload[offlineTaskPayload](record.Payload)
-			if err != nil {
-				return err
-			}
-			known := make(map[string]bool, len(input.FileIDs))
-			for _, id := range input.FileIDs {
+			known := make(map[string]bool, len(record.FileIds))
+			for _, id := range record.FileIds {
 				known[id] = true
 			}
 			for _, id := range ids {
 				if !known[id] {
-					input.FileIDs = append(input.FileIDs, id)
+					record.FileIds = append(record.FileIds, id)
 					known[id], offlineChanged = true, true
 				}
 			}
 			if offlineChanged {
-				record.Payload, err = tasks.SetPayloadField(record.Payload, "file_ids", input.FileIDs)
-				if err != nil {
-					return err
-				}
-				if err := tx.Task.UpdateOneID(record.ID).SetPayload(record.Payload).Exec(ctx); err != nil {
+				if err := tx.OfflineDownload.UpdateOneID(record.ID).SetFileIds(record.FileIds).Exec(ctx); err != nil {
 					return err
 				}
 			}

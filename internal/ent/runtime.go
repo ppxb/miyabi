@@ -9,6 +9,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/schema"
 	"github.com/ppxb/miyabi/internal/ent/setting"
 	"github.com/ppxb/miyabi/internal/ent/subscription"
@@ -127,6 +128,67 @@ func init() {
 	movieDescFanarts := movieFields[14].Descriptor()
 	// movie.DefaultFanarts holds the default value on creation for the fanarts field.
 	movie.DefaultFanarts = movieDescFanarts.Default.(func() []string)
+	offlinedownloadMixin := schema.OfflineDownload{}.Mixin()
+	offlinedownloadMixinFields0 := offlinedownloadMixin[0].Fields()
+	_ = offlinedownloadMixinFields0
+	offlinedownloadFields := schema.OfflineDownload{}.Fields()
+	_ = offlinedownloadFields
+	// offlinedownloadDescCreatedAt is the schema descriptor for created_at field.
+	offlinedownloadDescCreatedAt := offlinedownloadMixinFields0[0].Descriptor()
+	// offlinedownload.DefaultCreatedAt holds the default value on creation for the created_at field.
+	offlinedownload.DefaultCreatedAt = offlinedownloadDescCreatedAt.Default.(func() time.Time)
+	// offlinedownloadDescUpdatedAt is the schema descriptor for updated_at field.
+	offlinedownloadDescUpdatedAt := offlinedownloadMixinFields0[1].Descriptor()
+	// offlinedownload.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	offlinedownload.DefaultUpdatedAt = offlinedownloadDescUpdatedAt.Default.(func() time.Time)
+	// offlinedownload.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	offlinedownload.UpdateDefaultUpdatedAt = offlinedownloadDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// offlinedownloadDescCode is the schema descriptor for code field.
+	offlinedownloadDescCode := offlinedownloadFields[0].Descriptor()
+	// offlinedownload.DefaultCode holds the default value on creation for the code field.
+	offlinedownload.DefaultCode = offlinedownloadDescCode.Default.(string)
+	// offlinedownloadDescJavdbID is the schema descriptor for javdb_id field.
+	offlinedownloadDescJavdbID := offlinedownloadFields[1].Descriptor()
+	// offlinedownload.DefaultJavdbID holds the default value on creation for the javdb_id field.
+	offlinedownload.DefaultJavdbID = offlinedownloadDescJavdbID.Default.(string)
+	// offlinedownloadDescHash is the schema descriptor for hash field.
+	offlinedownloadDescHash := offlinedownloadFields[2].Descriptor()
+	// offlinedownload.HashValidator is a validator for the "hash" field. It is called by the builders before save.
+	offlinedownload.HashValidator = offlinedownloadDescHash.Validators[0].(func(string) error)
+	// offlinedownloadDescInfoHash is the schema descriptor for info_hash field.
+	offlinedownloadDescInfoHash := offlinedownloadFields[3].Descriptor()
+	// offlinedownload.DefaultInfoHash holds the default value on creation for the info_hash field.
+	offlinedownload.DefaultInfoHash = offlinedownloadDescInfoHash.Default.(string)
+	// offlinedownloadDescAccountID is the schema descriptor for account_id field.
+	offlinedownloadDescAccountID := offlinedownloadFields[4].Descriptor()
+	// offlinedownload.DefaultAccountID holds the default value on creation for the account_id field.
+	offlinedownload.DefaultAccountID = offlinedownloadDescAccountID.Default.(string)
+	// offlinedownloadDescDirectoryID is the schema descriptor for directory_id field.
+	offlinedownloadDescDirectoryID := offlinedownloadFields[5].Descriptor()
+	// offlinedownload.DefaultDirectoryID holds the default value on creation for the directory_id field.
+	offlinedownload.DefaultDirectoryID = offlinedownloadDescDirectoryID.Default.(string)
+	// offlinedownloadDescProgress is the schema descriptor for progress field.
+	offlinedownloadDescProgress := offlinedownloadFields[7].Descriptor()
+	// offlinedownload.DefaultProgress holds the default value on creation for the progress field.
+	offlinedownload.DefaultProgress = offlinedownloadDescProgress.Default.(int)
+	// offlinedownload.ProgressValidator is a validator for the "progress" field. It is called by the builders before save.
+	offlinedownload.ProgressValidator = offlinedownloadDescProgress.Validators[0].(func(int) error)
+	// offlinedownloadDescFileID is the schema descriptor for file_id field.
+	offlinedownloadDescFileID := offlinedownloadFields[9].Descriptor()
+	// offlinedownload.DefaultFileID holds the default value on creation for the file_id field.
+	offlinedownload.DefaultFileID = offlinedownloadDescFileID.Default.(string)
+	// offlinedownloadDescFileIds is the schema descriptor for file_ids field.
+	offlinedownloadDescFileIds := offlinedownloadFields[10].Descriptor()
+	// offlinedownload.DefaultFileIds holds the default value on creation for the file_ids field.
+	offlinedownload.DefaultFileIds = offlinedownloadDescFileIds.Default.([]string)
+	// offlinedownloadDescScanTaskID is the schema descriptor for scan_task_id field.
+	offlinedownloadDescScanTaskID := offlinedownloadFields[11].Descriptor()
+	// offlinedownload.DefaultScanTaskID holds the default value on creation for the scan_task_id field.
+	offlinedownload.DefaultScanTaskID = offlinedownloadDescScanTaskID.Default.(int)
+	// offlinedownloadDescAwaitingLocation is the schema descriptor for awaiting_location field.
+	offlinedownloadDescAwaitingLocation := offlinedownloadFields[12].Descriptor()
+	// offlinedownload.DefaultAwaitingLocation holds the default value on creation for the awaiting_location field.
+	offlinedownload.DefaultAwaitingLocation = offlinedownloadDescAwaitingLocation.Default.(bool)
 	settingMixin := schema.Setting{}.Mixin()
 	settingMixinFields0 := settingMixin[0].Fields()
 	_ = settingMixinFields0

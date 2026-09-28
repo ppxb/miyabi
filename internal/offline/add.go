@@ -5,13 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"entgo.io/ent/dialect/sql"
-	"entgo.io/ent/dialect/sql/sqljson"
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/ent/task"
-	"github.com/ppxb/miyabi/internal/tasks"
+	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 )
 
 // Add validates and records a new offline download for the given movie ID and magnet hash.
@@ -49,19 +46,11 @@ func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.O
 	}
 	defer unlock()
 
-	existing, err := service.database.Task.Query().Where(task.TypeEQ(tasks.KindOffline.String()),
-		task.StatusIn(task.StatusQueued, task.StatusRunning), func(s *sql.Selector) {
-			s.Where(sql.And(
-				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("account_id")),
-				sqljson.ValueEQ(task.FieldPayload, hash, sqljson.Path("hash")),
-			))
-		}).First(ctx)
+	existing, err := service.database.OfflineDownload.Query().Where(
+		offlinedownload.AccountIDEQ(source.AccountID), offlinedownload.HashEQ(hash),
+		offlinedownload.StatusEQ(offlinedownload.StatusRunning)).First(ctx)
 	if err == nil {
-		input, err := tasks.DecodePayload[offlinePayload](existing.Payload)
-		if err != nil {
-			return domain.OfflineSubmission{}, err
-		}
-		if input.DirectoryID != directory.ID {
+		if existing.DirectoryID != directory.ID {
 			return domain.OfflineSubmission{}, domain.E(domain.KindConflict, "该磁力正在下载到另一个目录，请先在 115 中处理该任务", nil)
 		}
 		return service.submission(ctx, existing, &source)
@@ -70,13 +59,10 @@ func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.O
 		return domain.OfflineSubmission{}, fmt.Errorf("find active offline task: %w", err)
 	}
 
-	previous, err := service.database.Task.Query().Where(task.TypeEQ(tasks.KindOffline.String()), task.StatusEQ(task.StatusDone), func(s *sql.Selector) {
-		s.Where(sql.And(
-			sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("account_id")),
-			sqljson.ValueEQ(task.FieldPayload, directory.ID, sqljson.Path("directory_id")),
-			sqljson.ValueEQ(task.FieldPayload, hash, sqljson.Path("hash")),
-		))
-	}).Order(ent.Desc(task.FieldID)).First(ctx)
+	previous, err := service.database.OfflineDownload.Query().Where(
+		offlinedownload.AccountIDEQ(source.AccountID), offlinedownload.DirectoryIDEQ(directory.ID),
+		offlinedownload.HashEQ(hash), offlinedownload.StatusEQ(offlinedownload.StatusDone)).
+		Order(ent.Desc(offlinedownload.FieldID)).First(ctx)
 	if err == nil {
 		state, err := service.submission(ctx, previous, &source)
 		if err != nil {
@@ -105,32 +91,18 @@ func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.O
 	if err != nil {
 		return domain.OfflineSubmission{}, fmt.Errorf("submit 115 offline download: %w", err)
 	}
-	input := offlinePayload{
-		Code:        code,
-		JavDBID:     movieID,
-		Hash:        hash,
-		InfoHash:    remote.Hash,
-		AccountID:   source.AccountID,
-		DirectoryID: directory.ID,
-	}
-	encoded, err := tasks.EncodePayload(input)
-	if err != nil {
-		return domain.OfflineSubmission{}, err
-	}
-
-	var created *ent.Task
+	var created *ent.OfflineDownload
 	if err := service.drive.Commit(submitContext, func(tx *ent.Tx) error {
 		var err error
-		created, err = tx.Task.Create().
-			SetType(tasks.KindOffline.String()).
-			SetStatus(task.StatusRunning).
-			SetPayload(encoded).
+		created, err = tx.OfflineDownload.Create().
+			SetCode(code).SetJavdbID(movieID).SetHash(hash).SetInfoHash(remote.Hash).
+			SetAccountID(source.AccountID).SetDirectoryID(directory.ID).
 			Save(submitContext)
 		if err != nil {
 			return err
 		}
 		if remote.Status == 2 {
-			return service.completeTask(submitContext, tx, created, input, remote.FileID, sess)
+			return service.completeTask(submitContext, tx, created, remote.FileID)
 		}
 		return nil
 	}); err != nil {
@@ -138,7 +110,7 @@ func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.O
 	}
 
 	service.tasks.NotifyOfflineChanged()
-	created, err = service.database.Task.Get(submitContext, created.ID)
+	created, err = service.database.OfflineDownload.Get(submitContext, created.ID)
 	if err != nil {
 		return domain.OfflineSubmission{}, err
 	}

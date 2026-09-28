@@ -62,9 +62,9 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 		client.Close()
 		return nil, fmt.Errorf("migrate subscriptions: %w", err)
 	}
-	if err := createTaskHistoryIndexes(ctx, db); err != nil {
+	if err := migrateOfflineDownloads(ctx, db); err != nil {
 		client.Close()
-		return nil, err
+		return nil, fmt.Errorf("migrate offline downloads: %w", err)
 	}
 
 	return &Store{Client: client, db: db}, nil

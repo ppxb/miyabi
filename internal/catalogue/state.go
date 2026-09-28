@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqljson"
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -62,47 +63,41 @@ func (service *Service) MovieStates(ctx context.Context, identities []MovieIdent
 	}
 
 	var active []struct {
-		Type    string      `json:"type"`
-		Status  task.Status `json:"status"`
-		JavDBID string      `json:"javdb_id"`
+		JavDBID string `json:"javdb_id"`
 	}
-	err = service.database.Task.Query().Where(task.Or(
-		task.And(task.TypeEQ(tasks.KindOffline.String()), func(s *sql.Selector) {
-			s.Where(sql.And(
-				sqljson.ValueIn(task.FieldPayload, taskIDs, sqljson.Path("javdb_id")),
-				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("account_id")),
-				sqljson.ValueEQ(task.FieldPayload, source.Directory.ID, sqljson.Path("directory_id")),
-				sql.Or(sql.In(task.FieldStatus, string(task.StatusQueued), string(task.StatusRunning)),
-					sql.And(sql.EQ(task.FieldStatus, string(task.StatusDone)),
-						sql.Not(sqljson.HasKey(task.FieldPayload, sqljson.Path("scan_task_id"))),
-						sql.Or(
-							sqljson.ValueNEQ(task.FieldPayload, "", sqljson.Path("file_id")),
-							sqljson.ValueEQ(task.FieldPayload, true, sqljson.Path("awaiting_location")),
-						),
-					)),
-			))
-		}),
-		task.And(task.TypeIn(tasks.KindScan.String(), tasks.KindScrape.String(), tasks.KindCover.String()), task.StatusIn(task.StatusQueued, task.StatusRunning), func(s *sql.Selector) {
+	err = service.database.Task.Query().Where(
+		task.TypeIn(tasks.KindScan.String(), tasks.KindScrape.String(), tasks.KindCover.String()), task.StatusIn(task.StatusQueued, task.StatusRunning), func(s *sql.Selector) {
 			s.Where(sql.And(
 				sqljson.ValueIn(task.FieldPayload, taskIDs, sqljson.Path("javdb_id")),
 				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("source", "account_id")),
 				sqljson.ValueEQ(task.FieldPayload, source.Directory.ID, sqljson.Path("source", "directory", "id")),
 			))
-		}),
-	), func(s *sql.Selector) {
-		// Cover payloads can contain full NFO documents; only read task identity.
-		s.Select(s.C(task.FieldType), s.C(task.FieldStatus),
-			sql.As(tasks.JSONExtract(s.C(task.FieldPayload), "javdb_id"), "javdb_id"))
-	}).Select(task.FieldID).Scan(ctx, &active)
+		}, func(s *sql.Selector) {
+			// Cover payloads can contain full NFO documents; only read task identity.
+			s.Select(sql.As(tasks.JSONExtract(s.C(task.FieldPayload), "javdb_id"), "javdb_id"))
+		}).Select(task.FieldID).Scan(ctx, &active)
 	if err != nil {
 		return nil, fmt.Errorf("query movie workflows: %w", err)
 	}
 	saving, processing := make(map[string]bool), make(map[string]bool)
 	for _, record := range active {
-		if record.Type == tasks.KindOffline.String() && record.Status != task.StatusDone {
-			saving[record.JavDBID] = true
+		processing[record.JavDBID] = true
+	}
+	downloads, err := service.database.OfflineDownload.Query().Where(
+		offlinedownload.AccountIDEQ(source.AccountID), offlinedownload.DirectoryIDEQ(source.Directory.ID),
+		offlinedownload.JavdbIDIn(ids...),
+		offlinedownload.Or(offlinedownload.StatusEQ(offlinedownload.StatusRunning),
+			offlinedownload.And(offlinedownload.StatusEQ(offlinedownload.StatusDone), offlinedownload.ScanTaskIDEQ(0),
+				offlinedownload.Or(offlinedownload.FileIDNEQ(""), offlinedownload.AwaitingLocationEQ(true))))).
+		Select(offlinedownload.FieldJavdbID, offlinedownload.FieldStatus).All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("query movie downloads: %w", err)
+	}
+	for _, record := range downloads {
+		if record.Status == offlinedownload.StatusRunning {
+			saving[record.JavdbID] = true
 		} else {
-			processing[record.JavDBID] = true
+			processing[record.JavdbID] = true
 		}
 	}
 	for index, identity := range identities {

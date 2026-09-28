@@ -100,19 +100,11 @@ func ReconcileScanTx(ctx context.Context, tx *ent.Tx, taskID int, scanID string,
 		if err != nil {
 			return err
 		}
-		record, err := tx.Task.Get(ctx, payload.OfflineTaskID)
-		if err != nil {
-			return err
-		}
 		ids := make([]string, 0, len(files))
 		for _, entry := range files {
 			ids = append(ids, entry.FileID)
 		}
-		record.Payload, err = tasks.SetPayloadField(record.Payload, "file_ids", ids)
-		if err != nil {
-			return err
-		}
-		if err := tx.Task.UpdateOneID(record.ID).SetPayload(record.Payload).Exec(ctx); err != nil {
+		if err := tx.OfflineDownload.UpdateOneID(payload.OfflineTaskID).SetFileIds(ids).Exec(ctx); err != nil {
 			return err
 		}
 	}

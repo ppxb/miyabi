@@ -166,66 +166,6 @@ func TestStoredTaskJSONSurvivesReopenWithoutReencoding(t *testing.T) {
 	}
 }
 
-func TestOfflineHistoryIndexesSurviveReopenAndSupportGrouping(t *testing.T) {
-	directory := t.TempDir()
-	store, err := Open(t.Context(), directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if store != nil {
-			_ = store.Close()
-		}
-	})
-	job := store.Client.Task.Create().SetType("offline").
-		SetPayload(json.RawMessage(`{"account_id":"100","directory_id":"10","javdb_id":"movie","hash":"fixture"}`)).SaveX(t.Context())
-	// Upgrade a database populated before the expression indexes existed.
-	for _, name := range []string{"task_offline_source_history", "task_offline_movie_history"} {
-		if _, err := store.db.ExecContext(t.Context(), "DROP INDEX "+name); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for range 2 {
-		if err := store.Close(); err != nil {
-			t.Fatal(err)
-		}
-		store, err = Open(t.Context(), directory)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := store.Client.Task.GetX(t.Context(), job.ID); string(got.Payload) != string(job.Payload) || got.Status != job.Status {
-			t.Fatal("history index migration changed a task")
-		}
-		for _, query := range []struct{ field, value, index string }{
-			{"directory_id", "10", "task_offline_source_history"},
-			{"javdb_id", "movie", "task_offline_movie_history"},
-		} {
-			rows, err := store.db.QueryContext(t.Context(),
-				"EXPLAIN QUERY PLAN SELECT MAX(id) FROM tasks WHERE type = ? AND json_extract(payload, '$.account_id') = ? AND json_extract(payload, '$."+query.field+"') = ? GROUP BY json_type(payload, '$.hash'), json_extract(payload, '$.hash')",
-				"offline", "100", query.value)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var details []string
-			for rows.Next() {
-				var id, parent, unused int
-				var detail string
-				if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
-					rows.Close()
-					t.Fatal(err)
-				}
-				details = append(details, detail)
-			}
-			err = rows.Err()
-			rows.Close()
-			plan := strings.Join(details, "\n")
-			if err != nil || !strings.Contains(plan, query.index) || strings.Contains(plan, "TEMP B-TREE FOR GROUP BY") {
-				t.Fatalf("history query did not use its ordered scope index: %s, %v", plan, err)
-			}
-		}
-	}
-}
-
 func TestMigrateMonitorsToSubscriptions(t *testing.T) {
 	directory := t.TempDir()
 	store, err := Open(t.Context(), directory)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/library/scan"
 	scrapePkg "github.com/ppxb/miyabi/internal/library/scrape"
@@ -151,7 +153,7 @@ func TestMetadataCanonicalizesLegacyAliasBeforeRescan(t *testing.T) {
 func TestOfflineScanUsesCatalogueIdentityAndKeepsItOnRescan(t *testing.T) {
 	lib, queued, payload := libraryFixture(t)
 	ctx := t.Context()
-	offline := lib.database.Task.Create().SetType("offline").SaveX(ctx)
+	offline := lib.database.OfflineDownload.Create().SetHash("fixture-hash").SaveX(ctx)
 	payload.OfflineTaskID, payload.TargetID, payload.TargetPath = offline.ID, "download-folder", "/Movies/release-folder"
 	payload.Code, payload.JavDBID = "LUXU-1899", "catalogue-id"
 	entries := []pan.File{
@@ -179,6 +181,11 @@ func TestOfflineScanUsesCatalogueIdentityAndKeepsItOnRescan(t *testing.T) {
 	}
 	if err := reconcileScan(ctx, lib, queued.ID, "download", &payload, nil); err != nil {
 		t.Fatal(err)
+	}
+	download := lib.database.OfflineDownload.GetX(ctx, offline.ID)
+	slices.Sort(download.FileIds)
+	if !slices.Equal(download.FileIds, []string{"prefixed", "unnamed"}) || download.Hash != offline.Hash || download.Status != offline.Status {
+		t.Fatalf("scan file tracking changed download state or lost files: %+v", download)
 	}
 	metadata := lib.database.Task.Query().Where(task.TypeEQ("scrape")).OnlyX(ctx)
 	input, err := tasks.DecodePayload[scrapePkg.MetadataPayload](metadata.Payload)
@@ -352,7 +359,7 @@ func TestTaskRecoveryLeavesOfflineJobsAloneAndAllowsFailedScanRetry(t *testing.T
 	if err != nil || duplicate.ID != queued.ID {
 		t.Fatalf("duplicate scan = %#v, error = %v", duplicate, err)
 	}
-	offline, err := lib.database.Task.Create().SetType(tasks.KindOffline.String()).SetStatus(task.StatusRunning).SetProgress(40).Save(ctx)
+	offline, err := lib.database.OfflineDownload.Create().SetHash("fixture-hash").SetStatus(offlinedownload.StatusRunning).SetProgress(40).Save(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,8 +374,8 @@ func TestTaskRecoveryLeavesOfflineJobsAloneAndAllowsFailedScanRetry(t *testing.T
 	if err != nil || scanTask.Status != task.StatusQueued {
 		t.Fatalf("recovered scan = %#v, error = %v", scanTask, err)
 	}
-	download, err := lib.database.Task.Get(ctx, offline.ID)
-	if err != nil || download.Status != task.StatusRunning || download.Progress != 40 {
+	download, err := lib.database.OfflineDownload.Get(ctx, offline.ID)
+	if err != nil || download.Status != offlinedownload.StatusRunning || download.Progress != 40 {
 		t.Fatalf("offline task changed during recovery: %#v, error = %v", download, err)
 	}
 	if err := lib.tasks.Queue().Finish(ctx, queued.ID, errors.New("fixture failure")); err != nil {

@@ -15,6 +15,9 @@ type File func(*sql.Selector)
 // Movie is the predicate function for movie builders.
 type Movie func(*sql.Selector)
 
+// OfflineDownload is the predicate function for offlinedownload builders.
+type OfflineDownload func(*sql.Selector)
+
 // Setting is the predicate function for setting builders.
 type Setting func(*sql.Selector)
 

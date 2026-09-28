@@ -26,19 +26,6 @@ type Library interface {
 	EnqueueTargetedScan(ctx context.Context, tx *ent.Tx, source domain.LibrarySource, targetID string, offlineTaskID int, code, javdbID string) (int, error)
 }
 
-type offlinePayload struct {
-	Code             string   `json:"code"`
-	JavDBID          string   `json:"javdb_id"`
-	Hash             string   `json:"hash"`
-	InfoHash         string   `json:"info_hash"`
-	AccountID        string   `json:"account_id"`
-	DirectoryID      string   `json:"directory_id"`
-	FileID           string   `json:"file_id,omitempty"`
-	FileIDs          []string `json:"file_ids,omitempty"`
-	ScanTaskID       int      `json:"scan_task_id,omitempty"`
-	AwaitingLocation bool     `json:"awaiting_location,omitempty"`
-}
-
 // Service coordinates 115 offline download submissions, remote polling, and indexing transitions.
 type Service struct {
 	database  *ent.Client
