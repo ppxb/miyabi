@@ -102,3 +102,32 @@ func TestActorCursor(t *testing.T) {
 		t.Fatalf("seen list must keep the newest %d IDs, got %d ending in %s", seenMovieLimit, len(bounded.SeenMovieIDs), bounded.SeenMovieIDs[len(bounded.SeenMovieIDs)-1])
 	}
 }
+
+func TestActorCursor_Initialization(t *testing.T) {
+	var empty ActorCursor
+	if empty.isInitialized() {
+		t.Fatal("empty cursor should not be initialized")
+	}
+
+	snapEmpty := snapshotCursor(nil, "2026-09-18")
+	if !snapEmpty.isInitialized() || !snapEmpty.Initialized {
+		t.Fatal("snapshotCursor on empty page must mark initialized")
+	}
+
+	encoded := snapEmpty.encode()
+	decoded := decodeCursor(encoded)
+	if !decoded.isInitialized() || !decoded.Initialized {
+		t.Fatal("decoded cursor must preserve initialized flag")
+	}
+
+	legacyWithSeen := decodeCursor(`{"seen_movie_ids":["m1"]}`)
+	if !legacyWithSeen.isInitialized() {
+		t.Fatal("legacy cursor with seen IDs should be recognized as initialized")
+	}
+
+	legacyWithDate := decodeCursor(`{"latest_release_date":"2026-09-01"}`)
+	if !legacyWithDate.isInitialized() {
+		t.Fatal("legacy cursor with latest release date should be recognized as initialized")
+	}
+}
+

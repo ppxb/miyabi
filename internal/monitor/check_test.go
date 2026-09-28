@@ -109,3 +109,43 @@ func TestCheckDefersUpstreamFailure(t *testing.T) {
 		t.Fatal("subscription changes must notify subscribers")
 	}
 }
+
+func TestActorSubscriptionZeroInitialWorksSpawnsFirstWorks(t *testing.T) {
+	f, ctx := newFixture(t), t.Context()
+	actorRef := []domain.Actor{{ID: "actor-zero", Name: "Zero Works Debut", Avatar: "https://example.com/avatar.jpg"}}
+	// Actor initially has 0 works on JavDB
+	f.discover.actorMovies["actor-zero"] = []domain.Movie{}
+
+	actor, err := f.service.AddActor(ctx, "actor-zero", AddActorOptions{Title: "Zero Works Debut"})
+	if err != nil {
+		t.Fatalf("AddActor: %v", err)
+	}
+
+	// Verify no movies spawned initially
+	feed, err := f.service.ActorFeed(ctx, actor.ID, 1, 10)
+	if err != nil || len(feed) != 0 {
+		t.Fatalf("expected 0 works initially, got %d %v", len(feed), err)
+	}
+
+	// Later, actor's debut works appear on JavDB
+	f.discover.actorMovies["actor-zero"] = []domain.Movie{
+		{ID: "act-debut-1", Code: "DEBUT-001", Title: "Debut 1", ReleaseDate: "2099-01-01", Actors: actorRef},
+		{ID: "act-debut-2", Code: "DEBUT-002", Title: "Debut 2", ReleaseDate: "2026-09-01", Actors: actorRef},
+	}
+
+	f.forceDue(t, actor.ID)
+	if err := f.service.Check(ctx); err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+
+	// Verify both debut works were spawned as subscriptions
+	feed, err = f.service.ActorFeed(ctx, actor.ID, 1, 10)
+	if err != nil || len(feed) != 2 {
+		t.Fatalf("expected 2 spawned works for debut actor, got %d (err: %v)", len(feed), err)
+	}
+	targetIDs := map[string]bool{feed[0].TargetID: true, feed[1].TargetID: true}
+	if !targetIDs["act-debut-1"] || !targetIDs["act-debut-2"] {
+		t.Fatalf("expected act-debut-1 and act-debut-2 in feed, got %#v", feed)
+	}
+}
+

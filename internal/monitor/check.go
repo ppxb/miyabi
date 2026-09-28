@@ -137,7 +137,7 @@ func (service *Service) checkActor(ctx context.Context, record *ent.Subscription
 	}
 	today := now.Format(dateLayout)
 	cursor := decodeCursor(record.Cursor)
-	if len(cursor.SeenMovieIDs) == 0 {
+	if !cursor.isInitialized() {
 		// No baseline yet: record the page without treating the back
 		// catalogue as new releases.
 		cursor = snapshotCursor(movies, today)

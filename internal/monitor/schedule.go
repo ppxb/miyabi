@@ -24,8 +24,13 @@ const (
 // ActorCursor is what an actor subscription remembers between checks: the
 // works already seen and the newest release date that has actually shipped.
 type ActorCursor struct {
+	Initialized       bool     `json:"initialized"`
 	LatestReleaseDate string   `json:"latest_release_date"`
 	SeenMovieIDs      []string `json:"seen_movie_ids"`
+}
+
+func (cursor ActorCursor) isInitialized() bool {
+	return cursor.Initialized || len(cursor.SeenMovieIDs) > 0 || cursor.LatestReleaseDate != ""
 }
 
 func decodeCursor(raw string) ActorCursor {
@@ -43,7 +48,7 @@ func (cursor ActorCursor) encode() string {
 
 // snapshotCursor takes a works page as the baseline.
 func snapshotCursor(movies []domain.Movie, today string) ActorCursor {
-	return ActorCursor{}.advance(movies, today)
+	return ActorCursor{Initialized: true}.advance(movies, today)
 }
 
 // newWorks returns unseen works that are not older than the watermark minus
@@ -59,7 +64,7 @@ func (cursor ActorCursor) newWorks(movies []domain.Movie) []domain.Movie {
 	}
 	var result []domain.Movie
 	for _, movie := range movies {
-		if seen[movie.ID] || (movie.ReleaseDate != "" && movie.ReleaseDate < threshold) {
+		if seen[movie.ID] || (threshold != "" && movie.ReleaseDate != "" && movie.ReleaseDate < threshold) {
 			continue
 		}
 		result = append(result, movie)
@@ -70,6 +75,7 @@ func (cursor ActorCursor) newWorks(movies []domain.Movie) []domain.Movie {
 // advance marks the page seen, raises the watermark to the newest release
 // that is not in the future, and bounds the seen list to the newest IDs.
 func (cursor ActorCursor) advance(movies []domain.Movie, today string) ActorCursor {
+	cursor.Initialized = true
 	seen := make(map[string]bool, len(cursor.SeenMovieIDs))
 	for _, id := range cursor.SeenMovieIDs {
 		seen[id] = true
