@@ -88,6 +88,7 @@ var (
 		{Name: "cover", Type: field.TypeString, Nullable: true},
 		{Name: "poster", Type: field.TypeString, Nullable: true},
 		{Name: "fanarts", Type: field.TypeJSON},
+		{Name: "metadata_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "scrape_status", Type: field.TypeEnum, Enums: []string{"pending", "done", "failed"}, Default: "pending"},
 	}
 	// MoviesTable holds the schema information for the "movies" table.

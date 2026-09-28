@@ -19,14 +19,14 @@ import (
 )
 
 type completedScanFixture struct {
-	lib     *Service
-	queued  domain.TaskInfo
-	payload scan.Payload
-	covered *ent.Task
-	input   scrape.CoverPayload
-	movie   *ent.Movie
-	videos  []scan.Video
-	entries map[string][]pan.File
+	lib      *Service
+	queued   domain.TaskInfo
+	payload  scan.Payload
+	covered  *ent.Task
+	snapshot *domain.MetadataSnapshot
+	movie    *ent.Movie
+	videos   []scan.Video
+	entries  map[string][]pan.File
 }
 
 func newCompletedScanFixture(t *testing.T) *completedScanFixture {
@@ -57,13 +57,15 @@ func newCompletedScanFixture(t *testing.T) *completedScanFixture {
 	nfoFile := pan.File{Name: "ABP-001.nfo", SHA1: strings.Repeat("1", 40)}
 	poster := pan.File{Name: "ABP-001-poster.jpg", SHA1: strings.Repeat("2", 40)}
 	fanart := pan.File{Name: "ABP-001-fanart.jpg", SHA1: strings.Repeat("3", 40)}
+	snapshot := &domain.MetadataSnapshot{
+		AccountID: payload.Source.AccountID, DirectoryID: payload.Source.Directory.ID,
+		Videos:      scrape.VideoFingerprint([]pan.File{videos[0].File}),
+		Directories: []domain.DirectorySnapshot{scrape.NewDirectorySnapshot("10", nfoFile, poster, fanart)},
+	}
+	record = record.Update().SetMetadataSnapshot(snapshot).SaveX(ctx)
 	input := scrape.CoverPayload{
 		MetadataPayload: scrape.MetadataPayload{Source: payload.Source, ScanTaskID: queued.ID, MovieID: record.ID, Code: record.Code},
-		Artwork:         &artwork,
-		Snapshot: &scrape.Snapshot{
-			Videos:      scrape.VideoFingerprint([]pan.File{videos[0].File}),
-			Directories: []scrape.DirectorySnapshot{scrape.NewDirectorySnapshot("10", nfoFile, poster, fanart)},
-		},
+		Artwork:         &artwork, Completed: true,
 	}
 	encoded, err := tasks.EncodePayload(input)
 	if err != nil {
@@ -81,7 +83,7 @@ func newCompletedScanFixture(t *testing.T) *completedScanFixture {
 		t.Fatal(err)
 	}
 	payload.Scan = domain.ScanProgress{Stage: "scanning"}
-	return &completedScanFixture{lib: lib, queued: queued, payload: payload, movie: record, covered: covered, input: input,
+	return &completedScanFixture{lib: lib, queued: queued, payload: payload, movie: record, covered: covered, snapshot: snapshot,
 		videos: videos, entries: map[string][]pan.File{"10": {videos[0].File, nfoFile, poster, fanart}},
 	}
 }
@@ -93,15 +95,11 @@ func TestRescanSchedulesOnlyChangedOrIncompleteMetadata(t *testing.T) {
 		jobs   int
 	}{
 		{name: "unchanged"},
-		{name: "legacy cover without snapshot", jobs: 1, change: func(t *testing.T, f *completedScanFixture) {
-			f.input.Snapshot = nil
-			encoded, err := tasks.EncodePayload(f.input)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := f.covered.Update().SetPayload(encoded).Exec(t.Context()); err != nil {
-				t.Fatal(err)
-			}
+		{name: "movie without snapshot", jobs: 1, change: func(t *testing.T, f *completedScanFixture) {
+			f.movie.Update().ClearMetadataSnapshot().ExecX(t.Context())
+		}},
+		{name: "deleted task history", change: func(t *testing.T, f *completedScanFixture) {
+			f.lib.database.Task.DeleteOne(f.covered).ExecX(t.Context())
 		}},
 		{name: "unrelated movie in shared directory", change: func(_ *testing.T, f *completedScanFixture) {
 			f.entries["10"] = append(f.entries["10"], fixtureVideo("202", "ABP-002.mp4").File,
@@ -130,14 +128,12 @@ func TestRescanSchedulesOnlyChangedOrIncompleteMetadata(t *testing.T) {
 			}
 		}},
 		{name: "another root snapshot", jobs: 1, change: func(t *testing.T, f *completedScanFixture) {
-			f.input.Source.Directory.ID = "other-root"
-			encoded, err := tasks.EncodePayload(f.input)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := f.covered.Update().SetPayload(encoded).Exec(t.Context()); err != nil {
-				t.Fatal(err)
-			}
+			f.snapshot.DirectoryID = "other-root"
+			f.movie.Update().SetMetadataSnapshot(f.snapshot).ExecX(t.Context())
+		}},
+		{name: "another account snapshot", jobs: 1, change: func(t *testing.T, f *completedScanFixture) {
+			f.snapshot.AccountID = "other-account"
+			f.movie.Update().SetMetadataSnapshot(f.snapshot).ExecX(t.Context())
 		}},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {

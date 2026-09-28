@@ -115,18 +115,14 @@ func TestCompactScanKeepsSharedDirectoryAndArtworkMatching(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			f := newCompletedScanFixture(t)
 			f.entries["10"][1].Name, f.entries["10"][2].Name = scenario.nfo, scenario.poster
-			f.input.Snapshot.Directories[0].NFO.Name = scenario.nfo
-			f.input.Snapshot.Directories[0].Poster.Name = scenario.poster
+			f.snapshot.Directories[0].NFO.Name = scenario.nfo
+			f.snapshot.Directories[0].Poster.Name = scenario.poster
 			// A directory ending in .nfo must not become a candidate sidecar.
 			f.entries["10"] = append(f.entries["10"], pan.File{ID: "folder", Name: "other.nfo", IsDirectory: true})
 			if scenario.shared {
 				f.entries["10"] = append(f.entries["10"], pan.File{ID: "unmatched", Name: "recording.mp4", Size: 1 << 30})
 			}
-			encoded, err := tasks.EncodePayload(f.input)
-			if err != nil {
-				t.Fatal(err)
-			}
-			f.covered.Update().SetPayload(encoded).ExecX(t.Context())
+			f.movie.Update().SetMetadataSnapshot(f.snapshot).ExecX(t.Context())
 			observed := make(scrape.DirectoryObservations)
 			for _, entry := range f.entries["10"] {
 				observed.Add("10", []pan.File{entry})

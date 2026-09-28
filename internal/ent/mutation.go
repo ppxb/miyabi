@@ -12,6 +12,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
@@ -1919,46 +1920,47 @@ func (m *FileMutation) ResetEdge(name string) error {
 // MovieMutation represents an operation that mutates the Movie nodes in the graph.
 type MovieMutation struct {
 	config
-	op               Op
-	typ              string
-	id               *int
-	created_at       *time.Time
-	updated_at       *time.Time
-	code             *string
-	javdb_id         *string
-	title            *string
-	release_date     *time.Time
-	duration         *int
-	addduration      *int
-	director_id      *string
-	director_name    *string
-	maker_id         *string
-	maker_name       *string
-	series_id        *string
-	series_name      *string
-	rating           *float64
-	addrating        *float64
-	cover            *string
-	poster           *string
-	fanarts          *[]string
-	appendfanarts    []string
-	scrape_status    *movie.ScrapeStatus
-	clearedFields    map[string]struct{}
-	actors           map[int]struct{}
-	removedactors    map[int]struct{}
-	clearedactors    bool
-	tags             map[int]struct{}
-	removedtags      map[int]struct{}
-	clearedtags      bool
-	files            map[int]struct{}
-	removedfiles     map[int]struct{}
-	clearedfiles     bool
-	subtitles        map[int]struct{}
-	removedsubtitles map[int]struct{}
-	clearedsubtitles bool
-	done             bool
-	oldValue         func(context.Context) (*Movie, error)
-	predicates       []predicate.Movie
+	op                Op
+	typ               string
+	id                *int
+	created_at        *time.Time
+	updated_at        *time.Time
+	code              *string
+	javdb_id          *string
+	title             *string
+	release_date      *time.Time
+	duration          *int
+	addduration       *int
+	director_id       *string
+	director_name     *string
+	maker_id          *string
+	maker_name        *string
+	series_id         *string
+	series_name       *string
+	rating            *float64
+	addrating         *float64
+	cover             *string
+	poster            *string
+	fanarts           *[]string
+	appendfanarts     []string
+	metadata_snapshot **domain.MetadataSnapshot
+	scrape_status     *movie.ScrapeStatus
+	clearedFields     map[string]struct{}
+	actors            map[int]struct{}
+	removedactors     map[int]struct{}
+	clearedactors     bool
+	tags              map[int]struct{}
+	removedtags       map[int]struct{}
+	clearedtags       bool
+	files             map[int]struct{}
+	removedfiles      map[int]struct{}
+	clearedfiles      bool
+	subtitles         map[int]struct{}
+	removedsubtitles  map[int]struct{}
+	clearedsubtitles  bool
+	done              bool
+	oldValue          func(context.Context) (*Movie, error)
+	predicates        []predicate.Movie
 }
 
 var _ ent.Mutation = (*MovieMutation)(nil)
@@ -2884,6 +2886,55 @@ func (m *MovieMutation) ResetFanarts() {
 	m.appendfanarts = nil
 }
 
+// SetMetadataSnapshot sets the "metadata_snapshot" field.
+func (m *MovieMutation) SetMetadataSnapshot(ds *domain.MetadataSnapshot) {
+	m.metadata_snapshot = &ds
+}
+
+// MetadataSnapshot returns the value of the "metadata_snapshot" field in the mutation.
+func (m *MovieMutation) MetadataSnapshot() (r *domain.MetadataSnapshot, exists bool) {
+	v := m.metadata_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMetadataSnapshot returns the old "metadata_snapshot" field's value of the Movie entity.
+// If the Movie object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MovieMutation) OldMetadataSnapshot(ctx context.Context) (v *domain.MetadataSnapshot, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMetadataSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMetadataSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMetadataSnapshot: %w", err)
+	}
+	return oldValue.MetadataSnapshot, nil
+}
+
+// ClearMetadataSnapshot clears the value of the "metadata_snapshot" field.
+func (m *MovieMutation) ClearMetadataSnapshot() {
+	m.metadata_snapshot = nil
+	m.clearedFields[movie.FieldMetadataSnapshot] = struct{}{}
+}
+
+// MetadataSnapshotCleared returns if the "metadata_snapshot" field was cleared in this mutation.
+func (m *MovieMutation) MetadataSnapshotCleared() bool {
+	_, ok := m.clearedFields[movie.FieldMetadataSnapshot]
+	return ok
+}
+
+// ResetMetadataSnapshot resets all changes to the "metadata_snapshot" field.
+func (m *MovieMutation) ResetMetadataSnapshot() {
+	m.metadata_snapshot = nil
+	delete(m.clearedFields, movie.FieldMetadataSnapshot)
+}
+
 // SetScrapeStatus sets the "scrape_status" field.
 func (m *MovieMutation) SetScrapeStatus(ms movie.ScrapeStatus) {
 	m.scrape_status = &ms
@@ -3170,7 +3221,7 @@ func (m *MovieMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MovieMutation) Fields() []string {
-	fields := make([]string, 0, 18)
+	fields := make([]string, 0, 19)
 	if m.created_at != nil {
 		fields = append(fields, movie.FieldCreatedAt)
 	}
@@ -3222,6 +3273,9 @@ func (m *MovieMutation) Fields() []string {
 	if m.fanarts != nil {
 		fields = append(fields, movie.FieldFanarts)
 	}
+	if m.metadata_snapshot != nil {
+		fields = append(fields, movie.FieldMetadataSnapshot)
+	}
 	if m.scrape_status != nil {
 		fields = append(fields, movie.FieldScrapeStatus)
 	}
@@ -3267,6 +3321,8 @@ func (m *MovieMutation) Field(name string) (ent.Value, bool) {
 		return m.Poster()
 	case movie.FieldFanarts:
 		return m.Fanarts()
+	case movie.FieldMetadataSnapshot:
+		return m.MetadataSnapshot()
 	case movie.FieldScrapeStatus:
 		return m.ScrapeStatus()
 	}
@@ -3312,6 +3368,8 @@ func (m *MovieMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldPoster(ctx)
 	case movie.FieldFanarts:
 		return m.OldFanarts(ctx)
+	case movie.FieldMetadataSnapshot:
+		return m.OldMetadataSnapshot(ctx)
 	case movie.FieldScrapeStatus:
 		return m.OldScrapeStatus(ctx)
 	}
@@ -3442,6 +3500,13 @@ func (m *MovieMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetFanarts(v)
 		return nil
+	case movie.FieldMetadataSnapshot:
+		v, ok := value.(*domain.MetadataSnapshot)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMetadataSnapshot(v)
+		return nil
 	case movie.FieldScrapeStatus:
 		v, ok := value.(movie.ScrapeStatus)
 		if !ok {
@@ -3542,6 +3607,9 @@ func (m *MovieMutation) ClearedFields() []string {
 	if m.FieldCleared(movie.FieldPoster) {
 		fields = append(fields, movie.FieldPoster)
 	}
+	if m.FieldCleared(movie.FieldMetadataSnapshot) {
+		fields = append(fields, movie.FieldMetadataSnapshot)
+	}
 	return fields
 }
 
@@ -3591,6 +3659,9 @@ func (m *MovieMutation) ClearField(name string) error {
 		return nil
 	case movie.FieldPoster:
 		m.ClearPoster()
+		return nil
+	case movie.FieldMetadataSnapshot:
+		m.ClearMetadataSnapshot()
 		return nil
 	}
 	return fmt.Errorf("unknown Movie nullable field %s", name)
@@ -3650,6 +3721,9 @@ func (m *MovieMutation) ResetField(name string) error {
 		return nil
 	case movie.FieldFanarts:
 		m.ResetFanarts()
+		return nil
+	case movie.FieldMetadataSnapshot:
+		m.ResetMetadataSnapshot()
 		return nil
 	case movie.FieldScrapeStatus:
 		m.ResetScrapeStatus()

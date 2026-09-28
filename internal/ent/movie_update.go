@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
@@ -330,6 +331,18 @@ func (_u *MovieUpdate) SetFanarts(v []string) *MovieUpdate {
 // AppendFanarts appends value to the "fanarts" field.
 func (_u *MovieUpdate) AppendFanarts(v []string) *MovieUpdate {
 	_u.mutation.AppendFanarts(v)
+	return _u
+}
+
+// SetMetadataSnapshot sets the "metadata_snapshot" field.
+func (_u *MovieUpdate) SetMetadataSnapshot(v *domain.MetadataSnapshot) *MovieUpdate {
+	_u.mutation.SetMetadataSnapshot(v)
+	return _u
+}
+
+// ClearMetadataSnapshot clears the value of the "metadata_snapshot" field.
+func (_u *MovieUpdate) ClearMetadataSnapshot() *MovieUpdate {
+	_u.mutation.ClearMetadataSnapshot()
 	return _u
 }
 
@@ -653,6 +666,12 @@ func (_u *MovieUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, movie.FieldFanarts, value)
 		})
+	}
+	if value, ok := _u.mutation.MetadataSnapshot(); ok {
+		_spec.SetField(movie.FieldMetadataSnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.MetadataSnapshotCleared() {
+		_spec.ClearField(movie.FieldMetadataSnapshot, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.ScrapeStatus(); ok {
 		_spec.SetField(movie.FieldScrapeStatus, field.TypeEnum, value)
@@ -1157,6 +1176,18 @@ func (_u *MovieUpdateOne) AppendFanarts(v []string) *MovieUpdateOne {
 	return _u
 }
 
+// SetMetadataSnapshot sets the "metadata_snapshot" field.
+func (_u *MovieUpdateOne) SetMetadataSnapshot(v *domain.MetadataSnapshot) *MovieUpdateOne {
+	_u.mutation.SetMetadataSnapshot(v)
+	return _u
+}
+
+// ClearMetadataSnapshot clears the value of the "metadata_snapshot" field.
+func (_u *MovieUpdateOne) ClearMetadataSnapshot() *MovieUpdateOne {
+	_u.mutation.ClearMetadataSnapshot()
+	return _u
+}
+
 // SetScrapeStatus sets the "scrape_status" field.
 func (_u *MovieUpdateOne) SetScrapeStatus(v movie.ScrapeStatus) *MovieUpdateOne {
 	_u.mutation.SetScrapeStatus(v)
@@ -1507,6 +1538,12 @@ func (_u *MovieUpdateOne) sqlSave(ctx context.Context) (_node *Movie, err error)
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, movie.FieldFanarts, value)
 		})
+	}
+	if value, ok := _u.mutation.MetadataSnapshot(); ok {
+		_spec.SetField(movie.FieldMetadataSnapshot, field.TypeJSON, value)
+	}
+	if _u.mutation.MetadataSnapshotCleared() {
+		_spec.ClearField(movie.FieldMetadataSnapshot, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.ScrapeStatus(); ok {
 		_spec.SetField(movie.FieldScrapeStatus, field.TypeEnum, value)

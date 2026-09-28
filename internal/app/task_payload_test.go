@@ -30,7 +30,7 @@ func TestTaskPayloadRoundTripKeepsMetadataAndIntegerPrecision(t *testing.T) {
 		MetadataPayload: scrape.MetadataPayload{Source: fix.Payload.Source, ScanTaskID: 9007199254740993, MovieID: 2, Code: "ABP-001"},
 		Document: nfo.Movie{Code: "ABP-001", Title: "Fixture title", Rating: 4.5,
 			Tags: []nfo.Tag{{ID: "tag", Name: "标签", CategoryID: "category"}}},
-		Snapshot: &scrape.Snapshot{Videos: "fingerprint", Directories: []scrape.DirectorySnapshot{{ID: "10"}}},
+		Completed: true,
 	}
 	encoded := taskPayloadJSON(t, input)
 	record := fix.DB.Task.Create().SetType("cover").SetPayload(encoded).SaveX(t.Context())
@@ -93,8 +93,8 @@ func BenchmarkTaskPayload(b *testing.B) {
 	input := scrape.CoverPayload{
 		MetadataPayload: scrape.MetadataPayload{Source: domain.LibrarySource{AccountID: "100", Directory: domain.LibraryDirectory{ID: "10", Path: "/Movies"}},
 			ScanTaskID: 1, MovieID: 2, Code: "ABP-001", JavDBID: "movie"},
-		Document: nfo.Movie{Code: "ABP-001", Title: "Fixture title", Rating: 4.5},
-		Snapshot: &scrape.Snapshot{Videos: "fingerprint", Directories: []scrape.DirectorySnapshot{{ID: "10"}}},
+		Document:  nfo.Movie{Code: "ABP-001", Title: "Fixture title", Rating: 4.5},
+		Completed: true,
 	}
 	for i := range 20 {
 		input.Document.Tags = append(input.Document.Tags, nfo.Tag{ID: fmt.Sprint(i), Name: "Fixture tag", CategoryID: "category"})

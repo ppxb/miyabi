@@ -66,6 +66,10 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 		client.Close()
 		return nil, fmt.Errorf("migrate offline downloads: %w", err)
 	}
+	if err := migrateMetadataSnapshots(ctx, db); err != nil {
+		client.Close()
+		return nil, fmt.Errorf("migrate movie metadata snapshots: %w", err)
+	}
 
 	return &Store{Client: client, db: db}, nil
 }

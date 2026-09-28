@@ -190,12 +190,13 @@ func TestNFOIdentifiesOnlyEligibleVideosAndSmallFilesDoNotMakeDirectoryShared(t 
 	if !found || !compactFound || live.Name != "movie.nfo" || compact.Name != live.Name {
 		t.Fatal("live metadata reads and scan observations selected different NFOs")
 	}
-	snapshot := scrape.Snapshot{
+	snapshot := domain.MetadataSnapshot{
 		Videos:      scrape.VideoFingerprint([]pan.File{entries[0]}),
-		Directories: []scrape.DirectorySnapshot{scrape.NewDirectorySnapshot("10", entries[2], entries[3], entries[4])},
+		Directories: []domain.DirectorySnapshot{scrape.NewDirectorySnapshot("10", entries[2], entries[3], entries[4])},
 	}
 	indexed := lib.database.Movie.Query().Where(movie.IDEQ(film.ID)).WithFiles().OnlyX(ctx)
-	if !snapshot.Matches(indexed, observed) {
+	indexed.MetadataSnapshot = &snapshot
+	if !scrape.SnapshotMatches(indexed, domain.LibrarySource{}, observed) {
 		t.Fatal("an auxiliary video invalidated an unchanged NFO snapshot")
 	}
 }

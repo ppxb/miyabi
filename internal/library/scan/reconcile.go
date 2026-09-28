@@ -114,18 +114,8 @@ func ReconcileScanTx(ctx context.Context, tx *ent.Tx, taskID int, scanID string,
 	if err != nil {
 		return fmt.Errorf("find scanned metadata jobs: %w", err)
 	}
-	ids := make([]int, 0, len(moviesToScrape))
 	for _, record := range moviesToScrape {
-		if record.ScrapeStatus == movie.ScrapeStatusDone {
-			ids = append(ids, record.ID)
-		}
-	}
-	snapshots, err := scrape.CompletedMetadataSnapshots(ctx, tx.Client(), payload.Source, ids)
-	if err != nil {
-		return err
-	}
-	for _, record := range moviesToScrape {
-		if snapshot, found := snapshots[record.ID]; found && record.ScrapeStatus == movie.ScrapeStatusDone && snapshot.Matches(record, observed) {
+		if record.ScrapeStatus == movie.ScrapeStatusDone && scrape.SnapshotMatches(record, payload.Source, observed) {
 			if images != nil {
 				cached, err := images.Exists(scrape.MovieArtwork(record))
 				if err != nil {

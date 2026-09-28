@@ -449,7 +449,12 @@ func TestPipelineScansScrapesAndWritesSidecarsEndToEnd(t *testing.T) {
 		t.Fatalf("library page = %+v, %v", page, err)
 	}
 
-	// A rescan finds the sidecars it wrote and schedules no further metadata work.
+	if snapshot := record.MetadataSnapshot; snapshot == nil || snapshot.Videos != scrapePkg.VideoFingerprint([]pan.File{video}) ||
+		snapshot.AccountID != fixture.source.AccountID || snapshot.DirectoryID != fixture.source.Directory.ID || !snapshot.LocalExport {
+		t.Fatalf("export snapshot was not saved on the movie: %+v", snapshot)
+	}
+	// A rescan must reuse the movie snapshot even after all task history is removed.
+	fixture.store.Client.Task.Delete().ExecX(ctx)
 	if _, err := fixture.library.StartScan(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -457,7 +462,7 @@ func TestPipelineScansScrapesAndWritesSidecarsEndToEnd(t *testing.T) {
 	if len(executed) != 1 || executed[0].Type != "scan" {
 		t.Fatalf("rescan executed %v", executed)
 	}
-	if scrapes := fixture.tasksOfType(t, "scrape"); len(scrapes) != 1 {
+	if scrapes := fixture.tasksOfType(t, "scrape"); len(scrapes) != 0 {
 		t.Fatalf("rescan created %d scrape tasks", len(scrapes))
 	}
 	if fixture.catalogue.calls["detail"] != 1 {

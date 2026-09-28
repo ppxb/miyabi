@@ -1,59 +1,31 @@
 package scrape
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 
-	"entgo.io/ent/dialect/sql"
-	"entgo.io/ent/dialect/sql/sqljson"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/ent/task"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/pan"
-	"github.com/ppxb/miyabi/internal/tasks"
 )
 
-// Sidecar records the identity and hash of an NFO, poster, or fanart sidecar.
-type Sidecar struct {
-	Name string `json:"name"`
-	SHA1 string `json:"sha1"`
-}
-
-// DirectorySnapshot records the sidecar state of a single media directory.
-type DirectorySnapshot struct {
-	ID     string  `json:"id"`
-	NFO    Sidecar `json:"nfo"`
-	Poster Sidecar `json:"poster"`
-	Fanart Sidecar `json:"fanart"`
-}
-
 // NewDirectorySnapshot creates a DirectorySnapshot from pan.File entries.
-func NewDirectorySnapshot(id string, nfo, poster, fanart pan.File) DirectorySnapshot {
-	return DirectorySnapshot{
+func NewDirectorySnapshot(id string, nfo, poster, fanart pan.File) domain.DirectorySnapshot {
+	return domain.DirectorySnapshot{
 		ID:     id,
-		NFO:    Sidecar{Name: nfo.Name, SHA1: nfo.SHA1},
-		Poster: Sidecar{Name: poster.Name, SHA1: poster.SHA1},
-		Fanart: Sidecar{Name: fanart.Name, SHA1: fanart.SHA1},
+		NFO:    domain.Sidecar{Name: nfo.Name, SHA1: nfo.SHA1},
+		Poster: domain.Sidecar{Name: poster.Name, SHA1: poster.SHA1},
+		Fanart: domain.Sidecar{Name: fanart.Name, SHA1: fanart.SHA1},
 	}
-}
-
-// Snapshot records the exact videos and sidecars handled by a completed cover job.
-// Later scans compare their directory listings without downloading unchanged NFOs or images.
-type Snapshot struct {
-	Videos      string              `json:"videos"`
-	Directories []DirectorySnapshot `json:"directories,omitempty"`
-	LocalExport bool                `json:"local_export,omitempty"`
 }
 
 // ObservedFile represents a file observed during a scan in a directory.
 type ObservedFile struct {
-	Sidecar
+	domain.Sidecar
 	VideoID string
 }
 
@@ -61,13 +33,13 @@ type ObservedFile struct {
 type ObservedDirectory []ObservedFile
 
 // Sidecar finds an observed sidecar by name (case-insensitive).
-func (d ObservedDirectory) Sidecar(name string) (Sidecar, bool) {
+func (d ObservedDirectory) Sidecar(name string) (domain.Sidecar, bool) {
 	for _, entry := range d {
 		if strings.EqualFold(entry.Name, name) {
 			return entry.Sidecar, true
 		}
 	}
-	return Sidecar{}, false
+	return domain.Sidecar{}, false
 }
 
 // DirectoryObservations maps directory IDs to their observed files.
@@ -87,7 +59,7 @@ func (observed DirectoryObservations) Add(id string, files []pan.File) {
 		if entry.IsDirectory {
 			continue
 		}
-		file := ObservedFile{Sidecar: Sidecar{Name: entry.Name, SHA1: entry.SHA1}}
+		file := ObservedFile{Sidecar: domain.Sidecar{Name: entry.Name, SHA1: entry.SHA1}}
 		if !entry.IsDirectory && domain.IsVideo(entry.Name) && entry.Size >= domain.MinVideoSize {
 			file.VideoID = entry.ID
 		}
@@ -107,18 +79,17 @@ func VideoFingerprint(files []pan.File) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// VideosMatch checks if the snapshot matches the current movie video files.
-func (snapshot Snapshot) VideosMatch(record *ent.Movie) bool {
+// SnapshotMatches compares the movie's saved export with this source's current files.
+func SnapshotMatches(record *ent.Movie, source domain.LibrarySource, directories DirectoryObservations) bool {
+	snapshot := record.MetadataSnapshot
+	if snapshot == nil || snapshot.AccountID != source.AccountID || snapshot.DirectoryID != source.Directory.ID {
+		return false
+	}
 	files := make([]pan.File, 0, len(record.Edges.Files))
 	for _, entry := range record.Edges.Files {
 		files = append(files, pan.File{ID: entry.FileID, ParentID: entry.ParentID, Name: entry.Name, SHA1: entry.Sha1, Size: entry.Size})
 	}
-	return snapshot.Videos == VideoFingerprint(files)
-}
-
-// Matches checks if the snapshot matches the current movie files and directory observations.
-func (snapshot Snapshot) Matches(record *ent.Movie, directories DirectoryObservations) bool {
-	if !snapshot.VideosMatch(record) {
+	if snapshot.Videos != VideoFingerprint(files) {
 		return false
 	}
 	if snapshot.LocalExport {
@@ -139,7 +110,7 @@ func (snapshot Snapshot) Matches(record *ent.Movie, directories DirectoryObserva
 		if !found || !strings.EqualFold(nfoFile.Name, saved.NFO.Name) {
 			return false
 		}
-		for _, sidecar := range []Sidecar{saved.NFO, saved.Poster, saved.Fanart} {
+		for _, sidecar := range []domain.Sidecar{saved.NFO, saved.Poster, saved.Fanart} {
 			entry, found := directory.Sidecar(sidecar.Name)
 			if !found || entry.SHA1 == "" || !strings.EqualFold(entry.SHA1, sidecar.SHA1) {
 				return false
@@ -147,46 +118,6 @@ func (snapshot Snapshot) Matches(record *ent.Movie, directories DirectoryObserva
 		}
 	}
 	return true
-}
-
-// CompletedMetadataSnapshots loads the latest completed cover job snapshot for each movie ID.
-func CompletedMetadataSnapshots(ctx context.Context, database *ent.Client, source domain.LibrarySource, movieIDs []int) (map[int]Snapshot, error) {
-	result := make(map[int]Snapshot)
-	for start := 0; start < len(movieIDs); start += 500 {
-		ids := make([]any, 0, 500)
-		for _, id := range movieIDs[start:min(start+500, len(movieIDs))] {
-			ids = append(ids, id)
-		}
-		table := sql.Table(task.Table)
-		latest := sql.Select(sql.Max(table.C(task.FieldID))).From(table).Where(sql.And(
-			sql.EQ(table.C(task.FieldType), tasks.KindCover.String()), sql.EQ(table.C(task.FieldStatus), task.StatusDone),
-			sqljson.ValueIn(table.C(task.FieldPayload), ids, sqljson.Path("movie_id")),
-			sqljson.ValueEQ(table.C(task.FieldPayload), source.AccountID, sqljson.Path("source", "account_id")),
-			sqljson.ValueEQ(table.C(task.FieldPayload), source.Directory.ID, sqljson.Path("source", "directory", "id")),
-		)).GroupBy(tasks.JSONExtract(table.C(task.FieldPayload), "movie_id"))
-		var records []struct {
-			MovieID  int     `json:"movie_id"`
-			Snapshot *string `json:"snapshot"`
-		}
-		err := database.Task.Query().Where(func(s *sql.Selector) {
-			s.Where(sql.In(s.C(task.FieldID), latest))
-			s.Select(sql.As(tasks.JSONExtract(s.C(task.FieldPayload), "movie_id"), "movie_id"),
-				sql.As(tasks.JSONExtract(s.C(task.FieldPayload), "snapshot"), "snapshot"))
-		}).Select(task.FieldID).Scan(ctx, &records)
-		if err != nil {
-			return nil, fmt.Errorf("load completed metadata snapshots: %w", err)
-		}
-		for _, record := range records {
-			if record.Snapshot != nil {
-				var snapshot Snapshot
-				if err := json.Unmarshal([]byte(*record.Snapshot), &snapshot); err != nil {
-					return nil, fmt.Errorf("decode completed metadata snapshot: %w", err)
-				}
-				result[record.MovieID] = snapshot
-			}
-		}
-	}
-	return result, nil
 }
 
 // MovieArtwork extracts the artwork URLs from an indexed ent.Movie record.

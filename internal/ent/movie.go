@@ -10,6 +10,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 )
 
@@ -52,6 +53,8 @@ type Movie struct {
 	Poster *string `json:"poster,omitempty"`
 	// Fanarts holds the value of the "fanarts" field.
 	Fanarts []string `json:"fanarts,omitempty"`
+	// MetadataSnapshot holds the value of the "metadata_snapshot" field.
+	MetadataSnapshot *domain.MetadataSnapshot `json:"metadata_snapshot,omitempty"`
 	// ScrapeStatus holds the value of the "scrape_status" field.
 	ScrapeStatus movie.ScrapeStatus `json:"scrape_status,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -116,7 +119,7 @@ func (*Movie) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case movie.FieldFanarts:
+		case movie.FieldFanarts, movie.FieldMetadataSnapshot:
 			values[i] = new([]byte)
 		case movie.FieldRating:
 			values[i] = new(sql.NullFloat64)
@@ -263,6 +266,14 @@ func (_m *Movie) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field fanarts: %w", err)
 				}
 			}
+		case movie.FieldMetadataSnapshot:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field metadata_snapshot", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.MetadataSnapshot); err != nil {
+					return fmt.Errorf("unmarshal field metadata_snapshot: %w", err)
+				}
+			}
 		case movie.FieldScrapeStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field scrape_status", values[i])
@@ -399,6 +410,9 @@ func (_m *Movie) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("fanarts=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Fanarts))
+	builder.WriteString(", ")
+	builder.WriteString("metadata_snapshot=")
+	builder.WriteString(fmt.Sprintf("%v", _m.MetadataSnapshot))
 	builder.WriteString(", ")
 	builder.WriteString("scrape_status=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ScrapeStatus))

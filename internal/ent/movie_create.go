@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
@@ -245,6 +246,12 @@ func (_c *MovieCreate) SetNillablePoster(v *string) *MovieCreate {
 // SetFanarts sets the "fanarts" field.
 func (_c *MovieCreate) SetFanarts(v []string) *MovieCreate {
 	_c.mutation.SetFanarts(v)
+	return _c
+}
+
+// SetMetadataSnapshot sets the "metadata_snapshot" field.
+func (_c *MovieCreate) SetMetadataSnapshot(v *domain.MetadataSnapshot) *MovieCreate {
+	_c.mutation.SetMetadataSnapshot(v)
 	return _c
 }
 
@@ -503,6 +510,10 @@ func (_c *MovieCreate) createSpec() (*Movie, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Fanarts(); ok {
 		_spec.SetField(movie.FieldFanarts, field.TypeJSON, value)
 		_node.Fanarts = value
+	}
+	if value, ok := _c.mutation.MetadataSnapshot(); ok {
+		_spec.SetField(movie.FieldMetadataSnapshot, field.TypeJSON, value)
+		_node.MetadataSnapshot = value
 	}
 	if value, ok := _c.mutation.ScrapeStatus(); ok {
 		_spec.SetField(movie.FieldScrapeStatus, field.TypeEnum, value)
@@ -900,6 +911,24 @@ func (u *MovieUpsert) UpdateFanarts() *MovieUpsert {
 	return u
 }
 
+// SetMetadataSnapshot sets the "metadata_snapshot" field.
+func (u *MovieUpsert) SetMetadataSnapshot(v *domain.MetadataSnapshot) *MovieUpsert {
+	u.Set(movie.FieldMetadataSnapshot, v)
+	return u
+}
+
+// UpdateMetadataSnapshot sets the "metadata_snapshot" field to the value that was provided on create.
+func (u *MovieUpsert) UpdateMetadataSnapshot() *MovieUpsert {
+	u.SetExcluded(movie.FieldMetadataSnapshot)
+	return u
+}
+
+// ClearMetadataSnapshot clears the value of the "metadata_snapshot" field.
+func (u *MovieUpsert) ClearMetadataSnapshot() *MovieUpsert {
+	u.SetNull(movie.FieldMetadataSnapshot)
+	return u
+}
+
 // SetScrapeStatus sets the "scrape_status" field.
 func (u *MovieUpsert) SetScrapeStatus(v movie.ScrapeStatus) *MovieUpsert {
 	u.Set(movie.FieldScrapeStatus, v)
@@ -1276,6 +1305,27 @@ func (u *MovieUpsertOne) SetFanarts(v []string) *MovieUpsertOne {
 func (u *MovieUpsertOne) UpdateFanarts() *MovieUpsertOne {
 	return u.Update(func(s *MovieUpsert) {
 		s.UpdateFanarts()
+	})
+}
+
+// SetMetadataSnapshot sets the "metadata_snapshot" field.
+func (u *MovieUpsertOne) SetMetadataSnapshot(v *domain.MetadataSnapshot) *MovieUpsertOne {
+	return u.Update(func(s *MovieUpsert) {
+		s.SetMetadataSnapshot(v)
+	})
+}
+
+// UpdateMetadataSnapshot sets the "metadata_snapshot" field to the value that was provided on create.
+func (u *MovieUpsertOne) UpdateMetadataSnapshot() *MovieUpsertOne {
+	return u.Update(func(s *MovieUpsert) {
+		s.UpdateMetadataSnapshot()
+	})
+}
+
+// ClearMetadataSnapshot clears the value of the "metadata_snapshot" field.
+func (u *MovieUpsertOne) ClearMetadataSnapshot() *MovieUpsertOne {
+	return u.Update(func(s *MovieUpsert) {
+		s.ClearMetadataSnapshot()
 	})
 }
 
@@ -1823,6 +1873,27 @@ func (u *MovieUpsertBulk) SetFanarts(v []string) *MovieUpsertBulk {
 func (u *MovieUpsertBulk) UpdateFanarts() *MovieUpsertBulk {
 	return u.Update(func(s *MovieUpsert) {
 		s.UpdateFanarts()
+	})
+}
+
+// SetMetadataSnapshot sets the "metadata_snapshot" field.
+func (u *MovieUpsertBulk) SetMetadataSnapshot(v *domain.MetadataSnapshot) *MovieUpsertBulk {
+	return u.Update(func(s *MovieUpsert) {
+		s.SetMetadataSnapshot(v)
+	})
+}
+
+// UpdateMetadataSnapshot sets the "metadata_snapshot" field to the value that was provided on create.
+func (u *MovieUpsertBulk) UpdateMetadataSnapshot() *MovieUpsertBulk {
+	return u.Update(func(s *MovieUpsert) {
+		s.UpdateMetadataSnapshot()
+	})
+}
+
+// ClearMetadataSnapshot clears the value of the "metadata_snapshot" field.
+func (u *MovieUpsertBulk) ClearMetadataSnapshot() *MovieUpsertBulk {
+	return u.Update(func(s *MovieUpsert) {
+		s.ClearMetadataSnapshot()
 	})
 }
 

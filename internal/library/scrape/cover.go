@@ -28,7 +28,7 @@ type CoverPayload struct {
 	CoverURL     string              `json:"cover_url,omitempty"`
 	Origin       *ArtworkOrigin      `json:"origin,omitempty"`
 	Artwork      *mediaimage.Artwork `json:"artwork,omitempty"`
-	Snapshot     *Snapshot           `json:"snapshot,omitempty"`
+	Completed    bool                `json:"completed,omitempty"`
 }
 
 // Cover processes the cover download, generation, and export of artwork and NFO sidecars.
@@ -37,7 +37,7 @@ func (service *Service) Cover(ctx context.Context, job tasks.Job) error {
 	if err != nil {
 		return err
 	}
-	if input.Snapshot != nil {
+	if input.Completed {
 		return nil
 	}
 
@@ -124,7 +124,9 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 	if err != nil {
 		return nil, err
 	}
-	snapshot := &Snapshot{
+	snapshot := &domain.MetadataSnapshot{
+		AccountID:   input.Source.AccountID,
+		DirectoryID: input.Source.Directory.ID,
 		LocalExport: true,
 	}
 	var videos []pan.File
@@ -164,7 +166,7 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 	if err := service.exportLocalMedia(ctx, input, stem, doc, videos, poster, fanart); err != nil {
 		return nil, err
 	}
-	input.Snapshot = snapshot
+	input.Completed = true
 	encoded, err = tasks.EncodePayload(input)
 	if err != nil {
 		return nil, err
@@ -172,7 +174,7 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 	if err := sess.Commit(ctx, func(tx *ent.Tx) error {
 		if err := tx.Movie.UpdateOneID(input.MovieID).SetCode(input.Code).
 			SetCover(artwork.Thumbnail).SetPoster(artwork.Poster).SetFanarts([]string{artwork.Fanart}).
-			SetScrapeStatus(movie.ScrapeStatusDone).Exec(ctx); err != nil {
+			SetScrapeStatus(movie.ScrapeStatusDone).SetMetadataSnapshot(snapshot).Exec(ctx); err != nil {
 			return err
 		}
 		return tx.Task.UpdateOneID(job.ID).SetPayload(encoded).Exec(ctx)
@@ -231,8 +233,8 @@ func (service *Service) originImage(ctx context.Context, sess drive.Session, ent
 	return sess.Read(ctx, info.File.PickCode, 32<<20)
 }
 
-func (service *Service) writeSidecars(ctx context.Context, sess drive.Session, input CoverPayload, directory MovieDirectory, poster, fanart []byte) (DirectorySnapshot, nfo.Movie, error) {
-	var snapshot DirectorySnapshot
+func (service *Service) writeSidecars(ctx context.Context, sess drive.Session, input CoverPayload, directory MovieDirectory, poster, fanart []byte) (domain.DirectorySnapshot, nfo.Movie, error) {
+	var snapshot domain.DirectorySnapshot
 	stem := nfo.FileStem(input.Code)
 	nfoName := stem + ".nfo"
 

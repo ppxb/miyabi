@@ -5,6 +5,7 @@ import (
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"github.com/ppxb/miyabi/internal/domain"
 )
 
 type Movie struct {
@@ -61,6 +62,7 @@ func (Movie) Fields() []ent.Field {
 			Nillable(),
 		field.JSON("fanarts", []string{}).
 			Default(func() []string { return []string{} }),
+		field.JSON("metadata_snapshot", &domain.MetadataSnapshot{}).Optional(),
 		field.Enum("scrape_status").
 			Values("pending", "done", "failed").
 			Default("pending"),
