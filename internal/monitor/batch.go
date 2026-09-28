@@ -99,14 +99,16 @@ func (service *Service) BatchHandler(ctx context.Context, job tasks.Job) error {
 	if err != nil {
 		return err
 	}
-	for index, id := range payload.IDs {
-		if index > 0 {
+	start := min(len(payload.IDs), max(0, payload.Batch.Processed))
+	for index := start; index < len(payload.IDs); index++ {
+		if index > start {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-time.After(batchGapMin + rand.N(batchGapJitter)):
 			}
 		}
+		id := payload.IDs[index]
 		code := ""
 		if record, err := service.database.Subscription.Get(ctx, id); err == nil {
 			code = record.Code

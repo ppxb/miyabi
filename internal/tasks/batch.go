@@ -39,7 +39,7 @@ func (s *Service) SaveSubscriptionBatch(ctx context.Context, id int, payload Sub
 	}
 	progress := 0
 	if payload.Batch.Total > 0 {
-		progress = payload.Batch.Processed * 100 / payload.Batch.Total
+		progress = min(100, max(0, payload.Batch.Processed*100/payload.Batch.Total))
 	}
 	if err := s.database.Task.UpdateOneID(id).SetProgress(progress).SetPayload(encoded).Exec(ctx); err != nil {
 		return fmt.Errorf("save subscription batch %d: %w", id, err)

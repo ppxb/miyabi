@@ -98,3 +98,51 @@ func TestBatchEnqueueTask(t *testing.T) {
 		t.Fatal("expected a second task")
 	}
 }
+
+func TestBatchHandlerResume(t *testing.T) {
+	f, ctx := newFixture(t), t.Context()
+	item1, _ := f.service.AddMovie(ctx, "resume-1", AddMovieOptions{})
+	item2, _ := f.service.AddMovie(ctx, "resume-2", AddMovieOptions{})
+	f.discover.magnets["resume-2"] = []domain.Magnet{{Hash: "hash2", Name: "resume-2", HasSubtitle: true, HD: true, Size: 1000}}
+
+	taskID, err := f.service.EnqueueBatch(ctx, BatchEnqueueRequest{IDs: []int{item1.ID, item2.ID}})
+	if err != nil {
+		t.Fatalf("EnqueueBatch: %v", err)
+	}
+
+	payload := tasks.SubscriptionBatchPayload{
+		IDs: []int{item1.ID, item2.ID},
+		Batch: domain.SubscriptionBatch{
+			Total:     2,
+			Processed: 1,
+			Waiting:   1,
+		},
+	}
+	encoded, err := tasks.EncodePayload(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.client.Task.UpdateOneID(taskID).SetPayload(encoded).SetProgress(50).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := f.service.BatchHandler(ctx, tasks.Job{ID: taskID, Type: tasks.KindSubscriptionBatch, Payload: encoded}); err != nil {
+		t.Fatalf("BatchHandler: %v", err)
+	}
+
+	row := f.client.Task.GetX(ctx, taskID)
+	savedPayload, err := tasks.DecodePayload[tasks.SubscriptionBatchPayload](row.Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch := savedPayload.Batch
+	if batch.Total != 2 || batch.Processed != 2 || batch.Submitted != 1 || batch.Waiting != 1 || row.Progress != 100 {
+		t.Fatalf("unexpected tally after resume %+v progress=%d", batch, row.Progress)
+	}
+	if sub := f.client.Subscription.GetX(ctx, item1.ID); sub.Status != subscription.StatusWaiting {
+		t.Fatalf("item1 must remain untouched, got %s", sub.Status)
+	}
+	if sub := f.client.Subscription.GetX(ctx, item2.ID); sub.Status != subscription.StatusAdded || sub.Hash != "hash2" {
+		t.Fatalf("item2 must be added, got %s %s", sub.Status, sub.Hash)
+	}
+}
