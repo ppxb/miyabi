@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -122,7 +123,9 @@ func cachedJavDB[T any](ctx context.Context, service *Service, cache *responseCa
 	return cache.get(ctx, key, func(ctx context.Context) (T, error) {
 		value, err := load(ctx)
 		if err == nil {
-			err = service.persistActiveRoute(ctx)
+			if routeErr := service.persistActiveRoute(ctx); routeErr != nil {
+				slog.WarnContext(ctx, "failed to persist active JavDB route", "error", routeErr)
+			}
 		}
 		return value, err
 	})

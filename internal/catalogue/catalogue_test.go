@@ -403,3 +403,55 @@ func TestServiceMagnetsWithAggregator(t *testing.T) {
 		t.Errorf("expected HasMagnet to return true, got %v, err=%v", has, err)
 	}
 }
+
+type stubProviderWithRoute struct {
+	stubProviderWithMagnets
+	route javdb.RouteStatus
+}
+
+func (s *stubProviderWithRoute) Route() (javdb.RouteStatus, bool) {
+	return s.route, true
+}
+
+func TestCachedJavDBIgnoresPersistActiveRouteFailure(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	provider := &stubProviderWithRoute{
+		route: javdb.RouteStatus{Host: "https://new-route.example"},
+	}
+	service, err := NewWithProvider(t.Context(), store.Client, provider, &stubLocalState{})
+	if err != nil {
+		store.Close()
+		t.Fatal(err)
+	}
+
+	// Close the DB store so any write in persistActiveRoute fails
+	store.Close()
+
+	cache := newResponseCache[string](2, time.Hour)
+	var loadCalls int
+	load := func(context.Context) (string, error) {
+		loadCalls++
+		return "test-result", nil
+	}
+
+	val, err := cachedJavDB(t.Context(), service, cache, "key-1", load)
+	if err != nil {
+		t.Fatalf("cachedJavDB should succeed even if persistActiveRoute fails, got err: %v", err)
+	}
+	if val != "test-result" {
+		t.Fatalf("expected test-result, got %s", val)
+	}
+	if loadCalls != 1 {
+		t.Fatalf("expected 1 load call, got %d", loadCalls)
+	}
+
+	// Second request should hit cache and not invoke load again
+	val2, err := cachedJavDB(t.Context(), service, cache, "key-1", load)
+	if err != nil || val2 != "test-result" || loadCalls != 1 {
+		t.Fatalf("expected cached result without reload, got val=%s, calls=%d, err=%v", val2, loadCalls, err)
+	}
+}
