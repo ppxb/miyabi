@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from '@/api/client'
+import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from './client.ts'
 
 export type SubscriptionKind = 'movie' | 'actor'
 
@@ -29,10 +29,23 @@ export type SubscriptionItem = {
   updated_at: string
 }
 
+export const SUBSCRIPTION_PAGE_SIZE = 20
+
+export type SubscriptionTarget = {
+  id: number
+  kind: SubscriptionKind
+  target_id: string
+  origin_id?: number
+  status: SubscriptionStatus
+}
+
 export const subscriptionKeys = {
   all: ['subscriptions'] as const,
-  list: (kind: SubscriptionKind) => ['subscriptions', 'list', kind] as const,
-  feed: (actorID: number) => ['subscriptions', 'feed', actorID] as const
+  targets: (kind?: SubscriptionKind) => ['subscriptions', 'targets', kind ?? 'all'] as const,
+  list: (kind: SubscriptionKind, page = 1, limit = SUBSCRIPTION_PAGE_SIZE) =>
+    ['subscriptions', 'list', kind, { page, limit }] as const,
+  feed: (actorID: number | null, page = 1, limit = SUBSCRIPTION_PAGE_SIZE) =>
+    ['subscriptions', 'feed', actorID ?? 'all', { page, limit }] as const
 }
 
 function describeError(error: unknown) {
@@ -44,40 +57,64 @@ const listOptions = {
   refetchOnMount: 'always'
 } as const
 
-export function useSubscriptions(kind: SubscriptionKind, enabled = true) {
+export function useSubscriptionTargets(kind?: SubscriptionKind) {
+  return useQuery({
+    queryKey: subscriptionKeys.targets(kind),
+    queryFn: ({ signal }) =>
+      apiGet<SubscriptionTarget[]>(
+        '/api/subscriptions/targets',
+        kind ? { kind } : undefined,
+        signal
+      ),
+    staleTime: Infinity,
+    select: targets => {
+      const map = new Map<string, SubscriptionTarget>()
+      for (const item of targets) {
+        map.set(item.target_id, item)
+      }
+      return { list: targets, map }
+    }
+  })
+}
+
+export function useSubscriptions(
+  kind: SubscriptionKind,
+  page = 1,
+  limit = SUBSCRIPTION_PAGE_SIZE,
+  enabled = true
+) {
   return useQuery({
     ...listOptions,
-    queryKey: subscriptionKeys.list(kind),
+    queryKey: subscriptionKeys.list(kind, page, limit),
     queryFn: ({ signal }) =>
-      apiGet<SubscriptionItem[]>('/api/subscriptions', { kind, limit: 100 }, signal),
+      apiGet<SubscriptionItem[]>('/api/subscriptions', { kind, page, limit }, signal),
     enabled
   })
 }
 
 export function useSubscription(kind: SubscriptionKind, targetID: string) {
-  const subscriptions = useSubscriptions(kind)
+  const targets = useSubscriptionTargets(kind)
   return {
-    subscription: subscriptions.data?.find(item => item.target_id === targetID),
-    isPending: subscriptions.isPending
+    subscription: targets.data?.map.get(targetID),
+    isPending: targets.isPending
   }
 }
 
-export function useActorFeed(actorID: number | null) {
+export function useActorFeed(
+  actorID: number | null,
+  page = 1,
+  limit = SUBSCRIPTION_PAGE_SIZE,
+  enabled = true
+) {
+  const url = actorID
+    ? `/api/subscriptions/actors/${actorID}/feed`
+    : '/api/subscriptions/actors/feed'
   return useQuery({
     ...listOptions,
-    queryKey: subscriptionKeys.feed(actorID ?? 0),
-    queryFn: ({ signal }) =>
-      apiGet<SubscriptionItem[]>(
-        `/api/subscriptions/actors/${actorID}/feed`,
-        { limit: 100 },
-        signal
-      ),
-    enabled: actorID !== null
+    queryKey: subscriptionKeys.feed(actorID, page, limit),
+    queryFn: ({ signal }) => apiGet<SubscriptionItem[]>(url, { page, limit }, signal),
+    enabled
   })
-}
-
-function replaceItem(items: SubscriptionItem[] | undefined, item: SubscriptionItem) {
-  return (items ?? []).map(existing => (existing.id === item.id ? item : existing))
 }
 
 export function useAddSubscription() {
@@ -86,10 +123,6 @@ export function useAddSubscription() {
     mutationFn: (payload: { kind: SubscriptionKind; target_id: string; title?: string }) =>
       apiPost<SubscriptionItem>('/api/subscriptions', payload),
     onSuccess: item => {
-      queryClient.setQueryData<SubscriptionItem[]>(subscriptionKeys.list(item.kind), items => [
-        item,
-        ...(items ?? []).filter(existing => existing.id !== item.id)
-      ])
       void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
       toast.success(item.kind === 'actor' ? `已订阅演员 ${item.title}` : item.code, {
         description:
@@ -115,10 +148,7 @@ export function useUpdateSubscription() {
       auto_download?: boolean
       status?: 'active' | 'paused'
     }) => apiPatch<SubscriptionItem>(`/api/subscriptions/${id}`, patch),
-    onSuccess: item => {
-      queryClient.setQueryData<SubscriptionItem[]>(subscriptionKeys.list(item.kind), items =>
-        replaceItem(items, item)
-      )
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
     },
     onError: error => toast.error('更新订阅失败', { description: describeError(error) })
@@ -128,12 +158,9 @@ export function useUpdateSubscription() {
 export function useRemoveSubscription() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (item: Pick<SubscriptionItem, 'id' | 'kind'>) =>
+    mutationFn: (item: { id: number; kind?: SubscriptionKind }) =>
       apiDelete<null>(`/api/subscriptions/${item.id}`),
-    onSuccess: (_, item) => {
-      queryClient.setQueryData<SubscriptionItem[]>(subscriptionKeys.list(item.kind), items =>
-        (items ?? []).filter(existing => existing.id !== item.id)
-      )
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
     },
     onError: error => toast.error('取消订阅失败', { description: describeError(error) })
@@ -145,9 +172,6 @@ export function useEnqueueSubscription() {
   return useMutation({
     mutationFn: (id: number) => apiPost<SubscriptionItem>(`/api/subscriptions/${id}/enqueue`),
     onSuccess: item => {
-      queryClient.setQueryData<SubscriptionItem[]>(subscriptionKeys.list(item.kind), items =>
-        replaceItem(items, item)
-      )
       void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
       if (item.status === 'added') {
         toast.success(item.code, { description: '已加入 115 离线下载。' })

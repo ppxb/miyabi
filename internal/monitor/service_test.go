@@ -161,3 +161,74 @@ func TestSubscriptionSettings(t *testing.T) {
 		t.Fatalf("legacy config must normalize: %#v %v", legacy, err)
 	}
 }
+
+func TestSubscriptionTargetsAndPagination(t *testing.T) {
+	f, ctx := newFixture(t), t.Context()
+	f.discover.actorMovies["act1"] = []domain.Movie{
+		{ID: "m-spawned", Code: "SPAWN-001", Title: "Spawned Movie", ReleaseDate: "2099-11-01", Actors: []domain.Actor{{ID: "act1", Name: "Actor 1"}}},
+	}
+	actor, err := f.service.AddActor(ctx, "act1", AddActorOptions{Title: "Actor 1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m1, err := f.service.AddMovie(ctx, "m1", AddMovieOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m2, err := f.service.AddMovie(ctx, "m2", AddMovieOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targets, err := f.service.Targets(ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(targets) != 4 { // 1 actor + 2 movies + 1 spawned movie
+		t.Fatalf("expected 4 targets, got %d", len(targets))
+	}
+
+	movieTargets, err := f.service.Targets(ctx, "movie")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(movieTargets) != 3 {
+		t.Fatalf("expected 3 movie targets, got %d", len(movieTargets))
+	}
+
+	// Pagination test
+	page1, err := f.service.List(ctx, "movie", 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page1) != 2 {
+		t.Fatalf("expected 2 items on page 1, got %d", len(page1))
+	}
+	page2, err := f.service.List(ctx, "movie", 2, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page2) != 1 {
+		t.Fatalf("expected 1 item on page 2, got %d", len(page2))
+	}
+
+	// ActorFeed tests
+	specificFeed, err := f.service.ActorFeed(ctx, actor.ID, 1, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(specificFeed) != 1 || specificFeed[0].TargetID != "m-spawned" {
+		t.Fatalf("expected 1 spawned movie for actor, got %#v", specificFeed)
+	}
+
+	allSpawnedFeed, err := f.service.ActorFeed(ctx, 0, 1, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(allSpawnedFeed) != 1 || allSpawnedFeed[0].TargetID != "m-spawned" {
+		t.Fatalf("expected 1 spawned movie in all spawned feed, got %#v", allSpawnedFeed)
+	}
+
+	_ = m1
+	_ = m2
+}

@@ -12,7 +12,7 @@ type ActorSubscriptionsProps = {
   actors: ReturnType<typeof useSubscriptions>
   selectedID: number | null
   onSelectID: (id: number | null) => void
-  allSpawned: SubscriptionItem[]
+  allSpawned: Array<{ origin_id?: number }>
   displayItems: SubscriptionItem[]
   displayQuery: {
     isPending: boolean
@@ -58,7 +58,7 @@ export function ActorSubscriptions({
       />
     )
   }
-  if (actors.data.length === 0) {
+  if (!actors.data || actors.data.length === 0) {
     return <EmptyState title="还没有订阅演员，在演员作品页点击「订阅演员」" />
   }
 

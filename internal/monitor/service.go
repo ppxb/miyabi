@@ -151,6 +151,43 @@ func (service *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 	return database.SaveSetting(ctx, service.database, subscriptionConfigSetting, cfg)
 }
 
+// TargetItem is a lightweight projection used to check subscription status.
+type TargetItem struct {
+	ID       int    `json:"id"`
+	Kind     string `json:"kind"`
+	TargetID string `json:"target_id"`
+	OriginID *int   `json:"origin_id,omitempty"`
+	Status   Status `json:"status"`
+}
+
+func (service *Service) Targets(ctx context.Context, kind string) ([]TargetItem, error) {
+	query := service.database.Subscription.Query()
+	if kind != "" {
+		query = query.Where(subscription.KindEQ(subscription.Kind(kind)))
+	}
+	records, err := query.Select(
+		subscription.FieldID,
+		subscription.FieldKind,
+		subscription.FieldTargetID,
+		subscription.FieldOriginID,
+		subscription.FieldStatus,
+	).All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list subscription targets: %w", err)
+	}
+	result := make([]TargetItem, len(records))
+	for index, record := range records {
+		result[index] = TargetItem{
+			ID:       record.ID,
+			Kind:     string(record.Kind),
+			TargetID: record.TargetID,
+			OriginID: record.OriginID,
+			Status:   Status(record.Status),
+		}
+	}
+	return result, nil
+}
+
 func (service *Service) List(ctx context.Context, kind string, page, limit int) ([]Item, error) {
 	query := service.database.Subscription.Query()
 	if kind != "" {
@@ -167,11 +204,16 @@ func (service *Service) List(ctx context.Context, kind string, page, limit int) 
 	return items(records), nil
 }
 
-// ActorFeed lists the movie subscriptions spawned by one actor subscription.
+// ActorFeed lists the movie subscriptions spawned by one actor subscription (or all actors if actorSubscriptionID <= 0).
 func (service *Service) ActorFeed(ctx context.Context, actorSubscriptionID, page, limit int) ([]Item, error) {
 	query := service.database.Subscription.Query().
-		Where(subscription.KindEQ(subscription.KindMovie), subscription.OriginIDEQ(actorSubscriptionID)).
+		Where(subscription.KindEQ(subscription.KindMovie)).
 		Order(ent.Desc(subscription.FieldReleaseDate), ent.Desc(subscription.FieldID))
+	if actorSubscriptionID > 0 {
+		query = query.Where(subscription.OriginIDEQ(actorSubscriptionID))
+	} else {
+		query = query.Where(subscription.OriginIDNotNil())
+	}
 	if limit > 0 {
 		query = query.Offset((max(page, 1) - 1) * limit).Limit(limit)
 	}

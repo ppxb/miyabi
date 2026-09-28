@@ -99,11 +99,13 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	subscriptionsAPI := protected.Group("/subscriptions", noStore())
 	subscriptionsAPI.GET("", subscriptionListHandler(deps.Monitor))
+	subscriptionsAPI.GET("/targets", subscriptionTargetsHandler(deps.Monitor))
 	subscriptionsAPI.POST("", subscriptionCreateHandler(deps.Monitor))
 	subscriptionsAPI.PATCH("/:id", subscriptionUpdateHandler(deps.Monitor))
 	subscriptionsAPI.DELETE("/:id", subscriptionRemoveHandler(deps.Monitor))
 	subscriptionsAPI.POST("/:id/enqueue", subscriptionEnqueueSingleHandler(deps.Monitor))
 	subscriptionsAPI.POST("/enqueue", subscriptionEnqueueBatchHandler(deps.Monitor))
+	subscriptionsAPI.GET("/actors/feed", subscriptionActorFeedHandler(deps.Monitor))
 	subscriptionsAPI.GET("/actors/:id/feed", subscriptionActorFeedHandler(deps.Monitor))
 
 	protected.GET("/discover/movies", discoverBrowseHandler(deps.Catalogue))

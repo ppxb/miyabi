@@ -194,6 +194,13 @@ func (goldenSubscription) List(context.Context, string, int, int) ([]monitor.Ite
 	}, nil
 }
 
+func (goldenSubscription) Targets(context.Context, string) ([]monitor.TargetItem, error) {
+	return []monitor.TargetItem{
+		{ID: 2, Kind: "movie", TargetID: "movie-upcoming", Status: monitor.StatusWaiting},
+		{ID: 1, Kind: "movie", TargetID: "movie-exact", Status: monitor.StatusAdded},
+	}, nil
+}
+
 type goldenPan struct {
 	DriveManager
 }

@@ -10,6 +10,7 @@ import (
 
 type SubscriptionManager interface {
 	List(ctx context.Context, kind string, page int, limit int) ([]monitor.Item, error)
+	Targets(ctx context.Context, kind string) ([]monitor.TargetItem, error)
 	AddMovie(ctx context.Context, movieID string, opts monitor.AddMovieOptions) (monitor.Item, error)
 	AddActor(ctx context.Context, actorID string, opts monitor.AddActorOptions) (monitor.Item, error)
 	Update(ctx context.Context, id int, opts monitor.UpdateOptions) (monitor.Item, error)
@@ -25,6 +26,10 @@ type subscriptionListQuery struct {
 	Kind  string `form:"kind" binding:"omitempty,oneof=movie actor"`
 	Page  int    `form:"page,default=1" binding:"min=1"`
 	Limit int    `form:"limit,default=50" binding:"min=1,max=100"`
+}
+
+type subscriptionTargetsQuery struct {
+	Kind string `form:"kind" binding:"omitempty,oneof=movie actor"`
 }
 
 type subscriptionCreateInput struct {
@@ -49,6 +54,21 @@ type subscriptionEnqueueBatchInput struct {
 
 type subscriptionURI struct {
 	ID int `uri:"id" binding:"required,min=1"`
+}
+
+type optionalSubscriptionURI struct {
+	ID int `uri:"id" binding:"omitempty,min=1"`
+}
+
+func subscriptionTargetsHandler(mgr SubscriptionManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		query, ok := bindQuery[subscriptionTargetsQuery](c)
+		if !ok {
+			return
+		}
+		items, err := mgr.Targets(c.Request.Context(), query.Kind)
+		respond(c, items, err)
+	}
 }
 
 func subscriptionListHandler(mgr SubscriptionManager) gin.HandlerFunc {
@@ -148,10 +168,7 @@ func subscriptionEnqueueBatchHandler(mgr SubscriptionManager) gin.HandlerFunc {
 
 func subscriptionActorFeedHandler(mgr SubscriptionManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		uri, ok := bindURI[subscriptionURI](c)
-		if !ok {
-			return
-		}
+		uri, _ := bindURI[optionalSubscriptionURI](c)
 		query, ok := bindQuery[subscriptionListQuery](c)
 		if !ok {
 			return

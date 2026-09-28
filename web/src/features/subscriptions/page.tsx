@@ -2,9 +2,16 @@ import { CloudDownloadIcon, LoaderCircleIcon, XIcon } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
-import { useActorFeed, useBatchEnqueueSubscriptions, useSubscriptions } from '@/api/subscriptions'
+import {
+  SUBSCRIPTION_PAGE_SIZE,
+  useActorFeed,
+  useBatchEnqueueSubscriptions,
+  useSubscriptions,
+  useSubscriptionTargets
+} from '@/api/subscriptions'
 import { AppPage } from '@/components/app-page'
 import { InlineError } from '@/components/error-state'
+import { ListPagination } from '@/components/list-pagination'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
 import {
@@ -25,27 +32,35 @@ type SubscriptionsView = 'movies' | 'actors'
 export function SubscriptionsPage() {
   const [view, setView] = useState<SubscriptionsView>('movies')
   const [selectedActorID, setSelectedActorID] = useState<number | null>(null)
+  const [page, setPage] = useState(1)
 
-  const movies = useSubscriptions('movie')
-  const actors = useSubscriptions('actor', view === 'actors')
-  const feed = useActorFeed(view === 'actors' ? selectedActorID : null)
+  const targets = useSubscriptionTargets()
+  const movies = useSubscriptions('movie', page, SUBSCRIPTION_PAGE_SIZE, view === 'movies')
+  const actors = useSubscriptions('actor', 1, 100, view === 'actors')
+  const feed = useActorFeed(selectedActorID, page, SUBSCRIPTION_PAGE_SIZE, view === 'actors')
   const batch = useBatchEnqueueSubscriptions()
 
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState<Set<number>>(() => new Set())
   const [confirmMode, setConfirmMode] = useState<'all' | 'selected' | null>(null)
 
-  const allMovies = movies.data ?? []
-  const allSpawned = allMovies.filter(item => item.origin_id != null)
-  const currentItems =
-    view === 'movies' ? allMovies : selectedActorID === null ? allSpawned : (feed.data ?? [])
+  const allSpawnedTargets = (targets.data?.list ?? []).filter(
+    item => item.kind === 'movie' && item.origin_id != null
+  )
 
-  const currentQuery = view === 'movies' ? movies : selectedActorID === null ? movies : feed
+  const currentItems = view === 'movies' ? (movies.data ?? []) : (feed.data ?? [])
+  const currentQuery = view === 'movies' ? movies : feed
 
   const pending = currentItems.filter(isPendingSubscription)
   const selectedIDs = pending.filter(item => selected.has(item.id)).map(item => item.id)
   const allSelected = pending.length > 0 && selectedIDs.length === pending.length
-  const pendingCount = pending.length
+
+  const totalMovieWaiting = (targets.data?.list ?? []).filter(
+    item => item.kind === 'movie' && item.status === 'waiting'
+  ).length
+  const canBatchAll = view === 'movies' ? totalMovieWaiting > 0 : pending.length > 0
+  const pendingCount =
+    view === 'movies' && confirmMode === 'all' ? totalMovieWaiting : pending.length
 
   function leaveSelection() {
     setSelecting(false)
@@ -54,12 +69,14 @@ export function SubscriptionsPage() {
 
   function handleTabChange(nextView: SubscriptionsView) {
     setView(nextView)
+    setPage(1)
     leaveSelection()
     setSelectedActorID(null)
   }
 
   function handleSelectActor(id: number | null) {
     setSelectedActorID(id)
+    setPage(1)
     leaveSelection()
   }
 
@@ -139,7 +156,7 @@ export function SubscriptionsPage() {
               type="button"
               variant="outline"
               size="sm"
-              disabled={pendingCount === 0}
+              disabled={pending.length === 0}
               onClick={() => setSelecting(true)}
             >
               选择入库
@@ -147,7 +164,7 @@ export function SubscriptionsPage() {
             <Button
               type="button"
               size="sm"
-              disabled={pendingCount === 0}
+              disabled={!canBatchAll}
               onClick={() => {
                 batch.reset()
                 setConfirmMode('all')
@@ -173,7 +190,7 @@ export function SubscriptionsPage() {
             actors={actors}
             selectedID={selectedActorID}
             onSelectID={handleSelectActor}
-            allSpawned={allSpawned}
+            allSpawned={allSpawnedTargets}
             displayItems={currentItems}
             displayQuery={currentQuery}
             selecting={selecting}
@@ -183,7 +200,7 @@ export function SubscriptionsPage() {
           />
         ) : (
           <MovieSubscriptions
-            items={allMovies}
+            items={currentItems}
             isPending={movies.isPending}
             isError={movies.isError}
             isFetching={movies.isFetching}
@@ -195,6 +212,13 @@ export function SubscriptionsPage() {
             disabled={batch.isPending}
           />
         )}
+
+        <ListPagination
+          page={page}
+          hasMore={currentItems.length === SUBSCRIPTION_PAGE_SIZE}
+          disabled={currentQuery.isFetching}
+          onPageChange={setPage}
+        />
       </div>
 
       <Dialog
