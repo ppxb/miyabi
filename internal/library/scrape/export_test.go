@@ -281,4 +281,130 @@ func TestParseSTRMFileID(t *testing.T) {
 	}
 }
 
+func TestNaturalCompare(t *testing.T) {
+	cases := []struct {
+		a, b string
+		want int
+	}{
+		{"cd1", "cd2", -1},
+		{"cd2", "cd10", -1},
+		{"cd10", "cd2", 1},
+		{"CD1", "cd1", 0},
+		{"cd01", "cd1", 0},
+		{"cd01", "cd2", -1},
+		{"abc", "abc", 0},
+		{"abc", "abd", -1},
+		{"abd", "abc", 1},
+		{"SSIS-456-CD1.mp4", "SSIS-456-CD2.mp4", -1},
+		{"SSIS-456-CD2.mp4", "SSIS-456-CD10.mp4", -1},
+		{"file10a", "file2b", 1},
+	}
+
+	for _, tc := range cases {
+		got := NaturalCompare(tc.a, tc.b)
+		if (tc.want < 0 && got >= 0) || (tc.want > 0 && got <= 0) || (tc.want == 0 && got != 0) {
+			t.Errorf("NaturalCompare(%q, %q) = %d, want sign %d", tc.a, tc.b, got, tc.want)
+		}
+	}
+}
+
+func TestSortFiles(t *testing.T) {
+	files := []pan.File{
+		{ID: "3", Name: "SSIS-456-cd10.mp4"},
+		{ID: "2", Name: "SSIS-456-CD2.mp4"},
+		{ID: "1", Name: "SSIS-456-cd1.mp4"},
+	}
+
+	SortFiles(files)
+
+	if files[0].ID != "1" || files[1].ID != "2" || files[2].ID != "3" {
+		t.Fatalf("unexpected sort order: %+v", files)
+	}
+}
+
+func TestExportEmbyMedia_CleansObsoleteSTRM(t *testing.T) {
+	tempDir := t.TempDir()
+	embyDir := filepath.Join(tempDir, "emby")
+	doc := nfo.Movie{Code: "MIDE-123", Title: "Clean Test"}
+
+	// Step 1: Export single video -> MIDE-123.strm
+	singleVideo := []pan.File{{ID: "v1", Name: "MIDE-123.mp4"}}
+	if err := ExportEmbyMedia(embyDir, "http://localhost:8080", "tok", "MIDE-123", doc, singleVideo, nil, nil); err != nil {
+		t.Fatalf("first export failed: %v", err)
+	}
+
+	movieDir := filepath.Join(embyDir, "MIDE", "MIDE-123")
+	if _, err := os.Stat(filepath.Join(movieDir, "MIDE-123.strm")); err != nil {
+		t.Fatalf("expected MIDE-123.strm to exist: %v", err)
+	}
+
+	// Step 2: Export two disc videos -> MIDE-123-cd1.strm, MIDE-123-cd2.strm. Old MIDE-123.strm should be removed.
+	twoVideos := []pan.File{
+		{ID: "v1", Name: "MIDE-123-CD1.mp4"},
+		{ID: "v2", Name: "MIDE-123-CD2.mp4"},
+	}
+	if err := ExportEmbyMedia(embyDir, "http://localhost:8080", "tok", "MIDE-123", doc, twoVideos, nil, nil); err != nil {
+		t.Fatalf("second export failed: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(movieDir, "MIDE-123.strm")); !os.IsNotExist(err) {
+		t.Fatalf("expected obsolete MIDE-123.strm to be removed, got err: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(movieDir, "MIDE-123-cd1.strm")); err != nil {
+		t.Fatalf("expected MIDE-123-cd1.strm: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(movieDir, "MIDE-123-cd2.strm")); err != nil {
+		t.Fatalf("expected MIDE-123-cd2.strm: %v", err)
+	}
+
+	// Step 3: Export back to single video -> MIDE-123.strm. cd1 and cd2 strm should be removed.
+	if err := ExportEmbyMedia(embyDir, "http://localhost:8080", "tok", "MIDE-123", doc, singleVideo, nil, nil); err != nil {
+		t.Fatalf("third export failed: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(movieDir, "MIDE-123.strm")); err != nil {
+		t.Fatalf("expected MIDE-123.strm to exist: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(movieDir, "MIDE-123-cd1.strm")); !os.IsNotExist(err) {
+		t.Fatalf("expected obsolete MIDE-123-cd1.strm to be removed")
+	}
+	if _, err := os.Stat(filepath.Join(movieDir, "MIDE-123-cd2.strm")); !os.IsNotExist(err) {
+		t.Fatalf("expected obsolete MIDE-123-cd2.strm to be removed")
+	}
+}
+
+func TestExportEmbyMedia_MultiVideoOrder(t *testing.T) {
+	tempDir := t.TempDir()
+	embyDir := filepath.Join(tempDir, "emby")
+	doc := nfo.Movie{Code: "STARS-001", Title: "Multi Order Test"}
+
+	// Pass videos in reverse order
+	videos := []pan.File{
+		{ID: "vid-part2", Name: "STARS-001-cd2.mp4"},
+		{ID: "vid-part1", Name: "STARS-001-cd1.mp4"},
+	}
+
+	if err := ExportEmbyMedia(embyDir, "http://localhost:8080", "tok", "STARS-001", doc, videos, nil, nil); err != nil {
+		t.Fatalf("ExportEmbyMedia failed: %v", err)
+	}
+
+	movieDir := filepath.Join(embyDir, "STARS", "STARS-001")
+	cd1Bytes, err := os.ReadFile(filepath.Join(movieDir, "STARS-001-cd1.strm"))
+	if err != nil {
+		t.Fatalf("cd1 strm missing: %v", err)
+	}
+	if !strings.Contains(string(cd1Bytes), "vid-part1") {
+		t.Fatalf("expected cd1 strm to contain vid-part1, got %s", string(cd1Bytes))
+	}
+
+	cd2Bytes, err := os.ReadFile(filepath.Join(movieDir, "STARS-001-cd2.strm"))
+	if err != nil {
+		t.Fatalf("cd2 strm missing: %v", err)
+	}
+	if !strings.Contains(string(cd2Bytes), "vid-part2") {
+		t.Fatalf("expected cd2 strm to contain vid-part2, got %s", string(cd2Bytes))
+	}
+}
+
+
 

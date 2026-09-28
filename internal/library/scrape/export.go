@@ -1,10 +1,13 @@
 package scrape
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/export"
@@ -34,6 +37,52 @@ func RewriteSTRM(embyDir, publicURL, strmToken string) (int, error) {
 	return export.RewriteSTRM(context.Background(), embyDir, publicURL, strmToken)
 }
 
+// NaturalCompare compares two strings using natural numeric order (e.g. "cd2" < "cd10").
+func NaturalCompare(a, b string) int {
+	aLower, bLower := strings.ToLower(a), strings.ToLower(b)
+	i, j := 0, 0
+	for i < len(aLower) && j < len(bLower) {
+		if isDigit(aLower[i]) && isDigit(bLower[j]) {
+			startA, startB := i, j
+			for i < len(aLower) && isDigit(aLower[i]) {
+				i++
+			}
+			for j < len(bLower) && isDigit(bLower[j]) {
+				j++
+			}
+			numA := strings.TrimLeft(aLower[startA:i], "0")
+			numB := strings.TrimLeft(bLower[startB:j], "0")
+			if len(numA) != len(numB) {
+				return cmp.Compare(len(numA), len(numB))
+			}
+			if c := cmp.Compare(numA, numB); c != 0 {
+				return c
+			}
+			continue
+		}
+		if aLower[i] != bLower[j] {
+			return cmp.Compare(aLower[i], bLower[j])
+		}
+		i++
+		j++
+	}
+	return cmp.Compare(len(aLower)-i, len(bLower)-j)
+}
+
+func isDigit(b byte) bool {
+	return b >= '0' && b <= '9'
+}
+
+// SortFiles sorts video files by Name using natural sort order.
+func SortFiles(videos []pan.File) {
+	slices.SortFunc(videos, func(a, b pan.File) int {
+		if c := NaturalCompare(a.Name, b.Name); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.ID, b.ID)
+	})
+}
+
 // ExportEmbyMedia writes .strm, .nfo, poster.jpg, and fanart.jpg files to the Emby directory structure.
 func ExportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, videos []pan.File, poster, fanart []byte) error {
 	stem := nfo.FileStem(code)
@@ -41,6 +90,9 @@ func ExportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, 
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return fmt.Errorf("create emby directory %s: %w", destDir, err)
 	}
+
+	// Ensure videos are sorted deterministically
+	SortFiles(videos)
 
 	// 1. Write poster and fanart FIRST
 	posterName, fanartName := "poster.jpg", "fanart.jpg"
@@ -71,16 +123,34 @@ func ExportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, 
 	}
 
 	// 3. Write STRM files LAST so media servers (Emby) watching via inotify detect complete assets
+	expectedSTRMs := make(map[string]bool)
 	if len(videos) == 1 {
-		strmPath := filepath.Join(destDir, stem+".strm")
+		strmName := stem + ".strm"
+		expectedSTRMs[strmName] = true
+		strmPath := filepath.Join(destDir, strmName)
 		if err := os.WriteFile(strmPath, export.STRMContent(publicURL, videos[0].ID, strmToken), 0o644); err != nil {
 			return fmt.Errorf("write strm file: %w", err)
 		}
 	} else if len(videos) > 1 {
 		for i, v := range videos {
-			strmPath := filepath.Join(destDir, fmt.Sprintf("%s-cd%d.strm", stem, i+1))
+			strmName := fmt.Sprintf("%s-cd%d.strm", stem, i+1)
+			expectedSTRMs[strmName] = true
+			strmPath := filepath.Join(destDir, strmName)
 			if err := os.WriteFile(strmPath, export.STRMContent(publicURL, v.ID, strmToken), 0o644); err != nil {
 				return fmt.Errorf("write strm file: %w", err)
+			}
+		}
+	}
+
+	// Clean up obsolete .strm files belonging to this movie
+	if entries, err := os.ReadDir(destDir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			name := entry.Name()
+			if strings.HasSuffix(name, ".strm") && strings.HasPrefix(name, stem) && !expectedSTRMs[name] {
+				_ = os.Remove(filepath.Join(destDir, name))
 			}
 		}
 	}
@@ -98,13 +168,19 @@ func ExportLocalMovie(embyDir, publicURL, strmToken string, record *ent.Movie, i
 	stem := nfo.FileStem(record.Code)
 	nfoPath := filepath.Join(destDir, stem+".nfo")
 	posterPath := filepath.Join(destDir, "poster.jpg")
-	strmPath := filepath.Join(destDir, stem+".strm")
 
-	// If .nfo and poster.jpg already exist, and at least one strm exists, we don't need to re-write.
+	hasSTRM := false
+	if len(record.Edges.Files) == 1 {
+		_, err := os.Stat(filepath.Join(destDir, stem+".strm"))
+		hasSTRM = err == nil
+	} else if len(record.Edges.Files) > 1 {
+		_, err := os.Stat(filepath.Join(destDir, fmt.Sprintf("%s-cd1.strm", stem)))
+		hasSTRM = err == nil
+	}
+
 	_, nfoErr := os.Stat(nfoPath)
 	_, posterErr := os.Stat(posterPath)
-	_, strmErr := os.Stat(strmPath)
-	if nfoErr == nil && posterErr == nil && (strmErr == nil || len(record.Edges.Files) > 1) {
+	if nfoErr == nil && posterErr == nil && hasSTRM {
 		return nil
 	}
 
@@ -113,6 +189,7 @@ func ExportLocalMovie(embyDir, publicURL, strmToken string, record *ent.Movie, i
 	for _, f := range record.Edges.Files {
 		videos = append(videos, pan.File{ID: f.FileID, Name: f.Name, Size: f.Size, PickCode: f.PickCode})
 	}
+	SortFiles(videos)
 
 	var posterBytes, fanartBytes []byte
 	if images != nil {

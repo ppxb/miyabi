@@ -121,3 +121,51 @@ func TestExportLocalMediaMultiVideo(t *testing.T) {
 		t.Fatalf("cd2 strm content mismatch: %s", string(cd2Content))
 	}
 }
+
+func TestExportLocalMediaMultiVideoUnsorted(t *testing.T) {
+	tempDir := t.TempDir()
+	service := &Service{}
+	service.SetEmbyExport(tempDir, "http://127.0.0.1:8080", "")
+
+	doc := nfo.Movie{
+		Code:  "SSIS-456",
+		Title: "Two Disc Movie",
+	}
+	input := CoverPayload{
+		MetadataPayload: MetadataPayload{
+			Code:    "SSIS-456",
+			MovieID: 2,
+		},
+		Document: doc,
+	}
+
+	// Pass in reversed order: cd2 first, then cd1
+	videos := []pan.File{
+		{ID: "video-cd2", Name: "SSIS-456-CD2.mp4"},
+		{ID: "video-cd1", Name: "SSIS-456-CD1.mp4"},
+	}
+
+	err := service.exportLocalMedia(t.Context(), input, "SSIS-456", doc, videos, nil, nil)
+	if err != nil {
+		t.Fatalf("exportLocalMedia failed: %v", err)
+	}
+
+	movieDir := filepath.Join(tempDir, "SSIS", "SSIS-456")
+
+	cd1Content, err := os.ReadFile(filepath.Join(movieDir, "SSIS-456-cd1.strm"))
+	if err != nil {
+		t.Fatalf("cd1 strm not found: %v", err)
+	}
+	if !strings.Contains(string(cd1Content), "/api/strm/play/video-cd1") {
+		t.Fatalf("cd1 strm should point to video-cd1, got: %s", string(cd1Content))
+	}
+
+	cd2Content, err := os.ReadFile(filepath.Join(movieDir, "SSIS-456-cd2.strm"))
+	if err != nil {
+		t.Fatalf("cd2 strm not found: %v", err)
+	}
+	if !strings.Contains(string(cd2Content), "/api/strm/play/video-cd2") {
+		t.Fatalf("cd2 strm should point to video-cd2, got: %s", string(cd2Content))
+	}
+}
+

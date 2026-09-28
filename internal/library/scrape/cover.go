@@ -127,27 +127,43 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 		LocalExport: true,
 	}
 	var videos []pan.File
+	doc := input.Document
 	for i, directory := range directories {
 		if err := service.verifyVideoPositions(ctx, sess, directory); err != nil {
 			return nil, err
 		}
-		var dirVideos []pan.File
 		for _, entry := range directory.Files {
 			if directory.VideoIDs[entry.ID] {
 				videos = append(videos, entry)
-				dirVideos = append(dirVideos, entry)
 			}
 		}
-		state, err := service.writeSidecars(ctx, sess, input, directory, dirVideos, poster, fanart)
+		state, dirDoc, err := service.writeSidecars(ctx, sess, input, directory, poster, fanart)
 		if err != nil {
 			return nil, err
 		}
+		doc = dirDoc
 		snapshot.Directories = append(snapshot.Directories, state)
 		if err := service.db.Task.UpdateOneID(job.ID).SetProgress((i + 1) * 100 / len(directories)).Exec(ctx); err != nil {
 			return nil, err
 		}
 	}
+	// Deduplicate and sort all videos across all directories
+	seenVideos := make(map[string]bool, len(videos))
+	uniqueVideos := make([]pan.File, 0, len(videos))
+	for _, v := range videos {
+		if !seenVideos[v.ID] {
+			seenVideos[v.ID] = true
+			uniqueVideos = append(uniqueVideos, v)
+		}
+	}
+	videos = uniqueVideos
+	SortFiles(videos)
 	snapshot.Videos = VideoFingerprint(videos)
+
+	stem := nfo.FileStem(input.Code)
+	if err := service.exportLocalMedia(ctx, input, stem, doc, videos, poster, fanart); err != nil {
+		return nil, err
+	}
 	input.Snapshot = snapshot
 	encoded, err = tasks.EncodePayload(input)
 	if err != nil {
@@ -215,7 +231,7 @@ func (service *Service) originImage(ctx context.Context, sess drive.Session, ent
 	return sess.Read(ctx, info.File.PickCode, 32<<20)
 }
 
-func (service *Service) writeSidecars(ctx context.Context, sess drive.Session, input CoverPayload, directory MovieDirectory, dirVideos []pan.File, poster, fanart []byte) (DirectorySnapshot, error) {
+func (service *Service) writeSidecars(ctx context.Context, sess drive.Session, input CoverPayload, directory MovieDirectory, poster, fanart []byte) (DirectorySnapshot, nfo.Movie, error) {
 	var snapshot DirectorySnapshot
 	stem := nfo.FileStem(input.Code)
 	nfoName := stem + ".nfo"
@@ -224,10 +240,10 @@ func (service *Service) writeSidecars(ctx context.Context, sess drive.Session, i
 	// An existing matching NFO is already the source of truth. Preserve its
 	// formatting and user edits, as well as its referenced artwork.
 	if existingDoc, origin, found, err := DirectoryNFO(ctx, sess, input.Code, directory); err != nil {
-		return snapshot, err
+		return snapshot, doc, err
 	} else if found {
 		if err := VerifyCoverOrigin(input, directory.ID, existingDoc, *origin, poster, fanart); err != nil {
-			return snapshot, err
+			return snapshot, doc, err
 		}
 		doc = existingDoc
 	}
@@ -236,19 +252,15 @@ func (service *Service) writeSidecars(ctx context.Context, sess drive.Session, i
 	doc.Thumbs = []nfo.Thumb{{Aspect: "poster", Path: posterName}}
 	doc.Fanart = fanartName
 
-	if err := service.exportLocalMedia(ctx, input, stem, doc, dirVideos, poster, fanart); err != nil {
-		return snapshot, err
-	}
-
 	body, err := nfo.Encode(doc)
 	if err != nil {
-		return snapshot, err
+		return snapshot, doc, err
 	}
 
 	return NewDirectorySnapshot(directory.ID,
 		pan.File{Name: nfoName, SHA1: pan.SHA1(body)},
 		pan.File{Name: posterName, SHA1: pan.SHA1(poster)},
-		pan.File{Name: fanartName, SHA1: pan.SHA1(fanart)}), nil
+		pan.File{Name: fanartName, SHA1: pan.SHA1(fanart)}), doc, nil
 }
 
 func (service *Service) exportLocalMedia(ctx context.Context, input CoverPayload, stem string, doc nfo.Movie, videos []pan.File, poster, fanart []byte) error {
