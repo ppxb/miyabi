@@ -22,6 +22,7 @@ import (
 // sseTaskStub is a TaskManager whose snapshot and revisions change when the
 // test publishes an update, mirroring TaskService's coalesced notifications.
 type sseTaskStub struct {
+	TaskManager
 	mu          sync.Mutex
 	updates     chan struct{}
 	revisions   tasks.TaskRevisions
@@ -169,6 +170,7 @@ func TestTaskEventsFailsBeforeStreamingWhenSnapshotIsUnavailable(t *testing.T) {
 }
 
 type sseFailingTasks struct {
+	TaskManager
 	unsubscribed bool
 }
 

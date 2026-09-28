@@ -13,8 +13,9 @@ import (
 // batchPayload is the stored JSON payload of a subscription batch
 // task: the subscription IDs to process and the running tally.
 type batchPayload struct {
-	IDs   []int                    `json:"ids"`
-	Batch domain.SubscriptionBatch `json:"batch"`
+	FailedIDs []int                    `json:"failed_ids,omitempty"`
+	IDs       []int                    `json:"ids"`
+	Batch     domain.SubscriptionBatch `json:"batch"`
 }
 
 // enqueueSubscriptionBatch queues one batch task over the given subscriptions.
@@ -60,6 +61,8 @@ func batchTaskInfo(record *ent.Task) (domain.TaskInfo, error) {
 		ID: record.ID, Type: record.Type, Status: string(record.Status), Progress: record.Progress,
 		Error: record.Error, CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
 		Batch: &batch,
+		CanRetry: (record.Status == task.StatusFailed || record.Status == task.StatusDone) &&
+			payload.Batch.Failed == len(payload.FailedIDs) && (len(payload.FailedIDs) > 0 || payload.Batch.Processed < len(payload.IDs)),
 	}, nil
 }
 

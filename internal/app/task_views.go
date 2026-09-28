@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/library"
 	"github.com/ppxb/miyabi/internal/monitor"
 	"github.com/ppxb/miyabi/internal/tasks"
@@ -13,8 +14,9 @@ import (
 // taskViews composes business-owned projections with the task notification bus.
 type taskViews struct {
 	*tasks.Service
-	library *library.Service
-	monitor *monitor.Service
+	database *ent.Client
+	library  *library.Service
+	monitor  *monitor.Service
 }
 
 func (v *taskViews) List(ctx context.Context) ([]domain.TaskInfo, error) {
@@ -45,4 +47,20 @@ func (v *taskViews) List(ctx context.Context) ([]domain.TaskInfo, error) {
 		return b.ID - a.ID
 	})
 	return result, nil
+}
+
+// Retry delegates each workflow's retry rules to its owner.
+func (v *taskViews) Retry(ctx context.Context, id int) (domain.TaskInfo, error) {
+	record, err := v.database.Task.Get(ctx, id)
+	if err != nil {
+		return domain.TaskInfo{}, err
+	}
+	switch tasks.Kind(record.Type) {
+	case tasks.KindScan:
+		return v.library.RetryTask(ctx, id)
+	case tasks.KindSubscriptionBatch:
+		return v.monitor.RetryTask(ctx, id)
+	default:
+		return domain.TaskInfo{}, domain.E(domain.KindInvalid, "该任务不支持重试", nil)
+	}
 }

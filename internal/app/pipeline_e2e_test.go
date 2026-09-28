@@ -541,6 +541,22 @@ func TestPipelineMarksMovieFailedWhenCatalogueLacksIt(t *testing.T) {
 	if err != nil || len(infos) != 1 || infos[0].Status != string(task.StatusFailed) || infos[0].Error == nil {
 		t.Fatalf("scan workflow = %+v, %v", infos, err)
 	}
+	// Repairing the upstream failure must not require another directory scan.
+	detail := fixtureDetail()
+	detail.Code = "ZZZ-999"
+	fixture.addCatalogueMovie(detail)
+	views := &taskViews{Service: fixture.tasks, database: fixture.store.Client, library: fixture.library}
+	if _, err := views.Retry(ctx, infos[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	retried := fixture.runQueue(t)
+	if len(retried) != 2 || retried[0].ID != scrapes[0].ID || retried[0].Type != tasks.KindScrape || retried[1].Type != tasks.KindCover {
+		t.Fatalf("retry replayed completed work: %+v", retried)
+	}
+	infos, err = fixture.library.ListTasks(ctx)
+	if err != nil || len(infos) != 1 || infos[0].Status != "done" || infos[0].CanRetry {
+		t.Fatalf("retried workflow = %+v, %v", infos, err)
+	}
 }
 
 func TestPipelineRemovesMovieWhenDeletedFrom115(t *testing.T) {

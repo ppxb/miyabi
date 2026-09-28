@@ -99,7 +99,7 @@ func TestTaskListRetainsOlderActiveWorkflows(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	views := &taskViews{Service: fix.Tasks, library: fix.Service, monitor: monitor.New(fix.DB, nil, nil, fix.Tasks)}
+	views := &taskViews{Service: fix.Tasks, database: fix.DB, library: fix.Service, monitor: monitor.New(fix.DB, nil, nil, fix.Tasks)}
 	items, err := views.List(ctx)
 	if err != nil || len(items) != 21 || items[0].ID != parent.ID || items[0].Status != string(task.StatusQueued) {
 		t.Fatalf("active workflows: %+v err=%v", items, err)
@@ -122,7 +122,7 @@ func TestTaskViewsMergeScanAndBatchActivity(t *testing.T) {
 		t.Fatal(err)
 	}
 	runningScan := fix.DB.Task.Create().SetType("scan").SetStatus(task.StatusRunning).SetPayload(scanPayload).SaveX(ctx)
-	views := &taskViews{Service: fix.Tasks, library: fix.Service, monitor: monitor.New(fix.DB, nil, nil, fix.Tasks)}
+	views := &taskViews{Service: fix.Tasks, database: fix.DB, library: fix.Service, monitor: monitor.New(fix.DB, nil, nil, fix.Tasks)}
 	items, err := views.List(ctx)
 	if err != nil {
 		t.Fatal(err)

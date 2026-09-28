@@ -12,6 +12,68 @@ const dummySource = {
   directory: { id: 'dir1', name: 'Movies', path: '/Movies' }
 }
 
+test('offline failures gain retry actions when their scan arrives later', () => {
+  const task = {
+    task_id: 9, scan_task_id: 1, status: 'done', phase: 'in_library',
+    processing: false, progress: 100, error: 'metadata failed'
+  }
+  const context = {
+    tasks: [], activity: { source: dummySource, tasks: [task] },
+    waiting: false, isTasksError: false, isActivityError: false,
+    previous: new Map(), dismissed: new Set(), announced: new Set(), initialized: true
+  }
+  const first = diffTaskNotifications(context)
+  const scan = makeScanTask({ status: 'failed', can_retry: true, offline_task_id: 9 })
+  const second = diffTaskNotifications({ ...context, tasks: [scan], previous: first.nextEntries })
+  assert.equal(second.actions.length, 1)
+  assert.equal(second.actions[0].type, 'notify_offline')
+  assert.equal(second.actions[0].scan.can_retry, true)
+  const third = diffTaskNotifications({ ...context, tasks: [scan], previous: second.nextEntries })
+  assert.equal(third.actions.length, 0)
+})
+
+for (const kind of ['scan', 'batch', 'offline']) {
+  test(`${kind} retry results update visible notifications even if active state is missed`, () => {
+    const failed = kind === 'batch'
+      ? makeBatchTask({ status: 'done', can_retry: true, updated_at: '2026-09-28T10:00:00Z' })
+      : makeScanTask({
+          status: 'failed', can_retry: true, updated_at: '2026-09-28T10:00:00Z',
+          ...(kind === 'offline' ? { offline_task_id: 9 } : {})
+        })
+    const offline = {
+      task_id: 9, scan_task_id: failed.id, status: 'done', phase: 'in_library',
+      processing: false, progress: 100, error: 'metadata failed'
+    }
+    const id = kind === 'offline' ? 'offline:9' : `${kind}:${failed.id}`
+    const context = {
+      tasks: [failed], activity: { source: dummySource, tasks: kind === 'offline' ? [offline] : [] },
+      waiting: false, isTasksError: false, isActivityError: false,
+      previous: new Map(), dismissed: new Set(), announced: new Set([id]), initialized: true
+    }
+    const first = diffTaskNotifications(context)
+    for (const success of [false, true]) {
+      const retried = {
+        ...failed, updated_at: '2026-09-28T10:01:00Z',
+        ...(success ? { status: 'done', can_retry: false } : {})
+      }
+      const refreshed = {
+        ...context, tasks: [retried], previous: first.nextEntries,
+        activity: {
+          ...context.activity,
+          tasks: kind === 'offline' ? [{ ...offline, error: success ? undefined : offline.error }] : []
+        }
+      }
+      const result = diffTaskNotifications(refreshed)
+      assert.equal(result.actions.length, 1)
+      assert.equal(result.actions[0].type, `notify_${kind}`)
+      assert.equal(diffTaskNotifications({ ...refreshed, previous: result.nextEntries }).actions.length, 0)
+      assert.equal(diffTaskNotifications({
+        ...refreshed, announced: new Set(), dismissed: new Set([id])
+      }).actions.length, 0)
+    }
+  })
+}
+
 function makeScanTask(overrides = {}) {
   return {
     id: 1,

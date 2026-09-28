@@ -1,6 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 
-import { apiGet } from '@/api/client'
+import { apiGet, apiPost } from '@/api/client'
+import { offlineKeys } from '@/api/offline'
 import type { PanDirectory } from '@/api/pan'
 
 export type LibrarySource = {
@@ -15,6 +17,7 @@ type TaskBase = {
   status: 'queued' | 'running' | 'done' | 'failed'
   progress: number
   error?: string
+  can_retry?: boolean
   created_at: string
   updated_at: string
 }
@@ -64,6 +67,20 @@ export function useTasks() {
     queryFn: ({ signal }) => apiGet<Task[]>('/api/tasks', undefined, signal),
     staleTime: Infinity,
     refetchOnMount: 'always'
+  })
+}
+
+export function useRetryTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => apiPost<Task>(`/api/tasks/${id}/retry`),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: taskKeys.all }),
+        queryClient.invalidateQueries({ queryKey: offlineKeys.all })
+      ])
+    },
+    onError: error => toast.error('重试失败', { description: error.message })
   })
 }
 

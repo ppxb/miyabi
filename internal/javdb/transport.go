@@ -83,7 +83,7 @@ func (t *transport) getJSON(
 
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		_, _ = io.CopyN(io.Discard, response.Body, 4096)
-		return &HTTPError{StatusCode: response.StatusCode}
+		return &HTTPError{StatusCode: response.StatusCode, RetryAfter: parseRetryAfter(response.Header.Get("Retry-After"), time.Now())}
 	}
 
 	limited := io.LimitReader(response.Body, maxResponseBodyBytes+1)

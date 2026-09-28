@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"net/url"
 	"slices"
 	"sync"
@@ -29,17 +30,19 @@ type jsonTransport interface {
 
 // Client is the anonymous JavDB App API client.
 type Client struct {
-	options      Options
-	limiter      *rate.Limiter
-	media        *resty.Client
-	current      atomic.Pointer[routeState]
-	lastProbe    atomic.Pointer[[]RouteCandidate]
-	routes       singleflight.Group
-	selectionMu  sync.Mutex
-	routeContext context.Context
-	stopRoutes   context.CancelFunc
-	selector     func(context.Context, routeSelection) (*routeState, error)
-	proxyChanges <-chan struct{}
+	options       Options
+	limiter       *rate.Limiter
+	cooldownMu    sync.Mutex
+	cooldownUntil time.Time
+	media         *resty.Client
+	current       atomic.Pointer[routeState]
+	lastProbe     atomic.Pointer[[]RouteCandidate]
+	routes        singleflight.Group
+	selectionMu   sync.Mutex
+	routeContext  context.Context
+	stopRoutes    context.CancelFunc
+	selector      func(context.Context, routeSelection) (*routeState, error)
+	proxyChanges  <-chan struct{}
 }
 
 func New(options Options) (*Client, error) {
@@ -262,22 +265,42 @@ func (c *Client) getJSON(
 	if err != nil {
 		return err
 	}
-	if err := c.limiter.Wait(ctx); err != nil {
-		return err
+	deadline := time.Now().Add(maxRateLimitWait)
+	failover := false
+	for retries := 0; ; {
+		if err := c.waitRequest(ctx, deadline); err != nil {
+			return err
+		}
+		if current := c.current.Load(); current != nil {
+			state = current
+		}
+		err = state.transport.getJSON(ctx, path, params, language, destination)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		var response *HTTPError
+		if errors.As(err, &response) && response.StatusCode == 429 {
+			delay := response.RetryAfter
+			if delay <= 0 {
+				base := time.Second << retries
+				delay = base + rand.N(base/2)
+			}
+			c.deferRequests(delay)
+			if retries == maxRateLimitRetries {
+				return err
+			}
+			retries++
+			continue
+		}
+		if !routeFailure(err) || failover {
+			return err
+		}
+		state, err = c.replaceFailedRoute(ctx, state)
+		if err != nil {
+			return err
+		}
+		failover = true
 	}
-	err = state.transport.getJSON(ctx, path, params, language, destination)
-	if ctx.Err() != nil || !routeFailure(err) {
-		return err
-	}
-
-	state, err = c.replaceFailedRoute(ctx, state)
-	if err != nil {
-		return err
-	}
-	if err := c.limiter.Wait(ctx); err != nil {
-		return err
-	}
-	return state.transport.getJSON(ctx, path, params, language, destination)
 }
 
 func (c *Client) ensureRoute(ctx context.Context) (*routeState, error) {

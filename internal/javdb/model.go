@@ -83,6 +83,7 @@ func (e *APIError) PublicMessage() string {
 // HTTPError is returned for a non-success HTTP status.
 type HTTPError struct {
 	StatusCode int
+	RetryAfter time.Duration
 }
 
 func (e *HTTPError) Error() string {
@@ -92,5 +93,8 @@ func (e *HTTPError) Error() string {
 func (e *HTTPError) DomainKind() domain.Kind { return domain.KindUpstream }
 
 func (e *HTTPError) PublicMessage() string {
+	if e.StatusCode == 429 {
+		return "JavDB 请求过于频繁，请稍后重试"
+	}
 	return fmt.Sprintf("JavDB 服务异常（HTTP %d），请稍后重试", e.StatusCode)
 }

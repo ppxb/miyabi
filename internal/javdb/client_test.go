@@ -142,7 +142,6 @@ func TestClientDoesNotReselectForProtocolOrClientErrors(t *testing.T) {
 		{name: "api", err: &APIError{Action: "BadRequest", Message: "invalid"}},
 		{name: "http 400", err: &HTTPError{StatusCode: 400}},
 		{name: "http 401", err: &HTTPError{StatusCode: 401}},
-		{name: "http 429", err: &HTTPError{StatusCode: 429}},
 		{name: "json", err: errors.New("decode JavDB data")},
 	}
 

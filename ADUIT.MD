@@ -63,7 +63,7 @@
 - [x] **36.** ✔ `internal/emby/service.go:443-475` `translatePath` 中 `strings.HasPrefix(rel, "..")` 会把 `..foo` 目录误判为越界；方法未使用 receiver。
 - [x] **241.** ✔ `internal/library/scan/reconcile.go:58-71`、`persist.go:197-210`：用户在 115 删除影片后重新扫描，仅删除了 SQLite 的 `File` 与无引用 `Movie` 记录，未清理 `EmbyDir` 本地对应的影片目录（`.strm`、`.nfo`、海报等），且未向 Emby 发送删除/变更通知，导致 Emby 媒体库残留死链幽灵影片。
 - [x] **242.** ✔ 废除 JavBus 强制绑定代理限制，移除冗余的手动设置项，改为全自动连通性健康探测与自适应降级：删除后端 `/api/settings/javbus`（连同 `internal/api/javbus.go`）及前端 JavBus 开关与 API；`javbus.Client` 内部自适应维护连通性探测与熔断状态，网络可达时自动聚合磁力，不可达时 0ms 静默跳过（`ErrSkipped`），代理配置变更时自动重探自愈（一并解决第 175、178、223 条）。
-- [ ] **243.** `internal/javdb/client.go:260-281` + `transport.go:84-87`：JavDB 客户端对 HTTP 429（Too Many Requests）无退避重试与 Retry-After 响应头处理，遭遇突发限流后请求立即报错；且扫库与订阅任务层对失败项缺乏细粒度重试与断点恢复机制，单次限流即导致整个任务终态失败（只能全量重新扫描）→ 增加 429 退避重试与 Retry-After 解析（对照组：`internal/pan/client.go:129-145`），并在任务层支持失败项重试或断点续扫。
+- [x] **243.** ✔ JavDB API 原缺少 HTTP 429 退避和 `Retry-After` 处理，现支持有限次数重试、秒数/日期解析、共享冷却与取消，超长冷却不提前重发。扫描原已有断点，批量原按 `Processed` 续跑；现补充任务重试接口及通知入口：保留扫描断点和任务 ID，仅重排失败的刮削/封面子任务，批量仅重试失败与未处理的订阅，并完整保存失败 ID。旧批量记录缺少完整失败 ID 时不推测重试范围，需重新选择失败订阅。
 - [ ] **244.** `internal/codeid/codeid.go:38-55,59-93` `filenamePattern`：正则前缀匹配规则对个别非番号文件名存在误提取（如相机默认命名的 `VID-20220326`、`IMG-XXXX`、包含分辨率标签的 `MAYLI-1080P` 等被当作番号提取并提交上游查询）→ 建立常见非番号前缀黑名单（如 `VID`, `IMG`, `DSC`, `MOV` 等）与分辨率标记过滤，避免无效请求与限流损耗。
 
 

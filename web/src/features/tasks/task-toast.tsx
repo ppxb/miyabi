@@ -16,15 +16,20 @@ type TaskToastOptions = {
 
 export { batchToastID, offlineToastID, scanToastID }
 
-function taskToastOptions(id: string, active: boolean, options: TaskToastOptions = {}) {
+function taskToastOptions(
+  id: string,
+  active: boolean,
+  options: TaskToastOptions = {},
+  retryTaskID?: number
+) {
   return {
     id,
-    duration: active ? Infinity : 8000,
+    duration: active || retryTaskID !== undefined ? Infinity : 8000,
     dismissible: true,
     closeButton: false,
     icon: undefined,
     onDismiss: options.onDismiss,
-    action: <TaskToastActions id={id} />
+    action: <TaskToastActions id={id} retryTaskID={retryTaskID} />
   }
 }
 
@@ -34,7 +39,12 @@ export function notifyTaskError(id: string, title: string, description: string) 
 
 export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
   const active = isTaskActive(task)
-  const props = taskToastOptions(scanToastID(task.id), active, options)
+  const props = taskToastOptions(
+    scanToastID(task.id),
+    active,
+    options,
+    task.can_retry ? task.id : undefined
+  )
   if (active) {
     // Sonner's loading type hides the close button; long tasks remain dismissible.
     toast.info(options.waiting ? '扫描进度等待同步' : '正在处理媒体库', {
@@ -63,7 +73,12 @@ export function notifyOfflineTask(
 ) {
   const active = isOfflineTaskActive(task)
   const id = offlineToastID(task.task_id)
-  const props = taskToastOptions(id, active, options)
+  const props = taskToastOptions(
+    id,
+    active,
+    options,
+    options.scan?.can_retry ? options.scan.id : undefined
+  )
   if (active) {
     const scan = options.scan
     toast.info(task.code, {
@@ -114,7 +129,12 @@ export function notifyOfflineTask(
 
 export function notifyBatchTask(task: BatchTask, options: TaskToastOptions = {}) {
   const active = isTaskActive(task)
-  const props = taskToastOptions(batchToastID(task.id), active, options)
+  const props = taskToastOptions(
+    batchToastID(task.id),
+    active,
+    options,
+    task.can_retry ? task.id : undefined
+  )
   const { total, processed, submitted, waiting, failed, failures } = task.batch
   const summary = `已加入 115 ${submitted} 部 · 等待磁力 ${waiting} 部${failed > 0 ? ` · 失败 ${failed} 部` : ''}`
   if (active) {

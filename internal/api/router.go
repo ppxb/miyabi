@@ -92,6 +92,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.GET("/library/artwork/:key", libraryArtworkHandler(deps.Artwork))
 
 	protected.GET("/tasks", noStore(), tasksHandler(deps.Tasks))
+	protected.POST("/tasks/:id/retry", taskRetryHandler(deps.Tasks))
 	protected.GET("/tasks/events", taskEventsHandler(deps.Tasks))
 	protected.GET("/offline/tasks", noStore(), offlineActivityHandler(deps.Offline))
 

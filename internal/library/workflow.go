@@ -113,6 +113,7 @@ func (s *Service) Workflows(ctx context.Context, records []*ent.Task) ([]domain.
 				info.Status = string(task.StatusFailed)
 			}
 		}
+		info.CanRetry = info.Status == string(task.StatusFailed)
 		result = append(result, info)
 	}
 	return result, nil
@@ -151,7 +152,7 @@ func scanTaskInfo(record *ent.Task) (domain.TaskInfo, error) {
 	}
 	return domain.TaskInfo{
 		ID: record.ID, Type: record.Type, Status: string(record.Status), Progress: record.Progress,
-		Error: record.Error, CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
+		Error: record.Error, CanRetry: record.Status == task.StatusFailed, CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
 		Source: payload.Source, Scan: payload.Scan, OfflineTaskID: payload.OfflineTaskID,
 	}, nil
 }

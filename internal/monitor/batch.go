@@ -117,6 +117,7 @@ func (service *Service) BatchHandler(ctx context.Context, job tasks.Job) error {
 		switch {
 		case err != nil:
 			payload.Batch.Failed++
+			payload.FailedIDs = append(payload.FailedIDs, id)
 			if len(payload.Batch.Failures) < batchFailureLimit {
 				payload.Batch.Failures = append(payload.Batch.Failures, domain.SubscriptionFailure{Code: code, Error: domain.PublicMessage(err)})
 			}
@@ -127,7 +128,7 @@ func (service *Service) BatchHandler(ctx context.Context, job tasks.Job) error {
 			payload.Batch.Waiting++
 		}
 		if err := service.saveSubscriptionBatch(ctx, job.ID, payload); err != nil {
-			slog.WarnContext(ctx, "batch ingestion progress not saved", "task_id", job.ID, "error", err)
+			return err
 		}
 	}
 	return nil

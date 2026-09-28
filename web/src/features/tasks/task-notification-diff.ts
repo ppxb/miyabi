@@ -16,6 +16,7 @@ function isTaskActive(task: Task): boolean {
 export type NotificationEntry = {
   active: boolean
   playable?: boolean
+  retryable?: boolean
   fingerprint: string
 }
 
@@ -56,11 +57,11 @@ export const isOfflineTaskActive = (task: { phase: string; processing: boolean }
   task.phase === 'downloading' || task.processing
 
 export function scanFingerprint(task: ScanTask): string {
-  return `${task.status}|${task.progress}|${task.error ?? ''}|${task.scan.stage}|${task.scan.movies}|${task.scan.metadata_total}|${task.scan.metadata_completed}`
+  return `${task.status}|${task.progress}|${task.error ?? ''}|${task.scan.stage}|${task.scan.movies}|${task.scan.metadata_total}|${task.scan.metadata_completed}|${task.updated_at}|${!!task.can_retry}`
 }
 
 export function batchFingerprint(task: BatchTask): string {
-  return `${task.status}|${task.progress}|${task.error ?? ''}|${task.batch.processed}|${task.batch.failed}`
+  return `${task.status}|${task.progress}|${task.error ?? ''}|${task.batch.processed}|${task.batch.failed}|${task.updated_at}|${!!task.can_retry}`
 }
 
 export function diffTaskNotifications(ctx: DiffContext): DiffResult {
@@ -92,10 +93,11 @@ export function diffTaskNotifications(ctx: DiffContext): DiffResult {
 
     const old = ctx.previous.get(id)
     if (old?.fingerprint !== fp) {
+      // A retry may finish between polls; refresh its visible terminal result too.
       if (
         active
           ? !ctx.dismissed.has(id)
-          : old?.active || (!old && (ctx.initialized || ctx.announced.has(id)))
+          : old?.active || ctx.announced.has(id) || (!old && ctx.initialized)
       ) {
         actions.push({ type: 'notify_scan', id, task, waiting: waitingForScan })
       }
@@ -114,7 +116,7 @@ export function diffTaskNotifications(ctx: DiffContext): DiffResult {
       if (
         active
           ? !ctx.dismissed.has(id)
-          : old?.active || (!old && (ctx.initialized || ctx.announced.has(id)))
+          : old?.active || ctx.announced.has(id) || (!old && ctx.initialized)
       ) {
         actions.push({ type: 'notify_batch', id, task, waiting: waitingForScan })
       }
@@ -127,10 +129,12 @@ export function diffTaskNotifications(ctx: DiffContext): DiffResult {
     const scan = task.scan_task_id ? scansByID.get(task.scan_task_id) : undefined
     const active = isOfflineTaskActive(task)
     const scanPart = active && scan ? scanFingerprint(scan) : ''
-    const fp = `${task.status}|${task.phase}|${task.processing}|${task.library_id ?? ''}|${task.progress}|${task.error ?? ''}|${scanPart}|${waitingForOffline}`
+    const retryable = !!scan?.can_retry
+    const fp = `${task.status}|${task.phase}|${task.processing}|${task.library_id ?? ''}|${task.progress}|${task.error ?? ''}|${scanPart}|${scan?.updated_at ?? ''}|${retryable}|${waitingForOffline}`
     const entry: NotificationEntry = {
       active,
       playable: task.phase === 'in_library',
+      retryable,
       fingerprint: fp
     }
     nextEntries.set(id, entry)
@@ -140,7 +144,10 @@ export function diffTaskNotifications(ctx: DiffContext): DiffResult {
       if (
         active
           ? !ctx.dismissed.has(id)
-          : old?.active || (!old && (ctx.initialized || ctx.announced.has(id)))
+          : old?.active ||
+            (old && retryable && !old.retryable) ||
+            ctx.announced.has(id) ||
+            (!old && ctx.initialized)
       ) {
         actions.push({ type: 'notify_offline', id, task, scan, waiting: waitingForOffline })
       }
