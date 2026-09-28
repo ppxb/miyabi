@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -34,6 +35,13 @@ func (s *subscriptionStub) ActorFeed(_ context.Context, actorID, page, limit int
 	return []monitor.Item{
 		{ID: 3, Kind: "movie", TargetID: "m-spawned", Title: "Spawned"},
 	}, nil
+}
+
+func (s *subscriptionStub) UpdateConfig(_ context.Context, cfg monitor.Config) (monitor.Config, error) {
+	if cfg.CheckTime == "" {
+		cfg.CheckTime = "00:00"
+	}
+	return cfg, nil
 }
 
 func TestSubscriptionTargetsHandler(t *testing.T) {
@@ -77,5 +85,27 @@ func TestSubscriptionActorFeedHandlerAllSpawned(t *testing.T) {
 	}
 	if stub.actorFeedPage != 2 || stub.actorFeedLimit != 20 {
 		t.Fatalf("expected page 2 limit 20, got page %d limit %d", stub.actorFeedPage, stub.actorFeedLimit)
+	}
+}
+
+func TestSubscriptionSettingsUpdateHandler_ReturnsNormalizedConfig(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	stub := &subscriptionStub{}
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPut, "/api/settings/subscription", bytes.NewReader([]byte(`{"check_time":""}`)))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	subscriptionSettingsUpdateHandler(stub)(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var res monitor.Config
+	if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil {
+		t.Fatal(err)
+	}
+	if res.CheckTime != "00:00" {
+		t.Fatalf("expected normalized check_time '00:00', got %q", res.CheckTime)
 	}
 }

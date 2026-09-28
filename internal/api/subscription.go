@@ -19,7 +19,7 @@ type SubscriptionManager interface {
 	EnqueueBatch(ctx context.Context, req monitor.BatchEnqueueRequest) (int, error)
 	ActorFeed(ctx context.Context, actorID int, page int, limit int) ([]monitor.Item, error)
 	Config(ctx context.Context) (monitor.Config, error)
-	UpdateConfig(ctx context.Context, cfg monitor.Config) error
+	UpdateConfig(ctx context.Context, cfg monitor.Config) (monitor.Config, error)
 }
 
 type subscriptionListQuery struct {
@@ -191,7 +191,7 @@ func subscriptionSettingsUpdateHandler(mgr SubscriptionManager) gin.HandlerFunc 
 		if !ok {
 			return
 		}
-		err := mgr.UpdateConfig(c.Request.Context(), cfg)
-		respond(c, cfg, err)
+		saved, err := mgr.UpdateConfig(c.Request.Context(), cfg)
+		respond(c, saved, err)
 	}
 }

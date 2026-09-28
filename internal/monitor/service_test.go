@@ -136,11 +136,15 @@ func TestSubscriptionSettings(t *testing.T) {
 		t.Fatalf("default config mismatch: %#v %v", cfg, err)
 	}
 	cfg.ActorAutoDownload, cfg.CheckTime, cfg.Preferences.Subtitle = true, "05:30", magnet.PreferenceRequired
-	if err := f.service.UpdateConfig(ctx, cfg); err != nil {
+	if _, err := f.service.UpdateConfig(ctx, cfg); err != nil {
 		t.Fatal(err)
 	}
 	if saved, err := f.service.Config(ctx); err != nil || saved != cfg {
 		t.Fatalf("round trip mismatch: %#v %v", saved, err)
+	}
+	normalized, err := f.service.UpdateConfig(ctx, Config{CheckTime: ""})
+	if err != nil || normalized.CheckTime != "00:00" {
+		t.Fatalf("expected normalized check_time 00:00, got %#v %v", normalized, err)
 	}
 	for name, mutate := range map[string]func(*Config){
 		"hour out of range": func(c *Config) { c.CheckTime = "25:00" },
@@ -149,7 +153,7 @@ func TestSubscriptionSettings(t *testing.T) {
 	} {
 		bad := cfg
 		mutate(&bad)
-		if err := f.service.UpdateConfig(ctx, bad); !domain.IsKind(err, domain.KindInvalid) {
+		if _, err := f.service.UpdateConfig(ctx, bad); !domain.IsKind(err, domain.KindInvalid) {
 			t.Errorf("%s: expected KindInvalid, got %v", name, err)
 		}
 	}

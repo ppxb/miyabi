@@ -143,12 +143,15 @@ func (service *Service) config(ctx context.Context) Config {
 	return cfg
 }
 
-func (service *Service) UpdateConfig(ctx context.Context, cfg Config) error {
+func (service *Service) UpdateConfig(ctx context.Context, cfg Config) (Config, error) {
 	cfg = cfg.normalized()
 	if err := cfg.validate(); err != nil {
-		return err
+		return Config{}, err
 	}
-	return database.SaveSetting(ctx, service.database, subscriptionConfigSetting, cfg)
+	if err := database.SaveSetting(ctx, service.database, subscriptionConfigSetting, cfg); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
 }
 
 // TargetItem is a lightweight projection used to check subscription status.
