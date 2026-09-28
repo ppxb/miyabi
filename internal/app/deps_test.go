@@ -12,11 +12,11 @@ import (
 // Business packages may only reach each other through domain types or
 // interfaces declared by the caller. This test pins the import direction:
 // a business package must not import another business package, and the
-// shared kernel (drive, tasks, database) must not import any of them.
+// shared domain and infrastructure packages must not import any of them.
 func TestBusinessPackagesDoNotImportEachOther(t *testing.T) {
 	const module = "github.com/ppxb/miyabi/internal/"
-	business := []string{"catalogue", "library", "library/scan", "library/scrape", "offline", "monitor", "strm", "maintenance"}
-	kernel := []string{"drive", "tasks", "database"}
+	business := []string{"catalogue", "library", "library/scan", "library/scrape", "offline", "monitor", "strm", "maintenance", "emby", "subtitle"}
+	shared := []string{"drive", "tasks", "database", "domain", "domain/subtitle", "export"}
 	// Subpackages of one bounded context may share code downward only.
 	allowed := map[string][]string{
 		"library":      {"library/scan"},
@@ -25,7 +25,7 @@ func TestBusinessPackagesDoNotImportEachOther(t *testing.T) {
 	forbidden := func(pkg string) []string {
 		var list []string
 		for _, other := range business {
-			if other == pkg || strings.HasPrefix(other, pkg+"/") && contains(allowed[pkg], other) {
+			if other == pkg {
 				continue
 			}
 			if contains(allowed[pkg], other) {
@@ -35,18 +35,21 @@ func TestBusinessPackagesDoNotImportEachOther(t *testing.T) {
 		}
 		return list
 	}
-	for _, pkg := range append(append([]string{}, business...), kernel...) {
+	for _, pkg := range append(append([]string{}, business...), shared...) {
 		banned := forbidden(pkg)
-		if contains(kernel, pkg) {
-			banned = nil
-			for _, other := range business {
-				banned = append(banned, module+other)
-			}
+		switch pkg {
+		case "database":
+			banned = append(banned, module+"tasks", module+"drive")
+		case "domain", "domain/subtitle":
+			banned = append(banned, module+"tasks", module+"drive", module+"database", module+"export")
 		}
 		for _, imported := range packageImports(t, filepath.Join("..", filepath.FromSlash(pkg))) {
+			if contains(allowed[pkg], strings.TrimPrefix(imported, module)) {
+				continue
+			}
 			for _, ban := range banned {
-				if imported == ban {
-					t.Errorf("%s imports %s; business packages must talk through domain types or caller-defined interfaces", pkg, imported)
+				if imported == ban || strings.HasPrefix(imported, ban+"/") {
+					t.Errorf("%s imports %s; dependency must point toward shared types and infrastructure", pkg, imported)
 				}
 			}
 		}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/ppxb/miyabi/internal/codeid"
+	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/netx"
 )
 
@@ -94,7 +95,7 @@ func (f *Finder) search(ctx context.Context, query string) []Candidate {
 }
 
 // Download fetches a candidate and resolves an unknown language from its text.
-func (f *Finder) Download(ctx context.Context, candidate Candidate) ([]byte, Language, error) {
+func (f *Finder) Download(ctx context.Context, candidate Candidate) ([]byte, subtitlemeta.Language, error) {
 	if candidate.URL == "" {
 		return nil, "", fmt.Errorf("empty candidate URL")
 	}
@@ -111,8 +112,8 @@ func (f *Finder) Download(ctx context.Context, candidate Candidate) ([]byte, Lan
 		return nil, "", err
 	}
 	language := candidate.Language
-	if language == LangUnknown {
-		language = DetectLanguage("", text)
+	if language == subtitlemeta.LangUnknown {
+		language = subtitlemeta.DetectLanguage("", text)
 	}
 	return body, language, nil
 }

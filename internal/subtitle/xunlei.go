@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/netx"
 )
 
@@ -88,9 +89,9 @@ func (p *XunleiProvider) Search(ctx context.Context, code string) ([]Candidate, 
 			Provider: p.Name(),
 			Name:     name,
 			URL:      item.URL,
-			Format:   Format(ext),
-			Language: LanguageHint(strings.Join(item.Languages, " ") + " " + name),
-			Version:  DetectVersion(name),
+			Format:   subtitlemeta.Format(ext),
+			Language: subtitlemeta.LanguageHint(strings.Join(item.Languages, " ") + " " + name),
+			Version:  subtitlemeta.DetectVersion(name),
 		})
 	}
 

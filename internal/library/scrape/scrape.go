@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqljson"
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
+	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
@@ -20,7 +21,6 @@ import (
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/pan"
-	"github.com/ppxb/miyabi/internal/subtitle"
 	"github.com/ppxb/miyabi/internal/syncx"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -48,7 +48,7 @@ type Notifier interface {
 
 // SubtitleExporter writes a movie's subtitles beside its exported .strm file.
 type SubtitleExporter interface {
-	Export(ctx context.Context, reader subtitle.Reader, movieID int, target subtitle.Target) (int, error)
+	Export(ctx context.Context, reader subtitlemeta.Reader, movieID int, target subtitlemeta.Target) (int, error)
 }
 
 const defaultDirCacheTTL = 45 * time.Second

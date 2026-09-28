@@ -8,6 +8,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
+	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
@@ -16,7 +17,6 @@ import (
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/nfo"
 	"github.com/ppxb/miyabi/internal/pan"
-	"github.com/ppxb/miyabi/internal/subtitle"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -200,12 +200,12 @@ func (service *Service) subtitleTask(input MetadataPayload, videos []pan.File) *
 	return &SubtitleTask{
 		MovieID:     input.MovieID,
 		MetaPayload: input,
-		Target: subtitle.Target{
+		Target: subtitlemeta.Target{
 			Dir:           EmbyMovieDir(service.exportConfig().EmbyDir, input.Code),
 			Stem:          nfo.FileStem(input.Code),
 			Code:          input.Code,
-			Uncensored:    subtitle.IsUncensored(videos[0].Name),
-			HardSubtitled: subtitle.HasHardSubtitle(videos[0].Name),
+			Uncensored:    subtitlemeta.IsUncensored(videos[0].Name),
+			HardSubtitled: subtitlemeta.HasHardSubtitle(videos[0].Name),
 		},
 	}
 }

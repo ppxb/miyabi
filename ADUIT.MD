@@ -71,7 +71,7 @@
 ## 二、架构不合理
 
 - [x] **37.** 导出配置 `(embyDir, publicURL, strmToken)` 复制在 `scan.Scanner`、`scrape.Service`、`library.Service`（仅透传）、`emby.Service`、`app.go` 共 5 处，靠 `SetEmbyExport` / `SetSTRMToken` / `SetSTRMExporters` 扇出同步（4~6 的根源）；scrape 另有 `defaultEmbyDir = "./data/emby"` 与写死 8080 端口的 `defaultPublicURL()`（`export.go:18-22`），与 `config.Load` 推导不一致 → 新建 `internal/export`（或并入 strm），持有��一 `atomic.Pointer[ExportConfig]` 并负责 STRM/NFO/图片目录布局与重写。
-- [ ] **38.** 依赖方向反转：emby 导入 `library/scrape`（为 `RewriteSTRM`），scrape 又通过 `MediaNotifier` 回调 emby；`internal/database/indexes.go:8` 导入 tasks���仅为常量）；`internal/app/deps_test.go:17-18` 的 business 列表漏了 emby、subtitle，因此未拦截。
+- [x] **38.** 依赖方向反转：emby 导入 `library/scrape`（为 `RewriteSTRM`），scrape 又通过 `MediaNotifier` 回调 emby；`internal/database/indexes.go:8` 导入 tasks���仅为常量）；`internal/app/deps_test.go:17-18` 的 business 列表漏了 emby、subtitle，因此未拦截。
 - [ ] **39.** `internal/tasks` 通用包内含业务逻辑：`SubscriptionBatchPayload` / `EnqueueSubscriptionBatch` / `SaveSubscriptionBatch` / `BatchTaskInfo`（batch.go）、`EnsureScanTask` / `EnqueueScan` / `EnqueueFreshScan` / `ScanTaskInfo` / scrape-cover 折叠规则（workflow.go:219-248）、各业务 payload JSON 路径常量（payload.go:10-24）→ 分别迁回 monitor、library。
 - [ ] **40.** offline 下载记录存于 task 表（`KindOffline`，从不进入 pool），依赖 JSON payload + 手写表达式索引（`database/indexes.go`）查询；`scan/persist.go:17` 跨包用字符串 `"file_ids"` 调 `SetPayloadField` 改写 offline payload，而 offline 自身整体重编码 payload，二者前提矛盾；各处 `StatusQueued` 判断（add.go:53、sync.go:38/213、projection.go:86/145）对 offline 永不成立 → 独立 ent 表。
 - [ ] **41.** cover 快照存于已完成 cover 任务的 payload（`scrape/snapshot.go:153-190`、`scrape.go:167-169`），导致 task 表永远不能清理、每次扫描需对全表 `json_extract` → 快照 / `videos_fingerprint` 存到 movie 行。

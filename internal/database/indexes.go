@@ -4,23 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-
-	"github.com/ppxb/miyabi/internal/tasks"
 )
 
-// Ent cannot describe expression indexes. Keep the existing JSON storage and
-// index the stable scope/hash fields used by both offline history queries.
+// Ent cannot describe expression indexes. These literals describe the persisted
+// schema, independent of runtime task constants, and must change via migration.
 // Other task types do not pay for these indexes or carry their larger documents.
 func createTaskHistoryIndexes(ctx context.Context, database *sql.DB) error {
 	for _, statement := range []string{
-		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS task_offline_source_history ON tasks (
-			json_extract(payload, '$.%s'), json_extract(payload, '$.%s'),
-			json_type(payload, '$.%s'), json_extract(payload, '$.%s'), id DESC
-		) WHERE type = '%s'`, tasks.PathAccountID, tasks.PathDirectoryID, tasks.PathHash, tasks.PathHash, tasks.KindOffline),
-		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS task_offline_movie_history ON tasks (
-			json_extract(payload, '$.%s'), json_extract(payload, '$.%s'),
-			json_type(payload, '$.%s'), json_extract(payload, '$.%s'), id DESC
-		) WHERE type = '%s'`, tasks.PathAccountID, tasks.PathJavDBID, tasks.PathHash, tasks.PathHash, tasks.KindOffline),
+		`CREATE INDEX IF NOT EXISTS task_offline_source_history ON tasks (
+			json_extract(payload, '$.account_id'), json_extract(payload, '$.directory_id'),
+			json_type(payload, '$.hash'), json_extract(payload, '$.hash'), id DESC
+		) WHERE type = 'offline'`,
+		`CREATE INDEX IF NOT EXISTS task_offline_movie_history ON tasks (
+			json_extract(payload, '$.account_id'), json_extract(payload, '$.javdb_id'),
+			json_type(payload, '$.hash'), json_extract(payload, '$.hash'), id DESC
+		) WHERE type = 'offline'`,
 	} {
 		if _, err := database.ExecContext(ctx, statement); err != nil {
 			return fmt.Errorf("create offline task history index: %w", err)

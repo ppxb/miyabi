@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/database"
+	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/pan"
@@ -37,7 +38,7 @@ func (reader panReader) Read(_ context.Context, pickCode string, _ int64) ([]byt
 
 // exportFixture serves subtitle bodies by path and returns a service whose
 // only provider offers the given candidates, with URLs resolved against the server.
-func exportFixture(t *testing.T, bodies map[string]string, candidates ...Candidate) (*Service, *ent.Client, int, Target) {
+func exportFixture(t *testing.T, bodies map[string]string, candidates ...Candidate) (*Service, *ent.Client, int, subtitlemeta.Target) {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, ok := bodies[r.URL.Path]
@@ -58,7 +59,7 @@ func exportFixture(t *testing.T, bodies map[string]string, candidates ...Candida
 	t.Cleanup(func() { _ = store.Close() })
 	film := store.Client.Movie.Create().SetCode("ABP-123").SaveX(t.Context())
 	finder := NewFinder(nil, WithAllowLoopbackForTesting(true), WithProviders(fixedProvider(candidates)))
-	target := Target{Dir: filepath.Join(t.TempDir(), "ABP", "ABP-123"), Stem: "ABP-123", Code: "ABP-123"}
+	target := subtitlemeta.Target{Dir: filepath.Join(t.TempDir(), "ABP", "ABP-123"), Stem: "ABP-123", Code: "ABP-123"}
 	return NewService(store.Client, finder), store.Client, film.ID, target
 }
 
@@ -83,11 +84,11 @@ func TestExportWritesPanSubtitlesThenOnlineSubtitlesOfOtherKinds(t *testing.T) {
 		"/styled.ass":      simplifiedASS,
 		"/extra.vtt":       "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\n这是\n",
 	},
-		Candidate{Name: "ABP-123.chs.srt", URL: "/same-kind.srt", Format: "srt", Language: LangSimplifiedChinese, Version: VersionStandard},
-		Candidate{Name: "ABP-123.srt", URL: "/traditional.srt", Format: "srt", Version: VersionStandard},
-		Candidate{Name: "ABP-123 copy.srt", URL: "/duplicate.srt", Format: "srt", Version: VersionStandard},
-		Candidate{Name: "ABP-123.ass", URL: "/styled.ass", Format: "ass", Language: LangSimplifiedChinese, Version: VersionStandard},
-		Candidate{Name: "ABP-123.vtt", URL: "/extra.vtt", Format: "vtt", Language: LangSimplifiedChinese, Version: VersionStandard},
+		Candidate{Name: "ABP-123.chs.srt", URL: "/same-kind.srt", Format: "srt", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard},
+		Candidate{Name: "ABP-123.srt", URL: "/traditional.srt", Format: "srt", Version: subtitlemeta.VersionStandard},
+		Candidate{Name: "ABP-123 copy.srt", URL: "/duplicate.srt", Format: "srt", Version: subtitlemeta.VersionStandard},
+		Candidate{Name: "ABP-123.ass", URL: "/styled.ass", Format: "ass", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard},
+		Candidate{Name: "ABP-123.vtt", URL: "/extra.vtt", Format: "vtt", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard},
 	)
 	ctx := t.Context()
 	tx, err := db.Tx(ctx)
@@ -131,7 +132,7 @@ func TestExportWritesPanSubtitlesThenOnlineSubtitlesOfOtherKinds(t *testing.T) {
 
 func TestExportReplacesRemovedOnlineSubtitles(t *testing.T) {
 	service, db, movieID, target := exportFixture(t, map[string]string{"/first.srt": simplifiedSRT},
-		Candidate{Name: "ABP-123.chs.srt", URL: "/first.srt", Format: "srt", Language: LangSimplifiedChinese, Version: VersionStandard})
+		Candidate{Name: "ABP-123.chs.srt", URL: "/first.srt", Format: "srt", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard})
 	ctx := t.Context()
 	if written, err := service.Export(ctx, panReader{}, movieID, target); err != nil || written != 1 {
 		t.Fatalf("Export = %d, %v", written, err)
@@ -150,7 +151,7 @@ func TestExportReplacesRemovedOnlineSubtitles(t *testing.T) {
 
 func TestExportSkipsOnlineSearchForHardSubtitledVideos(t *testing.T) {
 	service, db, movieID, target := exportFixture(t, map[string]string{"/first.srt": simplifiedSRT},
-		Candidate{Name: "ABP-123.chs.srt", URL: "/first.srt", Format: "srt", Language: LangSimplifiedChinese, Version: VersionStandard})
+		Candidate{Name: "ABP-123.chs.srt", URL: "/first.srt", Format: "srt", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard})
 	target.HardSubtitled = true
 	if written, err := service.Export(t.Context(), panReader{}, movieID, target); err != nil || written != 0 {
 		t.Fatalf("Export = %d, %v", written, err)
@@ -161,10 +162,10 @@ func TestExportSkipsOnlineSearchForHardSubtitledVideos(t *testing.T) {
 }
 
 func TestTargetPathNamesVersionAndLanguageForEmby(t *testing.T) {
-	target := Target{Dir: "emby", Stem: "ABP-123"}
-	for kind, want := range map[Kind]string{
-		{Language: LangSimplifiedChinese, Version: VersionStandard, Format: "srt"}:    "ABP-123.zh-CN.srt",
-		{Language: LangTraditionalChinese, Version: VersionUncensored, Format: "ass"}: "ABP-123.uncensored.zh-TW.ass",
+	target := subtitlemeta.Target{Dir: "emby", Stem: "ABP-123"}
+	for kind, want := range map[subtitlemeta.Kind]string{
+		{Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard, Format: "srt"}:    "ABP-123.zh-CN.srt",
+		{Language: subtitlemeta.LangTraditionalChinese, Version: subtitlemeta.VersionUncensored, Format: "ass"}: "ABP-123.uncensored.zh-TW.ass",
 	} {
 		if got := target.Path(kind); got != filepath.Join("emby", want) {
 			t.Errorf("Path(%+v) = %s; want %s", kind, got, want)
@@ -207,4 +208,3 @@ func TestExportDeletesOrphanPendingSubtitles(t *testing.T) {
 		t.Fatalf("expected orphan subtitle to be deleted, exists: %v, err: %v", exists, err)
 	}
 }
-

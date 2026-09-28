@@ -13,6 +13,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
+	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
@@ -20,7 +21,6 @@ import (
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/nfo"
-	subpkg "github.com/ppxb/miyabi/internal/subtitle"
 )
 
 // LocalScanResult summarizes the outcome of a local directory scan.
@@ -356,7 +356,7 @@ func findMatchingSubtitles(stem string, subFiles []string) []string {
 // kind is not exported again.
 func indexLocalSubtitle(ctx context.Context, tx *ent.Tx, movieID int, subPath string) error {
 	name := filepath.Base(subPath)
-	format := subpkg.Format(filepath.Ext(name))
+	format := subtitlemeta.Format(filepath.Ext(name))
 	if format == "" {
 		return nil
 	}
@@ -365,6 +365,6 @@ func indexLocalSubtitle(ctx context.Context, tx *ent.Tx, movieID int, subPath st
 		return err
 	}
 	return tx.Subtitle.Create().SetMovieID(movieID).SetName(name).SetFormat(format).
-		SetLanguage(string(subpkg.DetectLanguage(name, ""))).SetVersionTag(string(subpkg.DetectVersion(name))).
-		SetSource(subpkg.SourceLocal).SetStoragePath(subPath).Exec(ctx)
+		SetLanguage(string(subtitlemeta.DetectLanguage(name, ""))).SetVersionTag(string(subtitlemeta.DetectVersion(name))).
+		SetSource("local").SetStoragePath(subPath).Exec(ctx)
 }

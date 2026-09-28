@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/ppxb/miyabi/internal/codeid"
+	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 )
 
 // Candidate is a subtitle offered by an online provider.
@@ -13,23 +14,15 @@ type Candidate struct {
 	Name     string
 	URL      string
 	Format   string
-	// Language is LangUnknown when the provider gave no hint; it is then
+	// Language is subtitlemeta.LangUnknown when the provider gave no hint; it is then
 	// detected from the downloaded text.
-	Language Language
-	Version  VersionTag
+	Language subtitlemeta.Language
+	Version  subtitlemeta.VersionTag
 	Score    int
 }
 
-// Kind groups interchangeable subtitles. Emby lists one track per kind, so a
-// movie keeps at most one subtitle of each.
-type Kind struct {
-	Language Language
-	Version  VersionTag
-	Format   string
-}
-
-func (c Candidate) Kind() Kind {
-	return Kind{Language: c.Language, Version: c.Version, Format: c.Format}
+func (c Candidate) Kind() subtitlemeta.Kind {
+	return subtitlemeta.Kind{Language: c.Language, Version: c.Version, Format: c.Format}
 }
 
 // Rank keeps candidates that name the movie's catalogue number and orders
@@ -43,7 +36,7 @@ func Rank(candidates []Candidate, code string, uncensored bool) []Candidate {
 			continue
 		}
 		// Uncensored cuts are retimed; their subtitles drift on censored releases.
-		leaked := candidate.Version == VersionUncensored || candidate.Version == VersionLeaked
+		leaked := candidate.Version == subtitlemeta.VersionUncensored || candidate.Version == subtitlemeta.VersionLeaked
 		if leaked && !uncensored {
 			continue
 		}
@@ -62,9 +55,9 @@ func identifies(name, code string) bool {
 func score(candidate Candidate, uncensored bool) int {
 	score := 0
 	switch candidate.Language {
-	case LangSimplifiedChinese:
+	case subtitlemeta.LangSimplifiedChinese:
 		score += 150
-	case LangTraditionalChinese:
+	case subtitlemeta.LangTraditionalChinese:
 		score += 120
 	default:
 		score += 100
@@ -79,9 +72,9 @@ func score(candidate Candidate, uncensored bool) int {
 		score += 10
 	}
 	switch {
-	case uncensored && (candidate.Version == VersionUncensored || candidate.Version == VersionLeaked):
+	case uncensored && (candidate.Version == subtitlemeta.VersionUncensored || candidate.Version == subtitlemeta.VersionLeaked):
 		score += 150
-	case candidate.Version == VersionStandard:
+	case candidate.Version == subtitlemeta.VersionStandard:
 		score += 60
 	}
 	return score

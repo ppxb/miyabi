@@ -8,15 +8,15 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 
+	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
 const (
-	// MaxTracks bounds the subtitles exported per movie, one of each Kind.
+	// MaxTracks bounds the subtitles exported per movie, one of each subtitlemeta.Kind.
 	MaxTracks = 3
 	// maxDownloads bounds the subtitles downloaded per export: a candidate
 	// without a language hint may turn out to repeat an exported kind.
@@ -24,36 +24,7 @@ const (
 
 	// SourcePan marks tracks indexed from subtitle files beside the 115 videos.
 	SourcePan = "115"
-	// SourceLocal marks tracks found beside existing local .strm files.
-	SourceLocal = "local"
 )
-
-// Reader reads files from the mounted 115 directory.
-type Reader interface {
-	Read(ctx context.Context, pickCode string, limit int64) ([]byte, error)
-}
-
-// Target locates the exported .strm file a movie's subtitles accompany.
-type Target struct {
-	Dir  string
-	Stem string
-	Code string
-	// Uncensored selects subtitles timed for uncensored cuts.
-	Uncensored bool
-	// HardSubtitled videos already show Chinese subtitles; no online search is made.
-	HardSubtitled bool
-}
-
-// Path names a subtitle so Emby attaches it to the .strm and reads its
-// language: <stem>[.<version>].<language>.<format>.
-func (target Target) Path(kind Kind) string {
-	parts := []string{target.Stem}
-	if kind.Version != VersionStandard && kind.Version != "" {
-		parts = append(parts, string(kind.Version))
-	}
-	parts = append(parts, string(kind.Language), kind.Format)
-	return filepath.Join(target.Dir, strings.Join(parts, "."))
-}
 
 // Service exports movie subtitles beside their Emby .strm files.
 type Service struct {
@@ -68,12 +39,12 @@ func NewService(db *ent.Client, finder *Finder) *Service {
 // Export writes a movie's subtitles beside its .strm file and returns how many
 // files it wrote. Subtitles stored with the 115 videos come first; online
 // subtitles then fill the remaining kinds up to MaxTracks.
-func (s *Service) Export(ctx context.Context, reader Reader, movieID int, target Target) (int, error) {
+func (s *Service) Export(ctx context.Context, reader subtitlemeta.Reader, movieID int, target subtitlemeta.Target) (int, error) {
 	tracks, err := s.db.Subtitle.Query().Where(subtitle.MovieIDEQ(movieID)).Order(ent.Asc(subtitle.FieldID)).All(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("list movie subtitles: %w", err)
 	}
-	exported := make(map[Kind]bool)
+	exported := make(map[subtitlemeta.Kind]bool)
 	var pending []*ent.Subtitle
 	for _, track := range tracks {
 		if filepath.Dir(track.StoragePath) == target.Dir && fileExists(track.StoragePath) {
@@ -113,8 +84,8 @@ func (s *Service) Export(ctx context.Context, reader Reader, movieID int, target
 	return written, errors.Join(errs...)
 }
 
-func (s *Service) exportPanTrack(ctx context.Context, reader Reader, track *ent.Subtitle, target Target, exported map[Kind]bool) (bool, error) {
-	format := Format(track.Format)
+func (s *Service) exportPanTrack(ctx context.Context, reader subtitlemeta.Reader, track *ent.Subtitle, target subtitlemeta.Target, exported map[subtitlemeta.Kind]bool) (bool, error) {
+	format := subtitlemeta.Format(track.Format)
 	if format == "" {
 		return false, nil
 	}
@@ -126,7 +97,7 @@ func (s *Service) exportPanTrack(ctx context.Context, reader Reader, track *ent.
 	if err != nil {
 		return false, fmt.Errorf("115 subtitle %s: %w", track.Name, err)
 	}
-	kind := Kind{Language: DetectLanguage(track.Name, text), Version: VersionTag(track.VersionTag), Format: format}
+	kind := subtitlemeta.Kind{Language: subtitlemeta.DetectLanguage(track.Name, text), Version: subtitlemeta.VersionTag(track.VersionTag), Format: format}
 	if exported[kind] {
 		return false, nil
 	}
@@ -140,13 +111,13 @@ func (s *Service) exportPanTrack(ctx context.Context, reader Reader, track *ent.
 
 type download struct {
 	body     []byte
-	language Language
+	language subtitlemeta.Language
 	err      error
 }
 
 // exportOnline fills the remaining kinds in two passes: first a language or
 // cut the movie lacks, then another format of one it has.
-func (s *Service) exportOnline(ctx context.Context, movieID int, target Target, exported map[Kind]bool) (int, error) {
+func (s *Service) exportOnline(ctx context.Context, movieID int, target subtitlemeta.Target, exported map[subtitlemeta.Kind]bool) (int, error) {
 	candidates := s.finder.Search(ctx, target.Code, target.Uncensored)
 	downloads := make(map[string]download)
 	written := make(map[[sha256.Size]byte]bool)
@@ -155,7 +126,7 @@ func (s *Service) exportOnline(ctx context.Context, movieID int, target Target, 
 			if len(exported) >= MaxTracks {
 				return len(written), nil
 			}
-			if candidate.Language != LangUnknown && !wanted(candidate.Kind(), exported, distinctLanguage) {
+			if candidate.Language != subtitlemeta.LangUnknown && !wanted(candidate.Kind(), exported, distinctLanguage) {
 				continue
 			}
 			result, fetched := downloads[candidate.URL]
@@ -192,7 +163,7 @@ func (s *Service) exportOnline(ctx context.Context, movieID int, target Target, 
 
 // wanted reports whether kind adds a track. With distinctLanguage, the movie
 // must also lack any format of the kind's language and cut.
-func wanted(kind Kind, exported map[Kind]bool, distinctLanguage bool) bool {
+func wanted(kind subtitlemeta.Kind, exported map[subtitlemeta.Kind]bool, distinctLanguage bool) bool {
 	if exported[kind] {
 		return false
 	}
@@ -209,7 +180,7 @@ func wanted(kind Kind, exported map[Kind]bool, distinctLanguage bool) bool {
 // IndexPanTrack records a subtitle file found beside a movie's 115 videos.
 // Export copies it into the Emby directory.
 func IndexPanTrack(ctx context.Context, tx *ent.Tx, movieID int, file pan.File) error {
-	format := Format(path.Ext(file.Name))
+	format := subtitlemeta.Format(path.Ext(file.Name))
 	if format == "" {
 		return nil
 	}
@@ -218,12 +189,12 @@ func IndexPanTrack(ctx context.Context, tx *ent.Tx, movieID int, file pan.File) 
 		return err
 	}
 	return tx.Subtitle.Create().SetMovieID(movieID).SetFileID(file.ID).SetPickCode(file.PickCode).
-		SetName(file.Name).SetLanguage(string(DetectLanguage(file.Name, ""))).SetFormat(format).
-		SetVersionTag(string(DetectVersion(file.Name))).SetSource(SourcePan).Exec(ctx)
+		SetName(file.Name).SetLanguage(string(subtitlemeta.DetectLanguage(file.Name, ""))).SetFormat(format).
+		SetVersionTag(string(subtitlemeta.DetectVersion(file.Name))).SetSource(SourcePan).Exec(ctx)
 }
 
-func trackKind(track *ent.Subtitle) Kind {
-	return Kind{Language: Language(track.Language), Version: VersionTag(track.VersionTag), Format: Format(track.Format)}
+func trackKind(track *ent.Subtitle) subtitlemeta.Kind {
+	return subtitlemeta.Kind{Language: subtitlemeta.Language(track.Language), Version: subtitlemeta.VersionTag(track.VersionTag), Format: subtitlemeta.Format(track.Format)}
 }
 
 func fileExists(name string) bool {

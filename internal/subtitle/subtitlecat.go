@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/netx"
 	"golang.org/x/net/html"
 )
@@ -154,22 +155,22 @@ func parseSubtitleCatDetail(body []byte, movieName string, origin string) []Cand
 			innerWalk(n)
 
 			if downloadURL != "" {
-				lang := LangUnknown
+				lang := subtitlemeta.LangUnknown
 				switch strings.ToLower(flagAlt) {
 				case "zh-cn":
-					lang = LangSimplifiedChinese
+					lang = subtitlemeta.LangSimplifiedChinese
 				case "zh-tw":
-					lang = LangTraditionalChinese
+					lang = subtitlemeta.LangTraditionalChinese
 				}
 
-				if lang != LangUnknown {
+				if lang != subtitlemeta.LangUnknown {
 					candidates = append(candidates, Candidate{
 						Provider: "SubtitleCat",
 						Name:     movieName,
 						URL:      downloadURL,
 						Format:   "srt",
 						Language: lang,
-						Version:  DetectVersion(movieName),
+						Version:  subtitlemeta.DetectVersion(movieName),
 					})
 				}
 			}

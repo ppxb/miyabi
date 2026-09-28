@@ -1,3 +1,4 @@
+// Package subtitle defines shared subtitle metadata and filename conventions.
 package subtitle
 
 import (

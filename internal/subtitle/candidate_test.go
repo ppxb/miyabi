@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 )
 
 func TestXunleiSearchParsing(t *testing.T) {
@@ -28,9 +30,9 @@ func TestXunleiSearchParsing(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []Candidate{
-		{Provider: "迅雷", Name: "SSIS-589.chs.srt", URL: "http://example.com/ssis589.srt", Format: "srt", Language: LangSimplifiedChinese, Version: VersionStandard},
-		{Provider: "迅雷", Name: "SSIS-589.uncensored.ass", URL: "http://example.com/ssis589-uncensored.ass", Format: "ass", Language: LangTraditionalChinese, Version: VersionUncensored},
-		{Provider: "迅雷", Name: "SSIS-589.srt", URL: "http://example.com/ssis589-plain.srt", Format: "srt", Language: LangUnknown, Version: VersionStandard},
+		{Provider: "迅雷", Name: "SSIS-589.chs.srt", URL: "http://example.com/ssis589.srt", Format: "srt", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard},
+		{Provider: "迅雷", Name: "SSIS-589.uncensored.ass", URL: "http://example.com/ssis589-uncensored.ass", Format: "ass", Language: subtitlemeta.LangTraditionalChinese, Version: subtitlemeta.VersionUncensored},
+		{Provider: "迅雷", Name: "SSIS-589.srt", URL: "http://example.com/ssis589-plain.srt", Format: "srt", Language: subtitlemeta.LangUnknown, Version: subtitlemeta.VersionStandard},
 	}
 	if len(results) != len(want) {
 		t.Fatalf("results = %+v", results)
@@ -75,7 +77,7 @@ func TestSubtitleCatHTMLParsing(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("expected simplified and traditional items, got %+v", items)
 	}
-	if items[0].Language != LangSimplifiedChinese || items[1].Language != LangTraditionalChinese ||
+	if items[0].Language != subtitlemeta.LangSimplifiedChinese || items[1].Language != subtitlemeta.LangTraditionalChinese ||
 		items[1].URL != "https://www.subtitlecat.com/download/124.srt" || items[0].Format != "srt" {
 		t.Errorf("items = %+v", items)
 	}
@@ -83,13 +85,13 @@ func TestSubtitleCatHTMLParsing(t *testing.T) {
 
 func TestRankKeepsOnlyTheMovieAndOrdersByRelevance(t *testing.T) {
 	candidates := []Candidate{
-		{Name: "SSIS-5890.chs.srt", Format: "srt", Language: LangSimplifiedChinese, Version: VersionStandard},
-		{Name: "OTHER-589.chs.srt", Format: "srt", Language: LangSimplifiedChinese, Version: VersionStandard},
-		{Name: "Unrelated title.srt", Format: "srt", Language: LangSimplifiedChinese, Version: VersionStandard},
-		{Name: "SSIS-589.idx", Format: "", Language: LangSimplifiedChinese, Version: VersionStandard},
-		{Name: "SSIS-589.uncensored.chs.srt", Format: "srt", Language: LangSimplifiedChinese, Version: VersionUncensored},
-		{Name: "ssis00589.cht.ass", Format: "ass", Language: LangTraditionalChinese, Version: VersionStandard},
-		{Name: "SSIS-589-C.chs.srt", Format: "srt", Language: LangSimplifiedChinese, Version: VersionStandard},
+		{Name: "SSIS-5890.chs.srt", Format: "srt", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard},
+		{Name: "OTHER-589.chs.srt", Format: "srt", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard},
+		{Name: "Unrelated title.srt", Format: "srt", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard},
+		{Name: "SSIS-589.idx", Format: "", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard},
+		{Name: "SSIS-589.uncensored.chs.srt", Format: "srt", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionUncensored},
+		{Name: "ssis00589.cht.ass", Format: "ass", Language: subtitlemeta.LangTraditionalChinese, Version: subtitlemeta.VersionStandard},
+		{Name: "SSIS-589-C.chs.srt", Format: "srt", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard},
 	}
 
 	censored := Rank(candidates, "SSIS-589", false)
@@ -98,12 +100,12 @@ func TestRankKeepsOnlyTheMovieAndOrdersByRelevance(t *testing.T) {
 	}
 
 	uncensored := Rank(candidates, "SSIS-589", true)
-	if len(uncensored) != 3 || uncensored[0].Version != VersionUncensored {
+	if len(uncensored) != 3 || uncensored[0].Version != subtitlemeta.VersionUncensored {
 		t.Fatalf("uncensored ranking = %+v", uncensored)
 	}
 
 	// Release labels may carry distributor digits the catalogue number omits.
-	labelled := Rank([]Candidate{{Name: "LUXU-1899.srt", Format: "srt", Version: VersionStandard}}, "259LUXU-1899", false)
+	labelled := Rank([]Candidate{{Name: "LUXU-1899.srt", Format: "srt", Version: subtitlemeta.VersionStandard}}, "259LUXU-1899", false)
 	if len(labelled) != 1 {
 		t.Fatalf("label-prefixed catalogue number did not match: %+v", labelled)
 	}

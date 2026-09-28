@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ppxb/miyabi/internal/subtitle"
+	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 )
 
 // SubtitleTask exports the subtitles of one movie after its artwork and .strm are written.
 type SubtitleTask struct {
 	MovieID     int
 	MetaPayload MetadataPayload
-	Target      subtitle.Target
+	Target      subtitlemeta.Target
 }
 
 // SubtitleQueue is a bounded, concurrency-controlled background worker queue for subtitle processing.
