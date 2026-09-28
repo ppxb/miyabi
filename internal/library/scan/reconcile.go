@@ -3,6 +3,8 @@ package scan
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"entgo.io/ent/dialect/sql"
@@ -68,7 +70,17 @@ func ReconcileScanTx(ctx context.Context, tx *ent.Tx, taskID int, scanID string,
 	if err != nil {
 		return err
 	}
-	payload.Scan.RemovedMovies += removed
+	payload.Scan.RemovedMovies += len(removed)
+	if embyDir != "" && len(removed) > 0 {
+		for _, code := range removed {
+			movieDir := scrape.EmbyMovieDir(embyDir, code)
+			_ = os.RemoveAll(movieDir)
+			_ = os.Remove(filepath.Dir(movieDir))
+			if notifier != nil {
+				notifier.NotifyUpdated(movieDir)
+			}
+		}
+	}
 	indexed := file.And(database.LibraryFiles(payload.Source), file.ScanIDEQ(scanID))
 	if payload.OfflineTaskID != 0 {
 		files, err := tx.File.Query().Where(indexed).Select(file.FieldFileID).All(ctx)

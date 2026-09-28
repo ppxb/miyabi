@@ -128,7 +128,7 @@ func ProcessScanPageTx(ctx context.Context, tx *ent.Tx, taskID int, scanID, dire
 		if err != nil {
 			return err
 		}
-		payload.Scan.RemovedMovies += removed
+		payload.Scan.RemovedMovies += len(removed)
 		if len(videos) > 0 && payload.OfflineTaskID != 0 {
 			record, err := tx.Task.Get(ctx, payload.OfflineTaskID)
 			if err != nil {
@@ -194,19 +194,32 @@ func IndexDownloadedMovie(ctx context.Context, tx *ent.Tx, payload Payload) (int
 	return record.ID, nil
 }
 
-// RemoveUnreferencedMovies deletes movie records that no longer have any associated media files.
-func RemoveUnreferencedMovies(ctx context.Context, tx *ent.Tx, ids []int) (int, error) {
-	removed := 0
+// RemoveUnreferencedMovies deletes movie records that no longer have any associated media files and returns their codes.
+func RemoveUnreferencedMovies(ctx context.Context, tx *ent.Tx, ids []int) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var removedCodes []string
 	for start := 0; start < len(ids); start += 500 {
-		count, err := tx.Movie.Delete().Where(
-			movie.IDIn(ids[start:min(start+500, len(ids))]...), movie.Not(movie.HasFiles()),
+		batchIDs := ids[start:min(start+500, len(ids))]
+		codes, err := tx.Movie.Query().Where(
+			movie.IDIn(batchIDs...), movie.Not(movie.HasFiles()),
+		).Select(movie.FieldCode).Strings(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("find unreferenced movies: %w", err)
+		}
+		if len(codes) == 0 {
+			continue
+		}
+		_, err = tx.Movie.Delete().Where(
+			movie.IDIn(batchIDs...), movie.Not(movie.HasFiles()),
 		).Exec(ctx)
 		if err != nil {
-			return 0, fmt.Errorf("remove movies without files: %w", err)
+			return nil, fmt.Errorf("remove movies without files: %w", err)
 		}
-		removed += count
+		removedCodes = append(removedCodes, codes...)
 	}
-	return removed, nil
+	return removedCodes, nil
 }
 
 // SaveScanProgress updates a scan task record's payload with latest progress.

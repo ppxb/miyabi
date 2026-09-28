@@ -3,6 +3,9 @@ package library
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/domain"
@@ -421,3 +424,88 @@ func TestScanProgressDoesNotInvalidateUnchangedLibrary(t *testing.T) {
 		t.Fatalf("progress invalidated library: before=%+v after=%+v", revision, got)
 	}
 }
+
+type testMediaNotifier struct {
+	mu       sync.Mutex
+	notified []string
+}
+
+func (n *testMediaNotifier) NotifyUpdated(path string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.notified = append(n.notified, path)
+}
+
+func TestScanReconcile_CleansUpEmbyDirectoryAndNotifiesEmbyOnMovieDeletion(t *testing.T) {
+	lib, queued, payload := libraryFixture(t)
+	ctx := t.Context()
+	tempDir := t.TempDir()
+	embyDir := filepath.Join(tempDir, "emby")
+
+	// 1. Initial scan: index ABP-001.mp4
+	old := []scan.Video{fixtureVideo("101", "ABP-001.mp4")}
+	if err := indexScanPage(ctx, lib, queued.ID, "attempt-1", "/Movies", old, &payload); err != nil {
+		t.Fatal(err)
+	}
+
+	// 2. Simulate exported Emby files on local disk
+	movieDir := filepath.Join(embyDir, "ABP", "ABP-001")
+	if err := os.MkdirAll(movieDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(movieDir, "ABP-001.strm"), []byte("strm content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(movieDir, "ABP-001.nfo"), []byte("nfo content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(movieDir, "poster.jpg"), []byte("poster data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify local files exist before deletion
+	if _, err := os.Stat(filepath.Join(movieDir, "ABP-001.strm")); err != nil {
+		t.Fatalf("strm file not created: %v", err)
+	}
+
+	// 3. User deletes ABP-001 in 115. Rescan discovers a different video (SSIS-999.mp4), omitting ABP-001
+	newVideos := []scan.Video{fixtureVideo("202", "SSIS-999.mp4")}
+	if err := indexScanPage(ctx, lib, queued.ID, "attempt-2", "/Movies", newVideos, &payload); err != nil {
+		t.Fatal(err)
+	}
+
+	notifier := &testMediaNotifier{}
+	if err := reconcileScan(ctx, lib, queued.ID, "attempt-2", &payload, nil, embyDir, "http://127.0.0.1:8080", "tok", notifier); err != nil {
+		t.Fatalf("reconcileScan failed: %v", err)
+	}
+
+	// 4. Verify scan stats
+	if payload.Scan.RemovedFiles != 1 || payload.Scan.RemovedMovies != 1 {
+		t.Fatalf("expected 1 removed file and 1 removed movie, got %+v", payload.Scan)
+	}
+
+	// 5. Verify local movie directory and all sidecars were deleted
+	if _, err := os.Stat(movieDir); !os.IsNotExist(err) {
+		t.Fatalf("expected movieDir %s to be deleted, got err: %v", movieDir, err)
+	}
+
+	// 6. Verify empty prefix folder was also deleted
+	prefixDir := filepath.Join(embyDir, "ABP")
+	if _, err := os.Stat(prefixDir); !os.IsNotExist(err) {
+		t.Fatalf("expected empty prefixDir %s to be deleted, got err: %v", prefixDir, err)
+	}
+
+	// 7. Verify notifier was notified of the deletion
+	notifier.mu.Lock()
+	defer notifier.mu.Unlock()
+	if len(notifier.notified) != 1 || notifier.notified[0] != movieDir {
+		t.Fatalf("expected notifier to receive %s, got: %+v", movieDir, notifier.notified)
+	}
+
+	// 8. Verify database movie record is removed
+	exists, err := lib.database.Movie.Query().Where(movie.CodeEQ("ABP-001")).Exist(ctx)
+	if err != nil || exists {
+		t.Fatalf("expected ABP-001 to be removed from DB: exists=%t, err=%v", exists, err)
+	}
+}
+

@@ -193,6 +193,74 @@ func TestEmbyService_NotifyUpdatedBatch(t *testing.T) {
 	}
 }
 
+func TestEmbyService_NotifyUpdatedDeleted(t *testing.T) {
+	receivedUpdates := make(chan []mediaUpdateItem, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/Library/Media/Updated" && r.Method == http.MethodPost {
+			var req mediaUpdateRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+				receivedUpdates <- req.Updates
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if r.URL.Path == "/Library/Refresh" && r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	store, err := database.Open(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatalf("database.Open failed: %v", err)
+	}
+	defer store.Close()
+
+	tempDir := t.TempDir()
+	localDir := filepath.Join(tempDir, "emby")
+	existingMovieDir := filepath.Join(localDir, "IPX", "IPX-123")
+	if err := os.MkdirAll(existingMovieDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	deletedMovieDir := filepath.Join(localDir, "SSIS", "SSIS-456")
+
+	svc, err := NewService(context.Background(), store.Client, Config{
+		Enabled:   true,
+		ServerURL: server.URL,
+		APIKey:    "valid-token",
+		LocalDir:  localDir,
+		MediaPath: "/media",
+	})
+	if err != nil {
+		t.Fatalf("NewService failed: %v", err)
+	}
+	defer svc.Close()
+
+	svc.NotifyUpdated(existingMovieDir)
+	svc.NotifyUpdated(deletedMovieDir)
+
+	select {
+	case updates := <-receivedUpdates:
+		if len(updates) != 2 {
+			t.Fatalf("expected 2 updates, got %d: %+v", len(updates), updates)
+		}
+		updateMap := make(map[string]string)
+		for _, u := range updates {
+			updateMap[u.Path] = u.UpdateType
+		}
+		if updateMap["/media/IPX/IPX-123"] != "Created" {
+			t.Errorf("expected Created for existing movie, got %s", updateMap["/media/IPX/IPX-123"])
+		}
+		if updateMap["/media/SSIS/SSIS-456"] != "Deleted" {
+			t.Errorf("expected Deleted for missing movie, got %s", updateMap["/media/SSIS/SSIS-456"])
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for batched updates")
+	}
+}
+
 func TestEmbyService_SyncActorAvatars(t *testing.T) {
 	uploadedAvatars := make(chan string, 1)
 	gfriendsImage := []byte("gfriends-jpeg-data")

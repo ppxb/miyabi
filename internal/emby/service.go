@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
 	"slices"
@@ -409,9 +410,13 @@ func (s *Service) sendBatch(ctx context.Context, localPaths []string) error {
 	for _, lp := range localPaths {
 		embyPath := s.translatePath(lp, cfg.LocalDir, cfg.MediaPath)
 		if embyPath != "" {
+			updateType := "Created"
+			if _, err := os.Stat(lp); os.IsNotExist(err) {
+				updateType = "Deleted"
+			}
 			updates = append(updates, mediaUpdateItem{
 				Path:       embyPath,
-				UpdateType: "Created",
+				UpdateType: updateType,
 			})
 		}
 	}
