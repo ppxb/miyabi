@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
+
+var poolRetryDelay = 200 * time.Millisecond
 
 // PoolQueue defines the queue operations required by the worker Pool.
 type PoolQueue interface {
@@ -63,7 +66,13 @@ func (pool *Pool) runWorker(ctx context.Context, kinds []Kind) error {
 			return nil
 		}
 		if err != nil {
-			return err
+			pool.logger.ErrorContext(ctx, "failed to claim task, retrying", "error", err)
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(poolRetryDelay):
+			}
+			continue
 		}
 		if job == nil {
 			select {
@@ -84,11 +93,23 @@ func (pool *Pool) runWorker(ctx context.Context, kinds []Kind) error {
 			// service shutdown as a failed user task.
 			return nil
 		}
-		if err := pool.queue.Finish(ctx, job.ID, runError); err != nil {
-			if ctx.Err() != nil {
-				return nil
+		for ctx.Err() == nil {
+			if err := pool.queue.Finish(ctx, job.ID, runError); err != nil {
+				if ctx.Err() != nil {
+					return nil
+				}
+				pool.logger.ErrorContext(ctx, "failed to finish task, retrying", "task_id", job.ID, "type", string(job.Type), "error", err)
+				select {
+				case <-ctx.Done():
+					return nil
+				case <-time.After(poolRetryDelay):
+				}
+				continue
 			}
-			return fmt.Errorf("persist task result: %w", err)
+			break
+		}
+		if ctx.Err() != nil {
+			return nil
 		}
 		if runError != nil {
 			pool.logger.ErrorContext(ctx, "task failed", "task_id", job.ID, "type", string(job.Type), "error", runError)
