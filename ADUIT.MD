@@ -48,7 +48,7 @@
 - [x] **21.** ✔ `internal/emby/service.go:147-161` `ScheduleActorSync` 的 `Timer.Stop` 挡不住已在运行的同步 → 多个 `SyncActorAvatars` 并发；找不到头像的演员每轮都重查 GFriends / DB / JavDB → `atomic.Bool` 单飞 + 负缓存。
 - [x] **22.** ✔ `internal/pan/play.go:92-95` + `internal/strm/relay.go:47,77-81`：`DownloadURL` 用播放器 UA 签名，`OpenMedia` HEAD 探测时空 UA 被替换成 `"Miyabi/1.0"` → 签名不匹配 403；回退 `PlayURL` 时同样不一致 → UA 由 strm 统一决定并透传。
 - [x] **23.** ✔ `internal/strm/relay.go:47-49` `DownloadURL` 的所有错误（含 Unauthorized、SourceChanged、ctx 取消）都被吞掉并回退 `PlayURL` → 仅在"无直链"时降级。
-- [ ] **24.** `internal/drive/account.go:54-74` 账号缓存未绑定 `credentialVersion`，旧凭证的在途 fetch 可能在重新登录后写回旧账号 → 60s 内误清新账号挂载。
+- [x] **24.** ✔ `internal/drive/account.go:54-74` 账号缓存未绑定 `credentialVersion`，旧凭证的在途 fetch 可能在重新登录后写回旧账号 → 60s 内误清新账号挂载。
 - [ ] **25.** `internal/netx/proxy.go:83-97` `Update` 的 Load / Store 非原子；`internal/app/network.go` 的 `UpdateNetwork` 先写 DB 再更新内存，不在同一把锁内；`Normalize` 调用两次。
 - [ ] **26.** `internal/catalogue/cache.go:113-121` 上游成功后 `persistActiveRoute` 写库失败，会让本次成功的数据变成错误返回且不入缓存 → 记日志后忽略。
 - [ ] **27.** ✔ `internal/domain/error.go:132-143` `PublicMessage` 无公开消息时返回 `err.Error()` → 500 把 SQL、文件路径、validator 原文（如 `Key: 'discoverSearchQuery.Query' Error:...`）返回前端 → Unexpected/Internal 一律返回默认文案。

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
@@ -267,5 +268,73 @@ func TestAccountVerificationIsCachedBriefly(t *testing.T) {
 	}
 	if calls.Load() != 3 {
 		t.Fatalf("a new login reused the previous account verification: %d calls", calls.Load())
+	}
+}
+
+func TestInFlightAccountFetchDoesNotPoisonCacheAfterRelogin(t *testing.T) {
+	d, client := mountedTestDrive(t)
+	oldAccount := pan.Account{ID: testSource.AccountID, Name: "OldUser"}
+	newAccount := pan.Account{ID: "200", Name: "NewUser"}
+
+	fetchGate, releaseFetch := testGate(t)
+	fetchStarted := make(chan struct{}, 1)
+
+	client.account = func(ctx context.Context, token string) (pan.Account, error) {
+		if token != "new-token" {
+			select {
+			case fetchStarted <- struct{}{}:
+			default:
+			}
+			<-fetchGate
+			return oldAccount, nil
+		}
+		return newAccount, nil
+	}
+
+	d.invalidateAccountCache()
+	state1 := d.snapshot()
+
+	fetchDone := make(chan error, 1)
+	go func() {
+		_, err := d.verifyAccount(t.Context(), state1)
+		fetchDone <- err
+	}()
+
+	await(t, fetchStarted)
+
+	newTokens := pan.Tokens{AccessToken: "new-token", RefreshToken: "new-refresh", ExpiresAt: time.Now().Add(time.Hour)}
+	if err := database.SaveSetting(t.Context(), d.database, credentialsSetting, newTokens); err != nil {
+		t.Fatal(err)
+	}
+	d.mu.Lock()
+	d.tokens = newTokens
+	d.credentialVersion++
+	d.tokenVersion++
+	d.authorizationVersion++
+	d.mu.Unlock()
+	d.invalidateAccountCache()
+
+	releaseFetch()
+	err := await(t, fetchDone)
+	if !errors.Is(err, pan.ErrUnauthorized) {
+		t.Fatalf("in-flight verifyAccount error = %v, want pan.ErrUnauthorized", err)
+	}
+
+	state2 := d.snapshot()
+	acc2, err := d.verifyAccount(t.Context(), state2)
+	if err != nil {
+		t.Fatalf("verifyAccount for state2 failed: %v", err)
+	}
+	if acc2.ID != newAccount.ID {
+		t.Fatalf("verifyAccount returned old account %s, want new account %s", acc2.ID, newAccount.ID)
+	}
+
+	d.accountCacheMu.Lock()
+	cachedID := d.cachedAccount.ID
+	cachedVer := d.cachedCredentialVersion
+	d.accountCacheMu.Unlock()
+
+	if cachedID != newAccount.ID || cachedVer != state2.credentialVersion {
+		t.Fatalf("cache poisoned: got ID=%s Ver=%d, want ID=%s Ver=%d", cachedID, cachedVer, newAccount.ID, state2.credentialVersion)
 	}
 }

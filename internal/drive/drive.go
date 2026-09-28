@@ -81,9 +81,10 @@ type Drive struct {
 	work                 sync.WaitGroup
 	closed               bool
 
-	accountCacheMu    sync.Mutex
-	cachedAccount     pan.Account
-	cachedAccountTime time.Time
+	accountCacheMu          sync.Mutex
+	cachedAccount           pan.Account
+	cachedAccountTime       time.Time
+	cachedCredentialVersion uint64
 
 	events *eventBus
 }

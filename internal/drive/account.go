@@ -53,7 +53,7 @@ type loginSession struct {
 
 func (d *Drive) verifyAccount(ctx context.Context, state snapshot) (pan.Account, error) {
 	d.accountCacheMu.Lock()
-	if d.cachedAccount.ID != "" && time.Since(d.cachedAccountTime) < accountCacheTTL {
+	if d.cachedAccount.ID != "" && d.cachedCredentialVersion == state.credentialVersion && time.Since(d.cachedAccountTime) < accountCacheTTL {
 		cached := d.cachedAccount
 		d.accountCacheMu.Unlock()
 		return cached, nil
@@ -66,10 +66,13 @@ func (d *Drive) verifyAccount(ctx context.Context, state snapshot) (pan.Account,
 	}
 
 	d.accountCacheMu.Lock()
+	defer d.accountCacheMu.Unlock()
+	if _, err := d.credentials(state); err != nil {
+		return pan.Account{}, err
+	}
 	d.cachedAccount = account
 	d.cachedAccountTime = time.Now()
-	d.accountCacheMu.Unlock()
-
+	d.cachedCredentialVersion = state.credentialVersion
 	return account, nil
 }
 
@@ -77,6 +80,7 @@ func (d *Drive) invalidateAccountCache() {
 	d.accountCacheMu.Lock()
 	d.cachedAccount = pan.Account{}
 	d.cachedAccountTime = time.Time{}
+	d.cachedCredentialVersion = 0
 	d.accountCacheMu.Unlock()
 }
 
