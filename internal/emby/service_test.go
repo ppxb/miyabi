@@ -64,30 +64,40 @@ func TestEmbyConfig_Normalize(t *testing.T) {
 }
 
 func TestEmbyService_TranslatePath(t *testing.T) {
-	s := &Service{}
-
 	// Standard relative inside localDir
-	got := s.translatePath("/app/data/emby/IPX/IPX-123", "/app/data/emby", "/media")
+	got := translatePath("/app/data/emby/IPX/IPX-123", "/app/data/emby", "/media")
 	if got != "/media/IPX/IPX-123" {
 		t.Errorf("expected /media/IPX/IPX-123, got %q", got)
 	}
 
+	// Subdirectory starting with .. inside localDir (should not be treated as escaping)
+	got = translatePath("/app/data/emby/..foo/IPX-123", "/app/data/emby", "/media")
+	if got != "/media/..foo/IPX-123" {
+		t.Errorf("expected /media/..foo/IPX-123, got %q", got)
+	}
+
 	// Empty media path returns local path with forward slashes
-	got = s.translatePath("/app/data/emby/IPX/IPX-123", "/app/data/emby", "")
+	got = translatePath("/app/data/emby/IPX/IPX-123", "/app/data/emby", "")
 	if got != "/app/data/emby/IPX/IPX-123" {
 		t.Errorf("expected /app/data/emby/IPX/IPX-123, got %q", got)
 	}
 
 	// Relative path with empty media path resolves to absolute
-	got = s.translatePath("data/emby/IPX/IPX-123", "data/emby", "")
+	got = translatePath("data/emby/IPX/IPX-123", "data/emby", "")
 	if !filepath.IsAbs(got) {
 		t.Errorf("expected absolute path for relative input with empty media path, got %q", got)
 	}
 
 	// Path outside localDir returns empty string (should be skipped)
-	got = s.translatePath("/other/folder/movie", "/app/data/emby", "/media")
+	got = translatePath("/other/folder/movie", "/app/data/emby", "/media")
 	if got != "" {
 		t.Errorf("expected empty string for path outside localDir, got %q", got)
+	}
+
+	// Escaping path via .. returns empty string
+	got = translatePath("/app/data/emby/../other/movie", "/app/data/emby", "/media")
+	if got != "" {
+		t.Errorf("expected empty string for escaping path, got %q", got)
 	}
 }
 

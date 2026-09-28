@@ -421,7 +421,7 @@ func (s *Service) sendBatch(ctx context.Context, localPaths []string) error {
 
 	updates := make([]mediaUpdateItem, 0, len(localPaths))
 	for _, lp := range localPaths {
-		embyPath := s.translatePath(lp, cfg.LocalDir, cfg.MediaPath)
+		embyPath := translatePath(lp, cfg.LocalDir, cfg.MediaPath)
 		if embyPath != "" {
 			updateType := "Created"
 			if _, err := os.Stat(lp); os.IsNotExist(err) {
@@ -505,7 +505,7 @@ func (s *Service) RefreshLibrary(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) translatePath(localPath, localDir, mediaPath string) string {
+func translatePath(localPath, localDir, mediaPath string) string {
 	localPath = filepath.Clean(localPath)
 	if mediaPath == "" {
 		if !filepath.IsAbs(localPath) && !strings.HasPrefix(localPath, "/") && !strings.HasPrefix(localPath, "\\") {
@@ -523,14 +523,19 @@ func (s *Service) translatePath(localPath, localDir, mediaPath string) string {
 	if localDir != "" {
 		cleanLocalDir := filepath.Clean(localDir)
 		rel, err := filepath.Rel(cleanLocalDir, localPath)
-		if err == nil && !strings.HasPrefix(rel, "..") {
+		if err == nil {
 			slashRel := filepath.ToSlash(rel)
-			return path.Join(mediaPath, slashRel)
+			if slashRel != ".." && !strings.HasPrefix(slashRel, "../") {
+				return path.Join(mediaPath, slashRel)
+			}
 		}
 		if absLocalDir, err1 := filepath.Abs(cleanLocalDir); err1 == nil {
 			if absLocalPath, err2 := filepath.Abs(localPath); err2 == nil {
-				if rel2, err3 := filepath.Rel(absLocalDir, absLocalPath); err3 == nil && !strings.HasPrefix(rel2, "..") {
-					return path.Join(mediaPath, filepath.ToSlash(rel2))
+				if rel2, err3 := filepath.Rel(absLocalDir, absLocalPath); err3 == nil {
+					slashRel2 := filepath.ToSlash(rel2)
+					if slashRel2 != ".." && !strings.HasPrefix(slashRel2, "../") {
+						return path.Join(mediaPath, slashRel2)
+					}
 				}
 			}
 		}
