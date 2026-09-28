@@ -89,7 +89,7 @@ function LoginContent({
   // at, and it may still be live once the connection recovers.
   const showQR = session !== undefined && !deadCode
   const needsRetry = exhausted || deadCode
-  const refreshed = useRef(false)
+  const refreshedSessionId = useRef<string | null>(null)
 
   useEffect(() => {
     if (state === 'authorized') {
@@ -100,11 +100,11 @@ function LoginContent({
   // An expired code is 115 saying this QR is dead, so replacing it costs the user
   // nothing. A cancellation is the user's own doing: leave that one to them.
   useEffect(() => {
-    if (state !== 'expired' || refreshed.current) return
-    refreshed.current = true
+    if (state !== 'expired' || !session?.id || refreshedSessionId.current === session.id) return
+    refreshedSessionId.current = session.id
     toast.info('二维码已过期，已刷新')
     onRetry()
-  }, [state, onRetry])
+  }, [state, session?.id, onRetry])
 
   let message = '等待扫码'
   if (pending) {
