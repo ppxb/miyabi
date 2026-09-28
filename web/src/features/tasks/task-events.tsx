@@ -10,6 +10,7 @@ import {
   type PropsWithChildren
 } from 'react'
 
+import { getAuthToken, notifyUnauthorized } from '@/api/client'
 import { invalidateMovieStates } from '@/api/movie-state-cache'
 import { libraryKeys } from '@/api/library'
 import { offlineKeys } from '@/api/offline'
@@ -58,17 +59,41 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
       }
     }
 
-    function restartConnection() {
+    async function restartConnection() {
       events.close()
       clearTimeout(connectionTimer)
       clearTimeout(retryTimer)
       markDisconnected()
-      retryTimer = setTimeout(() => setAttempt(value => value + 1), 3000)
+
+      try {
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 5000)
+        const token = getAuthToken()
+        const response = await fetch('/api/tasks/events', {
+          signal: controller.signal,
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        })
+        clearTimeout(timer)
+        if (response.status === 401) {
+          const payload = (await response.json().catch(() => null)) as { code?: string } | null
+          if (!payload?.code || payload.code === 'UNAUTHORIZED') {
+            notifyUnauthorized()
+            return
+          }
+        }
+        controller.abort()
+      } catch {
+        // Network error, abort, or offline falls through to reconnect retry
+      }
+
+      if (!disposed) {
+        retryTimer = setTimeout(() => setAttempt(value => value + 1), 3000)
+      }
     }
 
     function waitForActivity(timeout = 45_000) {
       clearTimeout(connectionTimer)
-      connectionTimer = setTimeout(restartConnection, timeout)
+      connectionTimer = setTimeout(() => void restartConnection(), timeout)
     }
 
     async function refreshData() {
@@ -127,7 +152,7 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
     events.onerror = () => {
       revisions = undefined
       // Native EventSource retries transport interruptions, but not a terminal CLOSED state.
-      if (events.readyState === EventSource.CLOSED) restartConnection()
+      if (events.readyState === EventSource.CLOSED) void restartConnection()
       else {
         markDisconnected()
         waitForActivity(15_000)

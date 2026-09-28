@@ -81,6 +81,13 @@ export function clearAuthToken(): void {
   localStorage.removeItem(TOKEN_STORAGE_KEY)
 }
 
+export function notifyUnauthorized(): void {
+  clearAuthToken()
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('miyabi:unauthorized'))
+  }
+}
+
 // JavDB CDN hosts are not reachable from every browser network, so images go through the backend.
 export function imageURL(source: string) {
   if (source.startsWith('/api/library/artwork/')) return source
@@ -120,10 +127,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
 
     if (response.status === 401 && code === 'UNAUTHORIZED' && !path.startsWith('/api/auth/')) {
-      clearAuthToken()
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('miyabi:unauthorized'))
-      }
+      notifyUnauthorized()
     }
 
     throw new ApiError(message, response.status)

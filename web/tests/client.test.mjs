@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { ApiError, apiPost } from '../src/api/client.ts'
+import { ApiError, apiPost, notifyUnauthorized } from '../src/api/client.ts'
 
 for (const scenario of [
   {
@@ -158,4 +158,30 @@ test('401 without code UNAUTHORIZED preserves token and does not dispatch miyabi
   assert.equal(storage.get('miyabi_jwt_token'), 'test-token')
   assert.deepEqual(events, [])
 })
+
+test('notifyUnauthorized clears token and dispatches miyabi:unauthorized', () => {
+  const events = []
+  const storage = new Map([['miyabi_jwt_token', 'test-token']])
+  const originalWindow = globalThis.window
+  const originalLocalStorage = globalThis.localStorage
+
+  globalThis.localStorage = {
+    getItem: key => storage.get(key) ?? null,
+    setItem: (key, val) => storage.set(key, val),
+    removeItem: key => storage.delete(key),
+  }
+  globalThis.window = {
+    dispatchEvent: event => events.push(event.type),
+  }
+
+  try {
+    notifyUnauthorized()
+    assert.equal(storage.has('miyabi_jwt_token'), false)
+    assert.deepEqual(events, ['miyabi:unauthorized'])
+  } finally {
+    globalThis.window = originalWindow
+    globalThis.localStorage = originalLocalStorage
+  }
+})
+
 

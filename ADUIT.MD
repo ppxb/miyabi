@@ -55,7 +55,7 @@
 - [x] **28.** ✔ `internal/api/movie.go:72` `req, _ := bindJSON(...)` 忽略绑定失败，`c.Errors` 已挂 400 仍去扫默认目录。
 - [x] **29.** ✔ `internal/api/subscription.go:171-179` PUT 返回用户原始输入，而非 `normalized()` 后实际保存的值（如 `check_time` 为空存 "00:00" 却返回 ""）。
 - [x] **30.** ✔ `internal/subtitle/service.go:87-105` 既无 PickCode 也无 SourceURL 的 pending 记录不进任何分支，永远不清理 → 增加 default 分支删除。
-- [ ] **31.** `web/src/features/tasks/task-events.tsx:127-135` SSE 遇 401 后变为 CLOSED，每 3 秒无限重连且不会触发未授权处理。
+- [x] **31.** ✔ `web/src/features/tasks/task-events.tsx:127-135` SSE 遇 401 后变为 CLOSED，每 3 秒无限重连且不会触发未授权处理。
 - [ ] **32.** `web/src/features/settings/pan-login-dialog.tsx:92,102-107` `refreshed` ref 整个会话只置位一次，第二张二维码过期不再自动刷新，但 :117 文案仍显示"正在刷新" → 按 `session.id` 重置。
 - [ ] **33.** ✔ `web/src/features/settings/data-section.tsx:93` 按钮文案"清理所有缓存"，实际（:109 标题、:39 toast）只清理未使用的图片缓存 → 改为"清理未使用缓存"。
 - [ ] **34.** `web/src/api/browse-history-store.ts:158-175` visibilitychange 触发 `flush()` 未返回时 pagehide 又用 beacon 发同一批 → 重复 POST；beacon 发送后不清 pending，下次启动再发一次。
