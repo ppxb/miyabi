@@ -8,6 +8,7 @@ import (
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/ent/subscription"
 	"github.com/ppxb/miyabi/internal/magnet"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -232,3 +233,76 @@ func TestSubscriptionTargetsAndPagination(t *testing.T) {
 	_ = m1
 	_ = m2
 }
+
+func TestMovieSubscription_ConstraintErrorRecoversWithoutRecursion(t *testing.T) {
+	f, ctx := newFixture(t), t.Context()
+	var wg sync.WaitGroup
+	n := 10
+	results := make([]Item, n)
+	errors := make([]error, n)
+
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			results[idx], errors[idx] = f.service.addMovie(ctx, domain.MovieSummary{
+				ID: "m-race", Code: "MOCK-race", Title: "Race Title",
+			}, AddMovieOptions{})
+		}(i)
+	}
+	wg.Wait()
+
+	for i := 0; i < n; i++ {
+		if errors[i] != nil {
+			t.Fatalf("expected concurrent addMovie to succeed via constraint recovery, got error at %d: %v", i, errors[i])
+		}
+		if results[i].ID != results[0].ID {
+			t.Fatalf("expected all results to have the same ID, got %d vs %d", results[i].ID, results[0].ID)
+		}
+	}
+
+	count, err := f.client.Subscription.Query().Where(subscription.KindEQ(subscription.KindMovie), subscription.TargetIDEQ("m-race")).Count(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("expected exactly 1 subscription created, got %d", count)
+	}
+}
+
+func TestActorSubscription_ConstraintErrorRecoversWithoutRecursion(t *testing.T) {
+	f, ctx := newFixture(t), t.Context()
+	var wg sync.WaitGroup
+	n := 10
+	results := make([]Item, n)
+	errors := make([]error, n)
+
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			results[idx], errors[idx] = f.service.AddActor(ctx, "act-race", AddActorOptions{
+				Title: "Actor Race",
+			})
+		}(i)
+	}
+	wg.Wait()
+
+	for i := 0; i < n; i++ {
+		if errors[i] != nil {
+			t.Fatalf("expected concurrent AddActor to succeed via constraint recovery, got error at %d: %v", i, errors[i])
+		}
+		if results[i].ID != results[0].ID {
+			t.Fatalf("expected all results to have the same ID, got %d vs %d", results[i].ID, results[0].ID)
+		}
+	}
+
+	count, err := f.client.Subscription.Query().Where(subscription.KindEQ(subscription.KindActor), subscription.TargetIDEQ("act-race")).Count(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("expected exactly 1 subscription created, got %d", count)
+	}
+}
+

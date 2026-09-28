@@ -49,8 +49,10 @@ func (service *Service) addMovie(ctx context.Context, summary domain.MovieSummar
 		SetNillableOriginID(opts.OriginID).SetNextCheckAt(time.Now()).Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
-			// Lost a race with a concurrent add; the existing row wins.
-			return service.addMovie(ctx, summary, opts)
+			// Lost a race with a concurrent add; query the existing row once.
+			if item, found, findErr := service.existingMovie(ctx, summary.ID, opts); findErr == nil && found {
+				return item, nil
+			}
 		}
 		return Item{}, fmt.Errorf("create movie subscription: %w", err)
 	}
