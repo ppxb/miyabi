@@ -2,7 +2,6 @@ package strm
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -16,10 +15,11 @@ import (
 // Any other call panics through the nil embedded client.
 type panStub struct {
 	drive.Client
-	info        func(context.Context, string, string) (pan.FileInfo, error)
-	downloadURL func(context.Context, string, string, string) (string, error)
-	playURL     func(context.Context, string, string, string) ([]pan.PlaySource, error)
-	openMedia   func(context.Context, string, string, http.Header) (*http.Response, error)
+	info         func(context.Context, string, string) (pan.FileInfo, error)
+	downloadURL  func(context.Context, string, string, string) (string, error)
+	playURL      func(context.Context, string, string, string) ([]pan.PlaySource, error)
+	openMedia    func(context.Context, string, string, http.Header) (*http.Response, error)
+	refreshToken func(context.Context, string) (pan.Tokens, error)
 }
 
 func (*panStub) Close() {}
@@ -38,6 +38,13 @@ func (*panStub) LoginStatus(context.Context, *pan.Login) (pan.LoginState, error)
 
 func (*panStub) ExchangeToken(context.Context, *pan.Login) (pan.Tokens, error) {
 	return pan.Tokens{AccessToken: "access", RefreshToken: "refresh", ExpiresAt: time.Now().Add(time.Hour)}, nil
+}
+
+func (client *panStub) RefreshToken(ctx context.Context, token string) (pan.Tokens, error) {
+	if client.refreshToken != nil {
+		return client.refreshToken(ctx, token)
+	}
+	return pan.Tokens{AccessToken: "refreshed-access", RefreshToken: "refreshed-refresh", ExpiresAt: time.Now().Add(time.Hour)}, nil
 }
 
 func (*panStub) List(context.Context, string, string, int, int) (pan.FilePage, error) {
@@ -59,7 +66,7 @@ func (client *panStub) DownloadURL(ctx context.Context, token, pickCode, userAge
 	if client.downloadURL != nil {
 		return client.downloadURL(ctx, token, pickCode, userAgent)
 	}
-	return "", errors.New("download url not stubbed")
+	return "", pan.ErrDownloadUnavailable
 }
 
 func (client *panStub) OpenMedia(ctx context.Context, method, address string, headers http.Header) (*http.Response, error) {

@@ -51,13 +51,14 @@ func TestPlayURLDecodesOfficialResponses(t *testing.T) {
 
 func TestDownloadURLDecodesMetadataSources(t *testing.T) {
 	for _, test := range []struct {
-		name    string
-		body    string
-		wantErr bool
+		name         string
+		body         string
+		wantErr      bool
+		wantSentinel error
 	}{
 		{name: "metadata", body: `{"state":true,"code":0,"data":{"42":{"url":{"url":"https://cdn.example/sidecar?sign=fixture"}}}}`},
-		{name: "missing download", body: `{"state":true,"code":0,"data":{}}`, wantErr: true},
-		{name: "empty download URL", body: `{"state":true,"code":0,"data":{"42":{"url":{"url":""}}}}`, wantErr: true},
+		{name: "missing download", body: `{"state":true,"code":0,"data":{}}`, wantErr: true, wantSentinel: ErrDownloadUnavailable},
+		{name: "empty download URL", body: `{"state":true,"code":0,"data":{"42":{"url":{"url":""}}}}`, wantErr: true, wantSentinel: ErrDownloadUnavailable},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			client := New()
@@ -77,6 +78,9 @@ func TestDownloadURLDecodesMetadataSources(t *testing.T) {
 			address, err := client.DownloadURL(t.Context(), "fixture-token", "fixture-pick", MediaUserAgent)
 			if (err != nil) != test.wantErr {
 				t.Fatalf("DownloadURL error = %v, want error = %t", err, test.wantErr)
+			}
+			if test.wantSentinel != nil && !errors.Is(err, test.wantSentinel) {
+				t.Fatalf("DownloadURL error = %v, want sentinel %v", err, test.wantSentinel)
 			}
 			if !test.wantErr && address != "https://cdn.example/sidecar?sign=fixture" {
 				t.Fatalf("download URL = %q", address)

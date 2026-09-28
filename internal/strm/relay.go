@@ -49,8 +49,12 @@ func (relay *Relay) StreamURL(ctx context.Context, fileID, userAgent string) (st
 		return "", err
 	}
 	// Prefer the direct download URL for full CDN throughput and instant seeking.
-	if downloadURL, err := sess.DownloadURL(ctx, pickCode, ua); err == nil && downloadURL != "" {
+	downloadURL, err := sess.DownloadURL(ctx, pickCode, ua)
+	if err == nil && downloadURL != "" {
 		return downloadURL, nil
+	}
+	if err != nil && !errors.Is(err, pan.ErrDownloadUnavailable) {
+		return "", err
 	}
 	sources, err := sess.PlayURL(ctx, pickCode, ua)
 	if err != nil {

@@ -12,6 +12,7 @@ var (
 	ErrNotFound             = domain.E(domain.KindNotFound, "115 file not found", nil)
 	ErrOfflineExists        = domain.E(domain.KindConflict, "115 offline task already exists", nil)
 	ErrTranscodeUnavailable = errors.New("transcoded playback sources unavailable")
+	ErrDownloadUnavailable  = errors.New("direct download URL unavailable")
 )
 
 type apiError struct {

@@ -140,7 +140,7 @@ func TestStreamURLAndProbeConsistentUserAgent(t *testing.T) {
 	// Case 2: Custom UA in StreamURL when DownloadURL fails is passed to PlayURL
 	var capturedPlayUA string
 	client.downloadURL = func(_ context.Context, _, _, _ string) (string, error) {
-		return "", errors.New("no direct download")
+		return "", pan.ErrDownloadUnavailable
 	}
 	client.playURL = func(_ context.Context, _, _, userAgent string) ([]pan.PlaySource, error) {
 		capturedPlayUA = userAgent
@@ -152,5 +152,35 @@ func TestStreamURLAndProbeConsistentUserAgent(t *testing.T) {
 	}
 	if capturedPlayUA != "Infuse/7.5" {
 		t.Fatalf("PlayURL must receive custom UA %q, got %q", "Infuse/7.5", capturedPlayUA)
+	}
+}
+
+func TestStreamURLDoesNotFallbackOnFatalErrors(t *testing.T) {
+	fatalErrors := []struct {
+		name string
+		err  error
+	}{
+		{name: "unauthorized", err: pan.ErrUnauthorized},
+		{name: "source changed", err: drive.ErrSourceChanged},
+		{name: "context canceled", err: context.Canceled},
+		{name: "unexpected error", err: errors.New("unexpected upstream error")},
+	}
+
+	for _, tc := range fatalErrors {
+		t.Run(tc.name, func(t *testing.T) {
+			relay, client := relayFixture(t, "pick-101")
+			client.downloadURL = func(context.Context, string, string, string) (string, error) {
+				return "", tc.err
+			}
+			client.playURL = func(context.Context, string, string, string) ([]pan.PlaySource, error) {
+				t.Fatal("PlayURL must not be called when DownloadURL returns a fatal error")
+				return nil, nil
+			}
+
+			_, err := relay.StreamURL(t.Context(), "101", "")
+			if !errors.Is(err, tc.err) {
+				t.Fatalf("StreamURL error = %v, want %v", err, tc.err)
+			}
+		})
 	}
 }

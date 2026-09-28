@@ -44,6 +44,9 @@ func (client *Client) DownloadURL(ctx context.Context, accessToken, pickCode, us
 	if err != nil {
 		return "", err
 	}
+	if len(result.Data) == 0 {
+		return "", ErrDownloadUnavailable
+	}
 	if len(result.Data) != 1 {
 		return "", fmt.Errorf("115 returned no unique download URL")
 	}
@@ -52,7 +55,7 @@ func (client *Client) DownloadURL(ctx context.Context, accessToken, pickCode, us
 		address = item.URL.URL
 	}
 	if address == "" {
-		return "", fmt.Errorf("115 download URL is empty")
+		return "", ErrDownloadUnavailable
 	}
 	return address, nil
 }
