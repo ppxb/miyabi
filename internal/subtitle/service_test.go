@@ -186,3 +186,25 @@ func TestFinderBlocksLoopbackDownloads(t *testing.T) {
 		t.Errorf("unexpected error message: %v", err)
 	}
 }
+
+func TestExportDeletesOrphanPendingSubtitles(t *testing.T) {
+	service, db, movieID, target := exportFixture(t, nil)
+	ctx := t.Context()
+
+	orphan := db.Subtitle.Create().
+		SetMovieID(movieID).
+		SetName("ABP-123.orphan.srt").
+		SetFormat("srt").
+		SetStoragePath(filepath.Join(target.Dir, "non-existent.srt")).
+		SaveX(ctx)
+
+	if _, err := service.Export(ctx, panReader{}, movieID, target); err != nil {
+		t.Fatalf("Export = %v", err)
+	}
+
+	exists, err := db.Subtitle.Query().Where(subtitle.IDEQ(orphan.ID)).Exist(ctx)
+	if err != nil || exists {
+		t.Fatalf("expected orphan subtitle to be deleted, exists: %v, err: %v", exists, err)
+	}
+}
+

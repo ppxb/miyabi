@@ -101,6 +101,8 @@ func (s *Service) Export(ctx context.Context, reader Reader, movieID int, target
 				_ = os.Remove(target.Path(kind))
 			}
 			errs = append(errs, s.db.Subtitle.DeleteOne(track).Exec(ctx))
+		default:
+			errs = append(errs, s.db.Subtitle.DeleteOne(track).Exec(ctx))
 		}
 	}
 	if !target.HardSubtitled && len(exported) < MaxTracks {
