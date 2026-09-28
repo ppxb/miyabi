@@ -42,7 +42,7 @@
 - [x] **15.** ✔ `web/src/api/subscriptions.ts:52` 订阅列表固定 `limit: 100` 只取第 1 页，`useSubscription`（:57-63）用 `find` 查找 → 第 101 条起显示"未订阅"，订阅页也显示不全。
 - [x] **16.** ✔ `internal/library/scrape/cover.go:130-149` 同一影片分布在多个 115 目录时，每个目录各导出一次到同一 `EmbyMovieDir` → `stem.strm` 互相覆盖、cd 编号错乱；`ExportLocalMovie`（`export.go:150`）不排序 → 先收集全部视频、排序后统一导出一次。
 - [x] **17.** ✔ `internal/export/export.go:39`（原 `library/scrape/export.go:26`）`EmbyMovieDir` 直接用原始 code 作目录名，含 `/` `\` `:` 时产生嵌套或非法路径 → 使用 `nfo.FileStem(code)`。
-- [ ] **18.** `internal/library/scan/local.go:177` 本地 NFO 未做 `codeid.Normalize` 且无空值回退，`SetCode("")` 违反 NotEmpty；同段多处 `_ =` 吞错（含 `:244`）。
+- [x] **18.** ✔ `internal/library/scan/local.go:177` 本地 NFO 未做 `codeid.Normalize` 且无空值回退，`SetCode("")` 违反 NotEmpty；同段多处 `_ =` 吞错（含 `:244`）。
 - [ ] **19.** `internal/monitor/subscribe.go:51`、`actor.go:71` 遇 `ent.IsConstraintError` 无限递归自身，外键约束也会命中 → 栈溢出风险 → 只重查一次。
 - [ ] **20.** `internal/monitor/actor.go:37-69` + `check.go:140-143` 空作品演员 `SeenMovieIDs` 为空，被当成"尚无基线"，首批新作只记基线不生成订阅 → 增加显式"已初始化"标记。
 - [ ] **21.** `internal/emby/service.go:147-161` `ScheduleActorSync` 的 `Timer.Stop` 挡不住已在运行的同步 → 多个 `SyncActorAvatars` 并发；找不到头像的演员每轮都重查 GFriends / DB / JavDB → `atomic.Bool` 单飞 + 负缓存。

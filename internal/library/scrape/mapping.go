@@ -93,9 +93,12 @@ func MovieNFO(record *ent.Movie) nfo.Movie {
 
 // SaveMovieMetadata updates an ent.Movie record and associates actors and tags from an NFO document.
 func SaveMovieMetadata(ctx context.Context, tx *ent.Tx, id int, doc nfo.Movie) error {
-	update := tx.Movie.UpdateOneID(id).SetCode(doc.Code).SetTitle(doc.Title).SetScrapeStatus(movie.ScrapeStatusPending).
+	update := tx.Movie.UpdateOneID(id).SetTitle(doc.Title).SetScrapeStatus(movie.ScrapeStatusPending).
 		ClearActors().ClearTags().ClearJavdbID().ClearReleaseDate().ClearDuration().ClearRating().
 		ClearDirectorID().ClearDirectorName().ClearMakerID().ClearMakerName().ClearSeriesID().ClearSeriesName()
+	if doc.Code != "" {
+		update.SetCode(doc.Code)
+	}
 	if doc.JavDBID() != "" {
 		update.SetJavdbID(doc.JavDBID())
 	}

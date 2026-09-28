@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -167,12 +168,26 @@ func (s *LocalScanner) ingestMedia(
 
 		if nfoPath != "" {
 			nfoBytes, readErr := os.ReadFile(nfoPath)
-			if readErr == nil {
+			if readErr != nil {
+				slog.WarnContext(ctx, "failed to read local NFO", "path", nfoPath, "error", readErr)
+			} else {
 				doc, decodeErr := nfo.Decode(nfoBytes)
-				if decodeErr == nil {
+				if decodeErr != nil {
+					slog.WarnContext(ctx, "failed to decode local NFO", "path", nfoPath, "error", decodeErr)
+				} else {
 					result.NFORead++
-					if err := scrape.SaveMovieMetadata(ctx, tx, movieID, doc); err == nil {
-						_ = tx.Movie.UpdateOneID(movieID).SetScrapeStatus(movie.ScrapeStatusDone).Exec(ctx)
+					if doc.Code != "" {
+						doc.Code = codeid.Normalize(doc.Code)
+					}
+					if doc.Code == "" {
+						doc.Code = code
+					}
+					if err := scrape.SaveMovieMetadata(ctx, tx, movieID, doc); err != nil {
+						slog.WarnContext(ctx, "failed to save movie metadata from local NFO", "path", nfoPath, "error", err)
+					} else {
+						if err := tx.Movie.UpdateOneID(movieID).SetScrapeStatus(movie.ScrapeStatusDone).Exec(ctx); err != nil {
+							return err
+						}
 					}
 				}
 			}
@@ -205,7 +220,9 @@ func (s *LocalScanner) ingestMedia(
 					if artwork.Fanart != "" {
 						update.SetFanarts([]string{artwork.Fanart})
 					}
-					_ = update.Exec(ctx)
+					if err := update.Exec(ctx); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -215,7 +232,10 @@ func (s *LocalScanner) ingestMedia(
 			content, _ := os.ReadFile(mediaPath)
 			fileID = scrape.ParseSTRMFileID(string(content))
 		}
-		rel, _ := filepath.Rel(rootDir, mediaPath)
+		rel, relErr := filepath.Rel(rootDir, mediaPath)
+		if relErr != nil {
+			return fmt.Errorf("compute relative path for %s: %w", mediaPath, relErr)
+		}
 		if fileID == "" {
 			hash := sha256.Sum256([]byte(rel))
 			fileID = "local-" + hex.EncodeToString(hash[:16])
@@ -236,7 +256,9 @@ func (s *LocalScanner) ingestMedia(
 				return err
 			}
 		} else if err == nil && (existingFile.MovieID == nil || *existingFile.MovieID != movieID) {
-			_ = tx.File.UpdateOneID(existingFile.ID).SetMovieID(movieID).Exec(ctx)
+			if err := tx.File.UpdateOneID(existingFile.ID).SetMovieID(movieID).Exec(ctx); err != nil {
+				return err
+			}
 		}
 
 		for _, subPath := range subPaths {

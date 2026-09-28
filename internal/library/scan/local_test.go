@@ -166,3 +166,111 @@ func TestLocalScannerRawSTRMWithoutNFO(t *testing.T) {
 		t.Fatalf("expected pending status, got %v", film.ScrapeStatus)
 	}
 }
+
+func TestLocalScannerNFO_EmptyCodeFallsBackToMediaCode(t *testing.T) {
+	ctx := t.Context()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	tempDir := t.TempDir()
+	movieDir := filepath.Join(tempDir, "MIDE", "MIDE-999")
+	if err := os.MkdirAll(movieDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	strmContent := "http://127.0.0.1:8080/api/strm/play/115-test-999?token=secret123"
+	if err := os.WriteFile(filepath.Join(movieDir, "MIDE-999.strm"), []byte(strmContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// NFO without code / <num> tag
+	doc := nfo.Movie{
+		Title: "Local Title Without Num",
+		Code:  "",
+	}
+	nfoBytes, err := nfo.Encode(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(movieDir, "MIDE-999.nfo"), nfoBytes, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	scanner := NewLocalScanner(store.Client, nil)
+	res, err := scanner.Scan(ctx, tempDir)
+	if err != nil {
+		t.Fatalf("local scan failed: %v", err)
+	}
+
+	if res.MediaFiles != 1 || res.MoviesAdded != 1 || res.NFORead != 1 {
+		t.Fatalf("unexpected scan result: %+v", res)
+	}
+
+	film, err := store.Client.Movie.Query().Where(movie.CodeEQ("MIDE-999")).Only(ctx)
+	if err != nil {
+		t.Fatalf("query movie: %v", err)
+	}
+	if film.Title != "Local Title Without Num" {
+		t.Fatalf("unexpected title: %q", film.Title)
+	}
+	if film.ScrapeStatus != movie.ScrapeStatusDone {
+		t.Fatalf("expected scrape status done, got %v", film.ScrapeStatus)
+	}
+}
+
+func TestLocalScannerNFO_UnnormalizedCodeIsNormalized(t *testing.T) {
+	ctx := t.Context()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	tempDir := t.TempDir()
+	movieDir := filepath.Join(tempDir, "SSIS", "SSIS-555")
+	if err := os.MkdirAll(movieDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	strmContent := "http://127.0.0.1:8080/api/strm/play/115-test-555?token=secret123"
+	if err := os.WriteFile(filepath.Join(movieDir, "SSIS-555.strm"), []byte(strmContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// NFO with unnormalized lowercase code
+	doc := nfo.Movie{
+		Title: "Local Title Unnormalized",
+		Code:  "ssis-555",
+	}
+	nfoBytes, err := nfo.Encode(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(movieDir, "SSIS-555.nfo"), nfoBytes, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	scanner := NewLocalScanner(store.Client, nil)
+	res, err := scanner.Scan(ctx, tempDir)
+	if err != nil {
+		t.Fatalf("local scan failed: %v", err)
+	}
+
+	if res.MediaFiles != 1 || res.MoviesAdded != 1 || res.NFORead != 1 {
+		t.Fatalf("unexpected scan result: %+v", res)
+	}
+
+	film, err := store.Client.Movie.Query().Where(movie.CodeEQ("SSIS-555")).Only(ctx)
+	if err != nil {
+		t.Fatalf("query movie: %v", err)
+	}
+	if film.Title != "Local Title Unnormalized" {
+		t.Fatalf("unexpected title: %q", film.Title)
+	}
+	if film.ScrapeStatus != movie.ScrapeStatusDone {
+		t.Fatalf("expected scrape status done, got %v", film.ScrapeStatus)
+	}
+}
