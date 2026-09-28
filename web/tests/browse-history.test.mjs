@@ -180,3 +180,40 @@ test('BrowseHistoryStore flushKeepalive does not send duplicate beacon while flu
 })
 
 
+
+test('keepalive fallback preserves failed batches and acknowledges only successful IDs', async () => {
+  const originalWindow = globalThis.window
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
+  const originalFetch = globalThis.fetch
+  const saved = new Map()
+  globalThis.window = {
+    addEventListener: () => {},
+    localStorage: { getItem: key => saved.get(key), setItem: (key, value) => saved.set(key, value) }
+  }
+  Object.defineProperty(globalThis, 'navigator', { value: { sendBeacon: () => false }, configurable: true })
+  try {
+    const store = new BrowseHistoryStore({ storageKey: 'test:fallback' })
+    store.recordView('first')
+    for (const fail of [async () => ({ ok: false }), async () => { throw new Error('offline') }]) {
+      globalThis.fetch = fail
+      await store.flushKeepalive()
+      assert.equal(store.getPendingCount(), 1)
+      assert.deepEqual(JSON.parse(saved.get('test:fallback')).pending, ['first'])
+    }
+    let finish
+    let requests = 0
+    globalThis.fetch = () => { requests++; return new Promise(resolve => { finish = resolve }) }
+    const pending = store.flushKeepalive()
+    await store.flushKeepalive()
+    assert.equal(requests, 1)
+    store.recordView('second')
+    finish({ ok: true })
+    await pending
+    assert.deepEqual(JSON.parse(saved.get('test:fallback')).pending, ['second'])
+  } finally {
+    globalThis.window = originalWindow
+    globalThis.fetch = originalFetch
+    if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator)
+    else delete globalThis.navigator
+  }
+})

@@ -165,7 +165,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	embySvc.SetExportManager(exportMgr)
 
 	if activePublicURL != "" && activeEmbyDir != "" {
-		embySvc.StartStartupSTRMRewrite(activeEmbyDir, activePublicURL, cfg.STRMToken, logger)
+		embySvc.StartStartupSTRMRewrite()
 	}
 
 	taskRegistry.Register(tasks.NewHandler(tasks.KindScan, libSvc.Scan, libSvc.Finished))

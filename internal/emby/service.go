@@ -14,7 +14,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -53,15 +52,9 @@ type Service struct {
 	syncing          atomic.Bool
 	avatarNotFoundMu sync.Mutex
 	avatarNotFound   map[string]time.Time
-	strmExporters    []STRMExporter
 	strmToken        string
 	exportMgr        *export.Manager
-	rewriteMu        sync.Mutex
-}
-
-// STRMExporter configures the STRM export settings across services.
-type STRMExporter interface {
-	SetEmbyExport(embyDir, publicURL, strmToken string)
+	updateMu         sync.Mutex
 }
 
 // NewService instantiates an Emby service, restoring config from database or using defaults.
@@ -144,13 +137,6 @@ func (s *Service) SetSTRMToken(token string) {
 	s.strmToken = token
 }
 
-// SetSTRMExporters registers downstream services that need notification when PublicURL changes.
-func (s *Service) SetSTRMExporters(exporters ...STRMExporter) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.strmExporters = append(s.strmExporters, exporters...)
-}
-
 // SetExportManager configures the unified export manager.
 func (s *Service) SetExportManager(mgr *export.Manager) {
 	s.mu.Lock()
@@ -196,6 +182,8 @@ func (s *Service) Config(context.Context) (Config, error) {
 
 // UpdateConfig validates and persists the new configuration to the database.
 func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
+	s.updateMu.Lock()
+	defer s.updateMu.Unlock()
 	s.mu.Lock()
 	if cfg.LocalDir == "" {
 		cfg.LocalDir = s.cfg.LocalDir
@@ -205,7 +193,6 @@ func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 	}
 	oldPublicURL := s.cfg.PublicURL
 	token := s.strmToken
-	exporters := slices.Clone(s.strmExporters)
 	s.mu.Unlock()
 
 	if err := cfg.Normalize(); err != nil {
@@ -228,22 +215,8 @@ func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 			STRMToken: token,
 		})
 	}
-	for _, exp := range exporters {
-		exp.SetEmbyExport(cfg.LocalDir, cfg.PublicURL, token)
-	}
-
-	if cfg.PublicURL != "" && cfg.LocalDir != "" && oldPublicURL != cfg.PublicURL {
-		s.wg.Add(1)
-		go func() {
-			defer s.wg.Done()
-			s.rewriteMu.Lock()
-			defer s.rewriteMu.Unlock()
-			count, err := export.RewriteSTRM(s.ctx, cfg.LocalDir, cfg.PublicURL, token)
-			if err == nil && count > 0 {
-				slog.Info("rewrote strm files with updated public url", "count", count, "public_url", cfg.PublicURL)
-				s.NotifyUpdated(cfg.LocalDir)
-			}
-		}()
+	if oldPublicURL != cfg.PublicURL && exportMgr != nil {
+		s.startSTRMRewrite(exportMgr)
 	}
 
 	if cfg.Enabled && cfg.IsSyncActors() {
@@ -253,29 +226,26 @@ func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 	return nil
 }
 
-// StartStartupSTRMRewrite triggers managed STRM rewriting on startup within the service lifecycle.
-func (s *Service) StartStartupSTRMRewrite(embyDir, publicURL, token string, logger *slog.Logger) {
-	if embyDir == "" || publicURL == "" {
-		return
+// StartStartupSTRMRewrite uses the shared manager's current configuration.
+func (s *Service) StartStartupSTRMRewrite() {
+	s.mu.RLock()
+	mgr := s.exportMgr
+	s.mu.RUnlock()
+	if mgr != nil {
+		s.startSTRMRewrite(mgr)
 	}
+}
+
+func (s *Service) startSTRMRewrite(mgr *export.Manager) {
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		s.rewriteMu.Lock()
-		defer s.rewriteMu.Unlock()
-		count, err := export.RewriteSTRM(s.ctx, embyDir, publicURL, token)
+		count, err := mgr.RewriteSTRM(s.ctx)
 		if err != nil && !errors.Is(err, context.Canceled) {
-			if logger != nil {
-				logger.Error("failed to rewrite STRM files on startup", "error", err)
-			} else {
-				slog.Error("failed to rewrite STRM files on startup", "error", err)
-			}
+			slog.Error("failed to rewrite STRM files", "error", err)
 		} else if count > 0 {
-			if logger != nil {
-				logger.Info("rewrote STRM files on startup", "count", count, "url", publicURL)
-			} else {
-				slog.Info("rewrote STRM files on startup", "count", count, "url", publicURL)
-			}
+			slog.Info("rewrote STRM files", "count", count)
+			s.NotifyUpdated(mgr.Config().EmbyDir)
 		}
 	}()
 }
@@ -660,11 +630,13 @@ func (s *Service) SyncActorAvatars(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 
+	canCacheMiss := true
 	if g != nil {
 		if err := g.EnsureIndex(ctx); err != nil {
 			// Skip GFriends for this run instead of re-downloading its index per actor.
 			slog.WarnContext(ctx, "gfriends index unavailable; using JavDB avatars only", "error", err)
 			g = nil
+			canCacheMiss = false
 		}
 	}
 
@@ -680,7 +652,7 @@ func (s *Service) SyncActorAvatars(ctx context.Context) (int, error) {
 			continue
 		}
 
-		avatar, found := s.findAvatar(ctx, g, media, person.Name)
+		avatar, found, lookupErr := s.findAvatar(ctx, g, media, person.Name)
 		if found {
 			if err := s.UploadPersonAvatar(ctx, person.ID, avatar); err != nil {
 				slog.WarnContext(ctx, "failed to upload avatar for actor", "name", person.Name, "error", err)
@@ -688,7 +660,9 @@ func (s *Service) SyncActorAvatars(ctx context.Context) (int, error) {
 				uploaded++
 				slog.DebugContext(ctx, "uploaded actor avatar to emby", "name", person.Name)
 			}
-		} else {
+		} else if lookupErr != nil {
+			slog.WarnContext(ctx, "failed to resolve actor avatar", "name", person.Name, "error", lookupErr)
+		} else if canCacheMiss {
 			s.markAvatarNotFound(person.Name)
 		}
 
@@ -748,26 +722,36 @@ func (s *Service) ClearAvatarNotFoundCache() {
 }
 
 // findAvatar prefers GFriends and falls back to the JavDB avatar of a scraped actor.
-func (s *Service) findAvatar(ctx context.Context, g *gfriends.Client, media MediaFetcher, name string) (domain.Media, bool) {
+func (s *Service) findAvatar(ctx context.Context, g *gfriends.Client, media MediaFetcher, name string) (domain.Media, bool, error) {
 	if s.isAvatarNotFound(name) {
-		return domain.Media{}, false
+		return domain.Media{}, false, nil
 	}
+	var upstreamErr error
 	if g != nil {
-		if data, err := g.FetchAvatar(ctx, name); err == nil && len(data) > 0 {
-			return domain.Media{ContentType: http.DetectContentType(data), Body: data}, true
+		data, err := g.FetchAvatar(ctx, name)
+		if err == nil && len(data) > 0 {
+			return domain.Media{ContentType: http.DetectContentType(data), Body: data}, true, nil
+		}
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			upstreamErr = err
 		}
 	}
 	if media == nil || s.db == nil {
-		return domain.Media{}, false
+		return domain.Media{}, false, upstreamErr
 	}
 	act, err := s.db.Actor.Query().Where(actor.Or(actor.NameEQ(name), actor.NameZhtEQ(name)), actor.AvatarNotNil()).First(ctx)
-	if err != nil || *act.Avatar == "" {
-		return domain.Media{}, false
+	if ent.IsNotFound(err) {
+		return domain.Media{}, false, upstreamErr
+	}
+	if err != nil {
+		return domain.Media{}, false, errors.Join(upstreamErr, err)
+	}
+	if *act.Avatar == "" {
+		return domain.Media{}, false, upstreamErr
 	}
 	image, err := media.Media(ctx, *act.Avatar)
 	if err != nil {
-		slog.DebugContext(ctx, "failed to download JavDB actor avatar", "name", name, "error", err)
-		return domain.Media{}, false
+		return domain.Media{}, false, errors.Join(upstreamErr, err)
 	}
-	return image, true
+	return image, true, nil
 }

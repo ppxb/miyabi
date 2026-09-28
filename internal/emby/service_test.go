@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -411,11 +412,11 @@ func TestEmbyService_FindAvatarFallsBackToJavDBMedia(t *testing.T) {
 		}
 		return want, nil
 	})
-	got, found := svc.findAvatar(t.Context(), nil, media, "三上悠亞")
-	if !found || got.ContentType != want.ContentType || !bytes.Equal(got.Body, want.Body) {
+	got, found, err := svc.findAvatar(t.Context(), nil, media, "三上悠亞")
+	if err != nil || !found || got.ContentType != want.ContentType || !bytes.Equal(got.Body, want.Body) {
 		t.Fatalf("findAvatar = %+v, %v", got, found)
 	}
-	if _, found := svc.findAvatar(t.Context(), nil, media, "未知演员"); found {
+	if _, found, err := svc.findAvatar(t.Context(), nil, media, "未知演员"); found || err != nil {
 		t.Fatal("unknown actor produced an avatar")
 	}
 }
@@ -453,8 +454,8 @@ func TestEmbyService_AvatarNegativeCache(t *testing.T) {
 	})
 
 	// First lookup: not found, marks negative cache
-	_, found := svc.findAvatar(t.Context(), nil, media, actorName)
-	if found {
+	_, found, err := svc.findAvatar(t.Context(), nil, media, actorName)
+	if err != nil || found {
 		t.Fatal("expected avatar not found")
 	}
 	svc.markAvatarNotFound(actorName)
@@ -468,7 +469,7 @@ func TestEmbyService_AvatarNegativeCache(t *testing.T) {
 		SetAvatar("https://example.com/avatar.jpg").ExecX(t.Context())
 
 	// Second lookup: hits negative cache, does not query DB or media fetcher
-	_, found = svc.findAvatar(t.Context(), nil, media, actorName)
+	_, found, err = svc.findAvatar(t.Context(), nil, media, actorName)
 	if found {
 		t.Fatal("expected negative cache to return false without looking up")
 	}
@@ -483,7 +484,7 @@ func TestEmbyService_AvatarNegativeCache(t *testing.T) {
 	}
 
 	// Third lookup: cache cleared, finds actor
-	_, found = svc.findAvatar(t.Context(), nil, media, actorName)
+	_, found, err = svc.findAvatar(t.Context(), nil, media, actorName)
 	if !found {
 		t.Fatal("expected avatar found after clearing negative cache")
 	}
@@ -492,3 +493,43 @@ func TestEmbyService_AvatarNegativeCache(t *testing.T) {
 	}
 }
 
+func TestAvatarFailureIsRetriedOnNextSync(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	store.Client.Actor.Create().SetJavdbID("retry-actor").SetName("Retry Actor").SetAvatar("https://example.com/avatar.jpg").ExecX(t.Context())
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/Persons" {
+			_, _ = io.WriteString(w, `{"Items":[{"Id":"person-1","Name":"Retry Actor"}]}`)
+		} else {
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}))
+	defer server.Close()
+	svc, err := NewService(t.Context(), store.Client, Config{Enabled: true, ServerURL: server.URL, APIKey: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer svc.Close()
+	calls := 0
+	svc.SetMediaFetcher(mediaFetcherFunc(func(context.Context, string) (domain.Media, error) {
+		calls++
+		if calls == 1 {
+			return domain.Media{}, errors.New("temporary network failure")
+		}
+		return domain.Media{ContentType: "image/png", Body: []byte("avatar")}, nil
+	}))
+	if _, err := svc.SyncActorAvatars(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if svc.isAvatarNotFound("Retry Actor") {
+		t.Fatal("temporary failure cached as missing")
+	}
+	count, err := svc.SyncActorAvatars(t.Context())
+	if err != nil || count != 1 || calls != 2 {
+		t.Fatalf("retry uploaded=%d calls=%d err=%v", count, calls, err)
+	}
+}

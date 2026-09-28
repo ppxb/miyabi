@@ -1,5 +1,6 @@
-import { useSubscriptions } from '@/api/subscriptions'
+import { SUBSCRIPTION_PAGE_SIZE, useSubscriptions } from '@/api/subscriptions'
 import type { SubscriptionItem } from '@/api/subscriptions'
+import { ListPagination } from '@/components/list-pagination'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { Badge } from '@/components/ui/badge'
@@ -10,6 +11,8 @@ import { MovieSubscriptions } from './movie-subscriptions'
 
 type ActorSubscriptionsProps = {
   actors: ReturnType<typeof useSubscriptions>
+  page: number
+  onPageChange: (page: number) => void
   selectedID: number | null
   onSelectID: (id: number | null) => void
   allSpawned: Array<{ origin_id?: number }>
@@ -30,6 +33,8 @@ type ActorSubscriptionsProps = {
 // narrows the grid to that actor's feed.
 export function ActorSubscriptions({
   actors,
+  page,
+  onPageChange,
   selectedID,
   onSelectID,
   allSpawned,
@@ -58,7 +63,7 @@ export function ActorSubscriptions({
       />
     )
   }
-  if (!actors.data || actors.data.length === 0) {
+  if (page === 1 && actors.data.length === 0) {
     return <EmptyState title="还没有订阅演员，在演员作品页点击「订阅演员」" />
   }
 
@@ -95,6 +100,13 @@ export function ActorSubscriptions({
         ))}
       </div>
 
+      <ListPagination
+        page={page}
+        hasMore={actors.data.length === SUBSCRIPTION_PAGE_SIZE}
+        disabled={actors.isFetching}
+        scrollToTop={false}
+        onPageChange={onPageChange}
+      />
       <MovieSubscriptions
         items={displayItems}
         isPending={displayQuery.isPending}

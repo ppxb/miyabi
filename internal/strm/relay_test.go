@@ -18,8 +18,8 @@ func TestStreamURLPrefersOriginalQuality(t *testing.T) {
 		if pickCode != "pick-101" {
 			t.Fatalf("unexpected pick code: %s", pickCode)
 		}
-		if userAgent != pan.MediaUserAgent {
-			t.Fatalf("unexpected userAgent: %s, want %s", userAgent, pan.MediaUserAgent)
+		if userAgent != "" {
+			t.Fatalf("expected empty user agent, got %q", userAgent)
 		}
 		return []pan.PlaySource{
 			{URL: "https://cdn.example/1080p.m3u8", Height: 1080, Definition: 3},
@@ -107,7 +107,7 @@ func TestStreamURLPrefersDownloadURL(t *testing.T) {
 }
 
 func TestStreamURLAndProbeConsistentUserAgent(t *testing.T) {
-	// Case 1: Empty UA in StreamURL and Probe both resolve to pan.MediaUserAgent
+	// Case 1: Empty UA in StreamURL and Probe both preserve the empty user agent
 	relay, client := relayFixture(t, "pick-101")
 	var capturedDownloadUA string
 	client.downloadURL = func(_ context.Context, _, _, userAgent string) (string, error) {
@@ -124,8 +124,8 @@ func TestStreamURLAndProbeConsistentUserAgent(t *testing.T) {
 	if err != nil || url != "https://cdn.example/video.mp4" {
 		t.Fatalf("StreamURL failed: %v", err)
 	}
-	if capturedDownloadUA != pan.MediaUserAgent {
-		t.Fatalf("StreamURL with empty UA must default to %q, got %q", pan.MediaUserAgent, capturedDownloadUA)
+	if capturedDownloadUA != "" {
+		t.Fatalf("StreamURL with empty UA must preserve %q, got %q", "", capturedDownloadUA)
 	}
 
 	resp, err := relay.Probe(t.Context(), url, http.Header{})
@@ -133,8 +133,8 @@ func TestStreamURLAndProbeConsistentUserAgent(t *testing.T) {
 		t.Fatalf("Probe failed: %v", err)
 	}
 	defer resp.Body.Close()
-	if capturedProbeUA != pan.MediaUserAgent {
-		t.Fatalf("Probe with empty UA must default to %q, got %q", pan.MediaUserAgent, capturedProbeUA)
+	if capturedProbeUA != "" {
+		t.Fatalf("Probe with empty UA must preserve %q, got %q", "", capturedProbeUA)
 	}
 
 	// Case 2: Custom UA in StreamURL when DownloadURL fails is passed to PlayURL

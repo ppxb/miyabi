@@ -58,13 +58,6 @@ func New(driveSvc *drive.Drive, db *ent.Client, images *mediaimage.Cache, tasksS
 	}
 }
 
-func (s *Scanner) exportConfig() export.Config {
-	if s.exportMgr != nil {
-		return s.exportMgr.Config()
-	}
-	return export.Config{}
-}
-
 func (s *Scanner) SetExportManager(mgr *export.Manager) {
 	s.exportMgr = mgr
 }
@@ -115,6 +108,7 @@ func (s *Scanner) Run(ctx context.Context, job tasks.Job) error {
 	isResume := payload.ScanID != ""
 	if !isResume {
 		payload.ScanID = uuid.NewString()
+		payload.Checkpoint = ""
 		payload.Scan = domain.ScanProgress{
 			Stage:                 "scanning",
 			CurrentPath:           source.Directory.Path,
@@ -137,9 +131,10 @@ func (s *Scanner) Run(ctx context.Context, job tasks.Job) error {
 		})
 	}
 	reconcile := func() error {
-		expCfg := s.exportConfig()
-		return sess.Commit(ctx, func(tx *ent.Tx) error {
-			return ReconcileScanTx(ctx, tx, job.ID, scanID, &payload, observed, images, tasksSvc, expCfg.EmbyDir, expCfg.PublicURL, expCfg.STRMToken, s.notifier)
+		return s.exportMgr.WithConfig(func(expCfg export.Config) error {
+			return sess.Commit(ctx, func(tx *ent.Tx) error {
+				return ReconcileScanTx(ctx, tx, job.ID, scanID, &payload, observed, images, tasksSvc, expCfg.EmbyDir, expCfg.PublicURL, expCfg.STRMToken, s.notifier)
+			})
 		})
 	}
 

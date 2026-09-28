@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -35,7 +36,7 @@ func TestPlayURLDecodesOfficialResponses(t *testing.T) {
 				}
 				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(test.body)), Request: request}, nil
 			}))
-			sources, err := client.PlayURL(t.Context(), "fixture-token", "fixture-pick", "")
+			sources, err := client.PlayURL(t.Context(), "fixture-token", "fixture-pick", MediaUserAgent)
 			if (err != nil) != test.wantErr {
 				t.Fatalf("PlayURL error = %v, want error = %t", err, test.wantErr)
 			}
@@ -123,7 +124,7 @@ func TestPlayURLRespectsCallerUserAgent(t *testing.T) {
 		wantUA  string
 	}{
 		{name: "custom UA", inputUA: "VidHub/1.8.0", wantUA: "VidHub/1.8.0"},
-		{name: "empty UA falls back to MediaUserAgent", inputUA: "", wantUA: MediaUserAgent},
+		{name: "empty UA is preserved", inputUA: "", wantUA: ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client := New()
@@ -166,7 +167,7 @@ func TestOpenMediaStreamsRangeAndHeadWithoutCredentials(t *testing.T) {
 			defer client.Close()
 			body := &observedMediaBody{Reader: strings.NewReader("fixture video")}
 			client.media.SetTransport(offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
-				if request.Method != method || request.UserAgent() != MediaUserAgent || request.Header.Get("Range") != "bytes=2-5" || request.Header.Get("If-Range") != `"fixture-etag"` {
+				if request.Method != method || request.UserAgent() != "" || request.Header.Get("Range") != "bytes=2-5" || request.Header.Get("If-Range") != `"fixture-etag"` {
 					t.Errorf("method or media headers were lost: %s %#v", request.Method, request.Header)
 				}
 				if request.Header.Get("Authorization") != "" || request.Header.Get("Cookie") != "" {
@@ -203,5 +204,26 @@ func TestMediaRequestErrorRedactsURLAndPreservesCancellation(t *testing.T) {
 	_, err := client.OpenMedia(t.Context(), http.MethodGet, "https://cdn.example/video?secret=fixture", nil)
 	if !errors.Is(err, context.Canceled) || strings.Contains(err.Error(), "secret") || strings.Contains(err.Error(), "cdn.example") {
 		t.Fatalf("unsafe or unrecognizable media error: %v", err)
+	}
+}
+
+func TestOpenMediaPreservesEmptyUserAgentOnWire(t *testing.T) {
+	for _, ua := range []string{"", "Player/1.0"} {
+		t.Run(ua, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.UserAgent() != ua {
+					t.Errorf("wire UA=%q want %q", r.UserAgent(), ua)
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+			client := New()
+			defer client.Close()
+			response, err := client.OpenMedia(t.Context(), http.MethodHead, server.URL, http.Header{"User-Agent": {ua}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			response.Body.Close()
+		})
 	}
 }

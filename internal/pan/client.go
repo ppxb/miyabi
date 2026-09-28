@@ -56,10 +56,6 @@ func newPanTransport(base http.RoundTripper, limiter *rate.Limiter, maxConcurren
 }
 
 func (t *panTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.Header.Get("User-Agent") == "__EMPTY__" {
-		req.Header.Del("User-Agent")
-		req.Header["User-Agent"] = []string{""}
-	}
 	// 1. Limit concurrent in-flight requests
 	select {
 	case t.inFlight <- struct{}{}:
@@ -120,7 +116,7 @@ func parseRetryAfter(header string) time.Duration {
 // New creates a 115 client. 115 is always reached directly: routing it through
 // the upstream proxy is slower and trips risk control.
 func New() *Client {
-	httpClient := netx.NewDirectRestyClient(netx.RestyOptions{Timeout: requestTimeout})
+	httpClient := netx.NewDirectRestyClient(netx.RestyOptions{Timeout: requestTimeout}).SetPreRequestHook(preserveEmptyUserAgent)
 	limiter := rate.NewLimiter(rate.Every(requestGap), 1)
 
 	baseTransport := httpClient.GetClient().Transport
@@ -167,10 +163,9 @@ func New() *Client {
 		return false
 	})
 
-
 	return &Client{
 		http:    httpClient,
-		media:   netx.NewDirectRestyClient(netx.RestyOptions{ResponseHeaderTimeout: requestTimeout}),
+		media:   netx.NewDirectRestyClient(netx.RestyOptions{ResponseHeaderTimeout: requestTimeout}).SetPreRequestHook(preserveEmptyUserAgent),
 		limiter: limiter,
 	}
 }
@@ -252,4 +247,12 @@ func apiRequest[T apiPayload](client *Client, request *resty.Request, method, en
 		return result, err
 	}
 	return result, nil
+}
+
+// Resty fills empty UA headers; clear the sentinel after it builds the request.
+func preserveEmptyUserAgent(_ *resty.Client, req *http.Request) error {
+	if req.Header.Get("User-Agent") == "__EMPTY__" {
+		req.Header.Set("User-Agent", "")
+	}
+	return nil
 }

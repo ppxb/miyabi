@@ -69,7 +69,7 @@ export class BrowseHistoryStore {
       window.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') void this.flush()
       })
-      window.addEventListener('pagehide', () => this.flushKeepalive())
+      window.addEventListener('pagehide', () => void this.flushKeepalive())
     }
   }
 
@@ -156,24 +156,28 @@ export class BrowseHistoryStore {
     }
   }
 
-  flushKeepalive(): void {
+  async flushKeepalive(): Promise<void> {
     if (this.isFlushing || this.pendingList.length === 0 || typeof window === 'undefined') return
     this.clearFlushTimer()
+    this.isFlushing = true
     try {
       const ids = [...this.pendingList]
       const body = JSON.stringify({ ids })
       let sent = false
       if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
-        sent = navigator.sendBeacon(VIEWED_MOVIES_PATH, new Blob([body], { type: 'application/json' }))
+        sent = navigator.sendBeacon(
+          VIEWED_MOVIES_PATH,
+          new Blob([body], { type: 'application/json' })
+        )
       }
       if (!sent) {
-        void fetch(VIEWED_MOVIES_PATH, {
+        const response = await fetch(VIEWED_MOVIES_PATH, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body,
           keepalive: true
         })
-        sent = true
+        sent = response.ok
       }
       if (sent) {
         const synced = new Set(ids)
@@ -181,7 +185,9 @@ export class BrowseHistoryStore {
         this.persist()
       }
     } catch {
-      // Ignore beacon failures during teardown
+      // Keep pending entries when the fallback request fails.
+    } finally {
+      this.isFlushing = false
     }
   }
 

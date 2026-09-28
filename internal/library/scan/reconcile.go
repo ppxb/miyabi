@@ -2,6 +2,7 @@ package scan
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -72,14 +73,26 @@ func ReconcileScanTx(ctx context.Context, tx *ent.Tx, taskID int, scanID string,
 	}
 	payload.Scan.RemovedMovies += len(removed)
 	if embyDir != "" && len(removed) > 0 {
-		for _, code := range removed {
-			movieDir := scrape.EmbyMovieDir(embyDir, code)
-			_ = os.RemoveAll(movieDir)
-			_ = os.Remove(filepath.Dir(movieDir))
-			if notifier != nil {
-				notifier.NotifyUpdated(movieDir)
-			}
-		}
+		tx.OnCommit(func(next ent.Committer) ent.Committer {
+			return ent.CommitFunc(func(ctx context.Context, tx *ent.Tx) error {
+				if err := next.Commit(ctx, tx); err != nil {
+					return err
+				}
+				var cleanupErrors []error
+				for _, code := range removed {
+					movieDir := scrape.EmbyMovieDir(embyDir, code)
+					if err := os.RemoveAll(movieDir); err != nil {
+						cleanupErrors = append(cleanupErrors, fmt.Errorf("remove exported movie %s after commit: %w", code, err))
+						continue
+					}
+					_ = os.Remove(filepath.Dir(movieDir)) // Keep non-empty prefix directories.
+					if notifier != nil {
+						notifier.NotifyUpdated(movieDir)
+					}
+				}
+				return errors.Join(cleanupErrors...)
+			})
+		})
 	}
 	indexed := file.And(database.LibraryFiles(payload.Source), file.ScanIDEQ(scanID))
 	if payload.OfflineTaskID != 0 {

@@ -3,6 +3,8 @@ package library
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/domain"
@@ -143,101 +145,136 @@ func TestCompactScanKeepsSharedDirectoryAndArtworkMatching(t *testing.T) {
 }
 
 func TestScanCheckpointResumePreservesPreviousScannedFiles(t *testing.T) {
-	lib, client := panConcurrencyFixture(t)
+	for _, legacy := range []bool{false, true} {
+		t.Run(map[bool]string{false: "current", true: "legacy"}[legacy], func(t *testing.T) {
+			lib, client := panConcurrencyFixture(t)
+			ctx := t.Context()
+			source := *lib.drive.Source()
+
+			rootDirID := source.Directory.ID
+			entries := map[string][]pan.File{
+				rootDirID: {
+					{ID: "dir-1", ParentID: rootDirID, Name: "Dir1", IsDirectory: true},
+					{ID: "dir-2", ParentID: rootDirID, Name: "Dir2", IsDirectory: true},
+				},
+				"dir-1": {
+					{ID: "v1", ParentID: "dir-1", Name: "ABP-001.mp4", Size: 1 << 30, SHA1: "s1"},
+				},
+				"dir-2": {
+					{ID: "v2", ParentID: "dir-2", Name: "ABP-002.mp4", Size: 1 << 30, SHA1: "s2"},
+				},
+			}
+			client.list = func(_ context.Context, _, id string, offset, _ int) (pan.FilePage, error) {
+				if offset != 0 {
+					return pan.FilePage{}, nil
+				}
+				files := entries[id]
+				return pan.FilePage{Files: files, Total: len(files), Path: []pan.Directory{{ID: rootDirID}}}, nil
+			}
+
+			scanID := "test-scan-uuid-123"
+			payload := scan.Payload{
+				ScanID: scanID,
+				Source: source,
+				Scan: domain.ScanProgress{
+					Stage:                 "scanning",
+					CurrentPath:           "/Movies/Dir1",
+					DirectoriesDiscovered: 2,
+					DirectoriesScanned:    1,
+					FilesScanned:          1,
+					VideoFiles:            1,
+					MatchedFiles:          1,
+					Movies:                1,
+				},
+			}
+			v1 := scan.IdentifyVideo(pan.File{ID: "v1", ParentID: "dir-1", Name: "ABP-001.mp4", Size: 1 << 30, SHA1: "s1"})
+			queued := lib.database.Task.Query().Where(task.TypeEQ("scan")).OnlyX(ctx)
+
+			if err := scan.ProcessScanPage(ctx, lib.database, queued.ID, scanID, "/Movies/Dir1", []scan.Video{v1}, &payload, nil, lib.tasks); err != nil {
+				t.Fatal(err)
+			}
+
+			cp, err := json.Marshal([]scan.Directory{{ID: "dir-2", Path: "/Movies/Dir2"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload.Checkpoint = string(cp)
+			if legacy {
+				payload.ScanID = ""
+			}
+			if err := scan.SaveScanProgress(ctx, lib.database.Task, queued.ID, payload); err != nil {
+				t.Fatal(err)
+			}
+
+			taskRecord := lib.database.Task.GetX(ctx, queued.ID)
+			if err := lib.Scan(ctx, tasks.Job{ID: taskRecord.ID, Payload: taskRecord.Payload}); err != nil {
+				t.Fatal(err)
+			}
+
+			file1, err := lib.database.File.Query().Where(file.FileIDEQ("v1")).Only(ctx)
+			if err != nil {
+				t.Fatalf("file v1 from dir-1 was incorrectly deleted during resume reconciliation: %v", err)
+			}
+			if !legacy && file1.ScanID != scanID {
+				t.Fatalf("expected file1 scanID %s, got %s", scanID, file1.ScanID)
+			}
+			file2, err := lib.database.File.Query().Where(file.FileIDEQ("v2")).Only(ctx)
+			if err != nil {
+				t.Fatalf("file v2 from dir-2 was not indexed: %v", err)
+			}
+			if file2.ScanID != file1.ScanID {
+				t.Fatalf("expected file2 scanID %s, got %s", scanID, file2.ScanID)
+			}
+
+			if !lib.database.Movie.Query().Where(movie.CodeEQ("ABP-001")).ExistX(ctx) {
+				t.Fatal("ABP-001 movie was incorrectly deleted during resume reconciliation")
+			}
+			if !lib.database.Movie.Query().Where(movie.CodeEQ("ABP-002")).ExistX(ctx) {
+				t.Fatal("ABP-002 movie was not indexed")
+			}
+
+			resumedTask := lib.database.Task.GetX(ctx, queued.ID)
+			resumedPayload, err := tasks.DecodePayload[scan.Payload](resumedTask.Payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resumedPayload.Scan.Stage != "done" {
+				t.Fatalf("expected stage 'done', got %q", resumedPayload.Scan.Stage)
+			}
+			if resumedPayload.Checkpoint != "" {
+				t.Fatalf("expected empty checkpoint, got %q", resumedPayload.Checkpoint)
+			}
+			if resumedPayload.Scan.Movies != 2 {
+				t.Fatalf("expected 2 movies in scan progress, got %d", resumedPayload.Scan.Movies)
+			}
+		})
+	}
+}
+
+func TestReconcileRollbackKeepsExport(t *testing.T) {
+	lib, queued, payload := libraryFixture(t)
 	ctx := t.Context()
-	source := *lib.drive.Source()
-
-	rootDirID := source.Directory.ID
-	entries := map[string][]pan.File{
-		rootDirID: {
-			{ID: "dir-1", ParentID: rootDirID, Name: "Dir1", IsDirectory: true},
-			{ID: "dir-2", ParentID: rootDirID, Name: "Dir2", IsDirectory: true},
-		},
-		"dir-1": {
-			{ID: "v1", ParentID: "dir-1", Name: "ABP-001.mp4", Size: 1 << 30, SHA1: "s1"},
-		},
-		"dir-2": {
-			{ID: "v2", ParentID: "dir-2", Name: "ABP-002.mp4", Size: 1 << 30, SHA1: "s2"},
-		},
-	}
-	client.list = func(_ context.Context, _, id string, offset, _ int) (pan.FilePage, error) {
-		if offset != 0 {
-			return pan.FilePage{}, nil
-		}
-		files := entries[id]
-		return pan.FilePage{Files: files, Total: len(files), Path: []pan.Directory{{ID: rootDirID}}}, nil
-	}
-
-	scanID := "test-scan-uuid-123"
-	payload := scan.Payload{
-		ScanID: scanID,
-		Source: source,
-		Scan: domain.ScanProgress{
-			Stage:                 "scanning",
-			CurrentPath:           "/Movies/Dir1",
-			DirectoriesDiscovered: 2,
-			DirectoriesScanned:    1,
-			FilesScanned:          1,
-			VideoFiles:            1,
-			MatchedFiles:          1,
-			Movies:                1,
-		},
-	}
-	v1 := scan.IdentifyVideo(pan.File{ID: "v1", ParentID: "dir-1", Name: "ABP-001.mp4", Size: 1 << 30, SHA1: "s1"})
-	queued := lib.database.Task.Query().Where(task.TypeEQ("scan")).OnlyX(ctx)
-
-	if err := scan.ProcessScanPage(ctx, lib.database, queued.ID, scanID, "/Movies/Dir1", []scan.Video{v1}, &payload, nil, lib.tasks); err != nil {
+	if err := indexScanPage(ctx, lib, queued.ID, "old", "/Movies", []scan.Video{fixtureVideo("101", "ABP-001.mp4")}, &payload); err != nil {
 		t.Fatal(err)
 	}
-
-	cp, err := json.Marshal([]scan.Directory{{ID: "dir-2", Path: "/Movies/Dir2"}})
-	if err != nil {
+	root := t.TempDir()
+	dir := scrape.EmbyMovieDir(root, "ABP-001")
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	payload.Checkpoint = string(cp)
-	if err := scan.SaveScanProgress(ctx, lib.database.Task, queued.ID, payload); err != nil {
+	exported := filepath.Join(dir, "ABP-001.strm")
+	if err := os.WriteFile(exported, []byte("saved-media"), 0644); err != nil {
 		t.Fatal(err)
 	}
-
-	taskRecord := lib.database.Task.GetX(ctx, queued.ID)
-	if err := lib.Scan(ctx, tasks.Job{ID: taskRecord.ID, Payload: taskRecord.Payload}); err != nil {
-		t.Fatal(err)
+	// A missing task causes SaveScanProgress to fail after reconciliation work.
+	err := scan.ReconcileScan(ctx, lib.database, -1, "new", &payload, nil, nil, nil, root)
+	if err == nil {
+		t.Fatal("expected rollback")
 	}
-
-	file1, err := lib.database.File.Query().Where(file.FileIDEQ("v1")).Only(ctx)
-	if err != nil {
-		t.Fatalf("file v1 from dir-1 was incorrectly deleted during resume reconciliation: %v", err)
+	if count := lib.database.Movie.Query().CountX(ctx); count != 1 {
+		t.Fatalf("database did not roll back: %d", count)
 	}
-	if file1.ScanID != scanID {
-		t.Fatalf("expected file1 scanID %s, got %s", scanID, file1.ScanID)
-	}
-	file2, err := lib.database.File.Query().Where(file.FileIDEQ("v2")).Only(ctx)
-	if err != nil {
-		t.Fatalf("file v2 from dir-2 was not indexed: %v", err)
-	}
-	if file2.ScanID != scanID {
-		t.Fatalf("expected file2 scanID %s, got %s", scanID, file2.ScanID)
-	}
-
-	if !lib.database.Movie.Query().Where(movie.CodeEQ("ABP-001")).ExistX(ctx) {
-		t.Fatal("ABP-001 movie was incorrectly deleted during resume reconciliation")
-	}
-	if !lib.database.Movie.Query().Where(movie.CodeEQ("ABP-002")).ExistX(ctx) {
-		t.Fatal("ABP-002 movie was not indexed")
-	}
-
-	resumedTask := lib.database.Task.GetX(ctx, queued.ID)
-	resumedPayload, err := tasks.DecodePayload[scan.Payload](resumedTask.Payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resumedPayload.Scan.Stage != "done" {
-		t.Fatalf("expected stage 'done', got %q", resumedPayload.Scan.Stage)
-	}
-	if resumedPayload.Checkpoint != "" {
-		t.Fatalf("expected empty checkpoint, got %q", resumedPayload.Checkpoint)
-	}
-	if resumedPayload.Scan.Movies != 2 {
-		t.Fatalf("expected 2 movies in scan progress, got %d", resumedPayload.Scan.Movies)
+	if _, err := os.Stat(exported); err != nil {
+		t.Fatalf("export deleted despite database rollback: %v", err)
 	}
 }

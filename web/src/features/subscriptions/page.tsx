@@ -33,10 +33,11 @@ export function SubscriptionsPage() {
   const [view, setView] = useState<SubscriptionsView>('movies')
   const [selectedActorID, setSelectedActorID] = useState<number | null>(null)
   const [page, setPage] = useState(1)
+  const [actorPage, setActorPage] = useState(1)
 
   const targets = useSubscriptionTargets()
   const movies = useSubscriptions('movie', page, SUBSCRIPTION_PAGE_SIZE, view === 'movies')
-  const actors = useSubscriptions('actor', 1, 100, view === 'actors')
+  const actors = useSubscriptions('actor', actorPage, SUBSCRIPTION_PAGE_SIZE, view === 'actors')
   const feed = useActorFeed(selectedActorID, page, SUBSCRIPTION_PAGE_SIZE, view === 'actors')
   const batch = useBatchEnqueueSubscriptions()
 
@@ -188,6 +189,11 @@ export function SubscriptionsPage() {
         {view === 'actors' ? (
           <ActorSubscriptions
             actors={actors}
+            page={actorPage}
+            onPageChange={next => {
+              setActorPage(next)
+              handleSelectActor(null)
+            }}
             selectedID={selectedActorID}
             onSelectID={handleSelectActor}
             allSpawned={allSpawnedTargets}

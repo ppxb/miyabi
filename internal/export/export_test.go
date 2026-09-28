@@ -4,7 +4,10 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/nfo"
 )
@@ -119,15 +122,6 @@ func TestExportManager(t *testing.T) {
 	if cfg2.EmbyDir != "/tmp/emby2" || cfg2.PublicURL != "http://example2.com:8080" || cfg2.STRMToken != "secret2" {
 		t.Fatalf("unexpected updated config: %+v", cfg2)
 	}
-
-	mgr.Update(func(old Config) Config {
-		old.PublicURL = "http://updated.com:8080"
-		return old
-	})
-	cfg3 := mgr.Config()
-	if cfg3.PublicURL != "http://updated.com:8080" || cfg3.STRMToken != "secret2" {
-		t.Fatalf("unexpected atomic update: %+v", cfg3)
-	}
 }
 
 func TestEmbyMovieDir(t *testing.T) {
@@ -168,3 +162,53 @@ func TestEmbyMovieDir(t *testing.T) {
 	}
 }
 
+func TestEmbyMovieDirStaysWithinRoot(t *testing.T) {
+	root := t.TempDir()
+	for _, code := range []string{"../../ABC-001", `..\..\ABC-001`, "A/B-001", ".", "..", "..-001"} {
+		got := EmbyMovieDir(root, code)
+		rel, err := filepath.Rel(root, got)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.Dir(filepath.Dir(got)) != root {
+			t.Errorf("unsafe export path for %q: %s (%v)", code, got, err)
+		}
+	}
+}
+
+func TestManagerSerializesExportsAndRewrites(t *testing.T) {
+	root := t.TempDir()
+	mgr := NewManager(Config{EmbyDir: root, PublicURL: "http://old.example", STRMToken: "old"})
+	path := filepath.Join(root, "movie.strm")
+	started, release := make(chan struct{}), make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		err := mgr.WithConfig(func(cfg Config) error {
+			close(started)
+			<-release
+			return os.WriteFile(path, STRMContent(cfg.PublicURL, "101", cfg.STRMToken), 0644)
+		})
+		if err != nil {
+			t.Error(err)
+		}
+	})
+	<-started
+	updating, updated := make(chan struct{}), make(chan struct{})
+	wg.Go(func() {
+		close(updating)
+		mgr.Set(Config{EmbyDir: root, PublicURL: "http://new.example", STRMToken: "new"})
+		close(updated)
+		if _, err := mgr.RewriteSTRM(context.Background()); err != nil {
+			t.Error(err)
+		}
+	})
+	<-updating
+	select {
+	case <-updated:
+		t.Error("configuration changed during export")
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(release)
+	wg.Wait()
+	data, err := os.ReadFile(path)
+	if err != nil || string(data) != string(STRMContent("http://new.example", "101", "new")) {
+		t.Fatalf("stale export survived rewrite: %s (%v)", data, err)
+	}
+}

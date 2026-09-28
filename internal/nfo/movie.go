@@ -65,6 +65,12 @@ type Thumb struct {
 // FileStem encodes a catalogue number as one filename component. Metadata keeps
 // the full number; characters such as slashes must not become directory paths.
 func FileStem(code string) string {
+	switch code {
+	case ".":
+		return "%2E"
+	case "..":
+		return "%2E%2E"
+	}
 	return url.QueryEscape(code)
 }
 

@@ -15,8 +15,8 @@ type Config struct {
 
 // Manager coordinates atomic access to the export configuration and serializes STRM rewrites.
 type Manager struct {
-	cfg       atomic.Pointer[Config]
-	rewriteMu sync.Mutex
+	cfg     atomic.Pointer[Config]
+	writeMu sync.Mutex
 }
 
 // NewManager creates an export Manager initialized with the given Config.
@@ -42,32 +42,32 @@ func (m *Manager) Set(cfg Config) {
 	if m == nil {
 		return
 	}
+	m.writeMu.Lock()
+	defer m.writeMu.Unlock()
 	m.cfg.Store(&cfg)
 }
 
-// Update atomically mutates the configuration using a transform function.
-func (m *Manager) Update(fn func(old Config) Config) Config {
+// WithConfig serializes filesystem work with configuration changes and rewrites.
+// The callback must not call Set or WithConfig on this manager.
+func (m *Manager) WithConfig(fn func(Config) error) error {
 	if m == nil {
-		return Config{}
+		return fn(Config{})
 	}
-	for {
-		old := m.cfg.Load()
-		var oldVal Config
-		if old != nil {
-			oldVal = *old
-		}
-		newVal := fn(oldVal)
-		if m.cfg.CompareAndSwap(old, &newVal) {
-			return newVal
-		}
-	}
+	m.writeMu.Lock()
+	defer m.writeMu.Unlock()
+	return fn(m.Config())
 }
 
-// RewriteSTRM executes a serialized STRM rewrite using the current or specified configuration.
-func (m *Manager) RewriteSTRM(ctx context.Context, embyDir, publicURL, strmToken string) (int, error) {
-	if m != nil {
-		m.rewriteMu.Lock()
-		defer m.rewriteMu.Unlock()
-	}
-	return RewriteSTRM(ctx, embyDir, publicURL, strmToken)
+// RewriteSTRM rewrites with the latest configuration while excluding exports.
+func (m *Manager) RewriteSTRM(ctx context.Context) (int, error) {
+	var count int
+	err := m.WithConfig(func(cfg Config) error {
+		if cfg.EmbyDir == "" || cfg.PublicURL == "" {
+			return nil
+		}
+		var err error
+		count, err = RewriteSTRM(ctx, cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken)
+		return err
+	})
+	return count, err
 }

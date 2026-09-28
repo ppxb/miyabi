@@ -69,7 +69,7 @@ func (client *Client) PlayURL(ctx context.Context, accessToken, pickCode, userAg
 	}
 	ua := strings.TrimSpace(userAgent)
 	if ua == "" {
-		ua = MediaUserAgent
+		ua = "__EMPTY__"
 	}
 	result, err := apiRequest[playURLWire](
 		client,
@@ -96,9 +96,9 @@ func (client *Client) PlayURL(ctx context.Context, accessToken, pickCode, userAg
 // OpenMedia streams CDN responses without the API rate limiter or OAuth headers.
 // The caller owns the body, including for unsuccessful HTTP responses.
 func (client *Client) OpenMedia(ctx context.Context, method, address string, headers http.Header) (*http.Response, error) {
-	ua := headers.Get("User-Agent")
+	ua := strings.TrimSpace(headers.Get("User-Agent"))
 	if ua == "" {
-		ua = MediaUserAgent
+		ua = "__EMPTY__"
 	}
 	request := client.media.R().SetContext(ctx).SetDoNotParseResponse(true).
 		SetHeader("User-Agent", ua).SetHeader("Accept-Encoding", "identity")

@@ -37,9 +37,6 @@ func (relay *Relay) StreamURL(ctx context.Context, fileID, userAgent string) (st
 		return "", drive.ErrMediaDirectoryRequired
 	}
 	ua := strings.TrimSpace(userAgent)
-	if ua == "" {
-		ua = pan.MediaUserAgent
-	}
 	sess, err := relay.drive.Open(ctx)
 	if err != nil {
 		return "", err
@@ -87,14 +84,7 @@ func (relay *Relay) Probe(ctx context.Context, address string, headers http.Head
 	if relay.drive == nil {
 		return nil, drive.ErrMediaDirectoryRequired
 	}
-	h := headers.Clone()
-	if h == nil {
-		h = make(http.Header)
-	}
-	if strings.TrimSpace(h.Get("User-Agent")) == "" {
-		h.Set("User-Agent", pan.MediaUserAgent)
-	}
-	return relay.drive.OpenMedia(ctx, http.MethodHead, address, h)
+	return relay.drive.OpenMedia(ctx, http.MethodHead, address, headers)
 }
 
 // pickCode prefers the indexed pick code and asks 115 only for videos indexed

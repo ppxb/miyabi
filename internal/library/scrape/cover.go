@@ -12,6 +12,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/nfo"
 	"github.com/ppxb/miyabi/internal/pan"
@@ -157,7 +158,6 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 		}
 	}
 	videos = uniqueVideos
-	SortFiles(videos)
 	snapshot.Videos = VideoFingerprint(videos)
 
 	stem := nfo.FileStem(input.Code)
@@ -275,14 +275,15 @@ func (service *Service) exportLocalMedia(ctx context.Context, input CoverPayload
 		}
 	}
 
-	expCfg := service.exportConfig()
-	if err := ExportEmbyMedia(expCfg.EmbyDir, expCfg.PublicURL, expCfg.STRMToken, input.Code, doc, videos, poster, fanart); err != nil {
-		return err
-	}
-	if service.mediaNotifier != nil && expCfg.EmbyDir != "" {
-		service.mediaNotifier.NotifyUpdated(EmbyMovieDir(expCfg.EmbyDir, input.Code))
-	}
-	return nil
+	return service.exportMgr.WithConfig(func(expCfg export.Config) error {
+		if err := ExportEmbyMedia(expCfg.EmbyDir, expCfg.PublicURL, expCfg.STRMToken, input.Code, doc, videos, poster, fanart); err != nil {
+			return err
+		}
+		if service.mediaNotifier != nil && expCfg.EmbyDir != "" {
+			service.mediaNotifier.NotifyUpdated(EmbyMovieDir(expCfg.EmbyDir, input.Code))
+		}
+		return nil
+	})
 }
 
 // VerifyCoverOrigin validates that existing sidecars have not changed concurrently.
@@ -312,4 +313,3 @@ func VerifyCoverOrigin(input CoverPayload, directoryID string, current nfo.Movie
 	}
 	return nil
 }
-

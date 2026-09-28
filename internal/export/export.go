@@ -41,7 +41,7 @@ func EmbyMovieDir(embyDir, code string) string {
 	if embyDir == "" {
 		embyDir = defaultEmbyDir
 	}
-	return filepath.Join(embyDir, codeid.Prefix(code), nfo.FileStem(code))
+	return filepath.Join(embyDir, nfo.FileStem(codeid.Prefix(code)), nfo.FileStem(code))
 }
 
 // STRMContent is the body of a .strm file: the relay URL that resolves the
@@ -73,7 +73,10 @@ func RewriteSTRM(ctx context.Context, embyDir, publicURL, strmToken string) (int
 	rewritten := 0
 	err := filepath.WalkDir(embyDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
 		}
 		if ctx != nil && ctx.Err() != nil {
 			return ctx.Err()
@@ -83,7 +86,7 @@ func RewriteSTRM(ctx context.Context, embyDir, publicURL, strmToken string) (int
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return nil
+			return fmt.Errorf("read STRM %s: %w", path, err)
 		}
 		fileID := ParseSTRMFileID(string(data))
 		if fileID == "" {
@@ -91,9 +94,10 @@ func RewriteSTRM(ctx context.Context, embyDir, publicURL, strmToken string) (int
 		}
 		newContent := STRMContent(publicURL, fileID, strmToken)
 		if !bytes.Equal(bytes.TrimSpace(data), bytes.TrimSpace(newContent)) {
-			if err := os.WriteFile(path, newContent, 0o644); err == nil {
-				rewritten++
+			if err := os.WriteFile(path, newContent, 0o644); err != nil {
+				return fmt.Errorf("rewrite STRM %s: %w", path, err)
 			}
+			rewritten++
 		}
 		return nil
 	})
