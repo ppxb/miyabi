@@ -58,7 +58,7 @@
 - [x] **31.** ✔ `web/src/features/tasks/task-events.tsx:127-135` SSE 遇 401 后变为 CLOSED，每 3 秒无限重连且不会触发未授权处理。
 - [x] **32.** ✔ `web/src/features/settings/pan-login-dialog.tsx:92,102-107` `refreshed` ref 整个会话只置位一次，第二张二维码过期不再自动刷新，但 :117 文案仍显示"正在刷新" → 按 `session.id` 重置。
 - [x] **33.** ✔ `web/src/features/settings/data-section.tsx:93` 按钮文案"清理所有缓存"，实际（:109 标题、:39 toast）只清理未使用的图片缓存 → 改为"清理未使用缓存"。
-- [ ] **34.** `web/src/api/browse-history-store.ts:158-175` visibilitychange 触发 `flush()` 未返回时 pagehide 又用 beacon 发同一批 → 重复 POST；beacon 发送后不清 pending，下次启动再发一次。
+- [x] **34.** ✔ `web/src/api/browse-history-store.ts:158-175` visibilitychange 触发 `flush()` 未返回时 pagehide 又用 beacon 发同一批 → 重复 POST；beacon 发送后不清 pending，下次启动再发一次。
 - [ ] **35.** `internal/javbus/parser.go:19,203-214` 正则允许 `PB`，switch 中无 PB 分支，倍率落到 1。
 - [ ] **36.** `internal/emby/service.go:443-475` `translatePath` 中 `strings.HasPrefix(rel, "..")` 会把 `..foo` 目录误判为越界；方法未使用 receiver。
 - [x] **241.** ✔ `internal/library/scan/reconcile.go:58-71`、`persist.go:197-210`：用户在 115 删除影片后重新扫描，仅删除了 SQLite 的 `File` 与无引用 `Movie` 记录，未清理 `EmbyDir` 本地对应的影片目录（`.strm`、`.nfo`、海报等），且未向 Emby 发送删除/变更通知，导致 Emby 媒体库残留死链幽灵影片。

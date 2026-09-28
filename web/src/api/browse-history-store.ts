@@ -141,6 +141,7 @@ export class BrowseHistoryStore {
 
   async flush(): Promise<void> {
     if (this.isFlushing || this.pendingList.length === 0 || !this.syncViewed) return
+    this.clearFlushTimer()
     this.isFlushing = true
     const toSync = [...this.pendingList]
     try {
@@ -155,19 +156,29 @@ export class BrowseHistoryStore {
     }
   }
 
-  private flushKeepalive(): void {
-    if (this.pendingList.length === 0 || typeof window === 'undefined') return
+  flushKeepalive(): void {
+    if (this.isFlushing || this.pendingList.length === 0 || typeof window === 'undefined') return
+    this.clearFlushTimer()
     try {
-      const body = JSON.stringify({ ids: [...this.pendingList] })
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(VIEWED_MOVIES_PATH, new Blob([body], { type: 'application/json' }))
-      } else {
+      const ids = [...this.pendingList]
+      const body = JSON.stringify({ ids })
+      let sent = false
+      if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+        sent = navigator.sendBeacon(VIEWED_MOVIES_PATH, new Blob([body], { type: 'application/json' }))
+      }
+      if (!sent) {
         void fetch(VIEWED_MOVIES_PATH, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body,
           keepalive: true
         })
+        sent = true
+      }
+      if (sent) {
+        const synced = new Set(ids)
+        this.pendingList = this.pendingList.filter(item => !synced.has(item))
+        this.persist()
       }
     } catch {
       // Ignore beacon failures during teardown
