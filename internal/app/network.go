@@ -25,6 +25,7 @@ const (
 type NetworkService struct {
 	database *ent.Client
 	proxy    *netx.ProxyManager
+	mu       sync.Mutex
 }
 
 func NewNetworkService(ctx context.Context, db *ent.Client) (*NetworkService, error) {
@@ -49,14 +50,17 @@ func (service *NetworkService) Network(context.Context) (netx.ProxyConfig, error
 
 // UpdateNetwork validates, persists and broadcasts the configuration.
 func (service *NetworkService) UpdateNetwork(ctx context.Context, config netx.ProxyConfig) error {
-	normalized, _, err := netx.Normalize(config)
+	normalized, parsed, err := netx.Normalize(config)
 	if err != nil {
 		return err
 	}
+	service.mu.Lock()
+	defer service.mu.Unlock()
 	if err := database.SaveSetting(ctx, service.database, networkProxySetting, normalized); err != nil {
 		return err
 	}
-	return service.proxy.Update(normalized)
+	service.proxy.Apply(normalized, parsed)
+	return nil
 }
 
 // TestNetwork probes JavDB and JavBus concurrently through the candidate configuration without persisting it.

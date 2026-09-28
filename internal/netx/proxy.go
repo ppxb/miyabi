@@ -78,6 +78,21 @@ func (state *proxyState) resolve() *url.URL {
 	return &proxy
 }
 
+// Apply sets the pre-normalized proxy state and broadcasts to subscribers
+// if the effective proxy address or enabled state changed.
+func (m *ProxyManager) Apply(normalized ProxyConfig, parsed *url.URL) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	previous := m.current.Load()
+	sameURL := (previous.proxy == nil && parsed == nil) ||
+		(previous.proxy != nil && parsed != nil && previous.proxy.String() == parsed.String())
+	sameConfig := previous.config == normalized
+	m.current.Store(&proxyState{config: normalized, proxy: parsed})
+	if !sameConfig || !sameURL {
+		m.broadcastLocked()
+	}
+}
+
 // Update validates the new configuration and broadcasts to all subscribers
 // if the effective proxy address or enabled state changed.
 func (m *ProxyManager) Update(config ProxyConfig) error {
@@ -85,14 +100,7 @@ func (m *ProxyManager) Update(config ProxyConfig) error {
 	if err != nil {
 		return err
 	}
-	previous := m.current.Load()
-	sameURL := (previous.proxy == nil && parsed == nil) ||
-		(previous.proxy != nil && parsed != nil && previous.proxy.String() == parsed.String())
-	sameConfig := previous.config == normalized
-	m.current.Store(&proxyState{config: normalized, proxy: parsed})
-	if !sameConfig || !sameURL {
-		m.broadcast()
-	}
+	m.Apply(normalized, parsed)
 	return nil
 }
 
@@ -116,9 +124,7 @@ func (m *ProxyManager) Unsubscribe(ch <-chan struct{}) {
 	}
 }
 
-func (m *ProxyManager) broadcast() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (m *ProxyManager) broadcastLocked() {
 	for ch := range m.subs {
 		select {
 		case ch <- struct{}{}:
