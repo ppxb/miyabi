@@ -16,7 +16,7 @@ var (
 	ucPattern  = regexp.MustCompile(`var\s+uc\s*=\s*(\d+);`)
 	imgPattern = regexp.MustCompile(`var\s+img\s*=\s*['"]([^'"]+)['"];`)
 	hashRegex  = regexp.MustCompile(`(?i)xt=urn:btih:([a-f0-9]{40})`)
-	sizeRegex  = regexp.MustCompile(`(?i)^([0-9]+(?:\.[0-9]+)?)\s*([kmgtp]?b)$`)
+	sizeRegex  = regexp.MustCompile(`(?i)^([0-9]+(?:\.[0-9]+)?)\s*([kmgt]?b)$`)
 	dateRegex  = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 )
 
