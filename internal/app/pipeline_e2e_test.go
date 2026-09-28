@@ -432,11 +432,11 @@ func TestPipelineScansScrapesAndWritesSidecarsEndToEnd(t *testing.T) {
 	}
 
 	// The scan workflow reports the metadata chain as complete.
-	infos, err := fixture.tasks.List(ctx)
+	infos, err := fixture.library.ListTasks(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(infos) != 1 || infos[0].Status != task.StatusDone || infos[0].Scan.MetadataTotal != 1 || infos[0].Scan.MetadataCompleted != 1 || infos[0].Scan.Movies != 1 {
+	if len(infos) != 1 || infos[0].Status != string(task.StatusDone) || infos[0].Scan.MetadataTotal != 1 || infos[0].Scan.MetadataCompleted != 1 || infos[0].Scan.Movies != 1 {
 		t.Fatalf("scan workflow = %+v", infos)
 	}
 	states, err := fixture.discover.MovieStates(ctx, []catalogue.MovieIdentity{{ID: "movie-exact", Code: "ABP-123"}})
@@ -532,8 +532,8 @@ func TestPipelineMarksMovieFailedWhenCatalogueLacksIt(t *testing.T) {
 	if covers := fixture.tasksOfType(t, "cover"); len(covers) != 0 {
 		t.Fatalf("failed scrape queued artwork: %v", covers)
 	}
-	infos, err := fixture.tasks.List(ctx)
-	if err != nil || len(infos) != 1 || infos[0].Status != task.StatusFailed || infos[0].Error == nil {
+	infos, err := fixture.library.ListTasks(ctx)
+	if err != nil || len(infos) != 1 || infos[0].Status != string(task.StatusFailed) || infos[0].Error == nil {
 		t.Fatalf("scan workflow = %+v, %v", infos, err)
 	}
 }

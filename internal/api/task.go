@@ -4,12 +4,13 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
 type TaskManager interface {
 	Revisions() tasks.TaskRevisions
-	List(context.Context) ([]tasks.TaskInfo, error)
+	List(context.Context) ([]domain.TaskInfo, error)
 	Subscribe() (<-chan struct{}, func())
 }
 

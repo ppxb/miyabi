@@ -20,7 +20,7 @@ import (
 
 type completedScanFixture struct {
 	lib     *Service
-	queued  tasks.TaskInfo
+	queued  domain.TaskInfo
 	payload scan.Payload
 	covered *ent.Task
 	input   scrape.CoverPayload
@@ -76,7 +76,7 @@ func newCompletedScanFixture(t *testing.T) *completedScanFixture {
 	if err := lib.tasks.Queue().Finish(ctx, queued.ID, nil); err != nil {
 		t.Fatal(err)
 	}
-	queued, err = lib.tasks.EnqueueScan(ctx, payload.Source)
+	queued, err = lib.EnqueueScan(ctx, payload.Source)
 	if err != nil {
 		t.Fatal(err)
 	}

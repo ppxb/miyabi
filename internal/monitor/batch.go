@@ -86,16 +86,12 @@ func (service *Service) EnqueueBatch(ctx context.Context, req BatchEnqueueReques
 	if len(ids) == 0 {
 		return 0, domain.E(domain.KindInvalid, "没有可入库的订阅", nil)
 	}
-	info, err := service.tasks.EnqueueSubscriptionBatch(ctx, ids)
-	if err != nil {
-		return 0, err
-	}
-	return info.ID, nil
+	return service.enqueueSubscriptionBatch(ctx, ids)
 }
 
 // BatchHandler runs a subscription batch task on the single-worker pool.
 func (service *Service) BatchHandler(ctx context.Context, job tasks.Job) error {
-	payload, err := tasks.DecodePayload[tasks.SubscriptionBatchPayload](job.Payload)
+	payload, err := tasks.DecodePayload[batchPayload](job.Payload)
 	if err != nil {
 		return err
 	}
@@ -130,7 +126,7 @@ func (service *Service) BatchHandler(ctx context.Context, job tasks.Job) error {
 		default:
 			payload.Batch.Waiting++
 		}
-		if err := service.tasks.SaveSubscriptionBatch(ctx, job.ID, payload); err != nil {
+		if err := service.saveSubscriptionBatch(ctx, job.ID, payload); err != nil {
 			slog.WarnContext(ctx, "batch ingestion progress not saved", "task_id", job.ID, "error", err)
 		}
 	}

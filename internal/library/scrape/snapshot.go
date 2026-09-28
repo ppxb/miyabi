@@ -160,18 +160,18 @@ func CompletedMetadataSnapshots(ctx context.Context, database *ent.Client, sourc
 		table := sql.Table(task.Table)
 		latest := sql.Select(sql.Max(table.C(task.FieldID))).From(table).Where(sql.And(
 			sql.EQ(table.C(task.FieldType), tasks.KindCover.String()), sql.EQ(table.C(task.FieldStatus), task.StatusDone),
-			sqljson.ValueIn(table.C(task.FieldPayload), ids, sqljson.Path(tasks.PathMovieID)),
-			sqljson.ValueEQ(table.C(task.FieldPayload), source.AccountID, sqljson.Path(tasks.PathSource, tasks.PathAccountID)),
-			sqljson.ValueEQ(table.C(task.FieldPayload), source.Directory.ID, sqljson.Path(tasks.PathSource, "directory", "id")),
-		)).GroupBy(tasks.JSONExtract(table.C(task.FieldPayload), tasks.PathMovieID))
+			sqljson.ValueIn(table.C(task.FieldPayload), ids, sqljson.Path("movie_id")),
+			sqljson.ValueEQ(table.C(task.FieldPayload), source.AccountID, sqljson.Path("source", "account_id")),
+			sqljson.ValueEQ(table.C(task.FieldPayload), source.Directory.ID, sqljson.Path("source", "directory", "id")),
+		)).GroupBy(tasks.JSONExtract(table.C(task.FieldPayload), "movie_id"))
 		var records []struct {
 			MovieID  int     `json:"movie_id"`
 			Snapshot *string `json:"snapshot"`
 		}
 		err := database.Task.Query().Where(func(s *sql.Selector) {
 			s.Where(sql.In(s.C(task.FieldID), latest))
-			s.Select(sql.As(tasks.JSONExtract(s.C(task.FieldPayload), tasks.PathMovieID), "movie_id"),
-				sql.As(tasks.JSONExtract(s.C(task.FieldPayload), tasks.PathSnapshot), "snapshot"))
+			s.Select(sql.As(tasks.JSONExtract(s.C(task.FieldPayload), "movie_id"), "movie_id"),
+				sql.As(tasks.JSONExtract(s.C(task.FieldPayload), "snapshot"), "snapshot"))
 		}).Select(task.FieldID).Scan(ctx, &records)
 		if err != nil {
 			return nil, fmt.Errorf("load completed metadata snapshots: %w", err)

@@ -185,7 +185,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Monitor:        monitorSvc,
 		Library:        libSvc,
 		STRM:           strm.New(store.Client, driveSvc),
-		Tasks:          taskSvc,
+		Tasks:          &taskViews{Service: taskSvc, library: libSvc, monitor: monitorSvc},
 		Artwork:        scrapeSvc,
 		Maintenance:    maintenanceSvc,
 		Network:        network,

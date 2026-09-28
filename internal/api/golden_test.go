@@ -147,13 +147,13 @@ type goldenTasks struct {
 	TaskManager
 }
 
-func (goldenTasks) List(context.Context) ([]tasks.TaskInfo, error) {
+func (goldenTasks) List(context.Context) ([]domain.TaskInfo, error) {
 	failure := "JavDB 返回的番号不一致"
-	return []tasks.TaskInfo{
-		{ID: 3, Type: "scan", Status: task.StatusRunning, Progress: 50, CreatedAt: goldenTime(), UpdatedAt: goldenTime().Add(time.Minute),
+	return []domain.TaskInfo{
+		{ID: 3, Type: "scan", Status: string(task.StatusRunning), Progress: 50, CreatedAt: goldenTime(), UpdatedAt: goldenTime().Add(time.Minute),
 			Source: goldenSource(), Scan: domain.ScanProgress{Stage: "scraping", CurrentPath: "/Movies", DirectoriesDiscovered: 2, DirectoriesScanned: 2,
 				FilesScanned: 5, VideoFiles: 2, MatchedFiles: 2, Movies: 2, MetadataTotal: 2, MetadataCompleted: 1}},
-		{ID: 2, Type: "scan", Status: task.StatusFailed, Error: &failure, CreatedAt: goldenTime(), UpdatedAt: goldenTime(),
+		{ID: 2, Type: "scan", Status: string(task.StatusFailed), Error: &failure, CreatedAt: goldenTime(), UpdatedAt: goldenTime(),
 			Source: goldenSource(), Scan: domain.ScanProgress{Stage: "done"}, OfflineTaskID: 9},
 	}, nil
 }

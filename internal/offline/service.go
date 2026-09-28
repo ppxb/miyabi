@@ -20,8 +20,9 @@ type Catalogue interface {
 	MovieCode(ctx context.Context, movieID string) (string, error)
 }
 
-// TargetedScanner schedules a scan for a specific target directory or file within an active transaction.
-type TargetedScanner interface {
+// Library schedules scans and projects their current workflow status.
+type Library interface {
+	Workflows(context.Context, []*ent.Task) ([]domain.TaskInfo, error)
 	EnqueueTargetedScan(ctx context.Context, tx *ent.Tx, source domain.LibrarySource, targetID string, offlineTaskID int, code, javdbID string) (int, error)
 }
 
@@ -44,7 +45,7 @@ type Service struct {
 	catalogue Catalogue
 	drive     *drive.Drive
 	tasks     *tasks.Service
-	library   TargetedScanner
+	library   Library
 	// submitTimeout bounds one remote submission once it has started; the
 	// caller may have gone away but the mutation must be recorded.
 	submitTimeout time.Duration
@@ -53,7 +54,7 @@ type Service struct {
 }
 
 // New creates a new offline download management service.
-func New(database *ent.Client, catalogue Catalogue, drive *drive.Drive, tasks *tasks.Service, library TargetedScanner, submitTimeout time.Duration) *Service {
+func New(database *ent.Client, catalogue Catalogue, drive *drive.Drive, tasks *tasks.Service, library Library, submitTimeout time.Duration) *Service {
 	return &Service{
 		database:  database,
 		catalogue: catalogue,

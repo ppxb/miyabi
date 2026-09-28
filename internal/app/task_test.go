@@ -1,13 +1,17 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/library/scrape"
+	"github.com/ppxb/miyabi/internal/monitor"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -47,11 +51,12 @@ func TestTaskGroupsFoldChildCountsAndLatestState(t *testing.T) {
 		}
 		activeID = record.ID
 	}
-	info, err := fix.Tasks.Info(ctx, parent.ID)
+	infos, err := fix.Service.Workflows(ctx, []*ent.Task{fix.DB.Task.GetX(ctx, parent.ID)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Status != task.StatusRunning || info.Scan.Stage != "artwork" || info.Scan.MetadataTotal != 3 || info.Scan.MetadataCompleted != 2 || info.Progress != 66 || info.Error == nil {
+	info := infos[0]
+	if info.Status != string(task.StatusRunning) || info.Scan.Stage != "artwork" || info.Scan.MetadataTotal != 3 || info.Scan.MetadataCompleted != 2 || info.Progress != 66 || info.Error == nil {
 		t.Fatalf("workflow: %+v", info)
 	}
 	if !info.UpdatedAt.Equal(latest.Add(4 * time.Second)) {
@@ -60,8 +65,12 @@ func TestTaskGroupsFoldChildCountsAndLatestState(t *testing.T) {
 	if err := fix.Tasks.Queue().Finish(ctx, activeID, errors.New("fixture cover failure")); err != nil {
 		t.Fatal(err)
 	}
-	info, err = fix.Tasks.Info(ctx, parent.ID)
-	if err != nil || info.Status != task.StatusFailed || info.Scan.MetadataCompleted != 3 || info.Progress != 100 {
+	infos, err = fix.Service.Workflows(ctx, []*ent.Task{fix.DB.Task.GetX(ctx, parent.ID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	info = infos[0]
+	if err != nil || info.Status != string(task.StatusFailed) || info.Scan.MetadataCompleted != 3 || info.Progress != 100 {
 		t.Fatalf("finished workflow: %+v err=%v", info, err)
 	}
 }
@@ -90,8 +99,46 @@ func TestTaskListRetainsOlderActiveWorkflows(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	items, err := fix.Tasks.List(ctx)
-	if err != nil || len(items) != 21 || items[0].ID != parent.ID || items[0].Status != task.StatusQueued {
+	views := &taskViews{Service: fix.Tasks, library: fix.Service, monitor: monitor.New(fix.DB, nil, nil, fix.Tasks)}
+	items, err := views.List(ctx)
+	if err != nil || len(items) != 21 || items[0].ID != parent.ID || items[0].Status != string(task.StatusQueued) {
 		t.Fatalf("active workflows: %+v err=%v", items, err)
+	}
+}
+
+func TestTaskViewsMergeScanAndBatchActivity(t *testing.T) {
+	fix := libraryFixture(t)
+	ctx := t.Context()
+	batchPayload := json.RawMessage(`{"ids":[1,2],"batch":{"total":2,"processed":1,"waiting":1}}`)
+	oldBatch := fix.DB.Task.Create().SetType("subscription_batch").SetStatus(task.StatusRunning).SetProgress(50).SetPayload(batchPayload).SaveX(ctx)
+	var completed []int
+	for range 7 {
+		row := fix.DB.Task.Create().SetType("subscription_batch").SetStatus(task.StatusDone).SetProgress(100).SetPayload(batchPayload).SaveX(ctx)
+		completed = append(completed, row.ID)
+	}
+	queuedBatch := fix.DB.Task.Create().SetType("subscription_batch").SetPayload(batchPayload).SaveX(ctx)
+	scanPayload, err := tasks.EncodePayload(fix.Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runningScan := fix.DB.Task.Create().SetType("scan").SetStatus(task.StatusRunning).SetPayload(scanPayload).SaveX(ctx)
+	views := &taskViews{Service: fix.Tasks, library: fix.Service, monitor: monitor.New(fix.DB, nil, nil, fix.Tasks)}
+	items, err := views.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []int{runningScan.ID, oldBatch.ID, queuedBatch.ID, fix.Queued.ID, completed[6], completed[5], completed[4], completed[3]}
+	var ids []int
+	for _, item := range items {
+		ids = append(ids, item.ID)
+	}
+	if !slices.Equal(ids, want) {
+		t.Fatalf("merged task order=%v want=%v", ids, want)
+	}
+	if batch := items[1]; batch.Batch == nil || batch.Batch.Total != 2 || batch.Batch.Processed != 1 || batch.Progress != 50 {
+		t.Fatalf("batch progress lost: %+v", batch)
+	}
+	if items[0].Source != fix.Payload.Source || items[0].Batch != nil {
+		t.Fatalf("scan identity changed: %+v", items[0])
 	}
 }

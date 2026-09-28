@@ -348,7 +348,7 @@ func TestScanPageRollsBackFilesWhenProgressCannotBeSaved(t *testing.T) {
 func TestTaskRecoveryLeavesOfflineJobsAloneAndAllowsFailedScanRetry(t *testing.T) {
 	lib, queued, payload := libraryFixture(t)
 	ctx := t.Context()
-	duplicate, err := lib.tasks.EnqueueScan(ctx, payload.Source)
+	duplicate, err := lib.EnqueueScan(ctx, payload.Source)
 	if err != nil || duplicate.ID != queued.ID {
 		t.Fatalf("duplicate scan = %#v, error = %v", duplicate, err)
 	}
@@ -374,8 +374,8 @@ func TestTaskRecoveryLeavesOfflineJobsAloneAndAllowsFailedScanRetry(t *testing.T
 	if err := lib.tasks.Queue().Finish(ctx, queued.ID, errors.New("fixture failure")); err != nil {
 		t.Fatal(err)
 	}
-	retry, err := lib.tasks.EnqueueScan(ctx, payload.Source)
-	if err != nil || retry.ID == queued.ID || retry.Status != task.StatusQueued {
+	retry, err := lib.EnqueueScan(ctx, payload.Source)
+	if err != nil || retry.ID == queued.ID || retry.Status != string(task.StatusQueued) {
 		t.Fatalf("retry = %#v, error = %v", retry, err)
 	}
 }
@@ -508,4 +508,3 @@ func TestScanReconcile_CleansUpEmbyDirectoryAndNotifiesEmbyOnMovieDeletion(t *te
 		t.Fatalf("expected ABP-001 to be removed from DB: exists=%t, err=%v", exists, err)
 	}
 }
-

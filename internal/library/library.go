@@ -80,7 +80,7 @@ func New(database *ent.Client, d *drive.Drive, tasks *tasks.Service, images *med
 	if d != nil && tasks != nil {
 		d.SubscribeMount(func(ctx context.Context, event drive.MountEvent) error {
 			if event.Source.Directory.ID != "" {
-				if _, err := tasks.EnqueueFreshScan(ctx, event.Source); err != nil {
+				if _, err := svc.EnqueueFreshScan(ctx, event.Source); err != nil {
 					return err
 				}
 			}
@@ -91,12 +91,12 @@ func New(database *ent.Client, d *drive.Drive, tasks *tasks.Service, images *med
 	return svc
 }
 
-func (s *Service) StartScan(ctx context.Context) (tasks.TaskInfo, error) {
+func (s *Service) StartScan(ctx context.Context) (domain.TaskInfo, error) {
 	sess, err := s.drive.Open(ctx)
 	if err != nil {
-		return tasks.TaskInfo{}, err
+		return domain.TaskInfo{}, err
 	}
-	return s.tasks.EnqueueScan(ctx, sess.Source())
+	return s.EnqueueScan(ctx, sess.Source())
 }
 
 // Source returns the currently mounted library source, or nil if unmounted.

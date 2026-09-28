@@ -38,12 +38,12 @@ func (service *Service) Sync(ctx context.Context) error {
 		task.StatusIn(task.StatusQueued, task.StatusRunning),
 		task.And(task.StatusEQ(task.StatusDone), func(s *sql.Selector) {
 			s.Where(sql.And(
-				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path(tasks.PathAccountID)),
-				sqljson.ValueEQ(task.FieldPayload, source.Directory.ID, sqljson.Path(tasks.PathDirectoryID)),
-				sql.Not(sqljson.HasKey(task.FieldPayload, sqljson.Path(tasks.PathScanTaskID))),
+				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("account_id")),
+				sqljson.ValueEQ(task.FieldPayload, source.Directory.ID, sqljson.Path("directory_id")),
+				sql.Not(sqljson.HasKey(task.FieldPayload, sqljson.Path("scan_task_id"))),
 				sql.Or(
-					sqljson.HasKey(task.FieldPayload, sqljson.Path(tasks.PathFileID)),
-					sqljson.ValueEQ(task.FieldPayload, true, sqljson.Path(tasks.PathAwaitingLocation)),
+					sqljson.HasKey(task.FieldPayload, sqljson.Path("file_id")),
+					sqljson.ValueEQ(task.FieldPayload, true, sqljson.Path("awaiting_location")),
 				),
 			))
 		}),

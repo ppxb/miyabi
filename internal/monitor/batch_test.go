@@ -61,7 +61,7 @@ func TestBatchEnqueueTask(t *testing.T) {
 		t.Fatalf("BatchHandler: %v", err)
 	}
 	row = f.client.Task.GetX(ctx, taskID)
-	payload, err := tasks.DecodePayload[tasks.SubscriptionBatchPayload](row.Payload)
+	payload, err := tasks.DecodePayload[batchPayload](row.Payload)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,11 +76,11 @@ func TestBatchEnqueueTask(t *testing.T) {
 		t.Fatalf("item2 must keep waiting with auto-download on, got %s %v", sub.Status, sub.AutoDownload)
 	}
 
-	infos, err := f.tasks.List(ctx)
+	infos, err := f.service.ListTasks(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var listed *tasks.TaskInfo
+	var listed *domain.TaskInfo
 	for i := range infos {
 		if infos[i].ID == taskID {
 			listed = &infos[i]
@@ -110,7 +110,7 @@ func TestBatchHandlerResume(t *testing.T) {
 		t.Fatalf("EnqueueBatch: %v", err)
 	}
 
-	payload := tasks.SubscriptionBatchPayload{
+	payload := batchPayload{
 		IDs: []int{item1.ID, item2.ID},
 		Batch: domain.SubscriptionBatch{
 			Total:     2,
@@ -131,7 +131,7 @@ func TestBatchHandlerResume(t *testing.T) {
 	}
 
 	row := f.client.Task.GetX(ctx, taskID)
-	savedPayload, err := tasks.DecodePayload[tasks.SubscriptionBatchPayload](row.Payload)
+	savedPayload, err := tasks.DecodePayload[batchPayload](row.Payload)
 	if err != nil {
 		t.Fatal(err)
 	}

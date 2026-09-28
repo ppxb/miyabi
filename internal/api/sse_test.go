@@ -42,10 +42,10 @@ func (stub *sseTaskStub) Subscribe() (<-chan struct{}, func()) {
 	}
 }
 
-func (stub *sseTaskStub) List(context.Context) ([]tasks.TaskInfo, error) {
+func (stub *sseTaskStub) List(context.Context) ([]domain.TaskInfo, error) {
 	stub.mu.Lock()
 	defer stub.mu.Unlock()
-	return []tasks.TaskInfo{{ID: 1, Type: "scan", Status: task.StatusRunning, Progress: stub.progress,
+	return []domain.TaskInfo{{ID: 1, Type: "scan", Status: string(task.StatusRunning), Progress: stub.progress,
 		Scan: domain.ScanProgress{Stage: "scanning"}}}, nil
 }
 
@@ -124,7 +124,7 @@ func TestTaskEventsStreamsSnapshotsAndRevisionsUntilTheClientLeaves(t *testing.T
 		if event.name != "tasks" {
 			t.Fatalf("event = %+v, want tasks", event)
 		}
-		var infos []tasks.TaskInfo
+		var infos []domain.TaskInfo
 		if err := json.Unmarshal([]byte(event.data), &infos); err != nil || len(infos) != 1 || infos[0].Progress != progress {
 			t.Fatalf("tasks payload = %s (%v), want progress %d", event.data, err, progress)
 		}
@@ -176,7 +176,7 @@ func (stub *sseFailingTasks) Subscribe() (<-chan struct{}, func()) {
 	return make(chan struct{}), func() { stub.unsubscribed = true }
 }
 
-func (*sseFailingTasks) List(context.Context) ([]tasks.TaskInfo, error) {
+func (*sseFailingTasks) List(context.Context) ([]domain.TaskInfo, error) {
 	return nil, errors.New("database locked")
 }
 

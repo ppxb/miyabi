@@ -8,13 +8,12 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	lib "github.com/ppxb/miyabi/internal/library"
 	"github.com/ppxb/miyabi/internal/library/scan"
-	"github.com/ppxb/miyabi/internal/tasks"
 )
 
 type LibraryManager interface {
 	ViewedManager
 	Movies(context.Context, int, int) (lib.Page, error)
-	StartScan(context.Context) (tasks.TaskInfo, error)
+	StartScan(context.Context) (domain.TaskInfo, error)
 	ScanLocal(context.Context, string) (*scan.LocalScanResult, error)
 }
 

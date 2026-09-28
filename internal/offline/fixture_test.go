@@ -234,14 +234,15 @@ func libraryBaseFixture(t testing.TB) (*Service, *drive.Drive, *ent.Client, doma
 	source := domain.LibrarySource{AccountID: "100", Directory: domain.LibraryDirectory{ID: "10", Name: "Movies", Path: "/Movies"}}
 	driveSvc := newMountedDrive(t, store.Client, &panStub{}, source)
 	taskSvc := tasks.NewService(store.Client, tasks.NewRegistry())
-	if _, err := taskSvc.EnqueueScan(t.Context(), source); err != nil {
-		t.Fatal(err)
-	}
 	images, err := mediaimage.NewCache(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	lib := library.New(store.Client, driveSvc, taskSvc, images)
+	if _, err := lib.EnqueueScan(t.Context(), source); err != nil {
+		t.Fatal(err)
+	}
+
 	scrapeSvc := scrapePkg.New(store.Client, driveSvc, nil, images, taskSvc)
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScan, lib.Scan, lib.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScrape, scrapeSvc.Scrape, scrapeSvc.Finished))

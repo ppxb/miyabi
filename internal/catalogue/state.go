@@ -69,30 +69,30 @@ func (service *Service) MovieStates(ctx context.Context, identities []MovieIdent
 	err = service.database.Task.Query().Where(task.Or(
 		task.And(task.TypeEQ(tasks.KindOffline.String()), func(s *sql.Selector) {
 			s.Where(sql.And(
-				sqljson.ValueIn(task.FieldPayload, taskIDs, sqljson.Path(tasks.PathJavDBID)),
-				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path(tasks.PathAccountID)),
-				sqljson.ValueEQ(task.FieldPayload, source.Directory.ID, sqljson.Path(tasks.PathDirectoryID)),
+				sqljson.ValueIn(task.FieldPayload, taskIDs, sqljson.Path("javdb_id")),
+				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("account_id")),
+				sqljson.ValueEQ(task.FieldPayload, source.Directory.ID, sqljson.Path("directory_id")),
 				sql.Or(sql.In(task.FieldStatus, string(task.StatusQueued), string(task.StatusRunning)),
 					sql.And(sql.EQ(task.FieldStatus, string(task.StatusDone)),
-						sql.Not(sqljson.HasKey(task.FieldPayload, sqljson.Path(tasks.PathScanTaskID))),
+						sql.Not(sqljson.HasKey(task.FieldPayload, sqljson.Path("scan_task_id"))),
 						sql.Or(
-							sqljson.ValueNEQ(task.FieldPayload, "", sqljson.Path(tasks.PathFileID)),
-							sqljson.ValueEQ(task.FieldPayload, true, sqljson.Path(tasks.PathAwaitingLocation)),
+							sqljson.ValueNEQ(task.FieldPayload, "", sqljson.Path("file_id")),
+							sqljson.ValueEQ(task.FieldPayload, true, sqljson.Path("awaiting_location")),
 						),
 					)),
 			))
 		}),
 		task.And(task.TypeIn(tasks.KindScan.String(), tasks.KindScrape.String(), tasks.KindCover.String()), task.StatusIn(task.StatusQueued, task.StatusRunning), func(s *sql.Selector) {
 			s.Where(sql.And(
-				sqljson.ValueIn(task.FieldPayload, taskIDs, sqljson.Path(tasks.PathJavDBID)),
-				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path(tasks.PathSource, tasks.PathAccountID)),
-				sqljson.ValueEQ(task.FieldPayload, source.Directory.ID, sqljson.Path(tasks.PathSource, "directory", "id")),
+				sqljson.ValueIn(task.FieldPayload, taskIDs, sqljson.Path("javdb_id")),
+				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("source", "account_id")),
+				sqljson.ValueEQ(task.FieldPayload, source.Directory.ID, sqljson.Path("source", "directory", "id")),
 			))
 		}),
 	), func(s *sql.Selector) {
 		// Cover payloads can contain full NFO documents; only read task identity.
 		s.Select(s.C(task.FieldType), s.C(task.FieldStatus),
-			sql.As(tasks.JSONExtract(s.C(task.FieldPayload), tasks.PathJavDBID), "javdb_id"))
+			sql.As(tasks.JSONExtract(s.C(task.FieldPayload), "javdb_id"), "javdb_id"))
 	}).Select(task.FieldID).Scan(ctx, &active)
 	if err != nil {
 		return nil, fmt.Errorf("query movie workflows: %w", err)

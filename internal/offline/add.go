@@ -52,8 +52,8 @@ func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.O
 	existing, err := service.database.Task.Query().Where(task.TypeEQ(tasks.KindOffline.String()),
 		task.StatusIn(task.StatusQueued, task.StatusRunning), func(s *sql.Selector) {
 			s.Where(sql.And(
-				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path(tasks.PathAccountID)),
-				sqljson.ValueEQ(task.FieldPayload, hash, sqljson.Path(tasks.PathHash)),
+				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("account_id")),
+				sqljson.ValueEQ(task.FieldPayload, hash, sqljson.Path("hash")),
 			))
 		}).First(ctx)
 	if err == nil {
@@ -72,9 +72,9 @@ func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.O
 
 	previous, err := service.database.Task.Query().Where(task.TypeEQ(tasks.KindOffline.String()), task.StatusEQ(task.StatusDone), func(s *sql.Selector) {
 		s.Where(sql.And(
-			sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path(tasks.PathAccountID)),
-			sqljson.ValueEQ(task.FieldPayload, directory.ID, sqljson.Path(tasks.PathDirectoryID)),
-			sqljson.ValueEQ(task.FieldPayload, hash, sqljson.Path(tasks.PathHash)),
+			sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("account_id")),
+			sqljson.ValueEQ(task.FieldPayload, directory.ID, sqljson.Path("directory_id")),
+			sqljson.ValueEQ(task.FieldPayload, hash, sqljson.Path("hash")),
 		))
 	}).Order(ent.Desc(task.FieldID)).First(ctx)
 	if err == nil {

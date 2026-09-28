@@ -38,6 +38,8 @@ func TestBusinessPackagesDoNotImportEachOther(t *testing.T) {
 	for _, pkg := range append(append([]string{}, business...), shared...) {
 		banned := forbidden(pkg)
 		switch pkg {
+		case "tasks":
+			banned = append(banned, module+"domain")
 		case "database":
 			banned = append(banned, module+"tasks", module+"drive")
 		case "domain", "domain/subtitle":

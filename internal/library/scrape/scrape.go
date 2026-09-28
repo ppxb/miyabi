@@ -181,7 +181,7 @@ func (service *Service) Scrape(ctx context.Context, job tasks.Job) error {
 	input.Code = codeid.Normalize(input.Code)
 	// A committed cover job means the metadata transaction already succeeded.
 	queued, err := service.db.Task.Query().Where(task.TypeEQ(tasks.KindCover.String()), func(s *sql.Selector) {
-		s.Where(sqljson.ValueEQ(task.FieldPayload, job.ID, sqljson.Path(tasks.PathScrapeTaskID)))
+		s.Where(sqljson.ValueEQ(task.FieldPayload, job.ID, sqljson.Path("scrape_task_id")))
 	}).Exist(ctx)
 	if err != nil {
 		return fmt.Errorf("find queued artwork: %w", err)

@@ -32,8 +32,8 @@ func (service *Service) Activity(ctx context.Context) (Activity, error) {
 	}
 	records, err := latestOfflineTasks(ctx, service.database.Task.Query().Where(task.TypeEQ(tasks.KindOffline.String()), func(s *sql.Selector) {
 		s.Where(sql.And(
-			sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path(tasks.PathAccountID)),
-			sqljson.ValueEQ(task.FieldPayload, source.Directory.ID, sqljson.Path(tasks.PathDirectoryID)),
+			sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("account_id")),
+			sqljson.ValueEQ(task.FieldPayload, source.Directory.ID, sqljson.Path("directory_id")),
 		))
 	}))
 	if err != nil {
@@ -48,8 +48,8 @@ func (service *Service) Activity(ctx context.Context) (Activity, error) {
 func (service *Service) Tasks(ctx context.Context, movieID, accountID string) ([]domain.OfflineSubmission, error) {
 	records, err := latestOfflineTasks(ctx, service.database.Task.Query().Where(task.TypeEQ(tasks.KindOffline.String()), func(s *sql.Selector) {
 		s.Where(sql.And(
-			sqljson.ValueEQ(task.FieldPayload, movieID, sqljson.Path(tasks.PathJavDBID)),
-			sqljson.ValueEQ(task.FieldPayload, accountID, sqljson.Path(tasks.PathAccountID)),
+			sqljson.ValueEQ(task.FieldPayload, movieID, sqljson.Path("javdb_id")),
+			sqljson.ValueEQ(task.FieldPayload, accountID, sqljson.Path("account_id")),
 		))
 	}))
 	if err != nil {
@@ -91,13 +91,13 @@ func (service *Service) submissions(ctx context.Context, records []*ent.Task, so
 		}
 		fileIDs = append(fileIDs, input.FileIDs...)
 	}
-	scans := make(map[int]tasks.TaskInfo)
+	scans := make(map[int]domain.TaskInfo)
 	for start := 0; start < len(scanIDs); start += 500 {
 		parents, err := service.database.Task.Query().Where(task.IDIn(scanIDs[start:min(start+500, len(scanIDs))]...)).All(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("read download scan tasks: %w", err)
 		}
-		infos, err := service.tasks.Workflows(ctx, parents)
+		infos, err := service.library.Workflows(ctx, parents)
 		if err != nil {
 			return nil, err
 		}
@@ -151,7 +151,7 @@ func (service *Service) submissions(ctx context.Context, records []*ent.Task, so
 			if !found {
 				return nil, fmt.Errorf("scan task %d for download %d was not found", input.ScanTaskID, record.ID)
 			}
-			if scan.Status == task.StatusQueued || scan.Status == task.StatusRunning {
+			if scan.Status == string(task.StatusQueued) || scan.Status == string(task.StatusRunning) {
 				item.Processing = true
 			}
 			if scan.Error != nil {
@@ -195,7 +195,7 @@ func latestOfflineTasks(ctx context.Context, query *ent.TaskQuery) ([]*ent.Task,
 		// A malformed hash must remain visible to validation even if its JSON
 		// representation matches a newer string hash.
 		latest := s.Clone().Select(sql.Max(s.C(task.FieldID))).
-			GroupBy("json_type("+payload+", '$."+tasks.PathHash+"')", tasks.JSONExtract(payload, tasks.PathHash))
+			GroupBy("json_type("+payload+", '$.hash')", tasks.JSONExtract(payload, "hash"))
 		s.Where(sql.In(s.C(task.FieldID), latest))
 	}).Order(ent.Desc(task.FieldID)).All(ctx)
 }

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/ppxb/miyabi/internal/database"
-	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/tasks"
@@ -180,16 +179,11 @@ func TestQueueLifecycleAndHook(t *testing.T) {
 
 	svc := tasks.NewService(store.Client, registry)
 
-	source := domain.LibrarySource{
-		AccountID: "acc-1",
-		Directory: domain.LibraryDirectory{ID: "dir-1", Name: "Movies", Path: "/Movies"},
-	}
-
-	info, err := svc.EnqueueScan(ctx, source)
+	info, err := store.Client.Task.Create().SetType(string(tasks.KindScan)).SetPayload(json.RawMessage(`{}`)).Save(ctx)
 	if err != nil {
 		t.Fatalf("enqueue scan: %v", err)
 	}
-	if info.Status != task.StatusQueued || info.Source.AccountID != "acc-1" {
+	if info.Status != task.StatusQueued {
 		t.Fatalf("unexpected scan info: %+v", info)
 	}
 
@@ -258,11 +252,7 @@ func TestPoolWorkerExecution(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	pool := tasks.NewPool(svc.Queue(), svc.Bus(), registry, 1, logger)
 
-	source := domain.LibrarySource{
-		AccountID: "acc-10",
-		Directory: domain.LibraryDirectory{ID: "dir-10", Name: "Movies", Path: "/Movies"},
-	}
-	info, err := svc.EnqueueScan(ctx, source)
+	info, err := store.Client.Task.Create().SetType(string(tasks.KindScan)).SetPayload(json.RawMessage(`{}`)).Save(ctx)
 	if err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}

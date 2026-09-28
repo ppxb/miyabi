@@ -122,9 +122,9 @@ func (service *Service) retainedArtwork(ctx context.Context) (map[string]bool, e
 		task.TypeEQ(tasks.KindCover.String()), task.StatusNEQ(task.StatusDone),
 		func(selector *sql.Selector) {
 			selector.Select(
-				"coalesce("+tasks.JSONExtract(task.FieldPayload, tasks.PathArtwork, "poster")+", '') AS poster",
-				"coalesce("+tasks.JSONExtract(task.FieldPayload, tasks.PathArtwork, "fanart")+", '') AS fanart",
-				"coalesce("+tasks.JSONExtract(task.FieldPayload, tasks.PathArtwork, "thumbnail")+", '') AS thumbnail",
+				"coalesce("+tasks.JSONExtract(task.FieldPayload, "artwork", "poster")+", '') AS poster",
+				"coalesce("+tasks.JSONExtract(task.FieldPayload, "artwork", "fanart")+", '') AS fanart",
+				"coalesce("+tasks.JSONExtract(task.FieldPayload, "artwork", "thumbnail")+", '') AS thumbnail",
 			)
 		},
 	).Select(task.FieldID).Scan(ctx, &pending)

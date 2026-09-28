@@ -35,7 +35,7 @@ func TestScanProgressKeepsRestartContextAndScanKind(t *testing.T) {
 			if err != nil || restored != payload {
 				t.Fatalf("restart context changed: %+v err=%v", restored, err)
 			}
-			next, err := lib.tasks.EnqueueScan(t.Context(), payload.Source)
+			next, err := lib.EnqueueScan(t.Context(), payload.Source)
 			if err != nil || (next.ID == queued.ID) == targeted {
 				t.Fatalf("full-scan deduplication confused targeted=%t: %+v err=%v", targeted, next, err)
 			}

@@ -200,7 +200,7 @@ func newMountedDrive(t testing.TB, database *ent.Client, client *panStub, source
 	return d
 }
 
-func libraryFixture(t testing.TB) (*Service, tasks.TaskInfo, scan.Payload) {
+func libraryFixture(t testing.TB) (*Service, domain.TaskInfo, scan.Payload) {
 	t.Helper()
 	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {
@@ -210,15 +210,16 @@ func libraryFixture(t testing.TB) (*Service, tasks.TaskInfo, scan.Payload) {
 	source := domain.LibrarySource{AccountID: "100", Directory: domain.LibraryDirectory{ID: "10", Name: "Movies", Path: "/Movies"}}
 	driveSvc := newMountedDrive(t, store.Client, &panStub{}, source)
 	taskSvc := tasks.NewService(store.Client, tasks.NewRegistry())
-	queued, err := taskSvc.EnqueueScan(t.Context(), source)
-	if err != nil {
-		t.Fatal(err)
-	}
 	images, err := mediaimage.NewCache(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	lib := New(store.Client, driveSvc, taskSvc, images)
+	queued, err := lib.EnqueueScan(t.Context(), source)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	scrape := scrapePkg.New(store.Client, driveSvc, nil, images, taskSvc)
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScan, lib.Scan, lib.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScrape, scrape.Scrape, scrape.Finished))

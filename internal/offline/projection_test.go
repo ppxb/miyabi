@@ -271,7 +271,11 @@ func TestOfflineActivitySeparatesLibraryEntryFromArtworkAndRechecksFiles(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	scanInfo, err := service.tasks.Info(ctx, input.ScanTaskID)
+	infos, err := service.library.Workflows(ctx, []*ent.Task{service.database.Task.GetX(ctx, input.ScanTaskID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	scanInfo := infos[0]
 	if err != nil || scanInfo.OfflineTaskID != download.ID {
 		t.Fatalf("download scan identity: %+v err=%v", scanInfo, err)
 	}
