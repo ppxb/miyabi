@@ -87,6 +87,11 @@ func (s *Scanner) Run(ctx context.Context, job tasks.Job) error {
 		return err
 	}
 	source := sess.Source()
+	payload.Source = source
+	run := scanRun{scanner: s, session: sess, taskID: job.ID, payload: &payload}
+	if payload.Scan.Stage == "reconciling" {
+		return run.reconcile(ctx)
+	}
 	// A fresh scan gets a new marker; a resumed scan reuses its marker so files
 	// indexed before an interruption remain valid during reconciliation.
 	isResume := payload.ScanID != ""
@@ -104,8 +109,6 @@ func (s *Scanner) Run(ctx context.Context, job tasks.Job) error {
 			payload.Scan.CurrentPath = source.Directory.Path
 		}
 	}
-	payload.Source = source
-	run := scanRun{scanner: s, session: sess, taskID: job.ID, payload: &payload}
 	if payload.TargetID != "" {
 		return run.runTarget(ctx, isResume)
 	}
@@ -121,6 +124,8 @@ type scanRun struct {
 	directories []Directory
 	seen        map[string]bool
 	codes       map[string]bool
+	// Persist directory-start counters while its chunks commit independently.
+	checkpointProgress *domain.ScanProgress
 }
 
 func (r *scanRun) savePage(ctx context.Context, directoryPath string, videos []Video, prepare func([]Video) []Video) error {
@@ -194,24 +199,20 @@ func (r *scanRun) walk(ctx context.Context, start Directory, isResume bool) erro
 			}
 		}
 	}
-	lastReport := time.Time{}
-
 	for next := 0; next < len(r.directories); next++ {
 		directory := r.directories[next]
 		r.payload.Scan.CurrentPath = directory.Path
-		if time.Since(lastReport) >= 500*time.Millisecond || next == len(r.directories)-1 {
-			if remaining := r.directories[next:]; len(remaining) > 0 {
-				data, _ := json.Marshal(remaining)
-				r.payload.Checkpoint = string(data)
-			}
-			if err := ReportScan(ctx, r.scanner.db.Task, r.taskID, *r.payload, r.scanner.tasksSvc); err != nil {
-				return err
-			}
-			lastReport = time.Now()
+		data, _ := json.Marshal(r.directories[next:])
+		r.payload.Checkpoint = string(data)
+		if err := ReportScan(ctx, r.scanner.db.Task, r.taskID, *r.payload, r.scanner.tasksSvc); err != nil {
+			return err
 		}
+		progress := r.payload.Scan
+		r.checkpointProgress = &progress
 		if err := r.indexDirectory(ctx, directory); err != nil {
 			return err
 		}
+		r.checkpointProgress = nil
 	}
 
 	r.payload.Checkpoint = ""

@@ -148,7 +148,13 @@ func (r *scanRun) processPageTx(ctx context.Context, tx *ent.Tx, directoryPath s
 			}
 		}
 	}
-	if err := SaveScanProgress(ctx, tx.Task, r.taskID, *r.payload); err != nil {
+	progress := *r.payload
+	if r.checkpointProgress != nil {
+		progress.Scan = *r.checkpointProgress
+		// Deletions already committed by earlier chunks cannot be replayed.
+		progress.Scan.RemovedMovies = r.payload.Scan.RemovedMovies
+	}
+	if err := SaveScanProgress(ctx, tx.Task, r.taskID, progress); err != nil {
 		return err
 	}
 	var change tasks.Change

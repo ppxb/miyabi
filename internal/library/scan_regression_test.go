@@ -74,6 +74,117 @@ func TestScanResumesCanceledDirectoryAndPersistsAllChunks(t *testing.T) {
 	}
 }
 
+func TestScanResumesAfterCommittedChunkWithoutDoubleCounting(t *testing.T) {
+	for _, stopAfter := range []int{1, 2, 3} {
+		t.Run(fmt.Sprintf("chunk-%d", stopAfter), func(t *testing.T) {
+			lib, client := panConcurrencyFixture(t)
+			ctx := t.Context()
+			source := *lib.drive.Source()
+			entries := make([]pan.File, 205)
+			for i := range entries {
+				entries[i] = pan.File{ID: fmt.Sprintf("video-%d", i), ParentID: source.Directory.ID,
+					Name: fmt.Sprintf("ABP-%03d.mp4", i+1), Size: domain.MinVideoSize}
+			}
+			entries[204].Name, entries[204].Size = "sample.mp4", 1
+			oldMovie := lib.database.Movie.Create().SetCode("OLD-001").SaveX(ctx)
+			lib.database.File.Create().SetFileID("video-0").SetName("OLD-001.mp4").SetSize(domain.MinVideoSize).
+				SetAccountID(source.AccountID).SetRootID(source.Directory.ID).SetMovieID(oldMovie.ID).ExecX(ctx)
+			// A child discovered in the interrupted directory must also survive recovery.
+			entries = append(entries, pan.File{ID: "child", Name: "empty", IsDirectory: true})
+			client.list = func(_ context.Context, _, directoryID string, offset, _ int) (pan.FilePage, error) {
+				if directoryID == "child" {
+					return pan.FilePage{Path: []pan.Directory{{ID: source.Directory.ID}}}, nil
+				}
+				end := min(offset+100, len(entries))
+				return pan.FilePage{Files: entries[offset:end], Path: []pan.Directory{{ID: source.Directory.ID}},
+					Total: len(entries), HasMore: end < len(entries)}, nil
+			}
+			interrupted, cancel := context.WithCancel(ctx)
+			defer cancel()
+			commits := 0
+			lib.database.Task.Use(func(next ent.Mutator) ent.Mutator {
+				return ent.MutateFunc(func(ctx context.Context, mutation ent.Mutation) (ent.Value, error) {
+					result, err := next.Mutate(ctx, mutation)
+					if err == nil {
+						if tx, txErr := mutation.(*ent.TaskMutation).Tx(); txErr == nil {
+							tx.OnCommit(func(next ent.Committer) ent.Committer {
+								return ent.CommitFunc(func(ctx context.Context, tx *ent.Tx) error {
+									if err := next.Commit(ctx, tx); err != nil {
+										return err
+									}
+									commits++
+									if commits == stopAfter {
+										cancel()
+									}
+									return nil
+								})
+							})
+						}
+					}
+					return result, err
+				})
+			})
+			queued := lib.database.Task.Query().Where(task.TypeEQ("scan")).OnlyX(ctx)
+			if err := lib.Scan(interrupted, tasks.Job{ID: queued.ID, Payload: queued.Payload}); !errors.Is(err, context.Canceled) {
+				t.Fatalf("scan cancellation: %v", err)
+			}
+			if count := lib.database.File.Query().CountX(ctx); count != min(stopAfter*100, 205) {
+				t.Fatalf("committed file count = %d", count)
+			}
+			queued = lib.database.Task.GetX(ctx, queued.ID)
+			before, err := tasks.DecodePayload[domain.ScanPayload](queued.Payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := lib.Scan(ctx, tasks.Job{ID: queued.ID, Payload: queued.Payload}); err != nil {
+				t.Fatal(err)
+			}
+			after, err := tasks.DecodePayload[domain.ScanPayload](lib.database.Task.GetX(ctx, queued.ID).Payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if after.ScanID != before.ScanID || after.Checkpoint != "" || after.Scan.Stage != "done" ||
+				after.Scan.FilesScanned != 205 || after.Scan.VideoFiles != 205 || after.Scan.MatchedFiles != 204 ||
+				after.Scan.UnmatchedFiles != 1 || after.Scan.RemovedMovies != 1 || after.Scan.Movies != 204 ||
+				after.Scan.DirectoriesScanned != 2 || after.Scan.DirectoriesDiscovered != 2 {
+				t.Fatalf("unexpected resumed progress: %+v", after)
+			}
+			if count := lib.database.File.Query().Where(file.ScanIDEQ(before.ScanID)).CountX(ctx); count != 205 {
+				t.Fatalf("indexed files = %d, want 205", count)
+			}
+		})
+	}
+}
+
+func TestScanResumesReconciliationWithoutWalkingAgain(t *testing.T) {
+	lib, client := panConcurrencyFixture(t)
+	ctx := t.Context()
+	source := *lib.drive.Source()
+	client.list = func(context.Context, string, string, int, int) (pan.FilePage, error) {
+		return pan.FilePage{}, errors.New("completed traversal must not restart")
+	}
+	queued := lib.database.Task.Query().Where(task.TypeEQ("scan")).OnlyX(ctx)
+	payload := domain.ScanPayload{ScanID: "finished-walk", Source: source,
+		Scan: domain.ScanProgress{Stage: "reconciling", FilesScanned: 1, VideoFiles: 1, UnmatchedFiles: 1, DirectoriesScanned: 1}}
+	lib.database.File.Create().SetFileID("indexed").SetName("unknown.mp4").SetSize(1).
+		SetAccountID(source.AccountID).SetRootID(source.Directory.ID).SetScanID(payload.ScanID).ExecX(ctx)
+	if err := scan.SaveScanProgress(ctx, lib.database.Task, queued.ID, payload); err != nil {
+		t.Fatal(err)
+	}
+	queued = lib.database.Task.GetX(ctx, queued.ID)
+	if err := lib.Scan(ctx, tasks.Job{ID: queued.ID, Payload: queued.Payload}); err != nil {
+		t.Fatal(err)
+	}
+	after, err := tasks.DecodePayload[domain.ScanPayload](lib.database.Task.GetX(ctx, queued.ID).Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload.Scan.Stage = "done"
+	if after != payload || lib.database.File.Query().CountX(ctx) != 1 {
+		t.Fatalf("reconciliation changed traversal results: %+v", after)
+	}
+}
+
 func TestScanProgressKeepsRestartContextAndScanKind(t *testing.T) {
 	for _, targeted := range []bool{false, true} {
 		t.Run(map[bool]string{false: "full", true: "targeted"}[targeted], func(t *testing.T) {

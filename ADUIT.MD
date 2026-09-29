@@ -1,234 +1,34 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-30；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。本次复查现存 51 条已完成项，移除已被第 90、108 项覆盖的重复待办 185、144；新增扫描恢复进度边界 245。当前保留 177 条：126 条待处理，51 条已完成。
+> 清单整理：2026-09-30；本轮删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条待处理项。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
-> 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
+> 原编号保留，不重新编号；完成项经复查确认后可移除，已提交的历史记录可通过 Git 追溯。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮核对现存已完成项的实现、调用链和回归覆盖，并非重新验证全部待办，也未重审此前移除的 62 条记录。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
 
-## 已完成项复查（2026-09-30）
+## 本轮复查结论（2026-09-30）
 
-- 范围：58–62、64–83、85、87–105、107–111、150，共 51 项；按实际保留方案复查，不将原始候选方案中的每个建议视为必须实现。
-- 补修：扫描分页入库和收尾原先在事务提交前通知任务总线，可能提前读取旧数据或在回滚后留下错误版本号。现通过事务提交钩子发送通知；新增分页/收尾各自提交与回滚的四个用例，原实现均失败，修复后通过。任务池原有完成回调的事务语义保持不变。
-- 清理：移除封面导出重复传入的 Document 参数；删除只调用 JSON 编解码而不执行扫描恢复的测试，将独立限速超时测试合入 synctest 用例，保留真实分页恢复、断点续扫、导出和事务测试。移除重复待办 144、185，已完成项原文与历史验证记录保留。
-- 验证：修改后 go test ./... 通过；本轮前端 119 项 Vitest、TypeScript、oxlint、Vite 生产构建及 go vet ./... 通过。无浏览器或真实 115/JavDB/Emby 联调；CGO_ENABLED=0，未运行 race 检测。
-- 工具限制：shadcn info --json 在读取项目配置前因现有依赖 @modelcontextprotocol/sdk 引用 zod/v3 失败（ERR_PACKAGE_PATH_NOT_EXPORTED）；未安装或修改依赖。cn 直接导入已通过应用类型检查和构建，但后续组件生成流程尚未完成端到端验证。
-- 剩余边界：第 244 项继续按用户要求暂缓；第 105 项不重排已迁移历史；第 108/150 项仍保留资料后请求实时状态的顺序。第 245 项是重构前已存在的恢复计数问题，不能将现有恢复测试通过解读为所有中断位置均已覆盖。
+- 已移除的 52 项：58–62、64–83、85、87–105、107–111、150、245。扫描事务通知和恢复计数的补修已完成，相关回归测试保留在代码中。
+- 验证：Go 全量测试、go vet、前端 119 项测试、TypeScript、oxlint、Vite 生产构建通过。未进行浏览器或真实上游联调；CGO_ENABLED=0，未运行 race 检测。
+- 保留问题：shadcn CLI 因现有依赖引用 zod/v3 启动失败（ERR_PACKAGE_PATH_NOT_EXPORTED），用户要求保留依赖现状，尚未修复。应用直接导入 cn 已通过类型检查和构建。
+- 已接受的行为边界：不猜测性重排此前已迁移的浏览记录；影片资料与实时状态仍分别请求。第 244 项继续暂缓。
 
 ## 处理顺序与原则
 
 - **优先核实行为与安全问题**：235、237（敏感日志与代理信任）、167（图片抓取边界）、244（非番号误识别）。
-- **再处理明显的阻塞与重复工作**：61、129、131、142、148、149；按当前调用链和测试确认影响。
-- **结构整理按模块进行**：60、64、65、184；保留任务分池、重启恢复、错误退避和协议兼容语义。
+- **再处理明显的阻塞与重复工作**：129、131、142、148、149；按当前调用链和测试确认影响。
+- **结构整理按模块进行**：184；保留任务分池、重启恢复、错误退避和协议兼容语义。
 - **前端优先保证交互与可访问性**：186–189、206、220–221、230–234，再处理布局与样式统一。
-- **死代码与测试一起核对**：78–83、85、93–109、238–240。只有确认失去生产职责和有效覆盖后才删除；不能只凭文件短、单实现或前端未调用下结论。
+- **死代码与测试一起核对**：238–240。只有确认失去生产职责和有效覆盖后才删除；不能只凭文件短、单实现或前端未调用下结论。
 - **方案是候选，不是强制指令**：已有公共实现优先复用；历史迁移的删除需先明确支持的升级起点，不能以本机迁完代替兼容策略。
-- **新完成的条目不删除**：保留原问题，勾选并记录实现、验证结果及未验证范围；勾选表示实现完成，不表示整体复查通过。混合条目保留已完成与未完成部分的状态说明，全部完成后再统一复查和决定归档。编号互引若指向此前已移除项，可在 Git 历史中追溯。
+- **完成后复查再清理**：完成时记录实现、验证结果及未验证范围；经复查确认后可删除。混合条目只移除已解决部分，保留剩余问题；历史编号可通过 Git 追溯。
 
 ---
 
 ## 一、正确性 / 并发 Bug
 
 - [ ] **244.** `internal/codeid/codeid.go:38-55,59-93` `filenamePattern`：正则前缀匹配规则对个别非番号文件名存在误提取（如相机默认命名的 `VID-20220326`、`IMG-XXXX`、包含分辨率标签的 `MAYLI-1080P` 等被当作番号提取并提交上游查询）→ 建立常见非番号前缀黑名单（如 `VID`, `IMG`, `DSC`, `MOV` 等）与分辨率标记过滤，避免无效请求与限流损耗。
-  - 暂缓：按用户要求撤回本次特例过滤及对应测试，不增加相机前缀、时间戳或分辨率硬编码规则；后续如处理，应先评估更通用的方案。第 99 项整理保持不变。
-- [ ] **245.** 静态复查发现扫描恢复的进度边界：`scan/walker.go` 按目录保存 Checkpoint，但目录内每 100 个视频入库时 `processPageTx` 会保存已累加的 Scan 计数。若在一个入库块提交后中断，恢复会从同一目录重新遍历，再次累加 FilesScanned/MatchedFiles/DirectoriesScanned；文件 upsert 不等于计数幂等。第 59 项前的实现亦有相同流程；现有 205 文件测试在第二个网络分页中断，尚未覆盖入库块提交后的中断。应补充该中断点测试，再让持久化进度与恢复检查点对应同一处理位置。
-
----
-
-## 三、上帝代码
-
-- [x] **58.** `internal/emby/service.go` 集中承担配置持久化、HTTP 请求、批量通知、全库刷新、演员头像同步和后台 STRM 重写，职责过多；需收敛请求构造、认证、启用条件及退出 flush 的重复。
-  - 后续完善：Emby 通知改为数据库按目录持久化、版本去重和退避重试（15 秒起，最长 5 分钟），成功后条件删除；手动媒体库/本地扫描触发补发，重启保留待办。事务内导出通知随事务提交，更新期间的旧成功/失败不覆盖新版本。按用户要求静默运行，不新增页面状态或提示；全量 Go 测试通过，未做真实 Emby 联调。
-  - 实现：提取 `internal/emby/client.go` 统一 HTTP 请求、X-Emby-Token 认证和错误处理；提取 `actors.go` 独立管理同步定时、单次执行、取消和退出等待。Service 保留配置与通知协调；配置变更取消旧同步，每轮同步使用同一份服务器配置。合并通知 flush，关闭时补发缓冲通知。
-  - 验证：`go test ./...` 通过，新增请求格式、同步取消与等待、服务器切换、退出通知回归测试。未运行 race 检测（当前 CGO 关闭），未进行真实 Emby 联调；待整体复查。每批通知后的全库刷新策略仍按第 129 条处理。
-- [x] **59.** `internal/library/scan/walker.go:76-263` `Scanner.Run` 约 190 行：参数校验、定向单文件、断点恢复、BFS、限速、NFO、分块入库、进度上报 + 两个闭包；:77 多余别名 → 拆 `runTargetFile` / `walk` / `indexDirectory`。
-  - 实现：Run 保留 payload 校验、数据源会话和 scanID 初始化，单次扫描状态由私有 scanRun 承载；runTarget、walk、indexDirectory 分别负责定向扫描、断点与 BFS 遍历、单目录分页及分块入库。复用现有事务与进度保存函数，保持检查点格式、取消和导出锁边界。
-  - 验证：library（含 scan/scrape）、app、offline、tasks 测试通过；新增 205 个视频在第二页取消后恢复的回归测试，验证未提交不完整目录、scanID 沿用、跨入库批次文件与进度完整。未进行真实 115 联调，待整体复查。
-- [x] **60.** `internal/drive/drive.go:69-90` `Drive`：二维码登录状态机 + token 刷新 + 账号缓存 + 挂载持久化 + 事件 + Session 签发 + 工作计数，含 2 mutex、1 ContextLock、2 singleflight、1 WaitGroup、3 个版本号 → 拆出二维码登录（约 180 行）。
-  - 实现：二维码登录状态机提取到 login.go 的私有 qrLogin，集中管理会话、轮询合并、超时、状态变化与凭据兑换；Drive 保留凭据提交、版本更新、账号缓存及挂载一致性。共用原有状态锁和提交锁，保持对外接口及关闭等待语义。
-  - 验证：drive、library（含 scan/scrape）、offline、app、api 测试通过；保留轮询共享、取消、过期及旧凭据防覆盖测试，新增二维码生成请求晚返回与断开/新登录交错的回归测试。未运行 race 检测或真实 115 扫码联调，待整体复查。
-- [x] **61.** `internal/gfriends/client.go:78-143` `EnsureIndex` 持写锁执行两个镜像的网络下载（各 30s），期间所有 `Lookup` 阻塞；`FetchAvatar`（208-234）复制镜像循环；stale 回退（136-141）把 `loadedAt` 设为 now，一次故障后 7 天不重试。
-  - 实现：复用 ContextLock 串行化并发刷新，磁盘读取、下载及索引构建放在读写锁外，短暂加锁替换索引；保留旧索引和磁盘修改时间，下载失败独立退避 5 分钟，取消不计入失败退避。索引与头像共用镜像下载逻辑，索引解析失败继续尝试下一镜像。
-  - 验证：gfriends、emby、app 测试通过；新增刷新期间查询、并发请求合并、等待取消、缓存年龄、旧缓存回退、失败退避与恢复、取消后重试及镜像回退测试。未运行 race 检测或真实 GFriends/Emby 联调，待整体复查。
-  - 复查修复：索引解析后必须含可用头像条目，远程和磁盘缓存共用校验；无效响应继续尝试下一镜像，全部失败时保留旧内存/磁盘缓存并短期退避。新增空对象、null、空目录和空目标、旧缓存保留及无效磁盘缓存恢复测试；gfriends、emby、app 测试通过。
-- [x] **62.** `web/src/features/library/page.tsx` 仍内联扫描状态推导、响应式 Tooltip 按钮和 mutation 回调；错误文案已使用公共 describeApiError。评估提取 LibraryScanButton，以减少页面编排中的业务细节。
-  - 实现：提取媒体库专用 LibraryScanButton，集中按钮文案、图标、禁用状态、响应式 Tooltip、扫描提交及通知。页面保留当前数据源的扫描任务匹配与扫描状态，供按钮和空列表共享，并通过 onStarted 回调切回第一页。
-  - 验证：现有 Vitest 107 项测试、typecheck、lint 通过；保持原有文案及交互分支。本次未新增组件交互测试，浏览器交互与响应式效果待用户验证，待整体复查。
-  - 复查修复：LibraryScanButton 始终挂载，内部切换加载占位或隐藏状态，避免翻页导致 mutation 回调丢失。新增组件结构与回调单元测试，验证各分页查询状态下控制组件位置稳定、hook 保留和成功/失败回调；Vitest 110 项、typecheck、lint 通过，真实浏览器分页交互仍待用户验证。
-
----
-
-## 四、过度设计
-
-- [x] **64.** `internal/tasks` 的 Service / Queue / Bus / Registry / Pool 及 handler 包装层仍可评估简化。目前已分离媒体库任务池与订阅批量任务池，不能再以“只有单 worker”为由合并 Runner；保留分池、取消、恢复和数据库错误退避语义，重点检查 Registry 锁及 handler 包装是否有实际收益。
-  - 实现：Handler 改为包含 Kind、Handle 和可选 Finished 函数的结构体，删除接口适配包装及完成回调类型断言；Registry 继续按值存储并保留读写锁。Service、Queue、Bus、分池执行及其取消、恢复、数据库错误退避保持原有职责。
-  - 验证：tasks、app、library（含 scan/scrape）、offline、monitor 测试通过；新增无完成回调、事务提交与回滚测试，确认任务状态和回调数据原子提交，回滚不发布通知或增加版本号。未运行 race 检测，待整体复查。
-- [x] **65.** `internal/library/scan/reconcile.go:20,27-46` `embyOpts ...any` 按 string 出现顺序解析 embyDir / publicURL / strmToken，类型不安全；`ProcessScanPageTx` 9 个参数 → 改为 `*Scanner` 方法。
-  - 实现：生产入库与收尾逻辑改为 scanRun.processPageTx / reconcileTx，直接使用任务状态和 Scanner 依赖，scanID 统一读取 payload.ScanID。删除 embyOpts ...any 及位置解析，显式传入 export.Config；保留数据源 Session 提交与导出配置锁边界，跨包测试使用的事务入口同步改为类型明确的参数。
-  - 验证：library（含 scan/scrape）、offline、app 测试通过，覆盖断点恢复、入库及导出清理回滚、离线任务并发更新；已有导出配置与通知测试同步迁移。未进行真实 115/Emby 联调，待整体复查。
-- [x] **66.** `web/src/api/movie-detail-cache.ts`（202 行）+ `discover.ts:160-202`：Query 缓存外再维护 `WeakMap<QueryClient, Map>` 全局卡片索引，订阅 QueryCache 每次 `removed` 全量重建；带引用计数、并发上限 2 的请求队列；`useSyncExternalStore` 手动订阅 → `placeholderData` 从 `getQueriesData` 查找 + queryFn 内约 10 行信号量；`discover.ts:163-165` 的 `prioritize` 多余。
-  - 方案修正：JavDB 推荐仅提供基础引用，卡片所需标题等字段必须补全；保留可见性触发、后台两路并发、共享消费者、撤销未开始请求、点击优先及导航请求复用。placeholderData 不能替代跨查询订阅，不按原候选方案强行删除调度和 useSyncExternalStore。
-  - 实现：删除额外 WeakMap 卡片索引、永久 QueryCache 订阅和全量重建，直接从 Query 缓存选取最新卡片；集中卡片查询范围与订阅过滤，订阅随组件卸载释放，忽略无关查询移除。列表替换后不再残留已移除卡片，完整详情缓存不混入列表数据。
-  - 验证：Vitest 113 项、typecheck、lint 通过，保留并发/优先/取消/导航复用测试，新增列表替换与移除、失效缓存补全、相关事件订阅与释放测试。未进行浏览器交互及真实 JavDB 联调，待整体复查。
-  - 复查修复：可见性 request 在初次命中缓存时也保留临时订阅；列表替换/移除导致数据缺失时重新进入同一补全队列，离屏释放订阅与未开始请求。新增缓存消失后补全、双并发限制、共享消费者及移除后立即离屏测试；全量 Vitest 115 项、typecheck、lint 通过。
-- [x] **67.** `web/src/api/browse-history-store.ts`（199 行）+ `browse-history.ts`：为"已浏览"徽章做 localStorage 持久化 + 服务端合并 + 50 条批量 + 10s 防抖 + beacon + 5000 截断（:178-183，服务端返回全部，不一致）；测试专用 `unref`（:136-139）进入生产代码；:47 注释引用已不存在的 `REFACTOR_PLAN`；`browse-history.ts:13` 每卡片 effect 调 `init()`，:15 `subscribe` 每次渲染新建 → `useQuery` + 乐观 `useMutation`，整个 store 删除。
-  - 核实与取舍：当前服务端同样限制 5000 条，原文“服务端返回全部”已不适用。采用服务端记录与 Query 缓存；用户已接受未提交成功就关闭页面的记录不再跨重启补发，旧 localStorage 待提交内容不再读取。
-  - 实现：删除 BrowseHistoryStore、localStorage 合并、延迟批量、退出 beacon 和手动订阅；共享 useQuery 获取记录，useMutation 立即提交并短期重试网络/服务端错误，useMutationState 提供提交中乐观徽章，失败不回滚其他记录。成功后仅更新缓存，保留服务端同步时间，过期后随页面挂载或窗口聚焦同步；查询合并请求期间新确认的记录，避免首次加载覆盖新记录，本地缓存同样限制 5000 条。保持空 ID 和同 ID 进行中提交去重。
-  - 验证：初次迁移生产 build 通过；后续减少全量刷新优化经 Vitest 115 项、typecheck、lint 验证，覆盖查询共享、立即提交、并发成功/失败、首次 GET 合并、提交不触发 GET、不延后缓存过期、服务端淘汰替换、5000 条上限及查询/提交重试。浏览器徽章、跨页面及网络切换交互待用户验证，待整体复查。
-- [x] **68.** `web/src/lib/pan-login.ts:11-19` `panLoginShouldRetry` 等价于 `retry: 4`，却配 146 行测试解释 react-query 内部行为；115 专用逻辑不应在 `lib/`。
-  - 实现：登录查询配置收拢到 pan.ts 的 panLoginOptions，usePanLoginStatus 直接复用；使用 retry: 4 保持首次请求加四次重试的预算，删除 lib/pan-login.ts。保留 1500ms 间隔、禁用重连刷新及错误/终态停止轮询。
-  - 验证：测试直接使用生产 options 和 API 查询函数，mock fetch 配合 Vitest 模拟时间，覆盖五次失败后停止、短暂失败保留 scanned、三个终态、waiting→scanned→authorized、URL 编码及空会话不请求。全量 Vitest 112 项、typecheck、lint 通过；未进行真实扫码与浏览器断网联调，待整体复查。
-- [x] **69.** `internal/drive/events.go` 整套 eventBus（RWMutex + 自增 ID + map + 取消函数）只有 `library.go:80` 一个订阅者且丢弃取消函数 → 单个 listener 字段。
-  - 实现：Drive 保存单个 MountListener，通过 SetMountListener 替换或清除；删除 eventBus、独立锁、ID、map 和取消订阅机制。复用状态锁读取回调后释放，再在原提交锁范围内同步执行；保持挂载失败恢复和清除目录通知语义。
-  - 验证：drive、library（含 scan/scrape）、offline、app 测试通过；新增回调替换/清除与读取状态无死锁测试，原有重复挂载、回调拒绝回滚及扫描入队测试通过。未运行 race 检测或真实 115 联调，待整体复查。
-- [x] **70.** `internal/netx/ssrf.go:216-236` functional options 只剩 `WithAllowLoopback`（测试开关，且 dialer 仍拦 loopback，所以 `subtitle.WithAllowLoopbackForTesting` 被迫换直连 client）；`WithMaxBytes` 仅测试使用。
-  - 实现：删除 DownloadOption、WithMaxBytes、WithAllowLoopback 及字幕 WithAllowLoopbackForTesting；URL 校验不再暴露放行回环地址的参数，SafeDownload 固定 5MB 上限。字幕导出测试使用公开 IP 形式的 URL 与模拟 Transport，不再通过生产开关替换安全客户端；保留生产连接、重定向及代理校验逻辑。
-  - 验证：netx、subtitle、app、library（含 scan/scrape）测试通过；实际验证 5MB/超出 1 字节边界，新增直接拨号拦截测试，保留本机 URL、重定向至本机、重定向次数、本地代理及字幕导出覆盖。未进行真实字幕来源联调，待整体复查。
-- [x] **71.** `internal/pan/client.go:91-98` 与 `:137-146` Retry-After 两套：`panTransport` 全局 `retryAfter` 窗口 + resty `SetRetryAfter` 各等一遍。
-  - 核实：原来的两层等待通常重叠，并非必然双倍；实际风险是共享截止时间延长后，已等待请求未重新检查。
-  - 实现：删除 Resty SetRetryAfter 回调，由 panTransport 统一解析并执行共享等待，在退避与限速等待后重新检查截止时间；保留重试次数、条件、普通退避、限速和并发上限。
-  - 验证：pan、drive、offline、app 测试通过；使用 testing/synctest 验证退避/限速期间延期、取消释放并发名额，并通过生产 New 客户端验证 Retry-After: 5 只等待 5 秒。原有重试限速、并发上限测试通过；未进行真实 115 限流联调，待整体复查。
-  - 复查修复：取消外层 http.Client 总超时，在传输层完成并发/限流等待后创建 35 秒网络 I/O deadline，覆盖响应头和响应体读取，EOF/Close 释放计时器；仍继承调用方取消与截止时间。新增 GET/POST 的 60/120 秒 Retry-After、响应头/体超时与计时器释放测试，pan、drive、offline、app 测试通过。
-- [x] **72.** `internal/pan/client.go:59-62`、`play.go:29-36` 用魔法字符串 `"__EMPTY__"` 作 UA 哨兵，在 RoundTrip 中改写 req（违反 RoundTripper 约定），`Header.Del` 后紧跟赋值多余；`pan/offline_test.go` 被迫复制该逻辑 → resty `SetPreRequestHook`。
-  - 核实与实现：请求改写此前已迁移到 SetPreRequestHook，RoundTrip 与测试不再复制 UA 改写。本次将三个位置的特殊字符串统一为私有 emptyUserAgentSentinel，保留显式空 UA 不被 Resty 默认值替换的行为。
-  - 验证：go test ./internal/pan 通过，已有播放/下载自定义 UA 与空 UA 测试通过；未进行真实播放器与 115 联调，待整体复查。
-- [x] **73.** `internal/config/runtime.go` 4 个从未被覆盖的常量包成 struct + `DefaultRuntime()`，`runtime_test.go` 仅断言常量本身 → 普通常量放到使用处。
-  - 实现：删除 Runtime、DefaultRuntime、Config.Runtime 及仅断言固定值的 runtime_test.go；同步间隔与提交超时放在 app.go 的私有常量中，媒体库任务池在构建处固定单 worker，保留独立订阅池及底层服务超时注入。四个生产数值保持不变。
-  - 验证：config、app、tasks、offline、monitor、cmd/miyabi 测试通过，保留分池、顺序执行和调度行为测试，未新增重复常量断言。待整体复查。
-- [x] **74.** `internal/api/access_gate.go` / `auth.go:16-21`：`NewAccessGateService(password, jwtSecret ...string)` 用可变参数模拟可选；`GenerateToken(subject, ttl)` 实参永远是 `"admin"` 与 `defaultTokenTTL`；`VerifyToken` 返回的 `*Claims` 全被 `_` 丢弃，禁用时返回 `(nil, nil)`；`SignToken` / `VerifyToken` / `Claims` / `BadRequest` 仅包内使用却导出。
-  - 实现：NewAccessGateService 明确接收 password/jwtSecret，空密钥继续按原规则派生；业务 GenerateToken 固定 admin 和 30 天，VerifyToken 仅返回 error；底层签名/校验、claims 和 badRequest 改为包内私有。过期 Cookie 测试直接用底层签名构造，JWT 格式和校验规则保持不变。
-  - 验证：api、app、cmd/miyabi 测试通过，覆盖 Cookie、SSE、STRM、过期/篡改 JWT；新增会话主体和期限、重建后密钥稳定、错误密钥拒绝及禁用门禁签发行为测试。未进行浏览器认证联调，待整体复查。
-- [x] **75.** `web/src/components/app-shell.tsx:22-24` 手算 `activeId` 传给 `FloatingNav` → 使用 `Link` 的 `activeProps` + `activeOptions`。
-  - 实现：删除 AppShell 的路径订阅与 activeId 传递，FloatingNav 使用 Link.activeProps / inactiveProps 切换完整按钮样式，activeOptions 对首页精确匹配、其余按子路径匹配，并忽略查询参数。
-  - 验证：现有 Vitest 112 项、typecheck、lint 通过；本次未新增组件交互测试，导航高亮及移动端样式待用户浏览器验证，待整体复查。
-- [x] **76.** `web/src/features/library/movie-card.tsx:14-18` hover 开关三重保护：`open={canHover && open}` + 条件渲染 + `key` 重挂载。
-  - 实现：合并 LibraryMovieCard 与内部 Content，删除按设备模式切换的 key；失去悬停能力时条件重置 open，避免重新启用后恢复旧弹层。保留受控展开、详情条件渲染、点击关闭及移动端标题提示。
-  - 验证：现有 Vitest 112 项、typecheck、lint 通过；本次未新增组件交互测试，桌面展开→缩小窗口→恢复、点击关闭及触屏标题提示待用户浏览器验证，待整体复查。
-- [x] **77.** `internal/magnet/aggregator.go:16,28-35` `logger` 参数两处调用均传 nil；`defaultAggregatorTimeout` 与 `catalogue.aggregatorTimeout` 同为 8s 重复定义。
-  - 实现：删除 Aggregator 的 logger 参数、字段及默认回退，直接使用 slog.WarnContext；删除 catalogue 重复定义的 8 秒超时，生产构造传 0 使用聚合器默认值。保留超时参数供测试验证慢来源处理。
-  - 验证：magnet、catalogue、app 测试通过，覆盖聚合去重、来源超时、部分失败与缓存行为；未进行真实磁力来源联调，待整体复查。
-
----
-
-## 五、冗余 / 死代码
-
-### 115 字幕删除（d6a8a0c）残留
-- [x] **78.** `internal/library/scan/subtitle.go` 已删除，但 `scan/subtitle_test.go` 仍保留旧命名测试。检查它们现在调用的生产路径和有效断言；失去测试目标的用例可删除，仍覆盖字幕匹配行为的用例应重命名或迁移。与第 239 条一起处理。
-  - 已完成：确认 IndexDirectorySubtitles 仅存在于测试专用实现，删除 scan/subtitle_test.go 与 subtitle_fixture_test.go；生产番号识别和影片匹配测试保留。go test ./... 通过，待整体复查。
-- [x] **79.** `internal/subtitle/service.go`：`SourcePan`（:25）、`Reader` 接口（:32）、`exportPanTrack`（:114）、`IndexPanTrack`（:209）；`Export` 的 `reader` 参数恒为 nil（`scrape/subtitle_queue.go:131`），`scrape/scrape.go:50` 的 `SubtitleExporter` 签名仍带 `subtitle.Reader`；:69-70 注释 "Subtitles stored with the 115 videos come first" 过时；历史 `pick_code != ''` 行永远 pending → 一次性 `DELETE`。
-  - 已完成：删除 SourcePan、IndexPanTrack、exportPanTrack、domain/subtitle.Reader 及 Export 的 reader 参数；在线字幕继续写入 Emby 目录。原描述修正：已导出且文件存在的旧记录原本可复用，未导出的记录才会跳过。现按停用 115 字幕的决定由版本迁移删除旧记录，不删除磁盘文件。在线字幕测试覆盖去重、数量限制、重复导出无下载、缺失重下载及硬字幕跳过；go test ./... 通过，待整体复查。
-- [x] **80.** `internal/ent/schema/subtitle.go:10-12,25-28,59`：`file_id`、`pick_code` 字段、`index.Fields("file_id")` 及过时注释 → 删除并重新生成 ent。
-  - 已完成：移除字幕 file_id、pick_code 和 file_id 索引并重新生成 Ent；追加第 6 个版本迁移，清理 source=115 或旧文件标识非空的记录和旧列/索引，不重排历史迁移。升级及再次打开测试验证在线记录与本地文件保留，go test ./... 通过；未在用户实际数据库执行，待整体复查。
-- [x] **81.** `internal/library/scrape/subtitle_queue.go:15` `SubtitleTask.MetaPayload` 只写不读。
-  - 已完成：删除 SubtitleTask.MetaPayload 及入队赋值，任务只携带 MovieID 和 Target；go test ./... 通过，待整体复查。
-
-### 旧快照 / sidecar 残留
-- [x] **82.** `internal/library/scrape/cover.go:126-128` 固定 `LocalExport: true`，而 `snapshot.go:124` `Matches` 此时直接 `return true` → `DirectorySnapshot`、`NewDirectorySnapshot`、`Sidecar`、`ObservedDirectory.Sidecar`、`Matches` 比对逻辑，以及 `walker.go:106` 全库 `DirectoryObservations`（每文件名 + SHA1 常驻内存）只服务老数据；每次 cover 仍计算 `nfo.Encode` + 两次 SHA1；`writeSidecars` 名不副实。
-  - 已完成：快照仅保留账号、根目录和视频指纹；删除 DirectorySnapshot、Sidecar、LocalExport、全扫描 DirectoryObservations 与远端文件摘要计算。旧 JSON 多余字段不再参与判断，无需数据库列迁移。保留扫描目录内用于番号识别的 NFO 列表、视频变动失效和缓存缺失重建；go test ./... 通过，待整体复查。
-- [x] **83.** `internal/library/scrape/cover.go:131,226-233` 已不回写 115，但每个 cover 仍重读 115 NFO（`DirectoryNFO`）、执行 `VerifyCoverOrigin`、逐视频 `sess.Info`（`verifyVideoPositions`），与"减轻网盘负担"目标相反 → 直接使用 payload 中的 `Document/Origin`。
-  - 方案修正并完成：扫描阶段保留 NFO 番号识别与内容比对，统一在 scan/nfo.go；每个匹配 NFO 在一次目录处理内最多读取一次，支持别名和多影片目录，明确冲突返回错误，损坏或不可读的可选 NFO 不阻断文件名刮削。单文件定向扫描也检查匹配 NFO。标题、演员和封面改由 JavDB 获取，已有刮削结果仍可复用；删除远端 NFO 元数据/图片复用和封面阶段的重复读取、VerifyCoverOrigin。保留实时视频位置与数据源提交校验；旧未完成封面任务缺少 CoverURL/Artwork 时通过 JavDB 恢复。测试覆盖冲突、单次读取、在线刮削、远端图片变化不重刮、旧任务恢复、缓存目录下视频移动/删除阻止导出；go test ./... 通过，未做真实 115/JavDB 联调，待整体复查。
-- [x] **85.** `internal/library/scrape/cover.go:255-264` `exportLocalMedia` 的 DB 兜底永远走不到（`directories()` 保证至少一个视频），且查询不按 source 过滤、`records, _ :=` 吞错。
-  - 已完成：删除 exportLocalMedia 中无数据源过滤且吞错的数据库兜底，移除无用 ctx/stem 参数。视频仍由受数据源约束的目录查询提供并逐个校验位置；保留本地单文件、多段视频导出测试，go test ./... 通过，待整体复查。
-
-### 其它死代码（已 grep 确认）
-- [x] **87.** `internal/javdb/client.go:291-294`、`route.go:45,102-104,171-173,185-188`：`preferredHost`、`RouteStatus.Manual`、`ensureRoute` 的 ManualRoute 分支在生产中不可达（仅 `route_test.go:43` 使用）；`client.go:168-176` `Route()` 中 `state == nil` 拼 `CachedHost` 分支不可达；`routeState.status.Candidates` 与 `lastProbe` 双份真相（:36、:362）。
-  - 方案修正：RouteStatus.Manual 仍用于手动选线、持久化恢复和代理变更策略，保留；仅删除 ensureRoute 的无效手动偏好分支、preferredHost 及 Route 的 CachedHost 兜底。
-  - 已完成：routeState 仅保存生效主机、延迟、手动标记和 transport；候选列表仅保存在 lastProbe，公共状态统一组合返回。探测失败保留当前线路并显示最新失败结果，取消不覆盖状态，代理重建继续保留手动选择。
-  - 验证：javdb、catalogue、api、app 包测试通过；新增本地 HTTP 模拟测试覆盖手动/自动探测失败、取消、成功切换及候选列表返回，保留缓存恢复与请求失败自动切换测试。未进行浏览器或真实 JavDB 联调，待整体复查。
-- [x] **88.** `internal/javdb/client.go:254-260` `getJSON` 的 `language` 参数所有调用点都传 `defaultLanguage`，`transport.go:132-134` `if language == ""` 死代码。
-  - 已完成：移除 Client、jsonTransport、transport 和请求构造中的 language 参数，统一在 newRequest 设置 accept-language=defaultLanguage（zh-TW），删除空值兜底；各 API、探测和测试桩同步简化，测试响应按路径索引。
-  - 验证：javdb、catalogue、api、app 包测试通过；请求构造测试直接断言 zh-TW 请求头，保留签名、解析、限流重试与线路切换覆盖，git diff --check 通过。未做真实 JavDB 联调，待整体复查。
-- [x] **89.** `internal/catalogue/service.go:344-361`、`types.go:77-87` `Facets()`、`Facets`、`FacetItem` 无 API / 生产使用，仅 `TestFacets`。
-  - 已完成：确认无生产/API 调用后，删除 Facets()、Facets、FacetItem 与仅验证其固定选项的 TestFacets；标签、演员页面使用的 JavDB main 分类筛选和前端 DISCOVER_ZONES 不受影响。
-  - 验证：catalogue、api 包测试通过，git diff --check 通过；未进行浏览器测试，待整体复查。
-- [x] **90.** `internal/javdb/magnet.go:81-94` `Find` 中 `JavDBID` 为空走 `ResolveMovieID` 分支不可达（`catalogue/magnets.go:66` 总带 JavDBID）；`magnet.go:54-71` 排序与 `aggregator.go:104-118` 同一规则重复。
-  - 已完成：Find 删除按番号回退查询，保留空 JavDB ID 返回空结果；Magnets 仅解码并保留来源顺序，删除预排序。最终排序统一由聚合器负责，保留推断标签、体积、文件数、来源及日期规则；ResolveMovieID 的其他业务调用不变。
-  - 验证：javdb、magnet、catalogue、api 包测试通过，覆盖来源顺序、元数据、缺少 ID 不请求及真实 JavDB 适配器经聚合器排序；git diff --check 通过。app 包的 TestEmbyDirectoryAutomaticallyQueuesLocalScan 在本地目录路径断言失败，使用 HEAD 原版 magnet.go 的 Go overlay 对照亦复现，属于已有失败。未进行浏览器或真实 JavDB 联调，待整体复查。
-- [x] **91.** `internal/javdb/client.go:52-66` + `internal/catalogue/service.go:56,65`：唯一调用 `app.go:89` 传 `javdb.Options{}`，Timeout / RPS / Burst 负值校验与 `DeviceUUID` 回退永不触发 → `catalogue.New` 不再接收 Options。
-  - 方案修正：Timeout 仍由网络连通性 Probe 传入并用于线路超时测试，保留该参数及 New 的默认值和负值校验；持久化 UUID 可能为空或无效，保留 JavDB 构造时的 UUID 校验。
-  - 已完成：catalogue.New 删除 Options 入参，直接生成并持久化首次设备 UUID，按数据库设置组装线路与代理配置；删除无人配置的 RequestsPerSecond / Burst 字段及其默认值、负值分支，限速统一使用原常量（2 次/秒、突发 1 次）。调用方和现有测试同步更新。
-  - 验证：javdb、catalogue、network、api 包测试及 git diff --check 通过，覆盖 UUID 持久化复用、手动线路恢复、共享选线超时和取消；app 包仅复现第 90 项已确认的 TestEmbyDirectoryAutomaticallyQueuesLocalScan 本地目录路径断言失败。未进行浏览器或真实上游联调，待整体复查。
-- [x] **92.** `internal/drive/drive.go:179-184` `ValidateSource`、`internal/drive/session.go:18,70-72` `Session.Version()` 仅测试使用（导致 scrape 的 `mockSession` 也必须实现）；`mount.go:152` `DirectoryPath` 仅包内使用。
-  - 已完成：删除 ValidateSource 及其专用测试，移除 Session.Version 接口、实现与 mock 方法，删除 app 中无人调用的 authorizationVersion 测试辅助函数；DirectoryPath 改为包内 directoryPath。会话内部版本字段、请求前后校验及事务锁逻辑不变，保留挂载切换和退出登录后的会话失效测试。
-  - 验证：drive、library（含 scan/scrape）、offline、api 包测试及 git diff --check 通过；app 包仅复现第 90 项已确认的 TestEmbyDirectoryAutomaticallyQueuesLocalScan 本地目录路径断言失败。未进行浏览器或真实 115 联调，待整体复查。
-- [x] **93.** 零生产调用 / 仅测试使用：`scan/persist.go:22` `ProcessScanPage`、`scan/reconcile.go:20` `ReconcileScan`（只包事务）、`scan/identity.go:127` `HasEligibleVideos`（零调用）；`scrape` 的 `Images()`（:124）、`LockArtwork`（:134）、`Directories`（:272）、`InvalidateDirCache`（:356）、`SetDirTTL`（:368）；`scrape/nfo_source.go:18` `ArtworkOrigin.NFO`（只写不读）；`library/library.go:62` `Service.images`（只赋值）；`library/viewed.go:25` `ViewedMovieIDs(ctx, limit ...int)` 无人传 limit（`api/discover.go:28` 接口也跟着带）；`scrape/subtitle_queue.go:68` `Enqueue` 返回的 bool 无人使用；大量仅包内使用的导出函数（`CanIdentifyVideo`、`IdentifyScanVideos`、`ResolveSingleNFO`、`IndexDownloadedMovie`、`RemoveUnreferencedMovies`、`SaveScanProgress`、`ReportScan`、`SidecarByName`、`FindDirectoryNFO`、`VerifyCoverOrigin`、emby client 的 `PersonItem`）→ 改小写。
-  - 第 82–83 项已删除 ArtworkOrigin、SidecarByName、FindDirectoryNFO、VerifyCoverOrigin；ResolveSingleNFO 已替换为扫描阶段 ResolveNFOCodes，不再引用旧符号作为待办。
-  - 方案修正：ReportScan 仍被 library/local.go 生产调用；ProcessScanPage、ReconcileScan、IdentifyScanVideos、IndexDownloadedMovie、SaveScanProgress 是跨包回归测试使用的入口，本次保留其导出边界和事务语义，不删除测试或引入替代包装。Directories 保留跨包测试入口，合并原有公私两层方法，生产 Cover 共用同一实现。
-  - 已完成：删除 HasEligibleVideos、scrape.Images、LockArtwork、InvalidateDirCache、SetDirTTL 和可变 dirTTL；维护测试改用已有 TryLockArtwork，缓存测试改验实际过期刷新。library.Service.images 移到测试夹具，构造时仍将原缓存传给扫描器；ViewedMovieIDs 固定原 5000 条上限，接口与测试桩同步简化；Enqueue 不再返回无人读取的 bool，测试验证实际队列内容、去重、容量及关闭后拒绝入队；CanIdentifyVideo、RemoveUnreferencedMovies、PersonItem 改为包内符号。
-  - 验证：library（含 scan/scrape）、maintenance、emby、offline、api 包测试及 git diff --check 通过；app 包仅复现第 90 项已确认的 TestEmbyDirectoryAutomaticallyQueuesLocalScan 本地目录路径断言失败。未进行浏览器或真实上游联调，待整体复查。
-- [x] **94.** 任务业务已迁入 library / monitor。重新检查 `internal/tasks` 与迁移后包的导出边界、包装方法和重复入口；`Service.Registry()` 已被 `app/task_workers.go` 使用，不再属于“仅测试调用”。仅对当前没有外部调用且无接口职责的符号缩小可见性。
-  - 已完成：删除仅测试枚举的 Registry.Kinds 及对应断言；NewService 直接组装 Queue，移除仅包内调用的 NewQueue 包装；完成事务提交后直接调用 bus.publish，删除 Changed 包装。任务池通过 Service.Subscribe 订阅原总线，删除重复暴露总线的 Service.Bus，app 与测试同步调整。
-  - 保留：Service.Registry、Queue 的业务锁与任务池接口、业务包及 SSE 使用的通知方法；Registry.Get、Handler 构造和 payload 工具仍有跨包调用或测试用途。注册表锁、独立分池订阅、取消恢复及事务提交后通知语义不变。
-  - 验证：tasks、library（含 scan/scrape）、monitor、offline、api 包测试及 git diff --check 通过，覆盖数据库错误重试、先订阅后恢复、广播唤醒、退出解绑、完成回调提交与回滚；app 包仅复现第 90 项已确认的 TestEmbyDirectoryAutomaticallyQueuesLocalScan 本地目录路径断言失败。未进行浏览器或真实上游联调，待整体复查。
-  - 路径断言复查（第 90–94 项）：失败源于 Windows TEMP 使用 ADMINI~1 短路径，而扫描任务通过 filepath.EvalSymlinks 保存 Administrator 长路径。测试将原始输入直接与规范路径比较造成误报，实际指向同一目录。已修正启动、目录切换和重启断言的预期路径并补充差异诊断，保留原始路径作为配置输入；生产逻辑未修改，app 包全量测试及 git diff --check 通过。
-- [x] **95.** Subscription `zone` 字段（schema:38、monitor Item、`AddMovieOptions`、`AddActorOptions`、`UpdateOptions`、API 输入）写入、继承、返回，前后端从不读取；订阅状态 `"error"`（schema:41、`monitor/service.go:34`、前端 subscription-card）从未被设置；`monitor.Status` 与 ent `subscription.Status` 重复。
-  - 已完成：删除订阅 zone 的 Ent schema、生成代码、创建/更新选项、演员继承、API 输入输出及前端类型；旧 monitors 导入语句同步移除对 zone 列的依赖。删除重复 monitor.Status 及常量，Item、TargetItem 和调用方统一使用 subscription.Status。
-  - 按用户要求不保留旧状态兼容：删除 Ent 与前端的 error 状态枚举、标签及样式分支，移除本次新增的兼容测试；不新增旧状态转换或数据库清理迁移。失败原因仍使用 error 信息字段，检查失败时原有状态及重试策略不变。
-  - 验证：database、monitor、api、app 包测试通过，保留原有数据库迁移、演员订阅继承和订阅重试覆盖；前端 118 项测试、typecheck、lint 及 git diff --check 通过。未进行浏览器或真实上游联调，待整体复查。
-- [x] **96.** `internal/subtitle`：`Provider.Name()` 从未通过接口调用（`subtitlecat.go:167` 另写死 `"SubtitleCat"`）；`finder.go:29-37` `WithAllowLoopbackForTesting` 测试开关进入生产结构体；`DecodeToUTF8` 最后的 `ToValidUTF8` 兜底实际走不到。
-  - 已完成：Provider 仅保留 Search，删除两家 Provider 和测试桩的 Name 方法，候选来源仍为原名称“迅雷”和“SubtitleCat”。DecodeToUTF8 直接使用 Decoder.Bytes，删除流式包装和不可达的 ToValidUTF8 兜底；保留 UTF-8、GB18030、Big5 顺序及畸形字节替换行为。
-  - 现状修正：WithAllowLoopbackForTesting 已在此前清理中移除，Finder 使用统一安全下载客户端；现有测试替换 transport 提供响应，不绕过 URL 校验，本次无需重复修改。
-  - 验证：subtitle、netx、library/scrape、app 包测试及 git diff --check 通过；新增畸形/截断编码、空输入和仅 BOM 覆盖，保留来源解析、UTF-8/GB18030 转换、SRT/ASS 格式及安全下载测试。未进行浏览器或真实字幕站联调，待整体复查。
-- [x] **97.** `internal/netx/proxy.go:88-94` `sameConfig` 蕴含 `sameURL`，`!sameConfig || !sameURL` 实为 `!sameConfig`，与注释"只在生效代理变化时广播"相反（Enabled=false 改 URL 也重建 tls-client）→ 条件改为 `!sameURL`；:73-79 `resolve` 中 `!Enabled ||` 冗余；:131-133 `parseProxyURL` 的 `raw == ""` 分支死代码。
-  - 已完成：Apply 始终更新配置，仅在生效代理 URL 变化时广播；禁用时修改/清空 URL 和等效协议大小写变更不再触发客户端刷新。Normalize 已保证禁用时 parsed 为 nil、空 URL 提前返回，因此删除 resolve 的 Enabled 重复判断及 parseProxyURL 的空值分支。
-  - 验证：netx、network、javdb、javbus、catalogue、api、app 包测试及 git diff --check 通过；新增连续状态变更测试覆盖配置保存、生效代理、禁用修改、启用、重复更新、等效 URL、代理切换及停用通知，保留真实本地 HTTP 代理切换和进行中请求覆盖。未进行浏览器或真实上游联调，待整体复查。
-- [x] **98.** `internal/netx/ssrf.go:59-60` 255.255.255.255 分支已被 :58 `ip4[0] >= 240` 覆盖；:103 多余中间变量；:191-193 `timeout <= 0` 兜底唯一调用传固定 20s；:157/:176 `ips` 为空时返回 `(nil, nil)`。
-  - 已完成：删除广播地址重复判断、resolver 中间变量及未使用的 timeout 默认值；调用方显式提供正超时，生产仍为 20 秒，测试仍为 1–2 秒。
-  - 现状修正：检查当前 Go 标准库 LookupIP → internetAddrList → filterAddrList，空地址列表会返回错误；现有拨号逻辑已处理该错误，因此不存在空 DNS 结果导致 (nil, nil) 的可达路径，不增加重复校验或测试专用注入。
-  - 验证：netx、subtitle、library/scrape、app 包测试及 git diff --check 通过；补充保留网段边界和 IPv4 映射广播地址覆盖，保留私网拨号阻断、本地代理、重定向校验及下载大小限制测试。未进行浏览器或真实上游联调，待整体复查。
-- [x] **99.** `internal/codeid/codeid.go:132-144` `Layers.stripPrefix` 与 `:247-262` `Candidates` 两套"去前缀"逻辑，正则（`layerNumeric` vs `numericPattern`）已分歧；`Parse`（60-62）与 `Layers`（111-116）去噪流程重复；:344 `UnpaddedNumericCandidate` 仅包内使用；:350-362、:329-334 冗余分支；:95-101 正则 var 块散落；:180、:187 对恒为单元素的 `layers[0]` 循环。
-  - 已完成：共用 stripPrefix，仅对完整六位日期番号移除工作室前缀，避免 HEYDOUGA 等多段编号错误降级；layerNumeric 只负责候选形态识别。共用域名/编码噪声清理，合并正则声明，删除单元素循环、日期编号重拼及前导零重复判断；UnpaddedNumericCandidate 改为包内函数。
-  - 行为边界：Layers 保留同层发行商标签与日期两个候选，继续拒绝它们匹配不同影片的歧义；Candidates 保持原先优先日期别名的行为。双端回退同时考虑先去后缀再去前缀，使 CARIB-060326-001-C 仍能匹配日期番号；完整候选和前缀层仍优先。
-  - 验证：codeid 完整语料与优先级测试、javdb、catalogue、subtitle、library（含 scan/scrape）、offline、monitor、api、app 包测试及 git diff --check 通过；新增六组层级回归覆盖 Heydouga、多段数字、日期、发行商和字幕后缀，保留同层歧义和全零序号测试。未进行浏览器或真实上游联调，待整体复查。
-- [x] **100.** `internal/gfriends/client.go:21-23,29` `DefaultFastlyURL`、`DefaultRawURL`、`CacheExpiration`、`FileTree` 无外部使用却导出；:42-44 nil httpClient 默认值死代码；:127-128 写缓存错误被静默吞掉。
-  - 已完成：镜像 URL、缓存有效期与 fileTree 改为包内符号；New 直接使用调用方配置的 HTTP 客户端，测试同步显式传入客户端。目录创建或索引写入失败时记录包含路径和错误的警告，仍安装已下载的有效内存索引，不阻断头像查询或触发重复下载。
-  - 验证：gfriends、emby、app 包测试及 git diff --check 通过；新增目录创建失败、缓存文件写入失败测试，验证警告日志、索引可查询及后续请求复用；保留缓存恢复、刷新并发、镜像回退与取消覆盖。未进行浏览器或真实 GFriends/Emby 联调，待整体复查。
-- [x] **101.** `domain.ZoneAll` 的使用范围、`LocalMovie` 的 JSON 标签，以及 `domain.ScanPayload` 与 `scan.Payload` 别名是否仍有必要待核实。`KindInternal` 和旧 tasks 层 ScanPayload 别名已清理，不再作为待办。
-  - 已完成：LocalMovie 仅作为 library/catalogue 的进程内身份数据，删除无序列化用途的 JSON 标签；移除 scan.Payload 别名，扫描器、业务调用和测试统一引用 domain.ScanPayload，保留原字段及 JSON 标签，持久化格式不变。
-  - 保留：ZoneAll 在 JavDB 番号解析和搜索参数构造中表示跨分区搜索，仍有生产用途；不将它用于分类浏览。KindInternal 和旧 tasks 别名此前已删除，无需重复处理。
-  - 验证：library（含 scan/scrape）、catalogue、javdb、offline、api、app 包测试及 git diff --check 通过，保留扫描恢复、离线入库、任务 JSON 与 API golden 覆盖。未进行浏览器或真实上游联调，待整体复查。
-- [x] **102.** `internal/library/scrape/scrape.go:155` `fileScope` 与 `internal/database/scope.go:10` `LibraryFiles` 一字不差；魔法字符串 `"local"` 在 `library.go:118,120,202,204`、`scan/local.go:235-236` 硬编码，`Movies` 与 `MatchingMovies` 的 scope 计算重复 → `domain.LocalAccountID` + `s.libraryScope()`。
-  - 已完成：刮削直接复用 database.LibraryFiles，删除重复 fileScope；增加 domain.LocalAccountID，统一本地扫描任务、重试、入库与查询的账号标识，保留原存储值。字幕来源 local 属于不同语义，不借用账号常量。
-  - 实现：Movies 与 MatchingMovies 共用接收数据源快照的包内 libraryScope；列表返回的数据源和筛选条件使用同一次读取结果。继续展示当前挂载账号/根目录及全部本地影片，无挂载时仅展示本地影片。
-  - 验证：library（含 scan/scrape）、catalogue、offline、api、app 包测试及 git diff --check 通过；新增混合本地根目录、当前挂载、其他账号/根目录及卸载后的列表与身份匹配一致性测试，保留刮削数据源隔离和本地导入覆盖。未进行浏览器或真实上游联调，待整体复查。
-- [x] **103.** `internal/app/app.go` 的 EmbyDir 兜底与 `config.Load` 重复；核实直接调用 App.New 的测试和调用方需求后，统一配置初始化职责。旧的 Emby Config 读取、activePublicURL 及代理非空判断描述已失效。默认导出路径与 PublicURL 一并按第 184 条处理。
-  - 已完成：确认唯一生产入口先调用 config.Load；删除 App.New 对 EmbyDir 的重复补齐及配置改写，明确接收已初始化配置。生命周期测试显式提供原默认目录，其他直接调用测试已有显式目录。
-  - 验证：config、app、cmd/miyabi 包测试及 git diff --check 通过，覆盖默认环境配置、启动/关闭、本地目录切换和重启恢复。底层 export 的默认路径及 PublicURL 仍留在第 184 项处理，未进行浏览器测试。
-- [x] **104.** `internal/config/config.go:50` `MIYABI_EMBY_URL` 未文档化旧别名；:101-119 `validate` 重复 Trim、EmbyDir 空检查不可能触发；日志级别 `logging.Validate` 校验一次、main 中 `UnmarshalText` 再解析一次 → Config 直接存 `slog.Level`，删除 `internal/logging`（28 行）。
-  - 已完成：删除 MIYABI_EMBY_URL 旧别名；环境读取时统一去空白，Listen/DataDir 在推导默认值前已归一化，修复带空白数据目录生成错误 Emby 子目录的问题。validate 仅保留 Listen/DataDir 必填校验，移除重复 Trim 和不可达 EmbyDir 空检查。
-  - 日志：配置入口一次性将原有 debug/info/warn/error 转为 slog.Level，继续接受大小写和周围空白，不扩展支持偏移等级；main 直接构造 JSON 日志 handler，删除 logging 包，密码空白保留行为不变。
-  - 验证：config、app、cmd/miyabi 包测试及 git diff --check 通过；新增默认目录/端口推导、旧别名不生效、四种日志等级及偏移等级拒绝测试，保留密码空白和生命周期覆盖。未进行浏览器测试。
-- [x] **105.** `internal/database/viewed.go` 的 `migrateViewedMovies` 为全部旧浏览记录写入同一时间，可能丢失原有顺序。核实旧数组顺序及保留策略；迁移已纳入版本管理，不能因当前开发数据库迁完就删除或重排迁移步骤。若要修正已升级数据，应新增迁移并明确可恢复的信息。
-  - 核实：历史 mergeViewedMovies 将新 ID 按输入顺序放在旧数组之前，数组为最近优先；原迁移顺序插入但时间相同，新查询按 viewed_at DESC、id DESC 排序，会反转导入记录。
-  - 已完成：尚未执行的迁移按数组位置写入递减微秒时间以保留顺序，时间仅为排序用途，不声称还原实际浏览时刻；继续过滤空 ID、保留首次重复项且不覆盖表中已有记录。迁移版本和步骤顺序不变。
-  - 已升级数据边界：旧数组已删除，迁移产生的同时间记录无法可靠区别于正常批量浏览，不新增猜测性重排迁移，已有记录保持不变。
-  - 验证：database、library、api、app 包测试及 git diff --check 通过；迁移测试新增最终查询顺序断言，保留空值/重复项、已有时间戳、事务回滚与重开不重复迁移覆盖。未进行浏览器测试。
-- [x] **107.** 前端零引用 / 无意义项：
-  - `api/auth.ts:45-57` `useAccessGateLogout` 无调用（后端 `POST /auth/logout` 随之无人使用），`LoginResponse.expires_at` 不读；
-  - `auth.ts:20`、`discover.ts:134`、`:160`、`:235` 的 `enabled` 参数从未传入；
-  - `client.ts:53` `apiPut` 的 `options`（keepalive/signal）是播放记录删除残留；
-  - `features/tasks/task-toast.tsx:17` ToastID 再导出无人使用；`browse-history-store.ts:196` `getPendingCount` 仅测试；
-  - `lib/source.ts:5` `sameSource` 零调用，而同源判断在 `api/library.ts:57-64`、`api/offline.ts:68-86`、`features/library/page.tsx:33-40`、`task-notification-diff.ts:79-84` 手写 4 遍；`SourceScope` 的 `directory_id` 分支用不到；
-  - `api/tasks.ts:74` `isBatchTask` 外部无人使用；`library.ts:40` `movieLists` 未使用；`discover.ts:7` `discoverKeys` 再导出未使用；
-  - `api/tasks.ts:28-38` ScanTask 10 个前端不读字段（`current_path`、`directories_*`、`files_scanned`、`removed_*` 等）；
-  - `task-notification-diff.ts:18` `NotificationEntry.playable` 是删除播放器后的遗留命名（实为"已入库"）。
-  - 已完成：删除无调用的退出 hook、LoginResponse.expires_at、四个查询 hook 的闲置 enabled 参数、apiPut 的闲置 options、Toast ID/discoverKeys 重复导出、movieLists 和 api/tasks 的无调用 isBatchTask；通知内部 playable 改为 inLibrary。保留推荐卡片的按需加载开关及搜索词非空条件。
-  - 数据源：媒体库任务匹配、任务通知及离线提交后的活动缓存更新复用 sameSource。directory_id 对应真实离线提交结构，保留以支持与 directory.id 的比较；账号连接状态校验具有不同职责，继续保留原判断。
-  - 范围修正：ScanTask 字段保留用于描述完整 API 响应，browse-history-store 已删除无需重复处理；后端退出登录接口按第 109 项单独核实，本次不删除。
-  - 验证：前端 119 项测试、typecheck、lint、修改文件格式化及 git diff --check 通过；新增跨结构数据源比较、账号/目录不同及空值测试，保留任务通知和查询调度覆盖。未进行浏览器测试。
-- [x] **108.** 后端 `catalogue/service.go:398-401` 已随列表计算 `state` 与 `library_id`，前端从不读取 `DiscoverMovie.state`（`api/discover.ts:47,66`），见第 150 条。
-  - 已完成：列表、搜索和详情 DTO 删除 state/library_id，projectMovies 改为不依赖 Service 或数据库的资料投影函数，仅处理发行日期和 release_status；删除对应的本地状态查询与无用错误返回。前端 MovieLocalState/MovieState 独立定义，继续通过 movie-states 接口更新。
-  - 验证：catalogue、api、library（含 scan/scrape）、monitor、offline、app 包测试通过；新增非空搜索/列表/详情不访问 LocalState 的回归测试，身份匹配测试转向 MovieStates，保留日期规范化和状态变化覆盖。API golden 差异仅移除资料响应中的两个字段；前端 119 项测试、typecheck、lint 及 git diff --check 通过。未进行浏览器测试。
-- [x] **109.** 重新评估前端未调用的接口是否仍承担运维、外部调用或手动恢复职责：`GET /discover/movies/:id/offline`、`POST /library/scan/local`、`POST /auth/logout`。本地扫描接口已支持后台入队与配置路径校验；“前端未调用”本身不能作为删除理由。
-  - 已完成：用户确认当前产品不需要这三个独立入口后，删除路由、专用 handler/请求类型、接口声明及单影片离线历史查询方法；删除专用退出/本地扫描接口测试。内部 startLocalScan 改为包内方法，移除已无调用的显式路径参数。
-  - 保留：启动与配置目录切换仍通过 ScheduleLocalScan 入队；媒体库扫描继续重试待发送 Emby 通知；登录、Cookie 认证、统一离线活动接口和离线提交接口不变。历史查询测试迁往 Activity，保留最新记录、进行中任务和账号/目录隔离验证；本地任务去重、执行及目录变更检查仍有业务测试覆盖。
-  - 验证：api、library（含 scan/scrape）、offline、emby、app 包测试及 git diff --check 通过；新增路由表测试确认三个入口已移除且现有操作路由仍注册，保留切换目录自动扫描、重启恢复及媒体库扫描触发 Emby 重试测试。未进行浏览器或真实 Emby 联调。
-- [x] **110.** 删除属性后残留空行：`ui/input-group.tsx:13`（原 `role="group"`）、`ui/breadcrumb.tsx:57/68/82`（原 role / aria-hidden / aria-current）、`ui/dialog.tsx:62-64` 删除了 `sr-only` 文案、`search/page.tsx:67`、`settings/pan-section.tsx:40/62/76`、`pan-directory-row.tsx:34`；`internal/domain/video.go:30-31` 双空行（唯一 gofmt 报告）。
-  - 已完成：清除上述文件残留空行，使用 oxfmt/gofmt 格式化相关文件；为通用弹窗关闭按钮补充 aria-label="关闭"，不机械恢复其他已删除的 role/ARIA 属性。
-  - 验证：前端 TypeScript 类型检查、oxlint 及 git diff --check 通过；未进行浏览器测试。
-- [x] **111.** `cn` 导入不统一：`ui/hover-card.tsx:2`、`ui/popover.tsx:2`、`ui/dropdown-menu.tsx:2` 直接 `from 'cn'`，其余 `@/lib/utils`；`dropdown-menu.tsx` 未过 oxfmt（双引号、长行）。
-  - 已完成：按用户要求统一直接从 cn 包导入，删除仅作转导出的 lib/utils.ts；components.json 的 utils 别名同步改为 cn，后续生成组件沿用直接导入；使用 oxfmt 格式化相关文件。
-  - 验证：前端 TypeScript 类型检查、oxlint 及 git diff --check 通过，web 中已无旧导入路径；未进行浏览器测试。
+  - 暂缓：按用户要求撤回本次特例过滤及对应测试，不增加相机前缀、时间戳或分辨率硬编码规则；后续如处理，应先评估更通用的方案。已有通用候选降级规则保持不变。
 
 ---
 
@@ -275,8 +75,6 @@
 - [ ] **147.** `internal/subtitle/label.go:89-100` `[]rune(text)` 将最多 10MB 文本整体转换（约 40MB 分配）后再截取前 15000 个；`containsRune` 在 40 元素切片中线性查找 → range 计数 + map。
 - [ ] **148.** `internal/monitor/check.go:48-56` 每轮只查 10 部影片 / 5 个演员后等 5 分钟，500 个订阅约 2.8 小时才查完；`service.go:137` `EnqueueSingle` 每条读一次 config、新建 Picker；`BatchHandler` 先 `Subscription.Get` 一次，`EnqueueSingle` 再 Get 一次；`check.go:94-108` "继续等待"分支更新 checks 却不发 `NotifyMonitorChanged`。
 - [ ] **149.** `internal/library/library.go:222` 分页 `ORDER BY created_at DESC, id DESC`，movie 表无 `(created_at, id)` 索引；`scan/local.go:223-227` fileID 取 `sha256(rel)`，不同扫描根目录下相对路径相同会冲突，已存在记录不更新 path。
-- [x] **150.** 前端列表已带 `state`，每个 `MovieStateBadge` 再批量 `POST /api/discover/movie-states`，形成"列表 → 状态"瀑布 → 用列表数据 seed（`initialData` + `initialDataUpdatedAt`），或后端从列表 DTO 删除 state。
-  - 与第 108 项一并处理，采用删除资料 DTO 中本地状态的方案，消除后端重复查询；保留前端批量状态请求、事件失效及账号切换重置。资料加载后再请求状态的顺序仍存在，不将旧资料缓存用于初始化实时状态。
 - [ ] **151.** `web/src/features/tasks/task-events.tsx:115-123` 连接后首个 `changes` 事件因 `revisions` 为 undefined，把 library / offline / movie-states / subscriptions 四类全部失效 → 每次打开页面重复请求一次；:38 `reconnect` 中的 `invalidateQueries` 多余 → 首个事件仅作基线，断线重连后才强制刷新。
 - [ ] **152.** 复核 `refetchOnMount: 'always'` 与 staleTime 的组合：`web/src/api/tasks.ts`、`movie-states.ts`、`subscriptions.ts`、设置类查询等。全局默认值现位于 `api/query-client.ts`；JavBus 设置查询已删除。按事件同步和重连恢复需求决定刷新策略，不应仅因 staleTime 与 always 共存就机械删除。
 - [ ] **153.** `web/src/api/offline.ts:66-88` `useAddOffline` 成功后 `setQueryData` + `invalidate` + SSE 再失效，同一数据刷新三次；:48-57 `useOfflineTasks` 在 select 中重复过滤（后端已按数据源返回），与全局查询共用 key 使其 `enabled` 形同虚设；`library.ts:56-70` 两个分支最终都 invalidate。
@@ -299,7 +97,7 @@
 - [ ] **165.** `internal/library/viewed.go:91-110` Count + 查最旧 + Delete 三步 → 单条 `DELETE … WHERE id NOT IN (SELECT id … ORDER BY viewed_at DESC LIMIT ?)`。
 - [ ] **166.** `internal/api/router.go:139-158` `installFrontend` 中 `fs.Stat` 对目录也成功，FileServer 会列出 `/assets/` 目录清单；带哈希的静态资源无长缓存头。
 - [ ] **167.** `internal/javdb/media.go:29-43` `FetchMedia` 接受任意 https 主机且 body 无大小上限，`/image` 成为登录后任意抓取器 → 限定 JavDB CDN 域名或复用 `netx.SafeDownload` + 上限。
-- [ ] **168.** `internal/gfriends/client.go:236` `errors.Join(errors.New(...), lastErr)` → `fmt.Errorf("fetch avatar: %w", lastErr)`；:113 Filetree 读取无大小限制。 第 61 项已将头像下载错误改为 fmt.Errorf 包装；Filetree 大小限制仍待处理。
+- [ ] **168.** `internal/gfriends/client.go:236` `errors.Join(errors.New(...), lastErr)` → `fmt.Errorf("fetch avatar: %w", lastErr)`；:113 Filetree 读取无大小限制。 头像下载错误已改为 fmt.Errorf 包装；Filetree 大小限制仍待处理。
 - [ ] **169.** `web/src/api/client.ts:30-61` `apiPost` / `apiPatch` / `apiPut` JSON 体逻辑重复 3 遍 → `sendJSON(method, path, body)`；`apiGet(path, undefined, signal)` 出现 15 次 → `apiGet(path, { query, signal })`；:85-89 `imageURL` 不属于请求客户端。
 - [ ] **170.** 查询键的组织和命名仍不统一：discoverKeys 位于 `web/src/api/movie-detail-cache.ts`，`pan.ts` 存在 library/offline 字面量键，subscriptionSettingsKey 与其他配置键风格不同。评估集中管理或按 API 模块导出，避免重复定义与循环依赖；已删除 JavBus API 文件的引用不再适用。
 - [ ] **171.** `web/src/api/network.ts` 更新失败时同时回滚和 invalidate，核实是否需要两者；Emby、订阅设置与网络设置的乐观更新策略不同，应按失败恢复和交互需求明确规则，而不是机械要求所有设置采用同一方式。JavBus 设置 API 已删除。
@@ -325,7 +123,7 @@
 
 - [ ] **182.** `catalogue.MovieDetail` 重新声明 `domain.MovieDetail` 的字段而非内嵌；`domain/library.go` 实际存放 MovieSummary / Media / OfflineSubmission，`ScanProgress` 位于 `source.go`，文件名与内容不符；`ScanPayload.Checkpoint` 是 JSON 中嵌套 JSON 字符串 → 结构化字段。
 - [ ] **183.** `internal/app/app.go` 初始化失败分支仍重复列出资源 Close；此前 scrape worker 清理遗漏已修复。评估以清理栈或局部辅助方式减少重复，必须保持资源逆序关闭，并明确哪些对象在构造成功前已有后台工作；不强制改成半初始化 App。
-- [ ] **184.** 导出默认值仍有重复：`internal/export/export.go` 保留 `./data/emby` 和硬编码 8080 的 defaultPublicURL，与 config.Load 推导不一致；app 的 EmbyDir 兜底已在第 103 项删除。统一在配置入口确定，底层导出使用明确配置。另核实前端 emby-url.ts、network-section.tsx 的 URL scheme/host 格式化重复，以及 netx/ip.go 注释与实现的差异。
+- [ ] **184.** 导出默认值仍有重复：`internal/export/export.go` 保留 `./data/emby` 和硬编码 8080 的 defaultPublicURL，与 config.Load 推导不一致；app 的 EmbyDir 兜底已删除。统一在配置入口确定，底层导出使用明确配置。另核实前端 emby-url.ts、network-section.tsx 的 URL scheme/host 格式化重复，以及 netx/ip.go 注释与实现的差异。
 
 ---
 
@@ -409,6 +207,6 @@
 
 - [ ] **238.** `internal/codeid/prototype_test.go` 以 `prototypeResolve` / `prototypeMatch` 重写一遍 `javdb.ResolveMovieID`，`prototypeQueries` 已与生产 `Queries` 分歧，文件头注释过时——测的是副本而非生产代码 → 迁到 javdb 包基于 fixture transport 测真实实现；`corpus_test.go:18` 与 `random_corpus_test.go:12` 语料加载器几乎相同 → `loadSamples(t, file, n)`。
 - [ ] **239.** 随生产路径清理重新评估相关测试：scan/subtitle_test.go 的旧命名与断言、scrape/dir_cache_test.go、subtitle 中 115 导出路径等。UploadSidecar 已删除；snapshot_test.go 已覆盖 movie 快照，不应按旧快照测试整体删除。保留断点恢复、快照失效、历史封面任务 JSON 兼容等有效回归测试，按当前生产调用逐项决定删除或迁移。
-  - 第 82–83 项已删除远端目录快照和写回校验专用测试/基准，保留并更新电影快照、视频指纹、数据源隔离、断点和事务测试；旧 ArtworkOrigin 格式测试改为旧封面任务通过 JavDB 恢复的集成测试。
-  - 第 78–80 项已删除旧 115 字幕扫描测试和专用实现，将混合导出测试改为在线字幕测试，并增加旧字幕存储迁移测试；这部分不再作为待办，其余测试归属与覆盖评估保留。
+  - 已删除远端目录快照和写回校验专用测试/基准，保留并更新电影快照、视频指纹、数据源隔离、断点和事务测试；旧 ArtworkOrigin 格式测试改为旧封面任务通过 JavDB 恢复的集成测试。
+  - 已删除旧 115 字幕扫描测试和专用实现，将混合导出测试改为在线字幕测试，并增加旧字幕存储迁移测试；这部分不再作为待办，其余测试归属与覆盖评估保留。
 - [ ] **240.** 复核低收益或重复测试：runtime 常量、简单 domain helper、任务容器基本操作、健康检查重复路径，以及 app 包中实际测试 library/scrape 的用例归属。pan 客户端测试已增加真实请求路径覆盖，不能沿用“未测 New”的旧结论；前端测试已迁移为 `.test.ts`，pan-login-poll.test.ts 的失败预算与恢复行为应保留，是否缩减需按实际覆盖收益判断。
