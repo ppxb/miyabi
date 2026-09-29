@@ -1,228 +1,179 @@
 import assert from 'node:assert/strict'
-import { test, vi } from 'vitest'
+import { setImmediate } from 'node:timers/promises'
+import { QueryClient, QueryObserver } from '@tanstack/react-query'
+import { onTestFinished, test, vi } from 'vitest'
 
-import { BrowseHistoryStore } from '@/api/browse-history-store'
+import {
+  browseHistoryKeys,
+  recordMovieViewOptions,
+  viewedMoviesOptions
+} from '@/api/browse-history'
 
-test('BrowseHistoryStore tracks viewed IDs and deduplicates entries', async () => {
-  const synced: string[] = []
-  const store = new BrowseHistoryStore({
-    syncViewed: async ids => {
-      synced.push(...ids)
-    },
-    storageKey: 'test:browse_history'
+function fixture() {
+  vi.stubGlobal('window', { location: { origin: 'http://localhost' }, dispatchEvent: vi.fn() })
+  const client = new QueryClient({
+    defaultOptions: { queries: { gcTime: Infinity, retry: false } }
   })
+  onTestFinished(() => client.clear())
+  return client
+}
 
-  assert.equal(store.isViewed('test-id-1'), false)
-  assert.equal(store.isViewed(undefined), false)
+function record(client: QueryClient, id: string) {
+  const mutation = client
+    .getMutationCache()
+    .build(client, { ...recordMovieViewOptions(client, id), retryDelay: 0 })
+  return { mutation, finished: mutation.execute(undefined) }
+}
 
-  store.recordView('test-id-1')
-  store.recordView(' test-id-1 ')
-  store.recordView('   ')
+function observe(client: QueryClient) {
+  const observer = new QueryObserver(client, viewedMoviesOptions)
+  const unsubscribe = observer.subscribe(() => {})
+  onTestFinished(unsubscribe)
+  return observer
+}
 
-  assert.equal(store.isViewed('test-id-1'), true)
-  assert.equal(store.isViewed('test-id-2'), false)
-  assert.equal(store.getPendingCount(), 1)
-
-  await store.flush()
-  assert.equal(store.getPendingCount(), 0)
-  assert.deepEqual(synced, ['test-id-1'])
+test('cards share the viewed query instead of fetching once per card', async () => {
+  const client = fixture()
+  const response = Promise.withResolvers<Response>()
+  const fetch = vi.fn(() => response.promise)
+  vi.stubGlobal('fetch', fetch)
+  const first = observe(client)
+  const second = observe(client)
+  assert.equal(fetch.mock.calls.length, 1)
+  response.resolve(Response.json(['one']))
+  await setImmediate()
+  assert.deepEqual(first.getCurrentResult().data, ['one'])
+  assert.deepEqual(second.getCurrentResult().data, ['one'])
 })
 
-test('BrowseHistoryStore keeps pending entries when sync fails', async () => {
-  let fail = true
-  const store = new BrowseHistoryStore({
-    syncViewed: async () => {
-      if (fail) throw new Error('offline')
-    },
-    storageKey: 'test:browse_retry'
-  })
-  store.recordView('retry-id')
-  await store.flush()
-  assert.equal(store.getPendingCount(), 1)
-  fail = false
-  await store.flush()
-  assert.equal(store.getPendingCount(), 0)
+test('a view posts immediately and is pending until the server confirms it', async () => {
+  const client = fixture()
+  client.setQueryData(browseHistoryKeys.viewed, ['old'])
+  const response = Promise.withResolvers<Response>()
+  const fetch = vi.fn(() => response.promise)
+  vi.stubGlobal('fetch', fetch)
+  const { mutation, finished } = record(client, 'new')
+  await setImmediate()
+  assert.equal(client.isMutating({ mutationKey: browseHistoryKeys.record('new'), exact: true }), 1)
+  assert.deepEqual(client.getQueryData(browseHistoryKeys.viewed), ['old'])
+  assert.equal(fetch.mock.calls.length, 1)
+  const [url, options] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+  assert.equal(url, '/api/discover/viewed')
+  assert.equal(options.method, 'POST')
+  assert.deepEqual(JSON.parse(options.body as string), { ids: ['new'] })
+  response.resolve(Response.json(null))
+  await finished
+  assert.equal(mutation.state.status, 'success')
+  assert.deepEqual(client.getQueryData(browseHistoryKeys.viewed), ['new', 'old'])
 })
 
-test('BrowseHistoryStore batch triggers flush at 50 items', async () => {
-  const syncedBatches: string[][] = []
-  const store = new BrowseHistoryStore({
-    syncViewed: async ids => {
-      syncedBatches.push([...ids])
-    },
-    storageKey: 'test:browse_batch'
-  })
-
-  for (let i = 0; i < 49; i++) store.recordView(`item-${i}`)
-  assert.equal(syncedBatches.length, 0)
-  assert.equal(store.getPendingCount(), 49)
-
-  store.recordView('item-49')
-  await new Promise(resolve => setTimeout(resolve, 10))
-  assert.equal(syncedBatches.length, 1)
-  assert.equal(syncedBatches[0]!.length, 50)
-  assert.equal(store.getPendingCount(), 0)
-})
-
-test('BrowseHistoryStore flushKeepalive clears pending and persists state', () => {
-  const originalWindow = globalThis.window
-  const originalNavDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
-  const originalLocalStorage = globalThis.localStorage
-
-  const storage = new Map<string, string>()
-  const beacons: { url: string | URL; blob: Blob }[] = []
-
-  const mockStorage = {
-    getItem: (key: string) => storage.get(key) ?? null,
-    setItem: (key: string, val: string) => storage.set(key, val),
-    removeItem: (key: string) => storage.delete(key)
-  }
-  vi.stubGlobal('localStorage', mockStorage)
-  vi.stubGlobal('window', {
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    localStorage: mockStorage
-  })
-  Object.defineProperty(globalThis, 'navigator', {
-    value: {
-      sendBeacon: (url: string | URL, blob: Blob) => {
-        beacons.push({ url, blob })
-        return true
-      }
-    },
-    configurable: true
-  })
-
-  try {
-    const store = new BrowseHistoryStore({ storageKey: 'test:keepalive_clear' })
-    store.recordView('movie-1')
-    assert.equal(store.getPendingCount(), 1)
-
-    store.flushKeepalive()
-
-    assert.equal(beacons.length, 1)
-    assert.equal(beacons[0]!.url, '/api/discover/viewed')
-    assert.equal(store.getPendingCount(), 0)
-
-    const saved = JSON.parse(storage.get('test:keepalive_clear')!)
-    assert.deepEqual(saved.pending, [])
-    assert.deepEqual(saved.ids, ['movie-1'])
-  } finally {
-    globalThis.window = originalWindow
-    if (originalNavDesc) {
-      Object.defineProperty(globalThis, 'navigator', originalNavDesc)
-    }
-    globalThis.localStorage = originalLocalStorage
-  }
-})
-
-test('BrowseHistoryStore flushKeepalive does not send duplicate beacon while flush is in flight', async () => {
-  const originalWindow = globalThis.window
-  const originalNavDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
-  const originalLocalStorage = globalThis.localStorage
-
-  const storage = new Map<string, string>()
-  const beacons: { url: string | URL; blob: Blob }[] = []
-  const { promise: syncPromise, resolve: resolveSync } = Promise.withResolvers<void>()
-
-  const mockStorage = {
-    getItem: (key: string) => storage.get(key) ?? null,
-    setItem: (key: string, val: string) => storage.set(key, val),
-    removeItem: (key: string) => storage.delete(key)
-  }
-  vi.stubGlobal('localStorage', mockStorage)
-  vi.stubGlobal('window', {
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    localStorage: mockStorage
-  })
-  Object.defineProperty(globalThis, 'navigator', {
-    value: {
-      sendBeacon: (url: string | URL, blob: Blob) => {
-        beacons.push({ url, blob })
-        return true
-      }
-    },
-    configurable: true
-  })
-
-  try {
-    const store = new BrowseHistoryStore({
-      storageKey: 'test:keepalive_inflight',
-      syncViewed: async () => {
-        await syncPromise
-      }
+test('a failed optimistic view does not remove a concurrent successful view', async () => {
+  const client = fixture()
+  client.setQueryData(browseHistoryKeys.viewed, ['old'])
+  const firstResponse = Promise.withResolvers<Response>()
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((_url: string, options: RequestInit) => {
+      const { ids } = JSON.parse(options.body as string)
+      return ids[0] === 'first' ? firstResponse.promise : Promise.resolve(Response.json(null))
     })
-    store.recordView('movie-2')
-    assert.equal(store.getPendingCount(), 1)
-
-    const flushPromise = store.flush()
-    store.flushKeepalive()
-
-    assert.equal(beacons.length, 0)
-    assert.equal(store.getPendingCount(), 1)
-
-    resolveSync()
-    await flushPromise
-
-    assert.equal(store.getPendingCount(), 0)
-    assert.equal(beacons.length, 0)
-  } finally {
-    globalThis.window = originalWindow
-    if (originalNavDesc) {
-      Object.defineProperty(globalThis, 'navigator', originalNavDesc)
-    }
-    globalThis.localStorage = originalLocalStorage
-  }
+  )
+  const first = record(client, 'first')
+  const failure = assert.rejects(first.finished)
+  const second = record(client, 'second')
+  await second.finished
+  assert.equal(first.mutation.state.status, 'pending')
+  firstResponse.resolve(Response.json({ error: 'invalid' }, { status: 400 }))
+  await failure
+  assert.equal(first.mutation.state.status, 'error')
+  assert.deepEqual(client.getQueryData(browseHistoryKeys.viewed), ['second', 'old'])
 })
 
-test('keepalive fallback preserves failed batches and acknowledges only successful IDs', async () => {
-  const originalWindow = globalThis.window
-  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
-  const originalFetch = globalThis.fetch
-  const saved = new Map<string, string>()
-  vi.stubGlobal('window', {
-    addEventListener: () => {},
-    localStorage: {
-      getItem: (key: string) => saved.get(key),
-      setItem: (key: string, value: string) => saved.set(key, value)
-    }
-  })
-  Object.defineProperty(globalThis, 'navigator', {
-    value: { sendBeacon: () => false },
-    configurable: true
-  })
-  try {
-    const store = new BrowseHistoryStore({ storageKey: 'test:fallback' })
-    store.recordView('first')
-    for (const fail of [
-      async () => new Response(null, { status: 500 }),
-      async () => {
-        throw new Error('offline')
-      }
-    ]) {
-      globalThis.fetch = fail
-      await store.flushKeepalive()
-      assert.equal(store.getPendingCount(), 1)
-      assert.deepEqual(JSON.parse(saved.get('test:fallback')!).pending, ['first'])
-    }
-    const { promise: response, resolve: finish } = Promise.withResolvers<Response>()
-    let requests = 0
-    globalThis.fetch = () => {
-      requests++
-      return response
-    }
-    const pending = store.flushKeepalive()
-    await store.flushKeepalive()
-    assert.equal(requests, 1)
-    store.recordView('second')
-    finish(new Response())
-    await pending
-    assert.deepEqual(JSON.parse(saved.get('test:fallback')!).pending, ['second'])
-  } finally {
-    globalThis.window = originalWindow
-    globalThis.fetch = originalFetch
-    if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator)
-    else Reflect.deleteProperty(globalThis, 'navigator')
-  }
+test('a first GET preserves existing server history and concurrent confirmed writes', async () => {
+  const client = fixture()
+  const stale = Promise.withResolvers<Response>()
+  let signal: AbortSignal | null | undefined
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((_url: string, options: RequestInit) => {
+      if (options.method === 'POST') return Promise.resolve(Response.json(null))
+      signal = options.signal
+      return stale.promise
+    })
+  )
+  const read = client.fetchQuery(viewedMoviesOptions).catch(() => undefined)
+  await record(client, 'new').finished
+  assert.equal(signal?.aborted, false)
+  stale.resolve(Response.json(['old']))
+  await read
+  await setImmediate()
+  assert.deepEqual(client.getQueryData(browseHistoryKeys.viewed), ['new', 'old'])
+})
+
+test('writes avoid full-list requests and preserve staleness until the next page visit', async () => {
+  const client = fixture()
+  const updatedAt = Date.now() - 30_000
+  client.setQueryData(browseHistoryKeys.viewed, ['old', 'evicted'], { updatedAt })
+  const fetch = vi.fn((_url: string, options: RequestInit) =>
+    Promise.resolve(Response.json(options.method === 'POST' ? null : ['new', 'old']))
+  )
+  vi.stubGlobal('fetch', fetch)
+  observe(client)
+  await record(client, 'new').finished
+  assert.equal(fetch.mock.calls.length, 1)
+  assert.equal(fetch.mock.calls[0]![1].method, 'POST')
+  assert.deepEqual(client.getQueryData(browseHistoryKeys.viewed), ['new', 'old', 'evicted'])
+  assert.equal(client.getQueryState(browseHistoryKeys.viewed)?.dataUpdatedAt, updatedAt)
+  observe(client)
+  assert.equal(fetch.mock.calls.length, 1)
+  vi.spyOn(Date, 'now').mockReturnValue(updatedAt + 61_000)
+  observe(client)
+  await setImmediate()
+  assert.equal(fetch.mock.calls.length, 2)
+  assert.deepEqual(client.getQueryData(browseHistoryKeys.viewed), ['new', 'old'])
+})
+
+test('transient writes retry but rejected requests do not', async () => {
+  const client = fixture()
+  const fetch = vi
+    .fn()
+    .mockRejectedValueOnce(new TypeError('offline'))
+    .mockResolvedValueOnce(Response.json({ error: 'busy' }, { status: 503 }))
+    .mockResolvedValueOnce(Response.json(null))
+  vi.stubGlobal('fetch', fetch)
+  await record(client, 'retried').finished
+  assert.equal(fetch.mock.calls.length, 3)
+  fetch.mockReset().mockResolvedValue(Response.json({ error: 'invalid' }, { status: 400 }))
+  await assert.rejects(record(client, 'rejected').finished)
+  assert.equal(fetch.mock.calls.length, 1)
+  assert.deepEqual(client.getQueryData(browseHistoryKeys.viewed), ['retried'])
+})
+
+test('initial history lookup can recover after a transient failure', async () => {
+  const client = fixture()
+  const fetch = vi
+    .fn()
+    .mockRejectedValueOnce(new TypeError('offline'))
+    .mockResolvedValueOnce(Response.json(['saved']))
+  vi.stubGlobal('fetch', fetch)
+  const data = await client.fetchQuery({ ...viewedMoviesOptions, retryDelay: 0 })
+  assert.deepEqual(data, ['saved'])
+  assert.equal(fetch.mock.calls.length, 2)
+})
+
+test('local confirmed views stay bounded and deduplicated without refreshing', async () => {
+  const client = fixture()
+  client.setQueryData(
+    browseHistoryKeys.viewed,
+    Array.from({ length: 5000 }, (_, i) => String(i))
+  )
+  const fetch = vi.fn(() => Promise.resolve(Response.json(null)))
+  vi.stubGlobal('fetch', fetch)
+  await record(client, 'new').finished
+  await record(client, 'new').finished
+  const ids = client.getQueryData<string[]>(browseHistoryKeys.viewed)!
+  assert.equal(ids.length, 5000)
+  assert.equal(ids[0], 'new')
+  assert.equal(ids.includes('4999'), false)
+  assert.equal(fetch.mock.calls.length, 2)
 })

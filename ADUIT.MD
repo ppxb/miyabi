@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：171 条待处理，8 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：170 条待处理，9 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -58,7 +58,10 @@
   - 方案修正：JavDB 推荐仅提供基础引用，卡片所需标题等字段必须补全；保留可见性触发、后台两路并发、共享消费者、撤销未开始请求、点击优先及导航请求复用。placeholderData 不能替代跨查询订阅，不按原候选方案强行删除调度和 useSyncExternalStore。
   - 实现：删除额外 WeakMap 卡片索引、永久 QueryCache 订阅和全量重建，直接从 Query 缓存选取最新卡片；集中卡片查询范围与订阅过滤，订阅随组件卸载释放，忽略无关查询移除。列表替换后不再残留已移除卡片，完整详情缓存不混入列表数据。
   - 验证：Vitest 113 项、typecheck、lint 通过，保留并发/优先/取消/导航复用测试，新增列表替换与移除、失效缓存补全、相关事件订阅与释放测试。未进行浏览器交互及真实 JavDB 联调，待整体复查。
-- [ ] **67.** `web/src/api/browse-history-store.ts`（199 行）+ `browse-history.ts`：为"已浏览"徽章做 localStorage 持久化 + 服务端合并 + 50 条批量 + 10s 防抖 + beacon + 5000 截断（:178-183，服务端返回全部，不一致）；测试专用 `unref`（:136-139）进入生产代码；:47 注释引用已不存在的 `REFACTOR_PLAN`；`browse-history.ts:13` 每卡片 effect 调 `init()`，:15 `subscribe` 每次渲染新建 → `useQuery` + 乐观 `useMutation`，整个 store 删除。
+- [x] **67.** `web/src/api/browse-history-store.ts`（199 行）+ `browse-history.ts`：为"已浏览"徽章做 localStorage 持久化 + 服务端合并 + 50 条批量 + 10s 防抖 + beacon + 5000 截断（:178-183，服务端返回全部，不一致）；测试专用 `unref`（:136-139）进入生产代码；:47 注释引用已不存在的 `REFACTOR_PLAN`；`browse-history.ts:13` 每卡片 effect 调 `init()`，:15 `subscribe` 每次渲染新建 → `useQuery` + 乐观 `useMutation`，整个 store 删除。
+  - 核实与取舍：当前服务端同样限制 5000 条，原文“服务端返回全部”已不适用。采用服务端记录与 Query 缓存；用户已接受未提交成功就关闭页面的记录不再跨重启补发，旧 localStorage 待提交内容不再读取。
+  - 实现：删除 BrowseHistoryStore、localStorage 合并、延迟批量、退出 beacon 和手动订阅；共享 useQuery 获取记录，useMutation 立即提交并短期重试网络/服务端错误，useMutationState 提供提交中乐观徽章，失败不回滚其他记录。成功后仅更新缓存，保留服务端同步时间，过期后随页面挂载或窗口聚焦同步；查询合并请求期间新确认的记录，避免首次加载覆盖新记录，本地缓存同样限制 5000 条。保持空 ID 和同 ID 进行中提交去重。
+  - 验证：初次迁移生产 build 通过；后续减少全量刷新优化经 Vitest 115 项、typecheck、lint 验证，覆盖查询共享、立即提交、并发成功/失败、首次 GET 合并、提交不触发 GET、不延后缓存过期、服务端淘汰替换、5000 条上限及查询/提交重试。浏览器徽章、跨页面及网络切换交互待用户验证，待整体复查。
 - [ ] **68.** `web/src/lib/pan-login.ts:11-19` `panLoginShouldRetry` 等价于 `retry: 4`，却配 146 行测试解释 react-query 内部行为；115 专用逻辑不应在 `lib/`。
 - [ ] **69.** `internal/drive/events.go` 整套 eventBus（RWMutex + 自增 ID + map + 取消函数）只有 `library.go:80` 一个订阅者且丢弃取消函数 → 单个 listener 字段。
 - [ ] **70.** `internal/netx/ssrf.go:216-236` functional options 只剩 `WithAllowLoopback`（测试开关，且 dialer 仍拦 loopback，所以 `subtitle.WithAllowLoopbackForTesting` 被迫换直连 client）；`WithMaxBytes` 仅测试使用。
