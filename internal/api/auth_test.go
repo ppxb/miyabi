@@ -121,7 +121,7 @@ func TestAuth_EnabledGateEnforcesJWT(t *testing.T) {
 		}
 	}
 
-	// 4. Login with correct password -> yields token & cookie
+	// 4. Login returns metadata; the JWT is only in the HttpOnly cookie.
 	var token string
 	var cookieHeader string
 	{
@@ -143,10 +143,13 @@ func TestAuth_EnabledGateEnforcesJWT(t *testing.T) {
 		if err := json.Unmarshal(rec.Body.Bytes(), &loginResp); err != nil {
 			t.Fatalf("unmarshal login resp: %v", err)
 		}
-		if !loginResp.Success || loginResp.Token == "" {
-			t.Fatalf("expected success with non-empty token, got %+v", loginResp)
+		if !loginResp.Success || loginResp.Token != "" || loginResp.ExpiresAt == 0 {
+			t.Fatalf("expected success without a JSON token, got %+v", loginResp)
 		}
-		token = loginResp.Token
+		token = rec.Result().Cookies()[0].Value
+		if _, err := gate.VerifyToken(token); err != nil {
+			t.Fatalf("cookie does not contain a valid JWT: %v", err)
+		}
 
 		cookieHeader = rec.Header().Get("Set-Cookie")
 		if !strings.Contains(cookieHeader, "miyabi_token=") {
@@ -164,8 +167,8 @@ func TestAuth_EnabledGateEnforcesJWT(t *testing.T) {
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusOK {
-			t.Fatalf("expected status 200 with Bearer token, got %d", rec.Code)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("expected status 401 with Bearer token, got %d", rec.Code)
 		}
 	}
 
@@ -187,8 +190,8 @@ func TestAuth_EnabledGateEnforcesJWT(t *testing.T) {
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusOK {
-			t.Fatalf("expected status 200 with query token, got %d", rec.Code)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("expected status 401 with query token, got %d", rec.Code)
 		}
 	}
 
@@ -284,4 +287,3 @@ func TestAuth_UntrustedProxiesIgnoreSpoofedIP(t *testing.T) {
 		}
 	}
 }
-

@@ -25,9 +25,8 @@ type accessLoginInput struct {
 }
 
 type accessLoginResponse struct {
-	Success   bool   `json:"success"`
-	Token     string `json:"token,omitempty"`
-	ExpiresAt int64  `json:"expires_at,omitempty"`
+	Success   bool  `json:"success"`
+	ExpiresAt int64 `json:"expires_at,omitempty"`
 }
 
 func accessConfigHandler(gate AccessGate) gin.HandlerFunc {
@@ -99,7 +98,6 @@ func accessLoginHandler(gate AccessGate, limiter *loginRateLimiter) gin.HandlerF
 
 		respond(c, accessLoginResponse{
 			Success:   true,
-			Token:     token,
 			ExpiresAt: expiresAt,
 		}, nil)
 	}
@@ -141,23 +139,19 @@ func authMiddleware(gate AccessGate) gin.HandlerFunc {
 }
 
 func extractToken(c *gin.Context) string {
-	// 1. Authorization: Bearer <token>
-	authHeader := c.GetHeader("Authorization")
-	if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
-		return strings.TrimSpace(authHeader[7:])
-	}
+	token, _ := c.Cookie(cookieAuthToken)
+	return token
+}
 
-	// 2. Cookie
-	if cookie, err := c.Cookie(cookieAuthToken); err == nil && cookie != "" {
-		return cookie
+func sameOriginMiddleware() gin.HandlerFunc {
+	protection := http.NewCrossOriginProtection()
+	return func(c *gin.Context) {
+		if err := protection.Check(c.Request); err != nil {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "不允许跨来源修改请求", "code": "CROSS_ORIGIN_DENIED"})
+			return
+		}
+		c.Next()
 	}
-
-	// 3. URL Query parameter ?token=...
-	if queryToken := c.Query("token"); queryToken != "" {
-		return queryToken
-	}
-
-	return ""
 }
 
 func setAuthCookie(c *gin.Context, token string, maxAge int) {

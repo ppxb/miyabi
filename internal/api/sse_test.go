@@ -97,7 +97,12 @@ func readEvent(t *testing.T, reader *bufio.Reader) sseEvent {
 
 func TestTaskEventsStreamsSnapshotsAndRevisionsUntilTheClientLeaves(t *testing.T) {
 	stub := newSSETaskStub()
-	server := httptest.NewServer(NewRouter(Dependencies{Tasks: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}))
+	gate := NewAccessGateService("password", "secret")
+	token, _, err := gate.GenerateToken("admin", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(NewRouter(Dependencies{Access: gate, Tasks: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}))
 	defer server.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -106,6 +111,7 @@ func TestTaskEventsStreamsSnapshotsAndRevisionsUntilTheClientLeaves(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
+	request.AddCookie(&http.Cookie{Name: cookieAuthToken, Value: token})
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatal(err)

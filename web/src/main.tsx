@@ -5,8 +5,11 @@ import { RouterProvider } from '@tanstack/react-router'
 import { ThemeProvider } from 'next-themes'
 
 import { router } from '@/router'
+import { clearLegacyAuthToken } from '@/api/client'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import '@/styles/globals.css'
+
+clearLegacyAuthToken()
 
 const queryClient = new QueryClient({
   defaultOptions: {

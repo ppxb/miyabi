@@ -60,29 +60,16 @@ export function apiPut<T>(
   })
 }
 
-const TOKEN_STORAGE_KEY = 'miyabi_jwt_token'
-
-export function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem(TOKEN_STORAGE_KEY)
-}
-
-export function setAuthToken(token: string | undefined): void {
-  if (typeof window === 'undefined') return
-  if (token) {
-    localStorage.setItem(TOKEN_STORAGE_KEY, token)
-  } else {
-    localStorage.removeItem(TOKEN_STORAGE_KEY)
+// Remove credentials saved by older versions without requiring storage access to sign in.
+export function clearLegacyAuthToken(): void {
+  try {
+    localStorage.removeItem('miyabi_jwt_token')
+  } catch {
+    // Storage can be unavailable or blocked; authentication now uses cookies.
   }
 }
 
-export function clearAuthToken(): void {
-  if (typeof window === 'undefined') return
-  localStorage.removeItem(TOKEN_STORAGE_KEY)
-}
-
 export function notifyUnauthorized(): void {
-  clearAuthToken()
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('miyabi:unauthorized'))
   }
@@ -96,15 +83,9 @@ export function imageURL(source: string) {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers = new Headers(init?.headers)
-  const token = getAuthToken()
-  if (token && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${token}`)
-  }
-
   const response = await fetch(path, {
     ...init,
-    headers
+    credentials: 'same-origin'
   })
 
   if (!response.ok) {

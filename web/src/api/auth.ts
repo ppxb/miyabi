@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { apiGet, apiPost, clearAuthToken, setAuthToken } from '@/api/client'
+import { apiGet, apiPost } from '@/api/client'
 
 export type AccessGateConfig = {
   enabled: boolean
@@ -9,7 +9,6 @@ export type AccessGateConfig = {
 
 export type LoginResponse = {
   success: boolean
-  token?: string
   expires_at?: number
 }
 
@@ -30,10 +29,7 @@ export function useAccessGateLogin() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (password: string) => apiPost<LoginResponse>('/api/auth/login', { password }),
-    onSuccess: data => {
-      if (data.token) {
-        setAuthToken(data.token)
-      }
+    onSuccess: () => {
       queryClient.setQueryData<AccessGateConfig>(authKeys.config, {
         enabled: true,
         authenticated: true
@@ -47,7 +43,6 @@ export function useAccessGateLogout() {
   return useMutation({
     mutationFn: () => apiPost<{ success: boolean }>('/api/auth/logout'),
     onSuccess: () => {
-      clearAuthToken()
       queryClient.setQueryData<AccessGateConfig>(authKeys.config, prev => ({
         enabled: prev?.enabled ?? true,
         authenticated: false

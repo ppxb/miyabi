@@ -56,7 +56,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	loginLimiter := newLoginRateLimiter(5, 5*time.Minute, 24*time.Hour)
 
-	api := router.Group("/api")
+	api := router.Group("/api", sameOriginMiddleware())
 	api.GET("/health", healthHandler(deps.Health))
 
 	authAPI := api.Group("/auth", noStore())

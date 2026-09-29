@@ -10,7 +10,7 @@ import {
   type PropsWithChildren
 } from 'react'
 
-import { getAuthToken, notifyUnauthorized } from '@/api/client'
+import { notifyUnauthorized } from '@/api/client'
 import { invalidateMovieStates } from '@/api/movie-state-cache'
 import { libraryKeys } from '@/api/library'
 import { offlineKeys } from '@/api/offline'
@@ -68,10 +68,9 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
       try {
         const controller = new AbortController()
         const timer = setTimeout(() => controller.abort(), 5000)
-        const token = getAuthToken()
         const response = await fetch('/api/tasks/events', {
           signal: controller.signal,
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
+          credentials: 'same-origin'
         })
         clearTimeout(timer)
         if (response.status === 401) {

@@ -1,7 +1,34 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { ApiError, apiPost, notifyUnauthorized } from '../src/api/client.ts'
+import { ApiError, apiPost, clearLegacyAuthToken, notifyUnauthorized } from '../src/api/client.ts'
+
+test('requests use cookies without reading or sending a stored JWT', async t => {
+  const originalStorage = globalThis.localStorage
+  globalThis.localStorage = {
+    getItem() { throw new Error('must not read credentials') }
+  }
+  t.after(() => { globalThis.localStorage = originalStorage })
+  t.mock.method(globalThis, 'fetch', async (path, init) => {
+    assert.equal(init.credentials, 'same-origin')
+    assert.equal(new Headers(init.headers).has('Authorization'), false)
+    assert.equal(new Headers(init.headers).get('Content-Type'), 'application/json')
+    return new Response('{}')
+  })
+  await apiPost('/api/test', { value: 1 })
+})
+
+test('upgrade removes only the legacy JWT and tolerates blocked storage', t => {
+  const originalStorage = globalThis.localStorage
+  t.after(() => { globalThis.localStorage = originalStorage })
+  const storage = new Map([['miyabi_jwt_token', 'old-token'], ['miyabi-theme', 'dark']])
+  globalThis.localStorage = { removeItem: key => storage.delete(key) }
+  clearLegacyAuthToken()
+  assert.equal(storage.has('miyabi_jwt_token'), false)
+  assert.equal(storage.get('miyabi-theme'), 'dark')
+  globalThis.localStorage = { removeItem() { throw new Error('blocked') } }
+  assert.doesNotThrow(clearLegacyAuthToken)
+})
 
 for (const scenario of [
   {
@@ -78,7 +105,7 @@ test('cancellation while reading an error body remains cancellation', async t =>
   await assert.rejects(apiPost('/api/test'), actual => actual === error)
 })
 
-test('401 with code UNAUTHORIZED clears token and dispatches miyabi:unauthorized', async t => {
+test('401 with code UNAUTHORIZED dispatches miyabi:unauthorized', async t => {
   const events = []
   const storage = new Map([['miyabi_jwt_token', 'test-token']])
   const originalWindow = globalThis.window
@@ -114,7 +141,7 @@ test('401 with code UNAUTHORIZED clears token and dispatches miyabi:unauthorized
     return true
   })
 
-  assert.equal(storage.has('miyabi_jwt_token'), false)
+  assert.equal(storage.get('miyabi_jwt_token'), 'test-token')
   assert.deepEqual(events, ['miyabi:unauthorized'])
 })
 
@@ -159,7 +186,7 @@ test('401 without code UNAUTHORIZED preserves token and does not dispatch miyabi
   assert.deepEqual(events, [])
 })
 
-test('notifyUnauthorized clears token and dispatches miyabi:unauthorized', () => {
+test('notifyUnauthorized dispatches miyabi:unauthorized', () => {
   const events = []
   const storage = new Map([['miyabi_jwt_token', 'test-token']])
   const originalWindow = globalThis.window
@@ -176,7 +203,7 @@ test('notifyUnauthorized clears token and dispatches miyabi:unauthorized', () =>
 
   try {
     notifyUnauthorized()
-    assert.equal(storage.has('miyabi_jwt_token'), false)
+    assert.equal(storage.get('miyabi_jwt_token'), 'test-token')
     assert.deepEqual(events, ['miyabi:unauthorized'])
   } finally {
     globalThis.window = originalWindow

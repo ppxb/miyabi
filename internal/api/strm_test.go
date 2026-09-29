@@ -154,18 +154,18 @@ func TestSTRMStreamHandlerAcceptsSignedInSessionsBehindTheAccessGate(t *testing.
 		t.Fatal(err)
 	}
 	for _, scenario := range []struct {
-		name, path, authorization string
-		status                    int
+		name, path, cookie string
+		status             int
 	}{
 		{name: "anonymous", path: "/api/strm/play/12345", status: http.StatusUnauthorized},
 		{name: "strm token", path: "/api/strm/play/12345?token=secret123", status: http.StatusFound},
-		{name: "signed in", path: "/api/strm/play/12345", authorization: "Bearer " + session, status: http.StatusFound},
-		{name: "forged session", path: "/api/strm/play/12345", authorization: "Bearer forged", status: http.StatusUnauthorized},
+		{name: "signed in", path: "/api/strm/play/12345", cookie: session, status: http.StatusFound},
+		{name: "forged session", path: "/api/strm/play/12345", cookie: "forged", status: http.StatusUnauthorized},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodGet, scenario.path, nil)
-			if scenario.authorization != "" {
-				request.Header.Set("Authorization", scenario.authorization)
+			if scenario.cookie != "" {
+				request.AddCookie(&http.Cookie{Name: cookieAuthToken, Value: scenario.cookie})
 			}
 			response := httptest.NewRecorder()
 			router.ServeHTTP(response, request)
