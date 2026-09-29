@@ -31,7 +31,6 @@ export function PanDirectoryRow({
           {directory ? (
             <Input
               value={directory.path}
-
               disabled
               className="min-w-0 flex-1 text-ellipsis sm:w-64 sm:flex-none"
             />

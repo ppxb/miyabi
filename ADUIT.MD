@@ -213,7 +213,9 @@
   - 已完成：用户确认当前产品不需要这三个独立入口后，删除路由、专用 handler/请求类型、接口声明及单影片离线历史查询方法；删除专用退出/本地扫描接口测试。内部 startLocalScan 改为包内方法，移除已无调用的显式路径参数。
   - 保留：启动与配置目录切换仍通过 ScheduleLocalScan 入队；媒体库扫描继续重试待发送 Emby 通知；登录、Cookie 认证、统一离线活动接口和离线提交接口不变。历史查询测试迁往 Activity，保留最新记录、进行中任务和账号/目录隔离验证；本地任务去重、执行及目录变更检查仍有业务测试覆盖。
   - 验证：api、library（含 scan/scrape）、offline、emby、app 包测试及 git diff --check 通过；新增路由表测试确认三个入口已移除且现有操作路由仍注册，保留切换目录自动扫描、重启恢复及媒体库扫描触发 Emby 重试测试。未进行浏览器或真实 Emby 联调。
-- [ ] **110.** 删除属性后残留空行：`ui/input-group.tsx:13`（原 `role="group"`）、`ui/breadcrumb.tsx:57/68/82`（原 role / aria-hidden / aria-current）、`ui/dialog.tsx:62-64` 删除了 `sr-only` 文案、`search/page.tsx:67`、`settings/pan-section.tsx:40/62/76`、`pan-directory-row.tsx:34`；`internal/domain/video.go:30-31` 双空行（唯一 gofmt 报告）。
+- [x] **110.** 删除属性后残留空行：`ui/input-group.tsx:13`（原 `role="group"`）、`ui/breadcrumb.tsx:57/68/82`（原 role / aria-hidden / aria-current）、`ui/dialog.tsx:62-64` 删除了 `sr-only` 文案、`search/page.tsx:67`、`settings/pan-section.tsx:40/62/76`、`pan-directory-row.tsx:34`；`internal/domain/video.go:30-31` 双空行（唯一 gofmt 报告）。
+  - 已完成：清除上述文件残留空行，使用 oxfmt/gofmt 格式化相关文件；为通用弹窗关闭按钮补充 aria-label="关闭"，不机械恢复其他已删除的 role/ARIA 属性。
+  - 验证：前端 TypeScript 类型检查、oxlint 及 git diff --check 通过；未进行浏览器测试。
 - [ ] **111.** `cn` 导入不统一：`ui/hover-card.tsx:2`、`ui/popover.tsx:2`、`ui/dropdown-menu.tsx:2` 直接 `from 'cn'`，其余 `@/lib/utils`；`dropdown-menu.tsx` 未过 oxfmt（双引号、长行）。
 
 ---

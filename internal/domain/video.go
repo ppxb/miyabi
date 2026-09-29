@@ -28,7 +28,6 @@ func IsMedia(name string) bool {
 	return IsVideo(name) || IsSTRM(name)
 }
 
-
 // IsSubtitle reports whether a filename has a recognized subtitle extension.
 func IsSubtitle(name string) bool {
 	switch strings.ToLower(path.Ext(name)) {

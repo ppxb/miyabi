@@ -64,7 +64,6 @@ function SearchForm({
         </InputGroupAddon>
         <InputGroupInput
           type="text"
-
           inputMode="search"
           enterKeyHint="search"
           value={draft}
