@@ -57,17 +57,16 @@ func TestValidateSafeURL(t *testing.T) {
 	}
 
 	for _, u := range prohibited {
-		_, err := ValidateSafeURL(ctx, u, false)
+		_, err := ValidateSafeURL(ctx, u)
 		if err == nil {
 			t.Errorf("URL %s should be rejected", u)
 		}
 	}
 
-	// Allowed public domain
-	_, err := ValidateSafeURL(ctx, "https://example.com/subtitle.srt", false)
+	// A public literal avoids depending on external DNS.
+	_, err := ValidateSafeURL(ctx, "https://93.184.216.34/subtitle.srt")
 	if err != nil {
-		// If DNS resolution fails in offline environment, ignore, otherwise ensure no false positive
-		t.Logf("DNS resolve result for example.com: %v", err)
+		t.Fatalf("public URL rejected: %v", err)
 	}
 }
 
@@ -82,12 +81,28 @@ func TestSafeDownload_BlocksLoopback(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	_, err := SafeDownload(ctx, client, server.URL, WithMaxBytes(1024))
+	_, err := SafeDownload(ctx, client, server.URL)
 	if err == nil {
 		t.Fatalf("SafeDownload must block loopback test server")
 	}
 	if !strings.Contains(err.Error(), "prohibited") && !strings.Contains(err.Error(), "blocked") {
 		t.Errorf("expected prohibition error, got: %v", err)
+	}
+}
+
+func TestSafeTransportBlocksPrivateAddressesAtDialTime(t *testing.T) {
+	transport := NewSafeTransport(nil)
+	defer transport.CloseIdleConnections()
+	for _, address := range []string{"127.0.0.1:80", "[::1]:80", "localhost:80", "10.0.0.1:80"} {
+		t.Run(address, func(t *testing.T) {
+			conn, err := transport.DialContext(t.Context(), "tcp", address)
+			if conn != nil {
+				conn.Close()
+			}
+			if err == nil || !strings.Contains(err.Error(), "prohibited") {
+				t.Fatalf("expected dial-time rejection, got %v", err)
+			}
+		})
 	}
 }
 
@@ -129,6 +144,10 @@ func TestSafeDownloadLimitsAndRedirects(t *testing.T) {
 		case "/redirect":
 			w.Header().Set("Location", "http://93.184.216.34/body")
 			w.WriteHeader(http.StatusFound)
+		case "/limit":
+			_, _ = w.Write([]byte(strings.Repeat("x", int(MaxSafeDownloadBytes))))
+		case "/overflow":
+			_, _ = w.Write([]byte(strings.Repeat("x", int(MaxSafeDownloadBytes)+1)))
 		case "/error":
 			w.WriteHeader(http.StatusServiceUnavailable)
 		default:
@@ -144,21 +163,22 @@ func TestSafeDownloadLimitsAndRedirects(t *testing.T) {
 	defer client.CloseIdleConnections()
 	for _, tc := range []struct {
 		path    string
-		limit   int64
+		size    int
 		failure string
 	}{
 		{"/body", 5, ""},
-		{"/body", 4, "exceeded"},
+		{"/limit", int(MaxSafeDownloadBytes), ""},
+		{"/overflow", 0, "exceeded"},
 		{"/redirect", 5, ""},
 		{"/private", 5, "redirect blocked"},
 		{"/loop", 5, "stopped after"},
 		{"/error", 5, "status code 503"},
 	} {
 		t.Run(tc.path+tc.failure, func(t *testing.T) {
-			body, err := SafeDownload(t.Context(), client, "http://93.184.216.34"+tc.path, WithMaxBytes(tc.limit))
+			body, err := SafeDownload(t.Context(), client, "http://93.184.216.34"+tc.path)
 			if tc.failure == "" {
-				if err != nil || string(body) != "12345" {
-					t.Fatalf("download %q: %v", body, err)
+				if err != nil || len(body) != tc.size {
+					t.Fatalf("download bytes=%d: %v", len(body), err)
 				}
 			} else if err == nil || !strings.Contains(err.Error(), tc.failure) {
 				t.Fatalf("expected %q, got %v", tc.failure, err)

@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：168 条待处理，11 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：167 条待处理，12 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -68,7 +68,9 @@
 - [x] **69.** `internal/drive/events.go` 整套 eventBus（RWMutex + 自增 ID + map + 取消函数）只有 `library.go:80` 一个订阅者且丢弃取消函数 → 单个 listener 字段。
   - 实现：Drive 保存单个 MountListener，通过 SetMountListener 替换或清除；删除 eventBus、独立锁、ID、map 和取消订阅机制。复用状态锁读取回调后释放，再在原提交锁范围内同步执行；保持挂载失败恢复和清除目录通知语义。
   - 验证：drive、library（含 scan/scrape）、offline、app 测试通过；新增回调替换/清除与读取状态无死锁测试，原有重复挂载、回调拒绝回滚及扫描入队测试通过。未运行 race 检测或真实 115 联调，待整体复查。
-- [ ] **70.** `internal/netx/ssrf.go:216-236` functional options 只剩 `WithAllowLoopback`（测试开关，且 dialer 仍拦 loopback，所以 `subtitle.WithAllowLoopbackForTesting` 被迫换直连 client）；`WithMaxBytes` 仅测试使用。
+- [x] **70.** `internal/netx/ssrf.go:216-236` functional options 只剩 `WithAllowLoopback`（测试开关，且 dialer 仍拦 loopback，所以 `subtitle.WithAllowLoopbackForTesting` 被迫换直连 client）；`WithMaxBytes` 仅测试使用。
+  - 实现：删除 DownloadOption、WithMaxBytes、WithAllowLoopback 及字幕 WithAllowLoopbackForTesting；URL 校验不再暴露放行回环地址的参数，SafeDownload 固定 5MB 上限。字幕导出测试使用公开 IP 形式的 URL 与模拟 Transport，不再通过生产开关替换安全客户端；保留生产连接、重定向及代理校验逻辑。
+  - 验证：netx、subtitle、app、library（含 scan/scrape）测试通过；实际验证 5MB/超出 1 字节边界，新增直接拨号拦截测试，保留本机 URL、重定向至本机、重定向次数、本地代理及字幕导出覆盖。未进行真实字幕来源联调，待整体复查。
 - [ ] **71.** `internal/pan/client.go:91-98` 与 `:137-146` Retry-After 两套：`panTransport` 全局 `retryAfter` 窗口 + resty `SetRetryAfter` 各等一遍。
 - [ ] **72.** `internal/pan/client.go:59-62`、`play.go:29-36` 用魔法字符串 `"__EMPTY__"` 作 UA 哨兵，在 RoundTrip 中改写 req（违反 RoundTripper 约定），`Header.Del` 后紧跟赋值多余；`pan/offline_test.go` 被迫复制该逻辑 → resty `SetPreRequestHook`。
 - [ ] **73.** `internal/config/runtime.go` 4 个从未被覆盖的常量包成 struct + `DefaultRuntime()`，`runtime_test.go` 仅断言常量本身 → 普通常量放到使用处。

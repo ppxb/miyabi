@@ -20,22 +20,11 @@ type Provider interface {
 
 // Finder searches online providers and downloads their subtitles.
 type Finder struct {
-	providers     []Provider
-	client        *http.Client
-	allowLoopback bool
+	providers []Provider
+	client    *http.Client
 }
 
 type FinderOption func(*Finder)
-
-// WithAllowLoopbackForTesting allows loopback IP addresses for safe downloads, strictly for unit tests.
-func WithAllowLoopbackForTesting(allow bool) FinderOption {
-	return func(f *Finder) {
-		f.allowLoopback = allow
-		if allow {
-			f.client = &http.Client{Timeout: 10 * time.Second, Transport: netx.NewTransport(nil)}
-		}
-	}
-}
 
 // WithProviders replaces the default providers.
 func WithProviders(providers ...Provider) FinderOption {
@@ -99,11 +88,7 @@ func (f *Finder) Download(ctx context.Context, candidate Candidate) ([]byte, sub
 	if candidate.URL == "" {
 		return nil, "", fmt.Errorf("empty candidate URL")
 	}
-	var opts []netx.DownloadOption
-	if f.allowLoopback {
-		opts = append(opts, netx.WithAllowLoopback(true))
-	}
-	raw, err := netx.SafeDownload(ctx, f.client, candidate.URL, opts...)
+	raw, err := netx.SafeDownload(ctx, f.client, candidate.URL)
 	if err != nil {
 		return nil, "", fmt.Errorf("download subtitle: %w", err)
 	}

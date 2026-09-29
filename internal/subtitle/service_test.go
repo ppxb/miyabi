@@ -2,6 +2,7 @@ package subtitle
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -36,21 +37,15 @@ func (reader panReader) Read(_ context.Context, pickCode string, _ int64) ([]byt
 	return []byte(reader[pickCode]), nil
 }
 
-// exportFixture serves subtitle bodies by path and returns a service whose
-// only provider offers the given candidates, with URLs resolved against the server.
+type subtitleTransport func(*http.Request) (*http.Response, error)
+
+func (f subtitleTransport) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+// exportFixture supplies subtitle responses without bypassing URL validation.
 func exportFixture(t *testing.T, bodies map[string]string, candidates ...Candidate) (*Service, *ent.Client, int, subtitlemeta.Target) {
 	t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, ok := bodies[r.URL.Path]
-		if !ok {
-			http.NotFound(w, r)
-			return
-		}
-		_, _ = w.Write([]byte(body))
-	}))
-	t.Cleanup(server.Close)
 	for i := range candidates {
-		candidates[i].URL = server.URL + candidates[i].URL
+		candidates[i].URL = "http://93.184.216.34" + candidates[i].URL
 	}
 	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {
@@ -58,7 +53,15 @@ func exportFixture(t *testing.T, bodies map[string]string, candidates ...Candida
 	}
 	t.Cleanup(func() { _ = store.Close() })
 	film := store.Client.Movie.Create().SetCode("ABP-123").SaveX(t.Context())
-	finder := NewFinder(nil, WithAllowLoopbackForTesting(true), WithProviders(fixedProvider(candidates)))
+	finder := NewFinder(nil, WithProviders(fixedProvider(candidates)))
+	finder.client.Transport = subtitleTransport(func(req *http.Request) (*http.Response, error) {
+		body, ok := bodies[req.URL.Path]
+		status := http.StatusOK
+		if !ok {
+			status = http.StatusNotFound
+		}
+		return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header), Request: req}, nil
+	})
 	target := subtitlemeta.Target{Dir: filepath.Join(t.TempDir(), "ABP", "ABP-123"), Stem: "ABP-123", Code: "ABP-123"}
 	return NewService(store.Client, finder), store.Client, film.ID, target
 }

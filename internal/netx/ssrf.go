@@ -63,7 +63,7 @@ func IsPrivateOrLoopbackIP(ip net.IP) bool {
 }
 
 // ValidateSafeURL checks that the URL scheme is http/https and does not resolve to private/loopback IPs.
-func ValidateSafeURL(ctx context.Context, rawURL string, allowLoopback bool) (*url.URL, error) {
+func ValidateSafeURL(ctx context.Context, rawURL string) (*url.URL, error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid url: %w", err)
@@ -80,18 +80,12 @@ func ValidateSafeURL(ctx context.Context, rawURL string, allowLoopback bool) (*u
 	}
 
 	if strings.EqualFold(hostname, "localhost") {
-		if !allowLoopback {
-			return nil, errors.New("access to localhost is prohibited")
-		}
-		return parsed, nil
+		return nil, errors.New("access to localhost is prohibited")
 	}
 
 	// If hostname is directly an IP literal
 	if ip := net.ParseIP(hostname); ip != nil {
 		if IsPrivateOrLoopbackIP(ip) {
-			if allowLoopback && ip.IsLoopback() {
-				return parsed, nil
-			}
 			return nil, fmt.Errorf("access to private/loopback IP %s is prohibited", ip)
 		}
 		return parsed, nil
@@ -109,9 +103,6 @@ func ValidateSafeURL(ctx context.Context, rawURL string, allowLoopback bool) (*u
 
 	for _, ip := range ips {
 		if IsPrivateOrLoopbackIP(ip) {
-			if allowLoopback && ip.IsLoopback() {
-				continue
-			}
 			return nil, fmt.Errorf("domain %s resolved to private/loopback IP %s", hostname, ip)
 		}
 	}
@@ -201,7 +192,7 @@ func NewSafeDownloadClient(proxyManager *ProxyManager, timeout time.Duration) *h
 				return fmt.Errorf("stopped after %d redirects", MaxRedirects)
 			}
 			// Re-validate target URL on every redirect hop
-			if _, err := ValidateSafeURL(req.Context(), req.URL.String(), false); err != nil {
+			if _, err := ValidateSafeURL(req.Context(), req.URL.String()); err != nil {
 				return fmt.Errorf("redirect blocked: %w", err)
 			}
 			return nil
@@ -209,40 +200,10 @@ func NewSafeDownloadClient(proxyManager *ProxyManager, timeout time.Duration) *h
 	}
 }
 
-// DownloadOption configures SafeDownload behavior.
-type DownloadOption func(*downloadOptions)
-
-type downloadOptions struct {
-	maxBytes      int64
-	allowLoopback bool
-}
-
-// WithMaxBytes sets the maximum allowed download bytes.
-func WithMaxBytes(maxBytes int64) DownloadOption {
-	return func(o *downloadOptions) {
-		o.maxBytes = maxBytes
-	}
-}
-
-// WithAllowLoopback configures whether loopback is allowed (used strictly in test environments).
-func WithAllowLoopback(allow bool) DownloadOption {
-	return func(o *downloadOptions) {
-		o.allowLoopback = allow
-	}
-}
-
-// SafeDownload performs a safe HTTP GET download, verifying URL, enforcing SSRF checks,
-// and reading at most maxBytes (defaulting to MaxSafeDownloadBytes if <= 0).
-func SafeDownload(ctx context.Context, client *http.Client, targetURL string, opts ...DownloadOption) ([]byte, error) {
-	cfg := downloadOptions{
-		maxBytes:      MaxSafeDownloadBytes,
-		allowLoopback: false,
-	}
-	for _, opt := range opts {
-		opt(&cfg)
-	}
-
-	if _, err := ValidateSafeURL(ctx, targetURL, cfg.allowLoopback); err != nil {
+// SafeDownload verifies the URL and enforces the 5MB response body limit.
+// Use NewSafeDownloadClient for dial-time and redirect protection.
+func SafeDownload(ctx context.Context, client *http.Client, targetURL string) ([]byte, error) {
+	if _, err := ValidateSafeURL(ctx, targetURL); err != nil {
 		return nil, fmt.Errorf("safe url check failed: %w", err)
 	}
 
@@ -261,14 +222,14 @@ func SafeDownload(ctx context.Context, client *http.Client, targetURL string, op
 	}
 
 	// Limit reader to maxBytes + 1 to detect overflow
-	limitedReader := io.LimitReader(resp.Body, cfg.maxBytes+1)
+	limitedReader := io.LimitReader(resp.Body, MaxSafeDownloadBytes+1)
 	body, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, fmt.Errorf("reading response body failed: %w", err)
 	}
 
-	if int64(len(body)) > cfg.maxBytes {
-		return nil, fmt.Errorf("download exceeded maximum allowed size (%d bytes)", cfg.maxBytes)
+	if int64(len(body)) > MaxSafeDownloadBytes {
+		return nil, fmt.Errorf("download exceeded maximum allowed size (%d bytes)", MaxSafeDownloadBytes)
 	}
 
 	return body, nil
