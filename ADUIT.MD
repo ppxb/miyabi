@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：166 条待处理，13 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：165 条待处理，14 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -75,7 +75,9 @@
   - 核实：原来的两层等待通常重叠，并非必然双倍；实际风险是共享截止时间延长后，已等待请求未重新检查。
   - 实现：删除 Resty SetRetryAfter 回调，由 panTransport 统一解析并执行共享等待，在退避与限速等待后重新检查截止时间；保留重试次数、条件、普通退避、限速和并发上限。
   - 验证：pan、drive、offline、app 测试通过；使用 testing/synctest 验证退避/限速期间延期、取消释放并发名额，并通过生产 New 客户端验证 Retry-After: 5 只等待 5 秒。原有重试限速、并发上限测试通过；未进行真实 115 限流联调，待整体复查。
-- [ ] **72.** `internal/pan/client.go:59-62`、`play.go:29-36` 用魔法字符串 `"__EMPTY__"` 作 UA 哨兵，在 RoundTrip 中改写 req（违反 RoundTripper 约定），`Header.Del` 后紧跟赋值多余；`pan/offline_test.go` 被迫复制该逻辑 → resty `SetPreRequestHook`。
+- [x] **72.** `internal/pan/client.go:59-62`、`play.go:29-36` 用魔法字符串 `"__EMPTY__"` 作 UA 哨兵，在 RoundTrip 中改写 req（违反 RoundTripper 约定），`Header.Del` 后紧跟赋值多余；`pan/offline_test.go` 被迫复制该逻辑 → resty `SetPreRequestHook`。
+  - 核实与实现：请求改写此前已迁移到 SetPreRequestHook，RoundTrip 与测试不再复制 UA 改写。本次将三个位置的特殊字符串统一为私有 emptyUserAgentSentinel，保留显式空 UA 不被 Resty 默认值替换的行为。
+  - 验证：go test ./internal/pan 通过，已有播放/下载自定义 UA 与空 UA 测试通过；未进行真实播放器与 115 联调，待整体复查。
 - [ ] **73.** `internal/config/runtime.go` 4 个从未被覆盖的常量包成 struct + `DefaultRuntime()`，`runtime_test.go` 仅断言常量本身 → 普通常量放到使用处。
 - [ ] **74.** `internal/api/access_gate.go` / `auth.go:16-21`：`NewAccessGateService(password, jwtSecret ...string)` 用可变参数模拟可选；`GenerateToken(subject, ttl)` 实参永远是 `"admin"` 与 `defaultTokenTTL`；`VerifyToken` 返回的 `*Claims` 全被 `_` 丢弃，禁用时返回 `(nil, nil)`；`SignToken` / `VerifyToken` / `Claims` / `BadRequest` 仅包内使用却导出。
 - [ ] **75.** `web/src/components/app-shell.tsx:22-24` 手算 `activeId` 传给 `FloatingNav` → 使用 `Link` 的 `activeProps` + `activeOptions`。

@@ -32,7 +32,7 @@ func (client *Client) DownloadURL(ctx context.Context, accessToken, pickCode, us
 	if ua != "" {
 		req.SetHeader("User-Agent", ua)
 	} else {
-		req.SetHeader("User-Agent", "__EMPTY__")
+		req.SetHeader("User-Agent", emptyUserAgentSentinel)
 	}
 	result, err := apiRequest[downloadURLWire](
 		client,
@@ -69,7 +69,7 @@ func (client *Client) PlayURL(ctx context.Context, accessToken, pickCode, userAg
 	}
 	ua := strings.TrimSpace(userAgent)
 	if ua == "" {
-		ua = "__EMPTY__"
+		ua = emptyUserAgentSentinel
 	}
 	result, err := apiRequest[playURLWire](
 		client,

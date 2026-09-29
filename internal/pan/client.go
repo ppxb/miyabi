@@ -252,9 +252,12 @@ func apiRequest[T apiPayload](client *Client, request *resty.Request, method, en
 	return result, nil
 }
 
-// Resty fills empty UA headers; clear the sentinel after it builds the request.
+// Resty fills empty UA headers; this private marker preserves an explicit empty UA.
+const emptyUserAgentSentinel = "__EMPTY__"
+
+// Clear the marker after Resty builds the request, before handing it to the transport.
 func preserveEmptyUserAgent(_ *resty.Client, req *http.Request) error {
-	if req.Header.Get("User-Agent") == "__EMPTY__" {
+	if req.Header.Get("User-Agent") == emptyUserAgentSentinel {
 		req.Header.Set("User-Agent", "")
 	}
 	return nil
