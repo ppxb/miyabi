@@ -70,7 +70,7 @@ func (s *Scanner) SetMediaNotifier(notifier MediaNotifier) {
 // Run executes a library scan job: it walks the media directories, matches NFOs
 // and videos, indexes movies and files, and enqueues metadata scraping.
 func (s *Scanner) Run(ctx context.Context, job tasks.Job) error {
-	payload, err := tasks.DecodePayload[Payload](job.Payload)
+	payload, err := tasks.DecodePayload[domain.ScanPayload](job.Payload)
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ type scanRun struct {
 	scanner     *Scanner
 	session     drive.Session
 	taskID      int
-	payload     *Payload
+	payload     *domain.ScanPayload
 	directories []Directory
 	seen        map[string]bool
 	codes       map[string]bool

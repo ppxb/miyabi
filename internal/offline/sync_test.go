@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/task"
@@ -231,7 +232,7 @@ func TestOfflineProgressPublishesChanges(t *testing.T) {
 func TestOfflinePageFileTrackingRollsBackWithTheIndex(t *testing.T) {
 	service, record, input, source := offlineFixture(t)
 	ctx := t.Context()
-	payload := scan.Payload{Source: source, OfflineTaskID: record.ID, TargetID: "download-folder",
+	payload := domain.ScanPayload{Source: source, OfflineTaskID: record.ID, TargetID: "download-folder",
 		Code: input.Code, JavDBID: input.JavdbID}
 	video := scan.IdentifyVideo(pan.File{ID: "video", ParentID: "download-folder", Name: input.Code + ".mp4", Size: 1 << 30})
 	// The missing parent fails the final progress write after file tracking.

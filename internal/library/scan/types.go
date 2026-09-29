@@ -1,12 +1,6 @@
 package scan
 
-import (
-	"github.com/ppxb/miyabi/internal/domain"
-	"github.com/ppxb/miyabi/internal/pan"
-)
-
-// Payload describes a library scanning task in the task queue.
-type Payload = domain.ScanPayload
+import "github.com/ppxb/miyabi/internal/pan"
 
 // Directory describes a directory queued during BFS traversal.
 type Directory struct {

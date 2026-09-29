@@ -15,7 +15,6 @@ import (
 	"github.com/ppxb/miyabi/internal/ent"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library"
-	"github.com/ppxb/miyabi/internal/library/scan"
 	scrapePkg "github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/tasks"
@@ -295,7 +294,7 @@ func libraryFixture(t testing.TB) testLibraryFixture {
 		Tasks:   taskSvc,
 		Images:  images,
 		Queued:  queued,
-		Payload: scan.Payload{Source: source, Scan: domain.ScanProgress{Stage: "scanning"}},
+		Payload: domain.ScanPayload{Source: source, Scan: domain.ScanProgress{Stage: "scanning"}},
 	}
 }
 
@@ -306,7 +305,7 @@ type testLibraryFixture struct {
 	Tasks   *tasks.Service
 	Images  *mediaimage.Cache
 	Queued  domain.TaskInfo
-	Payload scan.Payload
+	Payload domain.ScanPayload
 }
 
 func panConcurrencyFixture(t *testing.T) (*library.Service, *panStub) {

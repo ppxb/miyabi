@@ -21,7 +21,7 @@ import (
 type completedScanFixture struct {
 	lib      *libraryTestService
 	queued   domain.TaskInfo
-	payload  scan.Payload
+	payload  domain.ScanPayload
 	covered  *ent.Task
 	snapshot *domain.MetadataSnapshot
 	movie    *ent.Movie

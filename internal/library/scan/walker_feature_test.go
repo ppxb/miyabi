@@ -7,6 +7,8 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/ppxb/miyabi/internal/domain"
 )
 
 func TestScannerDefaultPacingAndCancellation(t *testing.T) {
@@ -42,7 +44,7 @@ func TestCheckpointSerializationAndRestoration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	payload := Payload{
+	payload := domain.ScanPayload{
 		Checkpoint: string(bytes),
 	}
 

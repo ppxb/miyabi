@@ -180,7 +180,7 @@ func (s *Service) Finished(_ context.Context, _ *ent.Tx, job tasks.Job, _ error)
 
 // EnqueueTargetedScan creates a targeted scan task inside the caller's transaction.
 func (s *Service) EnqueueTargetedScan(ctx context.Context, tx *ent.Tx, source domain.LibrarySource, targetID string, offlineTaskID int, code, javdbID string) (int, error) {
-	encoded, err := tasks.EncodePayload(scan.Payload{
+	encoded, err := tasks.EncodePayload(domain.ScanPayload{
 		Source:        source,
 		Scan:          domain.ScanProgress{Stage: "queued", CurrentPath: source.Directory.Path},
 		TargetID:      targetID,

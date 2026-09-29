@@ -173,7 +173,10 @@
 - [x] **100.** `internal/gfriends/client.go:21-23,29` `DefaultFastlyURL`、`DefaultRawURL`、`CacheExpiration`、`FileTree` 无外部使用却导出；:42-44 nil httpClient 默认值死代码；:127-128 写缓存错误被静默吞掉。
   - 已完成：镜像 URL、缓存有效期与 fileTree 改为包内符号；New 直接使用调用方配置的 HTTP 客户端，测试同步显式传入客户端。目录创建或索引写入失败时记录包含路径和错误的警告，仍安装已下载的有效内存索引，不阻断头像查询或触发重复下载。
   - 验证：gfriends、emby、app 包测试及 git diff --check 通过；新增目录创建失败、缓存文件写入失败测试，验证警告日志、索引可查询及后续请求复用；保留缓存恢复、刷新并发、镜像回退与取消覆盖。未进行浏览器或真实 GFriends/Emby 联调，待整体复查。
-- [ ] **101.** `domain.ZoneAll` 的使用范围、`LocalMovie` 的 JSON 标签，以及 `domain.ScanPayload` 与 `scan.Payload` 别名是否仍有必要待核实。`KindInternal` 和旧 tasks 层 ScanPayload 别名已清理，不再作为待办。
+- [x] **101.** `domain.ZoneAll` 的使用范围、`LocalMovie` 的 JSON 标签，以及 `domain.ScanPayload` 与 `scan.Payload` 别名是否仍有必要待核实。`KindInternal` 和旧 tasks 层 ScanPayload 别名已清理，不再作为待办。
+  - 已完成：LocalMovie 仅作为 library/catalogue 的进程内身份数据，删除无序列化用途的 JSON 标签；移除 scan.Payload 别名，扫描器、业务调用和测试统一引用 domain.ScanPayload，保留原字段及 JSON 标签，持久化格式不变。
+  - 保留：ZoneAll 在 JavDB 番号解析和搜索参数构造中表示跨分区搜索，仍有生产用途；不将它用于分类浏览。KindInternal 和旧 tasks 别名此前已删除，无需重复处理。
+  - 验证：library（含 scan/scrape）、catalogue、javdb、offline、api、app 包测试及 git diff --check 通过，保留扫描恢复、离线入库、任务 JSON 与 API golden 覆盖。未进行浏览器或真实上游联调，待整体复查。
 - [ ] **102.** `internal/library/scrape/scrape.go:155` `fileScope` 与 `internal/database/scope.go:10` `LibraryFiles` 一字不差；魔法字符串 `"local"` 在 `library.go:118,120,202,204`、`scan/local.go:235-236` 硬编码，`Movies` 与 `MatchingMovies` 的 scope 计算重复 → `domain.LocalAccountID` + `s.libraryScope()`。
 - [ ] **103.** `internal/app/app.go` 的 EmbyDir 兜底与 `config.Load` 重复；核实直接调用 App.New 的测试和调用方需求后，统一配置初始化职责。旧的 Emby Config 读取、activePublicURL 及代理非空判断描述已失效。默认导出路径与 PublicURL 一并按第 184 条处理。
 - [ ] **104.** `internal/config/config.go:50` `MIYABI_EMBY_URL` 未文档化旧别名；:101-119 `validate` 重复 Trim、EmbyDir 空检查不可能触发；日志级别 `logging.Validate` 校验一次、main 中 `UnmarshalText` 再解析一次 → Config 直接存 `slog.Level`，删除 `internal/logging`（28 行）。

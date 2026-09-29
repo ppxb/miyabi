@@ -10,7 +10,6 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/task"
-	"github.com/ppxb/miyabi/internal/library/scan"
 	"github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/tasks"
@@ -98,7 +97,7 @@ func TestOfflineCompletionAndTargetedScanCommitTogether(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	target, err := tasks.DecodePayload[scan.Payload](scanTask.Payload)
+	target, err := tasks.DecodePayload[domain.ScanPayload](scanTask.Payload)
 	if err != nil {
 		t.Fatal(err)
 	}

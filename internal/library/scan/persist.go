@@ -15,7 +15,7 @@ import (
 )
 
 // ProcessScanPage persists file associations and movie records for a scanned page within a transaction.
-func ProcessScanPage(ctx context.Context, db *ent.Client, taskID int, directoryPath string, videos []Video, payload *Payload, prepare func([]Video) []Video, tasksSvc *tasks.Service) error {
+func ProcessScanPage(ctx context.Context, db *ent.Client, taskID int, directoryPath string, videos []Video, payload *domain.ScanPayload, prepare func([]Video) []Video, tasksSvc *tasks.Service) error {
 	return ent.WithTx(ctx, db, func(tx *ent.Tx) error {
 		run := scanRun{scanner: &Scanner{tasksSvc: tasksSvc}, taskID: taskID, payload: payload}
 		return run.processPageTx(ctx, tx, directoryPath, videos, prepare)
@@ -164,7 +164,7 @@ func (r *scanRun) processPageTx(ctx context.Context, tx *ent.Tx, directoryPath s
 }
 
 // IndexDownloadedMovie binds a completed download target to a movie record with its known JavDB ID.
-func IndexDownloadedMovie(ctx context.Context, tx *ent.Tx, payload Payload) (int, error) {
+func IndexDownloadedMovie(ctx context.Context, tx *ent.Tx, payload domain.ScanPayload) (int, error) {
 	code := codeid.Normalize(payload.Code)
 	if err := tx.Movie.Create().SetCode(code).SetJavdbID(payload.JavDBID).
 		OnConflict().Ignore().Exec(ctx); err != nil {
@@ -212,7 +212,7 @@ func removeUnreferencedMovies(ctx context.Context, tx *ent.Tx, ids []int) ([]str
 }
 
 // SaveScanProgress updates a scan task record's payload with latest progress.
-func SaveScanProgress(ctx context.Context, client *ent.TaskClient, taskID int, payload Payload) error {
+func SaveScanProgress(ctx context.Context, client *ent.TaskClient, taskID int, payload domain.ScanPayload) error {
 	encoded, err := tasks.EncodePayload(payload)
 	if err != nil {
 		return err
@@ -224,7 +224,7 @@ func SaveScanProgress(ctx context.Context, client *ent.TaskClient, taskID int, p
 }
 
 // ReportScan saves progress and notifies the task bus.
-func ReportScan(ctx context.Context, client *ent.TaskClient, taskID int, payload Payload, tasksSvc *tasks.Service) error {
+func ReportScan(ctx context.Context, client *ent.TaskClient, taskID int, payload domain.ScanPayload, tasksSvc *tasks.Service) error {
 	if err := SaveScanProgress(ctx, client, taskID, payload); err != nil {
 		return err
 	}

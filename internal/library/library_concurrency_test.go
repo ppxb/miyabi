@@ -18,7 +18,7 @@ func TestScanDiscardsLatePageAfterSourceChange(t *testing.T) {
 	drive, ctx := lib.drive, t.Context()
 	source := *drive.Source()
 	queued := lib.database.Task.Query().Where(task.TypeEQ("scan")).OnlyX(ctx)
-	payload := scan.Payload{Source: source, Scan: domain.ScanProgress{Stage: "scanning"}}
+	payload := domain.ScanPayload{Source: source, Scan: domain.ScanProgress{Stage: "scanning"}}
 	if err := indexScanPage(ctx, lib, queued.ID, "previous-scan", "/Movies", []scan.Video{fixtureVideo("101", "ABP-001.mp4")}, &payload); err != nil {
 		t.Fatal(err)
 	}
@@ -49,4 +49,3 @@ func TestScanDiscardsLatePageAfterSourceChange(t *testing.T) {
 		t.Fatal("stale scan enqueued metadata work")
 	}
 }
-

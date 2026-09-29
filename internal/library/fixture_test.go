@@ -206,7 +206,7 @@ type libraryTestService struct {
 	images *mediaimage.Cache
 }
 
-func libraryFixture(t testing.TB) (*libraryTestService, domain.TaskInfo, scan.Payload) {
+func libraryFixture(t testing.TB) (*libraryTestService, domain.TaskInfo, domain.ScanPayload) {
 	t.Helper()
 	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {
@@ -230,7 +230,7 @@ func libraryFixture(t testing.TB) (*libraryTestService, domain.TaskInfo, scan.Pa
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScan, lib.Scan, lib.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScrape, scrape.Scrape, scrape.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindCover, scrape.Cover, scrape.Finished))
-	return lib, queued, scan.Payload{Source: source, Scan: domain.ScanProgress{Stage: "scanning"}}
+	return lib, queued, domain.ScanPayload{Source: source, Scan: domain.ScanProgress{Stage: "scanning"}}
 }
 
 func panConcurrencyFixture(t *testing.T) (*libraryTestService, *panStub) {
@@ -243,7 +243,7 @@ func fixtureVideo(id, name string) scan.Video {
 	return scan.IdentifyVideo(pan.File{ID: id, ParentID: "10", Name: name, Size: 1 << 30})
 }
 
-func identifyScanVideosForTest(ctx context.Context, lib *libraryTestService, payload scan.Payload, entries []pan.File) (map[string]scan.Video, error) {
+func identifyScanVideosForTest(ctx context.Context, lib *libraryTestService, payload domain.ScanPayload, entries []pan.File) (map[string]scan.Video, error) {
 	previous, err := lib.database.File.Query().WithMovie().All(ctx)
 	if err != nil {
 		return nil, err
@@ -266,12 +266,12 @@ func identifyScanVideosForTest(ctx context.Context, lib *libraryTestService, pay
 	return result, nil
 }
 
-func indexScanPage(ctx context.Context, lib *libraryTestService, taskID int, scanID, directoryPath string, videos []scan.Video, payload *scan.Payload) error {
+func indexScanPage(ctx context.Context, lib *libraryTestService, taskID int, scanID, directoryPath string, videos []scan.Video, payload *domain.ScanPayload) error {
 	payload.ScanID = scanID
 	return scan.ProcessScanPage(ctx, lib.database, taskID, directoryPath, videos, payload, nil, lib.tasks)
 }
 
-func reconcileScan(ctx context.Context, lib *libraryTestService, taskID int, scanID string, payload *scan.Payload) error {
+func reconcileScan(ctx context.Context, lib *libraryTestService, taskID int, scanID string, payload *domain.ScanPayload) error {
 	payload.ScanID = scanID
 	return scan.ReconcileScan(ctx, lib.database, taskID, payload, lib.images, lib.tasks, export.Config{}, nil)
 }

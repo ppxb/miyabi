@@ -54,14 +54,14 @@ func TestScanResumesCanceledDirectoryAndPersistsAllChunks(t *testing.T) {
 		t.Fatalf("partial directory committed %d files", count)
 	}
 	queued = lib.database.Task.GetX(ctx, queued.ID)
-	before, err := tasks.DecodePayload[scan.Payload](queued.Payload)
+	before, err := tasks.DecodePayload[domain.ScanPayload](queued.Payload)
 	if err != nil || before.ScanID == "" || before.Checkpoint == "" {
 		t.Fatalf("restart context missing: %+v %v", before, err)
 	}
 	if err := lib.Scan(ctx, tasks.Job{ID: queued.ID, Payload: queued.Payload}); err != nil {
 		t.Fatal(err)
 	}
-	after, err := tasks.DecodePayload[scan.Payload](lib.database.Task.GetX(ctx, queued.ID).Payload)
+	after, err := tasks.DecodePayload[domain.ScanPayload](lib.database.Task.GetX(ctx, queued.ID).Payload)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestScanProgressKeepsRestartContextAndScanKind(t *testing.T) {
 				t.Fatal(err)
 			}
 			record := lib.database.Task.GetX(t.Context(), queued.ID)
-			restored, err := tasks.DecodePayload[scan.Payload](record.Payload)
+			restored, err := tasks.DecodePayload[domain.ScanPayload](record.Payload)
 			if err != nil || restored != payload {
 				t.Fatalf("restart context changed: %+v err=%v", restored, err)
 			}
@@ -189,7 +189,7 @@ func TestScanCheckpointResumePreservesPreviousScannedFiles(t *testing.T) {
 			}
 
 			scanID := "test-scan-uuid-123"
-			payload := scan.Payload{
+			payload := domain.ScanPayload{
 				ScanID: scanID,
 				Source: source,
 				Scan: domain.ScanProgress{
@@ -252,7 +252,7 @@ func TestScanCheckpointResumePreservesPreviousScannedFiles(t *testing.T) {
 			}
 
 			resumedTask := lib.database.Task.GetX(ctx, queued.ID)
-			resumedPayload, err := tasks.DecodePayload[scan.Payload](resumedTask.Payload)
+			resumedPayload, err := tasks.DecodePayload[domain.ScanPayload](resumedTask.Payload)
 			if err != nil {
 				t.Fatal(err)
 			}

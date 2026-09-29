@@ -33,7 +33,7 @@ func BenchmarkUnchangedScanPage(b *testing.B) {
 }
 
 func BenchmarkScanPayload(b *testing.B) {
-	payload := scan.Payload{
+	payload := domain.ScanPayload{
 		Source: domain.LibrarySource{AccountID: "100", Directory: domain.LibraryDirectory{ID: "10", Name: "Movies", Path: "/Movies"}},
 		Scan:   domain.ScanProgress{Stage: "scanning", CurrentPath: "/Movies/fixture", FilesScanned: 50000, VideoFiles: 10000, DirectoriesDiscovered: 10000},
 	}

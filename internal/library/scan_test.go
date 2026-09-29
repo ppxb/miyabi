@@ -193,7 +193,7 @@ func TestOfflineScanUsesCatalogueIdentityAndKeepsItOnRescan(t *testing.T) {
 	if err != nil || input.MovieID != record.ID || input.JavDBID != payload.JavDBID {
 		t.Fatalf("metadata job lost the known JavDB ID: %#v, %v", input, err)
 	}
-	full := scan.Payload{Source: payload.Source}
+	full := domain.ScanPayload{Source: payload.Source}
 	restored, err := identifyScanVideosForTest(ctx, lib, full, entries)
 	if err != nil {
 		t.Fatal(err)

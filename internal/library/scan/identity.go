@@ -32,7 +32,7 @@ func IdentifyVideo(file pan.File) Video {
 
 // IdentifyScanVideos assigns catalogue codes to video files based on existing
 // associations, offline download metadata, and filename parsing.
-func IdentifyScanVideos(payload Payload, videos []Video, previous map[string]*ent.File) {
+func IdentifyScanVideos(payload domain.ScanPayload, videos []Video, previous map[string]*ent.File) {
 	for index := range videos {
 		video := &videos[index]
 		old := previous[video.ID]
