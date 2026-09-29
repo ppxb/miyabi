@@ -24,7 +24,7 @@ func (s *Service) StartLocalScan(ctx context.Context, requested string) (domain.
 		}
 	}
 	return s.EnqueueScan(ctx, domain.LibrarySource{
-		AccountID: "local",
+		AccountID: domain.LocalAccountID,
 		Directory: domain.LibraryDirectory{ID: root, Name: "Emby 本地目录", Path: root},
 	})
 }

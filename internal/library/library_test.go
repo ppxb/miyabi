@@ -8,9 +8,61 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 )
+
+func TestLibraryListingAndMatchingShareLocalAndMountedScope(t *testing.T) {
+	lib, _, payload := libraryFixture(t)
+	ctx := t.Context()
+	var codes []string
+	var visible []int
+	for i, source := range []struct{ account, root string }{
+		{domain.LocalAccountID, "local"},
+		{domain.LocalAccountID, "another-local-root"},
+		{payload.Source.AccountID, payload.Source.Directory.ID},
+		{payload.Source.AccountID, "other-root"},
+		{"other-account", payload.Source.Directory.ID},
+	} {
+		code := fmt.Sprintf("ABP-%03d", i+1)
+		film := lib.database.Movie.Create().SetCode(code).SaveX(ctx)
+		lib.database.File.Create().SetFileID(fmt.Sprint(i)).SetName(code + ".mp4").SetSize(1024).
+			SetAccountID(source.account).SetRootID(source.root).SetMovieID(film.ID).ExecX(ctx)
+		codes = append(codes, code)
+		if i < 3 {
+			visible = append(visible, film.ID)
+		}
+	}
+	for _, mounted := range []bool{true, false} {
+		if !mounted {
+			if err := lib.drive.ClearDirectory(ctx); err != nil {
+				t.Fatal(err)
+			}
+			visible = visible[:2]
+		}
+		page, err := lib.Movies(ctx, 1, 20)
+		if err != nil || page.Total != len(visible) || (page.Source != nil) != mounted {
+			t.Fatalf("mounted=%t page=%+v error=%v", mounted, page, err)
+		}
+		matches, err := lib.MatchingMovies(ctx, nil, codes)
+		if err != nil || len(matches) != len(visible) || len(page.Movies) != len(visible) {
+			t.Fatalf("mounted=%t page=%+v matches=%+v error=%v", mounted, page, matches, err)
+		}
+		for _, id := range visible {
+			inPage, inMatches := false, false
+			for _, film := range page.Movies {
+				inPage = inPage || film.ID == id
+			}
+			for _, film := range matches {
+				inMatches = inMatches || film.ID == id
+			}
+			if !inPage || !inMatches {
+				t.Fatalf("mounted=%t missing movie %d in page or matches", mounted, id)
+			}
+		}
+	}
+}
 
 func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 	lib, _, payload := libraryFixture(t)

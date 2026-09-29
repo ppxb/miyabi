@@ -247,8 +247,8 @@ func (s *LocalScanner) ingestMedia(
 				SetFileID(fileID).
 				SetName(mediaName).
 				SetSize(mediaSize).
-				SetAccountID("local").
-				SetRootID("local").
+				SetAccountID(domain.LocalAccountID).
+				SetRootID(domain.LocalAccountID).
 				SetPath(rel).
 				SetMovieID(movieID).
 				Save(ctx)

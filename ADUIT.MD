@@ -177,7 +177,10 @@
   - 已完成：LocalMovie 仅作为 library/catalogue 的进程内身份数据，删除无序列化用途的 JSON 标签；移除 scan.Payload 别名，扫描器、业务调用和测试统一引用 domain.ScanPayload，保留原字段及 JSON 标签，持久化格式不变。
   - 保留：ZoneAll 在 JavDB 番号解析和搜索参数构造中表示跨分区搜索，仍有生产用途；不将它用于分类浏览。KindInternal 和旧 tasks 别名此前已删除，无需重复处理。
   - 验证：library（含 scan/scrape）、catalogue、javdb、offline、api、app 包测试及 git diff --check 通过，保留扫描恢复、离线入库、任务 JSON 与 API golden 覆盖。未进行浏览器或真实上游联调，待整体复查。
-- [ ] **102.** `internal/library/scrape/scrape.go:155` `fileScope` 与 `internal/database/scope.go:10` `LibraryFiles` 一字不差；魔法字符串 `"local"` 在 `library.go:118,120,202,204`、`scan/local.go:235-236` 硬编码，`Movies` 与 `MatchingMovies` 的 scope 计算重复 → `domain.LocalAccountID` + `s.libraryScope()`。
+- [x] **102.** `internal/library/scrape/scrape.go:155` `fileScope` 与 `internal/database/scope.go:10` `LibraryFiles` 一字不差；魔法字符串 `"local"` 在 `library.go:118,120,202,204`、`scan/local.go:235-236` 硬编码，`Movies` 与 `MatchingMovies` 的 scope 计算重复 → `domain.LocalAccountID` + `s.libraryScope()`。
+  - 已完成：刮削直接复用 database.LibraryFiles，删除重复 fileScope；增加 domain.LocalAccountID，统一本地扫描任务、重试、入库与查询的账号标识，保留原存储值。字幕来源 local 属于不同语义，不借用账号常量。
+  - 实现：Movies 与 MatchingMovies 共用接收数据源快照的包内 libraryScope；列表返回的数据源和筛选条件使用同一次读取结果。继续展示当前挂载账号/根目录及全部本地影片，无挂载时仅展示本地影片。
+  - 验证：library（含 scan/scrape）、catalogue、offline、api、app 包测试及 git diff --check 通过；新增混合本地根目录、当前挂载、其他账号/根目录及卸载后的列表与身份匹配一致性测试，保留刮削数据源隔离和本地导入覆盖。未进行浏览器或真实上游联调，待整体复查。
 - [ ] **103.** `internal/app/app.go` 的 EmbyDir 兜底与 `config.Load` 重复；核实直接调用 App.New 的测试和调用方需求后，统一配置初始化职责。旧的 Emby Config 读取、activePublicURL 及代理非空判断描述已失效。默认导出路径与 PublicURL 一并按第 184 条处理。
 - [ ] **104.** `internal/config/config.go:50` `MIYABI_EMBY_URL` 未文档化旧别名；:101-119 `validate` 重复 Trim、EmbyDir 空检查不可能触发；日志级别 `logging.Validate` 校验一次、main 中 `UnmarshalText` 再解析一次 → Config 直接存 `slog.Level`，删除 `internal/logging`（28 行）。
 - [ ] **105.** `internal/database/viewed.go` 的 `migrateViewedMovies` 为全部旧浏览记录写入同一时间，可能丢失原有顺序。核实旧数组顺序及保留策略；迁移已纳入版本管理，不能因当前开发数据库迁完就删除或重排迁移步骤。若要修正已升级数据，应新增迁移并明确可恢复的信息。

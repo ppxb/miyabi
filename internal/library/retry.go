@@ -26,7 +26,7 @@ func (s *Service) RetryTask(ctx context.Context, id int) (domain.TaskInfo, error
 		return domain.TaskInfo{}, err
 	}
 	commit := func(fn func(*ent.Tx) error) error { return ent.WithTx(ctx, s.database, fn) }
-	if input.Source.AccountID == "local" {
+	if input.Source.AccountID == domain.LocalAccountID {
 		root, err := s.localScanRoot()
 		if err != nil {
 			return domain.TaskInfo{}, err

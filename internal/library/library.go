@@ -121,16 +121,9 @@ func (s *Service) MatchingMovies(ctx context.Context, javdbIDs []string, codes [
 	if len(javdbIDs) == 0 && len(codes) == 0 {
 		return nil, nil
 	}
-	source := s.Source()
-	var filePredicate predicate.File
-	if source != nil {
-		filePredicate = file.Or(database.LibraryFiles(*source), file.AccountIDEQ("local"))
-	} else {
-		filePredicate = file.AccountIDEQ("local")
-	}
 	records, err := s.database.Movie.Query().Where(
 		movie.Or(movie.JavdbIDIn(javdbIDs...), movie.And(movie.JavdbIDIsNil(), movie.CodeIn(codes...))),
-		movie.HasFilesWith(filePredicate),
+		movie.HasFilesWith(libraryScope(s.Source())),
 	).Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("query matching movies: %w", err)
@@ -161,7 +154,7 @@ func (s *Service) Scan(ctx context.Context, job tasks.Job) error {
 	if err != nil {
 		return err
 	}
-	if payload.Source.AccountID == "local" {
+	if payload.Source.AccountID == domain.LocalAccountID {
 		// Imports must not observe partially rewritten STRM or exported sidecars.
 		return s.exportMgr.WithConfig(func(export.Config) error {
 			return s.scanLocal(ctx, job.ID, payload)
@@ -172,7 +165,7 @@ func (s *Service) Scan(ctx context.Context, job tasks.Job) error {
 
 func (s *Service) Finished(_ context.Context, _ *ent.Tx, job tasks.Job, _ error) (tasks.Change, error) {
 	payload, err := tasks.DecodePayload[domain.ScanPayload](job.Payload)
-	if err == nil && payload.Source.AccountID == "local" {
+	if err == nil && payload.Source.AccountID == domain.LocalAccountID {
 		return tasks.ChangeLibrary, nil
 	}
 	return tasks.ChangeOffline, nil
@@ -201,16 +194,17 @@ func (s *Service) EnqueueTargetedScan(ctx context.Context, tx *ent.Tx, source do
 	return taskRecord.ID, nil
 }
 
-func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
-	result := Page{Movies: []Movie{}, Page: page}
-	source := s.drive.Source()
-	var scope predicate.File
+func libraryScope(source *domain.LibrarySource) predicate.File {
+	local := file.AccountIDEQ(domain.LocalAccountID)
 	if source != nil {
-		result.Source = source
-		scope = file.Or(database.LibraryFiles(*source), file.AccountIDEQ("local"))
-	} else {
-		scope = file.AccountIDEQ("local")
+		return file.Or(database.LibraryFiles(*source), local)
 	}
+	return local
+}
+
+func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
+	result := Page{Movies: []Movie{}, Page: page, Source: s.Source()}
+	scope := libraryScope(result.Source)
 	var err error
 	result.Total, err = s.database.File.Query().Where(scope).Aggregate(func(selector *sql.Selector) string {
 		return sql.As("COUNT(DISTINCT "+selector.C(file.FieldMovieID)+")", "total")

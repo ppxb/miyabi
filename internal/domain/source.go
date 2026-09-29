@@ -1,5 +1,8 @@
 package domain
 
+// LocalAccountID identifies files and scan tasks in the local library.
+const LocalAccountID = "local"
+
 // LibraryDirectory describes a mounted media directory on remote storage.
 type LibraryDirectory struct {
 	ID   string `json:"id"`
