@@ -1,19 +1,17 @@
 package javdb
 
 import (
-	"cmp"
 	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
-	"slices"
 	"strings"
 
 	"github.com/ppxb/miyabi/internal/domain"
 )
 
-// Magnets returns subtitle and HD resources first, then orders by size.
+// Magnets decodes resources in the order returned by JavDB.
 func (c *Client) Magnets(ctx context.Context, movieID string) ([]domain.Magnet, error) {
 	movieID = strings.TrimSpace(movieID)
 	if movieID == "" {
@@ -51,24 +49,6 @@ func (c *Client) Magnets(ctx context.Context, movieID string) ([]domain.Magnet, 
 			Tags:        tags,
 		}
 	}
-	slices.SortStableFunc(magnets, func(a, b domain.Magnet) int {
-		if a.HasSubtitle != b.HasSubtitle {
-			if a.HasSubtitle {
-				return -1
-			}
-			return 1
-		}
-		if a.HD != b.HD {
-			if a.HD {
-				return -1
-			}
-			return 1
-		}
-		if a.Size != b.Size {
-			return cmp.Compare(b.Size, a.Size)
-		}
-		return cmp.Compare(b.FilesCount, a.FilesCount)
-	})
 	return magnets, nil
 }
 
@@ -77,16 +57,9 @@ func (c *Client) Name() string {
 	return domain.MagnetSourceJavDB
 }
 
-// Find retrieves magnets for the given movie reference.
+// Find retrieves magnets using the movie reference's JavDB ID.
 func (c *Client) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Magnet, error) {
 	movieID := strings.TrimSpace(ref.JavDBID)
-	if movieID == "" && strings.TrimSpace(ref.Code) != "" {
-		resolved, err := c.ResolveMovieID(ctx, ref.Code)
-		if err != nil {
-			return nil, err
-		}
-		movieID = resolved
-	}
 	if movieID == "" {
 		return nil, nil
 	}
