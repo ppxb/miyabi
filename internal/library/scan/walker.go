@@ -126,14 +126,14 @@ type scanRun struct {
 
 func (r *scanRun) savePage(ctx context.Context, directoryPath string, videos []Video, prepare func([]Video) []Video) error {
 	return r.session.Commit(ctx, func(tx *ent.Tx) error {
-		return ProcessScanPageTx(ctx, tx, r.taskID, r.payload.ScanID, directoryPath, videos, r.payload, prepare, r.scanner.tasksSvc)
+		return r.processPageTx(ctx, tx, directoryPath, videos, prepare)
 	})
 }
 
 func (r *scanRun) reconcile(ctx context.Context) error {
 	return r.scanner.exportMgr.WithConfig(func(expCfg export.Config) error {
 		return r.session.Commit(ctx, func(tx *ent.Tx) error {
-			return ReconcileScanTx(ctx, tx, r.taskID, r.payload.ScanID, r.payload, r.observed, r.scanner.images, r.scanner.tasksSvc, expCfg.EmbyDir, expCfg.PublicURL, expCfg.STRMToken, r.scanner.notifier)
+			return r.reconcileTx(ctx, tx, expCfg)
 		})
 	})
 }

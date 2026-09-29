@@ -15,15 +15,16 @@ import (
 )
 
 // ProcessScanPage persists file associations and movie records for a scanned page within a transaction.
-func ProcessScanPage(ctx context.Context, db *ent.Client, taskID int, scanID, directoryPath string, videos []Video, payload *Payload, prepare func([]Video) []Video, tasksSvc *tasks.Service) error {
+func ProcessScanPage(ctx context.Context, db *ent.Client, taskID int, directoryPath string, videos []Video, payload *Payload, prepare func([]Video) []Video, tasksSvc *tasks.Service) error {
 	return ent.WithTx(ctx, db, func(tx *ent.Tx) error {
-		return ProcessScanPageTx(ctx, tx, taskID, scanID, directoryPath, videos, payload, prepare, tasksSvc)
+		run := scanRun{scanner: &Scanner{tasksSvc: tasksSvc}, taskID: taskID, payload: payload}
+		return run.processPageTx(ctx, tx, directoryPath, videos, prepare)
 	})
 }
 
-// ProcessScanPageTx reads identities and writes file associations in the same transaction.
+// processPageTx reads identities and writes file associations in the same transaction.
 // prepare accounts for identified videos and can filter or defer unknown files.
-func ProcessScanPageTx(ctx context.Context, tx *ent.Tx, taskID int, scanID, directoryPath string, videos []Video, payload *Payload, prepare func([]Video) []Video, tasksSvc *tasks.Service) error {
+func (r *scanRun) processPageTx(ctx context.Context, tx *ent.Tx, directoryPath string, videos []Video, prepare func([]Video) []Video) error {
 	indexChanged := false
 	offlineChanged := false
 
@@ -44,7 +45,7 @@ func ProcessScanPageTx(ctx context.Context, tx *ent.Tx, taskID int, scanID, dire
 			previousFiles[entry.FileID] = entry
 		}
 		if prepare != nil {
-			IdentifyScanVideos(*payload, videos, previousFiles)
+			IdentifyScanVideos(*r.payload, videos, previousFiles)
 			videos = prepare(videos)
 		}
 		ids = ids[:0]
@@ -63,8 +64,8 @@ func ProcessScanPageTx(ctx context.Context, tx *ent.Tx, taskID int, scanID, dire
 				}
 			}
 		}
-		if len(codes) > 0 && payload.OfflineTaskID != 0 && payload.TargetID != "" {
-			id, err := IndexDownloadedMovie(ctx, tx, *payload)
+		if len(codes) > 0 && r.payload.OfflineTaskID != 0 && r.payload.TargetID != "" {
+			id, err := IndexDownloadedMovie(ctx, tx, *r.payload)
 			if err != nil {
 				return err
 			}
@@ -91,7 +92,7 @@ func ProcessScanPageTx(ctx context.Context, tx *ent.Tx, taskID int, scanID, dire
 			old := previousFiles[video.ID]
 			if old != nil && old.Name == video.Name && old.ParentID == video.ParentID &&
 				old.Size == video.Size && old.Sha1 == video.SHA1 && old.PickCode == video.PickCode &&
-				old.AccountID == payload.Source.AccountID && old.RootID == payload.Source.Directory.ID &&
+				old.AccountID == r.payload.Source.AccountID && old.RootID == r.payload.Source.Directory.ID &&
 				old.Path == path.Join(directoryPath, video.Name) && domain.ValueOrZero(old.MovieID) == codes[video.Code] {
 				unchanged = append(unchanged, video.ID)
 				continue
@@ -102,8 +103,8 @@ func ProcessScanPageTx(ctx context.Context, tx *ent.Tx, taskID int, scanID, dire
 			}
 			builder := tx.File.Create().SetFileID(video.ID).SetName(video.Name).SetSize(video.Size).
 				SetPickCode(video.PickCode).SetSha1(video.SHA1).SetParentID(video.ParentID).
-				SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).
-				SetPath(path.Join(directoryPath, video.Name)).SetScanID(scanID)
+				SetAccountID(r.payload.Source.AccountID).SetRootID(r.payload.Source.Directory.ID).
+				SetPath(path.Join(directoryPath, video.Name)).SetScanID(r.payload.ScanID)
 			if video.Code != "" {
 				builder.SetMovieID(codes[video.Code])
 			}
@@ -116,7 +117,7 @@ func ProcessScanPageTx(ctx context.Context, tx *ent.Tx, taskID int, scanID, dire
 			}
 		}
 		if len(unchanged) > 0 {
-			if err := tx.File.Update().Where(file.FileIDIn(unchanged...)).SetScanID(scanID).Exec(ctx); err != nil {
+			if err := tx.File.Update().Where(file.FileIDIn(unchanged...)).SetScanID(r.payload.ScanID).Exec(ctx); err != nil {
 				return fmt.Errorf("mark unchanged scanned files: %w", err)
 			}
 		}
@@ -124,9 +125,9 @@ func ProcessScanPageTx(ctx context.Context, tx *ent.Tx, taskID int, scanID, dire
 		if err != nil {
 			return err
 		}
-		payload.Scan.RemovedMovies += len(removed)
-		if len(videos) > 0 && payload.OfflineTaskID != 0 {
-			record, err := tx.OfflineDownload.Get(ctx, payload.OfflineTaskID)
+		r.payload.Scan.RemovedMovies += len(removed)
+		if len(videos) > 0 && r.payload.OfflineTaskID != 0 {
+			record, err := tx.OfflineDownload.Get(ctx, r.payload.OfflineTaskID)
 			if err != nil {
 				return err
 			}
@@ -147,16 +148,16 @@ func ProcessScanPageTx(ctx context.Context, tx *ent.Tx, taskID int, scanID, dire
 			}
 		}
 	}
-	if err := SaveScanProgress(ctx, tx.Task, taskID, *payload); err != nil {
+	if err := SaveScanProgress(ctx, tx.Task, r.taskID, *r.payload); err != nil {
 		return err
 	}
-	if tasksSvc != nil {
+	if r.scanner.tasksSvc != nil {
 		if indexChanged {
-			tasksSvc.NotifyLibraryChanged()
+			r.scanner.tasksSvc.NotifyLibraryChanged()
 		} else if offlineChanged {
-			tasksSvc.NotifyOfflineChanged()
+			r.scanner.tasksSvc.NotifyOfflineChanged()
 		} else {
-			tasksSvc.Notify()
+			r.scanner.tasksSvc.Notify()
 		}
 	}
 	return nil

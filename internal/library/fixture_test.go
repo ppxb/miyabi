@@ -13,6 +13,7 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scan"
 	scrapePkg "github.com/ppxb/miyabi/internal/library/scrape"
@@ -261,11 +262,13 @@ func identifyScanVideosForTest(ctx context.Context, lib *Service, payload scan.P
 }
 
 func indexScanPage(ctx context.Context, lib *Service, taskID int, scanID, directoryPath string, videos []scan.Video, payload *scan.Payload) error {
-	return scan.ProcessScanPage(ctx, lib.database, taskID, scanID, directoryPath, videos, payload, nil, lib.tasks)
+	payload.ScanID = scanID
+	return scan.ProcessScanPage(ctx, lib.database, taskID, directoryPath, videos, payload, nil, lib.tasks)
 }
 
-func reconcileScan(ctx context.Context, lib *Service, taskID int, scanID string, payload *scan.Payload, observed scrapePkg.DirectoryObservations, embyOpts ...any) error {
-	return scan.ReconcileScan(ctx, lib.database, taskID, scanID, payload, observed, lib.images, lib.tasks, embyOpts...)
+func reconcileScan(ctx context.Context, lib *Service, taskID int, scanID string, payload *scan.Payload, observed scrapePkg.DirectoryObservations) error {
+	payload.ScanID = scanID
+	return scan.ReconcileScan(ctx, lib.database, taskID, payload, observed, lib.images, lib.tasks, export.Config{}, nil)
 }
 
 func panTestGate(t *testing.T) (<-chan struct{}, func()) {

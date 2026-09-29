@@ -321,7 +321,8 @@ func TestOfflineCompletionAndScanPagePreserveEachOthersFields(t *testing.T) {
 	}()
 	go func() {
 		<-start
-		finished <- scan.ProcessScanPage(ctx, service.database, parent.ID, "concurrent-scan", "/Movies/download-folder",
+		payload.ScanID = "concurrent-scan"
+		finished <- scan.ProcessScanPage(ctx, service.database, parent.ID, "/Movies/download-folder",
 			[]scan.Video{video}, &payload, nil, service.tasks)
 	}()
 	close(start)

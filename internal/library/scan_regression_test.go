@@ -14,6 +14,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/task"
+	"github.com/ppxb/miyabi/internal/export"
 	"github.com/ppxb/miyabi/internal/library/scan"
 	"github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/pan"
@@ -106,7 +107,8 @@ func TestMixedScanPageRollsBackBothChangedFilesAndUnchangedMarkers(t *testing.T)
 	}
 	lib.database.Task.DeleteOneID(queued.ID).ExecX(t.Context())
 	videos[1] = fixtureVideo("102", "ABP-003.mp4")
-	if err := scan.ProcessScanPage(t.Context(), lib.database, queued.ID, "failed", "/Movies", videos, &payload,
+	payload.ScanID = "failed"
+	if err := scan.ProcessScanPage(t.Context(), lib.database, queued.ID, "/Movies", videos, &payload,
 		func(videos []scan.Video) []scan.Video { return videos }, lib.tasks); err == nil {
 		t.Fatal("scan page without a progress record unexpectedly committed")
 	}
@@ -144,7 +146,8 @@ func TestScanResolvesAndIndexesCurrentIdentityWithOneFileRead(t *testing.T) {
 			return next.Query(ctx, query)
 		})
 	}))
-	if err := scan.ProcessScanPage(ctx, lib.database, queued.ID, "current", "/Movies", videos, &payload,
+	payload.ScanID = "current"
+	if err := scan.ProcessScanPage(ctx, lib.database, queued.ID, "/Movies", videos, &payload,
 		func(videos []scan.Video) []scan.Video { return videos }, lib.tasks); err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +244,9 @@ func TestScanCheckpointResumePreservesPreviousScannedFiles(t *testing.T) {
 			v1 := scan.IdentifyVideo(pan.File{ID: "v1", ParentID: "dir-1", Name: "ABP-001.mp4", Size: 1 << 30, SHA1: "s1"})
 			queued := lib.database.Task.Query().Where(task.TypeEQ("scan")).OnlyX(ctx)
 
-			if err := scan.ProcessScanPage(ctx, lib.database, queued.ID, scanID, "/Movies/Dir1", []scan.Video{v1}, &payload, nil, lib.tasks); err != nil {
+			payload.ScanID = scanID
+
+			if err := scan.ProcessScanPage(ctx, lib.database, queued.ID, "/Movies/Dir1", []scan.Video{v1}, &payload, nil, lib.tasks); err != nil {
 				t.Fatal(err)
 			}
 
@@ -318,7 +323,8 @@ func TestReconcileRollbackKeepsExport(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A missing task causes SaveScanProgress to fail after reconciliation work.
-	err := scan.ReconcileScan(ctx, lib.database, -1, "new", &payload, nil, nil, nil, root)
+	payload.ScanID = "new"
+	err := scan.ReconcileScan(ctx, lib.database, -1, &payload, nil, nil, nil, export.Config{EmbyDir: root}, nil)
 	if err == nil {
 		t.Fatal("expected rollback")
 	}

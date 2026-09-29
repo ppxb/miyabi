@@ -120,7 +120,8 @@ func BenchmarkIdentifyAndIndexScanPage(b *testing.B) {
 	}
 	b.ReportAllocs()
 	for b.Loop() {
-		if err := scan.ProcessScanPage(b.Context(), lib.database, queued.ID, "rescan", "/Movies", videos, &payload,
+		payload.ScanID = "rescan"
+		if err := scan.ProcessScanPage(b.Context(), lib.database, queued.ID, "/Movies", videos, &payload,
 			func(videos []scan.Video) []scan.Video { return videos }, lib.tasks); err != nil {
 			b.Fatal(err)
 		}

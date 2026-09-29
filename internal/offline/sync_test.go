@@ -235,7 +235,8 @@ func TestOfflinePageFileTrackingRollsBackWithTheIndex(t *testing.T) {
 		Code: input.Code, JavDBID: input.JavdbID}
 	video := scan.IdentifyVideo(pan.File{ID: "video", ParentID: "download-folder", Name: input.Code + ".mp4", Size: 1 << 30})
 	// The missing parent fails the final progress write after file tracking.
-	if err := scan.ProcessScanPage(ctx, service.database, -1, "rolled-back", "/Movies/download-folder",
+	payload.ScanID = "rolled-back"
+	if err := scan.ProcessScanPage(ctx, service.database, -1, "/Movies/download-folder",
 		[]scan.Video{video}, &payload, nil, service.tasks); err == nil {
 		t.Fatal("page with a missing scan parent unexpectedly committed")
 	}

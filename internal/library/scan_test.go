@@ -15,6 +15,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/task"
+	"github.com/ppxb/miyabi/internal/export"
 	"github.com/ppxb/miyabi/internal/library/scan"
 	scrapePkg "github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/nfo"
@@ -482,7 +483,8 @@ func TestScanReconcile_CleansUpEmbyDirectoryAndNotifiesEmbyOnMovieDeletion(t *te
 	}
 
 	notifier := &testMediaNotifier{}
-	if err := reconcileScan(ctx, lib, queued.ID, "attempt-2", &payload, nil, embyDir, "http://127.0.0.1:8080", "tok", notifier); err != nil {
+	payload.ScanID = "attempt-2"
+	if err := scan.ReconcileScan(ctx, lib.database, queued.ID, &payload, nil, lib.images, lib.tasks, export.Config{EmbyDir: embyDir, PublicURL: "http://127.0.0.1:8080", STRMToken: "tok"}, notifier); err != nil {
 		t.Fatalf("reconcileScan failed: %v", err)
 	}
 
