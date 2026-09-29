@@ -10,17 +10,11 @@ import { useDesktopHover } from './use-desktop-hover'
 
 export function LibraryMovieCard({ movie }: { movie: LibraryMovie }) {
   const canHover = useDesktopHover()
-  return (
-    <LibraryMovieCardContent
-      key={canHover ? 'desktop' : 'touch'}
-      movie={movie}
-      canHover={canHover}
-    />
-  )
-}
-
-function LibraryMovieCardContent({ movie, canHover }: { movie: LibraryMovie; canHover: boolean }) {
   const [open, setOpen] = useState(false)
+  // Reset before committing children so restoring desktop mode cannot reopen
+  // old hover content. The card and its image keep their component identity.
+  if (!canHover && open) setOpen(false)
+
   const card = (
     <MovieCard movie={movie} titleTooltip={!canHover}>
       <LibraryMovieStatus movie={movie} />
