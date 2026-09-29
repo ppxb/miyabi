@@ -9,7 +9,6 @@ import (
 	"math/rand/v2"
 	"net/url"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -31,10 +30,7 @@ const (
 	userAgent      = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
 
-type HTTPClient interface {
-	Do(req *http.Request) (*http.Response, error)
-	CloseIdleConnections()
-}
+type HTTPClient = netx.FingerprintHTTPClient
 
 // Options configures a JavBus client.
 type Options struct {
@@ -46,17 +42,14 @@ type Options struct {
 
 // Client accesses JavBus for movie magnets and metadata.
 type Client struct {
-	timeout      time.Duration
-	proxyManager *netx.ProxyManager
-	proxyChanges <-chan struct{}
-	limiter      *rate.Limiter
-	cache        *detailCache
+	limiter *rate.Limiter
+	cache   *detailCache
 
 	available atomic.Bool
 
-	clientMu sync.RWMutex
-	client   HTTPClient
-	isTest   bool
+	client      HTTPClient
+	fingerprint *netx.ProxiedFingerprintClient
+	isTest      bool
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -83,12 +76,10 @@ func New(options Options) (*Client, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	client := &Client{
-		timeout:      timeout,
-		proxyManager: options.Proxy,
-		limiter:      rate.NewLimiter(rate.Every(time.Second/time.Duration(defaultRate)), defaultBurst),
-		cache:        newDetailCache(detailCacheTTL),
-		ctx:          ctx,
-		cancel:       cancel,
+		limiter: rate.NewLimiter(rate.Every(time.Second/time.Duration(defaultRate)), defaultBurst),
+		cache:   newDetailCache(detailCacheTTL),
+		ctx:     ctx,
+		cancel:  cancel,
 	}
 
 	if options.testClient != nil {
@@ -98,16 +89,13 @@ func New(options Options) (*Client, error) {
 		return client, nil
 	}
 
-	initialClient, err := client.buildHTTPClient(client.resolveProxy())
+	initialClient, err := netx.NewProxiedFingerprintClient(options.Proxy, netx.FingerprintOptions{Timeout: timeout, CookieJar: true})
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("create JavBus fingerprint client: %w", err)
 	}
 	client.client = initialClient
-
-	if options.Proxy != nil {
-		client.proxyChanges = options.Proxy.Subscribe()
-	}
+	client.fingerprint = initialClient
 
 	go client.runHealthLoop()
 
@@ -170,7 +158,7 @@ func (c *Client) probe() bool {
 	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Cookie", "dv=1")
 
-	client := c.getHTTPClient()
+	client := c.client
 	if client == nil {
 		return false
 	}
@@ -232,7 +220,7 @@ func (c *Client) ensureDetailParams(ctx context.Context, code string) (gid, uc, 
 	req.Header.Set("Cookie", "dv=1; existmag=all")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 
-	client := c.getHTTPClient()
+	client := c.client
 	resp, err := client.Do(req)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -303,7 +291,7 @@ func (c *Client) fetchMagnets(ctx context.Context, code, gid, uc, img string) ([
 	req.Header.Set("Referer", fmt.Sprintf("%s/%s", baseURL, url.PathEscape(code)))
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 
-	client := c.getHTTPClient()
+	client := c.client
 	resp, err := client.Do(req)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -342,27 +330,6 @@ func (c *Client) fetchMagnets(ctx context.Context, code, gid, uc, img string) ([
 	return parseMagnetsHTML(bodyStr)
 }
 
-func (c *Client) getHTTPClient() HTTPClient {
-	c.clientMu.RLock()
-	defer c.clientMu.RUnlock()
-	return c.client
-}
-
-func (c *Client) resolveProxy() *url.URL {
-	if c.proxyManager == nil {
-		return nil
-	}
-	return c.proxyManager.Resolve()
-}
-
-func (c *Client) buildHTTPClient(proxy *url.URL) (HTTPClient, error) {
-	return netx.NewFingerprintClient(netx.FingerprintOptions{
-		Timeout:   c.timeout,
-		Proxy:     proxy,
-		CookieJar: true,
-	})
-}
-
 func (c *Client) runHealthLoop() {
 	c.setAvailable(c.probe())
 
@@ -375,21 +342,13 @@ func (c *Client) runHealthLoop() {
 			return
 		case <-ticker.C:
 			c.setAvailable(c.probe())
-		case _, ok := <-c.proxyChanges:
+		case _, ok := <-c.fingerprint.Changes():
 			if !ok {
 				return
 			}
-			newClient, err := c.buildHTTPClient(c.resolveProxy())
-			if err != nil {
+			if err := c.fingerprint.Refresh(); err != nil {
 				slog.WarnContext(c.ctx, "JavBus transport keeps previous proxy after change", "error", err)
 				continue
-			}
-			c.clientMu.Lock()
-			oldClient := c.client
-			c.client = newClient
-			c.clientMu.Unlock()
-			if oldClient != nil {
-				oldClient.CloseIdleConnections()
 			}
 			c.setAvailable(c.probe())
 		}
@@ -399,12 +358,9 @@ func (c *Client) runHealthLoop() {
 // Close releases network resources and proxy subscription.
 func (c *Client) Close() {
 	c.cancel()
-	if c.proxyManager != nil && c.proxyChanges != nil {
-		c.proxyManager.Unsubscribe(c.proxyChanges)
-	}
-	c.clientMu.Lock()
-	if c.client != nil {
+	if c.fingerprint != nil {
+		c.fingerprint.Close()
+	} else {
 		c.client.CloseIdleConnections()
 	}
-	c.clientMu.Unlock()
 }

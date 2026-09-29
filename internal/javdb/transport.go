@@ -13,15 +13,20 @@ import (
 	"github.com/ppxb/miyabi/internal/netx"
 )
 
-type httpClient interface {
-	Do(*http.Request) (*http.Response, error)
-	CloseIdleConnections()
-}
-
 type transport struct {
 	host       string
-	client     httpClient
+	client     netx.FingerprintHTTPClient
 	deviceUUID string
+}
+
+// routeTransport uses the managed client for normal API requests. Probe
+// transports remain independent and retain the proxy they were created with.
+func routeTransport(host string, client netx.FingerprintHTTPClient, options Options) (*transport, error) {
+	host, err := normalizeHost(host)
+	if err != nil {
+		return nil, err
+	}
+	return &transport{host: host, client: client, deviceUUID: options.DeviceUUID}, nil
 }
 
 type networkError struct {
@@ -42,8 +47,8 @@ func (e *networkError) PublicMessage() string {
 	return "无法连接 JavDB，请检查网络代理或线路设置"
 }
 
-// newTransport builds a fingerprinted API client bound to one host. The proxy
-// is fixed per transport, so callers rebuild it when the configuration changes.
+// newTransport builds an independent client for a route probe. Its proxy stays
+// fixed for the duration of that measurement.
 func newTransport(host string, proxy *url.URL, options Options) (*transport, error) {
 	host, err := normalizeHost(host)
 	if err != nil {

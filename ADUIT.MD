@@ -81,7 +81,7 @@
 - [x] **43.** ✔ 本地 Emby 目录扫描接入 `scan` 后台任务：启动及保存 Emby 设置时自动入队，同目录活动任务复用；与 115 扫描串行，并与 STRM 重写及导出互斥。`POST /api/library/scan/local` 返回 202 任务信息，仅接受当前配置的本地目录；执行和重试校验目录是否已变更，跳过目录中的符号链接，支持任务状态、失败重试和重启恢复。首次启动导出目录尚不存在时跳过自动扫描。
 - [x] **44.** ✔ 网页登录统一使用 HttpOnly Cookie 携带 JWT，保留签名与有效期校验；登录 JSON 不再返回 token，移除 localStorage 存取及 Bearer 注入、网页登录 URL token 通道，启动时清理旧存储。SSE、图片及 beacon 继续使用 Cookie，API 写请求采用标准库跨来源保护；独立 STRM 播放 token 保持可用。
 - [x] **45.** ✔ `netx.NewTransport(manager)` 统一标准 HTTP Transport 和动态代理配置，nil 时强制直连且不读取环境代理；Resty、安全下载及 GFriends 复用，删除字幕与 JavDB 图片客户端的重复分支和多余初始化。`SafeDownload`、`OpenMedia` 改用 `net/http`，保留下载大小限制、SSRF/重定向检查及媒体流的 UA、Range、HEAD、超时行为；需要浏览器 TLS 指纹的客户端继续独立使用。
-- [ ] **46.** javdb 与 javbus 重复实现：`httpClient` 接口、watchProxy 重建 fingerprint client（javbus 用 RWMutex、javdb 用 atomic）、Close 中冗余双重判断、导出的 `Probe`（`javbus/client.go:31-34,244-288`、`javbus/probe.go` vs `javdb/client.go:204-233,409-414`、`transport.go:16-19`）→ netx 提供 `ProxiedFingerprintClient`。
+- [x] **46.** ✔ `netx.ProxiedFingerprintClient` 统一指纹客户端接口、代理订阅、重建替换及关闭释放；重建失败保留旧客户端，关闭后禁止重建。JavDB 与 JavBus 正式请求复用此管理逻辑，分别保留线路重选和健康探测；JavDB 线路探测仍使用固定代理的临时客户端，两站 `Probe` 保留各自检测语义。
 - [ ] **47.** `internal/javbus/cache.go` 与 `internal/catalogue/cache.go` 两套缓存；javbus 版"上限 512"只清过期项，实际无上限；`get` 在 RUnlock 后再 Lock 删除存在 TOCTOU；外层已按影片缓存磁力 → 删除 javbus 缓存。
 - [ ] **48.** `internal/catalogue/types.go:89-102` `Provider` 11 方法接口仍返回 `javdb.RouteStatus`，未真正解耦；`NewWithProvider` 仅测试使用，`magnets.go:63-65` 的 `aggregator == nil` 分支只为它存在且行为与生产不一致；`javbus` 字段是具体类型、`javdb` 是接口。
 - [ ] **49.** 同一份路由信息 4 个结构体：`javdb.RouteStatus`、`routeResult`（字段完全一致，`client.go:341-345` 逐字段搬运）、`catalogue.RouteStatus`、`catalogue.persistedRoute`；`catalogue.Service.route` 镜像 javdb 路由状态（`service.go:48-49,153-158,295-319,407-430`）。

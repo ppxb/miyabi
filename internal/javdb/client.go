@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
+	"github.com/ppxb/miyabi/internal/netx"
 	"golang.org/x/sync/singleflight"
 	"golang.org/x/time/rate"
 )
@@ -42,7 +43,7 @@ type Client struct {
 	routeContext  context.Context
 	stopRoutes    context.CancelFunc
 	selector      func(context.Context, routeSelection) (*routeState, error)
-	proxyChanges  <-chan struct{}
+	fingerprint   *netx.ProxiedFingerprintClient
 }
 
 func New(options Options) (*Client, error) {
@@ -68,6 +69,10 @@ func New(options Options) (*Client, error) {
 		return nil, errors.New("JavDB rate limit must not be negative")
 	}
 
+	fingerprint, err := netx.NewProxiedFingerprintClient(options.Proxy, netx.FingerprintOptions{Timeout: options.Timeout, CookieJar: true})
+	if err != nil {
+		return nil, fmt.Errorf("create JavDB fingerprint client: %w", err)
+	}
 	routeContext, stopRoutes := context.WithCancel(context.Background())
 	client := &Client{
 		options:      options,
@@ -75,10 +80,10 @@ func New(options Options) (*Client, error) {
 		media:        newMediaClient(options),
 		routeContext: routeContext,
 		stopRoutes:   stopRoutes,
+		fingerprint:  fingerprint,
 	}
 	client.selector = client.selectAndInstall
 	if options.Proxy != nil {
-		client.proxyChanges = options.Proxy.Subscribe()
 		go client.watchProxy()
 	}
 	if options.CachedHost != "" {
@@ -195,8 +200,8 @@ func (c *Client) routeHosts() []string {
 // Close releases idle API and image connections.
 func (c *Client) Close() {
 	c.stopRoutes()
-	if c.options.Proxy != nil && c.proxyChanges != nil {
-		c.options.Proxy.Unsubscribe(c.proxyChanges)
+	if c.fingerprint != nil {
+		c.fingerprint.Close()
 	}
 	c.media.GetClient().CloseIdleConnections()
 	if state := c.current.Load(); state != nil {
@@ -219,7 +224,7 @@ func (c *Client) watchProxy() {
 		select {
 		case <-c.routeContext.Done():
 			return
-		case _, ok := <-c.proxyChanges:
+		case _, ok := <-c.fingerprint.Changes():
 			if !ok {
 				return
 			}
@@ -235,22 +240,20 @@ func (c *Client) watchProxy() {
 	}
 }
 
-// reinstall swaps the active route's transport for one built with the current
-// proxy. It returns nil when no route is installed yet.
+// reinstall refreshes the shared fingerprint client and publishes a new route
+// snapshot without changing its selection. It returns nil when no route is installed.
 func (c *Client) reinstall() (*routeState, error) {
 	c.selectionMu.Lock()
 	defer c.selectionMu.Unlock()
+	if err := c.fingerprint.Refresh(); err != nil {
+		return nil, err
+	}
 	previous := c.current.Load()
 	if previous == nil {
 		return nil, nil
 	}
-	transport, err := newTransport(previous.status.Host, c.proxyURL(), c.options)
-	if err != nil {
-		return nil, err
-	}
-	state := &routeState{transport: transport, status: previous.status}
+	state := &routeState{transport: previous.transport, status: previous.status}
 	c.current.Store(state)
-	previous.transport.closeIdleConnections()
 	return state, nil
 }
 
@@ -369,7 +372,7 @@ func (c *Client) selectAndInstall(ctx context.Context, options routeSelection) (
 }
 
 func (c *Client) installRoute(ctx context.Context, status RouteStatus) (*routeState, error) {
-	transport, err := newTransport(status.Host, c.proxyURL(), c.options)
+	transport, err := routeTransport(status.Host, c.fingerprint, c.options)
 	if err != nil {
 		return nil, err
 	}

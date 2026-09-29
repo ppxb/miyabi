@@ -281,8 +281,8 @@ func TestClient_ProxyManagerIntegration(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	parsed, _ := url.Parse("http://127.0.0.1:18888")
-	if client.resolveProxy().String() != parsed.String() {
-		t.Fatalf("expected proxy to be resolved as %v, got %v", parsed, client.resolveProxy())
+	if manager.Resolve().String() != parsed.String() {
+		t.Fatalf("expected proxy to be resolved as %v, got %v", parsed, manager.Resolve())
 	}
 }
 
