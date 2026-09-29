@@ -18,10 +18,6 @@ type Queue struct {
 	lock     syncx.ContextLock
 }
 
-func NewQueue(database *ent.Client, registry *Registry, bus *Bus) *Queue {
-	return &Queue{database: database, registry: registry, bus: bus}
-}
-
 // Lock serialises enqueue decisions that must observe a consistent queue.
 func (q *Queue) Lock(ctx context.Context) error { return q.lock.Lock(ctx) }
 func (q *Queue) Unlock()                        { q.lock.Unlock() }
@@ -95,7 +91,7 @@ func (q *Queue) Finish(ctx context.Context, id int, runError error) error {
 	}); err != nil {
 		return fmt.Errorf("finish task %d: %w", id, err)
 	}
-	q.bus.Changed(change)
+	q.bus.publish(change)
 	return nil
 }
 

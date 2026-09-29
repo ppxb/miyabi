@@ -11,11 +11,10 @@ type Service struct {
 
 func NewService(database *ent.Client, registry *Registry) *Service {
 	bus := NewBus()
-	return &Service{queue: NewQueue(database, registry, bus), bus: bus, registry: registry}
+	return &Service{queue: &Queue{database: database, registry: registry, bus: bus}, bus: bus, registry: registry}
 }
 
 func (s *Service) Queue() *Queue       { return s.queue }
-func (s *Service) Bus() *Bus           { return s.bus }
 func (s *Service) Registry() *Registry { return s.registry }
 
 func (s *Service) Subscribe() (<-chan struct{}, func()) { return s.bus.Subscribe() }

@@ -46,9 +46,6 @@ func (b *Bus) Subscribe() (<-chan struct{}, func()) {
 // Notify wakes all subscribers without bumping any revision.
 func (b *Bus) Notify() { b.publish(0) }
 
-// Changed bumps the named revisions and notifies all subscribers.
-func (b *Bus) Changed(change Change) { b.publish(change) }
-
 func (b *Bus) NotifyLibraryChanged() { b.publish(ChangeLibrary) }
 func (b *Bus) NotifyOfflineChanged() { b.publish(ChangeOffline) }
 func (b *Bus) NotifyMonitorChanged() { b.publish(ChangeMonitor) }

@@ -3,7 +3,6 @@ package tasks
 import (
 	"context"
 	"encoding/json"
-	"slices"
 	"sync"
 
 	"github.com/ppxb/miyabi/internal/ent"
@@ -54,16 +53,4 @@ func (r *Registry) Get(k Kind) (Handler, bool) {
 	defer r.mu.RUnlock()
 	h, ok := r.handlers[k]
 	return h, ok
-}
-
-// Kinds returns registered kinds in sorted order.
-func (r *Registry) Kinds() []Kind {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	kinds := make([]Kind, 0, len(r.handlers))
-	for k := range r.handlers {
-		kinds = append(kinds, k)
-	}
-	slices.Sort(kinds)
-	return kinds
 }

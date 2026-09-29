@@ -81,11 +81,6 @@ func TestRegistryAndHandlers(t *testing.T) {
 		t.Fatalf("get handler: ok=%v, kind=%v", ok, h.Kind)
 	}
 
-	kinds := registry.Kinds()
-	if len(kinds) != 1 || kinds[0] != tasks.KindScan {
-		t.Fatalf("unexpected kinds: %v", kinds)
-	}
-
 	if err := h.Handle(t.Context(), tasks.Job{ID: 1, Type: tasks.KindScan}); err != nil {
 		t.Fatalf("handle: %v", err)
 	}
@@ -249,7 +244,7 @@ func TestPoolWorkerExecution(t *testing.T) {
 
 	svc := tasks.NewService(store.Client, registry)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	pool := tasks.NewPool(svc.Queue(), svc.Bus(), registry, []tasks.Kind{tasks.KindScan}, 1, logger)
+	pool := tasks.NewPool(svc.Queue(), svc, registry, []tasks.Kind{tasks.KindScan}, 1, logger)
 
 	info, err := store.Client.Task.Create().SetType(string(tasks.KindScan)).SetPayload(json.RawMessage(`{}`)).Save(ctx)
 	if err != nil {
