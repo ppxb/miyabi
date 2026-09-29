@@ -145,7 +145,10 @@
   - 方案修正：ReportScan 仍被 library/local.go 生产调用；ProcessScanPage、ReconcileScan、IdentifyScanVideos、IndexDownloadedMovie、SaveScanProgress 是跨包回归测试使用的入口，本次保留其导出边界和事务语义，不删除测试或引入替代包装。Directories 保留跨包测试入口，合并原有公私两层方法，生产 Cover 共用同一实现。
   - 已完成：删除 HasEligibleVideos、scrape.Images、LockArtwork、InvalidateDirCache、SetDirTTL 和可变 dirTTL；维护测试改用已有 TryLockArtwork，缓存测试改验实际过期刷新。library.Service.images 移到测试夹具，构造时仍将原缓存传给扫描器；ViewedMovieIDs 固定原 5000 条上限，接口与测试桩同步简化；Enqueue 不再返回无人读取的 bool，测试验证实际队列内容、去重、容量及关闭后拒绝入队；CanIdentifyVideo、RemoveUnreferencedMovies、PersonItem 改为包内符号。
   - 验证：library（含 scan/scrape）、maintenance、emby、offline、api 包测试及 git diff --check 通过；app 包仅复现第 90 项已确认的 TestEmbyDirectoryAutomaticallyQueuesLocalScan 本地目录路径断言失败。未进行浏览器或真实上游联调，待整体复查。
-- [ ] **94.** 任务业务已迁入 library / monitor。重新检查 `internal/tasks` 与迁移后包的导出边界、包装方法和重复入口；`Service.Registry()` 已被 `app/task_workers.go` 使用，不再属于“仅测试调用”。仅对当前没有外部调用且无接口职责的符号缩小可见性。
+- [x] **94.** 任务业务已迁入 library / monitor。重新检查 `internal/tasks` 与迁移后包的导出边界、包装方法和重复入口；`Service.Registry()` 已被 `app/task_workers.go` 使用，不再属于“仅测试调用”。仅对当前没有外部调用且无接口职责的符号缩小可见性。
+  - 已完成：删除仅测试枚举的 Registry.Kinds 及对应断言；NewService 直接组装 Queue，移除仅包内调用的 NewQueue 包装；完成事务提交后直接调用 bus.publish，删除 Changed 包装。任务池通过 Service.Subscribe 订阅原总线，删除重复暴露总线的 Service.Bus，app 与测试同步调整。
+  - 保留：Service.Registry、Queue 的业务锁与任务池接口、业务包及 SSE 使用的通知方法；Registry.Get、Handler 构造和 payload 工具仍有跨包调用或测试用途。注册表锁、独立分池订阅、取消恢复及事务提交后通知语义不变。
+  - 验证：tasks、library（含 scan/scrape）、monitor、offline、api 包测试及 git diff --check 通过，覆盖数据库错误重试、先订阅后恢复、广播唤醒、退出解绑、完成回调提交与回滚；app 包仅复现第 90 项已确认的 TestEmbyDirectoryAutomaticallyQueuesLocalScan 本地目录路径断言失败。未进行浏览器或真实上游联调，待整体复查。
 - [ ] **95.** Subscription `zone` 字段（schema:38、monitor Item、`AddMovieOptions`、`AddActorOptions`、`UpdateOptions`、API 输入）写入、继承、返回，前后端从不读取；订阅状态 `"error"`（schema:41、`monitor/service.go:34`、前端 subscription-card）从未被设置；`monitor.Status` 与 ent `subscription.Status` 重复。
 - [ ] **96.** `internal/subtitle`：`Provider.Name()` 从未通过接口调用（`subtitlecat.go:167` 另写死 `"SubtitleCat"`）；`finder.go:29-37` `WithAllowLoopbackForTesting` 测试开关进入生产结构体；`DecodeToUTF8` 最后的 `ToValidUTF8` 兜底实际走不到。
 - [ ] **97.** `internal/netx/proxy.go:88-94` `sameConfig` 蕴含 `sameURL`，`!sameConfig || !sameURL` 实为 `!sameConfig`，与注释"只在生效代理变化时广播"相反（Enabled=false 改 URL 也重建 tls-client）→ 条件改为 `!sameURL`；:73-79 `resolve` 中 `!Enabled ||` 冗余；:131-133 `parseProxyURL` 的 `raw == ""` 分支死代码。
