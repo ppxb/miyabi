@@ -1,121 +1,42 @@
-# Miyabi 代码审计清单
+# Miyabi 当前审计待办
 
-> 审计日期：2026-09-27（基于提交 `f79e501`）
-> 范围：后端 Go（不含 ent 生成代码）+ 前端 web/src 全量非测试文件，测试文件仅检查臃肿问题。
-> 标记说明：✔ 表示已亲自打开源码复核；其余已通过 grep / 通读确认。编号全局连续，修复后勾选即可。
+> 初始审计：2026-09-27，基于提交 `f79e501`。
+> 清单整理：2026-09-29；移除 62 条已勾选记录及 63、86、223 三条已失效待办，剩余 179 条。
+> 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
+> 原编号保留，不重新编号；已完成记录与修复经过通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
+> 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
 
----
+## 处理顺序与原则
 
-## 修复优先级
-
-- **P0（直接影响使用）**：1、2、3、10、8、9、13、11、12、7
-- **P1（结构性，一改清一片）**
-  - 37 + 4/5/6：统一导出配置
-  - 41 + 82~85 + 126/133：快照移出 task 表
-  - 78~81：删除字幕残留并重新生成 ent
-  - 64 + 39 + 40：精简任务框架
-  - 44：认证只保留 cookie
-- **P2（前端）**
-  - 抽 IconButton / ConfirmDialog / useDraft / 订阅按钮 hook
-  - 统一设置页保存与错误处理
-  - 删掉 66、67 两个手写��存
-- **其余**：死代码与过度防御，按包批量清理
+- **优先核实行为与安全问题**：235、237（敏感日志与代理信任）、167（图片抓取边界）、244（非番号误识别）。
+- **再处理明显的阻塞与重复工作**：61、129、131、142、148、149；按当前调用链和测试确认影响。
+- **结构整理按模块进行**：58、60、64、65、184；保留任务分池、重启恢复、错误退避和协议兼容语义。
+- **前端优先保证交互与可访问性**：186–189、206、220–221、230–234，再处理布局与样式统一。
+- **死代码与测试一起核对**：78–83、85、93–109、238–240。只有确认失去生产职责和有效覆盖后才删除；不能只凭文件短、单实现或前端未调用下结论。
+- **方案是候选，不是强制指令**：已有公共实现优先复用；历史迁移的删除需先明确支持的升级起点，不能以本机迁完代替兼容策略。
+- **完成后从本清单移除**；混合条目只移除已解决部分。编号互引若指向已移除项，可在 Git 历史中追溯。
 
 ---
 
 ## 一、正确性 / 并发 Bug
 
-- [x] **1.** ✔ `web/pnpm-lock.yaml` 仍残留 `@vidstack/react`、`hls.js`（7fe1cba 只改了 package.json），Dockerfile `pnpm install --frozen-lockfile` 必然失败 → 本地 `pnpm install` 重新生成锁文件。
-- [x] **2.** ✔ `internal/library/scan/walker.go:98`、`:156` 断点续扫每次生成新 scanID，却只遍历剩余目录；`reconcile.go:47` 的 `ScanIDNEQ` 会把重启前已��目录的文件判为过期删除，连带影片与刮削结果 → scanID 持久化进 payload，续扫沿用。
-- [x] **3.** ✔ `internal/library/scrape/export.go:76` `RewriteSTRM` 仅在"没有 token"时追加，token 轮换后旧值保留 → 全部 401。应解析 fileID 后用 `STRMContent` 整行重生成；`"/api/strm/play/"` 在 `export.go:39`、`:70`、`scan/local.go:26` 三处硬编码需收敛。
-- [x] **4.** 导出配置数据竞争：`internal/emby/service.go:200` `UpdateConfig` 在 HTTP goroutine 无锁写 `scan.Scanner` / `scrape.Service` 的 `embyDir/publicURL/strmToken`，任务 worker 同时在读（`cover.go:266`、`walker.go:115`）。
-- [x] **5.** 导出目录双来源：`internal/app/app.go:142-154` 用环境变量 `cfg.EmbyDir`，emby 用数据库中的 `LocalDir`（`emby/service.go:70`），修改其一后 Emby 通知路径错误；`translatePath` 兜底返回 `mediaPath/<basename>`（`emby/service.go:474`）也是错误路径，应跳过。
-- [x] **6.** `internal/app/app.go:152`、`internal/emby/service.go:205` 裸 goroutine 执行 `RewriteSTRM`，不受 ctx / WaitGroup 管理，会与导出任务并发写同一批 .strm。
-- [x] **7.** ✔ `internal/magnet/aggregator.go:92` + `internal/catalogue/magnets.go:33`：关闭的 JavBus 返回 `nil, nil` 被计为成功，JavDB 失败时返回空列表不报错，并被缓存 1 分钟（`catalogue/cache.go:85`）；monitor 当作"无磁力"处理甚至标记 stale → 区分"跳过"与"成功为空"，部分失败不入缓存。
-- [x] **8.** ✔ `internal/netx/ssrf.go:134` SSRF 拨号检查同时作用于代理地址，`127.0.0.1:7890` 等本机 / 局域网代理被拦 → 开代理后字幕下载全部失败。仅在直连时检查。
-- [x] **9.** ✔ `internal/netx/client.go:39` "Direct" 客户端克隆 `http.DefaultTransport`，自带 `ProxyFromEnvironment`，Docker 设了 `HTTPS_PROXY` 时 115 流量走代理；`netx/client_test.go` 靠 `Setenv` 清空环境变量掩盖了问题 → 显式 `transport.Proxy = nil`。
-- [x] **10.** ✔ `internal/pan/client.go:147` resty 对 POST 同样重试：`/open/refreshToken` 超时重试会用已轮换的旧 refresh_token → 凭证丢失；`add_task_urls` 重试返回 10008 被当成冲突；`upload/init` 同理 → 只对 GET / 429 重试，或对 token/离线/上传请求关闭重试。
-- [x] **11.** ✔ `internal/monitor/batch.go:102` 批量任务重启后从 index 0 重跑，`Processed` 在旧值上继续累加 → 进度 >100 触发 schema `Range(0,100)` 校验，之后进度永远保存失败 → 从 `payload.Batch.Processed` 处继续。
-- [x] **12.** ✔ `internal/tasks/pool.go:66`、`:87` Claim / Finish 遇到一次数据库临时错误（SQLITE_BUSY）就 `return err` → errgroup 取消 → `App.Run` 关闭整个 HTTP 服务 → 记录日志并退避重试，仅 ctx 结束时退出。
-- [x] **13.** ✔ `web/src/api/client.ts:104` 所有非 `/api/auth/` 的 401 都会 `clearAuthToken()` 并派发 `miyabi:unauthorized`，而 115 登录失效（`pan.ErrUnauthorized`）、Emby API Key 错误也返回 401 → 仅在后端 `code: "UNAUTHORIZED"`（访问密码失效）时触发，或 115 失效改用独立状态码。
-- [x] **14.** `web/src/api/movie-state-cache.ts:73` 用 `initialData` 伪造 `not_in_library`，加载中 / 失败时被当成真实数据 → `features/subscriptions/subscription-card.tsx:56` 可对已入库影片点"入库" → 改 `placeholderData`，`resetMovieStates` 同理。
-- [x] **15.** ✔ `web/src/api/subscriptions.ts:52` 订阅列表固定 `limit: 100` 只取第 1 页，`useSubscription`（:57-63）用 `find` 查找 → 第 101 条起显示"未订阅"，订阅页也显示不全。
-- [x] **16.** ✔ `internal/library/scrape/cover.go:130-149` 同一影片分布在多个 115 目录时，每个目录各导出一次到同一 `EmbyMovieDir` → `stem.strm` 互相覆盖、cd 编号错乱；`ExportLocalMovie`（`export.go:150`）不排序 → 先收集全部视频、排序后统一导出一次。
-- [x] **17.** ✔ `internal/export/export.go:39`（原 `library/scrape/export.go:26`）`EmbyMovieDir` 直接用原始 code 作目录名，含 `/` `\` `:` 时产生嵌套或非法路径 → 使用 `nfo.FileStem(code)`。
-- [x] **18.** ✔ `internal/library/scan/local.go:177` 本地 NFO 未做 `codeid.Normalize` 且无空值回退，`SetCode("")` 违反 NotEmpty；同段多处 `_ =` 吞错（含 `:244`）。
-- [x] **19.** ✔ `internal/monitor/subscribe.go:51`、`actor.go:71` 遇 `ent.IsConstraintError` 无限递归自身，外键约束也会命中 → 栈溢出风险 → 只重查一次。
-- [x] **20.** ✔ `internal/monitor/actor.go:37-69` + `check.go:140-143` 空作品演员 `SeenMovieIDs` 为空，被当成"尚无基线"，首批新作只记基线不生成订阅 → 增加显式"已初始化"标记。
-- [x] **21.** ✔ `internal/emby/service.go:147-161` `ScheduleActorSync` 的 `Timer.Stop` 挡不住已在运行的同步 → 多个 `SyncActorAvatars` 并发；找不到头像的演员每轮都重查 GFriends / DB / JavDB → `atomic.Bool` 单飞 + 负缓存。
-- [x] **22.** ✔ `internal/pan/play.go:92-95` + `internal/strm/relay.go:47,77-81`：`DownloadURL` 用播放器 UA 签名，`OpenMedia` HEAD 探测时空 UA 被替换成 `"Miyabi/1.0"` → 签名不匹配 403；回退 `PlayURL` 时同样不一致 → UA 由 strm 统一决定并透传。
-- [x] **23.** ✔ `internal/strm/relay.go:47-49` `DownloadURL` 的所有错误（含 Unauthorized、SourceChanged、ctx 取消）都被吞掉并回退 `PlayURL` → 仅在"无直链"时降级。
-- [x] **24.** ✔ `internal/drive/account.go:54-74` 账号缓存未绑定 `credentialVersion`，旧凭证的在途 fetch 可能在重新登录后写回旧账号 → 60s 内误清新账号挂载。
-- [x] **25.** ✔ `internal/netx/proxy.go:83-97` `Update` 的 Load / Store 非原子；`internal/app/network.go` 的 `UpdateNetwork` 先写 DB 再更新内存，不在同一把锁内；`Normalize` 调用两次。
-- [x] **26.** ✔ `internal/catalogue/cache.go:113-121` 上游成功后 `persistActiveRoute` 写库失败，会让本次成功的数据变成错误返回且不入缓存 → 记日志后忽略。
-- [x] **27.** ✔ `internal/domain/error.go:132-143` `PublicMessage` 无公开消息时返回 `err.Error()` → 500 把 SQL、文件路径、validator 原文（如 `Key: 'discoverSearchQuery.Query' Error:...`）返回前端 → Unexpected/Internal 一律返回默认文案。
-- [x] **28.** ✔ `internal/api/movie.go:72` `req, _ := bindJSON(...)` 忽略绑定失败，`c.Errors` 已挂 400 仍去扫默认目录。
-- [x] **29.** ✔ `internal/api/subscription.go:171-179` PUT 返回用户原始输入，而非 `normalized()` 后实际保存的值（如 `check_time` 为空存 "00:00" 却返回 ""）。
-- [x] **30.** ✔ `internal/subtitle/service.go:87-105` 既无 PickCode 也无 SourceURL 的 pending 记录不进任何分支，永远不清理 → 增加 default 分支删除。
-- [x] **31.** ✔ `web/src/features/tasks/task-events.tsx:127-135` SSE 遇 401 后变为 CLOSED，每 3 秒无限重连且不会触发未授权处理。
-- [x] **32.** ✔ `web/src/features/settings/pan-login-dialog.tsx:92,102-107` `refreshed` ref 整个会话只置位一次，第二张二维码过期不再自动刷新，但 :117 文案仍显示"正在刷新" → 按 `session.id` 重置。
-- [x] **33.** ✔ `web/src/features/settings/data-section.tsx:93` 按钮文案"清理所有缓存"，实际（:109 标题、:39 toast）只清理未使用的图片缓存 → 改为"清理未使用缓存"。
-- [x] **34.** ✔ `web/src/api/browse-history-store.ts:158-175` visibilitychange 触发 `flush()` 未返回时 pagehide 又用 beacon 发同一批 → 重复 POST；beacon 发送后不清 pending，下次启动再发一次。
-- [x] **35.** ✔ `internal/javbus/parser.go:19,203-214` 正则允许 `PB`，switch 中无 PB 分支，倍率落到 1 → 正则移除 `p`，不匹配时返回 0。
-- [x] **36.** ✔ `internal/emby/service.go:443-475` `translatePath` 中 `strings.HasPrefix(rel, "..")` 会把 `..foo` 目录误判为越界；方法未使用 receiver。
-- [x] **241.** ✔ `internal/library/scan/reconcile.go:58-71`、`persist.go:197-210`：用户在 115 删除影片后重新扫描，仅删除了 SQLite 的 `File` 与无引用 `Movie` 记录，未清理 `EmbyDir` 本地对应的影片目录（`.strm`、`.nfo`、海报等），且未向 Emby 发送删除/变更通知，导致 Emby 媒体库残留死链幽灵影片。
-- [x] **242.** ✔ 废除 JavBus 强制绑定代理限制，移除冗余的手动设置项，改为全自动连通性健康探测与自适应降级：删除后端 `/api/settings/javbus`（连同 `internal/api/javbus.go`）及前端 JavBus 开关与 API；`javbus.Client` 内部自适应维护连通性探测与熔断状态，网络可达时自动聚合磁力，不可达时 0ms 静默跳过（`ErrSkipped`），代理配置变更时自动重探自愈（一并解决第 175、178、223 条）。
-- [x] **243.** ✔ JavDB API 原缺少 HTTP 429 退避和 `Retry-After` 处理，现支持有限次数重试、秒数/日期解析、共享冷却与取消，超长冷却不提前重发。扫描原已有断点，批量原按 `Processed` 续跑；现补充任务重试接口及通知入口：保留扫描断点和任务 ID，仅重排失败的刮削/封面子任务，批量仅重试失败与未处理的订阅，并完整保存失败 ID。旧批量记录缺少完整失败 ID 时不推测重试范围，需重新选择失败订阅。
 - [ ] **244.** `internal/codeid/codeid.go:38-55,59-93` `filenamePattern`：正则前缀匹配规则对个别非番号文件名存在误提取（如相机默认命名的 `VID-20220326`、`IMG-XXXX`、包含分辨率标签的 `MAYLI-1080P` 等被当作番号提取并提交上游查询）→ 建立常见非番号前缀黑名单（如 `VID`, `IMG`, `DSC`, `MOV` 等）与分辨率标记过滤，避免无效请求与限流损耗。
-
-
-
----
-
-## 二、架构不合理
-
-- [x] **37.** 导出配置 `(embyDir, publicURL, strmToken)` 复制在 `scan.Scanner`、`scrape.Service`、`library.Service`（仅透传）、`emby.Service`、`app.go` 共 5 处，靠 `SetEmbyExport` / `SetSTRMToken` / `SetSTRMExporters` 扇出同步（4~6 的根源）；scrape 另有 `defaultEmbyDir = "./data/emby"` 与写死 8080 端口的 `defaultPublicURL()`（`export.go:18-22`），与 `config.Load` 推导不一致 → 新建 `internal/export`（或并入 strm），持有��一 `atomic.Pointer[ExportConfig]` 并负责 STRM/NFO/图片目录布局与重写。
-- [x] **38.** 依赖方向反转：emby 导入 `library/scrape`（为 `RewriteSTRM`），scrape 又通过 `MediaNotifier` 回调 emby；`internal/database/indexes.go:8` 导入 tasks���仅为常量）；`internal/app/deps_test.go:17-18` 的 business 列表漏了 emby、subtitle，因此未拦截。
-- [x] **39.** `internal/tasks` 通用包内含业务逻辑：`SubscriptionBatchPayload` / `EnqueueSubscriptionBatch` / `SaveSubscriptionBatch` / `BatchTaskInfo`（batch.go）、`EnsureScanTask` / `EnqueueScan` / `EnqueueFreshScan` / `ScanTaskInfo` / scrape-cover 折叠规则（workflow.go:219-248）、各业务 payload JSON 路径常量（payload.go:10-24）→ 分别迁回 monitor、library。
-- [x] **40.** offline 下载记录存于 task 表（`KindOffline`，从不进入 pool），依赖 JSON payload + 手写表达式索引（`database/indexes.go`）查询；`scan/persist.go:17` 跨包用字符串 `"file_ids"` 调 `SetPayloadField` 改写 offline payload，而 offline 自身整体重编码 payload，二者前提矛盾；各处 `StatusQueued` 判断（add.go:53、sync.go:38/213、projection.go:86/145）对 offline 永不成立 → 独立 ent 表。
-- [x] **41.** cover 快照存于已完成 cover 任务的 payload（`scrape/snapshot.go:153-190`、`scrape.go:167-169`），导致 task 表永远不能清理、每次扫描需对全表 `json_extract` → 快照 / `videos_fingerprint` 存到 movie 行。
-- [x] **42.** `internal/config/runtime.go:24` `TaskPoolWorkers: 1` 硬编码：订阅批量（每条 sleep 1.5-3s，500 条约 30 分钟）与 scan/scrape/cover 共用唯一 worker，阻塞所有扫描（含离线完成后的 `EnqueueTargetedScan`）→ 批量任务独立执行。
-- [x] **43.** ✔ 本地 Emby 目录扫描接入 `scan` 后台任务：启动及保存 Emby 设置时自动入队，同目录活动任务复用；与 115 扫描串行，并与 STRM 重写及导出互斥。`POST /api/library/scan/local` 返回 202 任务信息，仅接受当前配置的本地目录；执行和重试校验目录是否已变更，跳过目录中的符号链接，支持任务状态、失败重试和重启恢复。首次启动导出目录尚不存在时跳过自动扫描。
-  - 复查补充：切换本地目录也触发 STRM 重写，即使 PublicURL 未变；回归测试确认新目录使用当前地址及 token，旧目录保持不变。
-- [x] **44.** ✔ 网页登录统一使用 HttpOnly Cookie 携带 JWT，保留签名与有效期校验；登录 JSON 不再返回 token，移除 localStorage 存取及 Bearer 注入、网页登录 URL token 通道，启动时清理旧存储。SSE、图片及 beacon 继续使用 Cookie，API 写请求采用标准库跨来源保护；独立 STRM 播放 token 保持可用。
-- [x] **45.** ✔ `netx.NewTransport(manager)` 统一标准 HTTP Transport 和动态代理配置，nil 时强制直连且不读取环境代理；Resty、安全下载及 GFriends 复用，删除字幕与 JavDB 图片客户端的重复分支和多余初始化。`SafeDownload`、`OpenMedia` 改用 `net/http`，保留下载大小限制、SSRF/重定向检查及媒体流的 UA、Range、HEAD、超时行为；需要浏览器 TLS 指纹的客户端继续独立使用。
-- [x] **46.** ✔ `netx.ProxiedFingerprintClient` 统一指纹客户端接口、代理订阅、重建替换及关闭释放；重建失败保留旧客户端，关闭后禁止重建。JavDB 与 JavBus 正式请求复用此管理逻辑，分别保留线路重选和健康探测；JavDB 线路探测仍使用固定代理的临时客户端，两站 `Probe` 保留各自检测语义。
-- [x] **47.** ✔ 删除 JavBus 详情参数及 HTML 缓存，消除无效容量上限与过期删除竞争；保留 catalogue 按影片缓存最终磁力结果及并发请求合并。外层缓存失效后重新获取 JavBus 详情参数，避免继续复用旧参数。
-- [x] **48.** ✔ 明确 JavDB 为主数据源：`Provider` 改为 `JavDBClient`，保留 JavDB 专属线路类型并要求磁力来源能力；JavBus 改为仅包含磁力查询、可用性和关闭能力的可选 `JavBusSource`。生产与 `NewWithClients` 共用组装逻辑，始终创建聚合器，删除直接读取磁力的备用分支；测试通过构造参数注入客户端，验证单源去重及补充源失败后的重试与缓存行为。
-  - 复查补充：JavDB 详情临时失败导致 JavBus 无法补查时，降级结果不进入磁力缓存；下次请求重试详情及补充源，完整查询后才缓存。
-- [x] **49.** ✔ 选线结果直接使用 `javdb.RouteStatus`，删除重复 `routeResult` 及逐字段搬运；保留前端毫秒格式投影与数据库恢复记录。catalogue 当前线路只读取 JavDB，删除保存状态的显示回退；`lastSavedRoute` 仅用于避免重复写库，成功保存后才更新。已验证启动恢复、保存失败后重试及无活动线路时不显示旧线路。
-- [x] **50.** ✔ 历史迁移统一由 database 的有序列表执行，使用 `PRAGMA user_version` 记录进度；每步数据修改和版本递增同事务提交，失败回滚并在重启后续迁。保留“播放器旧字段清理 → Ent 建表/索引 → 数据迁移”的依赖顺序，浏览记录迁移移出 app/library；兼容旧元数据迁移标记，拒绝未知高版本，已完成步骤不再重复探测和执行。
-- [x] **51.** ✔ 网络设置服务及连通性结果类型迁入 `internal/network`，app 仅负责组装，netx 不再包含网站专属测试结果；配置读取简化为 `Config() netx.ProxyConfig`，删除无效的 context/error 传递。保留整体 Context 与客户端请求两层超时，API JSON 格式不变；迁移原有测试，并将 network/netx 纳入依赖方向检查。
-- [x] **52.** ✔ Emby、刮削和扫描的固定依赖改为构造参数，在启动后台 worker 前完成赋值；Emby 构造时将已保存配置同步到共享导出管理器，STRM token 统一从管理器读取。扫描默认启用 DefaultPacing，测试显式覆盖；app 仅保留 library → Emby → catalogue → library 循环所需的通知绑定，且在任务池启动前完成。调整初始化顺序并补齐失败分支的后台服务清理，保留运行时导出配置更新能力。
-- [x] **53.** ✔ `Error` 与外部错误统一实现 `HasKind`，`IsKind` 复用 `KindOf`，明确最外层分类优先及 joined errors 的遍历规则；合并内部错误为 `KindUnexpected` 并保留安全文案。新增独立 `KindRateLimited`，登录限流返回 429；其他 Busy/Conflict 保持 409，并修正注释。已验证嵌套分类、错误身份匹配、限流响应及内部信息屏蔽。
-- [x] **54.** 前端为绕开 node test 不支持 `@/` 别名，把模块拆成"纯逻辑 + hooks"两半：`movie-detail-cache.ts`/`discover.ts`、`movie-state-cache.ts`/`movie-states.ts`、`browse-history-store.ts`/`browse-history.ts`、`task-progress-state.ts`/`task-progress.tsx`、`lib/offline-state.ts`（5 行），并为 `.ts` 后缀导入开启 `allowImportingTsExtensions` → 使用 package.json `"imports"`（`#/*`）两端原生支持，或换 vitest（需自行安装）。
-  - 已配置 Vitest 并迁移现有测试，统一使用 `@/` 导入，移除 `allowImportingTsExtensions`；合并 movie-state-cache 和 offline-state，保留有独立职责的缓存、存储和计算模块。类型检查及生产构建通过；测试已迁移为 TypeScript，源码、测试与 Vitest 配置统一纳入 web/tsconfig.json；使用 tsconfigPaths 解析别名，类型检查与 15 个测试文件、98 个用例全部通过。
-- [x] **55.** 前端 discover 浏览状态放在内存 zustand（`web/src/stores/discover.ts`），而 library / search 用 URL search params；`metadata-search-page.tsx:47-51` 用 effect 双向同步；订阅页 tab / 选中演员（`subscriptions/page.tsx:26-27`）用本地 useState，返回即丢失 → 统一 `validateSearch`。
-  - 发现页 tab、各 tab 页码与分类筛选，订阅页 tab、演员编号与分页均改用路由 validateSearch；移除 discover store 和元数据页 effect 同步，详情链接通过 URL 传递通用筛选。新增内存路由测试覆盖详情往返、刷新恢复和非法参数。
-- [x] **56.** 前端错误处理位置不统一：`api/subscriptions.ts` 在 hook 内 toast，其余在组件；"115 登录已失效"映射在 `library/page.tsx:72-76` 与 `movie-detail/magnets.tsx:192-196` 各写一遍；"query.error → invalidate account"在 `pan.ts:121-125`、`library.ts:71-76`、`offline.ts:90-94`、`pan.ts:140-144` 重复 → `QueryCache/MutationCache({ onError })` 统一。
-  - 后端补充 PAN_UNAUTHORIZED、PAN_DIRECTORY_REQUIRED、PAN_SOURCE_CHANGED 错误码，ApiError 保留 code；QueryCache/MutationCache 统一刷新相关状态，按 mutation meta 显式启用错误 toast，批量入库只保留弹窗内错误。统一文案并区分本站鉴权失效，测试覆盖普通 400、并发刷新、自刷新循环及重复提示。
-- [x] **57.** pan 包 json tag 语义混用：`pan.File`、`FilePage`、`Account` 带 API 输出 tag，被 `api/pan.go` 直接返回；`pan.OfflineTask` 的 tag 却是 115 线上字段名（如 `percentDone`）。
-  - pan 账号、文件与离线任务改为内部数据类型；API 层显式映射账号/文件响应，115 离线任务使用私有 wire 类型解析。保留现有 JSON 字段、空集合语义和历史封面任务格式，增加响应及持久化兼容测试。
 
 ---
 
 ## 三、上帝代码
 
-- [ ] **58.** `internal/emby/service.go`（645 行）：配置持久化（三处合并 defaultPublicURL：:67-76、:168、:180）+ HTTP client + 批量通知 worker + 全库刷新 + 演员头像同步（GFriends/JavDB 回退 + DB 查询）+ STRM token 与导出器扇出 + 后台 RewriteSTRM。5 个 HTTP 方法（:233、:381、:420、:495、:544）各自拼 URL/header，API key 同时放 header 与 query（泄露到日志）；`Enabled && ServerURL != "" && APIKey != ""` 重复 6 次；worker 退出 flush（:329-339）复制一份 → 拆 client / notifier / actors / config。
+- [ ] **58.** `internal/emby/service.go` 仍集成配置持久化、HTTP 请求、批量通知、全库刷新、演员头像同步和后台 STRM 重写。导出配置已集中到 export.Manager，旧的 exporter 扇出同步已移除。评估拆分 client / notifier / actors / config，收敛 URL/header 构造、启用条件及退出 flush 的重复；API key 日志风险与第 235 条一起处理。
 - [ ] **59.** `internal/library/scan/walker.go:76-263` `Scanner.Run` 约 190 行：参数校验、定向单文件、断点恢复、BFS、限速、NFO、分块入库、进度上报 + 两个闭包；:77 多余别名 → 拆 `runTargetFile` / `walk` / `indexDirectory`。
 - [ ] **60.** `internal/drive/drive.go:69-90` `Drive`：二维码登录状态机 + token 刷新 + 账号缓存 + 挂载持久化 + 事件 + Session 签发 + 工作计数，含 2 mutex、1 ContextLock、2 singleflight、1 WaitGroup、3 个版本号 → 拆出二维码登录（约 180 行）。
 - [ ] **61.** `internal/gfriends/client.go:78-143` `EnsureIndex` 持写锁执行两个镜像的网络下载（各 30s），期间所有 `Lookup` 阻塞；`FetchAvatar`（208-234）复制镜像循环；stale 回退（136-141）把 `loadedAt` 设为 now，一次故障后 7 天不重试。
-- [ ] **62.** `web/src/features/library/page.tsx:32-98` 扫描状态推导 + 响应式 Tooltip 按钮 + mutation + 错误映射内联在页面 → 抽 `LibraryScanButton`。
-- [ ] **63.** `web/src/features/settings/data-source-section.tsx` 把 JavDB 线路与 JavBus 开关两个无关功能塞在一个组件（靠 `// JavDB`、`// JavBus` 注释分块，:36、:45）→ 拆 `JavDBRouteRow`、`JavBusRow`。
+- [ ] **62.** `web/src/features/library/page.tsx` 仍内联扫描状态推导、响应式 Tooltip 按钮和 mutation 回调；错误文案已使用公共 describeApiError。评估提取 LibraryScanButton，以减少页面编排中的业务细节。
 
 ---
 
 ## 四、过度设计
 
-- [ ] **64.** `internal/tasks`：单 worker DB 队列拆成 Service / Queue / Bus / Registry / Pool 5 个类型 + `PoolQueue` / `PoolBus` 单实现接口；`Registry` 仅启动时注册却用 RWMutex，`Kinds()` 多余排序；`Handler` / `FinishedHook` / `funcHandler` / `funcHookHandler` / `HandleFunc` / `FinishedFunc` 多层包装，4 处注册全部带 finished；errgroup + size + Claim 重试循环均为多 worker 准备；`library.Finished`、`monitor.BatchFinished` 只返回常量 Change → 合成一个 Runner。
+- [ ] **64.** `internal/tasks` 的 Service / Queue / Bus / Registry / Pool 及 handler 包装层仍可评估简化。目前已分离媒体库任务池与订阅批量任务池，不能再以“只有单 worker”为由合并 Runner；保留分池、取消、恢复和数据库错误退避语义，重点检查 Registry 锁及 handler 包装是否有实际收益。
 - [ ] **65.** `internal/library/scan/reconcile.go:20,27-46` `embyOpts ...any` 按 string 出现顺序解析 embyDir / publicURL / strmToken，类型不安全；`ProcessScanPageTx` 9 个参数 → 改为 `*Scanner` 方法。
 - [ ] **66.** `web/src/api/movie-detail-cache.ts`（202 行）+ `discover.ts:160-202`：Query 缓存外再维护 `WeakMap<QueryClient, Map>` 全局卡片索引，订阅 QueryCache 每次 `removed` 全量重建；带引用计数、并发上限 2 的请求队列；`useSyncExternalStore` 手动订阅 → `placeholderData` 从 `getQueriesData` 查找 + queryFn 内约 10 行信号量；`discover.ts:163-165` 的 `prioritize` 多余。
 - [ ] **67.** `web/src/api/browse-history-store.ts`（199 行）+ `browse-history.ts`：为"已浏览"徽章做 localStorage 持久化 + 服务端合并 + 50 条批量 + 10s 防抖 + beacon + 5000 截断（:178-183，服务端返回全部，不一致）；测试专用 `unref`（:136-139）进入生产代码；:47 注释引用已不存在的 `REFACTOR_PLAN`；`browse-history.ts:13` 每卡片 effect 调 `init()`，:15 `subscribe` 每次渲染新建 → `useQuery` + 乐观 `useMutation`，整个 store 删除。
@@ -135,41 +56,36 @@
 ## 五、冗余 / 死代码
 
 ### 115 字幕删除（d6a8a0c）残留
-
-- [ ] **78.** `internal/library/scan/subtitle.go` 整个文件：`IndexDirectorySubtitles` 零生产调用，仅 `subtitle_test.go` 使用 → 两个文件一起删除。
+- [ ] **78.** `internal/library/scan/subtitle.go` 已删除，但 `scan/subtitle_test.go` 仍保留旧命名测试。检查它们现在调用的生产路径和有效断言；失去测试目标的用例可删除，仍覆盖字幕匹配行为的用例应重命名或迁移。与第 239 条一起处理。
 - [ ] **79.** `internal/subtitle/service.go`：`SourcePan`（:25）、`Reader` 接口（:32）、`exportPanTrack`（:114）、`IndexPanTrack`（:209）；`Export` 的 `reader` 参数恒为 nil（`scrape/subtitle_queue.go:131`），`scrape/scrape.go:50` 的 `SubtitleExporter` 签名仍带 `subtitle.Reader`；:69-70 注释 "Subtitles stored with the 115 videos come first" 过时；历史 `pick_code != ''` 行永远 pending → 一次性 `DELETE`。
 - [ ] **80.** `internal/ent/schema/subtitle.go:10-12,25-28,59`：`file_id`、`pick_code` 字段、`index.Fields("file_id")` 及过时注释 → 删除并重新生成 ent。
 - [ ] **81.** `internal/library/scrape/subtitle_queue.go:15` `SubtitleTask.MetaPayload` 只写不读。
 
 ### 旧快照 / sidecar 残留
-
 - [ ] **82.** `internal/library/scrape/cover.go:126-128` 固定 `LocalExport: true`，而 `snapshot.go:124` `Matches` 此时直接 `return true` → `DirectorySnapshot`、`NewDirectorySnapshot`、`Sidecar`、`ObservedDirectory.Sidecar`、`Matches` 比对逻辑，以及 `walker.go:106` 全库 `DirectoryObservations`（每文件名 + SHA1 常驻内存）只服务老数据；每次 cover 仍计算 `nfo.Encode` + 两次 SHA1；`writeSidecars` 名不副实。
 - [ ] **83.** `internal/library/scrape/cover.go:131,226-233` 已不回写 115，但每个 cover 仍重读 115 NFO（`DirectoryNFO`）、执行 `VerifyCoverOrigin`、逐视频 `sess.Info`（`verifyVideoPositions`），与"减轻网盘负担"目标相反 → 直接使用 payload 中的 `Document/Origin`。
-- [x] **84.** `internal/library/scrape/cover.go:304` `UploadSidecar` 零生产调用，仅 `library_concurrency_test.go:78` 测一条已不存在的上传路径。
 - [ ] **85.** `internal/library/scrape/cover.go:255-264` `exportLocalMedia` 的 DB 兜底永远走不到（`directories()` 保证至少一个视频），且查询不按 source 过滤、`records, _ :=` 吞错。
 
 ### 其它死代码（已 grep 确认）
-
-- [ ] **86.** ✔ `internal/javbus/cache.go:9,45,60` `detailCacheEntry.html` 存整张详情页（最大 2MB × 512 条）从未被读取。
-- [ ] **87.** `internal/javdb/client.go:291-294`、`route.go:45,102-104,171-173,185-188`：`preferredHost`、`routeResult.Manual`、`ensureRoute` 的 ManualRoute 分支在生产中不可达（仅 `route_test.go:43` 使用）；`client.go:168-176` `Route()` 中 `state == nil` 拼 `CachedHost` 分支不可达；`routeState.status.Candidates` 与 `lastProbe` 双份真相（:36、:362）。
+- [ ] **87.** `internal/javdb/client.go:291-294`、`route.go:45,102-104,171-173,185-188`：`preferredHost`、`RouteStatus.Manual`、`ensureRoute` 的 ManualRoute 分支在生产中不可达（仅 `route_test.go:43` 使用）；`client.go:168-176` `Route()` 中 `state == nil` 拼 `CachedHost` 分支不可达；`routeState.status.Candidates` 与 `lastProbe` 双份真相（:36、:362）。
 - [ ] **88.** `internal/javdb/client.go:254-260` `getJSON` 的 `language` 参数所有调用点都传 `defaultLanguage`，`transport.go:132-134` `if language == ""` 死代码。
 - [ ] **89.** `internal/catalogue/service.go:344-361`、`types.go:77-87` `Facets()`、`Facets`、`FacetItem` 无 API / 生产使用，仅 `TestFacets`。
 - [ ] **90.** `internal/javdb/magnet.go:81-94` `Find` 中 `JavDBID` 为空走 `ResolveMovieID` 分支不可达（`catalogue/magnets.go:66` 总带 JavDBID）；`magnet.go:54-71` 排序与 `aggregator.go:104-118` 同一规则重复。
 - [ ] **91.** `internal/javdb/client.go:52-66` + `internal/catalogue/service.go:56,65`：唯一调用 `app.go:89` 传 `javdb.Options{}`，Timeout / RPS / Burst 负值校验与 `DeviceUUID` 回退永不触发 → `catalogue.New` 不再接收 Options。
 - [ ] **92.** `internal/drive/drive.go:179-184` `ValidateSource`、`internal/drive/session.go:18,70-72` `Session.Version()` 仅测试使用（导致 scrape 的 `mockSession` 也必须实现）；`mount.go:152` `DirectoryPath` 仅包内使用。
 - [ ] **93.** 零生产调用 / 仅测试使用：`scan/persist.go:22` `ProcessScanPage`、`scan/reconcile.go:20` `ReconcileScan`（只包事务）、`scan/identity.go:127` `HasEligibleVideos`（零调用）；`scrape` 的 `Images()`（:124）、`LockArtwork`（:134）、`Directories`（:272）、`InvalidateDirCache`（:356）、`SetDirTTL`（:368）；`scrape/nfo_source.go:18` `ArtworkOrigin.NFO`（只写不读）；`library/library.go:62` `Service.images`（只赋值）；`library/viewed.go:25` `ViewedMovieIDs(ctx, limit ...int)` 无人传 limit（`api/discover.go:28` 接口也跟着带）；`scrape/subtitle_queue.go:68` `Enqueue` 返回的 bool 无人使用；大量仅包内使用的导出函数（`CanIdentifyVideo`、`IdentifyScanVideos`、`ResolveSingleNFO`、`IndexDownloadedMovie`、`RemoveUnreferencedMovies`、`SaveScanProgress`、`ReportScan`、`SidecarByName`、`FindDirectoryNFO`、`VerifyCoverOrigin`、emby 的 `Ping` / `RefreshLibrary` / `ListPersonsWithoutAvatar` / `UploadPersonAvatar` / `SyncActorAvatars` / `PersonItem`）→ 改小写。
-- [ ] **94.** `internal/tasks/service.go:34` `Service.Info`、`workflow.go:110` `WorkflowInfo`、`Service.Registry()` 仅测试使用；`Queue.Lock/Unlock`、`EnsureScanTask`、`ListWorkflows`、`WorkflowInfos`、`ScanTaskInfo`、`BatchTaskInfo`、`offline.UpdateTask` 仅包内使用却导出；Service 包装方法与包级函数两套对外 API。
+- [ ] **94.** 任务业务已迁入 library / monitor。重新检查 `internal/tasks` 与迁移后包的导出边界、包装方法和重复入口；`Service.Registry()` 已被 `app/task_workers.go` 使用，不再属于“仅测试调用”。仅对当前没有外部调用且无接口职责的符号缩小可见性。
 - [ ] **95.** Subscription `zone` 字段（schema:38、monitor Item、`AddMovieOptions`、`AddActorOptions`、`UpdateOptions`、API 输入）写入、继承、返回，前后端从不读取；订阅状态 `"error"`（schema:41、`monitor/service.go:34`、前端 subscription-card）从未被设置；`monitor.Status` 与 ent `subscription.Status` 重复。
-- [ ] **96.** `internal/subtitle`：`Provider.Name()` 从未通过接口调用（`subtitlecat.go:167` 另写死 `"SubtitleCat"`）；`finder.go:29-37` `WithAllowLoopbackForTesting` 测试开关进入生产结构体；两个 Provider 构造中 `if proxyManager != nil … else …` 复制；`DecodeToUTF8` 最后的 `ToValidUTF8` 兜底实际走不到。
+- [ ] **96.** `internal/subtitle`：`Provider.Name()` 从未通过接口调用（`subtitlecat.go:167` 另写死 `"SubtitleCat"`）；`finder.go:29-37` `WithAllowLoopbackForTesting` 测试开关进入生产结构体；`DecodeToUTF8` 最后的 `ToValidUTF8` 兜底实际走不到。
 - [ ] **97.** `internal/netx/proxy.go:88-94` `sameConfig` 蕴含 `sameURL`，`!sameConfig || !sameURL` 实为 `!sameConfig`，与注释"只在生效代理变化时广播"相反（Enabled=false 改 URL 也重建 tls-client）→ 条件改为 `!sameURL`；:73-79 `resolve` 中 `!Enabled ||` 冗余；:131-133 `parseProxyURL` 的 `raw == ""` 分支死代码。
-- [ ] **98.** `internal/netx/ssrf.go:59-60` 255.255.255.255 分支已被 :58 `ip4[0] >= 240` 覆盖；:103 多余中间变量；:195 `RestyOptions{Timeout}` 在 transport 中不生效；:191-193 `timeout <= 0` 兜底唯一调用传固定 20s；:157/:176 `ips` 为空时返回 `(nil, nil)`。
+- [ ] **98.** `internal/netx/ssrf.go:59-60` 255.255.255.255 分支已被 :58 `ip4[0] >= 240` 覆盖；:103 多余中间变量；:191-193 `timeout <= 0` 兜底唯一调用传固定 20s；:157/:176 `ips` 为空时返回 `(nil, nil)`。
 - [ ] **99.** `internal/codeid/codeid.go:132-144` `Layers.stripPrefix` 与 `:247-262` `Candidates` 两套"去前缀"逻辑，正则（`layerNumeric` vs `numericPattern`）已分歧；`Parse`（60-62）与 `Layers`（111-116）去噪流程重复；:344 `UnpaddedNumericCandidate` 仅包内使用；:350-362、:329-334 冗余分支；:95-101 正则 var 块散落；:180、:187 对恒为单元素的 `layers[0]` 循环。
 - [ ] **100.** `internal/gfriends/client.go:21-23,29` `DefaultFastlyURL`、`DefaultRawURL`、`CacheExpiration`、`FileTree` 无外部使用却导出；:42-44 nil httpClient 默认值死代码；:127-128 写缓存错误被静默吞掉。
-- [ ] **101.** `domain.KindInternal`；`domain.ZoneAll` 仅测试使用；`LocalMovie` json tag 无用；`domain.ScanPayload` 另被 `scan.Payload`（`scan/types.go:9`）与 `tasks.ScanPayload`（`workflow.go:33`）起别名，一个类型三个名字。
+- [ ] **101.** `domain.ZoneAll` 的使用范围、`LocalMovie` 的 JSON 标签，以及 `domain.ScanPayload` 与 `scan.Payload` 别名是否仍有必要待核实。`KindInternal` 和旧 tasks 层 ScanPayload 别名已清理，不再作为待办。
 - [ ] **102.** `internal/library/scrape/scrape.go:155` `fileScope` 与 `internal/database/scope.go:10` `LibraryFiles` 一字不差；魔法字符串 `"local"` 在 `library.go:118,120,202,204`、`scan/local.go:235-236` 硬编码，`Movies` 与 `MatchingMovies` 的 scope 计算重复 → `domain.LocalAccountID` + `s.libraryScope()`。
-- [ ] **103.** `internal/app/app.go:53-55` EmbyDir 默认值与 `config.go:36-39` 重复且 validate 已保证非空；:138-141 `embySvc.Config()` 的 err 恒为 nil、`activePublicURL` 判断与 :152 条件恒真；:126 `network.ProxyManager() != nil` 恒真。
+- [ ] **103.** `internal/app/app.go` 的 EmbyDir 兜底与 `config.Load` 重复；核实直接调用 App.New 的测试和调用方需求后，统一配置初始化职责。旧的 Emby Config 读取、activePublicURL 及代理非空判断描述已失效。默认导出路径与 PublicURL 一并按第 184 条处理。
 - [ ] **104.** `internal/config/config.go:50` `MIYABI_EMBY_URL` 未文档化旧别名；:101-119 `validate` 重复 Trim、EmbyDir 空检查不可能触发；日志级别 `logging.Validate` 校验一次、main 中 `UnmarshalText` 再解析一次 → Config 直接存 `slog.Level`，删除 `internal/logging`（28 行）。
-- [ ] **105.** `internal/library/viewed.go:115-162` `MigrateViewedMovies` 一次性历史迁移，数据迁完即可删除（且所有 ID 使用同一 `now`，原顺序丢失）。
+- [ ] **105.** `internal/database/viewed.go` 的 `migrateViewedMovies` 为全部旧浏览记录写入同一时间，可能丢失原有顺序。核实旧数组顺序及保留策略；迁移已纳入版本管理，不能因当前开发数据库迁完就删除或重排迁移步骤。若要修正已升级数据，应新增迁移并明确可恢复的信息。
 - [ ] **106.** ✔ 前端零引用 UI：`components/ui/popover.tsx`、`components/ui/dropdown-menu.tsx`；`ui/textarea.tsx` 仅被零引用的 `InputGroupTextarea` 使用；零引用导出 `AvatarBadge` / `AvatarGroup` / `AvatarGroupCount`、`CardFooter` / `CardAction`、`TabsContent`、`tabsListVariants`、`badgeVariants`、`InputGroupText`、`SelectLabel` / `SelectSeparator`、`BreadcrumbEllipsis`。
 - [ ] **107.** 前端零引用 / 无意义项：
   - `api/auth.ts:45-57` `useAccessGateLogout` 无调用（后端 `POST /auth/logout` 随之无人使用），`LoginResponse.expires_at` 不读；
@@ -181,7 +97,7 @@
   - `api/tasks.ts:28-38` ScanTask 10 个前端不读字段（`current_path`、`directories_*`、`files_scanned`、`removed_*` 等）；
   - `task-notification-diff.ts:18` `NotificationEntry.playable` 是删除播放器后的遗留命名（实为"已入库"）。
 - [ ] **108.** 后端 `catalogue/service.go:398-401` 已随列表计算 `state` 与 `library_id`，前端从不读取 `DiscoverMovie.state`（`api/discover.ts:47,66`），见第 150 条。
-- [ ] **109.** 后端接口前端从未调用：`GET /discover/movies/:id/offline`（`router.go:118`，连同 `offlineTasksHandler`、`offline.Service.Tasks`）、`POST /library/scan/local`（:93）、`POST /auth/logout`。
+- [ ] **109.** 重新评估前端未调用的接口是否仍承担运维、外部调用或手动恢复职责：`GET /discover/movies/:id/offline`、`POST /library/scan/local`、`POST /auth/logout`。本地扫描接口已支持后台入队与配置路径校验；“前端未调用”本身不能作为删除理由。
 - [ ] **110.** 删除属性后残留空行：`ui/input-group.tsx:13`（原 `role="group"`）、`ui/breadcrumb.tsx:57/68/82`（原 role / aria-hidden / aria-current）、`ui/dialog.tsx:62-64` 删除了 `sr-only` 文案、`search/page.tsx:67`、`settings/pan-section.tsx:40/62/76`、`pan-directory-row.tsx:34`；`internal/domain/video.go:30-31` 双空行（唯一 gofmt 报告）。
 - [ ] **111.** `cn` 导入不统一：`ui/hover-card.tsx:2`、`ui/popover.tsx:2`、`ui/dropdown-menu.tsx:2` 直接 `from 'cn'`，其余 `@/lib/utils`；`dropdown-menu.tsx` 未过 oxfmt（双引号、长行）。
 
@@ -192,40 +108,39 @@
 - [ ] **112.** `internal/api/auth.go:35/58/70/76/83/117`、`strm.go:64` 的 `gate == nil` 生产不可能成立；`rate_limiter.go:37/74/98` `limiter != nil` 与方法内 `l == nil` 双重防御；`accessLoginHandler` gate 为 nil 返回 `Success: true` 死路径 → 测试统一传 `NewAccessGateService("")`。
 - [ ] **113.** `internal/drive/token.go:59-105` `withPanToken` 中 `current.closed` 检查 3 次、`ctx.Err()` 3 次 + `refreshTokens` 入口再一次 → 合并为最多 2 次的循环。
 - [ ] **114.** `internal/drive/session.go` 每次调用执行 `sourceState` 3~4 次（显式一次、`withPanSourceToken` 内一次、重试一次、`checkSource` 一次）。
-- [ ] **115.** `internal/pan/client.go:48-50` `maxInFlight <= 0`、:127-129 `baseTransport == nil`、`SetRetryAfter` 中 `resp == nil` / `wait > 0`、:241-244 可直接 `return result, result.err()`；`play.go:91-116` `OpenMedia` 错误分支 `RawBody() != nil`；`auth.go:99-115` `Status == nil`、`case 0`、`default` 三处返回同值；`upload.go:44` 局部变量名 `init`。
+- [ ] **115.** `internal/pan/client.go:48-50` `maxInFlight <= 0`、:127-129 `baseTransport == nil`、`SetRetryAfter` 中 `resp == nil` / `wait > 0`、:241-244 可直接 `return result, result.err()`；`auth.go:99-115` `Status == nil`、`case 0`、`default` 三处返回同值；`upload.go:44` 局部变量名 `init`。
 - [ ] **116.** `internal/strm/relay.go:35-37,78-80` `relay.drive == nil`、:65 `source.URL != ""`、`downloadURL != ""`（pan 层已保证）。
 - [ ] **117.** `internal/javbus/client.go:149,214` `errors.Is(ctx.Err(), Canceled) || errors.Is(ctx.Err(), DeadlineExceeded)` 等价 `ctx.Err() != nil`；:70 `rate.Every(time.Second/time.Duration(defaultRate))` 即 `rate.Limit(1)`；:297 `c.client != nil`；`parser.go:57` `Contains("/doc/driver-verify") || Contains("driver-verify")`；`parser.go:128,132` 显式零值。
 - [ ] **118.** `internal/javdb/route.go:277` `utf8.Valid`；`route.go:217-256`、`client.go:369-389` 解析到 `map[string]any` 再逐层断言 → typed struct；`route.go:49` 类型 `probe` 与方法 `c.probe` 同名。
-- [ ] **119.** `internal/catalogue/state.go:60` `source == nil` 在 :32 已判断；`service.go:163-168` nil 检查；`service.go:379` `time.Now().In(time.Local)`；`magnets.go:40` `JavBus()` 永不返回 error；`magnets.go:80-90` 先投影 URI 再剥离。
+- [ ] **119.** `internal/catalogue/state.go:60` `source == nil` 在 :32 已判断；`service.go:163-168` nil 检查；`service.go:379` `time.Now().In(time.Local)`；`magnets.go:80-90` 先投影 URI 再剥离。
 - [ ] **120.** `internal/magnet/aggregator.go:75,84-86` Hash 小写化、`Sources` 为空兜底（各来源已保证）；`picker.go:108`、`quality.go:158` `m.HD || hasTag(m, MagnetTagHD)`（根源：`domain.Magnet` 同时用 bool 与 Tags 表达 HD/字幕）；`picker.go:105` 对已聚合结果再次 `ApplyInference`。
 - [ ] **121.** `internal/library/scrape`：`Close` 的 `service == nil`、`subtitleQueue != nil`；`newSubtitleQueue` 的 concurrency / capacity / logger 兜底（唯一调用传默认值）；`Enqueue` 的 `q.ctx != nil`、`q.logger != nil`；`worker` 的 `!ok`（channel 从不关闭）；`processCover` 与 `process` 两次判断 `subtitles != nil`；`ExportLocalMovie` 的 `record == nil` + `notifiers ...MediaNotifier` 表示可选；`scrape.go:339` `dirCache == nil`、:343 `ttl <= 0`；`findAvatar` 的 `s.db == nil`；`reconcile.go:112` `if images != nil`；`reconcile.go:58` 多余 `var err error`；`ResolveSingleNFO` 永远返回 nil error。
 - [ ] **122.** `internal/image` singleflight + Stat 检查 + `publishImage` 读回比较三层叠加 → 保留原子 rename + Stat；`internal/maintenance` 每次循环检查 `ctx.Err()`、检查 DB 文件 `IsRegular`。
 - [ ] **123.** `internal/monitor/service.go:108` `checking`、`internal/offline/service.go:52` `syncing` 互斥锁：生产中仅由一个 `RunPeriodic` 串行调用；`offline/add.go:20,30` `catalogue != nil` 两次；`sync.go:254` `library != nil` 只为测试；`sync.go:76` 重复过滤 `DirectoryID`、:94-96 每条检查 `ctx.Err()`、:154-159 身份校验冗余；`monitor/service.go:160,176` `limit > 0` / `max(page, 1)`（API 绑定已保证）；`tasks/pool.go:34` `logger == nil`。
-- [ ] **124.** `internal/offline/projection.go:81-83` + `latestOfflineTasks` 的 json_type 分组专门让格式错误的 hash 可见，结果一条坏记录让整个 Activity 报错 → 跳过并记日志。
+- [ ] **124.** `internal/offline/projection.go` 已使用独立 OfflineDownload 表，不再有旧 JSON hash 分组。当前空 hash 会使整次 Activity 投影报错，而 schema 已要求 hash 非空；核实遗留坏数据的实际入口，再决定移除冗余检查或采用记录日志并跳过的策略。
 - [ ] **125.** 前端：`access-gate.tsx:14,25` `sessionUnlocked`（onSuccess 已写入缓存）；`lib/math.ts:3` 处理 -0；`api/client.ts:66,71,80,106` 四处 `typeof window === 'undefined'`（SPA，且 :18 直接使用 `window.location.origin`）；`components/error-state.tsx:34` 外层重复判断 `retry.onRetry`；`task-progress-state.ts:21` 手写 clamp（`lib/math` 已有）；`lib/search-schema.ts:3` `errorMessage` 参数无意义；`stores/settings.ts:17` `partialize` 多余。
 
 ---
 
 ## 七、性能
 
-- [ ] **126.** `internal/tasks/workflow.go:183-203` `metadataGroups` 的 `sqljson.ValueIn($.scan_task_id)` 无索引，对所有历史 scrape/cover 行（payload 含大快照）逐行解析 JSON，task 表从不清理；`internal/api/sse.go:36-43` 每个 SSE 连接每次通知各执行一遍 `tasks.List`（6+ 查询），通知来源包括每个扫描分页、每次离线进度、每个任务结束 → 增加 `parent_id` 列并建索引；Bus 端计算一次快照（版本号 + 去抖）后广播。
+- [ ] **126.** `internal/library/workflow.go` 的 metadataGroups 仍通过 payload 中的 `scan_task_id` 聚合 scrape/cover 子任务；`internal/api/sse.go` 的多个连接可能重复计算同一任务快照。快照已移出 task 表，删除“大快照逐行解析”的旧描述。通过查询计划和负载数据评估 parent_id 列/索引，以及共享快照或通知合并。
 - [ ] **127.** `internal/tasks/bus.go:69-75` `Notify()` 同时唤醒 pool：扫描分页进度（`scan/persist.go:171,230`、`reconcile.go:151`）、`SaveSubscriptionBatch`、`ChangeOffline`（每 30s）都会让 pool 空跑 Claim；`queue.go:66` Claim 自身又 Notify → 拆分 `WakePool()` 与 `NotifyUI()`。
 - [ ] **128.** `internal/ent/schema/task.go:37-42` `index.Fields("status", "created_at")` 的 `created_at` 从未用于过滤 / 排序，热点查询均为 `type + status + ORDER BY id` → `index.Fields("type", "status")`，删除单列 `type` 索引。
 - [ ] **129.** ✔ `internal/emby/service.go:403` `sendBatch` 每批 `/Library/Media/Updated` 增量通知后无条件调用 `RefreshLibrary`（`/Library/Refresh` 全库扫描），扫描期间约每 3 秒一次 → 删除。
 - [ ] **130.** `internal/library/scan/movies.go:29` `MatchMovies` 每页 100 个 `LIKE '%code'` 以 OR 连接 → 全表扫描；:38-45 codes × records 双重循环；:56 `slices.Contains` 去重 O(n²) → 增加 `canonical_code` 索引列 + 等值 IN，去重用 map。
-- [ ] **131.** `internal/library/scan/local.go:147-256` 本地扫描逐文件开事务，每次 `MatchMovies` 全表匹配；图片解码 / 重编码（:196-198）在 SQLite 写事务内；`NotifyUpdated`（:252）在提交前发出；整体在 HTTP 请求内同步执行。
+- [ ] **131.** `internal/library/scan/local.go` 已通过后台任务执行，但仍逐文件开事务并调用 MatchMovies；图片解码/重编码在 SQLite 写事务内，NotifyUpdated 在事务提交前调用。评估批量匹配、缩短事务以及提交后通知。
 - [ ] **132.** `internal/library/scan/reconcile.go:94-142` 全量扫描加载所有已刮削影片的 files / actors / tags；每部影片 `images.Exists` 3 次 stat + `ExportLocalMovie` stat / 写文件均在 SQLite 写事务内，长时间占写锁；:139 刮削任务逐条 `Create().Exec` → 事务外导出 + `CreateBulk`。
-- [ ] **133.** `internal/library/scrape/snapshot.go:153-190` 每次扫描按 500 一组对 task 表 `json_extract + GROUP BY`；每个刮削任务对全部 cover 任务执行一次 JSON `Exist`。
+- [ ] **133.** `internal/library/scrape/scrape.go` 每个刮削任务仍用 cover payload 的 `scrape_task_id` 执行 Exist 查询，评估关联列或索引。旧的“扫描时从 task 表批量读取元数据快照”已随快照迁入 movie 解决；与第 126 条共同处理任务关联查询。
 - [ ] **134.** `internal/library/scrape/cover.go:45-53` `service.artwork.Lock` 覆盖整个 `processCover`（含 JavDB 封面下载、115 列目录、`sess.Info`、本地导出）→ 所有 cover 串行，刮削期间 `ClearCache` 永远返回"忙" → 只锁"保存图片到提交引用"一段。
 - [ ] **135.** `internal/library/scrape/scrape.go:71-73,320-353` `dirCache` 过期条目永不清理，每条存整个目录列表；`processCover:120` 注释 "Re-read the directory after scraping" 实际拿到 45s 内缓存。
-- [ ] **136.** `internal/offline/projection.go:26-44,190-201` `Activity` 刻意不设历史上限，每次解码全部 hash 最新记录 + 对所有关联扫描执行 `Workflows`（走第 126 条的全表 JSON）+ 查文件索引；`web/src/api/offline.ts:44` 在 SSE 之外还 `refetchInterval: 5000` 轮询。
-- [ ] **137.** `internal/tasks/batch.go:35-48` 批量每处理一条就重新编码整个 payload（含全部 IDs）写回并 Notify（触发第 126 条的全连接重查）→ 只更新计数或按 N 条 / T 秒保存。
+- [ ] **136.** `internal/offline/projection.go` 的 Activity 仍读取作用域内每个 hash 的最新下载记录且不设历史上限，再关联扫描任务与文件索引；已不再逐条解码离线 payload。`web/src/api/offline.ts` 仍在 SSE 之外每 5 秒轮询活动任务。评估数据量、事件断线兜底需求和重复查询成本。
+- [ ] **137.** `internal/monitor/batch.go` 批量每处理一条就重新编码整个 payload（含全部 IDs）写回并 Notify（触发第 126 条的全连接重查）→ 只更新计数或按 N 条 / T 秒保存。
 - [ ] **138.** `internal/pan/metadata.go:81-86` `ReadMetadata` 显式 `limiter.Wait` + `panTransport` 每次尝试再 Wait，加上 `DownloadURL`，一次 NFO/图片读取消耗 3 个令牌（上限 4 req/s）并占用 2 个 inFlight 槽之一，与 `OpenMedia` 注释"CDN 不走限流"矛盾 → 删除显式 Wait，CDN 读取改用 `client.media`，`Client.limiter` 字段随之可删。
 - [ ] **139.** `internal/pan/upload.go:86-97` 每个 sidecar 请求一次 `/open/upload/get_token`；OSS `PutObject` 经 `panTransport` 消耗 115 限流令牌并占 inFlight 槽 → STS token 按过期时间缓存，OSS 用独立 client。
 - [ ] **140.** `internal/api/strm.go:33-39` Emby / 播放器每次 HEAD、GET、Range 都走 DB + downurl（限流 4rps / 2 并发）+ CDN HEAD → 按 `(pickCode, UA)` 做短 TTL 缓存。
-- [ ] **141.** `internal/netx/ssrf.go:103-119,152,206` 同一主机 3 次 DNS 解析（请求前 `ValidateSafeURL`、每���重定向、拨号时），拨号那次已覆盖 DNS 重绑定 → `ValidateSafeURL` 只做语法校验。
+- [ ] **141.** `internal/netx/ssrf.go:103-119,152,206` 同一主机 3 次 DNS 解析（请求前 `ValidateSafeURL`、每次重定向、拨号时），拨号那次已覆盖 DNS 重绑定 → `ValidateSafeURL` 只做语法校验。
 - [ ] **142.** `internal/drive/account.go` 缓存未命中无 singleflight，并发 `Open()` 同时请求 `/open/user/info`；`accountCacheMu` 可并入 `d.mu`；`internal/drive/token.go:13-57` refresh_token 被吊销后不标记凭证失效，每个请求都发起一次注定失败的刷新。
-- [x] **143.** ✔ `internal/catalogue/magnets.go:67` 无论 JavBus 是否启用都先调 `CatalogueDetail`（可能连带最多 5 次 Tags），monitor 批量检查时 JavDB 限流请求翻倍 → 仅在 JavBus 可达时查询（`service.javbus != nil && service.javbus.Available()`）。
 - [ ] **144.** `internal/catalogue/service.go:239-251` `MovieSummary`、`:254-264` `BrowseMovies` 走完整 `projectMovies → MovieStates`（2 次 DB 查询）后丢弃投影结果。
 - [ ] **145.** `internal/javdb/movie.go:105-141,147-174` `ResolveMovieID` 每次查询前对累积的数百候选全量 `matchCandidates`，`codeid.Normalize` 每次最多 8 个正则，`IsFormatEquivalent` 两边重复 Normalize → 预计算 `normCode`。
 - [ ] **146.** `internal/javdb/route.go:112` 非 full 模式用 5ms ticker 轮询（最长 60s，每秒唤醒 200 次）→ 按最早截止时间的单个 `time.Timer`。
@@ -234,7 +149,7 @@
 - [ ] **149.** `internal/library/library.go:222` 分页 `ORDER BY created_at DESC, id DESC`，movie 表无 `(created_at, id)` 索引；`scan/local.go:223-227` fileID 取 `sha256(rel)`，不同扫描根目录下相对路径相同会冲突，已存在记录不更新 path。
 - [ ] **150.** 前端列表已带 `state`，每个 `MovieStateBadge` 再批量 `POST /api/discover/movie-states`，形成"列表 → 状态"瀑布 → 用列表数据 seed（`initialData` + `initialDataUpdatedAt`），或后端从列表 DTO 删除 state。
 - [ ] **151.** `web/src/features/tasks/task-events.tsx:115-123` 连接后首个 `changes` 事件因 `revisions` 为 undefined，把 library / offline / movie-states / subscriptions 四类全部失效 → 每次打开页面重复请求一次；:38 `reconnect` 中的 `invalidateQueries` 多余 → 首个事件仅作基线，断线重连后才强制刷新。
-- [ ] **152.** `refetchOnMount: 'always'` 滥用：`api/tasks.ts:66`、`movie-state-cache.ts:75`（每卡片挂载）、`subscriptions.ts:44`；`data.ts:22`、`emby.ts:29`、`javbus.ts:17`、`network.ts:29`、`subscription-settings.ts:28` 的 `staleTime: 15_000` 与 `'always'` 共存使 staleTime 无意义；`main.tsx:14` 全局默认 30s 被几乎所有查询覆盖。
+- [ ] **152.** 复核 `refetchOnMount: 'always'` 与 staleTime 的组合：`web/src/api/tasks.ts`、`movie-states.ts`、`subscriptions.ts`、设置类查询等。全局默认值现位于 `api/query-client.ts`；JavBus 设置查询已删除。按事件同步和重连恢复需求决定刷新策略，不应仅因 staleTime 与 always 共存就机械删除。
 - [ ] **153.** `web/src/api/offline.ts:66-88` `useAddOffline` 成功后 `setQueryData` + `invalidate` + SSE 再失效，同一数据刷新三次；:48-57 `useOfflineTasks` 在 select 中重复过滤（后端已按数据源返回），与全局查询共用 key 使其 `enabled` 形同虚设；`library.ts:56-70` 两个分支最终都 invalidate。
 - [ ] **154.** `useLibraryMovies`、`useSearchMovies` 未使用 `keepPreviousData`，翻页闪骨架；路由未注入 queryClient context、无 loader，`defaultPreload: 'intent'` 只预加载 chunk 不预取数据。
 - [ ] **155.** `web/src/components/media-image.tsx:60-65` 每张封面额外渲染一张 `scale-125 blur-xl brightness-75` 背景图，一页 20 个大半径模糊滤镜；`features/library/use-desktop-hover.ts:14` 每卡片每次 snapshot 调 `matchMedia` 并各自注册监听 → 模块级缓存 `MediaQueryList`。
@@ -246,19 +161,19 @@
 - [ ] **156.** `internal/drive/session.go:79-207` 8 个 `sourceSession` 方法同一模板（`sourceState → withPanSourceToken → checkSource`），约 130 行 → 泛型 `call[T]`。
 - [ ] **157.** `internal/javbus/client.go:128-191` 与 `:193-242` `ensureDetailParams` / `fetchMagnets` 请求构造、UA/Cookie、301/302、`LimitReader`、Cloudflare 判断、状态码判断逐行重复 → `c.get(ctx, url, headers)`。
 - [ ] **158.** `internal/api/error.go:76-119` 与 sloggin 各记录一次失败日志；attrs 中 `cause` 与 `error` 内容重复。
-- [ ] **159.** `internal/api/auth.go:115-141` `authMiddleware` 绕过 errorMiddleware 手写两套中文消息与 `"code":"UNAUTHORIZED"`，`VerifyToken` 的公开消息被丢弃 → `c.Error(err); c.Abort()`。
-- [ ] **160.** api handler 零碎问题：`network.go:42`、`emby.go:41` test handler 先查已保存配置再被 body 覆盖（前端总带 body），两者写法相同可抽泛型 helper；`subscription.go:141-145` 手写 `c.JSON(202)` 未用 `accepted`；`subscription.go:155` feed 复用带 `Kind` 字段的 query 结构；`router.go:45-49` if/else 等价且忽略错误；`router.go:70-73` 4 条 STRM 路由可 `Match` 合并；`task.go:16`、`sse.go:10` 参数名 `tasks`、`offline.go` 参数名 `offline` 遮蔽包名；`javbus.go:25` Update 后重复调 `JavBus()`；`router.go:42` 构造函数中设置全局 `gin.SetMode`。
+- [ ] **159.** `internal/api/auth.go` 的 authMiddleware 仍直接构造鉴权错误响应，可考虑统一内部处理方式，但必须保留 `code: "UNAUTHORIZED"` 及缺失/失效令牌的语义。该错误码用于区分本站会话与 115 账号失效，不能直接改成不带 code 的通用错误响应。
+- [ ] **160.** api handler 零碎问题：`network.go:42`、`emby.go:41` test handler 先查已保存配置再被 body 覆盖（前端总带 body），两者写法相同可抽泛型 helper；`subscription.go:141-145` 手写 `c.JSON(202)` 未用 `accepted`；`subscription.go:155` feed 复用带 `Kind` 字段的 query 结构；`router.go:45-49` if/else 等价且忽略错误；`router.go:70-73` 4 条 STRM 路由可 `Match` 合并；`task.go:16`、`sse.go:10` 参数名 `tasks`、`offline.go` 参数名 `offline` 遮蔽包名；`router.go:42` 构造函数中设置全局 `gin.SetMode`。
 - [ ] **161.** `internal/api/rate_limiter.go`：`records` 仅在同一 IP 再访问或登录成功时删除（换 IP 无限增长）；`check` 与 `recordFailure` 不在同一把锁（并发可超过 maxFailures）；`ErrTooManyLoginAttempts` 文案写死"24 小时"且作为 Cause 拼出矛盾日志 → `allow(ip)` 一次加锁完成检查与预占。
 - [ ] **162.** `internal/tasks/queue.go:47-68` Claim 先 SELECT 再条件 UPDATE + 重试循环 → 单条 `UPDATE … WHERE id=(SELECT … LIMIT 1) RETURNING`；`batch.go:66-76` `listBatchTasks` 两次查询内存合并；`pool.go:76-79` `registry.Get` 分支不可达。
 - [ ] **163.** 订阅 API 三种风格：tasks 返回 `(ch, unsubscribe)`、drive 返回 `func()`、netx 返回 ch + 单独 `Unsubscribe`（`proxy.go:99-117` O(n) 遍历）→ 统一 `(<-chan struct{}, func())`。
-- [ ] **164.** Go 1.27：`app.go:223-235`、`network.go:82-84`、`aggregator.go:53-62` 可用 `wg.Go`；`internal/syncx/lock.go:47` 对未加锁的锁 `Unlock` 会永久阻塞（`sync.Mutex` 会 panic）；`KindX.String()` 与 `string(KindX)` 混用。
+- [ ] **164.** Go 1.27：`app.go:223-235`、`internal/network/service.go`、`aggregator.go:53-62` 可用 `wg.Go`；`internal/syncx/lock.go:47` 对未加锁的锁 `Unlock` 会永久阻塞（`sync.Mutex` 会 panic）；`KindX.String()` 与 `string(KindX)` 混用。
 - [ ] **165.** `internal/library/viewed.go:91-110` Count + 查最旧 + Delete 三步 → 单条 `DELETE … WHERE id NOT IN (SELECT id … ORDER BY viewed_at DESC LIMIT ?)`。
 - [ ] **166.** `internal/api/router.go:139-158` `installFrontend` 中 `fs.Stat` 对目录也成功，FileServer 会列出 `/assets/` 目录清单；带哈希的静态资源无长缓存头。
 - [ ] **167.** `internal/javdb/media.go:29-43` `FetchMedia` 接受任意 https 主机且 body 无大小上限，`/image` 成为登录后任意抓取器 → 限定 JavDB CDN 域名或复用 `netx.SafeDownload` + 上限。
 - [ ] **168.** `internal/gfriends/client.go:236` `errors.Join(errors.New(...), lastErr)` → `fmt.Errorf("fetch avatar: %w", lastErr)`；:113 Filetree 读取无大小限制。
 - [ ] **169.** `web/src/api/client.ts:30-61` `apiPost` / `apiPatch` / `apiPut` JSON 体逻辑重复 3 遍 → `sendJSON(method, path, body)`；`apiGet(path, undefined, signal)` 出现 15 次 → `apiGet(path, { query, signal })`；:85-89 `imageURL` 不属于请求客户端。
-- [ ] **170.** 查询键无统一管理：`discoverKeys` 定义在缓存实现文件 `movie-detail-cache.ts:5-13`；`pan.ts:65-66` 字面量 `['library']`、`['offline']`；`javbus.ts:35` 字面量 `['discover', 'movie']`；`subscriptionSettingsKey` 与 `xxxKeys.config` 命名混用，`dataKeys` 未导出 → `api/query-keys.ts`。
-- [ ] **171.** `web/src/api/javbus.ts:37-42`、`network.ts:50-55` onError 先回滚再 invalidate，二者取一；且仅这两个设置做乐观更新，emby / subscription-settings 未做（订阅设置 Switch 需等服务端返回且保存期间整块禁用）。
+- [ ] **170.** 查询键的组织和命名仍不统一：discoverKeys 位于 `web/src/api/movie-detail-cache.ts`，`pan.ts` 存在 library/offline 字面量键，subscriptionSettingsKey 与其他配置键风格不同。评估集中管理或按 API 模块导出，避免重复定义与循环依赖；已删除 JavBus API 文件的引用不再适用。
+- [ ] **171.** `web/src/api/network.ts` 更新失败时同时回滚和 invalidate，核实是否需要两者；Emby、订阅设置与网络设置的乐观更新策略不同，应按失败恢复和交互需求明确规则，而不是机械要求所有设置采用同一方式。JavBus 设置 API 已删除。
 - [ ] **172.** `web/package.json` build 脚本 `vite build && tsc --noEmit`，类型检查应在前。
 - [ ] **173.** `web/src/features/settings/network-section.tsx:39` `setTimeout(() => inputRef.current?.focus(), 50)` 不清理 → `autoFocus`；`access-gate.tsx:26` effect 依赖整个 `config` 查询对象 → 依赖 `config.refetch`。
 - [ ] **174.** 导入风格混用：`tasks-section.tsx:7`、`scan-progress.tsx:8` 用 `@/features/settings/shared`，同目录其他文件用 `./shared`；`components/movie/index.ts` barrel 仅部分使用（`recommendations.tsx:5-6` 相邻两行一个走 barrel 一个直连，barrel 导出的 `DiscoverMovieCard` 无外部使用）；`DISCOVER_PAGE_SIZE as PAGE_SIZE`（`category-content.tsx:6`、`discover/page.tsx:7`）、`DISCOVER_ZONES as zones`（`category-filters.tsx:15`）别名不一致。
@@ -267,29 +182,29 @@
 
 ## 九、过度拆分
 
-- [ ] **175.** `internal/api`：`task.go`（21 行）、`sse.go`、`health.go`、`javbus.go`、`data.go` 各二三十行；`data.go` 实为 maintenance、`movie.go` 实为 library；`HealthChecker` 定义在 `router.go` 而 handler 在 `health.go` → 按资源合并。
+- [ ] **175.** `internal/api` 中部分文件命名与资源职责不一致：`data.go` 对应 maintenance、`movie.go` 对应 library，HealthChecker 与 handler 分散。按资源和依赖关系评估整理；task/sse/health 等文件短不等于需要合并。JavBus handler 文件已删除。
 - [ ] **176.** `internal/drive/drive.go:195-198` `Drive.OpenMedia` 与 `internal/strm/relay.go:77-82` `Relay.Probe` 纯透传，一次 HEAD 穿过 api → strm → drive → pan 三层空转发；api 层自行编排两次调用 → strm 持窄接口并提供 `Head()`。
 - [ ] **177.** `cmd/miyabi/healthcheck.go` 一行转发 `app.CheckHealth`（应属 CLI）；healthcheck 子命令执行完整 `config.Load`，其中 `netx.OutboundIP()` 做一次 UDP 拨号。
-- [ ] **178.** `internal/magnet/source.go`（13 行单接口）、`internal/netx/probe.go`（14 行）、`internal/api/javbus.go`（28 行两个 handler）。
+- [ ] **178.** `internal/magnet/source.go` 只有 Source 接口，评估是否适合与同职责类型合放；如它是清晰的聚合器依赖边界，可保留。原 netx/probe.go 和 api/javbus.go 已删除，不能再作为待清理文件。
 - [ ] **179.** `DiscoverResults` 三处调用（`discover/browse-results.tsx:14-23`、`metadata-search-page.tsx:104-113`、`search/page.tsx:103-112`）是相同的"拆 query 字段传 props"适配 → 直接接收 `UseQueryResult` + `emptyTitle`，删除 `BrowseResults` / `SearchResults` 壳组件。
-- [ ] **180.** `web/src/features/subscriptions/actor-subscriptions.tsx` 接收 `displayItems` / `displayQuery`（:17-22 手写 query 子集类型）/ `selecting` / `selected` / `onSelect` / `disabled` 后原样转给 `MovieSubscriptions`（:98-109），`MovieSubscriptions` 在两处渲染 → page 统一渲染一次；`page.tsx:43` 可简化为 `view === 'actors' && selectedActorID !== null ? feed : movies`。
-- [ ] **181.** 单调用方小文件：`features/library/movie-status.tsx`（18 行，外层 `<>` 包单个三元）、`features/movie-detail/metadata-link.tsx`、`api/movie-states.ts`（17 行）。
+- [ ] **180.** `web/src/features/subscriptions/actor-subscriptions.tsx` 把 displayItems/displayQuery、选择状态等透传给 MovieSubscriptions，后者又在 page 中另一分支渲染。可将结果列表统一放在 page 层。注意演员页未选单个演员时仍应展示“全部演员新作”feed，不能回退到普通影片订阅列表。
+- [ ] **181.** 评估 `features/library/movie-status.tsx`、`features/movie-detail/metadata-link.tsx` 的单调用方拆分是否改善可读性；删除无意义 Fragment 等局部冗余。`api/movie-states.ts` 已合并状态加载与 hook，不再是原来的 17 行壳文件。不要仅按文件行数合并模块。
 
 ---
 
 ## 十、臃肿 / 重复（后端）
 
 - [ ] **182.** `catalogue.MovieDetail` 重新声明 `domain.MovieDetail` 的字段而非内嵌；`domain/library.go` 实际存放 MovieSummary / Media / OfflineSubmission，`ScanProgress` 位于 `source.go`，文件名与内容不符；`ScanPayload.Checkpoint` 是 JSON 中嵌套 JSON 字符串 → 结构化字段。
-- [ ] **183.** `internal/app/app.go:56-123` 每个失败分支手工复制一串 `Close()`，且不完整（maintenance / emby 失败时未关闭已启动 subtitleQueue 的 scrapeSvc）；`Close()`（:268-285）的 nil 检查从未用于半构造 App → 先 `a := &App{}`，出错统一 `a.Close()`。
-- [ ] **184.** URL scheme 正则前端 3 份（`settings/emby-url.ts:15,42`、`network-section.tsx:175`）+ `formatHost` 另一正则 → `hasScheme` / `withDefaultScheme` 入 lib；后端 `scrape/export.go:20-21` `defaultPublicURL()` 写死 8080、每次导出触发 `OutboundIP()` UDP 拨号，与 `config.go:41-46` 推导重复；`netx/ip.go:11-19` 注释"优先私网段"与 UDP 探测实现不符。
+- [ ] **183.** `internal/app/app.go` 初始化失败分支仍重复列出资源 Close；此前 scrape worker 清理遗漏已修复。评估以清理栈或局部辅助方式减少重复，必须保持资源逆序关闭，并明确哪些对象在构造成功前已有后台工作；不强制改成半初始化 App。
+- [ ] **184.** 导出默认值仍有重复：`internal/export/export.go` 保留 `./data/emby` 和硬编码 8080 的 defaultPublicURL，与 config.Load 推导不一致；app 也有 EmbyDir 兜底。统一在配置入口确定，底层导出使用明确配置。另核实前端 emby-url.ts、network-section.tsx 的 URL scheme/host 格式化重复，以及 netx/ip.go 注释与实现的差异。
 - [ ] **185.** 磁力排序规则（字幕 > 高清 > 体积 > 文件数）在 `javdb/magnet.go:54-71` 与 `magnet/aggregator.go:104-118` 各一份。
 
 ---
 
 ## 十一、UI 一致性
 
-- [ ] **186.** 设置页 5 种保存语义：立即生效无提示（外观、隐私、JavDB 线路 `data-source-section.tsx:56`）；立即生效且每项 toast（`subscription-section.tsx:45` 改一个 Select 弹一次、JavBus `data-source-section.tsx:78`）；代理开启需手动保存、关闭立即保存（`network-section.tsx:36-59`）；Emby 开关也需点保存（`emby-section.tsx:155-171`）→ 统一：开关 / 下拉即时保存，文本表单才有保存按钮，toast 策略一致。
-- [ ] **187.** 加载态不一致：Skeleton（data-section）、纯文本（`tasks-section.tsx:23`）、裸 spinner（`pan-section.tsx:55`）、直接显示假默认值（`subscription-section.tsx:61` `movie_auto_download ?? true`、`emby-section.tsx:32` `sync_actors ?? true`，加载中显示为开启）。错误态：tasks / data 带重试，emby:246、network:152、subscription:138、javbus:173 无重试；`data-source-section.tsx:147` 文案"点击重试"却未接 `onRetry`；同一"任务读取失败"在 `library/page.tsx:248` 用 `retryLabel="重新连接"`、`tasks-section.tsx:25` 未用且文案不同 → `SettingsSection` 接收 query 统一处理。
+- [ ] **186.** 设置页 5 种保存语义：立即生效无提示（外观、隐私、JavDB 线路 `data-source-section.tsx:56`）；立即生效且每项 toast（`subscription-section.tsx:45` 改一个 Select 弹一次）；代理开启需手动保存、关闭立即保存（`network-section.tsx:36-59`）；Emby 开关也需点保存（`emby-section.tsx:155-171`）→ 统一：开关 / 下拉即时保存，文本表单才有保存按钮，toast 策略一致。
+- [ ] **187.** 加载态不一致：Skeleton（data-section）、纯文本（`tasks-section.tsx:23`）、裸 spinner（`pan-section.tsx:55`）、直接显示假默认值（`subscription-section.tsx:61` `movie_auto_download ?? true`、`emby-section.tsx:32` `sync_actors ?? true`，加载中显示为开启）。错误态：tasks / data 带重试，emby:246、network:152、subscription:138 无重试；`data-source-section.tsx:147` 文案"点击重试"却未接 `onRetry`；同一"任务读取失败"在 `library/page.tsx:248` 用 `retryLabel="重新连接"`、`tasks-section.tsx:25` 未用且文案不同 → `SettingsSection` 接收 query 统一处理。
 - [ ] **188.** 同一扫描阶段两套文案：`features/tasks/scan-status.ts:3-18`（扫描中 / 核对中 / 刮削中 / 写入元数据）vs `task-progress-state.ts:5-12`（正在扫描文件 / 正在核对媒体库 / 正在刮削元数据 / 正在写回元数据）→ 共用一张 label 表。
 - [ ] **189.** ✔ 订阅按钮三处实现且语义冲突：`components/movie/movie-subscribe-button.tsx:14` `subscribed = waiting || added`，`movie-detail/subscription-action.tsx:11` 只算 `waiting`（`added` 显示"重新订阅"）；"已订阅"卡片用 `variant="default"` 实心，详情 / 演员按钮用 `outline`，颜色相反；`discover/metadata-search-page.tsx:118-146` 演员按钮文案"已订阅演员"点击即取消订阅。
 - [ ] **190.** 硬编码颜色 / 语义色挪用：`library/movie-status.tsx:10` `[--destructive:oklch(0.577_0.245_27.325)]` 覆盖暗色 token；`ui/badge.tsx:18` library 变体写死 `bg-violet-600/dark:bg-violet-500`，hover 仍是 `violet-600/80`；`data-source-section.tsx:216` `text-orange-600 dark:text-orange-400`；`subscription-card.tsx:151` `data-checked:text-white`；`globals.css:17,19` `--color-success` / `--color-info` 直接指 `emerald-500` / `sky-500` 不分亮暗，白字配 emerald-500 对比度约 2.5:1；`ring-success` / `bg-success`（`subscription-card.tsx:130,151`）把"成功"色当"选中"色（全站其他选中用 primary）→ `:root/.dark` 定义 `--success`、`--library` 及 `*-foreground`。
@@ -313,7 +228,7 @@
 ## 十二、UI 复用（重复粘贴）
 
 - [ ] **205.** `<TooltipTrigger asChild><Button size="icon">` 组合在 settings 约 9 处、`floating-nav`、`back-top-button`、`preview-viewer` 关闭、library 扫描、`movie-subscribe-button` 等处重复 → 抽 `IconButton({ label, ... })`，同一 label 同时用于 `aria-label` 与 `TooltipContent`；`data-section.tsx:60-61` 的 `title` 一并统一。
-- [ ] **206.** settings mutation `onError: error => toast.error(error instanceof Error ? error.message : '…')` 重复 7 遍（`data-source-section.tsx:81`、`emby-section.tsx:105,143`、`network-section.tsx:51,80,98`、`subscription-section.tsx:47`），fallback 永不触发，网络异常时原样显示 "Failed to fetch" → 将 `api/subscriptions.ts:38` 的 `describeError` 提到 `client.ts` 统一使用。
+- [ ] **206.** `web/src/api/client.ts` 已有 describeApiError，订阅错误提示也已集中处理；设置页 emby-section、network-section、subscription-section 仍直接显示 Error.message，网络错误可能显示英文 Failed to fetch。接入公共错误文案，并为每个操作明确 inline 或 toast 的唯一展示位置。
 - [ ] **207.** "测试连接 + 保存"操作栏 `emby-section.tsx:227-244` 与 `network-section.tsx:126-148` JSX 完全相同 → `settings/shared.tsx` 增加 `SettingsActions`。
 - [ ] **208.** "服务端值 + 本地草稿"两种实现：emby 用 `form | null` 手工比较 7 个字段（`emby-section.tsx:48-57`），network 用两个 `useState<T | null>`（`network-section.tsx:26-33`）；emby 无 `<form>` 回车不提交，network 手写 `onKeyDown`（:120）→ 抽 `useDraft(serverValue)` + `<form onSubmit>`。
 - [ ] **209.** 确认弹窗 `data-section.tsx:101-139` 与 `subscriptions/page.tsx:200-243` 结构一致（pending 时禁止关闭、`showCloseButton={!pending}`、InlineError、取消 + loader 确认）→ 抽 `ConfirmDialog`。
@@ -322,7 +237,7 @@
 - [ ] **212.** 影片信息栏 `movie-detail/hero.tsx:44-73`（MovieStats）与 `library/movie-hover-details.tsx:34-46` 重复判断与格式化 release_date / duration / rating → `movieStats(movie)`。
 - [ ] **213.** discover 分类派生 `category-content.tsx:18-21` 与 `category-filters.tsx:27-30` 逐字相同；分区 Select `category-filters.tsx:35-53` 与 `metadata-search-page.tsx:69-88` 两份；`mainOptions` 一处用常量 `MAIN_CATEGORY`、一处用字面量 `'main'`（:43）→ `useDiscoverTaxonomy` + `ZoneSelect({ allowAll })`。
 - [ ] **214.** 详情页 section 标题 `<section className="space-y-4"><h2 className="text-xl font-semibold tracking-normal">` 在 `magnets.tsx:63`、`previews.tsx:20`、`recommendations.tsx:23` 重复 → `DetailSection`；`previews.tsx:20` 的 `id="movie-previews-title"` 无人引用。
-- [ ] **215.** `features/tasks/task-notification-diff.ts:4-14` 重复定义 `isScanTask` / `isBatchTask` / `isTaskActive`（`api/tasks.ts:70-80` 已有），:55-56 第三份 `isOfflineTaskActive`（`lib/offline-state.ts`、`api/offline.ts:9` 已有）；三个循环（:78-103、:105-122、:125-147）通知判定条件完全复制 → 纯函数移至 `lib/task-state.ts`，抽 `shouldNotify()`。
+- [ ] **215.** `features/tasks/task-notification-diff.ts` 仍重复定义 isScanTask/isBatchTask/isTaskActive，以及 `api/offline.ts` 已有的 isOfflineTaskActive。通知判定循环也有重复。评估共用状态判断并提取真正重复的通知条件，避免再创建只作转发的层；原 lib/offline-state.ts 已删除。
 - [ ] **216.** `features/tasks/task-toast.tsx:42,71,123` 三处 `icon: options.waiting ? undefined : <LoaderCircleIcon…/>` → 并入 `taskToastOptions`；"等待同步"scan 改标题、offline / batch 改描述，处理不一致。
 - [ ] **217.** `settings/pan-directory-dialog.tsx:83-109` 手写上一页 / 下一页且无 aria-label，现成 `ListPagination` 已支持 `hasMore`、可不传 totalPages 和 `scrollToTop={false}`。
 - [ ] **218.** 本地 NFO 解码（`scan/local.go`）与 `ReadNFO` 两套 → 抽 `decodeNFO(body, fallbackName)` 共用。
@@ -333,9 +248,8 @@
 ## 十三、UI 合理性
 
 - [ ] **220.** 破坏性操作确认策略倒置：风险最低的"清理未使用缓存"有确认弹窗；退出 115 登录（`pan-section.tsx:78`）、取消挂载目录（`pan-directory-row.tsx:62`）、取消演员订阅（`actor-chip.tsx:93`）、取消影片订阅（`subscription-card.tsx:111`）均一键执行 → 统一使用 ConfirmDialog。
-- [ ] **221.** 批量入库失败错误双显示：hook onError 已 toast（`api/subscriptions.ts:168`），弹窗又显示 `InlineError`（`subscriptions/page.tsx:215`）；成功时 `page.tsx:90` toast + 任务通知 toast 两个。
+- [ ] **221.** 批量入库失败已只在弹窗内展示。成功时，`subscriptions/page.tsx` 的“已创建任务”toast 与 task-toast.tsx 的任务通知仍可能同时出现；评估保留一条可持续更新的任务通知，避免重复反馈。
 - [ ] **222.** `data-section.tsx:28` `busy` 包含 `info.isFetching`，每次后台刷新清理按钮闪一下禁用；刷新统计按钮放在"数据目录"行（:56），位置与作用不符。
-- [ ] **223.** `data-source-section.tsx:70` 代理未开启时用 error toast 拦截 JavBus 开关 → 直接禁用开关并在描述中说明原因。
 - [ ] **224.** `pan-directory-row.tsx:35` 用 `disabled` Input 展示当前路径（opacity-50 变淡、无法选中复制）→ `readOnly`。
 - [ ] **225.** `movie-detail/magnets.tsx:48,55` "已复制"状态永不恢复；:108 复制失败提示在整个 section 底部，远离按钮。
 - [ ] **226.** `search/page.tsx:31-38` 无关键词时下方完全空白；`components/page-back-button.tsx:14` ghost 按钮 `px-3` 使返回图标比标题右缩 12px，:17 兜底写死 `/discover`。
@@ -357,7 +271,7 @@
 
 ## 十五、安全（顺带发现）
 
-- [ ] **235.** `internal/api/router.go:52` sloggin 默认记录 query，`.strm` URL 带 `?token=<STRMToken>`（`scrape/export.go:41`）→ Emby 每次播放把 token 明文写进 info 日志；emby API key 放在 query 同样进日志；`auth.go:155` `extractToken` 接受 `?token=` JWT 而前端从不使用 → 删除该分支并对 sloggin 做 query 脱敏。
+- [ ] **235.** 核查日志中的敏感查询参数：`internal/api/router.go` 请求日志可能记录 STRM URL 的 `token`；Emby 请求也有 query 形式的 API key。网页登录 URL token 通道已删除，不再列为待办。对实际日志入口统一脱敏，并验证错误日志和代理日志是否仍会泄漏。
 - [ ] **236.** `GET /api/settings/emby` 明文返回 APIKey → 打码返回，提交时回填。
 - [ ] **237.** `internal/api/auth.go:164` 无论代理是否可信都信任 `X-Forwarded-Proto`；`router.go:45-49` `SetTrustedProxies` 错误被忽略，解析失败时部分列表静默生效 → 在 `config.Load` 校验。
 
@@ -366,5 +280,5 @@
 ## 十六、测试臃肿
 
 - [ ] **238.** `internal/codeid/prototype_test.go` 以 `prototypeResolve` / `prototypeMatch` 重写一遍 `javdb.ResolveMovieID`，`prototypeQueries` 已与生产 `Queries` 分歧，文件头注释过时——测的是副本而非生产代码 → 迁到 javdb 包基于 fixture transport 测真实实现；`corpus_test.go:18` 与 `random_corpus_test.go:12` 语料加载器几乎相同 → `loadSamples(t, file, n)`。
-- [ ] **239.** 随死代码一并删除的测试：`scan/subtitle_test.go`（`IndexDirectorySubtitles`）、`library_concurrency_test.go:55`（`UploadSidecar`）、`scrape/dir_cache_test.go`（`InvalidateDirCache`）、`scrape/snapshot_test.go:27` `TestSnapshotMatches`（老快照路径）、`scan/walker_feature_test.go:10`（只测 JSON 往返，且未覆盖第 2 条断点 bug）、`subtitle` 中测 pan 导出的部分、`database/sqlite_test.go:87` 相关断言。
-- [ ] **240.** 低价值测试：`config/runtime_test.go`（断言常量）、`domain/value_test.go`（5 行泛型函数）、`tasks_test.go` 的 `TestRegistryAndHandlers` / `TestBusSubscriptionsAndRevisions`（测 map / channel 本身）、`netx` 的 `TestFingerprintClientBuildsWithAndWithoutProxy`（只验证构造不报错）、`TestOutboundIP`（依赖环境）；`TestCheckHealth` 在 `app_test` 与 `cmd/miyabi/healthcheck_test.go` 重复；`api/jwt_test.go` 6 个测试走同一失败路径可表驱动；`app/task_test.go`、`task_payload_test.go` 测 tasks/scrape 行为却放在 app 包；`pan/client_test.go` 手工拼 resty 配置而非测试 `New()` 的真实配置（第 10 条因此未被发现）；`web/tests/pan-login-poll.test.mjs` 146 行测 `retry: 4` 的等价实现。
+- [ ] **239.** 随生产路径清理重新评估相关测试：scan/subtitle_test.go 的旧命名与断言、scrape/dir_cache_test.go、subtitle 中 115 导出路径等。UploadSidecar 已删除；snapshot_test.go 已覆盖 movie 快照，不应按旧快照测试整体删除。保留断点恢复、快照失效、历史封面任务 JSON 兼容等有效回归测试，按当前生产调用逐项决定删除或迁移。
+- [ ] **240.** 复核低收益或重复测试：runtime 常量、简单 domain helper、任务容器基本操作、健康检查重复路径，以及 app 包中实际测试 library/scrape 的用例归属。pan 客户端测试已增加真实请求路径覆盖，不能沿用“未测 New”的旧结论；前端测试已迁移为 `.test.ts`，pan-login-poll.test.ts 的失败预算与恢复行为应保留，是否缩减需按实际覆盖收益判断。
