@@ -1,4 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  mutationOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient
+} from '@tanstack/react-query'
 
 import { apiGet, apiPost, apiPut } from '@/api/client'
 
@@ -31,17 +37,32 @@ export function useEmbyConfig() {
   })
 }
 
-export function useUpdateEmbyConfig() {
-  const queryClient = useQueryClient()
-  return useMutation({
+export function updateEmbyConfigOptions(queryClient: QueryClient) {
+  return mutationOptions({
     mutationFn: (config: EmbyConfig) => apiPut<EmbyConfig>('/api/settings/emby', config),
+    onMutate: async next => {
+      await queryClient.cancelQueries({ queryKey: embyKeys.config })
+      const previous = queryClient.getQueryData<EmbyConfig>(embyKeys.config)
+      queryClient.setQueryData<EmbyConfig>(embyKeys.config, {
+        ...previous,
+        ...next,
+        local_dir: next.local_dir || previous?.local_dir
+      })
+      return { previous }
+    },
     onSuccess: next => {
       queryClient.setQueryData(embyKeys.config, next)
     },
-    onError: () => {
+    onError: (_error, _next, context) => {
+      if (context?.previous) queryClient.setQueryData(embyKeys.config, context.previous)
+      // The backend can save settings before reporting a scan enqueue failure.
       void queryClient.invalidateQueries({ queryKey: embyKeys.config })
     }
   })
+}
+
+export function useUpdateEmbyConfig() {
+  return useMutation(updateEmbyConfigOptions(useQueryClient()))
 }
 
 export function useTestEmbyConfig() {

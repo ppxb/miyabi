@@ -56,6 +56,10 @@ export function EmbySection() {
       current.public_url !== initial.public_url ||
       current.sync_actors !== initial.sync_actors)
 
+  // Keep the saved form visible until the query observer receives the same
+  // values. Clearing it in the success callback can briefly reveal old data.
+  if (form !== null && !isDirty && !updateConfig.isPending) setForm(null)
+
   const disabled = emby.isLoading || emby.isError || updateConfig.isPending
 
   function updateField<K extends keyof EmbyFormData>(key: K, value: EmbyFormData[K]) {
@@ -135,8 +139,8 @@ export function EmbySection() {
     }
 
     updateConfig.mutate(payload, {
-      onSuccess: () => {
-        setForm(null)
+      onSuccess: next => {
+        setForm(configToFormData(next))
         toast.success('Emby 设置已保存')
       },
       onError: error => {
