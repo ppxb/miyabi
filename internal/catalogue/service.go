@@ -133,7 +133,7 @@ func newService(database *ent.Client, primary JavDBClient, supplement JavBusSour
 		database:       database,
 		javdb:          primary,
 		javbus:         supplement,
-		aggregator:     magnet.NewAggregator(sources, aggregatorTimeout, nil),
+		aggregator:     magnet.NewAggregator(sources, 0),
 		lists:          newResponseCache[[]domain.Movie](listCacheSize, listCacheTTL),
 		details:        newResponseCache[domain.MovieDetail](detailCacheSize, detailCacheTTL),
 		tags:           newResponseCache[[]domain.TagCategory](tagsCacheSize, tagsCacheTTL),

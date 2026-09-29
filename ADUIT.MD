@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：161 条待处理，18 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：160 条待处理，19 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -90,7 +90,9 @@
 - [x] **76.** `web/src/features/library/movie-card.tsx:14-18` hover 开关三重保护：`open={canHover && open}` + 条件渲染 + `key` 重挂载。
   - 实现：合并 LibraryMovieCard 与内部 Content，删除按设备模式切换的 key；失去悬停能力时条件重置 open，避免重新启用后恢复旧弹层。保留受控展开、详情条件渲染、点击关闭及移动端标题提示。
   - 验证：现有 Vitest 112 项、typecheck、lint 通过；本次未新增组件交互测试，桌面展开→缩小窗口→恢复、点击关闭及触屏标题提示待用户浏览器验证，待整体复查。
-- [ ] **77.** `internal/magnet/aggregator.go:16,28-35` `logger` 参数两处调用均传 nil；`defaultAggregatorTimeout` 与 `catalogue.aggregatorTimeout` 同为 8s 重复定义。
+- [x] **77.** `internal/magnet/aggregator.go:16,28-35` `logger` 参数两处调用均传 nil；`defaultAggregatorTimeout` 与 `catalogue.aggregatorTimeout` 同为 8s 重复定义。
+  - 实现：删除 Aggregator 的 logger 参数、字段及默认回退，直接使用 slog.WarnContext；删除 catalogue 重复定义的 8 秒超时，生产构造传 0 使用聚合器默认值。保留超时参数供测试验证慢来源处理。
+  - 验证：magnet、catalogue、app 测试通过，覆盖聚合去重、来源超时、部分失败与缓存行为；未进行真实磁力来源联调，待整体复查。
 
 ---
 

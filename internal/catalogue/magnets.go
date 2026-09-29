@@ -4,12 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
 )
-
-const aggregatorTimeout = 8 * time.Second
 
 // Magnets returns the aggregated, cached magnet list of a movie. The detail
 // lookup supplies the code and zone JavBus needs; when it fails the

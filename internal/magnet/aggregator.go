@@ -20,19 +20,15 @@ const defaultAggregatorTimeout = 8 * time.Second
 type Aggregator struct {
 	sources []Source
 	timeout time.Duration
-	logger  *slog.Logger
 }
 
-// NewAggregator creates an Aggregator. Each source gets its own timeout; a nil
-// logger falls back to the process default.
-func NewAggregator(sources []Source, timeout time.Duration, logger *slog.Logger) *Aggregator {
+// NewAggregator creates an Aggregator. Each source gets its own timeout;
+// a non-positive timeout uses the default.
+func NewAggregator(sources []Source, timeout time.Duration) *Aggregator {
 	if timeout <= 0 {
 		timeout = defaultAggregatorTimeout
 	}
-	if logger == nil {
-		logger = slog.Default()
-	}
-	return &Aggregator{sources: sources, timeout: timeout, logger: logger}
+	return &Aggregator{sources: sources, timeout: timeout}
 }
 
 type queryResult struct {
@@ -83,7 +79,7 @@ func (a *Aggregator) FindDetailed(ctx context.Context, ref domain.MovieRef) ([]d
 			continue
 		}
 		if res.err != nil {
-			a.logger.WarnContext(ctx, "magnet source query failed", "source", res.source, "code", ref.Code, "error", res.err)
+			slog.WarnContext(ctx, "magnet source query failed", "source", res.source, "code", ref.Code, "error", res.err)
 			failures = append(failures, fmt.Errorf("%s: %w", res.source, res.err))
 			continue
 		}
