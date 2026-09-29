@@ -2,6 +2,7 @@ package scan
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/drive"
@@ -12,10 +13,72 @@ import (
 type nfoStubSession struct {
 	drive.Session
 	bodies map[string][]byte
+	reads  int
 }
 
 func (s *nfoStubSession) Read(_ context.Context, pickCode string, _ int64) ([]byte, error) {
+	s.reads++
 	return s.bodies[pickCode], nil
+}
+
+func TestResolveNFOCodesChecksContentAndReadsEachFileOnce(t *testing.T) {
+	for _, tc := range []struct {
+		name, code string
+		conflict   bool
+	}{
+		{name: "matching", code: "ABP-001"},
+		{name: "conflicting content", code: "IPX-123", conflict: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body, err := nfo.Encode(nfo.Movie{Code: tc.code})
+			if err != nil {
+				t.Fatal(err)
+			}
+			sess := &nfoStubSession{bodies: map[string][]byte{"nfo": body}}
+			videos := []Video{
+				{File: pan.File{ID: "v1", Name: "ABP-001-CD1.mp4", Size: 1 << 30}, Code: "ABP-001"},
+				{File: pan.File{ID: "v2", Name: "ABP-001-CD2.mp4", Size: 1 << 30}, Code: "ABP-001"},
+			}
+			err = ResolveNFOCodes(t.Context(), sess, []pan.File{{ID: "n1", Name: "ABP-001.nfo", PickCode: "nfo"}}, videos)
+			if tc.conflict {
+				if err == nil || !strings.Contains(err.Error(), "不一致") {
+					t.Fatalf("conflict = %v", err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if sess.reads != 1 {
+				t.Fatalf("NFO reads = %d", sess.reads)
+			}
+			for _, video := range videos {
+				if video.Code != "ABP-001" {
+					t.Fatalf("conflicting NFO replaced identity: %+v", video)
+				}
+			}
+		})
+	}
+}
+
+func TestResolveNFOCodesMatchesEachMovieInSharedDirectory(t *testing.T) {
+	bodies := make(map[string][]byte)
+	var sidecars []pan.File
+	var videos []Video
+	for _, code := range []string{"ABP-001", "IPX-123"} {
+		body, err := nfo.Encode(nfo.Movie{Code: code})
+		if err != nil {
+			t.Fatal(err)
+		}
+		bodies[code] = body
+		sidecars = append(sidecars, pan.File{ID: code, Name: code + ".nfo", PickCode: code})
+		videos = append(videos, Video{File: pan.File{ID: code, Name: code + ".mp4", Size: 1 << 30}, Code: code})
+	}
+	sess := &nfoStubSession{bodies: bodies}
+	if err := ResolveNFOCodes(t.Context(), sess, sidecars, videos); err != nil {
+		t.Fatal(err)
+	}
+	if sess.reads != 2 || videos[0].Code != "ABP-001" || videos[1].Code != "IPX-123" {
+		t.Fatalf("shared directory = %+v, reads = %d", videos, sess.reads)
+	}
 }
 
 func TestCanIdentifyVideo(t *testing.T) {
@@ -38,7 +101,7 @@ func TestCanIdentifyVideo(t *testing.T) {
 	}
 }
 
-func TestResolveSingleNFO_ToleranceMatching(t *testing.T) {
+func TestResolveNFOCodes_ToleranceMatching(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("canonicalizes distributor prefix 200GANA to GANA", func(t *testing.T) {
@@ -53,7 +116,7 @@ func TestResolveSingleNFO_ToleranceMatching(t *testing.T) {
 			{File: pan.File{ID: "v2", Name: "APP.mp4", Size: 5 << 20}, Code: ""},
 		}
 
-		if err := ResolveSingleNFO(ctx, sess, sidecars, videos); err != nil {
+		if err := ResolveNFOCodes(ctx, sess, sidecars, videos); err != nil {
 			t.Fatal(err)
 		}
 
@@ -76,7 +139,7 @@ func TestResolveSingleNFO_ToleranceMatching(t *testing.T) {
 			{File: pan.File{ID: "v1", Name: "Carib-060326-001.mp4", Size: 1 << 30}, Code: "CARIB-060326-001"},
 		}
 
-		if err := ResolveSingleNFO(ctx, sess, sidecars, videos); err != nil {
+		if err := ResolveNFOCodes(ctx, sess, sidecars, videos); err != nil {
 			t.Fatal(err)
 		}
 
@@ -97,7 +160,7 @@ func TestResolveSingleNFO_ToleranceMatching(t *testing.T) {
 			{File: pan.File{ID: "v2", Name: "trailer.mp4", Size: 10 << 20}, Code: ""},
 		}
 
-		if err := ResolveSingleNFO(ctx, sess, sidecars, videos); err != nil {
+		if err := ResolveNFOCodes(ctx, sess, sidecars, videos); err != nil {
 			t.Fatal(err)
 		}
 
@@ -121,7 +184,7 @@ func TestResolveSingleNFO_ToleranceMatching(t *testing.T) {
 			{File: pan.File{ID: "v2", Name: "IPX-123.mp4", Size: 1 << 30}, Code: "IPX-123"},
 		}
 
-		if err := ResolveSingleNFO(ctx, sess, sidecars, videos); err != nil {
+		if err := ResolveNFOCodes(ctx, sess, sidecars, videos); err != nil {
 			t.Fatal(err)
 		}
 
@@ -141,7 +204,7 @@ func TestResolveSingleNFO_ToleranceMatching(t *testing.T) {
 			{File: pan.File{ID: "v1", Name: "feature.mp4", Size: 1 << 30}, Code: ""},
 		}
 
-		if err := ResolveSingleNFO(ctx, sess, sidecars, videos); err != nil {
+		if err := ResolveNFOCodes(ctx, sess, sidecars, videos); err != nil {
 			t.Fatal(err)
 		}
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -17,6 +18,7 @@ import (
 	"github.com/ppxb/miyabi/internal/catalogue"
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/export"
 
@@ -32,13 +34,14 @@ import (
 )
 
 // fakeDrive is an in-memory 115 account: a directory tree, file contents keyed
-// by pick code, and a record of every sidecar upload in call order.
+// by pick code, and a record of metadata reads in call order.
 type fakeDrive struct {
 	mu        sync.Mutex
 	accountID string
 	dirs      map[string]fakeDirectory
 	files     map[string]pan.File
 	contents  map[string][]byte
+	reads     []string
 	nextID    int
 }
 
@@ -138,6 +141,7 @@ func (drive *fakeDrive) Info(_ context.Context, _ string, id string) (pan.FileIn
 func (drive *fakeDrive) ReadMetadata(_ context.Context, _ string, pickCode string, limit int64) ([]byte, error) {
 	drive.mu.Lock()
 	defer drive.mu.Unlock()
+	drive.reads = append(drive.reads, pickCode)
 	body, ok := drive.contents[pickCode]
 	if !ok {
 		return nil, pan.ErrNotFound
@@ -241,16 +245,17 @@ func fixtureJPEG(t testing.TB, width, height int) []byte {
 // pipelineFixture wires every service that participates in the scan → scrape
 // → cover workflow against the in-memory 115 account and catalogue.
 type pipelineFixture struct {
-	store     *database.Store
-	drive     *fakeDrive
-	catalogue *fakeCatalogue
-	tasks     *tasks.Service
-	library   *library.Service
-	scrape    *scrapePkg.Service
-	discover  *catalogue.Service
-	images    *mediaimage.Cache
-	source    domain.LibrarySource
-	embyDir   string
+	driveService *drive.Drive
+	store        *database.Store
+	drive        *fakeDrive
+	catalogue    *fakeCatalogue
+	tasks        *tasks.Service
+	library      *library.Service
+	scrape       *scrapePkg.Service
+	discover     *catalogue.Service
+	images       *mediaimage.Cache
+	source       domain.LibrarySource
+	embyDir      string
 }
 
 func newPipelineFixture(t *testing.T) *pipelineFixture {
@@ -290,7 +295,7 @@ func newPipelineFixture(t *testing.T) *pipelineFixture {
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScrape, scrape.Scrape, scrape.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindCover, scrape.Cover, scrape.Finished))
 	return &pipelineFixture{
-		store: store, drive: drive, catalogue: catalogueClient, tasks: taskSvc,
+		store: store, drive: drive, driveService: d, catalogue: catalogueClient, tasks: taskSvc,
 		library: library, discover: discover, scrape: scrape, images: images, source: source,
 		embyDir: embyDir,
 	}
@@ -457,7 +462,7 @@ func TestPipelineScansScrapesAndWritesSidecarsEndToEnd(t *testing.T) {
 	}
 
 	if snapshot := record.MetadataSnapshot; snapshot == nil || snapshot.Videos != scrapePkg.VideoFingerprint([]pan.File{video}) ||
-		snapshot.AccountID != fixture.source.AccountID || snapshot.DirectoryID != fixture.source.Directory.ID || !snapshot.LocalExport {
+		snapshot.AccountID != fixture.source.AccountID || snapshot.DirectoryID != fixture.source.Directory.ID {
 		t.Fatalf("export snapshot was not saved on the movie: %+v", snapshot)
 	}
 	// A rescan must reuse the movie snapshot even after all task history is removed.
@@ -477,9 +482,10 @@ func TestPipelineScansScrapesAndWritesSidecarsEndToEnd(t *testing.T) {
 	}
 }
 
-func TestPipelineReusesUserNFOInsteadOfCatalogue(t *testing.T) {
+func TestPipelineUsesNFOCodeButScrapesCatalogueMetadata(t *testing.T) {
 	fixture := newPipelineFixture(t)
 	ctx := t.Context()
+	fixture.addCatalogueMovie(fixtureDetail())
 	fixture.drive.addDirectory("11", "10", "ABP-123")
 	fixture.drive.addFile("101", "11", "ABP-123.mp4", 2<<30, []byte("video"))
 	poster, fanart := fixtureJPEG(t, 200, 300), fixtureJPEG(t, 600, 400)
@@ -508,15 +514,34 @@ func TestPipelineReusesUserNFOInsteadOfCatalogue(t *testing.T) {
 			}
 		}
 	}
-	if len(fixture.catalogue.calls) != 0 {
-		t.Fatalf("user NFO must not trigger catalogue calls: %v", fixture.catalogue.calls)
+	if len(fixture.catalogue.calls) == 0 {
+		t.Fatalf("NFO must not bypass catalogue scraping: %v", fixture.catalogue.calls)
 	}
 	record, err := fixture.store.Client.Movie.Query().Where(movie.CodeEQ("ABP-123")).WithActors().Only(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if record.Title != "User title" || domain.ValueOrZero(record.JavdbID) != "movie-user" || len(record.Edges.Actors) != 1 || record.ScrapeStatus != movie.ScrapeStatusDone {
+	if record.Title != fixtureDetail().Title || domain.ValueOrZero(record.JavdbID) != fixtureDetail().ID || len(record.Edges.Actors) != len(fixtureDetail().Actors) || record.ScrapeStatus != movie.ScrapeStatusDone {
 		t.Fatalf("movie from NFO = %+v actors %d", record, len(record.Edges.Actors))
+	}
+
+	if len(fixture.drive.reads) != 1 || fixture.drive.reads[0] != "pc-104" {
+		t.Fatalf("only the scan should read the NFO; reads = %v", fixture.drive.reads)
+	}
+	calls := maps.Clone(fixture.catalogue.calls)
+	doc.Title = "Edited remote title"
+	body, err = nfo.Encode(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.drive.addFile("104", "11", "ABP-123.nfo", int64(len(body)), body)
+	fixture.drive.addFile("102", "11", "poster.jpg", 6, []byte("broken"))
+	if _, err := fixture.library.StartScan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	fixture.runQueue(t)
+	if !maps.Equal(fixture.catalogue.calls, calls) || len(fixture.drive.reads) != 2 {
+		t.Fatalf("remote artwork changes caused redundant scraping: calls=%v reads=%v", fixture.catalogue.calls, fixture.drive.reads)
 	}
 }
 

@@ -8,8 +8,6 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/library/scan"
-	"github.com/ppxb/miyabi/internal/library/scrape"
-	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -31,29 +29,6 @@ func BenchmarkUnchangedScanPage(b *testing.B) {
 		if err := indexScanPage(b.Context(), lib, job.ID, fmt.Sprint(iteration), "/Movies", videos, &payload); err != nil {
 			b.Fatal(err)
 		}
-	}
-}
-
-func BenchmarkScanObservations(b *testing.B) {
-	pages := make(map[string][]pan.File, 10000)
-	for i := range 10000 {
-		id := fmt.Sprint(i + 1)
-		var entries []pan.File
-		for j, name := range []string{"ABP-001-CD1.mp4", "ABP-001-CD2.mp4", "ABP-001.nfo", "poster.jpg", "fanart.jpg", "subdirectory"} {
-			entries = append(entries, pan.File{
-				ID: fmt.Sprintf("%d-%d", i, j), ParentID: id, Name: name, IsDirectory: j == 5,
-				Size: 1 << 30, PickCode: "fixture-pick-code", SHA1: "0123456789012345678901234567890123456789",
-			})
-		}
-		pages[id] = entries
-	}
-	b.ReportAllocs()
-	for b.Loop() {
-		observed := make(scrape.DirectoryObservations)
-		for id, entries := range pages {
-			observed.Add(id, entries)
-		}
-		scanBenchmarkResult = observed
 	}
 }
 

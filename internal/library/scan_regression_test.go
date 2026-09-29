@@ -160,44 +160,6 @@ func TestScanResolvesAndIndexesCurrentIdentityWithOneFileRead(t *testing.T) {
 	}
 }
 
-func TestCompactScanKeepsSharedDirectoryAndArtworkMatching(t *testing.T) {
-	for _, scenario := range []struct {
-		name, nfo, poster string
-		shared            bool
-		jobs              int
-	}{
-		{name: "generic NFO", nfo: "movie.nfo", poster: "cover.asset"},
-		{name: "generic NFO with another video", nfo: "movie.nfo", poster: "cover.asset", shared: true, jobs: 1},
-		{name: "exact NFO with another video", nfo: "ABP-001.nfo", poster: "cover.asset", shared: true},
-	} {
-		t.Run(scenario.name, func(t *testing.T) {
-			f := newCompletedScanFixture(t)
-			f.entries["10"][1].Name, f.entries["10"][2].Name = scenario.nfo, scenario.poster
-			f.snapshot.Directories[0].NFO.Name = scenario.nfo
-			f.snapshot.Directories[0].Poster.Name = scenario.poster
-			// A directory ending in .nfo must not become a candidate sidecar.
-			f.entries["10"] = append(f.entries["10"], pan.File{ID: "folder", Name: "other.nfo", IsDirectory: true})
-			if scenario.shared {
-				f.entries["10"] = append(f.entries["10"], pan.File{ID: "unmatched", Name: "recording.mp4", Size: 1 << 30})
-			}
-			f.movie.Update().SetMetadataSnapshot(f.snapshot).ExecX(t.Context())
-			observed := make(scrape.DirectoryObservations)
-			for _, entry := range f.entries["10"] {
-				observed.Add("10", []pan.File{entry})
-			}
-			if err := indexScanPage(t.Context(), f.lib, f.queued.ID, "rescan", "/Movies", f.videos, &f.payload); err != nil {
-				t.Fatal(err)
-			}
-			if err := reconcileScan(t.Context(), f.lib, f.queued.ID, "rescan", &f.payload, observed); err != nil {
-				t.Fatal(err)
-			}
-			if count := f.lib.database.Task.Query().Where(task.TypeEQ("scrape")).CountX(t.Context()); count != scenario.jobs {
-				t.Fatalf("metadata tasks=%d want=%d", count, scenario.jobs)
-			}
-		})
-	}
-}
-
 func TestScanCheckpointResumePreservesPreviousScannedFiles(t *testing.T) {
 	for _, legacy := range []bool{false, true} {
 		t.Run(map[bool]string{false: "current", true: "legacy"}[legacy], func(t *testing.T) {
@@ -324,7 +286,7 @@ func TestReconcileRollbackKeepsExport(t *testing.T) {
 	}
 	// A missing task causes SaveScanProgress to fail after reconciliation work.
 	payload.ScanID = "new"
-	err := scan.ReconcileScan(ctx, lib.database, -1, &payload, nil, nil, nil, export.Config{EmbyDir: root}, nil)
+	err := scan.ReconcileScan(ctx, lib.database, -1, &payload, nil, nil, export.Config{EmbyDir: root}, nil)
 	if err == nil {
 		t.Fatal("expected rollback")
 	}

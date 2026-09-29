@@ -2,6 +2,8 @@ package scan
 
 import (
 	"context"
+	"fmt"
+	"path"
 	"slices"
 	"strings"
 
@@ -9,7 +11,6 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
@@ -54,73 +55,89 @@ func IdentifyScanVideos(payload Payload, videos []Video, previous map[string]*en
 	}
 }
 
-// ResolveSingleNFO applies single-NFO heuristic and tolerance matching to a directory's videos.
-// When an exclusive directory contains exactly one NFO, its canonical code takes precedence
-// over equivalent filename candidate codes (e.g. distributor prefixes such as 200GANA vs GANA,
-// or pure dates like 060326-001 vs CARIB-060326-001), preventing dirty prefixes from entering the library.
-func ResolveSingleNFO(ctx context.Context, sess drive.Session, sidecars []pan.File, videos []Video) error {
-	if len(sidecars) != 1 {
+// ResolveNFOCodes uses matching NFOs only to identify and validate catalogue codes.
+// A sole NFO may identify unnamed videos only in an unshared directory.
+func ResolveNFOCodes(ctx context.Context, sess drive.Session, sidecars []pan.File, videos []Video) error {
+	if len(sidecars) == 0 {
 		return nil
 	}
-	nfoFile := sidecars[0]
-
-	nfoFilenameCode, hasNFOFilenameCode := codeid.Parse(nfoFile.Name)
-
-	hasUnidentifiedEligible := false
-	hasDiscrepancy := false
-	hasEligible := false
-
-	for _, v := range videos {
-		if !CanIdentifyVideo(v.File) {
+	var firstCode string
+	shared := false
+	for _, video := range videos {
+		if !CanIdentifyVideo(video.File) || video.Code == "" {
 			continue
 		}
-		hasEligible = true
-		if v.Code == "" {
-			hasUnidentifiedEligible = true
-		} else if hasNFOFilenameCode && !strings.EqualFold(v.Code, nfoFilenameCode) && codeid.IsEquivalent(v.Code, nfoFilenameCode) {
-			hasDiscrepancy = true
+		if firstCode == "" {
+			firstCode = video.Code
+		} else if !codeid.IsEquivalent(firstCode, video.Code) {
+			shared = true
 		}
 	}
-
-	if !hasEligible || (!hasUnidentifiedEligible && !hasDiscrepancy) {
-		return nil
-	}
-
-	canonicalCode := nfoFilenameCode
-	if canonicalCode == "" || hasUnidentifiedEligible {
-		doc, err := scrape.ReadNFO(ctx, sess, nfoFile)
-		if err != nil {
-			// A damaged or inaccessible NFO should not abort the entire scan.
-			return nil
-		}
-		if doc.Code != "" {
-			canonicalCode = doc.Code
-		}
-	}
-	if canonicalCode == "" {
-		return nil
-	}
-
-	// Verify no eligible video conflicts with canonicalCode.
-	for _, v := range videos {
-		if !CanIdentifyVideo(v.File) || v.Code == "" {
-			continue
-		}
-		if !codeid.IsEquivalent(v.Code, canonicalCode) {
-			// A conflicting code exists (e.g. multi-movie folder); do not override.
-			return nil
-		}
-	}
-
-	// All candidate codes are equivalent or empty; assign the canonical NFO code to all eligible videos.
+	codes := make(map[string]string)
 	for i := range videos {
-		if CanIdentifyVideo(videos[i].File) {
-			if videos[i].Code == "" || codeid.IsEquivalent(videos[i].Code, canonicalCode) {
-				videos[i].Code = canonicalCode
-			}
+		video := &videos[i]
+		if !CanIdentifyVideo(video.File) || (video.Code == "" && (shared || len(sidecars) != 1)) {
+			continue
 		}
+		entry, found := findNFO(video.Code, shared, sidecars)
+		if !found {
+			continue
+		}
+		canonical, read := codes[entry.ID]
+		if !read {
+			doc, err := readNFO(ctx, sess, entry)
+			if err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				// Unreadable optional metadata must not prevent filename scraping.
+				codes[entry.ID] = ""
+				continue
+			}
+			canonical = doc.Code
+			codes[entry.ID] = canonical
+		}
+		if canonical == "" {
+			continue
+		}
+		expected := video.Code
+		if expected == "" {
+			expected = firstCode
+		}
+		if expected != "" && !codeid.IsEquivalent(expected, canonical) {
+			return domain.E(domain.KindConflict, fmt.Sprintf("NFO %s 的番号 %s 与视频 %s 的番号 %s 不一致", entry.Name, canonical, video.Name, expected), nil)
+		}
+		video.Code = canonical
 	}
 	return nil
+}
+
+// A targeted download checks only its matching NFO, not other movies' metadata.
+func resolveTargetNFO(ctx context.Context, sess drive.Session, videos []Video) error {
+	video := videos[0]
+	if !CanIdentifyVideo(video.File) {
+		return nil
+	}
+	entries, err := drive.DirectoryEntries(ctx, sess, video.ParentID)
+	if err != nil {
+		return err
+	}
+	var sidecars []pan.File
+	shared := false
+	for _, entry := range entries {
+		if !entry.IsDirectory && strings.EqualFold(path.Ext(entry.Name), ".nfo") {
+			sidecars = append(sidecars, entry)
+		}
+		if entry.ID != video.ID && CanIdentifyVideo(entry) {
+			code, _ := codeid.Parse(entry.Name)
+			shared = shared || code == "" || !codeid.IsEquivalent(video.Code, code)
+		}
+	}
+	entry, found := findNFO(video.Code, shared, sidecars)
+	if !found {
+		return nil
+	}
+	return ResolveNFOCodes(ctx, sess, []pan.File{entry}, videos)
 }
 
 // HasEligibleVideos returns whether the given videos slice contains any eligible feature video.

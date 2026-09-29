@@ -26,7 +26,6 @@ type completedScanFixture struct {
 	snapshot *domain.MetadataSnapshot
 	movie    *ent.Movie
 	videos   []scan.Video
-	entries  map[string][]pan.File
 }
 
 func newCompletedScanFixture(t *testing.T) *completedScanFixture {
@@ -54,13 +53,9 @@ func newCompletedScanFixture(t *testing.T) *completedScanFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	nfoFile := pan.File{Name: "ABP-001.nfo", SHA1: strings.Repeat("1", 40)}
-	poster := pan.File{Name: "ABP-001-poster.jpg", SHA1: strings.Repeat("2", 40)}
-	fanart := pan.File{Name: "ABP-001-fanart.jpg", SHA1: strings.Repeat("3", 40)}
 	snapshot := &domain.MetadataSnapshot{
 		AccountID: payload.Source.AccountID, DirectoryID: payload.Source.Directory.ID,
-		Videos:      scrape.VideoFingerprint([]pan.File{videos[0].File}),
-		Directories: []domain.DirectorySnapshot{scrape.NewDirectorySnapshot("10", nfoFile, poster, fanart)},
+		Videos: scrape.VideoFingerprint([]pan.File{videos[0].File}),
 	}
 	record = record.Update().SetMetadataSnapshot(snapshot).SaveX(ctx)
 	input := scrape.CoverPayload{
@@ -84,7 +79,7 @@ func newCompletedScanFixture(t *testing.T) *completedScanFixture {
 	}
 	payload.Scan = domain.ScanProgress{Stage: "scanning"}
 	return &completedScanFixture{lib: lib, queued: queued, payload: payload, movie: record, covered: covered, snapshot: snapshot,
-		videos: videos, entries: map[string][]pan.File{"10": {videos[0].File, nfoFile, poster, fanart}},
+		videos: videos,
 	}
 }
 
@@ -101,20 +96,9 @@ func TestRescanSchedulesOnlyChangedOrIncompleteMetadata(t *testing.T) {
 		{name: "deleted task history", change: func(t *testing.T, f *completedScanFixture) {
 			f.lib.database.Task.DeleteOne(f.covered).ExecX(t.Context())
 		}},
-		{name: "unrelated movie in shared directory", change: func(_ *testing.T, f *completedScanFixture) {
-			f.entries["10"] = append(f.entries["10"], fixtureVideo("202", "ABP-002.mp4").File,
-				pan.File{Name: "ABP-002.nfo", SHA1: strings.Repeat("4", 40)})
-		}},
-		{name: "edited NFO", jobs: 1, change: func(_ *testing.T, f *completedScanFixture) { f.entries["10"][1].SHA1 = strings.Repeat("4", 40) }},
-		{name: "edited artwork", jobs: 1, change: func(_ *testing.T, f *completedScanFixture) { f.entries["10"][3].SHA1 = strings.Repeat("4", 40) }},
-		{name: "missing artwork", jobs: 1, change: func(_ *testing.T, f *completedScanFixture) { f.entries["10"] = f.entries["10"][:3] }},
-		{name: "missing NFO", jobs: 1, change: func(_ *testing.T, f *completedScanFixture) {
-			f.entries["10"] = append(f.entries["10"][:1], f.entries["10"][2:]...)
-		}},
 		{name: "new part", jobs: 1, change: func(_ *testing.T, f *completedScanFixture) {
 			video := fixtureVideo("102", "ABP-001-CD2.mp4")
 			f.videos = append(f.videos, video)
-			f.entries["10"] = append(f.entries["10"], video.File)
 		}},
 		{name: "moved video", jobs: 1, change: func(_ *testing.T, f *completedScanFixture) { f.videos[0].ParentID = "20" }},
 		{name: "missing cache", jobs: 1, change: func(t *testing.T, f *completedScanFixture) {
@@ -144,11 +128,7 @@ func TestRescanSchedulesOnlyChangedOrIncompleteMetadata(t *testing.T) {
 			if err := indexScanPage(t.Context(), f.lib, f.queued.ID, "rescan", "/Movies", f.videos, &f.payload); err != nil {
 				t.Fatal(err)
 			}
-			observed := make(scrape.DirectoryObservations)
-			for id, entries := range f.entries {
-				observed.Add(id, entries)
-			}
-			if err := reconcileScan(t.Context(), f.lib, f.queued.ID, "rescan", &f.payload, observed); err != nil {
+			if err := reconcileScan(t.Context(), f.lib, f.queued.ID, "rescan", &f.payload); err != nil {
 				t.Fatal(err)
 			}
 			count, err := f.lib.database.Task.Query().Where(task.TypeEQ("scrape")).Count(t.Context())

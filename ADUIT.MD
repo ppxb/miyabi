@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：156 条待处理，23 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：153 条待处理，26 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -111,9 +111,12 @@
   - 已完成：删除 SubtitleTask.MetaPayload 及入队赋值，任务只携带 MovieID 和 Target；go test ./... 通过，待整体复查。
 
 ### 旧快照 / sidecar 残留
-- [ ] **82.** `internal/library/scrape/cover.go:126-128` 固定 `LocalExport: true`，而 `snapshot.go:124` `Matches` 此时直接 `return true` → `DirectorySnapshot`、`NewDirectorySnapshot`、`Sidecar`、`ObservedDirectory.Sidecar`、`Matches` 比对逻辑，以及 `walker.go:106` 全库 `DirectoryObservations`（每文件名 + SHA1 常驻内存）只服务老数据；每次 cover 仍计算 `nfo.Encode` + 两次 SHA1；`writeSidecars` 名不副实。
-- [ ] **83.** `internal/library/scrape/cover.go:131,226-233` 已不回写 115，但每个 cover 仍重读 115 NFO（`DirectoryNFO`）、执行 `VerifyCoverOrigin`、逐视频 `sess.Info`（`verifyVideoPositions`），与"减轻网盘负担"目标相反 → 直接使用 payload 中的 `Document/Origin`。
-- [ ] **85.** `internal/library/scrape/cover.go:255-264` `exportLocalMedia` 的 DB 兜底永远走不到（`directories()` 保证至少一个视频），且查询不按 source 过滤、`records, _ :=` 吞错。
+- [x] **82.** `internal/library/scrape/cover.go:126-128` 固定 `LocalExport: true`，而 `snapshot.go:124` `Matches` 此时直接 `return true` → `DirectorySnapshot`、`NewDirectorySnapshot`、`Sidecar`、`ObservedDirectory.Sidecar`、`Matches` 比对逻辑，以及 `walker.go:106` 全库 `DirectoryObservations`（每文件名 + SHA1 常驻内存）只服务老数据；每次 cover 仍计算 `nfo.Encode` + 两次 SHA1；`writeSidecars` 名不副实。
+  - 已完成：快照仅保留账号、根目录和视频指纹；删除 DirectorySnapshot、Sidecar、LocalExport、全扫描 DirectoryObservations 与远端文件摘要计算。旧 JSON 多余字段不再参与判断，无需数据库列迁移。保留扫描目录内用于番号识别的 NFO 列表、视频变动失效和缓存缺失重建；go test ./... 通过，待整体复查。
+- [x] **83.** `internal/library/scrape/cover.go:131,226-233` 已不回写 115，但每个 cover 仍重读 115 NFO（`DirectoryNFO`）、执行 `VerifyCoverOrigin`、逐视频 `sess.Info`（`verifyVideoPositions`），与"减轻网盘负担"目标相反 → 直接使用 payload 中的 `Document/Origin`。
+  - 方案修正并完成：扫描阶段保留 NFO 番号识别与内容比对，统一在 scan/nfo.go；每个匹配 NFO 在一次目录处理内最多读取一次，支持别名和多影片目录，明确冲突返回错误，损坏或不可读的可选 NFO 不阻断文件名刮削。单文件定向扫描也检查匹配 NFO。标题、演员和封面改由 JavDB 获取，已有刮削结果仍可复用；删除远端 NFO 元数据/图片复用和封面阶段的重复读取、VerifyCoverOrigin。保留实时视频位置与数据源提交校验；旧未完成封面任务缺少 CoverURL/Artwork 时通过 JavDB 恢复。测试覆盖冲突、单次读取、在线刮削、远端图片变化不重刮、旧任务恢复、缓存目录下视频移动/删除阻止导出；go test ./... 通过，未做真实 115/JavDB 联调，待整体复查。
+- [x] **85.** `internal/library/scrape/cover.go:255-264` `exportLocalMedia` 的 DB 兜底永远走不到（`directories()` 保证至少一个视频），且查询不按 source 过滤、`records, _ :=` 吞错。
+  - 已完成：删除 exportLocalMedia 中无数据源过滤且吞错的数据库兜底，移除无用 ctx/stem 参数。视频仍由受数据源约束的目录查询提供并逐个校验位置；保留本地单文件、多段视频导出测试，go test ./... 通过，待整体复查。
 
 ### 其它死代码（已 grep 确认）
 - [ ] **87.** `internal/javdb/client.go:291-294`、`route.go:45,102-104,171-173,185-188`：`preferredHost`、`RouteStatus.Manual`、`ensureRoute` 的 ManualRoute 分支在生产中不可达（仅 `route_test.go:43` 使用）；`client.go:168-176` `Route()` 中 `state == nil` 拼 `CachedHost` 分支不可达；`routeState.status.Candidates` 与 `lastProbe` 双份真相（:36、:362）。
@@ -123,6 +126,7 @@
 - [ ] **91.** `internal/javdb/client.go:52-66` + `internal/catalogue/service.go:56,65`：唯一调用 `app.go:89` 传 `javdb.Options{}`，Timeout / RPS / Burst 负值校验与 `DeviceUUID` 回退永不触发 → `catalogue.New` 不再接收 Options。
 - [ ] **92.** `internal/drive/drive.go:179-184` `ValidateSource`、`internal/drive/session.go:18,70-72` `Session.Version()` 仅测试使用（导致 scrape 的 `mockSession` 也必须实现）；`mount.go:152` `DirectoryPath` 仅包内使用。
 - [ ] **93.** 零生产调用 / 仅测试使用：`scan/persist.go:22` `ProcessScanPage`、`scan/reconcile.go:20` `ReconcileScan`（只包事务）、`scan/identity.go:127` `HasEligibleVideos`（零调用）；`scrape` 的 `Images()`（:124）、`LockArtwork`（:134）、`Directories`（:272）、`InvalidateDirCache`（:356）、`SetDirTTL`（:368）；`scrape/nfo_source.go:18` `ArtworkOrigin.NFO`（只写不读）；`library/library.go:62` `Service.images`（只赋值）；`library/viewed.go:25` `ViewedMovieIDs(ctx, limit ...int)` 无人传 limit（`api/discover.go:28` 接口也跟着带）；`scrape/subtitle_queue.go:68` `Enqueue` 返回的 bool 无人使用；大量仅包内使用的导出函数（`CanIdentifyVideo`、`IdentifyScanVideos`、`ResolveSingleNFO`、`IndexDownloadedMovie`、`RemoveUnreferencedMovies`、`SaveScanProgress`、`ReportScan`、`SidecarByName`、`FindDirectoryNFO`、`VerifyCoverOrigin`、emby client 的 `PersonItem`）→ 改小写。
+  - 第 82–83 项已删除 ArtworkOrigin、SidecarByName、FindDirectoryNFO、VerifyCoverOrigin；ResolveSingleNFO 已替换为扫描阶段 ResolveNFOCodes，不再引用旧符号作为待办。
 - [ ] **94.** 任务业务已迁入 library / monitor。重新检查 `internal/tasks` 与迁移后包的导出边界、包装方法和重复入口；`Service.Registry()` 已被 `app/task_workers.go` 使用，不再属于“仅测试调用”。仅对当前没有外部调用且无接口职责的符号缩小可见性。
 - [ ] **95.** Subscription `zone` 字段（schema:38、monitor Item、`AddMovieOptions`、`AddActorOptions`、`UpdateOptions`、API 输入）写入、继承、返回，前后端从不读取；订阅状态 `"error"`（schema:41、`monitor/service.go:34`、前端 subscription-card）从未被设置；`monitor.Status` 与 ent `subscription.Status` 重复。
 - [ ] **96.** `internal/subtitle`：`Provider.Name()` 从未通过接口调用（`subtitlecat.go:167` 另写死 `"SubtitleCat"`）；`finder.go:29-37` `WithAllowLoopbackForTesting` 测试开关进入生产结构体；`DecodeToUTF8` 最后的 `ToValidUTF8` 兜底实际走不到。
@@ -163,7 +167,7 @@
 - [ ] **118.** `internal/javdb/route.go:277` `utf8.Valid`；`route.go:217-256`、`client.go:369-389` 解析到 `map[string]any` 再逐层断言 → typed struct；`route.go:49` 类型 `probe` 与方法 `c.probe` 同名。
 - [ ] **119.** `internal/catalogue/state.go:60` `source == nil` 在 :32 已判断；`service.go:163-168` nil 检查；`service.go:379` `time.Now().In(time.Local)`；`magnets.go:80-90` 先投影 URI 再剥离。
 - [ ] **120.** `internal/magnet/aggregator.go:75,84-86` Hash 小写化、`Sources` 为空兜底（各来源已保证）；`picker.go:108`、`quality.go:158` `m.HD || hasTag(m, MagnetTagHD)`（根源：`domain.Magnet` 同时用 bool 与 Tags 表达 HD/字幕）；`picker.go:105` 对已聚合结果再次 `ApplyInference`。
-- [ ] **121.** `internal/library/scrape`：`Close` 的 `service == nil`、`subtitleQueue != nil`；`newSubtitleQueue` 的 concurrency / capacity / logger 兜底（唯一调用传默认值）；`Enqueue` 的 `q.ctx != nil`、`q.logger != nil`；`worker` 的 `!ok`（channel 从不关闭）；`processCover` 与 `process` 两次判断 `subtitles != nil`；`ExportLocalMovie` 的 `record == nil` + `notifiers ...MediaNotifier` 表示可选；`scrape.go:339` `dirCache == nil`、:343 `ttl <= 0`；`findAvatar` 的 `s.db == nil`；`reconcile.go:112` `if images != nil`；`reconcile.go:58` 多余 `var err error`；`ResolveSingleNFO` 永远返回 nil error。
+- [ ] **121.** `internal/library/scrape`：`Close` 的 `service == nil`、`subtitleQueue != nil`；`newSubtitleQueue` 的 concurrency / capacity / logger 兜底（唯一调用传默认值）；`Enqueue` 的 `q.ctx != nil`、`q.logger != nil`；`worker` 的 `!ok`（channel 从不关闭）；`processCover` 与 `process` 两次判断 `subtitles != nil`；`ExportLocalMovie` 的 `record == nil` + `notifiers ...MediaNotifier` 表示可选；`scrape.go:339` `dirCache == nil`、:343 `ttl <= 0`；`findAvatar` 的 `s.db == nil`；`reconcile.go:112` `if images != nil`；`reconcile.go:58` 多余 `var err error`。
 - [ ] **122.** `internal/image` singleflight + Stat 检查 + `publishImage` 读回比较三层叠加 → 保留原子 rename + Stat；`internal/maintenance` 每次循环检查 `ctx.Err()`、检查 DB 文件 `IsRegular`。
 - [ ] **123.** `internal/monitor/service.go:108` `checking`、`internal/offline/service.go:52` `syncing` 互斥锁：生产中仅由一个 `RunPeriodic` 串行调用；`offline/add.go:20,30` `catalogue != nil` 两次；`sync.go:254` `library != nil` 只为测试；`sync.go:76` 重复过滤 `DirectoryID`、:94-96 每条检查 `ctx.Err()`、:154-159 身份校验冗余；`monitor/service.go:160,176` `limit > 0` / `max(page, 1)`（API 绑定已保证）；`tasks/pool.go:34` `logger == nil`。
 - [ ] **124.** `internal/offline/projection.go` 已使用独立 OfflineDownload 表，不再有旧 JSON hash 分组。当前空 hash 会使整次 Activity 投影报错，而 schema 已要求 hash 非空；核实遗留坏数据的实际入口，再决定移除冗余检查或采用记录日志并跳过的策略。
@@ -289,7 +293,7 @@
 - [ ] **215.** `features/tasks/task-notification-diff.ts` 仍重复定义 isScanTask/isBatchTask/isTaskActive，以及 `api/offline.ts` 已有的 isOfflineTaskActive。通知判定循环也有重复。评估共用状态判断并提取真正重复的通知条件，避免再创建只作转发的层；原 lib/offline-state.ts 已删除。
 - [ ] **216.** `features/tasks/task-toast.tsx:42,71,123` 三处 `icon: options.waiting ? undefined : <LoaderCircleIcon…/>` → 并入 `taskToastOptions`；"等待同步"scan 改标题、offline / batch 改描述，处理不一致。
 - [ ] **217.** `settings/pan-directory-dialog.tsx:83-109` 手写上一页 / 下一页且无 aria-label，现成 `ListPagination` 已支持 `hasMore`、可不传 totalPages 和 `scrollToTop={false}`。
-- [ ] **218.** 本地 NFO 解码（`scan/local.go`）与 `ReadNFO` 两套 → 抽 `decodeNFO(body, fallbackName)` 共用。
+- [ ] **218.** 本地 NFO 解码（`scan/local.go`）与 `scan/nfo.go` 的 `readNFO` 两套 → 抽 `decodeNFO(body, fallbackName)` 共用。
 - [ ] **219.** 测试桩复制 5 份约 1500 行：`internal/app/drive_fixture_test.go`（371）、`internal/library/fixture_test.go`（367）、offline（363）、drive（292）、strm（95），app 与 library 两份几乎相同 → `internal/pan/pantest`，或像 `strm/fixture_test.go` 那样嵌入接口只覆盖需要的方法。
 
 ---
@@ -330,5 +334,6 @@
 
 - [ ] **238.** `internal/codeid/prototype_test.go` 以 `prototypeResolve` / `prototypeMatch` 重写一遍 `javdb.ResolveMovieID`，`prototypeQueries` 已与生产 `Queries` 分歧，文件头注释过时——测的是副本而非生产代码 → 迁到 javdb 包基于 fixture transport 测真实实现；`corpus_test.go:18` 与 `random_corpus_test.go:12` 语料加载器几乎相同 → `loadSamples(t, file, n)`。
 - [ ] **239.** 随生产路径清理重新评估相关测试：scan/subtitle_test.go 的旧命名与断言、scrape/dir_cache_test.go、subtitle 中 115 导出路径等。UploadSidecar 已删除；snapshot_test.go 已覆盖 movie 快照，不应按旧快照测试整体删除。保留断点恢复、快照失效、历史封面任务 JSON 兼容等有效回归测试，按当前生产调用逐项决定删除或迁移。
+  - 第 82–83 项已删除远端目录快照和写回校验专用测试/基准，保留并更新电影快照、视频指纹、数据源隔离、断点和事务测试；旧 ArtworkOrigin 格式测试改为旧封面任务通过 JavDB 恢复的集成测试。
   - 第 78–80 项已删除旧 115 字幕扫描测试和专用实现，将混合导出测试改为在线字幕测试，并增加旧字幕存储迁移测试；这部分不再作为待办，其余测试归属与覆盖评估保留。
 - [ ] **240.** 复核低收益或重复测试：runtime 常量、简单 domain helper、任务容器基本操作、健康检查重复路径，以及 app 包中实际测试 library/scrape 的用例归属。pan 客户端测试已增加真实请求路径覆盖，不能沿用“未测 New”的旧结论；前端测试已迁移为 `.test.ts`，pan-login-poll.test.ts 的失败预算与恢复行为应保留，是否缩减需按实际覆盖收益判断。

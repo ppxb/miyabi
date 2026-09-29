@@ -118,8 +118,8 @@ func TestRescanRepairsAuxiliaryVideosAndSSNISubtitleAlias(t *testing.T) {
 		lib.database.File.Query().Where(file.MovieIDIsNil()).CountX(ctx) != 16 {
 		t.Fatalf("rescan did not repair the reported library: %+v err=%v", page, err)
 	}
-	if metadata.reads != 0 {
-		t.Fatal("auxiliary files triggered directory NFO inference")
+	if metadata.reads == 0 {
+		t.Fatal("eligible videos did not validate directory NFO codes")
 	}
 	for _, code := range []string{"SSNI-748C", "UUE-29", "UUP-87"} {
 		if lib.database.Movie.Query().Where(movie.CodeEQ(code)).ExistX(ctx) {
@@ -180,25 +180,10 @@ func TestNFOIdentifiesOnlyEligibleVideosAndSmallFilesDoNotMakeDirectoryShared(t 
 		t.Fatal(err)
 	}
 	directories, err := scrapeSvc.Directories(ctx, sess, scrape.MetadataPayload{Source: source, MovieID: film.ID})
-	if err != nil || len(directories) != 1 || directories[0].Shared {
-		t.Fatalf("small video blocked reuse of the movie NFO: %+v err=%v", directories, err)
+	if err != nil || len(directories) != 1 {
+		t.Fatalf("small video blocked locating movie files: %+v err=%v", directories, err)
 	}
-	live, found := scrape.FindDirectoryNFO(film.Code, directories[0])
-	observed := make(scrape.DirectoryObservations)
-	observed.Add("10", entries)
-	compact, compactFound := scrape.FindNFO(film.Code, false, observed["10"], func(entry scrape.ObservedFile) string { return entry.Name })
-	if !found || !compactFound || live.Name != "movie.nfo" || compact.Name != live.Name {
-		t.Fatal("live metadata reads and scan observations selected different NFOs")
-	}
-	snapshot := domain.MetadataSnapshot{
-		Videos:      scrape.VideoFingerprint([]pan.File{entries[0]}),
-		Directories: []domain.DirectorySnapshot{scrape.NewDirectorySnapshot("10", entries[2], entries[3], entries[4])},
-	}
-	indexed := lib.database.Movie.Query().Where(movie.IDEQ(film.ID)).WithFiles().OnlyX(ctx)
-	indexed.MetadataSnapshot = &snapshot
-	if !scrape.SnapshotMatches(indexed, domain.LibrarySource{}, observed) {
-		t.Fatal("an auxiliary video invalidated an unchanged NFO snapshot")
-	}
+
 }
 
 func TestFixedVideoSizeThresholdAppliesToFilenameAndOfflineIdentity(t *testing.T) {

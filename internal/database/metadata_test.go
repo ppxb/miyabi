@@ -58,8 +58,7 @@ func TestMetadataSnapshotMigrationPreservesLatestScopedExport(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := store.Client.Movie.GetX(ctx, film.ID)
-	want := &domain.MetadataSnapshot{AccountID: "100", DirectoryID: "10", Videos: "latest", Directories: []domain.DirectorySnapshot{{ID: "11",
-		NFO: domain.Sidecar{Name: "ABP-001.nfo", SHA1: "nfo"}, Poster: domain.Sidecar{Name: "poster.jpg", SHA1: "poster"}, Fanart: domain.Sidecar{Name: "fanart.jpg", SHA1: "fanart"}}}}
+	want := &domain.MetadataSnapshot{AccountID: "100", DirectoryID: "10", Videos: "latest"}
 	if !reflect.DeepEqual(got.MetadataSnapshot, want) || got.Title != film.Title || !got.UpdatedAt.Equal(film.UpdatedAt) {
 		t.Fatalf("migrated movie = %+v", got)
 	}
@@ -123,7 +122,7 @@ func TestMetadataSnapshotMigrationHandlesLegacyCompletion(t *testing.T) {
 			}
 			snapshot := store.Client.Movie.GetX(ctx, film.ID).MetadataSnapshot
 			if scenario.want {
-				if snapshot == nil || snapshot.Videos != "committed" || !snapshot.LocalExport {
+				if snapshot == nil || snapshot.Videos != "committed" {
 					t.Fatalf("lost committed export: %+v", snapshot)
 				}
 				var checkpoint struct {

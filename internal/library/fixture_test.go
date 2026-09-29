@@ -266,9 +266,9 @@ func indexScanPage(ctx context.Context, lib *Service, taskID int, scanID, direct
 	return scan.ProcessScanPage(ctx, lib.database, taskID, directoryPath, videos, payload, nil, lib.tasks)
 }
 
-func reconcileScan(ctx context.Context, lib *Service, taskID int, scanID string, payload *scan.Payload, observed scrapePkg.DirectoryObservations) error {
+func reconcileScan(ctx context.Context, lib *Service, taskID int, scanID string, payload *scan.Payload) error {
 	payload.ScanID = scanID
-	return scan.ReconcileScan(ctx, lib.database, taskID, payload, observed, lib.images, lib.tasks, export.Config{}, nil)
+	return scan.ReconcileScan(ctx, lib.database, taskID, payload, lib.images, lib.tasks, export.Config{}, nil)
 }
 
 func panTestGate(t *testing.T) (<-chan struct{}, func()) {

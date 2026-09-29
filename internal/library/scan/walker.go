@@ -105,7 +105,7 @@ func (s *Scanner) Run(ctx context.Context, job tasks.Job) error {
 		}
 	}
 	payload.Source = source
-	run := scanRun{scanner: s, session: sess, taskID: job.ID, payload: &payload, observed: make(scrape.DirectoryObservations)}
+	run := scanRun{scanner: s, session: sess, taskID: job.ID, payload: &payload}
 	if payload.TargetID != "" {
 		return run.runTarget(ctx, isResume)
 	}
@@ -118,7 +118,6 @@ type scanRun struct {
 	session     drive.Session
 	taskID      int
 	payload     *Payload
-	observed    scrape.DirectoryObservations
 	directories []Directory
 	seen        map[string]bool
 	codes       map[string]bool
@@ -152,8 +151,15 @@ func (r *scanRun) runTarget(ctx context.Context, isResume bool) error {
 		if !domain.IsVideo(info.Name) {
 			return domain.E(domain.KindInvalid, "115 下载结果不是视频文件", nil)
 		}
+		videos := []Video{IdentifyVideo(info.File)}
+		if r.payload.OfflineTaskID != 0 {
+			videos[0].Code = r.payload.Code
+		}
+		if err := resolveTargetNFO(ctx, r.session, videos); err != nil {
+			return err
+		}
 		r.payload.Scan.FilesScanned, r.payload.Scan.VideoFiles = 1, 1
-		if err := r.savePage(ctx, path.Dir(r.payload.TargetPath), []Video{{File: info.File}}, func(videos []Video) []Video {
+		if err := r.savePage(ctx, path.Dir(r.payload.TargetPath), videos, func(videos []Video) []Video {
 			if videos[0].Code != "" {
 				r.payload.Scan.MatchedFiles, r.payload.Scan.Movies = 1, 1
 			} else {
@@ -163,11 +169,6 @@ func (r *scanRun) runTarget(ctx context.Context, isResume bool) error {
 		}); err != nil {
 			return err
 		}
-		entries, err := drive.DirectoryEntries(ctx, r.session, info.ParentID)
-		if err != nil {
-			return err
-		}
-		r.observed.Add(info.ParentID, entries)
 		return r.reconcile(ctx)
 	}
 	return r.walk(ctx, Directory{ID: info.ID, Path: r.payload.TargetPath}, isResume)
@@ -241,7 +242,6 @@ func (r *scanRun) indexDirectory(ctx context.Context, directory Directory) error
 		}
 		return page, nil
 	}, func(page pan.FilePage) (bool, error) {
-		r.observed.Add(directory.ID, page.Files)
 		for _, entry := range page.Files {
 			if r.seen[entry.ID] {
 				continue
@@ -272,7 +272,7 @@ func (r *scanRun) indexDirectory(ctx context.Context, directory Directory) error
 	}
 
 	// Apply single-NFO tolerance matching to establish standard catalogue identity.
-	if err := ResolveSingleNFO(ctx, r.session, sidecars, directoryVideos); err != nil {
+	if err := ResolveNFOCodes(ctx, r.session, sidecars, directoryVideos); err != nil {
 		return err
 	}
 

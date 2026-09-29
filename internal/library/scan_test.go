@@ -180,7 +180,7 @@ func TestOfflineScanUsesCatalogueIdentityAndKeepsItOnRescan(t *testing.T) {
 	if record.Code != payload.Code || domain.ValueOrZero(record.JavdbID) != payload.JavDBID {
 		t.Fatalf("download identity was not persisted: %#v", record)
 	}
-	if err := reconcileScan(ctx, lib, queued.ID, "download", &payload, nil); err != nil {
+	if err := reconcileScan(ctx, lib, queued.ID, "download", &payload); err != nil {
 		t.Fatal(err)
 	}
 	download := lib.database.OfflineDownload.GetX(ctx, offline.ID)
@@ -316,13 +316,13 @@ func TestScanReconcilesOnlyCompletedRootAndKeepsOtherSources(t *testing.T) {
 	}
 	canceled, cancel := context.WithCancel(ctx)
 	cancel()
-	if err := reconcileScan(canceled, lib, queued.ID, "restarted-attempt", &payload, nil); !errors.Is(err, context.Canceled) {
+	if err := reconcileScan(canceled, lib, queued.ID, "restarted-attempt", &payload); !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled reconciliation = %v", err)
 	}
 	if count, err := lib.database.File.Query().Count(ctx); err != nil || count != 5 {
 		t.Fatalf("canceled scan pruned files: count = %d, error = %v", count, err)
 	}
-	if err := reconcileScan(ctx, lib, queued.ID, "restarted-attempt", &payload, nil); err != nil {
+	if err := reconcileScan(ctx, lib, queued.ID, "restarted-attempt", &payload); err != nil {
 		t.Fatal(err)
 	}
 	if payload.Scan.RemovedFiles != 2 || payload.Scan.RemovedMovies != 1 {
@@ -402,7 +402,7 @@ func TestTargetedScanDoesNotPruneSiblingDirectories(t *testing.T) {
 		}
 	}
 	payload.TargetID, payload.TargetPath = "target-folder", "/Movies/target"
-	if err := reconcileScan(ctx, lib, queued.ID, "new", &payload, nil); err != nil {
+	if err := reconcileScan(ctx, lib, queued.ID, "new", &payload); err != nil {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"102", "103", "104"} {
@@ -484,7 +484,7 @@ func TestScanReconcile_CleansUpEmbyDirectoryAndNotifiesEmbyOnMovieDeletion(t *te
 
 	notifier := &testMediaNotifier{}
 	payload.ScanID = "attempt-2"
-	if err := scan.ReconcileScan(ctx, lib.database, queued.ID, &payload, nil, lib.images, lib.tasks, export.Config{EmbyDir: embyDir, PublicURL: "http://127.0.0.1:8080", STRMToken: "tok"}, notifier); err != nil {
+	if err := scan.ReconcileScan(ctx, lib.database, queued.ID, &payload, lib.images, lib.tasks, export.Config{EmbyDir: embyDir, PublicURL: "http://127.0.0.1:8080", STRMToken: "tok"}, notifier); err != nil {
 		t.Fatalf("reconcileScan failed: %v", err)
 	}
 

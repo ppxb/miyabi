@@ -1,17 +1,14 @@
 package scrape
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
 	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
@@ -26,7 +23,6 @@ type CoverPayload struct {
 	ScrapeTaskID int                 `json:"scrape_task_id"`
 	Document     nfo.Movie           `json:"document"`
 	CoverURL     string              `json:"cover_url,omitempty"`
-	Origin       *ArtworkOrigin      `json:"origin,omitempty"`
 	Artwork      *mediaimage.Artwork `json:"artwork,omitempty"`
 	Completed    bool                `json:"completed,omitempty"`
 }
@@ -76,22 +72,17 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 	switch {
 	case input.Artwork != nil:
 		artwork = *input.Artwork
-	case input.Origin != nil:
-		poster, err := service.originImage(ctx, sess, input.Origin.Poster)
-		if err != nil {
-			return nil, err
-		}
-		fanart, err := service.originImage(ctx, sess, input.Origin.Fanart)
-		if err != nil {
-			return nil, err
-		}
-		artwork, err = service.images.Restore(poster, fanart)
-		if err != nil {
-			return nil, err
-		}
 	default:
 		if input.CoverURL == "" {
-			return nil, domain.E(domain.KindNotFound, "JavDB 未返回影片封面", nil)
+			// Older queued jobs may contain only remote NFO artwork.
+			if err := service.loadCatalogueCover(ctx, &input); err != nil {
+				return nil, err
+			}
+			if err := sess.Commit(ctx, func(tx *ent.Tx) error {
+				return SaveMovieMetadata(ctx, tx, input.MovieID, input.Document)
+			}); err != nil {
+				return nil, err
+			}
 		}
 		media, err := service.discover.Media(ctx, input.CoverURL)
 		if err != nil {
@@ -118,8 +109,7 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 	if err := service.db.Task.UpdateOneID(job.ID).SetPayload(encoded).Exec(ctx); err != nil {
 		return nil, err
 	}
-	// Re-read the directory after scraping. Never upload alongside a video
-	// which was deleted or moved while waiting for JavDB or another task.
+	// Verify current video locations before exporting local files.
 	directories, err := service.directories(ctx, sess, input.MetadataPayload)
 	if err != nil {
 		return nil, err
@@ -127,10 +117,8 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 	snapshot := &domain.MetadataSnapshot{
 		AccountID:   input.Source.AccountID,
 		DirectoryID: input.Source.Directory.ID,
-		LocalExport: true,
 	}
 	var videos []pan.File
-	doc := input.Document
 	for i, directory := range directories {
 		if err := service.verifyVideoPositions(ctx, sess, directory); err != nil {
 			return nil, err
@@ -140,12 +128,6 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 				videos = append(videos, entry)
 			}
 		}
-		state, dirDoc, err := service.writeSidecars(ctx, sess, input, directory, poster, fanart)
-		if err != nil {
-			return nil, err
-		}
-		doc = dirDoc
-		snapshot.Directories = append(snapshot.Directories, state)
 		if err := service.db.Task.UpdateOneID(job.ID).SetProgress((i + 1) * 100 / len(directories)).Exec(ctx); err != nil {
 			return nil, err
 		}
@@ -162,8 +144,7 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 	videos = uniqueVideos
 	snapshot.Videos = VideoFingerprint(videos)
 
-	stem := nfo.FileStem(input.Code)
-	if err := service.exportLocalMedia(ctx, input, stem, doc, videos, poster, fanart); err != nil {
+	if err := service.exportLocalMedia(input, input.Document, videos, poster, fanart); err != nil {
 		return nil, err
 	}
 	input.Completed = true
@@ -224,58 +205,7 @@ func (service *Service) verifyVideoPositions(ctx context.Context, sess drive.Ses
 	return nil
 }
 
-func (service *Service) originImage(ctx context.Context, sess drive.Session, entry pan.File) ([]byte, error) {
-	info, err := drive.SourceInfo(ctx, sess, entry.ID)
-	if err != nil {
-		return nil, fmt.Errorf("find NFO artwork: %w", err)
-	}
-	return sess.Read(ctx, info.File.PickCode, 32<<20)
-}
-
-func (service *Service) writeSidecars(ctx context.Context, sess drive.Session, input CoverPayload, directory MovieDirectory, poster, fanart []byte) (domain.DirectorySnapshot, nfo.Movie, error) {
-	var snapshot domain.DirectorySnapshot
-	stem := nfo.FileStem(input.Code)
-	nfoName := stem + ".nfo"
-
-	doc := input.Document
-	// An existing matching NFO is already the source of truth. Preserve its
-	// formatting and user edits, as well as its referenced artwork.
-	if existingDoc, origin, found, err := DirectoryNFO(ctx, sess, input.Code, directory); err != nil {
-		return snapshot, doc, err
-	} else if found {
-		if err := VerifyCoverOrigin(input, directory.ID, existingDoc, *origin, poster, fanart); err != nil {
-			return snapshot, doc, err
-		}
-		doc = existingDoc
-	}
-
-	posterName, fanartName := "poster.jpg", "fanart.jpg"
-	doc.Thumbs = []nfo.Thumb{{Aspect: "poster", Path: posterName}}
-	doc.Fanart = fanartName
-
-	body, err := nfo.Encode(doc)
-	if err != nil {
-		return snapshot, doc, err
-	}
-
-	return NewDirectorySnapshot(directory.ID,
-		pan.File{Name: nfoName, SHA1: pan.SHA1(body)},
-		pan.File{Name: posterName, SHA1: pan.SHA1(poster)},
-		pan.File{Name: fanartName, SHA1: pan.SHA1(fanart)}), doc, nil
-}
-
-func (service *Service) exportLocalMedia(ctx context.Context, input CoverPayload, stem string, doc nfo.Movie, videos []pan.File, poster, fanart []byte) error {
-	// Resolve videos from database if empty
-	if len(videos) == 0 && service.db != nil && input.MovieID > 0 {
-		records, _ := service.db.File.Query().
-			Where(file.MovieIDEQ(input.MovieID)).
-			Order(ent.Asc(file.FieldName), ent.Asc(file.FieldID)).
-			All(ctx)
-		for _, r := range records {
-			videos = append(videos, pan.File{ID: r.FileID, Name: r.Name, Size: r.Size, PickCode: r.PickCode})
-		}
-	}
-
+func (service *Service) exportLocalMedia(input CoverPayload, doc nfo.Movie, videos []pan.File, poster, fanart []byte) error {
 	return service.exportMgr.WithConfig(func(expCfg export.Config) error {
 		if err := ExportEmbyMedia(expCfg.EmbyDir, expCfg.PublicURL, expCfg.STRMToken, input.Code, doc, videos, poster, fanart); err != nil {
 			return err
@@ -287,30 +217,31 @@ func (service *Service) exportLocalMedia(ctx context.Context, input CoverPayload
 	})
 }
 
-// VerifyCoverOrigin validates that existing sidecars have not changed concurrently.
-func VerifyCoverOrigin(input CoverPayload, directoryID string, current nfo.Movie, origin ArtworkOrigin, poster, fanart []byte) error {
-	expected := input.Document
-	posterSHA, fanartSHA := pan.SHA1(poster), pan.SHA1(fanart)
-	// directories() orders parent IDs as text; later NFOs keep their own edits.
-	if input.Origin != nil && directoryID > input.Origin.Poster.ParentID {
-		return nil
+// loadCatalogueCover resolves metadata and artwork from the configured catalogue.
+func (service *Service) loadCatalogueCover(ctx context.Context, input *CoverPayload) error {
+	id := input.JavDBID
+	knownID := id != ""
+	if id == "" {
+		var err error
+		id, err = service.discover.ResolveMovieID(ctx, input.Code)
+		if err != nil {
+			return err
+		}
 	}
-	if input.Origin != nil && directoryID == input.Origin.Poster.ParentID {
-		posterSHA, fanartSHA = input.Origin.Poster.SHA1, input.Origin.Fanart.SHA1
-	} else {
-		expected.Thumbs = []nfo.Thumb{{Aspect: "poster", Path: origin.Poster.Name}}
-		expected.Fanart = origin.Fanart.Name
-	}
-	before, err := nfo.Encode(expected)
+	detail, err := service.discover.CatalogueDetail(ctx, id)
 	if err != nil {
 		return err
 	}
-	after, err := nfo.Encode(current)
-	if err != nil {
-		return err
+	if !knownID && !codeid.IsEquivalent(detail.Code, input.Code) {
+		return domain.E(domain.KindConflict, fmt.Sprintf("JavDB 返回的番号 %s 与媒体文件 %s 不一致", detail.Code, input.Code), nil)
 	}
-	if !bytes.Equal(before, after) || !strings.EqualFold(posterSHA, origin.Poster.SHA1) || !strings.EqualFold(fanartSHA, origin.Fanart.SHA1) {
-		return domain.E(domain.KindConflict, "NFO 或图片在处理期间发生变化，请重新扫描", nil)
+	if detail.Cover == "" {
+		return domain.E(domain.KindNotFound, "JavDB 未返回影片封面", nil)
 	}
+	input.Document = DetailNFO(detail)
+	input.Code = codeid.Normalize(input.Document.Code)
+	input.Document.Code = input.Code
+	input.CoverURL = detail.Cover
+	input.JavDBID = id
 	return nil
 }

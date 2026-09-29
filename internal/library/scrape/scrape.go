@@ -192,49 +192,17 @@ func (service *Service) Scrape(ctx context.Context, job tasks.Job) error {
 	if err != nil {
 		return fmt.Errorf("load indexed movie for metadata: %w", err)
 	}
-	directories, err := service.directories(ctx, sess, input)
-	if err != nil {
-		return err
-	}
 	cover := CoverPayload{MetadataPayload: input, ScrapeTaskID: job.ID}
-	for _, directory := range directories {
-		doc, origin, found, err := DirectoryNFO(ctx, sess, input.Code, directory)
-		if err != nil {
+	if record.ScrapeStatus == movie.ScrapeStatusDone {
+		cover.Document = MovieNFO(record)
+		artwork := MovieArtwork(record)
+		cover.Artwork = &artwork
+	} else {
+		if id := domain.ValueOrZero(record.JavdbID); id != "" {
+			cover.JavDBID = id
+		}
+		if err := service.loadCatalogueCover(ctx, &cover); err != nil {
 			return err
-		}
-		if found {
-			cover.Document, cover.Origin = doc, origin
-			break
-		}
-	}
-	if cover.Document.Code == "" {
-		if record.ScrapeStatus == movie.ScrapeStatusDone {
-			cover.Document = MovieNFO(record)
-			artwork := MovieArtwork(record)
-			cover.Artwork = &artwork
-		} else {
-			id := domain.ValueOrZero(record.JavdbID)
-			if id == "" {
-				id = input.JavDBID
-			}
-			// Known source IDs own the catalogue number. Filename matching is
-			// needed only when discovering that identity for the first time.
-			knownID := id != ""
-			if id == "" {
-				id, err = service.discover.ResolveMovieID(ctx, input.Code)
-				if err != nil {
-					return err
-				}
-			}
-			detail, err := service.discover.CatalogueDetail(ctx, id)
-			if err != nil {
-				return err
-			}
-			if !knownID && !codeid.IsEquivalent(detail.Code, input.Code) {
-				return domain.E(domain.KindConflict, fmt.Sprintf("JavDB 返回的番号 %s 与媒体文件 %s 不一致", detail.Code, input.Code), nil)
-			}
-			cover.Document = DetailNFO(detail)
-			cover.CoverURL = detail.Cover
 		}
 	}
 	cover.Code = codeid.Normalize(cover.Document.Code)
@@ -278,6 +246,13 @@ func (service *Service) Finished(ctx context.Context, tx *ent.Tx, job tasks.Job,
 	return tasks.ChangeLibrary, nil
 }
 
+// MovieDirectory groups a movie's indexed videos with the current directory listing.
+type MovieDirectory struct {
+	ID       string
+	VideoIDs map[string]bool
+	Files    []pan.File
+}
+
 // Directories returns all directories containing media files for the movie.
 func (service *Service) Directories(ctx context.Context, sess drive.Session, input MetadataPayload) ([]MovieDirectory, error) {
 	return service.directories(ctx, sess, input)
@@ -314,8 +289,6 @@ func (service *Service) directories(ctx context.Context, sess drive.Session, inp
 			if !entry.IsDirectory && domain.IsVideo(entry.Name) && entry.Size >= domain.MinVideoSize {
 				if directory.VideoIDs[entry.ID] {
 					present++
-				} else {
-					directory.Shared = true
 				}
 			}
 		}

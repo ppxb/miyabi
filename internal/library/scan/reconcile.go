@@ -21,8 +21,8 @@ import (
 )
 
 // ReconcileScan executes reconciliation within a fresh transaction.
-func ReconcileScan(ctx context.Context, db *ent.Client, taskID int, payload *Payload, observed scrape.DirectoryObservations, images *mediaimage.Cache, tasksSvc *tasks.Service, cfg export.Config, notifier scrape.MediaNotifier) error {
-	run := scanRun{scanner: &Scanner{images: images, tasksSvc: tasksSvc, notifier: notifier}, taskID: taskID, payload: payload, observed: observed}
+func ReconcileScan(ctx context.Context, db *ent.Client, taskID int, payload *Payload, images *mediaimage.Cache, tasksSvc *tasks.Service, cfg export.Config, notifier scrape.MediaNotifier) error {
+	run := scanRun{scanner: &Scanner{images: images, tasksSvc: tasksSvc, notifier: notifier}, taskID: taskID, payload: payload}
 	return ent.WithTx(ctx, db, func(tx *ent.Tx) error { return run.reconcileTx(ctx, tx, cfg) })
 }
 
@@ -96,7 +96,7 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 		return fmt.Errorf("find scanned metadata jobs: %w", err)
 	}
 	for _, record := range moviesToScrape {
-		if record.ScrapeStatus == movie.ScrapeStatusDone && scrape.SnapshotMatches(record, r.payload.Source, r.observed) {
+		if record.ScrapeStatus == movie.ScrapeStatusDone && scrape.SnapshotMatches(record, r.payload.Source) {
 			if r.scanner.images != nil {
 				cached, err := r.scanner.images.Exists(scrape.MovieArtwork(record))
 				if err != nil {

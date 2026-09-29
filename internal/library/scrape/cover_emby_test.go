@@ -33,7 +33,7 @@ func TestExportLocalMediaSingleVideo(t *testing.T) {
 	poster := []byte("fake poster data")
 	fanart := []byte("fake fanart data")
 
-	err := service.exportLocalMedia(t.Context(), input, "IPX-123", doc, videos, poster, fanart)
+	err := service.exportLocalMedia(input, doc, videos, poster, fanart)
 	if err != nil {
 		t.Fatalf("exportLocalMedia failed: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestExportLocalMediaMultiVideo(t *testing.T) {
 		{ID: "video-cd2", Name: "SSIS-456-CD2.mp4"},
 	}
 
-	err := service.exportLocalMedia(t.Context(), input, "SSIS-456", doc, videos, nil, nil)
+	err := service.exportLocalMedia(input, doc, videos, nil, nil)
 	if err != nil {
 		t.Fatalf("exportLocalMedia failed: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestExportLocalMediaMultiVideoUnsorted(t *testing.T) {
 		{ID: "video-cd1", Name: "SSIS-456-CD1.mp4"},
 	}
 
-	err := service.exportLocalMedia(t.Context(), input, "SSIS-456", doc, videos, nil, nil)
+	err := service.exportLocalMedia(input, doc, videos, nil, nil)
 	if err != nil {
 		t.Fatalf("exportLocalMedia failed: %v", err)
 	}
@@ -168,4 +168,3 @@ func TestExportLocalMediaMultiVideoUnsorted(t *testing.T) {
 		t.Fatalf("cd2 strm should point to video-cd2, got: %s", string(cd2Content))
 	}
 }
-

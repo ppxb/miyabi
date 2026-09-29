@@ -1,7 +1,6 @@
 package scrape
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/domain"
@@ -27,95 +26,33 @@ func TestVideoFingerprintDeterministic(t *testing.T) {
 
 func TestSnapshotMatches(t *testing.T) {
 	video := pan.File{ID: "v1", ParentID: "dir-1", Name: "ABP-001.mp4", SHA1: "sha-video", Size: 1 << 30}
-	nfoFile := pan.File{Name: "ABP-001.nfo", SHA1: strings.Repeat("1", 40)}
-	poster := pan.File{Name: "poster.jpg", SHA1: strings.Repeat("2", 40)}
-	fanart := pan.File{Name: "fanart.jpg", SHA1: strings.Repeat("3", 40)}
-
-	snapshot := domain.MetadataSnapshot{
-		Videos: VideoFingerprint([]pan.File{video}),
-		Directories: []domain.DirectorySnapshot{
-			NewDirectorySnapshot("dir-1", nfoFile, poster, fanart),
-		},
-	}
-
-	record := &ent.Movie{
-		ID:               1,
-		Code:             "ABP-001",
-		MetadataSnapshot: &snapshot,
-		Edges: ent.MovieEdges{
-			Files: []*ent.File{
-				{FileID: video.ID, ParentID: video.ParentID, Name: video.Name, Sha1: video.SHA1, Size: video.Size},
-			},
-		},
-	}
-
-	observations := DirectoryObservations{
-		"dir-1": ObservedDirectory{
-			{Sidecar: domain.Sidecar{Name: video.Name, SHA1: video.SHA1}, VideoID: video.ID},
-			{Sidecar: domain.Sidecar{Name: nfoFile.Name, SHA1: nfoFile.SHA1}},
-			{Sidecar: domain.Sidecar{Name: poster.Name, SHA1: poster.SHA1}},
-			{Sidecar: domain.Sidecar{Name: fanart.Name, SHA1: fanart.SHA1}},
-		},
-	}
-
-	if !SnapshotMatches(record, domain.LibrarySource{}, observations) {
-		t.Fatal("expected snapshot to match unchanged observations")
-	}
-
-	// Change NFO hash
-	changedObservations := DirectoryObservations{
-		"dir-1": ObservedDirectory{
-			{Sidecar: domain.Sidecar{Name: video.Name, SHA1: video.SHA1}, VideoID: video.ID},
-			{Sidecar: domain.Sidecar{Name: nfoFile.Name, SHA1: strings.Repeat("9", 40)}},
-			{Sidecar: domain.Sidecar{Name: poster.Name, SHA1: poster.SHA1}},
-			{Sidecar: domain.Sidecar{Name: fanart.Name, SHA1: fanart.SHA1}},
-		},
-	}
-	if SnapshotMatches(record, domain.LibrarySource{}, changedObservations) {
-		t.Fatal("expected snapshot not to match when NFO SHA1 changes")
-	}
-}
-
-func TestSnapshotMatchesLocalExport(t *testing.T) {
-	video := pan.File{ID: "v1", ParentID: "dir-1", Name: "ABP-001.mp4", SHA1: "sha-video", Size: 1 << 30}
-	snapshot := domain.MetadataSnapshot{
-		Videos:      VideoFingerprint([]pan.File{video}),
-		LocalExport: true,
-	}
-
-	record := &ent.Movie{
-		ID:               1,
-		Code:             "ABP-001",
-		MetadataSnapshot: &snapshot,
-		Edges: ent.MovieEdges{
-			Files: []*ent.File{
-				{FileID: video.ID, ParentID: video.ParentID, Name: video.Name, Sha1: video.SHA1, Size: video.Size},
-			},
-		},
-	}
-
-	// LocalExport should match even if 115 directory has no sidecars at all
-	observations := DirectoryObservations{
-		"dir-1": ObservedDirectory{
-			{Sidecar: domain.Sidecar{Name: video.Name, SHA1: video.SHA1}, VideoID: video.ID},
-		},
-	}
-	if !SnapshotMatches(record, domain.LibrarySource{}, observations) {
-		t.Fatal("expected LocalExport snapshot to match unchanged video even without sidecars in 115")
-	}
-
-	// If video changed, LocalExport snapshot should NOT match
-	modifiedRecord := &ent.Movie{
-		ID:               1,
-		Code:             "ABP-001",
-		MetadataSnapshot: &snapshot,
-		Edges: ent.MovieEdges{
-			Files: []*ent.File{
-				{FileID: video.ID, ParentID: video.ParentID, Name: video.Name, Sha1: "changed-sha", Size: video.Size},
-			},
-		},
-	}
-	if SnapshotMatches(modifiedRecord, domain.LibrarySource{}, observations) {
-		t.Fatal("expected LocalExport snapshot not to match when video files changed")
+	source := domain.LibrarySource{AccountID: "account", Directory: domain.LibraryDirectory{ID: "root"}}
+	for _, tc := range []struct {
+		name   string
+		change func(*ent.Movie)
+		want   bool
+	}{
+		{name: "unchanged", want: true},
+		{name: "missing snapshot", change: func(m *ent.Movie) { m.MetadataSnapshot = nil }},
+		{name: "other account", change: func(m *ent.Movie) { m.MetadataSnapshot.AccountID = "other" }},
+		{name: "other root", change: func(m *ent.Movie) { m.MetadataSnapshot.DirectoryID = "other" }},
+		{name: "moved video", change: func(m *ent.Movie) { m.Edges.Files[0].ParentID = "other" }},
+		{name: "renamed video", change: func(m *ent.Movie) { m.Edges.Files[0].Name = "renamed.mp4" }},
+		{name: "changed content", change: func(m *ent.Movie) { m.Edges.Files[0].Sha1 = "changed" }},
+		{name: "changed size", change: func(m *ent.Movie) { m.Edges.Files[0].Size++ }},
+		{name: "removed video", change: func(m *ent.Movie) { m.Edges.Files = nil }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			record := &ent.Movie{
+				MetadataSnapshot: &domain.MetadataSnapshot{AccountID: source.AccountID, DirectoryID: source.Directory.ID, Videos: VideoFingerprint([]pan.File{video})},
+				Edges:            ent.MovieEdges{Files: []*ent.File{{FileID: video.ID, ParentID: video.ParentID, Name: video.Name, Sha1: video.SHA1, Size: video.Size}}},
+			}
+			if tc.change != nil {
+				tc.change(record)
+			}
+			if got := SnapshotMatches(record, source); got != tc.want {
+				t.Fatalf("match = %t, want %t", got, tc.want)
+			}
+		})
 	}
 }
