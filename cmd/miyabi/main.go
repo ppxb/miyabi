@@ -10,7 +10,6 @@ import (
 
 	"github.com/ppxb/miyabi/internal/app"
 	"github.com/ppxb/miyabi/internal/config"
-	"github.com/ppxb/miyabi/internal/logging"
 )
 
 func main() {
@@ -33,10 +32,7 @@ func run(args []string) error {
 		return checkHealth(cfg.Listen)
 	}
 
-	logger, err := logging.New(os.Stdout, cfg.LogLevel)
-	if err != nil {
-		return err
-	}
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	slog.SetDefault(logger)
 
 	application, err := app.New(&cfg, logger)

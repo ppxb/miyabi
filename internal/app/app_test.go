@@ -21,7 +21,7 @@ func TestAppLifecycle(t *testing.T) {
 		DataDir:  dataDir,
 		EmbyDir:  filepath.Join(dataDir, "emby"),
 		Listen:   "127.0.0.1:0",
-		LogLevel: "info",
+		LogLevel: slog.LevelInfo,
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 

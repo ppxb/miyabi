@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -17,6 +18,7 @@ func clearConfigEnvironment(t *testing.T) {
 		"MIYABI_PUBLIC_URL", "MIYABI_STRM_TOKEN",
 		"MIYABI_LOG_LEVEL", "MIYABI_ACCESS_PASSWORD", "MIYABI_JWT_SECRET", "MIYABI_TRUSTED_PROXIES",
 		"MIYABI_EMBY_ENABLED", "MIYABI_EMBY_SERVER_URL", "MIYABI_EMBY_API_KEY", "MIYABI_EMBY_MEDIA_PATH", "MIYABI_EMBY_SYNC_ACTORS",
+		"MIYABI_EMBY_URL",
 	} {
 		// Restore the developer's environment when the test finishes.
 		t.Setenv(key, "")
@@ -39,7 +41,7 @@ func TestLoadDefaultsAndEnvironment(t *testing.T) {
 				DataDir:        "./data",
 				EmbyDir:        filepath.Join("./data", "emby"),
 				PublicURL:      "http://" + netx.OutboundIP() + ":8080",
-				LogLevel:       "info",
+				LogLevel:       slog.LevelInfo,
 				EmbySyncActors: true,
 			},
 		},
@@ -65,7 +67,7 @@ func TestLoadDefaultsAndEnvironment(t *testing.T) {
 				EmbyDir:        "./custom-emby",
 				PublicURL:      "http://192.168.1.100:8080",
 				STRMToken:      "secret-token",
-				LogLevel:       "debug",
+				LogLevel:       slog.LevelDebug,
 				AccessPassword: " password with spaces ",
 				EmbyEnabled:    true,
 				EmbyServerURL:  "http://192.168.1.50:8096",
@@ -82,7 +84,7 @@ func TestLoadDefaultsAndEnvironment(t *testing.T) {
 				DataDir:        "./data",
 				EmbyDir:        filepath.Join("./data", "emby"),
 				PublicURL:      "http://" + netx.OutboundIP() + ":8080",
-				LogLevel:       "info",
+				LogLevel:       slog.LevelInfo,
 				EmbySyncActors: true,
 			},
 		},
@@ -105,12 +107,50 @@ func TestLoadRejectsInvalidEnvironment(t *testing.T) {
 		{"MIYABI_LISTEN", ""}, {"MIYABI_LISTEN", "  "},
 		{"MIYABI_DATA_DIR", ""}, {"MIYABI_DATA_DIR", "  "},
 		{"MIYABI_LOG_LEVEL", ""}, {"MIYABI_LOG_LEVEL", "  "}, {"MIYABI_LOG_LEVEL", "trace"},
+		{"MIYABI_LOG_LEVEL", "INFO+1"},
 	} {
 		t.Run(test.key+"="+test.value, func(t *testing.T) {
 			clearConfigEnvironment(t)
 			t.Setenv(test.key, test.value)
 			if _, err := Load(); err == nil || !strings.Contains(err.Error(), test.key) {
 				t.Fatalf("expected an error naming %s, got %v", test.key, err)
+			}
+		})
+	}
+}
+
+func TestLoadNormalizesBeforeDerivingExportDefaults(t *testing.T) {
+	clearConfigEnvironment(t)
+	t.Setenv("MIYABI_DATA_DIR", " ./custom-data ")
+	t.Setenv("MIYABI_LISTEN", " :9090 ")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.DataDir != "./custom-data" || cfg.EmbyDir != filepath.Join("./custom-data", "emby") || !strings.HasSuffix(cfg.PublicURL, ":9090") {
+		t.Fatalf("incorrect derived defaults: %+v", cfg)
+	}
+}
+
+func TestLoadIgnoresOldEmbyURLAlias(t *testing.T) {
+	clearConfigEnvironment(t)
+	t.Setenv("MIYABI_EMBY_URL", "http://old.example:8096")
+	cfg, err := Load()
+	if err != nil || cfg.EmbyServerURL != "" || cfg.EmbyEnabled {
+		t.Fatalf("old alias affected configuration: %+v, %v", cfg, err)
+	}
+}
+
+func TestLoadParsesSupportedLogLevels(t *testing.T) {
+	for name, want := range map[string]slog.Level{
+		" DEBUG ": slog.LevelDebug, "info": slog.LevelInfo, "Warn": slog.LevelWarn, "ERROR": slog.LevelError,
+	} {
+		t.Run(name, func(t *testing.T) {
+			clearConfigEnvironment(t)
+			t.Setenv("MIYABI_LOG_LEVEL", name)
+			cfg, err := Load()
+			if err != nil || cfg.LogLevel != want {
+				t.Fatalf("log level = %v, error = %v; want %v", cfg.LogLevel, err, want)
 			}
 		})
 	}

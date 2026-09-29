@@ -184,7 +184,10 @@
 - [x] **103.** `internal/app/app.go` 的 EmbyDir 兜底与 `config.Load` 重复；核实直接调用 App.New 的测试和调用方需求后，统一配置初始化职责。旧的 Emby Config 读取、activePublicURL 及代理非空判断描述已失效。默认导出路径与 PublicURL 一并按第 184 条处理。
   - 已完成：确认唯一生产入口先调用 config.Load；删除 App.New 对 EmbyDir 的重复补齐及配置改写，明确接收已初始化配置。生命周期测试显式提供原默认目录，其他直接调用测试已有显式目录。
   - 验证：config、app、cmd/miyabi 包测试及 git diff --check 通过，覆盖默认环境配置、启动/关闭、本地目录切换和重启恢复。底层 export 的默认路径及 PublicURL 仍留在第 184 项处理，未进行浏览器测试。
-- [ ] **104.** `internal/config/config.go:50` `MIYABI_EMBY_URL` 未文档化旧别名；:101-119 `validate` 重复 Trim、EmbyDir 空检查不可能触发；日志级别 `logging.Validate` 校验一次、main 中 `UnmarshalText` 再解析一次 → Config 直接存 `slog.Level`，删除 `internal/logging`（28 行）。
+- [x] **104.** `internal/config/config.go:50` `MIYABI_EMBY_URL` 未文档化旧别名；:101-119 `validate` 重复 Trim、EmbyDir 空检查不可能触发；日志级别 `logging.Validate` 校验一次、main 中 `UnmarshalText` 再解析一次 → Config 直接存 `slog.Level`，删除 `internal/logging`（28 行）。
+  - 已完成：删除 MIYABI_EMBY_URL 旧别名；环境读取时统一去空白，Listen/DataDir 在推导默认值前已归一化，修复带空白数据目录生成错误 Emby 子目录的问题。validate 仅保留 Listen/DataDir 必填校验，移除重复 Trim 和不可达 EmbyDir 空检查。
+  - 日志：配置入口一次性将原有 debug/info/warn/error 转为 slog.Level，继续接受大小写和周围空白，不扩展支持偏移等级；main 直接构造 JSON 日志 handler，删除 logging 包，密码空白保留行为不变。
+  - 验证：config、app、cmd/miyabi 包测试及 git diff --check 通过；新增默认目录/端口推导、旧别名不生效、四种日志等级及偏移等级拒绝测试，保留密码空白和生命周期覆盖。未进行浏览器测试。
 - [ ] **105.** `internal/database/viewed.go` 的 `migrateViewedMovies` 为全部旧浏览记录写入同一时间，可能丢失原有顺序。核实旧数组顺序及保留策略；迁移已纳入版本管理，不能因当前开发数据库迁完就删除或重排迁移步骤。若要修正已升级数据，应新增迁移并明确可恢复的信息。
 - [ ] **106.** ✔ 前端零引用 UI：`components/ui/popover.tsx`、`components/ui/dropdown-menu.tsx`；`ui/textarea.tsx` 仅被零引用的 `InputGroupTextarea` 使用；零引用导出 `AvatarBadge` / `AvatarGroup` / `AvatarGroupCount`、`CardFooter` / `CardAction`、`TabsContent`、`tabsListVariants`、`badgeVariants`、`InputGroupText`、`SelectLabel` / `SelectSeparator`、`BreadcrumbEllipsis`。
 - [ ] **107.** 前端零引用 / 无意义项：
