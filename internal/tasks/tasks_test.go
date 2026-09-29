@@ -77,8 +77,8 @@ func TestRegistryAndHandlers(t *testing.T) {
 	registry.Register(handler)
 
 	h, ok := registry.Get(tasks.KindScan)
-	if !ok || h.Kind() != tasks.KindScan {
-		t.Fatalf("get handler: ok=%v, kind=%v", ok, h.Kind())
+	if !ok || h.Kind != tasks.KindScan {
+		t.Fatalf("get handler: ok=%v, kind=%v", ok, h.Kind)
 	}
 
 	kinds := registry.Kinds()
@@ -93,11 +93,10 @@ func TestRegistryAndHandlers(t *testing.T) {
 		t.Fatal("handler was not called")
 	}
 
-	hook, ok := h.(tasks.FinishedHook)
-	if !ok {
-		t.Fatal("handler does not implement FinishedHook")
+	if h.Finished == nil {
+		t.Fatal("handler has no completion callback")
 	}
-	if change, err := hook.Finished(t.Context(), nil, tasks.Job{ID: 1, Type: tasks.KindScan}, nil); err != nil || change != tasks.ChangeLibrary {
+	if change, err := h.Finished(t.Context(), nil, tasks.Job{ID: 1, Type: tasks.KindScan}, nil); err != nil || change != tasks.ChangeLibrary {
 		t.Fatalf("finished: change=%v err=%v", change, err)
 	}
 	if !finishedHook.Load() {
@@ -287,5 +286,85 @@ func TestPoolWorkerExecution(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("pool did not stop on context cancellation")
+	}
+}
+
+func TestCompletionCallbackTransactionAndOptionalHook(t *testing.T) {
+	for _, mode := range []string{"no hook", "commit", "rollback"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx := t.Context()
+			store, err := database.Open(ctx, t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = store.Close() })
+			registry := tasks.NewRegistry()
+			hookErr := errors.New("completion failed")
+			var finished tasks.FinishedFunc
+			if mode != "no hook" {
+				finished = func(ctx context.Context, tx *ent.Tx, job tasks.Job, result error) (tasks.Change, error) {
+					row, err := tx.Task.Get(ctx, job.ID)
+					if err != nil {
+						return 0, err
+					}
+					if row.Status != task.StatusDone || result != nil {
+						t.Fatalf("callback observed status=%s result=%v", row.Status, result)
+					}
+					if err := tx.Task.UpdateOneID(job.ID).SetPayload(json.RawMessage(`{"changed":true}`)).Exec(ctx); err != nil {
+						return 0, err
+					}
+					if mode == "rollback" {
+						return tasks.ChangeLibrary, hookErr
+					}
+					return tasks.ChangeLibrary, nil
+				}
+			}
+			registry.Register(tasks.NewHandler(tasks.KindScan, func(context.Context, tasks.Job) error { return nil }, finished))
+			svc := tasks.NewService(store.Client, registry)
+			row, err := store.Client.Task.Create().SetType(string(tasks.KindScan)).SetStatus(task.StatusRunning).SetPayload(json.RawMessage(`{}`)).Save(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			updates, unsubscribe := svc.Subscribe()
+			defer unsubscribe()
+			err = svc.Queue().Finish(ctx, row.ID, nil)
+			if mode == "rollback" {
+				if !errors.Is(err, hookErr) {
+					t.Fatalf("completion error = %v", err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			row, err = store.Client.Task.Get(ctx, row.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantStatus, wantPayload := task.StatusDone, "{}"
+			if mode == "commit" {
+				wantPayload = `{"changed":true}`
+			}
+			if mode == "rollback" {
+				wantStatus = task.StatusRunning
+			}
+			if row.Status != wantStatus || string(row.Payload) != wantPayload {
+				t.Fatalf("completion record: status=%s payload=%s", row.Status, row.Payload)
+			}
+			wantRevisions := tasks.TaskRevisions{}
+			if mode == "commit" {
+				wantRevisions.Library = 1
+			}
+			if got := svc.Revisions(); got != wantRevisions {
+				t.Fatalf("revisions=%+v want=%+v", got, wantRevisions)
+			}
+			notified := false
+			select {
+			case <-updates:
+				notified = true
+			default:
+			}
+			if notified != (mode != "rollback") {
+				t.Fatalf("completion notification=%v", notified)
+			}
+		})
 	}
 }

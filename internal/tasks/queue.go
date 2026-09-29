@@ -10,7 +10,7 @@ import (
 )
 
 // Queue owns task claiming and completion. It knows nothing about what a
-// task does; handlers report their side effects through FinishedHook.
+// task does; handlers report their side effects through their Finished callback.
 type Queue struct {
 	database *ent.Client
 	registry *Registry
@@ -87,11 +87,9 @@ func (q *Queue) Finish(ctx context.Context, id int, runError error) error {
 			return err
 		}
 		job := jobOf(record)
-		if handler, ok := q.registry.Get(job.Type); ok {
-			if hook, ok := handler.(FinishedHook); ok {
-				change, err = hook.Finished(ctx, tx, *job, runError)
-				return err
-			}
+		if handler, ok := q.registry.Get(job.Type); ok && handler.Finished != nil {
+			change, err = handler.Finished(ctx, tx, *job, runError)
+			return err
 		}
 		return nil
 	}); err != nil {

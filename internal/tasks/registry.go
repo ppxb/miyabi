@@ -16,47 +16,20 @@ type Job struct {
 	Payload json.RawMessage `json:"payload"`
 }
 
-// Handler executes jobs of one Kind.
-type Handler interface {
-	Kind() Kind
-	Handle(ctx context.Context, job Job) error
-}
-
-// FinishedHook runs inside the completion transaction after the task row is
-// updated. It returns which revisions the completed job changed; the queue
-// publishes them once the transaction commits.
-type FinishedHook interface {
-	Finished(ctx context.Context, tx *ent.Tx, job Job, result error) (Change, error)
-}
-
 type HandleFunc func(ctx context.Context, job Job) error
 type FinishedFunc func(ctx context.Context, tx *ent.Tx, job Job, result error) (Change, error)
 
-type funcHandler struct {
-	kind   Kind
-	handle HandleFunc
+// Handler executes jobs of one Kind. Finished is optional and runs inside the
+// completion transaction; its revisions are published only after commit.
+type Handler struct {
+	Kind     Kind
+	Handle   HandleFunc
+	Finished FinishedFunc
 }
 
-func (h funcHandler) Kind() Kind                                { return h.kind }
-func (h funcHandler) Handle(ctx context.Context, job Job) error { return h.handle(ctx, job) }
-
-type funcHookHandler struct {
-	funcHandler
-	finished FinishedFunc
-}
-
-func (h funcHookHandler) Finished(ctx context.Context, tx *ent.Tx, job Job, result error) (Change, error) {
-	return h.finished(ctx, tx, job, result)
-}
-
-// NewHandler adapts plain functions to Handler. A nil finished hook means the
-// handler has nothing to do at completion and bumps no revision.
+// NewHandler pairs an execution function with an optional completion callback.
 func NewHandler(kind Kind, handle HandleFunc, finished FinishedFunc) Handler {
-	base := funcHandler{kind: kind, handle: handle}
-	if finished == nil {
-		return base
-	}
-	return funcHookHandler{funcHandler: base, finished: finished}
+	return Handler{Kind: kind, Handle: handle, Finished: finished}
 }
 
 // Registry maps task kinds to their handlers.
@@ -73,7 +46,7 @@ func NewRegistry() *Registry {
 func (r *Registry) Register(h Handler) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.handlers[h.Kind()] = h
+	r.handlers[h.Kind] = h
 }
 
 func (r *Registry) Get(k Kind) (Handler, bool) {

@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：174 条待处理，5 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：173 条待处理，6 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -48,7 +48,9 @@
 
 ## 四、过度设计
 
-- [ ] **64.** `internal/tasks` 的 Service / Queue / Bus / Registry / Pool 及 handler 包装层仍可评估简化。目前已分离媒体库任务池与订阅批量任务池，不能再以“只有单 worker”为由合并 Runner；保留分池、取消、恢复和数据库错误退避语义，重点检查 Registry 锁及 handler 包装是否有实际收益。
+- [x] **64.** `internal/tasks` 的 Service / Queue / Bus / Registry / Pool 及 handler 包装层仍可评估简化。目前已分离媒体库任务池与订阅批量任务池，不能再以“只有单 worker”为由合并 Runner；保留分池、取消、恢复和数据库错误退避语义，重点检查 Registry 锁及 handler 包装是否有实际收益。
+  - 实现：Handler 改为包含 Kind、Handle 和可选 Finished 函数的结构体，删除接口适配包装及完成回调类型断言；Registry 继续按值存储并保留读写锁。Service、Queue、Bus、分池执行及其取消、恢复、数据库错误退避保持原有职责。
+  - 验证：tasks、app、library（含 scan/scrape）、offline、monitor 测试通过；新增无完成回调、事务提交与回滚测试，确认任务状态和回调数据原子提交，回滚不发布通知或增加版本号。未运行 race 检测，待整体复查。
 - [ ] **65.** `internal/library/scan/reconcile.go:20,27-46` `embyOpts ...any` 按 string 出现顺序解析 embyDir / publicURL / strmToken，类型不安全；`ProcessScanPageTx` 9 个参数 → 改为 `*Scanner` 方法。
 - [ ] **66.** `web/src/api/movie-detail-cache.ts`（202 行）+ `discover.ts:160-202`：Query 缓存外再维护 `WeakMap<QueryClient, Map>` 全局卡片索引，订阅 QueryCache 每次 `removed` 全量重建；带引用计数、并发上限 2 的请求队列；`useSyncExternalStore` 手动订阅 → `placeholderData` 从 `getQueriesData` 查找 + queryFn 内约 10 行信号量；`discover.ts:163-165` 的 `prioritize` 多余。
 - [ ] **67.** `web/src/api/browse-history-store.ts`（199 行）+ `browse-history.ts`：为"已浏览"徽章做 localStorage 持久化 + 服务端合并 + 50 条批量 + 10s 防抖 + beacon + 5000 截断（:178-183，服务端返回全部，不一致）；测试专用 `unref`（:136-139）进入生产代码；:47 注释引用已不存在的 `REFACTOR_PLAN`；`browse-history.ts:13` 每卡片 effect 调 `init()`，:15 `subscribe` 每次渲染新建 → `useQuery` + 乐观 `useMutation`，整个 store 删除。
