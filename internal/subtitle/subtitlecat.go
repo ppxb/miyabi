@@ -27,10 +27,6 @@ func NewSubtitleCatProvider(proxyManager *netx.ProxyManager) *SubtitleCatProvide
 	return &SubtitleCatProvider{origin: defaultSubtitleCatOrigin, client: client}
 }
 
-func (p *SubtitleCatProvider) Name() string {
-	return "SubtitleCat"
-}
-
 type catSearchEntry struct {
 	Name      string
 	DetailURL string

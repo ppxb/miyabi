@@ -24,8 +24,6 @@ const (
 
 type fixedProvider []Candidate
 
-func (fixedProvider) Name() string { return "fixture" }
-
 func (provider fixedProvider) Search(context.Context, string) ([]Candidate, error) {
 	return provider, nil
 }

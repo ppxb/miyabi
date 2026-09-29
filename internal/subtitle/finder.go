@@ -14,7 +14,6 @@ import (
 
 // Provider searches one online subtitle source.
 type Provider interface {
-	Name() string
 	Search(ctx context.Context, query string) ([]Candidate, error)
 }
 

@@ -3,14 +3,11 @@ package subtitle
 import (
 	"bytes"
 	"errors"
-	"io"
 	"regexp"
-	"strings"
 	"unicode/utf8"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/encoding/traditionalchinese"
-	"golang.org/x/text/transform"
 )
 
 // maxSize bounds a subtitle download or 115 read; real subtitles are far smaller.
@@ -52,16 +49,11 @@ func DecodeToUTF8(raw []byte) (string, error) {
 	}
 	// GB18030 is the most common legacy encoding of Chinese fansub releases,
 	// Big5 of Traditional Chinese releases.
-	if text, ok := decode(raw, simplifiedchinese.GB18030.NewDecoder()); ok && !strings.Contains(text, "\uFFFD") {
-		return text, nil
+	decoded, err := simplifiedchinese.GB18030.NewDecoder().Bytes(raw)
+	if err == nil && !bytes.Contains(decoded, []byte("\uFFFD")) {
+		return string(decoded), nil
 	}
-	if text, ok := decode(raw, traditionalchinese.Big5.NewDecoder()); ok {
-		return text, nil
-	}
-	return string(bytes.ToValidUTF8(raw, []byte(" "))), nil
-}
-
-func decode(raw []byte, decoder transform.Transformer) (string, bool) {
-	decoded, err := io.ReadAll(transform.NewReader(bytes.NewReader(raw), decoder))
-	return string(decoded), err == nil && len(decoded) > 0 && utf8.Valid(decoded)
+	// Big5 decoding replaces malformed bytes with U+FFFD, producing valid UTF-8.
+	decoded, err = traditionalchinese.Big5.NewDecoder().Bytes(raw)
+	return string(decoded), err
 }

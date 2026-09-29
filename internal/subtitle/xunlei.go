@@ -26,10 +26,6 @@ func NewXunleiProvider(proxyManager *netx.ProxyManager) *XunleiProvider {
 	return &XunleiProvider{endpoint: defaultXunleiEndpoint, client: client}
 }
 
-func (p *XunleiProvider) Name() string {
-	return "迅雷"
-}
-
 type xunleiResponse struct {
 	Code int          `json:"code"`
 	Data []xunleiItem `json:"data"`
@@ -81,7 +77,7 @@ func (p *XunleiProvider) Search(ctx context.Context, code string) ([]Candidate, 
 			ext = "srt"
 		}
 		candidates = append(candidates, Candidate{
-			Provider: p.Name(),
+			Provider: "迅雷",
 			Name:     name,
 			URL:      item.URL,
 			Format:   subtitlemeta.Format(ext),

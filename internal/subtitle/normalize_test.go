@@ -8,6 +8,23 @@ import (
 )
 
 func TestDecodeToUTF8(t *testing.T) {
+	t.Run("malformed legacy bytes", func(t *testing.T) {
+		for _, raw := range [][]byte{{0xff}, {0x81}} {
+			got, err := DecodeToUTF8(raw)
+			if err != nil || got != "\uFFFD" {
+				t.Fatalf("DecodeToUTF8(%x) = %q, %v", raw, got, err)
+			}
+		}
+	})
+
+	t.Run("empty and BOM only", func(t *testing.T) {
+		for _, raw := range [][]byte{nil, utf8BOM} {
+			if _, err := DecodeToUTF8(raw); err == nil {
+				t.Fatalf("accepted empty subtitle %x", raw)
+			}
+		}
+	})
+
 	t.Run("utf-8 with BOM", func(t *testing.T) {
 		bom := []byte{0xEF, 0xBB, 0xBF}
 		raw := append(bom, []byte("你好世界")...)

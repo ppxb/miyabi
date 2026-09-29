@@ -154,7 +154,10 @@
   - 已完成：删除订阅 zone 的 Ent schema、生成代码、创建/更新选项、演员继承、API 输入输出及前端类型；旧 monitors 导入语句同步移除对 zone 列的依赖。删除重复 monitor.Status 及常量，Item、TargetItem 和调用方统一使用 subscription.Status。
   - 按用户要求不保留旧状态兼容：删除 Ent 与前端的 error 状态枚举、标签及样式分支，移除本次新增的兼容测试；不新增旧状态转换或数据库清理迁移。失败原因仍使用 error 信息字段，检查失败时原有状态及重试策略不变。
   - 验证：database、monitor、api、app 包测试通过，保留原有数据库迁移、演员订阅继承和订阅重试覆盖；前端 118 项测试、typecheck、lint 及 git diff --check 通过。未进行浏览器或真实上游联调，待整体复查。
-- [ ] **96.** `internal/subtitle`：`Provider.Name()` 从未通过接口调用（`subtitlecat.go:167` 另写死 `"SubtitleCat"`）；`finder.go:29-37` `WithAllowLoopbackForTesting` 测试开关进入生产结构体；`DecodeToUTF8` 最后的 `ToValidUTF8` 兜底实际走不到。
+- [x] **96.** `internal/subtitle`：`Provider.Name()` 从未通过接口调用（`subtitlecat.go:167` 另写死 `"SubtitleCat"`）；`finder.go:29-37` `WithAllowLoopbackForTesting` 测试开关进入生产结构体；`DecodeToUTF8` 最后的 `ToValidUTF8` 兜底实际走不到。
+  - 已完成：Provider 仅保留 Search，删除两家 Provider 和测试桩的 Name 方法，候选来源仍为原名称“迅雷”和“SubtitleCat”。DecodeToUTF8 直接使用 Decoder.Bytes，删除流式包装和不可达的 ToValidUTF8 兜底；保留 UTF-8、GB18030、Big5 顺序及畸形字节替换行为。
+  - 现状修正：WithAllowLoopbackForTesting 已在此前清理中移除，Finder 使用统一安全下载客户端；现有测试替换 transport 提供响应，不绕过 URL 校验，本次无需重复修改。
+  - 验证：subtitle、netx、library/scrape、app 包测试及 git diff --check 通过；新增畸形/截断编码、空输入和仅 BOM 覆盖，保留来源解析、UTF-8/GB18030 转换、SRT/ASS 格式及安全下载测试。未进行浏览器或真实字幕站联调，待整体复查。
 - [ ] **97.** `internal/netx/proxy.go:88-94` `sameConfig` 蕴含 `sameURL`，`!sameConfig || !sameURL` 实为 `!sameConfig`，与注释"只在生效代理变化时广播"相反（Enabled=false 改 URL 也重建 tls-client）→ 条件改为 `!sameURL`；:73-79 `resolve` 中 `!Enabled ||` 冗余；:131-133 `parseProxyURL` 的 `raw == ""` 分支死代码。
 - [ ] **98.** `internal/netx/ssrf.go:59-60` 255.255.255.255 分支已被 :58 `ip4[0] >= 240` 覆盖；:103 多余中间变量；:191-193 `timeout <= 0` 兜底唯一调用传固定 20s；:157/:176 `ips` 为空时返回 `(nil, nil)`。
 - [ ] **99.** `internal/codeid/codeid.go:132-144` `Layers.stripPrefix` 与 `:247-262` `Candidates` 两套"去前缀"逻辑，正则（`layerNumeric` vs `numericPattern`）已分歧；`Parse`（60-62）与 `Layers`（111-116）去噪流程重复；:344 `UnpaddedNumericCandidate` 仅包内使用；:350-362、:329-334 冗余分支；:95-101 正则 var 块散落；:180、:187 对恒为单元素的 `layers[0]` 循环。
