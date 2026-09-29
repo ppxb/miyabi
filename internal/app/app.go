@@ -21,7 +21,6 @@ import (
 	"github.com/ppxb/miyabi/internal/export"
 	"github.com/ppxb/miyabi/internal/gfriends"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
-	"github.com/ppxb/miyabi/internal/javdb"
 	"github.com/ppxb/miyabi/internal/library"
 	"github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/maintenance"
@@ -92,7 +91,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		EmbyDir: cfg.EmbyDir, PublicURL: cfg.PublicURL, STRMToken: cfg.STRMToken,
 	})
 	libSvc := library.New(store.Client, driveSvc, taskSvc, images, library.Options{ExportManager: exportMgr})
-	catalogueSvc, err := catalogue.New(ctx, store.Client, javdb.Options{}, networkSvc.ProxyManager(), libSvc)
+	catalogueSvc, err := catalogue.New(ctx, store.Client, networkSvc.ProxyManager(), libSvc)
 	if err != nil {
 		driveSvc.Close()
 		_ = store.Close()

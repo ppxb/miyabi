@@ -51,7 +51,6 @@ type Service struct {
 func New(
 	ctx context.Context,
 	db *ent.Client,
-	options javdb.Options,
 	proxy *netx.ProxyManager,
 	local LocalState,
 ) (*Service, error) {
@@ -60,30 +59,26 @@ func New(
 		return nil, err
 	}
 	if !found {
-		deviceUUID = options.DeviceUUID
-		if deviceUUID == "" {
-			deviceUUID, err = javdb.NewDeviceUUID()
-			if err != nil {
-				return nil, err
-			}
+		deviceUUID, err = javdb.NewDeviceUUID()
+		if err != nil {
+			return nil, err
 		}
 		if err := database.SaveSetting(ctx, db, javdbDeviceSetting, deviceUUID); err != nil {
 			return nil, err
 		}
 	}
 
-	route, found, err := database.LoadSetting[persistedRoute](ctx, db, javdbRouteSetting)
+	route, _, err := database.LoadSetting[persistedRoute](ctx, db, javdbRouteSetting)
 	if err != nil {
 		return nil, err
 	}
-	if found {
-		options.CachedHost = route.Host
-		options.CachedLatency = time.Duration(route.LatencyMS) * time.Millisecond
-		options.ManualRoute = route.Manual
-	}
-	options.DeviceUUID = deviceUUID
-	options.Proxy = proxy
-	client, err := javdb.New(options)
+	client, err := javdb.New(javdb.Options{
+		DeviceUUID:    deviceUUID,
+		Proxy:         proxy,
+		CachedHost:    route.Host,
+		CachedLatency: time.Duration(route.LatencyMS) * time.Millisecond,
+		ManualRoute:   route.Manual,
+	})
 	if err != nil {
 		return nil, err
 	}

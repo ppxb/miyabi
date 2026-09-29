@@ -61,15 +61,6 @@ func New(options Options) (*Client, error) {
 	if options.Timeout == 0 {
 		options.Timeout = defaultTimeout
 	}
-	if options.RequestsPerSecond == 0 {
-		options.RequestsPerSecond = defaultRate
-	}
-	if options.Burst == 0 {
-		options.Burst = defaultBurst
-	}
-	if options.RequestsPerSecond < 0 || options.Burst < 0 {
-		return nil, errors.New("JavDB rate limit must not be negative")
-	}
 
 	fingerprint, err := netx.NewProxiedFingerprintClient(options.Proxy, netx.FingerprintOptions{Timeout: options.Timeout, CookieJar: true})
 	if err != nil {
@@ -78,7 +69,7 @@ func New(options Options) (*Client, error) {
 	routeContext, stopRoutes := context.WithCancel(context.Background())
 	client := &Client{
 		options:      options,
-		limiter:      rate.NewLimiter(rate.Limit(options.RequestsPerSecond), options.Burst),
+		limiter:      rate.NewLimiter(defaultRate, defaultBurst),
 		media:        newMediaClient(options),
 		routeContext: routeContext,
 		stopRoutes:   stopRoutes,
