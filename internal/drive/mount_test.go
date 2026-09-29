@@ -30,7 +30,7 @@ type mountRecorder struct {
 
 func recordMounts(d *Drive) *mountRecorder {
 	r := &mountRecorder{}
-	d.SubscribeMount(func(ctx context.Context, event MountEvent) error {
+	d.SetMountListener(func(ctx context.Context, event MountEvent) error {
 		r.mu.Lock()
 		defer r.mu.Unlock()
 		r.calls++
@@ -56,6 +56,38 @@ func (r *mountRecorder) reject(err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.failure = err
+}
+
+func TestMountListenerReplacementAndClearing(t *testing.T) {
+	d, _ := mountFixture(t)
+	d.SetMountListener(func(context.Context, MountEvent) error {
+		return errors.New("replaced listener must not run")
+	})
+	var calls atomic.Int32
+	d.SetMountListener(func(_ context.Context, event MountEvent) error {
+		calls.Add(1)
+		// Reading state and clearing the callback must not deadlock on d.mu.
+		source := d.Source()
+		if source == nil || *source != event.Source {
+			return errors.New("listener did not observe the new mount")
+		}
+		d.SetMountListener(nil)
+		return nil
+	})
+	finished := make(chan error, 1)
+	go func() {
+		_, err := d.SelectDirectory(t.Context(), "20")
+		finished <- err
+	}()
+	if err := await(t, finished); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.ClearDirectory(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if calls.Load() != 1 || d.Source() != nil {
+		t.Fatalf("cleared listener: calls=%d source=%+v", calls.Load(), d.Source())
+	}
 }
 
 func TestDirectoryMountPublishesOnceAndDoesNotInterruptTheSameMount(t *testing.T) {

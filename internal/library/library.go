@@ -88,7 +88,7 @@ func New(database *ent.Client, d *drive.Drive, tasks *tasks.Service, images *med
 		exportMgr:    options.ExportManager,
 	}
 	if d != nil && tasks != nil {
-		d.SubscribeMount(func(ctx context.Context, event drive.MountEvent) error {
+		d.SetMountListener(func(ctx context.Context, event drive.MountEvent) error {
 			if event.Source.Directory.ID != "" {
 				if _, err := svc.EnqueueFreshScan(ctx, event.Source); err != nil {
 					return err

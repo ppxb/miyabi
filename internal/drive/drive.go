@@ -85,8 +85,8 @@ type Drive struct {
 	cachedAccountTime       time.Time
 	cachedCredentialVersion uint64
 
-	login  qrLogin
-	events *eventBus
+	login         qrLogin
+	mountListener MountListener
 }
 
 func New(ctx context.Context, db *ent.Client) (*Drive, error) {
@@ -107,7 +107,6 @@ func NewWithClient(ctx context.Context, db *ent.Client, client Client) (*Drive, 
 		client:    client,
 		tokens:    tokens,
 		directory: directory,
-		events:    newEventBus(),
 	}
 	d.login.drive = d
 	return d, nil
@@ -207,12 +206,4 @@ func (d *Drive) Source() *domain.LibrarySource {
 	}
 	src := s.source()
 	return &src
-}
-
-// SubscribeMount registers a listener for directory mount and unmount events.
-// Listeners run while the drive holds its commit lock, so they must not open
-// sessions or commit through the drive; an error from a mount listener rolls
-// the mount back.
-func (d *Drive) SubscribeMount(listener MountListener) func() {
-	return d.events.subscribe(listener)
 }

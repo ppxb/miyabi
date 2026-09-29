@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：169 条待处理，10 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：168 条待处理，11 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -65,7 +65,9 @@
 - [x] **68.** `web/src/lib/pan-login.ts:11-19` `panLoginShouldRetry` 等价于 `retry: 4`，却配 146 行测试解释 react-query 内部行为；115 专用逻辑不应在 `lib/`。
   - 实现：登录查询配置收拢到 pan.ts 的 panLoginOptions，usePanLoginStatus 直接复用；使用 retry: 4 保持首次请求加四次重试的预算，删除 lib/pan-login.ts。保留 1500ms 间隔、禁用重连刷新及错误/终态停止轮询。
   - 验证：测试直接使用生产 options 和 API 查询函数，mock fetch 配合 Vitest 模拟时间，覆盖五次失败后停止、短暂失败保留 scanned、三个终态、waiting→scanned→authorized、URL 编码及空会话不请求。全量 Vitest 112 项、typecheck、lint 通过；未进行真实扫码与浏览器断网联调，待整体复查。
-- [ ] **69.** `internal/drive/events.go` 整套 eventBus（RWMutex + 自增 ID + map + 取消函数）只有 `library.go:80` 一个订阅者且丢弃取消函数 → 单个 listener 字段。
+- [x] **69.** `internal/drive/events.go` 整套 eventBus（RWMutex + 自增 ID + map + 取消函数）只有 `library.go:80` 一个订阅者且丢弃取消函数 → 单个 listener 字段。
+  - 实现：Drive 保存单个 MountListener，通过 SetMountListener 替换或清除；删除 eventBus、独立锁、ID、map 和取消订阅机制。复用状态锁读取回调后释放，再在原提交锁范围内同步执行；保持挂载失败恢复和清除目录通知语义。
+  - 验证：drive、library（含 scan/scrape）、offline、app 测试通过；新增回调替换/清除与读取状态无死锁测试，原有重复挂载、回调拒绝回滚及扫描入队测试通过。未运行 race 检测或真实 115 联调，待整体复查。
 - [ ] **70.** `internal/netx/ssrf.go:216-236` functional options 只剩 `WithAllowLoopback`（测试开关，且 dialer 仍拦 loopback，所以 `subtitle.WithAllowLoopbackForTesting` 被迫换直连 client）；`WithMaxBytes` 仅测试使用。
 - [ ] **71.** `internal/pan/client.go:91-98` 与 `:137-146` Retry-After 两套：`panTransport` 全局 `retryAfter` 窗口 + resty `SetRetryAfter` 各等一遍。
 - [ ] **72.** `internal/pan/client.go:59-62`、`play.go:29-36` 用魔法字符串 `"__EMPTY__"` 作 UA 哨兵，在 RoundTrip 中改写 req（违反 RoundTripper 约定），`Header.Del` 后紧跟赋值多余；`pan/offline_test.go` 被迫复制该逻辑 → resty `SetPreRequestHook`。

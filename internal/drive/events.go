@@ -2,7 +2,6 @@ package drive
 
 import (
 	"context"
-	"sync"
 
 	"github.com/ppxb/miyabi/internal/domain"
 )
@@ -15,42 +14,21 @@ type MountEvent struct {
 // MountListener receives mount notifications.
 type MountListener func(ctx context.Context, event MountEvent) error
 
-type eventBus struct {
-	mu        sync.RWMutex
-	nextID    uint64
-	listeners map[uint64]MountListener
+// SetMountListener replaces the synchronous mount callback; nil clears it.
+// The callback runs under the commit lock, but not the state lock. It must not
+// open sessions or commit through Drive. A rejected mount restores its old state.
+func (d *Drive) SetMountListener(listener MountListener) {
+	d.mu.Lock()
+	d.mountListener = listener
+	d.mu.Unlock()
 }
 
-func newEventBus() *eventBus {
-	return &eventBus{listeners: make(map[uint64]MountListener)}
-}
-
-func (b *eventBus) subscribe(listener MountListener) func() {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.nextID++
-	id := b.nextID
-	b.listeners[id] = listener
-	return func() {
-		b.mu.Lock()
-		defer b.mu.Unlock()
-		delete(b.listeners, id)
+func (d *Drive) publishMount(ctx context.Context, source domain.LibrarySource) error {
+	d.mu.Lock()
+	listener := d.mountListener
+	d.mu.Unlock()
+	if listener == nil {
+		return nil
 	}
-}
-
-func (b *eventBus) publishMount(ctx context.Context, source domain.LibrarySource) error {
-	b.mu.RLock()
-	active := make([]MountListener, 0, len(b.listeners))
-	for _, l := range b.listeners {
-		active = append(active, l)
-	}
-	b.mu.RUnlock()
-
-	event := MountEvent{Source: source}
-	for _, listener := range active {
-		if err := listener(ctx, event); err != nil {
-			return err
-		}
-	}
-	return nil
+	return listener(ctx, MountEvent{Source: source})
 }

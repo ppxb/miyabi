@@ -70,9 +70,9 @@ func (d *Drive) SelectDirectory(ctx context.Context, directoryID string) (domain
 		return domain.LibraryDirectory{}, err
 	}
 	previous := d.swapDirectory(record)
-	// The mount is complete only once every listener has accepted it; the
+	// The mount is complete only once the listener has accepted it; the
 	// library queues the scan here. On failure nothing observable remains.
-	if err := d.events.publishMount(ctx, record.source()); err != nil {
+	if err := d.publishMount(ctx, record.source()); err != nil {
 		d.restoreDirectory(previous)
 		if rollback := d.persistDirectory(ctx, previous.directory); rollback != nil {
 			return domain.LibraryDirectory{}, fmt.Errorf("mount media directory: %w (rollback failed: %v)", err, rollback)
@@ -135,7 +135,7 @@ func (d *Drive) clearDirectory(ctx context.Context) error {
 		return err
 	}
 	d.swapDirectory(mountRecord{})
-	if err := d.events.publishMount(ctx, domain.LibrarySource{}); err != nil {
+	if err := d.publishMount(ctx, domain.LibrarySource{}); err != nil {
 		return fmt.Errorf("publish unmount event: %w", err)
 	}
 	return nil
