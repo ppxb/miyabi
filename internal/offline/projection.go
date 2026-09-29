@@ -38,18 +38,6 @@ func (service *Service) Activity(ctx context.Context) (Activity, error) {
 	return result, err
 }
 
-// Tasks projects history through the current file index and workflow. A
-// finished remote task alone never means the resource still exists.
-func (service *Service) Tasks(ctx context.Context, movieID, accountID string) ([]domain.OfflineSubmission, error) {
-	records, err := latestOfflineTasks(ctx, service.database.OfflineDownload.Query().Where(
-		offlinedownload.AccountIDEQ(accountID), offlinedownload.JavdbIDEQ(movieID)))
-	if err != nil {
-		return nil, fmt.Errorf("load movie offline tasks: %w", err)
-	}
-	source := service.drive.Source()
-	return service.submissions(ctx, records, source)
-}
-
 func (service *Service) submission(ctx context.Context, record *ent.OfflineDownload, source *domain.LibrarySource) (domain.OfflineSubmission, error) {
 	items, err := service.submissions(ctx, []*ent.OfflineDownload{record}, source)
 	if err != nil {

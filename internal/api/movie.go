@@ -13,7 +13,6 @@ type LibraryManager interface {
 	ViewedManager
 	Movies(context.Context, int, int) (lib.Page, error)
 	StartScan(context.Context) (domain.TaskInfo, error)
-	StartLocalScan(context.Context, string) (domain.TaskInfo, error)
 }
 
 type ArtworkReader interface {
@@ -64,30 +63,5 @@ func libraryScanHandler(library LibraryManager, emby EmbyManager) gin.HandlerFun
 		}
 		task, err := library.StartScan(c.Request.Context())
 		accepted(c, task, err)
-	}
-}
-
-type localScanRequest struct {
-	Path string `json:"path"`
-}
-
-func libraryLocalScanHandler(library LibraryManager, emby EmbyManager) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req localScanRequest
-		if c.Request.Body != nil && c.Request.ContentLength != 0 {
-			var ok bool
-			req, ok = bindJSON[localScanRequest](c)
-			if !ok {
-				return
-			}
-		}
-		if emby != nil {
-			if err := emby.RetryPending(c.Request.Context()); err != nil {
-				c.Error(err)
-				return
-			}
-		}
-		info, err := library.StartLocalScan(c.Request.Context(), req.Path)
-		accepted(c, info, err)
 	}
 }

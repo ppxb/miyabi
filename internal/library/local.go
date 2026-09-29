@@ -10,18 +10,11 @@ import (
 	"github.com/ppxb/miyabi/internal/library/scan"
 )
 
-// StartLocalScan queues an import of the configured Emby directory. A legacy
-// explicit path is accepted only when it names that same directory.
-func (s *Service) StartLocalScan(ctx context.Context, requested string) (domain.TaskInfo, error) {
+// startLocalScan queues an import of the configured Emby directory.
+func (s *Service) startLocalScan(ctx context.Context) (domain.TaskInfo, error) {
 	root, err := s.localScanRoot()
 	if err != nil {
 		return domain.TaskInfo{}, err
-	}
-	if requested != "" {
-		path, err := canonicalDirectory(requested)
-		if err != nil || path != root {
-			return domain.TaskInfo{}, domain.E(domain.KindInvalid, "只能扫描当前配置的 Emby 本地目录", nil)
-		}
 	}
 	return s.EnqueueScan(ctx, domain.LibrarySource{
 		AccountID: domain.LocalAccountID,
@@ -32,7 +25,7 @@ func (s *Service) StartLocalScan(ctx context.Context, requested string) (domain.
 // ScheduleLocalScan also runs at startup, where a fresh install may not have
 // created its export directory yet. No media needs importing in that case.
 func (s *Service) ScheduleLocalScan(ctx context.Context) error {
-	_, err := s.StartLocalScan(ctx, "")
+	_, err := s.startLocalScan(ctx)
 	if os.IsNotExist(err) {
 		return nil
 	}

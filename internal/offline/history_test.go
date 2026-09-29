@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 )
@@ -38,36 +37,29 @@ func TestOfflineHistoryLoadsOnlyLatestTasksAndRetainsOldDownloads(t *testing.T) 
 			return value, err
 		})
 	}))
-	for _, read := range []func() ([]domain.OfflineSubmission, error){
-		func() ([]domain.OfflineSubmission, error) {
-			activity, err := service.Activity(ctx)
-			return activity.Tasks, err
-		},
-		func() ([]domain.OfflineSubmission, error) { return service.Tasks(ctx, input.JavdbID, input.AccountID) },
-	} {
-		rowsRead = 0
-		records, err := read()
-		if err != nil || len(records) != 51 || rowsRead != 51 || records[0].TaskID != latestID {
-			t.Fatalf("history was hydrated or limited before grouping: %d records, %d rows, %v", len(records), rowsRead, err)
-		}
-		old := records[len(records)-1]
-		if old.TaskID != pending.ID || old.Status != string(offlinedownload.StatusRunning) || old.Progress != 17 || old.Phase != "downloading" {
-			t.Fatalf("old download disappeared behind completed history: %#v", old)
-		}
+	activity, err := service.Activity(ctx)
+	records := activity.Tasks
+	if err != nil || len(records) != 51 || rowsRead != 51 || records[0].TaskID != latestID {
+		t.Fatalf("history was hydrated or limited before grouping: %d records, %d rows, %v", len(records), rowsRead, err)
+	}
+	old := records[len(records)-1]
+	if old.TaskID != pending.ID || old.Status != string(offlinedownload.StatusRunning) || old.Progress != 17 || old.Phase != "downloading" {
+		t.Fatalf("old download disappeared behind completed history: %#v", old)
 	}
 }
 
-func TestOfflineHistoryScopesMovieAndAccountBeforeGrouping(t *testing.T) {
+func TestOfflineHistoryScopesDirectoryAndAccountBeforeGrouping(t *testing.T) {
 	service, original, input, _ := offlineFixture(t)
 	for _, change := range []func(*ent.OfflineDownload){
-		func(payload *ent.OfflineDownload) { payload.JavdbID = "other-movie" },
+		func(payload *ent.OfflineDownload) { payload.DirectoryID = "other-directory" },
 		func(payload *ent.OfflineDownload) { payload.AccountID = "other-account" },
 	} {
 		payload := input
 		change(&payload)
 		createDownload(service.database, payload).SetStatus(offlinedownload.StatusDone).ExecX(t.Context())
 	}
-	records, err := service.Tasks(t.Context(), input.JavdbID, input.AccountID)
+	activity, err := service.Activity(t.Context())
+	records := activity.Tasks
 	if err != nil || len(records) != 1 || records[0].TaskID != original.ID {
 		t.Fatalf("newer foreign task hid the movie's download: %#v, %v", records, err)
 	}

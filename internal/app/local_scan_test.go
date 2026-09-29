@@ -74,16 +74,6 @@ func TestEmbyDirectoryAutomaticallyQueuesLocalScan(t *testing.T) {
 		t.Fatalf("save used stale directory: got path %q, want %q; error %v", payload.Source.Directory.Path, wantNewRoot, err)
 	}
 
-	response = httptest.NewRecorder()
-	a.server.Handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/library/scan/local", nil))
-	if response.Code != http.StatusAccepted {
-		t.Fatalf("scan: %d %s", response.Code, response.Body.String())
-	}
-	var info domain.TaskInfo
-	if err := json.Unmarshal(response.Body.Bytes(), &info); err != nil || info.ID != queued.ID {
-		t.Fatalf("manual scan did not reuse active directory task: %+v %v", info, err)
-	}
-
 	// Restart restores the saved directory and reuses its pending scan.
 	if err := a.Close(); err != nil {
 		t.Fatal(err)

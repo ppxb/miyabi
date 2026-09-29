@@ -85,7 +85,7 @@ func TestCookieFlags(t *testing.T) {
 }
 
 func TestCrossOriginMutations(t *testing.T) {
-	for _, path := range []string{"/api/auth/logout", "/api/discover/viewed", "/api/auth/login"} {
+	for _, path := range []string{"/api/discover/viewed", "/api/auth/login"} {
 		for _, tc := range []struct {
 			name, site, origin string
 			allowed            bool
@@ -108,9 +108,6 @@ func TestCrossOriginMutations(t *testing.T) {
 				want := http.StatusForbidden
 				if tc.allowed {
 					want = http.StatusBadRequest // Empty login/history bodies fail validation after the origin check.
-					if path == "/api/auth/logout" {
-						want = http.StatusOK
-					}
 				}
 				if rec.Code != want {
 					t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())

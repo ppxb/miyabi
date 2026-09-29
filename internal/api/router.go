@@ -62,7 +62,6 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	authAPI := api.Group("/auth", noStore())
 	authAPI.GET("/config", accessConfigHandler(deps.Access))
 	authAPI.POST("/login", accessLoginHandler(deps.Access, loginLimiter))
-	authAPI.POST("/logout", accessLogoutHandler())
 
 	// Exported .strm files keep this path; it must stay stable across releases.
 	strmHandler := strmStreamHandler(deps.STRM, deps.STRMToken, deps.Access)
@@ -87,7 +86,6 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	protected.GET("/library/movies", libraryMoviesHandler(deps.Library))
 	protected.POST("/library/scan", libraryScanHandler(deps.Library, deps.Emby))
-	protected.POST("/library/scan/local", libraryLocalScanHandler(deps.Library, deps.Emby))
 	protected.GET("/library/artwork/:key", libraryArtworkHandler(deps.Artwork))
 
 	protected.GET("/tasks", noStore(), tasksHandler(deps.Tasks))
@@ -115,7 +113,6 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.GET("/discover/movies/:id", discoverMovieHandler(deps.Catalogue))
 	protected.GET("/discover/movies/:id/magnets", discoverMagnetsHandler(deps.Catalogue))
 	protected.POST("/discover/movies/:id/offline", offlineAddHandler(deps.Offline))
-	protected.GET("/discover/movies/:id/offline", noStore(), offlineTasksHandler(deps.Offline))
 	protected.GET("/image", imageHandler(deps.Catalogue))
 	protected.GET("/javdb/route", javdbRouteHandler(deps.Catalogue))
 	protected.PUT("/javdb/route", javdbSelectRouteHandler(deps.Catalogue))

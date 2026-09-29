@@ -32,7 +32,7 @@ func TestLocalScanWorkflow(t *testing.T) {
 	if err := lib.ScheduleLocalScan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	info, err := lib.StartLocalScan(ctx, "")
+	info, err := lib.startLocalScan(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,9 +41,6 @@ func TestLocalScanWorkflow(t *testing.T) {
 	}
 	if count := store.Client.Movie.Query().CountX(ctx); count != 0 {
 		t.Fatalf("import ran before claim: %d", count)
-	}
-	if _, err := lib.StartLocalScan(ctx, t.TempDir()); err == nil {
-		t.Fatal("accepted arbitrary directory")
 	}
 	job, err := queue.Queue().Claim(ctx, []tasks.Kind{tasks.KindScan})
 	if err != nil || job == nil {
@@ -84,7 +81,7 @@ func TestLocalScanWorkflow(t *testing.T) {
 	}
 
 	// A queued scan cannot read an old directory after configuration changes.
-	old, err := lib.StartLocalScan(ctx, "")
+	old, err := lib.startLocalScan(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +97,7 @@ func TestLocalScanWorkflow(t *testing.T) {
 	if _, err := lib.RetryTask(ctx, old.ID); err == nil {
 		t.Fatal("retried stale directory")
 	}
-	current, err := lib.StartLocalScan(ctx, "")
+	current, err := lib.startLocalScan(ctx)
 	if err != nil || current.Source.Directory.ID == old.Source.Directory.ID {
 		t.Fatalf("stale config: %+v %v", current, err)
 	}

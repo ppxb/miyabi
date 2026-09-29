@@ -103,13 +103,6 @@ func accessLoginHandler(gate AccessGate, limiter *loginRateLimiter) gin.HandlerF
 	}
 }
 
-func accessLogoutHandler() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		setAuthCookie(c, "", -1)
-		respond(c, gin.H{"success": true}, nil)
-	}
-}
-
 func authMiddleware(gate AccessGate) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if gate == nil || !gate.Enabled() {

@@ -195,20 +195,6 @@ func TestAuth_EnabledGateEnforcesJWT(t *testing.T) {
 		}
 	}
 
-	// 8. Logout clears cookie
-	{
-		req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
-		rec := httptest.NewRecorder()
-		router.ServeHTTP(rec, req)
-
-		if rec.Code != http.StatusOK {
-			t.Fatalf("expected status 200 on logout, got %d", rec.Code)
-		}
-		clearCookie := rec.Header().Get("Set-Cookie")
-		if !strings.Contains(clearCookie, "miyabi_token=") || !strings.Contains(clearCookie, "Max-Age=0") {
-			t.Fatalf("expected cookie clearing header, got %s", clearCookie)
-		}
-	}
 }
 
 func TestAuth_RateLimiterTriggers(t *testing.T) {
