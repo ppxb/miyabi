@@ -1,8 +1,6 @@
 import { Link } from '@tanstack/react-router'
-import { LoaderCircleIcon, RefreshCwIcon, ScanLineIcon } from 'lucide-react'
 
-import { describeApiError } from '@/api/client'
-import { LIBRARY_PAGE_SIZE, useLibraryMovies, useStartLibraryScan } from '@/api/library'
+import { LIBRARY_PAGE_SIZE, useLibraryMovies } from '@/api/library'
 import { isScanTask, isTaskActive, useTasks } from '@/api/tasks'
 import { AppPage } from '@/components/app-page'
 import { EmptyState } from '@/components/empty-state'
@@ -13,10 +11,9 @@ import { MovieGridSkeleton } from '@/components/movie/movie-grid-skeleton'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { LibraryMovieCard } from '@/features/library/movie-card'
+import { LibraryScanButton } from '@/features/library/scan-button'
 import { useTaskConnection } from '@/features/tasks/task-events'
-import { notifyScanTask, notifyTaskError } from '@/features/tasks/task-toast'
 
 export function LibraryPage({
   page,
@@ -28,7 +25,6 @@ export function LibraryPage({
   const library = useLibraryMovies(page)
   const tasks = useTasks()
   const connection = useTaskConnection()
-  const startScan = useStartLibraryScan()
   const source = library.data?.source
   const latest = tasks.data
     ?.filter(isScanTask)
@@ -39,14 +35,6 @@ export function LibraryPage({
         task.source.directory.id === source.directory.id
     )
   const scanning = latest !== undefined && isTaskActive(latest)
-  const processing = scanning && connection.status === 'connected'
-  const scanLabel = scanning
-    ? processing
-      ? '正在处理'
-      : '等待同步'
-    : latest?.status === 'failed'
-      ? '重新扫描'
-      : '扫描媒体库'
 
   return (
     <AppPage>
@@ -54,39 +42,12 @@ export function LibraryPage({
         {library.isPending ? (
           <Skeleton className="h-9 w-9 rounded-4xl sm:w-30" />
         ) : source ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                className="w-9 px-0 sm:w-auto sm:px-3"
-                disabled={scanning || startScan.isPending}
-                onClick={() =>
-                  startScan.mutate(undefined, {
-                    onSuccess: task => {
-                      notifyScanTask(task)
-                      onPageChange(1)
-                    },
-                    onError: error => {
-                      notifyTaskError(
-                        'scan:submit-error',
-                        '无法创建扫描任务',
-                        describeApiError(error)
-                      )
-                    }
-                  })
-                }
-              >
-                {processing || startScan.isPending ? (
-                  <LoaderCircleIcon className="size-4 animate-spin" />
-                ) : scanning ? (
-                  <RefreshCwIcon className="size-4" />
-                ) : (
-                  <ScanLineIcon className="size-4" />
-                )}
-                <span className="hidden sm:inline">{scanLabel}</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent className="sm:hidden">{scanLabel}</TooltipContent>
-          </Tooltip>
+          <LibraryScanButton
+            scanning={scanning}
+            connected={connection.status === 'connected'}
+            failed={latest?.status === 'failed'}
+            onStarted={() => onPageChange(1)}
+          />
         ) : library.isSuccess ? (
           <Button asChild>
             <Link to="/settings">挂载媒体目录</Link>
