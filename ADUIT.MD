@@ -165,7 +165,10 @@
   - 已完成：删除广播地址重复判断、resolver 中间变量及未使用的 timeout 默认值；调用方显式提供正超时，生产仍为 20 秒，测试仍为 1–2 秒。
   - 现状修正：检查当前 Go 标准库 LookupIP → internetAddrList → filterAddrList，空地址列表会返回错误；现有拨号逻辑已处理该错误，因此不存在空 DNS 结果导致 (nil, nil) 的可达路径，不增加重复校验或测试专用注入。
   - 验证：netx、subtitle、library/scrape、app 包测试及 git diff --check 通过；补充保留网段边界和 IPv4 映射广播地址覆盖，保留私网拨号阻断、本地代理、重定向校验及下载大小限制测试。未进行浏览器或真实上游联调，待整体复查。
-- [ ] **99.** `internal/codeid/codeid.go:132-144` `Layers.stripPrefix` 与 `:247-262` `Candidates` 两套"去前缀"逻辑，正则（`layerNumeric` vs `numericPattern`）已分歧；`Parse`（60-62）与 `Layers`（111-116）去噪流程重复；:344 `UnpaddedNumericCandidate` 仅包内使用；:350-362、:329-334 冗余分支；:95-101 正则 var 块散落；:180、:187 对恒为单元素的 `layers[0]` 循环。
+- [x] **99.** `internal/codeid/codeid.go:132-144` `Layers.stripPrefix` 与 `:247-262` `Candidates` 两套"去前缀"逻辑，正则（`layerNumeric` vs `numericPattern`）已分歧；`Parse`（60-62）与 `Layers`（111-116）去噪流程重复；:344 `UnpaddedNumericCandidate` 仅包内使用；:350-362、:329-334 冗余分支；:95-101 正则 var 块散落；:180、:187 对恒为单元素的 `layers[0]` 循环。
+  - 已完成：共用 stripPrefix，仅对完整六位日期番号移除工作室前缀，避免 HEYDOUGA 等多段编号错误降级；layerNumeric 只负责候选形态识别。共用域名/编码噪声清理，合并正则声明，删除单元素循环、日期编号重拼及前导零重复判断；UnpaddedNumericCandidate 改为包内函数。
+  - 行为边界：Layers 保留同层发行商标签与日期两个候选，继续拒绝它们匹配不同影片的歧义；Candidates 保持原先优先日期别名的行为。双端回退同时考虑先去后缀再去前缀，使 CARIB-060326-001-C 仍能匹配日期番号；完整候选和前缀层仍优先。
+  - 验证：codeid 完整语料与优先级测试、javdb、catalogue、subtitle、library（含 scan/scrape）、offline、monitor、api、app 包测试及 git diff --check 通过；新增六组层级回归覆盖 Heydouga、多段数字、日期、发行商和字幕后缀，保留同层歧义和全零序号测试。未进行浏览器或真实上游联调，待整体复查。
 - [ ] **100.** `internal/gfriends/client.go:21-23,29` `DefaultFastlyURL`、`DefaultRawURL`、`CacheExpiration`、`FileTree` 无外部使用却导出；:42-44 nil httpClient 默认值死代码；:127-128 写缓存错误被静默吞掉。
 - [ ] **101.** `domain.ZoneAll` 的使用范围、`LocalMovie` 的 JSON 标签，以及 `domain.ScanPayload` 与 `scan.Payload` 别名是否仍有必要待核实。`KindInternal` 和旧 tasks 层 ScanPayload 别名已清理，不再作为待办。
 - [ ] **102.** `internal/library/scrape/scrape.go:155` `fileScope` 与 `internal/database/scope.go:10` `LibraryFiles` 一字不差；魔法字符串 `"local"` 在 `library.go:118,120,202,204`、`scan/local.go:235-236` 硬编码，`Movies` 与 `MatchingMovies` 的 scope 计算重复 → `domain.LocalAccountID` + `s.libraryScope()`。

@@ -21,7 +21,7 @@ func prototypeLayers(filename string) [][]string {
 // compared with the original candidate, keeping multipart identities intact.
 func prototypeQueries(candidate string) []string {
 	queries := []string{candidate}
-	if unpadded, ok := UnpaddedNumericCandidate(candidate); ok {
+	if unpadded, ok := unpaddedNumericCandidate(candidate); ok {
 		queries = append(queries, unpadded)
 	}
 	for _, separator := range []string{"", " "} {
@@ -188,8 +188,8 @@ func TestPrototypeResolutionPriority(t *testing.T) {
 			name: "prefix fallback beats suffix fallback", input: "200START-637-C.mp4", want: "prefix",
 			responses: map[string][]catalogueSample{
 				"200START-637-C": {}, "200START637C": {}, "200START 637 C": {},
-				"START-637-C":   {{"prefix", "START-637-C"}},
-				"200START-637":  {{"suffix", "200START-637"}},
+				"START-637-C":  {{"prefix", "START-637-C"}},
+				"200START-637": {{"suffix", "200START-637"}},
 			},
 			queries: []string{"200START-637-C", "200START637C", "200START 637 C", "START-637-C"},
 		},

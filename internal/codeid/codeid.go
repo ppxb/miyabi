@@ -51,15 +51,19 @@ var (
 	fileMarker  = regexp.MustCompile(`^(?:C|U|UC|CHS|CHT|SUB|HD|FHD|UHD|(?:CD|DISC|PART)[0-9]+)$`)
 	// SSNI releases append C directly to the numeric serial for subtitles.
 	// Limit this filename alias to the known family; other catalogues have real letter variants.
-	ssniSubtitle = regexp.MustCompile(`^(SSNI-[0-9]+)C$`)
+	ssniSubtitle  = regexp.MustCompile(`^(SSNI-[0-9]+)C$`)
+	versionSuffix = regexp.MustCompile(`^[-_]([A-Z])(?:[^A-Z0-9]|$)`)
+	layerToken    = regexp.MustCompile(`[A-Z0-9]+(?:[-_.][A-Z0-9]+)*`)
+	layerSerial   = regexp.MustCompile(`[A-Z][A-Z0-9]*[-_.]?[0-9]`)
+	layerNumeric  = regexp.MustCompile(`^[0-9]+[-_][0-9]+(?:[-_][A-Z0-9]+)*$`)
+	layerPart     = regexp.MustCompile(`^[0-9]{1,2}$`)
 )
 
 // Parse extracts a catalogue number from a filename, discarding website,
 // encoding, subtitle and video-part annotations.
 func Parse(name string) (string, bool) {
 	name = strings.ToUpper(separators.Replace(name))
-	name = domainNoise.ReplaceAllString(name, " ")
-	name = codecNoise.ReplaceAllString(name, " ")
+	name = removeNameNoise(name)
 	// A compact number followed by CD1 is a file part, not an alphanumeric serial.
 	name = partNoise.ReplaceAllString(name, "$1$2")
 	match := filenamePattern.FindStringSubmatchIndex(name)
@@ -92,13 +96,9 @@ func Parse(name string) (string, bool) {
 	return code, code != ""
 }
 
-var (
-	versionSuffix = regexp.MustCompile(`^[-_]([A-Z])(?:[^A-Z0-9]|$)`)
-	layerToken    = regexp.MustCompile(`[A-Z0-9]+(?:[-_.][A-Z0-9]+)*`)
-	layerSerial   = regexp.MustCompile(`[A-Z][A-Z0-9]*[-_.]?[0-9]`)
-	layerNumeric  = regexp.MustCompile(`^[0-9]+[-_][0-9]+(?:[-_][A-Z0-9]+)*$`)
-	layerPart     = regexp.MustCompile(`^[0-9]{1,2}$`)
-)
+func removeNameNoise(name string) string {
+	return codecNoise.ReplaceAllString(domainNoise.ReplaceAllString(name, " "), " ")
+}
 
 // Layers generates catalogue candidates in priority order:
 // Level 0: 完整原貌 (Complete normalized catalogue candidate)
@@ -112,8 +112,7 @@ func Layers(name string) [][]string {
 	for _, ext := range []string{".MP4", ".MKV", ".NFO", ".STRM"} {
 		name = strings.TrimSuffix(name, ext)
 	}
-	name = domainNoise.ReplaceAllString(name, " ")
-	name = codecNoise.ReplaceAllString(name, " ")
+	name = removeNameNoise(name)
 	var complete string
 	for _, token := range layerToken.FindAllString(name, -1) {
 		if layerSerial.MatchString(token) || layerNumeric.MatchString(token) {
@@ -127,20 +126,6 @@ func Layers(name string) [][]string {
 		} else {
 			return nil
 		}
-	}
-
-	stripPrefix := func(code string) []string {
-		var alts []string
-		prefix, rest, separated := strings.Cut(code, "-")
-		if separated {
-			if label := strings.TrimLeft(prefix, "0123456789"); label != "" && label != prefix {
-				alts = append(alts, label+"-"+rest)
-			}
-			if layerNumeric.MatchString(rest) {
-				alts = append(alts, rest)
-			}
-		}
-		return alts
 	}
 
 	stripSuffix := func(code string) []string {
@@ -176,23 +161,20 @@ func Layers(name string) [][]string {
 	}
 
 	// Level 1: 前缀回退 (先剥离发行商/渠道前缀，保留尾部)
-	var prefixFallbacks []string
-	for _, code := range layers[0] {
-		prefixFallbacks = append(prefixFallbacks, stripPrefix(code)...)
-	}
+	prefixFallbacks := stripPrefix(complete)
 	addLayer(prefixFallbacks)
 
 	// Level 2: 后缀回退 (剥离分卷/字幕后缀)
-	var suffixFallbacks []string
-	for _, code := range layers[0] {
-		suffixFallbacks = append(suffixFallbacks, stripSuffix(code)...)
-	}
+	suffixFallbacks := stripSuffix(complete)
 	addLayer(suffixFallbacks)
 
 	// Level 3: 双端回退 (前缀与后缀均剥离)
 	var dualFallbacks []string
 	for _, code := range prefixFallbacks {
 		dualFallbacks = append(dualFallbacks, stripSuffix(code)...)
+	}
+	for _, code := range suffixFallbacks {
+		dualFallbacks = append(dualFallbacks, stripPrefix(code)...)
 	}
 	addLayer(dualFallbacks)
 
@@ -208,12 +190,11 @@ func Queries(candidate string) []string {
 		queries = append(queries, "FC2-"+strings.TrimPrefix(candidate, "FC2-PPV-"))
 	}
 	queries = append(queries, candidate)
-	if unpadded, ok := UnpaddedNumericCandidate(candidate); ok {
+	if unpadded, ok := unpaddedNumericCandidate(candidate); ok {
 		queries = append(queries, unpadded)
 	}
 	return queries
 }
-
 
 // Normalize builds a comparison key for a complete catalogue number, applying
 // known equivalent spellings and preserving unfamiliar formats. It does not
@@ -228,12 +209,8 @@ func Normalize(raw string) string {
 	if match := fc2Pattern.FindStringSubmatch(value); match != nil {
 		return "FC2-PPV-" + match[1] + delimiters.ReplaceAllString(match[2], "-")
 	}
-	if match := numericPattern.FindStringSubmatch(value); match != nil {
-		sep := "-"
-		if strings.Contains(value, "_") {
-			sep = "_"
-		}
-		return match[1] + sep + match[2]
+	if numericPattern.MatchString(value) {
+		return value
 	}
 	// Preserve explicit prefixes such as T28 before trying an omitted separator.
 	// Known multipart formats also accept compact spellings without losing a numeric segment.
@@ -256,13 +233,25 @@ func Candidates(code string) []string {
 		return nil
 	}
 	candidates := []string{norm}
+	if fallbacks := stripPrefix(norm); len(fallbacks) > 0 {
+		// Complete-code aliases prefer the date over a stripped distributor label.
+		candidates = append(candidates, fallbacks[len(fallbacks)-1])
+	}
+	return candidates
+}
+
+// stripPrefix only relaxes distributor labels and complete six-digit date codes.
+func stripPrefix(norm string) []string {
 	prefix, seq := splitCode(norm)
-	switch {
-	case prefix == "":
-	case numericPattern.MatchString(seq):
-		candidates = append(candidates, seq)
-	case labelPrefix.MatchString(prefix):
+	if prefix == "" {
+		return nil
+	}
+	var candidates []string
+	if labelPrefix.MatchString(prefix) {
 		candidates = append(candidates, strings.TrimLeft(prefix, "0123456789")+"-"+seq)
+	}
+	if numericPattern.MatchString(seq) {
+		candidates = append(candidates, seq)
 	}
 	return candidates
 }
@@ -332,31 +321,22 @@ func IsFormatEquivalent(a, b string) bool {
 	if isDigits(seqA) && isDigits(seqB) {
 		trimmedA := strings.TrimLeft(seqA, "0")
 		trimmedB := strings.TrimLeft(seqB, "0")
-		if trimmedA == "" {
-			trimmedA = "0"
-		}
-		if trimmedB == "" {
-			trimmedB = "0"
-		}
 		return trimmedA == trimmedB
 	}
 
 	return false
 }
 
-// UnpaddedNumericCandidate returns a catalogue candidate with leading zeros stripped
+// unpaddedNumericCandidate returns a catalogue candidate with leading zeros stripped
 // from a purely numeric sequence (e.g. "ABC-00123" -> "ABC-123", "IPX-052" -> "IPX-52").
 // It returns false if no padding zeros were present or if the sequence is non-numeric.
-func UnpaddedNumericCandidate(raw string) (string, bool) {
+func unpaddedNumericCandidate(raw string) (string, bool) {
 	norm := Normalize(raw)
 	if norm == "" {
 		return "", false
 	}
 	prefix, seq := splitCode(norm)
-	if prefix == "" || seq == "" || !isDigits(seq) {
-		return "", false
-	}
-	if !strings.HasPrefix(seq, "0") {
+	if prefix == "" || !isDigits(seq) {
 		return "", false
 	}
 	trimmed := strings.TrimLeft(seq, "0")

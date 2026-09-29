@@ -327,6 +327,27 @@ func TestCandidates(t *testing.T) {
 	}
 }
 
+func TestLayersUsesCataloguePrefixRules(t *testing.T) {
+	for _, tt := range []struct {
+		input string
+		want  [][]string
+	}{
+		{"HEYDOUGA-4030-2347.mp4", [][]string{{"HEYDOUGA-4030-2347"}}},
+		{"ABC-123-456.mp4", [][]string{{"ABC-123-456"}}},
+		{"CARIB-060326-001.mp4", [][]string{{"CARIB-060326-001"}, {"060326-001"}}},
+		{"1PONDO-060326-001.mp4", [][]string{{"1PONDO-060326-001"}, {"PONDO-060326-001", "060326-001"}}},
+		{"CARIB-060326-001-C.mp4", [][]string{{"CARIB-060326-001-C"}, {"CARIB-060326-001"}, {"060326-001"}}},
+		{"200START-637-C.mp4", [][]string{{"200START-637-C"}, {"START-637-C"}, {"200START-637"}, {"START-637"}}},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			got := Layers(tt.input)
+			if !slices.EqualFunc(got, tt.want, slices.Equal[[]string]) {
+				t.Fatalf("Layers(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestUnpaddedNumericCandidate(t *testing.T) {
 	tests := []struct {
 		input     string
@@ -345,9 +366,9 @@ func TestUnpaddedNumericCandidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			got, ok := UnpaddedNumericCandidate(tt.input)
+			got, ok := unpaddedNumericCandidate(tt.input)
 			if got != tt.want || ok != tt.wantMatch {
-				t.Errorf("UnpaddedNumericCandidate(%q) = (%q, %v); want (%q, %v)", tt.input, got, ok, tt.want, tt.wantMatch)
+				t.Errorf("unpaddedNumericCandidate(%q) = (%q, %v); want (%q, %v)", tt.input, got, ok, tt.want, tt.wantMatch)
 			}
 		})
 	}
@@ -389,4 +410,3 @@ func TestQueries(t *testing.T) {
 		})
 	}
 }
-
