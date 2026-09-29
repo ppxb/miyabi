@@ -60,11 +60,6 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
-	if err := library.MigrateViewedMovies(ctx, store.Client); err != nil {
-		_ = store.Close()
-		return nil, fmt.Errorf("migrate viewed movies: %w", err)
-	}
-
 	network, err := NewNetworkService(ctx, store.Client)
 	if err != nil {
 		_ = store.Close()

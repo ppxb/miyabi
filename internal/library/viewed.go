@@ -2,24 +2,15 @@ package library
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/ent/setting"
 	"github.com/ppxb/miyabi/internal/ent/viewedmovie"
 )
 
-const (
-	viewedMoviesLegacySetting = "browse.viewed_movies"
-	maxViewedMovies           = 5000
-)
-
-type legacyViewedMoviesPayload struct {
-	IDs []string `json:"ids"`
-}
+const maxViewedMovies = 5000
 
 // ViewedMovieIDs returns viewed JavDB IDs, ordered by most recently viewed first.
 func (s *Service) ViewedMovieIDs(ctx context.Context, limit ...int) ([]string, error) {
@@ -109,54 +100,4 @@ func (s *Service) AddViewedMovieIDs(ctx context.Context, ids []string) error {
 		}
 		return nil
 	})
-}
-
-// MigrateViewedMovies transfers legacy settings "browse.viewed_movies" JSON blob into the viewed_movie table.
-func MigrateViewedMovies(ctx context.Context, client *ent.Client) error {
-	record, err := client.Setting.Query().Where(setting.KeyEQ(viewedMoviesLegacySetting)).Only(ctx)
-
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	var payload legacyViewedMoviesPayload
-	if err := json.Unmarshal([]byte(record.Value), &payload); err != nil {
-		return fmt.Errorf("unmarshal legacy viewed movies: %w", err)
-	}
-
-	if len(payload.IDs) > 0 {
-		now := time.Now().UTC()
-		err := ent.WithTx(ctx, client, func(tx *ent.Tx) error {
-			// Insert in chunks of 500
-			for start := 0; start < len(payload.IDs); start += 500 {
-				end := min(start+500, len(payload.IDs))
-				chunk := payload.IDs[start:end]
-				var builders []*ent.ViewedMovieCreate
-				for _, id := range chunk {
-					id = strings.TrimSpace(id)
-					if id != "" {
-						builders = append(builders, tx.ViewedMovie.Create().SetJavdbID(id).SetViewedAt(now))
-					}
-				}
-				if len(builders) > 0 {
-					if err := tx.ViewedMovie.CreateBulk(builders...).
-						OnConflictColumns(viewedmovie.FieldJavdbID).
-						Ignore().
-						Exec(ctx); err != nil {
-						return err
-					}
-				}
-			}
-			return tx.Setting.DeleteOneID(record.ID).Exec(ctx)
-		})
-		if err != nil {
-			return fmt.Errorf("migrate legacy viewed movies to table: %w", err)
-		}
-	} else {
-		_ = client.Setting.DeleteOneID(record.ID).Exec(ctx)
-	}
-	return nil
 }

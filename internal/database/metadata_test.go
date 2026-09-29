@@ -46,6 +46,7 @@ func TestMetadataSnapshotMigrationPreservesLatestScopedExport(t *testing.T) {
 	add(task.StatusFailed, "100", "10", `null`)
 	// Recreate the previous schema and remove the one-time migration marker.
 	store.Client.Setting.Delete().Where(setting.Key(metadataSnapshotMigration)).ExecX(ctx)
+	setMigrationVersion(t, store, 3)
 	if _, err := store.db.ExecContext(ctx, `ALTER TABLE movies DROP COLUMN metadata_snapshot`); err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +117,8 @@ func TestMetadataSnapshotMigrationHandlesLegacyCompletion(t *testing.T) {
 			store.Client.Task.Create().SetType("cover").SetStatus(task.StatusDone).SetPayload(json.RawMessage(fmt.Sprintf(`{"movie_id":%d,"source":{"account_id":"100","directory":{"id":"10"}},"snapshot":{"videos":"old"}}`, film.ID))).SaveX(ctx)
 			job := store.Client.Task.Create().SetType("cover").SetStatus(scenario.status).SetPayload(json.RawMessage(fmt.Sprintf(`{"movie_id":%d,"source":{"account_id":"100","directory":{"id":"10"}},"snapshot":%s}`, film.ID, scenario.snapshot))).SaveX(ctx)
 			store.Client.Setting.Delete().Where(setting.Key(metadataSnapshotMigration)).ExecX(ctx)
-			if err := migrateMetadataSnapshots(ctx, store.db); err != nil {
+			setMigrationVersion(t, store, 3)
+			if err := runMigrations(ctx, store.db, len(migrations)); err != nil {
 				t.Fatal(err)
 			}
 			snapshot := store.Client.Movie.GetX(ctx, film.ID).MetadataSnapshot
@@ -151,8 +153,12 @@ func TestMetadataSnapshotMigrationRollsBackInvalidHistory(t *testing.T) {
 		SetPayload(json.RawMessage(fmt.Sprintf(`{"movie_id":%d,"source":{"account_id":"100","directory":{"id":"10"}},"snapshot":{"videos":"valid"}}`, film.ID))).SaveX(ctx)
 	bad := store.Client.Task.Create().SetType("cover").SetStatus(task.StatusDone).SetPayload(json.RawMessage(`{"snapshot":{"videos":123}}`)).SaveX(ctx)
 	store.Client.Setting.Delete().Where(setting.Key(metadataSnapshotMigration)).ExecX(ctx)
-	if err := migrateMetadataSnapshots(ctx, store.db); err == nil || !strings.Contains(err.Error(), fmt.Sprint(bad.ID)) {
+	setMigrationVersion(t, store, 3)
+	if err := runMigrations(ctx, store.db, len(migrations)); err == nil || !strings.Contains(err.Error(), fmt.Sprint(bad.ID)) {
 		t.Fatalf("invalid history accepted: %v", err)
+	}
+	if got := migrationVersion(t, store.db); got != 3 {
+		t.Fatalf("failed metadata migration advanced version to %d", got)
 	}
 	if got := store.Client.Movie.GetX(ctx, film.ID); got.MetadataSnapshot != nil {
 		t.Fatal("snapshot escaped rollback")
@@ -164,10 +170,47 @@ func TestMetadataSnapshotMigrationRollsBackInvalidHistory(t *testing.T) {
 		t.Fatal("failed migration marked complete")
 	}
 	store.Client.Task.DeleteOne(bad).ExecX(ctx)
-	if err := migrateMetadataSnapshots(ctx, store.db); err != nil {
+	if err := runMigrations(ctx, store.db, len(migrations)); err != nil {
 		t.Fatal(err)
 	}
 	if got := store.Client.Movie.GetX(ctx, film.ID); got.MetadataSnapshot == nil || got.MetadataSnapshot.Videos != "valid" {
 		t.Fatal("migration could not resume")
+	}
+}
+
+func TestVersionedMigrationHonorsLegacyMetadataMarker(t *testing.T) {
+	directory := t.TempDir()
+	ctx := t.Context()
+	store, err := Open(ctx, directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if store != nil {
+			_ = store.Close()
+		}
+	})
+	snapshot := &domain.MetadataSnapshot{AccountID: "100", DirectoryID: "10", Videos: "already-migrated"}
+	film := store.Client.Movie.Create().SetCode("ABP-001").SetMetadataSnapshot(snapshot).SaveX(ctx)
+	if err := SaveSetting(ctx, store.Client, metadataSnapshotMigration, true); err != nil {
+		t.Fatal(err)
+	}
+	// This leftover history would fail decoding if an already-completed legacy
+	// snapshot migration ran again during adoption of user_version.
+	store.Client.Task.Create().SetType("cover").SetStatus(task.StatusDone).
+		SetPayload(json.RawMessage(`{"snapshot":{"videos":123}}`)).SaveX(ctx)
+	setMigrationVersion(t, store, 0)
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	store, err = Open(ctx, directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := store.Client.Movie.GetX(ctx, film.ID); !reflect.DeepEqual(got.MetadataSnapshot, snapshot) {
+		t.Fatalf("overwrote existing snapshot: %+v", got.MetadataSnapshot)
+	}
+	if got := migrationVersion(t, store.db); got != len(migrations) {
+		t.Fatalf("legacy migration version=%d", got)
 	}
 }

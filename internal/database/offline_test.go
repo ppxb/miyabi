@@ -101,6 +101,7 @@ func TestMigrateOfflineDownloadsPreservesHistoryAndReferences(t *testing.T) {
 	sub := store.Client.Subscription.Create().SetTargetID("movie").SetTaskID(legacy[2].ID).SaveX(ctx)
 	// Model an existing installation without the new table and with its old JSON indexes.
 	for _, statement := range []string{
+		`PRAGMA user_version = 0`,
 		`DROP TABLE offline_downloads`,
 		`CREATE INDEX task_offline_source_history ON tasks (json_extract(payload, '$.account_id'), json_extract(payload, '$.directory_id'), json_type(payload, '$.hash'), json_extract(payload, '$.hash'), id DESC) WHERE type = 'offline'`,
 		`CREATE INDEX task_offline_movie_history ON tasks (json_extract(payload, '$.account_id'), json_extract(payload, '$.javdb_id'), json_type(payload, '$.hash'), json_extract(payload, '$.hash'), id DESC) WHERE type = 'offline'`,
@@ -167,13 +168,17 @@ func TestMigrateOfflineDownloadsRollsBackInvalidHistory(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer store.Close()
+			setMigrationVersion(t, store, 2)
 			good := store.Client.Task.Create().SetType("offline").SetPayload(json.RawMessage(`{"hash":"valid"}`)).SaveX(ctx)
 			bad := store.Client.Task.Create().SetType("offline").SaveX(ctx)
 			if _, err := store.db.ExecContext(ctx, `UPDATE tasks SET payload = ? WHERE id = ?`, raw, bad.ID); err != nil {
 				t.Fatal(err)
 			}
-			if err := migrateOfflineDownloads(ctx, store.db); err == nil || !strings.Contains(err.Error(), fmt.Sprint(bad.ID)) {
+			if err := runMigrations(ctx, store.db, len(migrations)); err == nil || !strings.Contains(err.Error(), fmt.Sprint(bad.ID)) {
 				t.Fatalf("invalid history did not fail with its row ID: %v", err)
+			}
+			if got := migrationVersion(t, store.db); got != 2 {
+				t.Fatalf("failed offline migration advanced version to %d", got)
 			}
 			if count := store.Client.OfflineDownload.Query().CountX(ctx); count != 0 {
 				t.Fatalf("%d copies escaped rollback", count)
@@ -192,7 +197,7 @@ func TestMigrateOfflineDownloadsRollsBackInvalidHistory(t *testing.T) {
 			if _, err := store.db.ExecContext(ctx, `UPDATE tasks SET payload = ? WHERE id = ?`, `{"hash":"corrected"}`, bad.ID); err != nil {
 				t.Fatal(err)
 			}
-			if err := migrateOfflineDownloads(ctx, store.db); err != nil {
+			if err := runMigrations(ctx, store.db, len(migrations)); err != nil {
 				t.Fatal(err)
 			}
 			if count := store.Client.OfflineDownload.Query().CountX(ctx); count != 2 {

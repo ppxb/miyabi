@@ -9,16 +9,12 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 )
 
+// Recognize the marker written before migrations used PRAGMA user_version.
 const metadataSnapshotMigration = "migration.movie_metadata_snapshot"
 
 // migrateMetadataSnapshots moves export state out of task history once. A cover
 // snapshot also marked a committed export awaiting queue completion after a crash.
-func migrateMetadataSnapshots(ctx context.Context, db *sql.DB) error {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+func migrateMetadataSnapshots(ctx context.Context, tx *sql.Tx) error {
 	var migrated bool
 	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM settings WHERE key = ?)`, metadataSnapshotMigration).Scan(&migrated); err != nil || migrated {
 		return err
@@ -77,9 +73,5 @@ func migrateMetadataSnapshots(ctx context.Context, db *sql.DB) error {
 	if err := rows.Close(); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO settings (key, value, created_at, updated_at)
-		VALUES (?, 'true', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, metadataSnapshotMigration); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return nil
 }

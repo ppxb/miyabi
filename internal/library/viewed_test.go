@@ -1,11 +1,9 @@
 package library
 
 import (
-	"encoding/json/jsontext"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/database"
-	"github.com/ppxb/miyabi/internal/ent/setting"
 )
 
 func TestViewedMovies_CRUDAndOrdering(t *testing.T) {
@@ -59,53 +57,4 @@ func TestViewedMovies_CRUDAndOrdering(t *testing.T) {
 	if len(ids) != 3 || ids[0] != "id-1" {
 		t.Fatalf("expected id-1 at front, got %v", ids)
 	}
-}
-
-func TestViewedMovies_MigrationFromSettings(t *testing.T) {
-	ctx := t.Context()
-	store, err := database.Open(ctx, t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
-	// Insert legacy setting
-	store.Client.Setting.Create().
-		SetKey(viewedMoviesLegacySetting).
-		SetValue(jsontext.Value(`{"ids":["legacy-1","legacy-2","legacy-3"]}`)).
-		SaveX(ctx)
-
-	// Explicit migration step
-	if err := MigrateViewedMovies(ctx, store.Client); err != nil {
-		t.Fatal(err)
-	}
-
-	svc := New(store.Client, nil, nil, nil)
-
-	ids, err := svc.ViewedMovieIDs(ctx)
-	if err != nil {
-		t.Fatalf("ViewedMovieIDs() error = %v", err)
-	}
-	if len(ids) != 3 {
-		t.Fatalf("expected 3 migrated ids, got %v", ids)
-	}
-
-	// Legacy setting record must be deleted
-	exists, err := store.Client.Setting.Query().Where(setting.KeyEQ(viewedMoviesLegacySetting)).Exist(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if exists {
-		t.Fatal("legacy setting was not cleaned up after migration")
-	}
-
-	// Subsequent MigrateViewedMovies calls should be idempotent
-	if err := MigrateViewedMovies(ctx, store.Client); err != nil {
-		t.Fatal(err)
-	}
-	count, err := store.Client.ViewedMovie.Query().Count(ctx)
-	if err != nil || count != 3 {
-		t.Fatalf("idempotent migration changed count: %d, %v", count, err)
-	}
-
 }

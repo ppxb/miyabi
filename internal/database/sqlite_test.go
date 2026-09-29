@@ -87,6 +87,7 @@ func TestPlayerStorageIsDroppedWithoutChangingLibraryRecords(t *testing.T) {
 		SetFileID("sub").SetPickCode("pick").SaveX(ctx)
 	// Installations with the in-app player stored watch state and player-only subtitle settings.
 	for _, statement := range []string{
+		"PRAGMA user_version = 0",
 		"ALTER TABLE movies ADD COLUMN watched bool NOT NULL DEFAULT false",
 		"ALTER TABLE subtitles ADD COLUMN display_name text NOT NULL DEFAULT '简体中文'",
 		"ALTER TABLE subtitles ADD COLUMN offset_ms integer NOT NULL DEFAULT 0",
@@ -204,7 +205,8 @@ func TestMigrateMonitorsToSubscriptions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := migrateSubscriptions(t.Context(), store.db); err != nil {
+	setMigrationVersion(t, store, 0)
+	if err := runMigrations(t.Context(), store.db, len(migrations)); err != nil {
 		t.Fatal(err)
 	}
 

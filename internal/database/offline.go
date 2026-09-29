@@ -9,12 +9,7 @@ import (
 
 // migrateOfflineDownloads preserves IDs referenced by subscriptions and scan payloads.
 // Copy and removal share a transaction, so a failed migration leaves all old rows intact.
-func migrateOfflineDownloads(ctx context.Context, db *sql.DB) error {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+func migrateOfflineDownloads(ctx context.Context, tx *sql.Tx) error {
 	rows, err := tx.QueryContext(ctx, `SELECT id, created_at, updated_at, status, progress, error, payload FROM tasks WHERE type = 'offline' ORDER BY id`)
 	if err != nil {
 		return err
@@ -83,5 +78,5 @@ func migrateOfflineDownloads(ctx context.Context, db *sql.DB) error {
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
 }

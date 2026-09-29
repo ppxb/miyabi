@@ -85,7 +85,7 @@
 - [x] **47.** ✔ 删除 JavBus 详情参数及 HTML 缓存，消除无效容量上限与过期删除竞争；保留 catalogue 按影片缓存最终磁力结果及并发请求合并。外层缓存失效后重新获取 JavBus 详情参数，避免继续复用旧参数。
 - [x] **48.** ✔ 明确 JavDB 为主数据源：`Provider` 改为 `JavDBClient`，保留 JavDB 专属线路类型并要求磁力来源能力；JavBus 改为仅包含磁力查询、可用性和关闭能力的可选 `JavBusSource`。生产与 `NewWithClients` 共用组装逻辑，始终创建聚合器，删除直接读取磁力的备用分支；测试通过构造参数注入客户端，验证单源去重及补充源失败后的重试与缓存行为。
 - [x] **49.** ✔ 选线结果直接使用 `javdb.RouteStatus`，删除重复 `routeResult` 及逐字段搬运；保留前端毫秒格式投影与数据库恢复记录。catalogue 当前线路只读取 JavDB，删除保存状态的显示回退；`lastSavedRoute` 仅用于避免重复写库，成功保存后才更新。已验证启动恢复、保存失败后重试及无活动线路时不显示旧线路。
-- [ ] **50.** 迁移分散：`database/sqlite.go:53,61` `dropPlayerStorage` / `migrateSubscriptions` + `app.go:62` `MigrateViewedMovies`，每次启动做 pragma / sqlite_master 探测且无版本记录 → `PRAGMA user_version` 有序迁移列表。
+- [x] **50.** ✔ 历史迁移统一由 database 的有序列表执行，使用 `PRAGMA user_version` 记录进度；每步数据修改和版本递增同事务提交，失败回滚并在重启后续迁。保留“播放器旧字段清理 → Ent 建表/索引 → 数据迁移”的依赖顺序，浏览记录迁移移出 app/library；兼容旧元数据迁移标记，拒绝未知高版本，已完成步骤不再重复探测和执行。
 - [ ] **51.** `internal/app/network.go` 的 `NetworkService` 是业务服务却放在组合根包，`Network(ctx)` 的 error 恒为 nil，:75 重复传超时；`internal/netx/probe.go` 的 `NetworkTestResponse`（含 javdb/javbus 字段）是 API DTO 却放在通用网络包。
 - [ ] **52.** `internal/app/app.go:135-150` 构造后 Set* 注入：`SetGFriends`、`SetMediaFetcher`、`SetSubtitles`、`SetMediaNotifier`、`SetPacing(scan.DefaultPacing)`、`SetSTRMToken`、`SetSTRMExporters`，存在时序耦合；`SetPacing` 传入的就是唯一生产值 → 非循环依赖走构造参数。
 - [ ] **53.** 错误体系：`KindInternal` 从未被构造（仅 `api/error.go:72` 作日志标签）；`HasKind` 接口与 `*Error` 两套分类，`IsKind`（error.go:119）只认 `*Error`、`KindOf`（:146）两者都认，行为不一致；`KindBusy` 注释写 409/503 实际只映射 409；登录限流应返回 429。
