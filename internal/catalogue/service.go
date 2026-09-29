@@ -318,25 +318,6 @@ func (service *Service) Reselect(ctx context.Context) (RouteStatus, error) {
 	return service.Route(), nil
 }
 
-// Facets exposes available zones and sort options for front-end discovery filtering.
-func (service *Service) Facets() Facets {
-	return Facets{
-		Zones: []FacetItem{
-			{Value: string(domain.ZoneCensored), Label: "有码"},
-			{Value: string(domain.ZoneUncensored), Label: "无码"},
-			{Value: string(domain.ZoneFC2), Label: "FC2"},
-			{Value: string(domain.ZoneWestern), Label: "欧美"},
-			{Value: string(domain.ZoneAnime), Label: "动漫"},
-		},
-		Sorts: []FacetItem{
-			{Value: "release", Label: "发布日期"},
-			{Value: "update", Label: "更新日期"},
-			{Value: "hit", Label: "热度"},
-			{Value: "score", Label: "评分"},
-		},
-	}
-}
-
 func (service *Service) projectMovies(
 	ctx context.Context,
 	source []domain.Movie,

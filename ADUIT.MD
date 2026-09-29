@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：151 条待处理，28 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：150 条待处理，29 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -126,7 +126,9 @@
 - [x] **88.** `internal/javdb/client.go:254-260` `getJSON` 的 `language` 参数所有调用点都传 `defaultLanguage`，`transport.go:132-134` `if language == ""` 死代码。
   - 已完成：移除 Client、jsonTransport、transport 和请求构造中的 language 参数，统一在 newRequest 设置 accept-language=defaultLanguage（zh-TW），删除空值兜底；各 API、探测和测试桩同步简化，测试响应按路径索引。
   - 验证：javdb、catalogue、api、app 包测试通过；请求构造测试直接断言 zh-TW 请求头，保留签名、解析、限流重试与线路切换覆盖，git diff --check 通过。未做真实 JavDB 联调，待整体复查。
-- [ ] **89.** `internal/catalogue/service.go:344-361`、`types.go:77-87` `Facets()`、`Facets`、`FacetItem` 无 API / 生产使用，仅 `TestFacets`。
+- [x] **89.** `internal/catalogue/service.go:344-361`、`types.go:77-87` `Facets()`、`Facets`、`FacetItem` 无 API / 生产使用，仅 `TestFacets`。
+  - 已完成：确认无生产/API 调用后，删除 Facets()、Facets、FacetItem 与仅验证其固定选项的 TestFacets；标签、演员页面使用的 JavDB main 分类筛选和前端 DISCOVER_ZONES 不受影响。
+  - 验证：catalogue、api 包测试通过，git diff --check 通过；未进行浏览器测试，待整体复查。
 - [ ] **90.** `internal/javdb/magnet.go:81-94` `Find` 中 `JavDBID` 为空走 `ResolveMovieID` 分支不可达（`catalogue/magnets.go:66` 总带 JavDBID）；`magnet.go:54-71` 排序与 `aggregator.go:104-118` 同一规则重复。
 - [ ] **91.** `internal/javdb/client.go:52-66` + `internal/catalogue/service.go:56,65`：唯一调用 `app.go:89` 传 `javdb.Options{}`，Timeout / RPS / Burst 负值校验与 `DeviceUUID` 回退永不触发 → `catalogue.New` 不再接收 Options。
 - [ ] **92.** `internal/drive/drive.go:179-184` `ValidateSource`、`internal/drive/session.go:18,70-72` `Session.Version()` 仅测试使用（导致 scrape 的 `mockSession` 也必须实现）；`mount.go:152` `DirectoryPath` 仅包内使用。

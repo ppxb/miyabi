@@ -290,26 +290,6 @@ func TestProjectionUsesSourceIDBeforeCatalogueSpelling(t *testing.T) {
 	}
 }
 
-func TestFacets(t *testing.T) {
-	service := &Service{}
-	facets := service.Facets()
-	if len(facets.Zones) == 0 || len(facets.Sorts) == 0 {
-		t.Fatalf("empty facets: %+v", facets)
-	}
-	expectedZones := map[string]bool{"censored": true, "uncensored": true, "fc2": true, "western": true, "anime": true}
-	for _, z := range facets.Zones {
-		if !expectedZones[z.Value] {
-			t.Errorf("unexpected zone: %s", z.Value)
-		}
-	}
-	expectedSorts := map[string]bool{"release": true, "update": true, "hit": true, "score": true}
-	for _, s := range facets.Sorts {
-		if !expectedSorts[s.Value] {
-			t.Errorf("unexpected sort: %s", s.Value)
-		}
-	}
-}
-
 type stubProviderWithMagnets struct {
 	magnets []domain.Magnet
 }

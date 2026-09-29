@@ -75,18 +75,6 @@ type MovieStateItem struct {
 	State     MovieState `json:"state"`
 }
 
-// FacetItem represents an option for discovery filtering.
-type FacetItem struct {
-	Value string `json:"value"`
-	Label string `json:"label"`
-}
-
-// Facets exposes discovery filtering dimensions such as zones and sorting options.
-type Facets struct {
-	Zones []FacetItem `json:"zones"`
-	Sorts []FacetItem `json:"sorts"`
-}
-
 // JavDBClient supplies the primary catalogue, route management and magnets.
 type JavDBClient interface {
 	magnet.Source
