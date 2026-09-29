@@ -42,8 +42,9 @@ type Service struct {
 	tags    *responseCache[[]domain.TagCategory]
 	magnets *responseCache[[]domain.Magnet]
 
-	routeMu sync.RWMutex
-	route   RouteStatus
+	persistRouteMu sync.Mutex
+	// Used only to avoid redundant database writes; live state belongs to JavDB.
+	lastSavedRoute persistedRoute
 }
 
 // New creates the lazy JavDB client and restores/persists device UUID and route settings.
@@ -129,21 +130,16 @@ func newService(database *ent.Client, primary JavDBClient, supplement JavBusSour
 		sources = append(sources, supplement)
 	}
 	return &Service{
-		database:   database,
-		javdb:      primary,
-		javbus:     supplement,
-		aggregator: magnet.NewAggregator(sources, aggregatorTimeout, nil),
-		lists:      newResponseCache[[]domain.Movie](listCacheSize, listCacheTTL),
-		details:    newResponseCache[domain.MovieDetail](detailCacheSize, detailCacheTTL),
-		tags:       newResponseCache[[]domain.TagCategory](tagsCacheSize, tagsCacheTTL),
-		magnets:    newResponseCache[[]domain.Magnet](magnetsCacheSize, magnetsCacheTTL),
-		local:      local,
-		route: RouteStatus{
-			Host:      route.Host,
-			LatencyMS: route.LatencyMS,
-			Active:    route.Host != "",
-			Manual:    route.Manual,
-		},
+		database:       database,
+		javdb:          primary,
+		javbus:         supplement,
+		aggregator:     magnet.NewAggregator(sources, aggregatorTimeout, nil),
+		lists:          newResponseCache[[]domain.Movie](listCacheSize, listCacheTTL),
+		details:        newResponseCache[domain.MovieDetail](detailCacheSize, detailCacheTTL),
+		tags:           newResponseCache[[]domain.TagCategory](tagsCacheSize, tagsCacheTTL),
+		magnets:        newResponseCache[[]domain.Magnet](magnetsCacheSize, magnetsCacheTTL),
+		local:          local,
+		lastSavedRoute: route,
 	}
 }
 
@@ -296,13 +292,6 @@ func (service *Service) Route() RouteStatus {
 			Status:    candidate.Status,
 		}
 	}
-	if !active {
-		service.routeMu.RLock()
-		result.Host = service.route.Host
-		result.LatencyMS = service.route.LatencyMS
-		result.Manual = service.route.Manual
-		service.routeMu.RUnlock()
-	}
 	return result
 }
 
@@ -393,26 +382,19 @@ func (service *Service) projectMovies(
 }
 
 func (service *Service) persistActiveRoute(ctx context.Context) error {
-	service.routeMu.Lock()
-	defer service.routeMu.Unlock()
+	service.persistRouteMu.Lock()
+	defer service.persistRouteMu.Unlock()
 	active, ok := service.javdb.Route()
 	if !ok {
 		return nil
 	}
 	route := persistedRoute{Host: active.Host, LatencyMS: active.Latency.Milliseconds(), Manual: active.Manual}
-	unchanged := service.route.Active && service.route.Host == route.Host &&
-		service.route.LatencyMS == route.LatencyMS && service.route.Manual == route.Manual
-	if unchanged {
+	if route == service.lastSavedRoute {
 		return nil
 	}
 	if err := database.SaveSetting(ctx, service.database, javdbRouteSetting, route); err != nil {
 		return fmt.Errorf("cache JavDB route: %w", err)
 	}
-	service.route = RouteStatus{
-		Host:      route.Host,
-		LatencyMS: route.LatencyMS,
-		Active:    true,
-		Manual:    route.Manual,
-	}
+	service.lastSavedRoute = route
 	return nil
 }

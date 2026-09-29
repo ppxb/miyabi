@@ -364,11 +364,7 @@ func (c *Client) selectAndInstall(ctx context.Context, options routeSelection) (
 	if err != nil {
 		return nil, err
 	}
-	return c.installRoute(ctx, RouteStatus{
-		Host: result.Host, Latency: result.Latency,
-		Manual:     result.Manual,
-		Candidates: result.Candidates,
-	})
+	return c.installRoute(ctx, result)
 }
 
 func (c *Client) installRoute(ctx context.Context, status RouteStatus) (*routeState, error) {

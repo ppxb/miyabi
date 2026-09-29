@@ -32,13 +32,6 @@ const (
 
 var backupKey, backupIV = backupKeyMaterial()
 
-type routeResult struct {
-	Host       string
-	Latency    time.Duration
-	Manual     bool
-	Candidates []RouteCandidate
-}
-
 type routeSelection struct {
 	full          bool
 	hosts         []string
@@ -65,7 +58,7 @@ type runningProbe struct {
 	cancel  context.CancelFunc
 }
 
-func selectRoute(ctx context.Context, options routeSelection, check probe) (routeResult, error) {
+func selectRoute(ctx context.Context, options routeSelection, check probe) (RouteStatus, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	events := make(chan probeEvent)
@@ -116,7 +109,7 @@ func selectRoute(ctx context.Context, options routeSelection, check probe) (rout
 	for len(running) > 0 {
 		select {
 		case <-ctx.Done():
-			return routeResult{}, ctx.Err()
+			return RouteStatus{}, ctx.Err()
 		case event := <-events:
 			state := running[event.host]
 			if !event.started.IsZero() {
@@ -162,7 +155,7 @@ func selectRoute(ctx context.Context, options routeSelection, check probe) (rout
 		}
 	}
 	if err := ctx.Err(); err != nil {
-		return routeResult{}, err
+		return RouteStatus{}, err
 	}
 
 	// Ties follow dynamic response order, then bootstrap and previously known hosts.
@@ -171,7 +164,7 @@ func selectRoute(ctx context.Context, options routeSelection, check probe) (rout
 	if options.preferredHost != "" {
 		hosts = append(hosts, options.preferredHost)
 	}
-	result := routeResult{Candidates: routeCandidates(hosts, known)}
+	result := RouteStatus{Candidates: routeCandidates(hosts, known)}
 	var selected probeResult
 	for _, host := range hosts {
 		candidate := known[host]
