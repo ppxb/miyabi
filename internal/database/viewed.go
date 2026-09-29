@@ -33,12 +33,14 @@ func migrateViewedMovies(ctx context.Context, tx *sql.Tx) error {
 		return err
 	}
 	defer statement.Close()
-	for _, id := range payload.IDs {
+	// Legacy IDs are newest-first but have no timestamps. Preserve that order
+	// with synthetic times instead of letting the descending row ID reverse it.
+	for index, id := range payload.IDs {
 		id = strings.TrimSpace(id)
 		if id == "" {
 			continue
 		}
-		if _, err := statement.ExecContext(ctx, id, now); err != nil {
+		if _, err := statement.ExecContext(ctx, id, now.Add(-time.Duration(index)*time.Microsecond)); err != nil {
 			return err
 		}
 	}

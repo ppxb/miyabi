@@ -188,8 +188,11 @@
   - 已完成：删除 MIYABI_EMBY_URL 旧别名；环境读取时统一去空白，Listen/DataDir 在推导默认值前已归一化，修复带空白数据目录生成错误 Emby 子目录的问题。validate 仅保留 Listen/DataDir 必填校验，移除重复 Trim 和不可达 EmbyDir 空检查。
   - 日志：配置入口一次性将原有 debug/info/warn/error 转为 slog.Level，继续接受大小写和周围空白，不扩展支持偏移等级；main 直接构造 JSON 日志 handler，删除 logging 包，密码空白保留行为不变。
   - 验证：config、app、cmd/miyabi 包测试及 git diff --check 通过；新增默认目录/端口推导、旧别名不生效、四种日志等级及偏移等级拒绝测试，保留密码空白和生命周期覆盖。未进行浏览器测试。
-- [ ] **105.** `internal/database/viewed.go` 的 `migrateViewedMovies` 为全部旧浏览记录写入同一时间，可能丢失原有顺序。核实旧数组顺序及保留策略；迁移已纳入版本管理，不能因当前开发数据库迁完就删除或重排迁移步骤。若要修正已升级数据，应新增迁移并明确可恢复的信息。
-- [ ] **106.** ✔ 前端零引用 UI：`components/ui/popover.tsx`、`components/ui/dropdown-menu.tsx`；`ui/textarea.tsx` 仅被零引用的 `InputGroupTextarea` 使用；零引用导出 `AvatarBadge` / `AvatarGroup` / `AvatarGroupCount`、`CardFooter` / `CardAction`、`TabsContent`、`tabsListVariants`、`badgeVariants`、`InputGroupText`、`SelectLabel` / `SelectSeparator`、`BreadcrumbEllipsis`。
+- [x] **105.** `internal/database/viewed.go` 的 `migrateViewedMovies` 为全部旧浏览记录写入同一时间，可能丢失原有顺序。核实旧数组顺序及保留策略；迁移已纳入版本管理，不能因当前开发数据库迁完就删除或重排迁移步骤。若要修正已升级数据，应新增迁移并明确可恢复的信息。
+  - 核实：历史 mergeViewedMovies 将新 ID 按输入顺序放在旧数组之前，数组为最近优先；原迁移顺序插入但时间相同，新查询按 viewed_at DESC、id DESC 排序，会反转导入记录。
+  - 已完成：尚未执行的迁移按数组位置写入递减微秒时间以保留顺序，时间仅为排序用途，不声称还原实际浏览时刻；继续过滤空 ID、保留首次重复项且不覆盖表中已有记录。迁移版本和步骤顺序不变。
+  - 已升级数据边界：旧数组已删除，迁移产生的同时间记录无法可靠区别于正常批量浏览，不新增猜测性重排迁移，已有记录保持不变。
+  - 验证：database、library、api、app 包测试及 git diff --check 通过；迁移测试新增最终查询顺序断言，保留空值/重复项、已有时间戳、事务回滚与重开不重复迁移覆盖。未进行浏览器测试。
 - [ ] **107.** 前端零引用 / 无意义项：
   - `api/auth.ts:45-57` `useAccessGateLogout` 无调用（后端 `POST /auth/logout` 随之无人使用），`LoginResponse.expires_at` 不读；
   - `auth.ts:20`、`discover.ts:134`、`:160`、`:235` 的 `enabled` 参数从未传入；

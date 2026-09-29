@@ -5,11 +5,14 @@ import (
 	"encoding/json/jsontext"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/setting"
+	"github.com/ppxb/miyabi/internal/ent/viewedmovie"
 )
 
 func setMigrationVersion(t *testing.T, store *Store, version int) {
@@ -69,6 +72,12 @@ func TestOpenMigratesViewedMoviesAndSkipsCompletedSteps(t *testing.T) {
 	}
 	if store.Client.Setting.Query().Where(setting.Key(viewedMoviesLegacySetting)).ExistX(ctx) {
 		t.Fatal("legacy history not removed")
+	}
+	ordered, err := store.Client.ViewedMovie.Query().
+		Order(ent.Desc(viewedmovie.FieldViewedAt), ent.Desc(viewedmovie.FieldID)).
+		Select(viewedmovie.FieldJavdbID).Strings(ctx)
+	if err != nil || !slices.Equal(ordered, []string{"legacy-1", "legacy-2", "existing"}) {
+		t.Fatalf("legacy newest-first order changed: %v, %v", ordered, err)
 	}
 	// Invalid legacy-looking data would fail if a completed migration ran again.
 	store.Client.Setting.Create().SetKey(viewedMoviesLegacySetting).SetValue(jsontext.Value(`{"ids":123}`)).SaveX(ctx)
