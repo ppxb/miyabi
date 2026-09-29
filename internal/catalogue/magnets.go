@@ -16,9 +16,6 @@ const aggregatorTimeout = 8 * time.Second
 // aggregator still runs with the JavDB ID alone.
 func (service *Service) Magnets(ctx context.Context, movieID string) ([]Magnet, error) {
 	magnets, err := cachedJavDB(ctx, service, service.magnets, movieID, func(ctx context.Context) ([]domain.Magnet, error) {
-		if service.aggregator == nil {
-			return service.javdb.Magnets(ctx, movieID)
-		}
 		ref := domain.MovieRef{JavDBID: movieID}
 		if service.javbus != nil && service.javbus.Available() {
 			if detail, err := service.CatalogueDetail(ctx, movieID); err == nil {

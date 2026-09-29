@@ -5,6 +5,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/javdb"
+	"github.com/ppxb/miyabi/internal/magnet"
 )
 
 type MovieState string
@@ -86,19 +87,26 @@ type Facets struct {
 	Sorts []FacetItem `json:"sorts"`
 }
 
-// Provider represents the upstream catalogue data source (e.g. JavDB).
-type Provider interface {
+// JavDBClient supplies the primary catalogue, route management and magnets.
+type JavDBClient interface {
+	magnet.Source
 	Close()
 	Search(context.Context, string, domain.SearchOptions) ([]domain.Movie, error)
 	Browse(context.Context, domain.BrowseOptions) ([]domain.Movie, error)
 	MovieDetail(context.Context, string) (domain.MovieDetail, error)
-	Magnets(context.Context, string) ([]domain.Magnet, error)
 	FetchMedia(context.Context, string) (domain.Media, error)
 	Tags(context.Context, domain.Zone) ([]domain.TagCategory, error)
 	ResolveMovieID(context.Context, string) (string, error)
 	Route() (javdb.RouteStatus, bool)
 	SelectRoute(context.Context, string) (javdb.RouteStatus, error)
 	Reselect(context.Context) (javdb.RouteStatus, error)
+}
+
+// JavBusSource supplements magnets without providing catalogue metadata.
+type JavBusSource interface {
+	magnet.Source
+	Available() bool
+	Close()
 }
 
 // LocalState supplies the mounted library source and matches local movies.

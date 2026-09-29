@@ -186,6 +186,11 @@ func (catalogue *fakeCatalogue) MovieDetail(_ context.Context, id string) (domai
 	return detail, nil
 }
 
+func (catalogue *fakeCatalogue) Name() string { return domain.MagnetSourceJavDB }
+func (catalogue *fakeCatalogue) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Magnet, error) {
+	return catalogue.Magnets(ctx, ref.JavDBID)
+}
+
 func (catalogue *fakeCatalogue) Magnets(context.Context, string) ([]domain.Magnet, error) {
 	catalogue.count("magnets")
 	return []domain.Magnet{}, nil
@@ -272,7 +277,7 @@ func newPipelineFixture(t *testing.T) *pipelineFixture {
 	}
 	catalogueClient := &fakeCatalogue{ids: make(map[string]string), details: make(map[string]domain.MovieDetail), cover: fixtureJPEG(t, 600, 400)}
 	library := library.New(store.Client, d, taskSvc, images)
-	discover, err := catalogue.NewWithProvider(ctx, store.Client, catalogueClient, library)
+	discover, err := catalogue.NewWithClients(ctx, store.Client, catalogueClient, nil, library)
 	if err != nil {
 		t.Fatal(err)
 	}

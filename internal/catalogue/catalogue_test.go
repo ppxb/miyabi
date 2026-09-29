@@ -366,10 +366,14 @@ func TestServiceMagnetsWithAggregator(t *testing.T) {
 				HasSubtitle: true,
 				Sources:     []string{"javdb"},
 			},
+			{
+				Hash: "1111111111111111111111111111111111111111",
+				Name: "duplicate from primary source",
+			},
 		},
 	}
 
-	service, err := NewWithProvider(t.Context(), store.Client, provider, &stubLocalState{})
+	service, err := NewWithClients(t.Context(), store.Client, provider, nil, &stubLocalState{})
 	if err != nil {
 		t.Fatalf("unexpected error creating service: %v", err)
 	}
@@ -409,7 +413,7 @@ func TestCachedJavDBIgnoresPersistActiveRouteFailure(t *testing.T) {
 	provider := &stubProviderWithRoute{
 		route: javdb.RouteStatus{Host: "https://new-route.example"},
 	}
-	service, err := NewWithProvider(t.Context(), store.Client, provider, &stubLocalState{})
+	service, err := NewWithClients(t.Context(), store.Client, provider, nil, &stubLocalState{})
 	if err != nil {
 		store.Close()
 		t.Fatal(err)

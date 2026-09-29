@@ -2,6 +2,7 @@ package catalogue
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"sync/atomic"
@@ -11,12 +12,51 @@ import (
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/javbus"
-	"github.com/ppxb/miyabi/internal/magnet"
 )
 
 type detailCountingProvider struct {
 	stubProviderWithMagnets
 	detailCalls atomic.Int32
+}
+
+type recoveringJavBusSource struct{ calls int }
+
+func (*recoveringJavBusSource) Name() string    { return domain.MagnetSourceJavBus }
+func (*recoveringJavBusSource) Available() bool { return true }
+func (*recoveringJavBusSource) Close()          {}
+func (s *recoveringJavBusSource) Find(_ context.Context, ref domain.MovieRef) ([]domain.Magnet, error) {
+	s.calls++
+	if s.calls == 1 {
+		return nil, errors.New("temporary JavBus failure")
+	}
+	if ref.Code != "SSIS-001" || ref.JavDBID != "movie-1" {
+		return nil, errors.New("missing primary catalogue identity")
+	}
+	return []domain.Magnet{{Hash: "2222222222222222222222222222222222222222", Name: "supplement"}}, nil
+}
+
+func TestMagnetsOptionalSourceFailureDoesNotCachePartialResults(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	primary := &stubProviderWithMagnets{magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "primary"}}}
+	supplement := &recoveringJavBusSource{}
+	service, err := NewWithClients(t.Context(), store.Client, primary, supplement, &stubLocalState{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+	for _, want := range []int{1, 2, 2} {
+		magnets, err := service.Magnets(t.Context(), "movie-1")
+		if err != nil || len(magnets) != want {
+			t.Fatalf("magnets=%+v error=%v want=%d", magnets, err, want)
+		}
+	}
+	if supplement.calls != 2 {
+		t.Fatalf("expected retry then cache hit, got %d upstream calls", supplement.calls)
+	}
 }
 
 type countingJavBusHTTP struct{ calls atomic.Int32 }
@@ -45,19 +85,14 @@ func TestMagnets_WithAvailableJavBus(t *testing.T) {
 			magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "SSIS-001"}},
 		},
 	}
-	service, err := NewWithProvider(t.Context(), store.Client, provider, &stubLocalState{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	upstream := &countingJavBusHTTP{}
 	javbusClient := javbus.NewForTest(true, upstream)
-	defer javbusClient.Close()
-	service.javbus = javbusClient
-	service.aggregator = magnet.NewAggregator([]magnet.Source{
-		provider,
-		javbusClient,
-	}, aggregatorTimeout, nil)
+	service, err := NewWithClients(t.Context(), store.Client, provider, javbusClient, &stubLocalState{})
+	if err != nil {
+		javbusClient.Close()
+		t.Fatal(err)
+	}
+	defer service.Close()
 
 	magnets, err := service.Magnets(t.Context(), "movie-1")
 	if err != nil {
@@ -100,18 +135,13 @@ func TestMagnets_WithUnavailableJavBus(t *testing.T) {
 			magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "SSIS-001"}},
 		},
 	}
-	service, err := NewWithProvider(t.Context(), store.Client, provider, &stubLocalState{})
+	javbusClient := javbus.NewForTest(false)
+	service, err := NewWithClients(t.Context(), store.Client, provider, javbusClient, &stubLocalState{})
 	if err != nil {
+		javbusClient.Close()
 		t.Fatal(err)
 	}
-
-	javbusClient := javbus.NewForTest(false)
-	defer javbusClient.Close()
-	service.javbus = javbusClient
-	service.aggregator = magnet.NewAggregator([]magnet.Source{
-		provider,
-		javbusClient,
-	}, aggregatorTimeout, nil)
+	defer service.Close()
 
 	magnets, err := service.Magnets(t.Context(), "movie-1")
 	if err != nil {

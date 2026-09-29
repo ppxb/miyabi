@@ -83,7 +83,7 @@
 - [x] **45.** ✔ `netx.NewTransport(manager)` 统一标准 HTTP Transport 和动态代理配置，nil 时强制直连且不读取环境代理；Resty、安全下载及 GFriends 复用，删除字幕与 JavDB 图片客户端的重复分支和多余初始化。`SafeDownload`、`OpenMedia` 改用 `net/http`，保留下载大小限制、SSRF/重定向检查及媒体流的 UA、Range、HEAD、超时行为；需要浏览器 TLS 指纹的客户端继续独立使用。
 - [x] **46.** ✔ `netx.ProxiedFingerprintClient` 统一指纹客户端接口、代理订阅、重建替换及关闭释放；重建失败保留旧客户端，关闭后禁止重建。JavDB 与 JavBus 正式请求复用此管理逻辑，分别保留线路重选和健康探测；JavDB 线路探测仍使用固定代理的临时客户端，两站 `Probe` 保留各自检测语义。
 - [x] **47.** ✔ 删除 JavBus 详情参数及 HTML 缓存，消除无效容量上限与过期删除竞争；保留 catalogue 按影片缓存最终磁力结果及并发请求合并。外层缓存失效后重新获取 JavBus 详情参数，避免继续复用旧参数。
-- [ ] **48.** `internal/catalogue/types.go:89-102` `Provider` 11 方法接口仍返回 `javdb.RouteStatus`，未真正解耦；`NewWithProvider` 仅测试使用，`magnets.go:63-65` 的 `aggregator == nil` 分支只为它存在且行为与生产不一致；`javbus` 字段是具体类型、`javdb` 是接口。
+- [x] **48.** ✔ 明确 JavDB 为主数据源：`Provider` 改为 `JavDBClient`，保留 JavDB 专属线路类型并要求磁力来源能力；JavBus 改为仅包含磁力查询、可用性和关闭能力的可选 `JavBusSource`。生产与 `NewWithClients` 共用组装逻辑，始终创建聚合器，删除直接读取磁力的备用分支；测试通过构造参数注入客户端，验证单源去重及补充源失败后的重试与缓存行为。
 - [ ] **49.** 同一份路由信息 4 个结构体：`javdb.RouteStatus`、`routeResult`（字段完全一致，`client.go:341-345` 逐字段搬运）、`catalogue.RouteStatus`、`catalogue.persistedRoute`；`catalogue.Service.route` 镜像 javdb 路由状态（`service.go:48-49,153-158,295-319,407-430`）。
 - [ ] **50.** 迁移分散：`database/sqlite.go:53,61` `dropPlayerStorage` / `migrateSubscriptions` + `app.go:62` `MigrateViewedMovies`，每次启动做 pragma / sqlite_master 探测且无版本记录 → `PRAGMA user_version` 有序迁移列表。
 - [ ] **51.** `internal/app/network.go` 的 `NetworkService` 是业务服务却放在组合根包，`Network(ctx)` 的 error 恒为 nil，:75 重复传超时；`internal/netx/probe.go` 的 `NetworkTestResponse`（含 javdb/javbus 字段）是 API DTO 却放在通用网络包。
