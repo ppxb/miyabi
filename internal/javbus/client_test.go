@@ -55,10 +55,11 @@ func (m *mockHTTPClient) getCallCount(path string) int {
 	return m.calls[path]
 }
 
-func TestClient_FindSuccessWithCaching(t *testing.T) {
+func TestClient_FindUsesFreshDetailParameters(t *testing.T) {
 	mock := newMockHTTPClient()
 	detailBody := fixtureFile(t, "detail_ssis-001.html")
 	magnetsBody := fixtureFile(t, "magnets_ssis-001.html")
+	expectedGID := "45622804531"
 
 	mock.handlers["/SSIS-001"] = func(req *http.Request) (*http.Response, error) {
 		if !strings.Contains(req.Header.Get("Cookie"), "dv=1") {
@@ -75,7 +76,7 @@ func TestClient_FindSuccessWithCaching(t *testing.T) {
 	}
 
 	mock.handlers["/ajax/uncledatoolsbyajax.php"] = func(req *http.Request) (*http.Response, error) {
-		if req.URL.Query().Get("gid") != "45622804531" {
+		if req.URL.Query().Get("gid") != expectedGID {
 			t.Errorf("unexpected gid query: %s", req.URL.Query().Get("gid"))
 		}
 		if req.URL.Query().Get("uc") != "0" {
@@ -101,7 +102,7 @@ func TestClient_FindSuccessWithCaching(t *testing.T) {
 		t.Fatalf("expected name to be javbus, got %s", client.Name())
 	}
 
-	// First query: populates cache.
+	// Each upstream lookup obtains the current detail parameters.
 	magnets, err := client.Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
 	if err != nil {
 		t.Fatalf("Find failed: %v", err)
@@ -116,7 +117,9 @@ func TestClient_FindSuccessWithCaching(t *testing.T) {
 		t.Fatalf("expected 1 ajax call, got %d", mock.getCallCount("/ajax/uncledatoolsbyajax.php"))
 	}
 
-	// Second query: should reuse cached detail parameters and only fetch ajax.
+	// The next lookup must use updated detail parameters rather than stale ones.
+	expectedGID = "45622804532"
+	detailBody = bytes.ReplaceAll(detailBody, []byte("45622804531"), []byte(expectedGID))
 	magnets2, err := client.Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
 	if err != nil {
 		t.Fatalf("second Find failed: %v", err)
@@ -124,8 +127,8 @@ func TestClient_FindSuccessWithCaching(t *testing.T) {
 	if len(magnets2) != 43 {
 		t.Fatalf("expected 43 magnets, got %d", len(magnets2))
 	}
-	if mock.getCallCount("/SSIS-001") != 1 {
-		t.Fatalf("expected detail call to remain 1 due to cache, got %d", mock.getCallCount("/SSIS-001"))
+	if mock.getCallCount("/SSIS-001") != 2 {
+		t.Fatalf("expected 2 detail calls, got %d", mock.getCallCount("/SSIS-001"))
 	}
 	if mock.getCallCount("/ajax/uncledatoolsbyajax.php") != 2 {
 		t.Fatalf("expected 2 ajax calls, got %d", mock.getCallCount("/ajax/uncledatoolsbyajax.php"))

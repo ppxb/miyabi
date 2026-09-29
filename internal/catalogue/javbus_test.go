@@ -2,9 +2,12 @@ package catalogue
 
 import (
 	"context"
+	"io"
+	"strings"
 	"sync/atomic"
 	"testing"
 
+	http "github.com/bogdanfinn/fhttp"
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/javbus"
@@ -15,6 +18,15 @@ type detailCountingProvider struct {
 	stubProviderWithMagnets
 	detailCalls atomic.Int32
 }
+
+type countingJavBusHTTP struct{ calls atomic.Int32 }
+
+func (c *countingJavBusHTTP) Do(*http.Request) (*http.Response, error) {
+	c.calls.Add(1)
+	return &http.Response{StatusCode: 404, Body: io.NopCloser(strings.NewReader("not found")), Header: make(http.Header)}, nil
+}
+
+func (*countingJavBusHTTP) CloseIdleConnections() {}
 
 func (d *detailCountingProvider) MovieDetail(ctx context.Context, id string) (domain.MovieDetail, error) {
 	d.detailCalls.Add(1)
@@ -38,7 +50,8 @@ func TestMagnets_WithAvailableJavBus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	javbusClient := javbus.NewForTest(true)
+	upstream := &countingJavBusHTTP{}
+	javbusClient := javbus.NewForTest(true, upstream)
 	defer javbusClient.Close()
 	service.javbus = javbusClient
 	service.aggregator = magnet.NewAggregator([]magnet.Source{
@@ -55,6 +68,23 @@ func TestMagnets_WithAvailableJavBus(t *testing.T) {
 	}
 	if provider.detailCalls.Load() != 1 {
 		t.Fatalf("expected 1 detail call when JavBus is available, got %d", provider.detailCalls.Load())
+	}
+	// Repeated page loads must not reach JavBus while the outer result is cached.
+	for range 3 {
+		cached, err := service.Magnets(t.Context(), "movie-1")
+		if err != nil || len(cached) != 1 {
+			t.Fatalf("cached magnets: %+v %v", cached, err)
+		}
+	}
+	if calls := upstream.calls.Load(); calls != 1 {
+		t.Fatalf("cached requests reached JavBus %d times", calls)
+	}
+	service.magnets.reset()
+	if _, err := service.Magnets(t.Context(), "movie-1"); err != nil {
+		t.Fatal(err)
+	}
+	if calls := upstream.calls.Load(); calls != 2 {
+		t.Fatalf("invalidated cache did not refresh JavBus: %d calls", calls)
 	}
 }
 

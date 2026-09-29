@@ -26,7 +26,6 @@ const (
 	probeInterval  = 2 * time.Minute
 	defaultRate    = 1
 	defaultBurst   = 2
-	detailCacheTTL = 5 * time.Minute
 	userAgent      = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
 
@@ -43,7 +42,6 @@ type Options struct {
 // Client accesses JavBus for movie magnets and metadata.
 type Client struct {
 	limiter *rate.Limiter
-	cache   *detailCache
 
 	available atomic.Bool
 
@@ -77,7 +75,6 @@ func New(options Options) (*Client, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	client := &Client{
 		limiter: rate.NewLimiter(rate.Every(time.Second/time.Duration(defaultRate)), defaultBurst),
-		cache:   newDetailCache(detailCacheTTL),
 		ctx:     ctx,
 		cancel:  cancel,
 	}
@@ -113,7 +110,6 @@ func NewForTest(available bool, testClients ...HTTPClient) *Client {
 		isTest:  true,
 		client:  cl,
 		limiter: rate.NewLimiter(rate.Inf, 0),
-		cache:   newDetailCache(detailCacheTTL),
 		ctx:     ctx,
 		cancel:  cancel,
 	}
@@ -203,10 +199,6 @@ func (c *Client) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Magnet
 }
 
 func (c *Client) ensureDetailParams(ctx context.Context, code string) (gid, uc, img string, err error) {
-	if entry, ok := c.cache.get(code); ok {
-		return entry.gid, entry.uc, entry.img, nil
-	}
-
 	if err := c.limiter.Wait(ctx); err != nil {
 		return "", "", "", err
 	}
@@ -269,7 +261,6 @@ func (c *Client) ensureDetailParams(ctx context.Context, code string) (gid, uc, 
 		return "", "", "", err
 	}
 
-	c.cache.set(code, bodyStr, params.GID, params.UC, params.Img)
 	return params.GID, params.UC, params.Img, nil
 }
 
