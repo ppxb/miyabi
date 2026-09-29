@@ -3,6 +3,8 @@ package library
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -17,6 +19,59 @@ import (
 	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
+
+func TestScanResumesCanceledDirectoryAndPersistsAllChunks(t *testing.T) {
+	lib, client := panConcurrencyFixture(t)
+	ctx := t.Context()
+	source := *lib.drive.Source()
+	entries := make([]pan.File, 205)
+	for i := range entries {
+		entries[i] = pan.File{ID: fmt.Sprintf("video-%d", i), ParentID: source.Directory.ID,
+			Name: fmt.Sprintf("ABP-%03d.mp4", i+1), Size: domain.MinVideoSize}
+	}
+	interrupted, cancel := context.WithCancel(ctx)
+	defer cancel()
+	stopOnSecondPage := true
+	client.list = func(_ context.Context, _, directoryID string, offset, _ int) (pan.FilePage, error) {
+		if directoryID != source.Directory.ID {
+			t.Fatalf("unexpected directory %q", directoryID)
+		}
+		if stopOnSecondPage && offset == 100 {
+			stopOnSecondPage = false
+			cancel()
+			return pan.FilePage{}, context.Canceled
+		}
+		end := min(offset+100, len(entries))
+		return pan.FilePage{Files: entries[offset:end], Path: []pan.Directory{{ID: source.Directory.ID}},
+			Total: len(entries), HasMore: end < len(entries)}, nil
+	}
+	queued := lib.database.Task.Query().Where(task.TypeEQ("scan")).OnlyX(ctx)
+	if err := lib.Scan(interrupted, tasks.Job{ID: queued.ID, Payload: queued.Payload}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("scan cancellation: %v", err)
+	}
+	if count := lib.database.File.Query().CountX(ctx); count != 0 {
+		t.Fatalf("partial directory committed %d files", count)
+	}
+	queued = lib.database.Task.GetX(ctx, queued.ID)
+	before, err := tasks.DecodePayload[scan.Payload](queued.Payload)
+	if err != nil || before.ScanID == "" || before.Checkpoint == "" {
+		t.Fatalf("restart context missing: %+v %v", before, err)
+	}
+	if err := lib.Scan(ctx, tasks.Job{ID: queued.ID, Payload: queued.Payload}); err != nil {
+		t.Fatal(err)
+	}
+	after, err := tasks.DecodePayload[scan.Payload](lib.database.Task.GetX(ctx, queued.ID).Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.ScanID != before.ScanID || after.Checkpoint != "" || after.Scan.Stage != "done" ||
+		after.Scan.FilesScanned != 205 || after.Scan.MatchedFiles != 205 || after.Scan.Movies != 205 || after.Scan.DirectoriesScanned != 1 {
+		t.Fatalf("unexpected resumed progress: %+v", after)
+	}
+	if count := lib.database.File.Query().Where(file.ScanIDEQ(before.ScanID)).CountX(ctx); count != 205 {
+		t.Fatalf("expected 205 files across all commit chunks, got %d", count)
+	}
+}
 
 func TestScanProgressKeepsRestartContextAndScanKind(t *testing.T) {
 	for _, targeted := range []bool{false, true} {

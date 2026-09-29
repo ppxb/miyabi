@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：178 条待处理，1 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：177 条待处理，2 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -29,7 +29,9 @@
 - [x] **58.** `internal/emby/service.go` 集中承担配置持久化、HTTP 请求、批量通知、全库刷新、演员头像同步和后台 STRM 重写，职责过多；需收敛请求构造、认证、启用条件及退出 flush 的重复。
   - 实现：提取 `internal/emby/client.go` 统一 HTTP 请求、X-Emby-Token 认证和错误处理；提取 `actors.go` 独立管理同步定时、单次执行、取消和退出等待。Service 保留配置与通知协调；配置变更取消旧同步，每轮同步使用同一份服务器配置。合并通知 flush，关闭时补发缓冲通知。
   - 验证：`go test ./...` 通过，新增请求格式、同步取消与等待、服务器切换、退出通知回归测试。未运行 race 检测（当前 CGO 关闭），未进行真实 Emby 联调；待整体复查。每批通知后的全库刷新策略仍按第 129 条处理。
-- [ ] **59.** `internal/library/scan/walker.go:76-263` `Scanner.Run` 约 190 行：参数校验、定向单文件、断点恢复、BFS、限速、NFO、分块入库、进度上报 + 两个闭包；:77 多余别名 → 拆 `runTargetFile` / `walk` / `indexDirectory`。
+- [x] **59.** `internal/library/scan/walker.go:76-263` `Scanner.Run` 约 190 行：参数校验、定向单文件、断点恢复、BFS、限速、NFO、分块入库、进度上报 + 两个闭包；:77 多余别名 → 拆 `runTargetFile` / `walk` / `indexDirectory`。
+  - 实现：Run 保留 payload 校验、数据源会话和 scanID 初始化，单次扫描状态由私有 scanRun 承载；runTarget、walk、indexDirectory 分别负责定向扫描、断点与 BFS 遍历、单目录分页及分块入库。复用现有事务与进度保存函数，保持检查点格式、取消和导出锁边界。
+  - 验证：library（含 scan/scrape）、app、offline、tasks 测试通过；新增 205 个视频在第二页取消后恢复的回归测试，验证未提交不完整目录、scanID 沿用、跨入库批次文件与进度完整。未进行真实 115 联调，待整体复查。
 - [ ] **60.** `internal/drive/drive.go:69-90` `Drive`：二维码登录状态机 + token 刷新 + 账号缓存 + 挂载持久化 + 事件 + Session 签发 + 工作计数，含 2 mutex、1 ContextLock、2 singleflight、1 WaitGroup、3 个版本号 → 拆出二维码登录（约 180 行）。
 - [ ] **61.** `internal/gfriends/client.go:78-143` `EnsureIndex` 持写锁执行两个镜像的网络下载（各 30s），期间所有 `Lookup` 阻塞；`FetchAvatar`（208-234）复制镜像循环；stale 回退（136-141）把 `loadedAt` 设为 now，一次故障后 7 天不重试。
 - [ ] **62.** `web/src/features/library/page.tsx` 仍内联扫描状态推导、响应式 Tooltip 按钮和 mutation 回调；错误文案已使用公共 describeApiError。评估提取 LibraryScanButton，以减少页面编排中的业务细节。
