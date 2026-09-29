@@ -53,10 +53,6 @@ func IsPrivateOrLoopbackIP(ip net.IP) bool {
 		if ip4[0] >= 240 {
 			return true
 		}
-		// 255.255.255.255 (Broadcast)
-		if ip4[0] == 255 && ip4[1] == 255 && ip4[2] == 255 && ip4[3] == 255 {
-			return true
-		}
 	}
 
 	return false
@@ -92,8 +88,7 @@ func ValidateSafeURL(ctx context.Context, rawURL string) (*url.URL, error) {
 	}
 
 	// Resolve hostname to IPs and ensure none are private/loopback
-	resolver := net.DefaultResolver
-	ips, err := resolver.LookupIP(ctx, "ip", hostname)
+	ips, err := net.DefaultResolver.LookupIP(ctx, "ip", hostname)
 	if err != nil {
 		return nil, fmt.Errorf("resolve hostname %s: %w", hostname, err)
 	}
@@ -177,11 +172,8 @@ func NewSafeTransport(proxyManager *ProxyManager) *http.Transport {
 
 // NewSafeDownloadClient applies SSRF protection, redirect checks and a timeout.
 // SafeDownload enforces the response body size limit.
+// Callers provide a positive timeout.
 func NewSafeDownloadClient(proxyManager *ProxyManager, timeout time.Duration) *http.Client {
-	if timeout <= 0 {
-		timeout = 20 * time.Second
-	}
-
 	transport := NewSafeTransport(proxyManager)
 
 	return &http.Client{

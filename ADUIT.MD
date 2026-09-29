@@ -161,7 +161,10 @@
 - [x] **97.** `internal/netx/proxy.go:88-94` `sameConfig` 蕴含 `sameURL`，`!sameConfig || !sameURL` 实为 `!sameConfig`，与注释"只在生效代理变化时广播"相反（Enabled=false 改 URL 也重建 tls-client）→ 条件改为 `!sameURL`；:73-79 `resolve` 中 `!Enabled ||` 冗余；:131-133 `parseProxyURL` 的 `raw == ""` 分支死代码。
   - 已完成：Apply 始终更新配置，仅在生效代理 URL 变化时广播；禁用时修改/清空 URL 和等效协议大小写变更不再触发客户端刷新。Normalize 已保证禁用时 parsed 为 nil、空 URL 提前返回，因此删除 resolve 的 Enabled 重复判断及 parseProxyURL 的空值分支。
   - 验证：netx、network、javdb、javbus、catalogue、api、app 包测试及 git diff --check 通过；新增连续状态变更测试覆盖配置保存、生效代理、禁用修改、启用、重复更新、等效 URL、代理切换及停用通知，保留真实本地 HTTP 代理切换和进行中请求覆盖。未进行浏览器或真实上游联调，待整体复查。
-- [ ] **98.** `internal/netx/ssrf.go:59-60` 255.255.255.255 分支已被 :58 `ip4[0] >= 240` 覆盖；:103 多余中间变量；:191-193 `timeout <= 0` 兜底唯一调用传固定 20s；:157/:176 `ips` 为空时返回 `(nil, nil)`。
+- [x] **98.** `internal/netx/ssrf.go:59-60` 255.255.255.255 分支已被 :58 `ip4[0] >= 240` 覆盖；:103 多余中间变量；:191-193 `timeout <= 0` 兜底唯一调用传固定 20s；:157/:176 `ips` 为空时返回 `(nil, nil)`。
+  - 已完成：删除广播地址重复判断、resolver 中间变量及未使用的 timeout 默认值；调用方显式提供正超时，生产仍为 20 秒，测试仍为 1–2 秒。
+  - 现状修正：检查当前 Go 标准库 LookupIP → internetAddrList → filterAddrList，空地址列表会返回错误；现有拨号逻辑已处理该错误，因此不存在空 DNS 结果导致 (nil, nil) 的可达路径，不增加重复校验或测试专用注入。
+  - 验证：netx、subtitle、library/scrape、app 包测试及 git diff --check 通过；补充保留网段边界和 IPv4 映射广播地址覆盖，保留私网拨号阻断、本地代理、重定向校验及下载大小限制测试。未进行浏览器或真实上游联调，待整体复查。
 - [ ] **99.** `internal/codeid/codeid.go:132-144` `Layers.stripPrefix` 与 `:247-262` `Candidates` 两套"去前缀"逻辑，正则（`layerNumeric` vs `numericPattern`）已分歧；`Parse`（60-62）与 `Layers`（111-116）去噪流程重复；:344 `UnpaddedNumericCandidate` 仅包内使用；:350-362、:329-334 冗余分支；:95-101 正则 var 块散落；:180、:187 对恒为单元素的 `layers[0]` 循环。
 - [ ] **100.** `internal/gfriends/client.go:21-23,29` `DefaultFastlyURL`、`DefaultRawURL`、`CacheExpiration`、`FileTree` 无外部使用却导出；:42-44 nil httpClient 默认值死代码；:127-128 写缓存错误被静默吞掉。
 - [ ] **101.** `domain.ZoneAll` 的使用范围、`LocalMovie` 的 JSON 标签，以及 `domain.ScanPayload` 与 `scan.Payload` 别名是否仍有必要待核实。`KindInternal` 和旧 tasks 层 ScanPayload 别名已清理，不再作为待办。
