@@ -26,7 +26,7 @@ func (dummyDataStub) ClearCache(context.Context) (maintenance.Info, error) {
 }
 
 func TestAuth_DisabledGateAllowsAll(t *testing.T) {
-	gate := NewAccessGateService("")
+	gate := NewAccessGateService("", "")
 	router := NewRouter(Dependencies{
 		Access:      gate,
 		Maintenance: dummyDataStub{},
@@ -72,7 +72,7 @@ func TestAuth_DisabledGateAllowsAll(t *testing.T) {
 
 func TestAuth_EnabledGateEnforcesJWT(t *testing.T) {
 	password := "my-secret-password-123"
-	gate := NewAccessGateService(password)
+	gate := NewAccessGateService(password, "")
 	router := NewRouter(Dependencies{
 		Access:      gate,
 		Maintenance: dummyDataStub{},
@@ -147,7 +147,7 @@ func TestAuth_EnabledGateEnforcesJWT(t *testing.T) {
 			t.Fatalf("expected success without a JSON token, got %+v", loginResp)
 		}
 		token = rec.Result().Cookies()[0].Value
-		if _, err := gate.VerifyToken(token); err != nil {
+		if err := gate.VerifyToken(token); err != nil {
 			t.Fatalf("cookie does not contain a valid JWT: %v", err)
 		}
 
@@ -213,7 +213,7 @@ func TestAuth_EnabledGateEnforcesJWT(t *testing.T) {
 
 func TestAuth_RateLimiterTriggers(t *testing.T) {
 	password := "correct-password"
-	gate := NewAccessGateService(password)
+	gate := NewAccessGateService(password, "")
 	router := NewRouter(Dependencies{
 		Access: gate,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -250,7 +250,7 @@ func TestAuth_RateLimiterTriggers(t *testing.T) {
 
 func TestAuth_UntrustedProxiesIgnoreSpoofedIP(t *testing.T) {
 	password := "correct-password"
-	gate := NewAccessGateService(password)
+	gate := NewAccessGateService(password, "")
 	// By default, TrustedProxies is empty so router.SetTrustedProxies(nil) is in effect
 	router := NewRouter(Dependencies{
 		Access: gate,

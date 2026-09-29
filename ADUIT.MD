@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：164 条待处理，15 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：163 条待处理，16 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -81,7 +81,9 @@
 - [x] **73.** `internal/config/runtime.go` 4 个从未被覆盖的常量包成 struct + `DefaultRuntime()`，`runtime_test.go` 仅断言常量本身 → 普通常量放到使用处。
   - 实现：删除 Runtime、DefaultRuntime、Config.Runtime 及仅断言固定值的 runtime_test.go；同步间隔与提交超时放在 app.go 的私有常量中，媒体库任务池在构建处固定单 worker，保留独立订阅池及底层服务超时注入。四个生产数值保持不变。
   - 验证：config、app、tasks、offline、monitor、cmd/miyabi 测试通过，保留分池、顺序执行和调度行为测试，未新增重复常量断言。待整体复查。
-- [ ] **74.** `internal/api/access_gate.go` / `auth.go:16-21`：`NewAccessGateService(password, jwtSecret ...string)` 用可变参数模拟可选；`GenerateToken(subject, ttl)` 实参永远是 `"admin"` 与 `defaultTokenTTL`；`VerifyToken` 返回的 `*Claims` 全被 `_` 丢弃，禁用时返回 `(nil, nil)`；`SignToken` / `VerifyToken` / `Claims` / `BadRequest` 仅包内使用却导出。
+- [x] **74.** `internal/api/access_gate.go` / `auth.go:16-21`：`NewAccessGateService(password, jwtSecret ...string)` 用可变参数模拟可选；`GenerateToken(subject, ttl)` 实参永远是 `"admin"` 与 `defaultTokenTTL`；`VerifyToken` 返回的 `*Claims` 全被 `_` 丢弃，禁用时返回 `(nil, nil)`；`SignToken` / `VerifyToken` / `Claims` / `BadRequest` 仅包内使用却导出。
+  - 实现：NewAccessGateService 明确接收 password/jwtSecret，空密钥继续按原规则派生；业务 GenerateToken 固定 admin 和 30 天，VerifyToken 仅返回 error；底层签名/校验、claims 和 badRequest 改为包内私有。过期 Cookie 测试直接用底层签名构造，JWT 格式和校验规则保持不变。
+  - 验证：api、app、cmd/miyabi 测试通过，覆盖 Cookie、SSE、STRM、过期/篡改 JWT；新增会话主体和期限、重建后密钥稳定、错误密钥拒绝及禁用门禁签发行为测试。未进行浏览器认证联调，待整体复查。
 - [ ] **75.** `web/src/components/app-shell.tsx:22-24` 手算 `activeId` 传给 `FloatingNav` → 使用 `Link` 的 `activeProps` + `activeOptions`。
 - [ ] **76.** `web/src/features/library/movie-card.tsx:14-18` hover 开关三重保护：`open={canHover && open}` + 条件渲染 + `key` 重挂载。
 - [ ] **77.** `internal/magnet/aggregator.go:16,28-35` `logger` 参数两处调用均传 nil；`defaultAggregatorTimeout` 与 `catalogue.aggregatorTimeout` 同为 8s 重复定义。

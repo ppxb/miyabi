@@ -48,7 +48,7 @@ func (err *requestError) PublicMessage() string {
 	return "请求参数无效"
 }
 
-func BadRequest(err error) error {
+func badRequest(err error) error {
 	return &requestError{err: err}
 }
 

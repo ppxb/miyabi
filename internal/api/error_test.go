@@ -52,8 +52,8 @@ func TestErrorMiddlewareMapsDomainErrorsToStatusAndMessage(t *testing.T) {
 		message string
 		code    string
 	}{
-		{name: "bad request wrapper", err: BadRequest(errors.New("page must be positive")), status: http.StatusBadRequest, message: "page must be positive"},
-		{name: "outer classification wins", err: BadRequest(domain.E(domain.KindConflict, "参数冲突", nil)), status: http.StatusBadRequest, message: "参数冲突"},
+		{name: "bad request wrapper", err: badRequest(errors.New("page must be positive")), status: http.StatusBadRequest, message: "page must be positive"},
+		{name: "outer classification wins", err: badRequest(domain.E(domain.KindConflict, "参数冲突", nil)), status: http.StatusBadRequest, message: "参数冲突"},
 		{name: "login rate limit", err: ErrTooManyLoginAttempts, status: http.StatusTooManyRequests, message: ErrTooManyLoginAttempts.PublicMessage()},
 		{name: "media directory required", err: drive.ErrMediaDirectoryRequired, status: http.StatusBadRequest, message: drive.ErrMediaDirectoryRequired.PublicMessage(), code: "PAN_DIRECTORY_REQUIRED"},
 		{name: "magnet not found", err: fmt.Errorf("add: %w", offline.ErrMagnetNotFound), status: http.StatusBadRequest, message: offline.ErrMagnetNotFound.PublicMessage()},

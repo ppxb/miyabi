@@ -7,33 +7,33 @@ import (
 )
 
 // bindJSON binds the JSON request body into a new instance of T.
-// On failure, it attaches a 400 BadRequest error to the context and returns false.
+// On failure, it attaches a 400 badRequest error to the context and returns false.
 func bindJSON[T any](c *gin.Context) (T, bool) {
 	var target T
 	if err := c.ShouldBindJSON(&target); err != nil {
-		c.Error(BadRequest(err))
+		c.Error(badRequest(err))
 		return target, false
 	}
 	return target, true
 }
 
 // bindQuery binds query string parameters into a new instance of T.
-// On failure, it attaches a 400 BadRequest error to the context and returns false.
+// On failure, it attaches a 400 badRequest error to the context and returns false.
 func bindQuery[T any](c *gin.Context) (T, bool) {
 	var target T
 	if err := c.ShouldBindQuery(&target); err != nil {
-		c.Error(BadRequest(err))
+		c.Error(badRequest(err))
 		return target, false
 	}
 	return target, true
 }
 
 // bindURI binds path parameters into a new instance of T.
-// On failure, it attaches a 400 BadRequest error to the context and returns false.
+// On failure, it attaches a 400 badRequest error to the context and returns false.
 func bindURI[T any](c *gin.Context) (T, bool) {
 	var target T
 	if err := c.ShouldBindUri(&target); err != nil {
-		c.Error(BadRequest(err))
+		c.Error(badRequest(err))
 		return target, false
 	}
 	return target, true

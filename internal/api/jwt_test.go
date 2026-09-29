@@ -11,16 +11,16 @@ func TestJWT_SignAndVerify(t *testing.T) {
 	secret := []byte("super-secret-key-32-bytes-long!")
 	now := time.Now().Unix()
 
-	claims := Claims{
+	claims := jwtClaims{
 		Subject:   "admin",
 		Issuer:    "miyabi",
 		IssuedAt:  now,
 		ExpiresAt: now + 3600,
 	}
 
-	token, err := SignToken(secret, claims)
+	token, err := signToken(secret, claims)
 	if err != nil {
-		t.Fatalf("SignToken failed: %v", err)
+		t.Fatalf("signToken failed: %v", err)
 	}
 
 	if token == "" {
@@ -32,7 +32,7 @@ func TestJWT_SignAndVerify(t *testing.T) {
 		t.Fatalf("expected 3 parts, got %d", len(parts))
 	}
 
-	verified, err := VerifyToken(secret, token)
+	verified, err := verifyToken(secret, token)
 	if err != nil {
 		t.Fatalf("VerifyToken failed: %v", err)
 	}
@@ -52,19 +52,19 @@ func TestJWT_ExpiredToken(t *testing.T) {
 	secret := []byte("secret")
 	now := time.Now().Unix()
 
-	claims := Claims{
+	claims := jwtClaims{
 		Subject:   "admin",
 		Issuer:    "miyabi",
 		IssuedAt:  now - 7200,
 		ExpiresAt: now - 3600, // Expired 1 hour ago
 	}
 
-	token, err := SignToken(secret, claims)
+	token, err := signToken(secret, claims)
 	if err != nil {
-		t.Fatalf("SignToken failed: %v", err)
+		t.Fatalf("signToken failed: %v", err)
 	}
 
-	_, err = VerifyToken(secret, token)
+	_, err = verifyToken(secret, token)
 	if !errors.Is(err, ErrTokenExpired) {
 		t.Fatalf("expected ErrTokenExpired, got %v", err)
 	}
@@ -72,18 +72,18 @@ func TestJWT_ExpiredToken(t *testing.T) {
 
 func TestJWT_TamperedSignature(t *testing.T) {
 	secret := []byte("secret")
-	claims := Claims{
+	claims := jwtClaims{
 		Subject:   "admin",
 		ExpiresAt: time.Now().Unix() + 3600,
 	}
 
-	token, err := SignToken(secret, claims)
+	token, err := signToken(secret, claims)
 	if err != nil {
-		t.Fatalf("SignToken failed: %v", err)
+		t.Fatalf("signToken failed: %v", err)
 	}
 
 	tampered := token + "tampered"
-	_, err = VerifyToken(secret, tampered)
+	_, err = verifyToken(secret, tampered)
 	if !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("expected ErrInvalidToken, got %v", err)
 	}
@@ -91,19 +91,19 @@ func TestJWT_TamperedSignature(t *testing.T) {
 
 func TestJWT_TamperedPayload(t *testing.T) {
 	secret := []byte("secret")
-	claims := Claims{
+	claims := jwtClaims{
 		Subject:   "admin",
 		ExpiresAt: time.Now().Unix() + 3600,
 	}
 
-	token, err := SignToken(secret, claims)
+	token, err := signToken(secret, claims)
 	if err != nil {
-		t.Fatalf("SignToken failed: %v", err)
+		t.Fatalf("signToken failed: %v", err)
 	}
 
 	parts := strings.Split(token, ".")
 	tampered := parts[0] + ".eyJzdWIiOiJoYWNrZXIifQ." + parts[2]
-	_, err = VerifyToken(secret, tampered)
+	_, err = verifyToken(secret, tampered)
 	if !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("expected ErrInvalidToken, got %v", err)
 	}
@@ -113,17 +113,17 @@ func TestJWT_WrongSecret(t *testing.T) {
 	secret1 := []byte("secret1")
 	secret2 := []byte("secret2")
 
-	claims := Claims{
+	claims := jwtClaims{
 		Subject:   "admin",
 		ExpiresAt: time.Now().Unix() + 3600,
 	}
 
-	token, err := SignToken(secret1, claims)
+	token, err := signToken(secret1, claims)
 	if err != nil {
-		t.Fatalf("SignToken failed: %v", err)
+		t.Fatalf("signToken failed: %v", err)
 	}
 
-	_, err = VerifyToken(secret2, token)
+	_, err = verifyToken(secret2, token)
 	if !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("expected ErrInvalidToken, got %v", err)
 	}
@@ -138,7 +138,7 @@ func TestJWT_MalformedToken(t *testing.T) {
 		"part1.part2.part3.part4",
 		"invalid-base64.invalid-base64.invalid-base64",
 	} {
-		_, err := VerifyToken(secret, malformed)
+		_, err := verifyToken(secret, malformed)
 		if !errors.Is(err, ErrInvalidToken) {
 			t.Errorf("for input %q: expected ErrInvalidToken, got %v", malformed, err)
 		}

@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 )
 
 type strmRelayStub struct {
@@ -149,7 +148,7 @@ func TestSTRMStreamHandlerAcceptsSignedInSessionsBehindTheAccessGate(t *testing.
 		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 		STRMToken: "secret123",
 	})
-	session, _, err := gate.GenerateToken("miyabi", time.Hour)
+	session, _, err := gate.GenerateToken()
 	if err != nil {
 		t.Fatal(err)
 	}

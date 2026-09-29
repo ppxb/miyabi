@@ -24,16 +24,16 @@ type jwtHeader struct {
 	Typ string `json:"typ"`
 }
 
-// Claims represents standard JWT claims for Miyabi session authentication.
-type Claims struct {
+// jwtClaims represents standard JWT claims for Miyabi session authentication.
+type jwtClaims struct {
 	Subject   string `json:"sub"`
 	Issuer    string `json:"iss"`
 	IssuedAt  int64  `json:"iat"`
 	ExpiresAt int64  `json:"exp"`
 }
 
-// SignToken generates an RFC 7519 compliant HS256 JWT string.
-func SignToken(secret []byte, claims Claims) (string, error) {
+// signToken generates an RFC 7519 compliant HS256 JWT string.
+func signToken(secret []byte, claims jwtClaims) (string, error) {
 	if len(secret) == 0 {
 		return "", errors.New("jwt secret must not be empty")
 	}
@@ -60,7 +60,7 @@ func SignToken(secret []byte, claims Claims) (string, error) {
 }
 
 // VerifyToken decodes and cryptographically validates an HS256 JWT string.
-func VerifyToken(secret []byte, tokenString string) (*Claims, error) {
+func verifyToken(secret []byte, tokenString string) (*jwtClaims, error) {
 	if len(secret) == 0 {
 		return nil, errors.New("jwt secret must not be empty")
 	}
@@ -104,7 +104,7 @@ func VerifyToken(secret []byte, tokenString string) (*Claims, error) {
 		return nil, ErrInvalidToken
 	}
 
-	var claims Claims
+	var claims jwtClaims
 	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
 		return nil, ErrInvalidToken
 	}

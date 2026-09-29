@@ -16,8 +16,8 @@ const (
 type AccessGate interface {
 	Enabled() bool
 	Verify(string) error
-	GenerateToken(subject string, ttl time.Duration) (string, int64, error)
-	VerifyToken(string) (*Claims, error)
+	GenerateToken() (string, int64, error)
+	VerifyToken(string) error
 }
 
 type accessLoginInput struct {
@@ -39,7 +39,7 @@ func accessConfigHandler(gate AccessGate) gin.HandlerFunc {
 		authenticated := false
 		token := extractToken(c)
 		if token != "" {
-			if _, err := gate.VerifyToken(token); err == nil {
+			if err := gate.VerifyToken(token); err == nil {
 				authenticated = true
 			}
 		}
@@ -87,7 +87,7 @@ func accessLoginHandler(gate AccessGate, limiter *loginRateLimiter) gin.HandlerF
 		var expiresAt int64
 		if gate.Enabled() {
 			var genErr error
-			token, expiresAt, genErr = gate.GenerateToken("admin", defaultTokenTTL)
+			token, expiresAt, genErr = gate.GenerateToken()
 			if genErr != nil {
 				c.Error(genErr)
 				return
@@ -126,7 +126,7 @@ func authMiddleware(gate AccessGate) gin.HandlerFunc {
 			return
 		}
 
-		if _, err := gate.VerifyToken(token); err != nil {
+		if err := gate.VerifyToken(token); err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "认证令牌无效或已过期，请重新登录",
 				"code":  "UNAUTHORIZED",

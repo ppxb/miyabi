@@ -21,10 +21,10 @@ type AccessGateService struct {
 	jwtSecret    []byte
 }
 
-func NewAccessGateService(password string, jwtSecret ...string) *AccessGateService {
+func NewAccessGateService(password, jwtSecret string) *AccessGateService {
 	var secret []byte
-	if len(jwtSecret) > 0 && jwtSecret[0] != "" {
-		secret = []byte(jwtSecret[0])
+	if jwtSecret != "" {
+		secret = []byte(jwtSecret)
 	} else if password != "" {
 		mac := hmac.New(sha256.New, []byte(defaultJWTSalt))
 		mac.Write([]byte(password))
@@ -53,28 +53,29 @@ func (gate *AccessGateService) Verify(password string) error {
 	return nil
 }
 
-func (gate *AccessGateService) GenerateToken(subject string, ttl time.Duration) (string, int64, error) {
+func (gate *AccessGateService) GenerateToken() (string, int64, error) {
 	if !gate.enabled {
 		return "", 0, errors.New("access gate is disabled")
 	}
 	now := time.Now().Unix()
-	expiresAt := now + int64(ttl.Seconds())
-	claims := Claims{
-		Subject:   subject,
+	expiresAt := now + int64(defaultTokenTTL.Seconds())
+	claims := jwtClaims{
+		Subject:   "admin",
 		Issuer:    "miyabi",
 		IssuedAt:  now,
 		ExpiresAt: expiresAt,
 	}
-	token, err := SignToken(gate.jwtSecret, claims)
+	token, err := signToken(gate.jwtSecret, claims)
 	if err != nil {
 		return "", 0, err
 	}
 	return token, expiresAt, nil
 }
 
-func (gate *AccessGateService) VerifyToken(token string) (*Claims, error) {
+func (gate *AccessGateService) VerifyToken(token string) error {
 	if !gate.enabled {
-		return nil, nil
+		return nil
 	}
-	return VerifyToken(gate.jwtSecret, token)
+	_, err := verifyToken(gate.jwtSecret, token)
+	return err
 }

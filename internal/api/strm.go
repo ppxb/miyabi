@@ -66,7 +66,7 @@ func strmAuthorized(c *gin.Context, token string, gate AccessGate) bool {
 		if session == "" {
 			return false
 		}
-		_, err := gate.VerifyToken(session)
+		err := gate.VerifyToken(session)
 		return err == nil
 	}
 	return token == ""

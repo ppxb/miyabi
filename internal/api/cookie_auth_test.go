@@ -15,11 +15,11 @@ import (
 
 func TestCookieAuthentication(t *testing.T) {
 	gate := NewAccessGateService("password", "secret")
-	valid, _, err := gate.GenerateToken("admin", time.Hour)
+	valid, _, err := gate.GenerateToken()
 	if err != nil {
 		t.Fatal(err)
 	}
-	expired, _, err := gate.GenerateToken("admin", -time.Hour)
+	expired, err := signToken(gate.jwtSecret, jwtClaims{Subject: "admin", Issuer: "miyabi", IssuedAt: time.Now().Add(-2 * time.Hour).Unix(), ExpiresAt: time.Now().Add(-time.Hour).Unix()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestCookieAuthentication(t *testing.T) {
 func TestCookieFlags(t *testing.T) {
 	for _, target := range []string{"http://miyabi.test", "https://miyabi.test"} {
 		t.Run(target, func(t *testing.T) {
-			router := NewRouter(Dependencies{Access: NewAccessGateService("password"), Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+			router := NewRouter(Dependencies{Access: NewAccessGateService("password", ""), Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 			req := httptest.NewRequest(http.MethodPost, target+"/api/auth/login", strings.NewReader(`{"password":"password"}`))
 			req.Header.Set("Content-Type", "application/json")
 			rec := httptest.NewRecorder()

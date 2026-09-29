@@ -98,7 +98,7 @@ func readEvent(t *testing.T, reader *bufio.Reader) sseEvent {
 func TestTaskEventsStreamsSnapshotsAndRevisionsUntilTheClientLeaves(t *testing.T) {
 	stub := newSSETaskStub()
 	gate := NewAccessGateService("password", "secret")
-	token, _, err := gate.GenerateToken("admin", time.Hour)
+	token, _, err := gate.GenerateToken()
 	if err != nil {
 		t.Fatal(err)
 	}
