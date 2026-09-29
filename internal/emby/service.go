@@ -36,25 +36,26 @@ type ServerInfo struct {
 
 // Service manages communication, configuration persistence, and batch notification to Emby.
 type Service struct {
-	db               *ent.Client
-	mu               sync.RWMutex
-	cfg              Config
-	defaultPublicURL string
-	client           *http.Client
-	queue            chan string
-	ctx              context.Context
-	cancel           context.CancelFunc
-	wg               sync.WaitGroup
-	gfriends         *gfriends.Client
-	media            MediaFetcher
-	actorSyncTimer   *time.Timer
-	actorSyncMu      sync.Mutex
-	syncing          atomic.Bool
-	avatarNotFoundMu sync.Mutex
-	avatarNotFound   map[string]time.Time
-	strmToken        string
-	exportMgr        *export.Manager
-	updateMu         sync.Mutex
+	db                *ent.Client
+	mu                sync.RWMutex
+	cfg               Config
+	defaultPublicURL  string
+	client            *http.Client
+	queue             chan string
+	ctx               context.Context
+	cancel            context.CancelFunc
+	wg                sync.WaitGroup
+	gfriends          *gfriends.Client
+	media             MediaFetcher
+	actorSyncTimer    *time.Timer
+	actorSyncMu       sync.Mutex
+	syncing           atomic.Bool
+	avatarNotFoundMu  sync.Mutex
+	avatarNotFound    map[string]time.Time
+	strmToken         string
+	exportMgr         *export.Manager
+	updateMu          sync.Mutex
+	scheduleLocalScan func(context.Context) error
 }
 
 // NewService instantiates an Emby service, restoring config from database or using defaults.
@@ -180,6 +181,11 @@ func (s *Service) Config(context.Context) (Config, error) {
 	return cfg, nil
 }
 
+// SetLocalScanScheduler wires automatic local imports during application setup.
+func (s *Service) SetLocalScanScheduler(schedule func(context.Context) error) {
+	s.scheduleLocalScan = schedule
+}
+
 // UpdateConfig validates and persists the new configuration to the database.
 func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 	s.updateMu.Lock()
@@ -208,7 +214,7 @@ func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 	exportMgr := s.exportMgr
 	s.mu.Unlock()
 
-	if exportMgr != nil && cfg.LocalDir != "" && cfg.PublicURL != "" {
+	if exportMgr != nil && cfg.LocalDir != "" {
 		exportMgr.Set(export.Config{
 			EmbyDir:   cfg.LocalDir,
 			PublicURL: cfg.PublicURL,
@@ -223,6 +229,11 @@ func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 		s.ScheduleActorSync(2 * time.Second)
 	}
 
+	if s.scheduleLocalScan != nil {
+		if err := s.scheduleLocalScan(ctx); err != nil {
+			return domain.E(domain.KindBusy, "Emby 设置已保存，但本地扫描入队失败，请重新保存重试", err)
+		}
+	}
 	return nil
 }
 

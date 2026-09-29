@@ -163,6 +163,10 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 
 	embySvc.SetSTRMToken(cfg.STRMToken)
 	embySvc.SetExportManager(exportMgr)
+	embySvc.SetLocalScanScheduler(libSvc.ScheduleLocalScan)
+	if err := libSvc.ScheduleLocalScan(ctx); err != nil {
+		logger.ErrorContext(ctx, "failed to queue startup Emby directory scan", "error", err)
+	}
 
 	if activePublicURL != "" && activeEmbyDir != "" {
 		embySvc.StartStartupSTRMRewrite()
@@ -192,7 +196,6 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Emby:           embySvc,
 		Frontend:       miyabi.Frontend(),
 		STRMToken:      cfg.STRMToken,
-		EmbyDir:        cfg.EmbyDir,
 		TrustedProxies: cfg.TrustedProxies,
 	})
 

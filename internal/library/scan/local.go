@@ -78,7 +78,7 @@ func (s *LocalScanner) Scan(ctx context.Context, rootDir string) (*LocalScanResu
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		if d.IsDir() {
+		if d.IsDir() || d.Type()&os.ModeSymlink != 0 {
 			return nil
 		}
 		result.FilesScanned++

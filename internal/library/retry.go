@@ -25,11 +25,23 @@ func (s *Service) RetryTask(ctx context.Context, id int) (domain.TaskInfo, error
 	if err != nil {
 		return domain.TaskInfo{}, err
 	}
-	sess, err := s.drive.OpenSource(ctx, input.Source)
-	if err != nil {
-		return domain.TaskInfo{}, err
+	commit := func(fn func(*ent.Tx) error) error { return ent.WithTx(ctx, s.database, fn) }
+	if input.Source.AccountID == "local" {
+		root, err := s.localScanRoot()
+		if err != nil {
+			return domain.TaskInfo{}, err
+		}
+		if root != input.Source.Directory.ID {
+			return domain.TaskInfo{}, domain.E(domain.KindConflict, "Emby 本地目录已变更，请扫描当前目录", nil)
+		}
+	} else {
+		sess, err := s.drive.OpenSource(ctx, input.Source)
+		if err != nil {
+			return domain.TaskInfo{}, err
+		}
+		commit = func(fn func(*ent.Tx) error) error { return sess.Commit(ctx, fn) }
 	}
-	err = sess.Commit(ctx, func(tx *ent.Tx) error {
+	err = commit(func(tx *ent.Tx) error {
 		current, err := tx.Task.Get(ctx, id)
 		if err != nil {
 			return err

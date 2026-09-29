@@ -34,7 +34,6 @@ type Dependencies struct {
 	Emby           EmbyManager
 	Frontend       fs.FS
 	STRMToken      string
-	EmbyDir        string
 	TrustedProxies []string
 }
 
@@ -88,7 +87,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	protected.GET("/library/movies", libraryMoviesHandler(deps.Library))
 	protected.POST("/library/scan", libraryScanHandler(deps.Library))
-	protected.POST("/library/scan/local", libraryLocalScanHandler(deps.Library, deps.EmbyDir))
+	protected.POST("/library/scan/local", libraryLocalScanHandler(deps.Library))
 	protected.GET("/library/artwork/:key", libraryArtworkHandler(deps.Artwork))
 
 	protected.GET("/tasks", noStore(), tasksHandler(deps.Tasks))

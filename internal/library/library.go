@@ -18,6 +18,7 @@ import (
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scan"
+	"github.com/ppxb/miyabi/internal/syncx"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -66,6 +67,8 @@ type Service struct {
 	tasks        *tasks.Service
 	scanner      *scan.Scanner
 	localScanner *scan.LocalScanner
+	exportMgr    *export.Manager
+	scanLock     syncx.ContextLock
 }
 
 func New(database *ent.Client, d *drive.Drive, tasks *tasks.Service, images *mediaimage.Cache) *Service {
@@ -138,19 +141,8 @@ func (s *Service) MatchingMovies(ctx context.Context, javdbIDs []string, codes [
 	return result, nil
 }
 
-// ScanLocal scans a local directory for media and sidecars and imports them.
-func (s *Service) ScanLocal(ctx context.Context, rootDir string) (*scan.LocalScanResult, error) {
-	result, err := s.localScanner.Scan(ctx, rootDir)
-	if err != nil {
-		return nil, err
-	}
-	if s.tasks != nil {
-		s.tasks.NotifyLibraryChanged()
-	}
-	return result, nil
-}
-
 func (s *Service) SetExportManager(mgr *export.Manager) {
+	s.exportMgr = mgr
 	s.scanner.SetExportManager(mgr)
 }
 
@@ -168,10 +160,28 @@ func (s *Service) SetMediaNotifier(notifier scan.MediaNotifier) {
 }
 
 func (s *Service) Scan(ctx context.Context, job tasks.Job) error {
+	if err := s.scanLock.Lock(ctx); err != nil {
+		return err
+	}
+	defer s.scanLock.Unlock()
+	payload, err := tasks.DecodePayload[domain.ScanPayload](job.Payload)
+	if err != nil {
+		return err
+	}
+	if payload.Source.AccountID == "local" {
+		// Imports must not observe partially rewritten STRM or exported sidecars.
+		return s.exportMgr.WithConfig(func(export.Config) error {
+			return s.scanLocal(ctx, job.ID, payload)
+		})
+	}
 	return s.scanner.Run(ctx, job)
 }
 
-func (s *Service) Finished(context.Context, *ent.Tx, tasks.Job, error) (tasks.Change, error) {
+func (s *Service) Finished(_ context.Context, _ *ent.Tx, job tasks.Job, _ error) (tasks.Change, error) {
+	payload, err := tasks.DecodePayload[domain.ScanPayload](job.Payload)
+	if err == nil && payload.Source.AccountID == "local" {
+		return tasks.ChangeLibrary, nil
+	}
 	return tasks.ChangeOffline, nil
 }
 
