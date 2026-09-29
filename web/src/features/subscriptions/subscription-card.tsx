@@ -12,7 +12,7 @@ import { MovieStateBadge } from '@/components/movie/movie-badges'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 
 const dateTimeFormat = new Intl.DateTimeFormat('zh-CN', {
   month: '2-digit',

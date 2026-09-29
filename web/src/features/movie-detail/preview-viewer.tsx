@@ -5,7 +5,7 @@ import type { PreviewImage } from '@/api/discover'
 import { MediaImage } from '@/components/media-image'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import {
   DOUBLE_TAP_SCALE,
   FIT_SCALE,

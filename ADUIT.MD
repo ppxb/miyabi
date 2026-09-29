@@ -216,7 +216,9 @@
 - [x] **110.** 删除属性后残留空行：`ui/input-group.tsx:13`（原 `role="group"`）、`ui/breadcrumb.tsx:57/68/82`（原 role / aria-hidden / aria-current）、`ui/dialog.tsx:62-64` 删除了 `sr-only` 文案、`search/page.tsx:67`、`settings/pan-section.tsx:40/62/76`、`pan-directory-row.tsx:34`；`internal/domain/video.go:30-31` 双空行（唯一 gofmt 报告）。
   - 已完成：清除上述文件残留空行，使用 oxfmt/gofmt 格式化相关文件；为通用弹窗关闭按钮补充 aria-label="关闭"，不机械恢复其他已删除的 role/ARIA 属性。
   - 验证：前端 TypeScript 类型检查、oxlint 及 git diff --check 通过；未进行浏览器测试。
-- [ ] **111.** `cn` 导入不统一：`ui/hover-card.tsx:2`、`ui/popover.tsx:2`、`ui/dropdown-menu.tsx:2` 直接 `from 'cn'`，其余 `@/lib/utils`；`dropdown-menu.tsx` 未过 oxfmt（双引号、长行）。
+- [x] **111.** `cn` 导入不统一：`ui/hover-card.tsx:2`、`ui/popover.tsx:2`、`ui/dropdown-menu.tsx:2` 直接 `from 'cn'`，其余 `@/lib/utils`；`dropdown-menu.tsx` 未过 oxfmt（双引号、长行）。
+  - 已完成：按用户要求统一直接从 cn 包导入，删除仅作转导出的 lib/utils.ts；components.json 的 utils 别名同步改为 cn，后续生成组件沿用直接导入；使用 oxfmt 格式化相关文件。
+  - 验证：前端 TypeScript 类型检查、oxlint 及 git diff --check 通过，web 中已无旧导入路径；未进行浏览器测试。
 
 ---
 

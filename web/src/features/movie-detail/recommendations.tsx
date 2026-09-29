@@ -5,7 +5,7 @@ import { type MovieReference, useRecommendationMovie } from '@/api/discover'
 import { MovieCard, MovieCardSkeleton, MovieGridLayout } from '@/components/movie'
 import { MovieResourceBadges, MovieStateBadge } from '@/components/movie/movie-badges'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import { useSettingsStore } from '@/stores/settings'
 import { observeRecommendation } from './recommendation-visibility'
 

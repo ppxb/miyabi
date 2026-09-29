@@ -22,7 +22,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import { SettingRow, SettingsSection } from './shared'
 
 const AUTO_ROUTE_VALUE = '__auto__'
@@ -54,10 +54,7 @@ export function DataSourceSection() {
 
   return (
     <SettingsSection icon={<DatabaseIcon className="size-4" />} title="数据源">
-      <SettingRow
-        title="JavDB 接口线路"
-        description="自动优选或手动选择线路，连接失败时自动重选"
-      >
+      <SettingRow title="JavDB 接口线路" description="自动优选或手动选择线路，连接失败时自动重选">
         <div className="flex w-full items-center gap-2 sm:w-auto">
           <Select
             value={value}
@@ -113,9 +110,7 @@ export function DataSourceSection() {
       </SettingRow>
 
       {route.isError ? (
-        <InlineError>
-          后端服务暂不可用，请启动后端服务后点击重试。
-        </InlineError>
+        <InlineError>后端服务暂不可用，请启动后端服务后点击重试。</InlineError>
       ) : selectRoute.isError || reselect.isError ? (
         <InlineError>
           {selectRoute.isError

@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatSize } from '@/lib/format'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import { SettingRow, SettingsSection } from './shared'
 
 const numberFormat = new Intl.NumberFormat('zh-CN')

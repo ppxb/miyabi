@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react'
 
 import { buttonVariants } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import type { FileRoutesByTo } from '@/routeTree.gen'
 
 type FloatingNavTo = keyof FileRoutesByTo

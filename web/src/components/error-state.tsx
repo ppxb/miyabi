@@ -3,7 +3,7 @@ import { RefreshCwIcon } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 
 type RetryProps = {
   onRetry?: () => void

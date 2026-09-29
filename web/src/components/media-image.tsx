@@ -2,7 +2,7 @@ import { ImageIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { imageURL } from '@/api/client'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 import { useSettingsStore } from '@/stores/settings'
 
 type MediaImageProps = {
