@@ -21,6 +21,11 @@ import (
 func TestEmbyDirectoryAutomaticallyQueuesLocalScan(t *testing.T) {
 	ctx := t.Context()
 	root := t.TempDir()
+	// TempDir may use a Windows short path; scan tasks store the resolved path.
+	wantRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(root, "ABC-123.strm"), []byte("https://example.com/video"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -37,8 +42,8 @@ func TestEmbyDirectoryAutomaticallyQueuesLocalScan(t *testing.T) {
 	}()
 	record := a.store.Client.Task.Query().Where(task.TypeEQ("scan")).OnlyX(ctx)
 	payload, err := tasks.DecodePayload[domain.ScanPayload](record.Payload)
-	if err != nil || payload.Source.AccountID != "local" || payload.Source.Directory.Path != root {
-		t.Fatalf("startup did not queue mounted directory: %+v %v", payload, err)
+	if err != nil || payload.Source.AccountID != "local" || payload.Source.Directory.Path != wantRoot {
+		t.Fatalf("startup did not queue mounted directory: got path %q, want %q; payload %+v, error %v", payload.Source.Directory.Path, wantRoot, payload, err)
 	}
 	if count := a.store.Client.Movie.Query().CountX(ctx); count != 0 {
 		t.Fatalf("startup imported synchronously: %d", count)
@@ -48,6 +53,10 @@ func TestEmbyDirectoryAutomaticallyQueuesLocalScan(t *testing.T) {
 	// Saving a new directory through the real settings handler queues that
 	// directory, even though the startup environment still names the old one.
 	newRoot := t.TempDir()
+	wantNewRoot, err := filepath.EvalSymlinks(newRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
 	body, err := json.Marshal(emby.Config{LocalDir: newRoot, MediaPath: "/emby-container/media", PublicURL: cfg.PublicURL})
 	if err != nil {
 		t.Fatal(err)
@@ -61,8 +70,8 @@ func TestEmbyDirectoryAutomaticallyQueuesLocalScan(t *testing.T) {
 	}
 	queued := a.store.Client.Task.Query().Where(task.StatusEQ(task.StatusQueued)).OnlyX(ctx)
 	payload, err = tasks.DecodePayload[domain.ScanPayload](queued.Payload)
-	if err != nil || payload.Source.Directory.Path != newRoot {
-		t.Fatalf("save used stale directory: %+v %v", payload, err)
+	if err != nil || payload.Source.Directory.Path != wantNewRoot {
+		t.Fatalf("save used stale directory: got path %q, want %q; error %v", payload.Source.Directory.Path, wantNewRoot, err)
 	}
 
 	response = httptest.NewRecorder()
@@ -85,7 +94,7 @@ func TestEmbyDirectoryAutomaticallyQueuesLocalScan(t *testing.T) {
 	}
 	queued = a.store.Client.Task.Query().Where(task.StatusEQ(task.StatusQueued)).OnlyX(ctx)
 	payload, err = tasks.DecodePayload[domain.ScanPayload](queued.Payload)
-	if err != nil || payload.Source.Directory.Path != newRoot {
-		t.Fatalf("restart used stale directory: %+v %v", payload, err)
+	if err != nil || payload.Source.Directory.Path != wantNewRoot {
+		t.Fatalf("restart used stale directory: got path %q, want %q; error %v", payload.Source.Directory.Path, wantNewRoot, err)
 	}
 }

@@ -149,6 +149,7 @@
   - 已完成：删除仅测试枚举的 Registry.Kinds 及对应断言；NewService 直接组装 Queue，移除仅包内调用的 NewQueue 包装；完成事务提交后直接调用 bus.publish，删除 Changed 包装。任务池通过 Service.Subscribe 订阅原总线，删除重复暴露总线的 Service.Bus，app 与测试同步调整。
   - 保留：Service.Registry、Queue 的业务锁与任务池接口、业务包及 SSE 使用的通知方法；Registry.Get、Handler 构造和 payload 工具仍有跨包调用或测试用途。注册表锁、独立分池订阅、取消恢复及事务提交后通知语义不变。
   - 验证：tasks、library（含 scan/scrape）、monitor、offline、api 包测试及 git diff --check 通过，覆盖数据库错误重试、先订阅后恢复、广播唤醒、退出解绑、完成回调提交与回滚；app 包仅复现第 90 项已确认的 TestEmbyDirectoryAutomaticallyQueuesLocalScan 本地目录路径断言失败。未进行浏览器或真实上游联调，待整体复查。
+  - 路径断言复查（第 90–94 项）：失败源于 Windows TEMP 使用 ADMINI~1 短路径，而扫描任务通过 filepath.EvalSymlinks 保存 Administrator 长路径。测试将原始输入直接与规范路径比较造成误报，实际指向同一目录。已修正启动、目录切换和重启断言的预期路径并补充差异诊断，保留原始路径作为配置输入；生产逻辑未修改，app 包全量测试及 git diff --check 通过。
 - [ ] **95.** Subscription `zone` 字段（schema:38、monitor Item、`AddMovieOptions`、`AddActorOptions`、`UpdateOptions`、API 输入）写入、继承、返回，前后端从不读取；订阅状态 `"error"`（schema:41、`monitor/service.go:34`、前端 subscription-card）从未被设置；`monitor.Status` 与 ent `subscription.Status` 重复。
 - [ ] **96.** `internal/subtitle`：`Provider.Name()` 从未通过接口调用（`subtitlecat.go:167` 另写死 `"SubtitleCat"`）；`finder.go:29-37` `WithAllowLoopbackForTesting` 测试开关进入生产结构体；`DecodeToUTF8` 最后的 `ToValidUTF8` 兜底实际走不到。
 - [ ] **97.** `internal/netx/proxy.go:88-94` `sameConfig` 蕴含 `sameURL`，`!sameConfig || !sameURL` 实为 `!sameConfig`，与注释"只在生效代理变化时广播"相反（Enabled=false 改 URL 也重建 tls-client）→ 条件改为 `!sameURL`；:73-79 `resolve` 中 `!Enabled ||` 冗余；:131-133 `parseProxyURL` 的 `raw == ""` 分支死代码。
