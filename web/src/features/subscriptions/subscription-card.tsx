@@ -26,8 +26,7 @@ const statusLabels: Record<SubscriptionItem['status'], string> = {
   added: '已加入 115',
   stale: '长期无源',
   active: '生效中',
-  paused: '已暂停',
-  error: '异常'
+  paused: '已暂停'
 }
 
 export function isPendingSubscription(item: SubscriptionItem) {
@@ -160,7 +159,6 @@ export function SubscriptionCard({
 function statusVariant(status: SubscriptionItem['status']) {
   if (status === 'added') return 'success' as const
   if (status === 'stale' || status === 'paused') return 'secondary' as const
-  if (status === 'error') return 'destructive' as const
   return 'default' as const
 }
 

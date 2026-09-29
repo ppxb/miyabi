@@ -34,8 +34,6 @@ const (
 	FieldOriginID = "origin_id"
 	// FieldAutoDownload holds the string denoting the auto_download field in the database.
 	FieldAutoDownload = "auto_download"
-	// FieldZone holds the string denoting the zone field in the database.
-	FieldZone = "zone"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldCursor holds the string denoting the cursor field in the database.
@@ -69,7 +67,6 @@ var Columns = []string{
 	FieldReleaseDate,
 	FieldOriginID,
 	FieldAutoDownload,
-	FieldZone,
 	FieldStatus,
 	FieldCursor,
 	FieldHash,
@@ -109,8 +106,6 @@ var (
 	DefaultReleaseDate string
 	// DefaultAutoDownload holds the default value on creation for the "auto_download" field.
 	DefaultAutoDownload bool
-	// DefaultZone holds the default value on creation for the "zone" field.
-	DefaultZone string
 	// DefaultCursor holds the default value on creation for the "cursor" field.
 	DefaultCursor string
 	// DefaultHash holds the default value on creation for the "hash" field.
@@ -160,7 +155,6 @@ const (
 	StatusStale   Status = "stale"
 	StatusActive  Status = "active"
 	StatusPaused  Status = "paused"
-	StatusError   Status = "error"
 )
 
 func (s Status) String() string {
@@ -170,7 +164,7 @@ func (s Status) String() string {
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s Status) error {
 	switch s {
-	case StatusWaiting, StatusAdded, StatusStale, StatusActive, StatusPaused, StatusError:
+	case StatusWaiting, StatusAdded, StatusStale, StatusActive, StatusPaused:
 		return nil
 	default:
 		return fmt.Errorf("subscription: invalid enum value for status field: %q", s)
@@ -233,11 +227,6 @@ func ByOriginID(opts ...sql.OrderTermOption) OrderOption {
 // ByAutoDownload orders the results by the auto_download field.
 func ByAutoDownload(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAutoDownload, opts...).ToFunc()
-}
-
-// ByZone orders the results by the zone field.
-func ByZone(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldZone, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

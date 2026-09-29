@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ppxb/miyabi/internal/ent/subscription"
 	"github.com/ppxb/miyabi/internal/monitor"
 )
 
@@ -23,8 +24,8 @@ type subscriptionStub struct {
 func (s *subscriptionStub) Targets(_ context.Context, kind string) ([]monitor.TargetItem, error) {
 	s.targetsCalledKind = kind
 	return []monitor.TargetItem{
-		{ID: 1, Kind: "movie", TargetID: "m1", Status: monitor.StatusWaiting},
-		{ID: 2, Kind: "actor", TargetID: "a1", Status: monitor.StatusActive},
+		{ID: 1, Kind: "movie", TargetID: "m1", Status: subscription.StatusWaiting},
+		{ID: 2, Kind: "actor", TargetID: "a1", Status: subscription.StatusActive},
 	}, nil
 }
 

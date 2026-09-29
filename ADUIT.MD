@@ -150,7 +150,10 @@
   - 保留：Service.Registry、Queue 的业务锁与任务池接口、业务包及 SSE 使用的通知方法；Registry.Get、Handler 构造和 payload 工具仍有跨包调用或测试用途。注册表锁、独立分池订阅、取消恢复及事务提交后通知语义不变。
   - 验证：tasks、library（含 scan/scrape）、monitor、offline、api 包测试及 git diff --check 通过，覆盖数据库错误重试、先订阅后恢复、广播唤醒、退出解绑、完成回调提交与回滚；app 包仅复现第 90 项已确认的 TestEmbyDirectoryAutomaticallyQueuesLocalScan 本地目录路径断言失败。未进行浏览器或真实上游联调，待整体复查。
   - 路径断言复查（第 90–94 项）：失败源于 Windows TEMP 使用 ADMINI~1 短路径，而扫描任务通过 filepath.EvalSymlinks 保存 Administrator 长路径。测试将原始输入直接与规范路径比较造成误报，实际指向同一目录。已修正启动、目录切换和重启断言的预期路径并补充差异诊断，保留原始路径作为配置输入；生产逻辑未修改，app 包全量测试及 git diff --check 通过。
-- [ ] **95.** Subscription `zone` 字段（schema:38、monitor Item、`AddMovieOptions`、`AddActorOptions`、`UpdateOptions`、API 输入）写入、继承、返回，前后端从不读取；订阅状态 `"error"`（schema:41、`monitor/service.go:34`、前端 subscription-card）从未被设置；`monitor.Status` 与 ent `subscription.Status` 重复。
+- [x] **95.** Subscription `zone` 字段（schema:38、monitor Item、`AddMovieOptions`、`AddActorOptions`、`UpdateOptions`、API 输入）写入、继承、返回，前后端从不读取；订阅状态 `"error"`（schema:41、`monitor/service.go:34`、前端 subscription-card）从未被设置；`monitor.Status` 与 ent `subscription.Status` 重复。
+  - 已完成：删除订阅 zone 的 Ent schema、生成代码、创建/更新选项、演员继承、API 输入输出及前端类型；旧 monitors 导入语句同步移除对 zone 列的依赖。删除重复 monitor.Status 及常量，Item、TargetItem 和调用方统一使用 subscription.Status。
+  - 按用户要求不保留旧状态兼容：删除 Ent 与前端的 error 状态枚举、标签及样式分支，移除本次新增的兼容测试；不新增旧状态转换或数据库清理迁移。失败原因仍使用 error 信息字段，检查失败时原有状态及重试策略不变。
+  - 验证：database、monitor、api、app 包测试通过，保留原有数据库迁移、演员订阅继承和订阅重试覆盖；前端 118 项测试、typecheck、lint 及 git diff --check 通过。未进行浏览器或真实上游联调，待整体复查。
 - [ ] **96.** `internal/subtitle`：`Provider.Name()` 从未通过接口调用（`subtitlecat.go:167` 另写死 `"SubtitleCat"`）；`finder.go:29-37` `WithAllowLoopbackForTesting` 测试开关进入生产结构体；`DecodeToUTF8` 最后的 `ToValidUTF8` 兜底实际走不到。
 - [ ] **97.** `internal/netx/proxy.go:88-94` `sameConfig` 蕴含 `sameURL`，`!sameConfig || !sameURL` 实为 `!sameConfig`，与注释"只在生效代理变化时广播"相反（Enabled=false 改 URL 也重建 tls-client）→ 条件改为 `!sameURL`；:73-79 `resolve` 中 `!Enabled ||` 冗余；:131-133 `parseProxyURL` 的 `raw == ""` 分支死代码。
 - [ ] **98.** `internal/netx/ssrf.go:59-60` 255.255.255.255 分支已被 :58 `ip4[0] >= 240` 覆盖；:103 多余中间变量；:191-193 `timeout <= 0` 兜底唯一调用传固定 20s；:157/:176 `ips` 为空时返回 `(nil, nil)`。

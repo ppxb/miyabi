@@ -159,20 +159,6 @@ func (_u *SubscriptionUpdate) SetNillableAutoDownload(v *bool) *SubscriptionUpda
 	return _u
 }
 
-// SetZone sets the "zone" field.
-func (_u *SubscriptionUpdate) SetZone(v string) *SubscriptionUpdate {
-	_u.mutation.SetZone(v)
-	return _u
-}
-
-// SetNillableZone sets the "zone" field if the given value is not nil.
-func (_u *SubscriptionUpdate) SetNillableZone(v *string) *SubscriptionUpdate {
-	if v != nil {
-		_u.SetZone(*v)
-	}
-	return _u
-}
-
 // SetStatus sets the "status" field.
 func (_u *SubscriptionUpdate) SetStatus(v subscription.Status) *SubscriptionUpdate {
 	_u.mutation.SetStatus(v)
@@ -434,9 +420,6 @@ func (_u *SubscriptionUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if value, ok := _u.mutation.AutoDownload(); ok {
 		_spec.SetField(subscription.FieldAutoDownload, field.TypeBool, value)
 	}
-	if value, ok := _u.mutation.Zone(); ok {
-		_spec.SetField(subscription.FieldZone, field.TypeString, value)
-	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(subscription.FieldStatus, field.TypeEnum, value)
 	}
@@ -626,20 +609,6 @@ func (_u *SubscriptionUpdateOne) SetAutoDownload(v bool) *SubscriptionUpdateOne 
 func (_u *SubscriptionUpdateOne) SetNillableAutoDownload(v *bool) *SubscriptionUpdateOne {
 	if v != nil {
 		_u.SetAutoDownload(*v)
-	}
-	return _u
-}
-
-// SetZone sets the "zone" field.
-func (_u *SubscriptionUpdateOne) SetZone(v string) *SubscriptionUpdateOne {
-	_u.mutation.SetZone(v)
-	return _u
-}
-
-// SetNillableZone sets the "zone" field if the given value is not nil.
-func (_u *SubscriptionUpdateOne) SetNillableZone(v *string) *SubscriptionUpdateOne {
-	if v != nil {
-		_u.SetZone(*v)
 	}
 	return _u
 }
@@ -934,9 +903,6 @@ func (_u *SubscriptionUpdateOne) sqlSave(ctx context.Context) (_node *Subscripti
 	}
 	if value, ok := _u.mutation.AutoDownload(); ok {
 		_spec.SetField(subscription.FieldAutoDownload, field.TypeBool, value)
-	}
-	if value, ok := _u.mutation.Zone(); ok {
-		_spec.SetField(subscription.FieldZone, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(subscription.FieldStatus, field.TypeEnum, value)

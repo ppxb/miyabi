@@ -12,7 +12,6 @@ import (
 
 type AddMovieOptions struct {
 	AutoDownload *bool
-	Zone         string
 	// OriginID marks a subscription spawned by an actor subscription.
 	OriginID *int
 }
@@ -45,7 +44,7 @@ func (service *Service) addMovie(ctx context.Context, summary domain.MovieSummar
 	record, err := service.database.Subscription.Create().
 		SetKind(subscription.KindMovie).SetTargetID(summary.ID).SetCode(summary.Code).
 		SetTitle(summary.Title).SetCover(summary.Cover).SetReleaseDate(summary.ReleaseDate).
-		SetAutoDownload(autoDownload).SetStatus(subscription.StatusWaiting).SetZone(opts.Zone).
+		SetAutoDownload(autoDownload).SetStatus(subscription.StatusWaiting).
 		SetNillableOriginID(opts.OriginID).SetNextCheckAt(time.Now()).Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
@@ -92,7 +91,6 @@ func (service *Service) retry(ctx context.Context, record *ent.Subscription) (It
 
 type UpdateOptions struct {
 	AutoDownload *bool
-	Zone         *string
 	// Status pauses or resumes an actor subscription; movie status only moves
 	// through checks and enqueues.
 	Status *string
@@ -106,9 +104,6 @@ func (service *Service) Update(ctx context.Context, id int, opts UpdateOptions) 
 	update := record.Update()
 	if opts.AutoDownload != nil {
 		update.SetAutoDownload(*opts.AutoDownload)
-	}
-	if opts.Zone != nil {
-		update.SetZone(*opts.Zone)
 	}
 	if opts.Status != nil {
 		status := subscription.Status(*opts.Status)

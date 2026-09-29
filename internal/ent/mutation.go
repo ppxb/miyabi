@@ -6325,7 +6325,6 @@ type SubscriptionMutation struct {
 	origin_id       *int
 	addorigin_id    *int
 	auto_download   *bool
-	zone            *string
 	status          *subscription.Status
 	cursor          *string
 	hash            *string
@@ -6834,42 +6833,6 @@ func (m *SubscriptionMutation) ResetAutoDownload() {
 	m.auto_download = nil
 }
 
-// SetZone sets the "zone" field.
-func (m *SubscriptionMutation) SetZone(s string) {
-	m.zone = &s
-}
-
-// Zone returns the value of the "zone" field in the mutation.
-func (m *SubscriptionMutation) Zone() (r string, exists bool) {
-	v := m.zone
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldZone returns the old "zone" field's value of the Subscription entity.
-// If the Subscription object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SubscriptionMutation) OldZone(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldZone is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldZone requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldZone: %w", err)
-	}
-	return oldValue.Zone, nil
-}
-
-// ResetZone resets all changes to the "zone" field.
-func (m *SubscriptionMutation) ResetZone() {
-	m.zone = nil
-}
-
 // SetStatus sets the "status" field.
 func (m *SubscriptionMutation) SetStatus(s subscription.Status) {
 	m.status = &s
@@ -7285,7 +7248,7 @@ func (m *SubscriptionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SubscriptionMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 18)
 	if m.created_at != nil {
 		fields = append(fields, subscription.FieldCreatedAt)
 	}
@@ -7315,9 +7278,6 @@ func (m *SubscriptionMutation) Fields() []string {
 	}
 	if m.auto_download != nil {
 		fields = append(fields, subscription.FieldAutoDownload)
-	}
-	if m.zone != nil {
-		fields = append(fields, subscription.FieldZone)
 	}
 	if m.status != nil {
 		fields = append(fields, subscription.FieldStatus)
@@ -7371,8 +7331,6 @@ func (m *SubscriptionMutation) Field(name string) (ent.Value, bool) {
 		return m.OriginID()
 	case subscription.FieldAutoDownload:
 		return m.AutoDownload()
-	case subscription.FieldZone:
-		return m.Zone()
 	case subscription.FieldStatus:
 		return m.Status()
 	case subscription.FieldCursor:
@@ -7418,8 +7376,6 @@ func (m *SubscriptionMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldOriginID(ctx)
 	case subscription.FieldAutoDownload:
 		return m.OldAutoDownload(ctx)
-	case subscription.FieldZone:
-		return m.OldZone(ctx)
 	case subscription.FieldStatus:
 		return m.OldStatus(ctx)
 	case subscription.FieldCursor:
@@ -7514,13 +7470,6 @@ func (m *SubscriptionMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAutoDownload(v)
-		return nil
-	case subscription.FieldZone:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetZone(v)
 		return nil
 	case subscription.FieldStatus:
 		v, ok := value.(subscription.Status)
@@ -7728,9 +7677,6 @@ func (m *SubscriptionMutation) ResetField(name string) error {
 		return nil
 	case subscription.FieldAutoDownload:
 		m.ResetAutoDownload()
-		return nil
-	case subscription.FieldZone:
-		m.ResetZone()
 		return nil
 	case subscription.FieldStatus:
 		m.ResetStatus()

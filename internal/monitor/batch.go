@@ -122,7 +122,7 @@ func (service *Service) BatchHandler(ctx context.Context, job tasks.Job) error {
 				payload.Batch.Failures = append(payload.Batch.Failures, domain.SubscriptionFailure{Code: code, Error: domain.PublicMessage(err)})
 			}
 			slog.WarnContext(ctx, "batch ingestion item failed", "subscription_id", id, "code", code, "error", err)
-		case item.Status == StatusAdded:
+		case item.Status == subscription.StatusAdded:
 			payload.Batch.Submitted++
 		default:
 			payload.Batch.Waiting++

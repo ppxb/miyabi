@@ -23,17 +23,6 @@ const (
 
 var checkTimePattern = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
 
-type Status string
-
-const (
-	StatusWaiting Status = "waiting"
-	StatusAdded   Status = "added"
-	StatusStale   Status = "stale"
-	StatusActive  Status = "active"
-	StatusPaused  Status = "paused"
-	StatusError   Status = "error"
-)
-
 // Config is the subscription settings section: default auto-download flags,
 // the daily time at which movie and actor subscriptions are checked, and the
 // magnet preferences the picker applies.
@@ -65,25 +54,24 @@ func (c Config) validate() error {
 
 // Item is the API projection of one subscription.
 type Item struct {
-	ID            int        `json:"id"`
-	Kind          string     `json:"kind"`
-	TargetID      string     `json:"target_id"`
-	Code          string     `json:"code,omitempty"`
-	Title         string     `json:"title"`
-	Cover         string     `json:"cover"`
-	ReleaseDate   string     `json:"release_date,omitempty"`
-	OriginID      *int       `json:"origin_id,omitempty"`
-	AutoDownload  bool       `json:"auto_download"`
-	Zone          string     `json:"zone,omitempty"`
-	Status        Status     `json:"status"`
-	Hash          string     `json:"hash,omitempty"`
-	TaskID        *int       `json:"task_id,omitempty"`
-	NextCheckAt   *time.Time `json:"next_check_at,omitempty"`
-	LastCheckedAt *time.Time `json:"last_checked_at,omitempty"`
-	Checks        int        `json:"checks"`
-	Error         *string    `json:"error,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID            int                 `json:"id"`
+	Kind          string              `json:"kind"`
+	TargetID      string              `json:"target_id"`
+	Code          string              `json:"code,omitempty"`
+	Title         string              `json:"title"`
+	Cover         string              `json:"cover"`
+	ReleaseDate   string              `json:"release_date,omitempty"`
+	OriginID      *int                `json:"origin_id,omitempty"`
+	AutoDownload  bool                `json:"auto_download"`
+	Status        subscription.Status `json:"status"`
+	Hash          string              `json:"hash,omitempty"`
+	TaskID        *int                `json:"task_id,omitempty"`
+	NextCheckAt   *time.Time          `json:"next_check_at,omitempty"`
+	LastCheckedAt *time.Time          `json:"last_checked_at,omitempty"`
+	Checks        int                 `json:"checks"`
+	Error         *string             `json:"error,omitempty"`
+	CreatedAt     time.Time           `json:"created_at"`
+	UpdatedAt     time.Time           `json:"updated_at"`
 }
 
 // Discoverer is the catalogue surface the service needs, in domain types.
@@ -156,11 +144,11 @@ func (service *Service) UpdateConfig(ctx context.Context, cfg Config) (Config, e
 
 // TargetItem is a lightweight projection used to check subscription status.
 type TargetItem struct {
-	ID       int    `json:"id"`
-	Kind     string `json:"kind"`
-	TargetID string `json:"target_id"`
-	OriginID *int   `json:"origin_id,omitempty"`
-	Status   Status `json:"status"`
+	ID       int                 `json:"id"`
+	Kind     string              `json:"kind"`
+	TargetID string              `json:"target_id"`
+	OriginID *int                `json:"origin_id,omitempty"`
+	Status   subscription.Status `json:"status"`
 }
 
 func (service *Service) Targets(ctx context.Context, kind string) ([]TargetItem, error) {
@@ -185,7 +173,7 @@ func (service *Service) Targets(ctx context.Context, kind string) ([]TargetItem,
 			Kind:     string(record.Kind),
 			TargetID: record.TargetID,
 			OriginID: record.OriginID,
-			Status:   Status(record.Status),
+			Status:   record.Status,
 		}
 	}
 	return result, nil
@@ -239,7 +227,7 @@ func subscriptionItem(record *ent.Subscription) Item {
 	return Item{
 		ID: record.ID, Kind: string(record.Kind), TargetID: record.TargetID, Code: record.Code,
 		Title: record.Title, Cover: record.Cover, ReleaseDate: record.ReleaseDate, OriginID: record.OriginID,
-		AutoDownload: record.AutoDownload, Zone: record.Zone, Status: Status(record.Status), Hash: record.Hash,
+		AutoDownload: record.AutoDownload, Status: record.Status, Hash: record.Hash,
 		TaskID: record.TaskID, NextCheckAt: record.NextCheckAt, LastCheckedAt: record.LastCheckedAt,
 		Checks: record.Checks, Error: record.Error, CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
 	}

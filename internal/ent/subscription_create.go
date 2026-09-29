@@ -154,20 +154,6 @@ func (_c *SubscriptionCreate) SetNillableAutoDownload(v *bool) *SubscriptionCrea
 	return _c
 }
 
-// SetZone sets the "zone" field.
-func (_c *SubscriptionCreate) SetZone(v string) *SubscriptionCreate {
-	_c.mutation.SetZone(v)
-	return _c
-}
-
-// SetNillableZone sets the "zone" field if the given value is not nil.
-func (_c *SubscriptionCreate) SetNillableZone(v *string) *SubscriptionCreate {
-	if v != nil {
-		_c.SetZone(*v)
-	}
-	return _c
-}
-
 // SetStatus sets the "status" field.
 func (_c *SubscriptionCreate) SetStatus(v subscription.Status) *SubscriptionCreate {
 	_c.mutation.SetStatus(v)
@@ -347,10 +333,6 @@ func (_c *SubscriptionCreate) defaults() {
 		v := subscription.DefaultAutoDownload
 		_c.mutation.SetAutoDownload(v)
 	}
-	if _, ok := _c.mutation.Zone(); !ok {
-		v := subscription.DefaultZone
-		_c.mutation.SetZone(v)
-	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := subscription.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -407,9 +389,6 @@ func (_c *SubscriptionCreate) check() error {
 	}
 	if _, ok := _c.mutation.AutoDownload(); !ok {
 		return &ValidationError{Name: "auto_download", err: errors.New(`ent: missing required field "Subscription.auto_download"`)}
-	}
-	if _, ok := _c.mutation.Zone(); !ok {
-		return &ValidationError{Name: "zone", err: errors.New(`ent: missing required field "Subscription.zone"`)}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "Subscription.status"`)}
@@ -499,10 +478,6 @@ func (_c *SubscriptionCreate) createSpec() (*Subscription, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.AutoDownload(); ok {
 		_spec.SetField(subscription.FieldAutoDownload, field.TypeBool, value)
 		_node.AutoDownload = value
-	}
-	if value, ok := _c.mutation.Zone(); ok {
-		_spec.SetField(subscription.FieldZone, field.TypeString, value)
-		_node.Zone = value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(subscription.FieldStatus, field.TypeEnum, value)
@@ -705,18 +680,6 @@ func (u *SubscriptionUpsert) SetAutoDownload(v bool) *SubscriptionUpsert {
 // UpdateAutoDownload sets the "auto_download" field to the value that was provided on create.
 func (u *SubscriptionUpsert) UpdateAutoDownload() *SubscriptionUpsert {
 	u.SetExcluded(subscription.FieldAutoDownload)
-	return u
-}
-
-// SetZone sets the "zone" field.
-func (u *SubscriptionUpsert) SetZone(v string) *SubscriptionUpsert {
-	u.Set(subscription.FieldZone, v)
-	return u
-}
-
-// UpdateZone sets the "zone" field to the value that was provided on create.
-func (u *SubscriptionUpsert) UpdateZone() *SubscriptionUpsert {
-	u.SetExcluded(subscription.FieldZone)
 	return u
 }
 
@@ -1034,20 +997,6 @@ func (u *SubscriptionUpsertOne) SetAutoDownload(v bool) *SubscriptionUpsertOne {
 func (u *SubscriptionUpsertOne) UpdateAutoDownload() *SubscriptionUpsertOne {
 	return u.Update(func(s *SubscriptionUpsert) {
 		s.UpdateAutoDownload()
-	})
-}
-
-// SetZone sets the "zone" field.
-func (u *SubscriptionUpsertOne) SetZone(v string) *SubscriptionUpsertOne {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.SetZone(v)
-	})
-}
-
-// UpdateZone sets the "zone" field to the value that was provided on create.
-func (u *SubscriptionUpsertOne) UpdateZone() *SubscriptionUpsertOne {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.UpdateZone()
 	})
 }
 
@@ -1553,20 +1502,6 @@ func (u *SubscriptionUpsertBulk) SetAutoDownload(v bool) *SubscriptionUpsertBulk
 func (u *SubscriptionUpsertBulk) UpdateAutoDownload() *SubscriptionUpsertBulk {
 	return u.Update(func(s *SubscriptionUpsert) {
 		s.UpdateAutoDownload()
-	})
-}
-
-// SetZone sets the "zone" field.
-func (u *SubscriptionUpsertBulk) SetZone(v string) *SubscriptionUpsertBulk {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.SetZone(v)
-	})
-}
-
-// UpdateZone sets the "zone" field to the value that was provided on create.
-func (u *SubscriptionUpsertBulk) UpdateZone() *SubscriptionUpsertBulk {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.UpdateZone()
 	})
 }
 

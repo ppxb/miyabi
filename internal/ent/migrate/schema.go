@@ -190,8 +190,7 @@ var (
 		{Name: "release_date", Type: field.TypeString, Default: ""},
 		{Name: "origin_id", Type: field.TypeInt, Nullable: true},
 		{Name: "auto_download", Type: field.TypeBool, Default: true},
-		{Name: "zone", Type: field.TypeString, Default: ""},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"waiting", "added", "stale", "active", "paused", "error"}, Default: "waiting"},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"waiting", "added", "stale", "active", "paused"}, Default: "waiting"},
 		{Name: "cursor", Type: field.TypeString, Default: ""},
 		{Name: "hash", Type: field.TypeString, Default: ""},
 		{Name: "task_id", Type: field.TypeInt, Nullable: true},
@@ -214,7 +213,7 @@ var (
 			{
 				Name:    "subscription_status_next_check_at",
 				Unique:  false,
-				Columns: []*schema.Column{SubscriptionsColumns[12], SubscriptionsColumns[16]},
+				Columns: []*schema.Column{SubscriptionsColumns[11], SubscriptionsColumns[15]},
 			},
 		},
 	}

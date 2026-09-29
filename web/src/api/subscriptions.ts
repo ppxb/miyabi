@@ -5,7 +5,7 @@ import { apiDelete, apiGet, apiPatch, apiPost } from './client'
 
 export type SubscriptionKind = 'movie' | 'actor'
 
-export type SubscriptionStatus = 'waiting' | 'added' | 'stale' | 'active' | 'paused' | 'error'
+export type SubscriptionStatus = 'waiting' | 'added' | 'stale' | 'active' | 'paused'
 
 export type SubscriptionItem = {
   id: number
@@ -17,7 +17,6 @@ export type SubscriptionItem = {
   release_date?: string
   origin_id?: number
   auto_download: boolean
-  zone?: string
   status: SubscriptionStatus
   hash?: string
   task_id?: number

@@ -24,7 +24,7 @@ func TestActorSubscriptionSpawnsOnlyNewWorks(t *testing.T) {
 		{ID: "act-past", Code: "PAST-001", Title: "Past", ReleaseDate: "2020-01-01", Actors: actorRef},
 	}
 	actor, err := f.service.AddActor(ctx, "actor-1", AddActorOptions{})
-	if err != nil || actor.Title != "Yua Mikami" || actor.Cover == "" || actor.Status != StatusActive || actor.NextCheckAt == nil || !actor.NextCheckAt.After(time.Now()) {
+	if err != nil || actor.Title != "Yua Mikami" || actor.Cover == "" || actor.Status != subscription.StatusActive || actor.NextCheckAt == nil || !actor.NextCheckAt.After(time.Now()) {
 		t.Fatalf("AddActor: %#v %v", actor, err)
 	}
 	feed, err := f.service.ActorFeed(ctx, actor.ID, 1, 10)
@@ -148,4 +148,3 @@ func TestActorSubscriptionZeroInitialWorksSpawnsFirstWorks(t *testing.T) {
 		t.Fatalf("expected act-debut-1 and act-debut-2 in feed, got %#v", feed)
 	}
 }
-

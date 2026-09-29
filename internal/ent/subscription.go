@@ -37,8 +37,6 @@ type Subscription struct {
 	OriginID *int `json:"origin_id,omitempty"`
 	// AutoDownload holds the value of the "auto_download" field.
 	AutoDownload bool `json:"auto_download,omitempty"`
-	// Zone holds the value of the "zone" field.
-	Zone string `json:"zone,omitempty"`
 	// Status holds the value of the "status" field.
 	Status subscription.Status `json:"status,omitempty"`
 	// Cursor holds the value of the "cursor" field.
@@ -67,7 +65,7 @@ func (*Subscription) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case subscription.FieldID, subscription.FieldOriginID, subscription.FieldTaskID, subscription.FieldChecks:
 			values[i] = new(sql.NullInt64)
-		case subscription.FieldKind, subscription.FieldTargetID, subscription.FieldCode, subscription.FieldTitle, subscription.FieldCover, subscription.FieldReleaseDate, subscription.FieldZone, subscription.FieldStatus, subscription.FieldCursor, subscription.FieldHash, subscription.FieldError:
+		case subscription.FieldKind, subscription.FieldTargetID, subscription.FieldCode, subscription.FieldTitle, subscription.FieldCover, subscription.FieldReleaseDate, subscription.FieldStatus, subscription.FieldCursor, subscription.FieldHash, subscription.FieldError:
 			values[i] = new(sql.NullString)
 		case subscription.FieldCreatedAt, subscription.FieldUpdatedAt, subscription.FieldNextCheckAt, subscription.FieldLastCheckedAt:
 			values[i] = new(sql.NullTime)
@@ -152,12 +150,6 @@ func (_m *Subscription) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field auto_download", values[i])
 			} else if value.Valid {
 				_m.AutoDownload = value.Bool
-			}
-		case subscription.FieldZone:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field zone", values[i])
-			} else if value.Valid {
-				_m.Zone = value.String
 			}
 		case subscription.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -278,9 +270,6 @@ func (_m *Subscription) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("auto_download=")
 	builder.WriteString(fmt.Sprintf("%v", _m.AutoDownload))
-	builder.WriteString(", ")
-	builder.WriteString("zone=")
-	builder.WriteString(_m.Zone)
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Status))

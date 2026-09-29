@@ -35,10 +35,8 @@ func (Subscription) Fields() []ent.Field {
 			Nillable(),
 		field.Bool("auto_download").
 			Default(true),
-		field.String("zone").
-			Default(""),
 		field.Enum("status").
-			Values("waiting", "added", "stale", "active", "paused", "error").
+			Values("waiting", "added", "stale", "active", "paused").
 			Default("waiting"),
 		field.String("cursor").
 			Default(""),

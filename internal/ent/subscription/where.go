@@ -99,11 +99,6 @@ func AutoDownload(v bool) predicate.Subscription {
 	return predicate.Subscription(sql.FieldEQ(FieldAutoDownload, v))
 }
 
-// Zone applies equality check predicate on the "zone" field. It's identical to ZoneEQ.
-func Zone(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldEQ(FieldZone, v))
-}
-
 // Cursor applies equality check predicate on the "cursor" field. It's identical to CursorEQ.
 func Cursor(v string) predicate.Subscription {
 	return predicate.Subscription(sql.FieldEQ(FieldCursor, v))
@@ -622,71 +617,6 @@ func AutoDownloadEQ(v bool) predicate.Subscription {
 // AutoDownloadNEQ applies the NEQ predicate on the "auto_download" field.
 func AutoDownloadNEQ(v bool) predicate.Subscription {
 	return predicate.Subscription(sql.FieldNEQ(FieldAutoDownload, v))
-}
-
-// ZoneEQ applies the EQ predicate on the "zone" field.
-func ZoneEQ(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldEQ(FieldZone, v))
-}
-
-// ZoneNEQ applies the NEQ predicate on the "zone" field.
-func ZoneNEQ(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldNEQ(FieldZone, v))
-}
-
-// ZoneIn applies the In predicate on the "zone" field.
-func ZoneIn(vs ...string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldIn(FieldZone, vs...))
-}
-
-// ZoneNotIn applies the NotIn predicate on the "zone" field.
-func ZoneNotIn(vs ...string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldNotIn(FieldZone, vs...))
-}
-
-// ZoneGT applies the GT predicate on the "zone" field.
-func ZoneGT(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldGT(FieldZone, v))
-}
-
-// ZoneGTE applies the GTE predicate on the "zone" field.
-func ZoneGTE(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldGTE(FieldZone, v))
-}
-
-// ZoneLT applies the LT predicate on the "zone" field.
-func ZoneLT(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldLT(FieldZone, v))
-}
-
-// ZoneLTE applies the LTE predicate on the "zone" field.
-func ZoneLTE(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldLTE(FieldZone, v))
-}
-
-// ZoneContains applies the Contains predicate on the "zone" field.
-func ZoneContains(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldContains(FieldZone, v))
-}
-
-// ZoneHasPrefix applies the HasPrefix predicate on the "zone" field.
-func ZoneHasPrefix(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldHasPrefix(FieldZone, v))
-}
-
-// ZoneHasSuffix applies the HasSuffix predicate on the "zone" field.
-func ZoneHasSuffix(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldHasSuffix(FieldZone, v))
-}
-
-// ZoneEqualFold applies the EqualFold predicate on the "zone" field.
-func ZoneEqualFold(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldEqualFold(FieldZone, v))
-}
-
-// ZoneContainsFold applies the ContainsFold predicate on the "zone" field.
-func ZoneContainsFold(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldContainsFold(FieldZone, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

@@ -85,7 +85,7 @@ func newFixture(t *testing.T) fixture {
 func TestMovieSubscriptionLifecycle(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
 	item, err := f.service.AddMovie(ctx, "m1", AddMovieOptions{})
-	if err != nil || item.Code != "MOCK-m1" || item.Status != StatusWaiting || !item.AutoDownload {
+	if err != nil || item.Code != "MOCK-m1" || item.Status != subscription.StatusWaiting || !item.AutoDownload {
 		t.Fatalf("AddMovie: %#v %v", item, err)
 	}
 	if again, err := f.service.AddMovie(ctx, "m1", AddMovieOptions{}); err != nil || again.ID != item.ID || f.discover.summaryCalls != 1 {
@@ -94,8 +94,8 @@ func TestMovieSubscriptionLifecycle(t *testing.T) {
 	if list, err := f.service.List(ctx, "movie", 1, 10); err != nil || len(list) != 1 {
 		t.Fatalf("List: %d %v", len(list), err)
 	}
-	updated, err := f.service.Update(ctx, item.ID, UpdateOptions{AutoDownload: ptr(false), Zone: ptr("censored")})
-	if err != nil || updated.AutoDownload || updated.Zone != "censored" {
+	updated, err := f.service.Update(ctx, item.ID, UpdateOptions{AutoDownload: ptr(false)})
+	if err != nil || updated.AutoDownload {
 		t.Fatalf("Update: %#v %v", updated, err)
 	}
 	if _, err := f.service.Update(ctx, item.ID, UpdateOptions{Status: ptr("paused")}); !domain.IsKind(err, domain.KindInvalid) {
@@ -113,15 +113,15 @@ func TestReAddingFinishedSubscriptionOnlyResetsForUsers(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
 	item, _ := f.service.AddMovie(ctx, "m1", AddMovieOptions{})
 	f.discover.magnets["m1"] = []domain.Magnet{{Hash: "h1", Name: "MOCK-m1", HasSubtitle: true}}
-	if added, err := f.service.EnqueueSingle(ctx, item.ID); err != nil || added.Status != StatusAdded {
+	if added, err := f.service.EnqueueSingle(ctx, item.ID); err != nil || added.Status != subscription.StatusAdded {
 		t.Fatalf("EnqueueSingle: %#v %v", added, err)
 	}
 	spawned, err := f.service.addMovie(ctx, domain.MovieSummary{ID: "m1"}, AddMovieOptions{OriginID: ptr(99)})
-	if err != nil || spawned.ID != item.ID || spawned.Status != StatusAdded {
+	if err != nil || spawned.ID != item.ID || spawned.Status != subscription.StatusAdded {
 		t.Fatalf("an actor-spawned add must leave an added subscription alone: %#v %v", spawned, err)
 	}
 	rearmed, err := f.service.AddMovie(ctx, "m1", AddMovieOptions{})
-	if err != nil || rearmed.Status != StatusWaiting || rearmed.Hash != "" {
+	if err != nil || rearmed.Status != subscription.StatusWaiting || rearmed.Hash != "" {
 		t.Fatalf("a user re-add must re-arm: %#v %v", rearmed, err)
 	}
 	if len(f.offline.submissions) != 1 {
@@ -309,4 +309,3 @@ func TestActorSubscription_ConstraintErrorRecoversWithoutRecursion(t *testing.T)
 		t.Fatalf("expected exactly 1 subscription created, got %d", count)
 	}
 }
-

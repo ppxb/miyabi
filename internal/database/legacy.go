@@ -15,11 +15,11 @@ func migrateSubscriptions(ctx context.Context, tx *sql.Tx) error {
 	_, err = tx.ExecContext(ctx, `
 		INSERT OR IGNORE INTO subscriptions (
 			id, created_at, updated_at, kind, target_id, code, title, cover, release_date,
-			status, hash, task_id, next_check_at, last_checked_at, checks, error, auto_download, zone, cursor
+			status, hash, task_id, next_check_at, last_checked_at, checks, error, auto_download, cursor
 		)
 		SELECT
 			id, created_at, updated_at, 'movie', movie_id, code, title, cover, release_date,
-			status, hash, task_id, next_check_at, last_checked_at, checks, error, 1, '', ''
+			status, hash, task_id, next_check_at, last_checked_at, checks, error, 1, ''
 		FROM monitors;
 		DROP TABLE monitors;
 	`)

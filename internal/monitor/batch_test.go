@@ -17,16 +17,16 @@ func TestEnqueueSingle(t *testing.T) {
 	}
 
 	waiting, err := f.service.EnqueueSingle(ctx, item.ID)
-	if err != nil || waiting.Status != StatusWaiting || !waiting.AutoDownload || waiting.NextCheckAt == nil || !waiting.NextCheckAt.After(time.Now()) {
+	if err != nil || waiting.Status != subscription.StatusWaiting || !waiting.AutoDownload || waiting.NextCheckAt == nil || !waiting.NextCheckAt.After(time.Now()) {
 		t.Fatalf("without a magnet the subscription waits with auto-download on and a future check: %#v %v", waiting, err)
 	}
 
 	f.discover.magnets["m1"] = []domain.Magnet{{Hash: "abc123", Name: "MOCK-m1", HasSubtitle: true, HD: true, Size: 1 << 30}}
 	added, err := f.service.EnqueueSingle(ctx, item.ID)
-	if err != nil || added.Status != StatusAdded || added.Hash != "abc123" || added.TaskID == nil {
+	if err != nil || added.Status != subscription.StatusAdded || added.Hash != "abc123" || added.TaskID == nil {
 		t.Fatalf("with a magnet the subscription is submitted: %#v %v", added, err)
 	}
-	if again, err := f.service.EnqueueSingle(ctx, item.ID); err != nil || again.Status != StatusAdded || len(f.offline.submissions) != 1 {
+	if again, err := f.service.EnqueueSingle(ctx, item.ID); err != nil || again.Status != subscription.StatusAdded || len(f.offline.submissions) != 1 {
 		t.Fatalf("enqueueing an added subscription must not resubmit: %#v %v submissions=%d", again, err, len(f.offline.submissions))
 	}
 

@@ -38,12 +38,10 @@ type subscriptionCreateInput struct {
 	Title        string `json:"title"`
 	Cover        string `json:"cover"`
 	AutoDownload *bool  `json:"auto_download"`
-	Zone         string `json:"zone"`
 }
 
 type subscriptionUpdateInput struct {
 	AutoDownload *bool   `json:"auto_download"`
-	Zone         *string `json:"zone"`
 	Status       *string `json:"status" binding:"omitempty,oneof=active paused"`
 }
 
@@ -95,12 +93,10 @@ func subscriptionCreateHandler(mgr SubscriptionManager) gin.HandlerFunc {
 				Title:        input.Title,
 				Cover:        input.Cover,
 				AutoDownload: input.AutoDownload,
-				Zone:         input.Zone,
 			})
 		} else {
 			item, err = mgr.AddMovie(c.Request.Context(), input.TargetID, monitor.AddMovieOptions{
 				AutoDownload: input.AutoDownload,
-				Zone:         input.Zone,
 			})
 		}
 		created(c, item, err)
@@ -119,7 +115,6 @@ func subscriptionUpdateHandler(mgr SubscriptionManager) gin.HandlerFunc {
 		}
 		item, err := mgr.Update(c.Request.Context(), uri.ID, monitor.UpdateOptions{
 			AutoDownload: input.AutoDownload,
-			Zone:         input.Zone,
 			Status:       input.Status,
 		})
 		respond(c, item, err)

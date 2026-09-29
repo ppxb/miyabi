@@ -18,6 +18,7 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/ent/subscription"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/javdb"
@@ -188,16 +189,16 @@ func (goldenSubscription) List(context.Context, string, int, int) ([]monitor.Ite
 	last := goldenTime()
 	return []monitor.Item{
 		{ID: 2, Kind: "movie", TargetID: "movie-upcoming", Code: "SONE-002", Title: "Upcoming", Cover: "https://media.example/upcoming.jpg", ReleaseDate: "2026-10-01",
-			AutoDownload: true, Status: monitor.StatusWaiting, NextCheckAt: &next, LastCheckedAt: &last, Checks: 3, Error: &failure, CreatedAt: goldenTime(), UpdatedAt: goldenTime()},
+			AutoDownload: true, Status: subscription.StatusWaiting, NextCheckAt: &next, LastCheckedAt: &last, Checks: 3, Error: &failure, CreatedAt: goldenTime(), UpdatedAt: goldenTime()},
 		{ID: 1, Kind: "movie", TargetID: "movie-exact", Code: "ABP-123", Title: "Localized title", Cover: "https://media.example/cover.jpg", ReleaseDate: "2026-08-01",
-			AutoDownload: true, Status: monitor.StatusAdded, Hash: "0000000000000000000000000000000000000003", TaskID: &taskID, Checks: 1, CreatedAt: goldenTime(), UpdatedAt: goldenTime()},
+			AutoDownload: true, Status: subscription.StatusAdded, Hash: "0000000000000000000000000000000000000003", TaskID: &taskID, Checks: 1, CreatedAt: goldenTime(), UpdatedAt: goldenTime()},
 	}, nil
 }
 
 func (goldenSubscription) Targets(context.Context, string) ([]monitor.TargetItem, error) {
 	return []monitor.TargetItem{
-		{ID: 2, Kind: "movie", TargetID: "movie-upcoming", Status: monitor.StatusWaiting},
-		{ID: 1, Kind: "movie", TargetID: "movie-exact", Status: monitor.StatusAdded},
+		{ID: 2, Kind: "movie", TargetID: "movie-upcoming", Status: subscription.StatusWaiting},
+		{ID: 1, Kind: "movie", TargetID: "movie-exact", Status: subscription.StatusAdded},
 	}, nil
 }
 
