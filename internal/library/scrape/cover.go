@@ -144,7 +144,7 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 	videos = uniqueVideos
 	snapshot.Videos = VideoFingerprint(videos)
 
-	if err := service.exportLocalMedia(ctx, input, input.Document, videos, poster, fanart); err != nil {
+	if err := service.exportLocalMedia(ctx, input, videos, poster, fanart); err != nil {
 		return nil, err
 	}
 	input.Completed = true
@@ -205,9 +205,9 @@ func (service *Service) verifyVideoPositions(ctx context.Context, sess drive.Ses
 	return nil
 }
 
-func (service *Service) exportLocalMedia(ctx context.Context, input CoverPayload, doc nfo.Movie, videos []pan.File, poster, fanart []byte) error {
+func (service *Service) exportLocalMedia(ctx context.Context, input CoverPayload, videos []pan.File, poster, fanart []byte) error {
 	return service.exportMgr.WithConfig(func(expCfg export.Config) error {
-		if err := ExportEmbyMedia(expCfg.EmbyDir, expCfg.PublicURL, expCfg.STRMToken, input.Code, doc, videos, poster, fanart); err != nil {
+		if err := ExportEmbyMedia(expCfg.EmbyDir, expCfg.PublicURL, expCfg.STRMToken, input.Code, input.Document, videos, poster, fanart); err != nil {
 			return err
 		}
 		if service.mediaNotifier != nil && expCfg.EmbyDir != "" {

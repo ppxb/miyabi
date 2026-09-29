@@ -138,12 +138,10 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 	if err := SaveScanProgress(ctx, tx.Task, r.taskID, *r.payload); err != nil {
 		return err
 	}
-	if r.scanner.tasksSvc != nil {
-		if r.payload.Scan.RemovedFiles > 0 || r.payload.Scan.RemovedMovies > 0 {
-			r.scanner.tasksSvc.NotifyLibraryChanged()
-		} else {
-			r.scanner.tasksSvc.Notify()
-		}
+	var change tasks.Change
+	if r.payload.Scan.RemovedFiles > 0 || r.payload.Scan.RemovedMovies > 0 {
+		change = tasks.ChangeLibrary
 	}
+	r.notifyAfterCommit(tx, change)
 	return nil
 }

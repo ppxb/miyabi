@@ -1,10 +1,19 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：150 条待处理，29 条已完成、待整体复查。
+> 清单整理：2026-09-30；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。本次复查现存 51 条已完成项，移除已被第 90、108 项覆盖的重复待办 185、144；新增扫描恢复进度边界 245。当前保留 177 条：126 条待处理，51 条已完成。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
-> 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
+> 本轮核对现存已完成项的实现、调用链和回归覆盖，并非重新验证全部待办，也未重审此前移除的 62 条记录。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
+
+## 已完成项复查（2026-09-30）
+
+- 范围：58–62、64–83、85、87–105、107–111、150，共 51 项；按实际保留方案复查，不将原始候选方案中的每个建议视为必须实现。
+- 补修：扫描分页入库和收尾原先在事务提交前通知任务总线，可能提前读取旧数据或在回滚后留下错误版本号。现通过事务提交钩子发送通知；新增分页/收尾各自提交与回滚的四个用例，原实现均失败，修复后通过。任务池原有完成回调的事务语义保持不变。
+- 清理：移除封面导出重复传入的 Document 参数；删除只调用 JSON 编解码而不执行扫描恢复的测试，将独立限速超时测试合入 synctest 用例，保留真实分页恢复、断点续扫、导出和事务测试。移除重复待办 144、185，已完成项原文与历史验证记录保留。
+- 验证：修改后 go test ./... 通过；本轮前端 119 项 Vitest、TypeScript、oxlint、Vite 生产构建及 go vet ./... 通过。无浏览器或真实 115/JavDB/Emby 联调；CGO_ENABLED=0，未运行 race 检测。
+- 工具限制：shadcn info --json 在读取项目配置前因现有依赖 @modelcontextprotocol/sdk 引用 zod/v3 失败（ERR_PACKAGE_PATH_NOT_EXPORTED）；未安装或修改依赖。cn 直接导入已通过应用类型检查和构建，但后续组件生成流程尚未完成端到端验证。
+- 剩余边界：第 244 项继续按用户要求暂缓；第 105 项不重排已迁移历史；第 108/150 项仍保留资料后请求实时状态的顺序。第 245 项是重构前已存在的恢复计数问题，不能将现有恢复测试通过解读为所有中断位置均已覆盖。
 
 ## 处理顺序与原则
 
@@ -22,6 +31,7 @@
 
 - [ ] **244.** `internal/codeid/codeid.go:38-55,59-93` `filenamePattern`：正则前缀匹配规则对个别非番号文件名存在误提取（如相机默认命名的 `VID-20220326`、`IMG-XXXX`、包含分辨率标签的 `MAYLI-1080P` 等被当作番号提取并提交上游查询）→ 建立常见非番号前缀黑名单（如 `VID`, `IMG`, `DSC`, `MOV` 等）与分辨率标记过滤，避免无效请求与限流损耗。
   - 暂缓：按用户要求撤回本次特例过滤及对应测试，不增加相机前缀、时间戳或分辨率硬编码规则；后续如处理，应先评估更通用的方案。第 99 项整理保持不变。
+- [ ] **245.** 静态复查发现扫描恢复的进度边界：`scan/walker.go` 按目录保存 Checkpoint，但目录内每 100 个视频入库时 `processPageTx` 会保存已累加的 Scan 计数。若在一个入库块提交后中断，恢复会从同一目录重新遍历，再次累加 FilesScanned/MatchedFiles/DirectoriesScanned；文件 upsert 不等于计数幂等。第 59 项前的实现亦有相同流程；现有 205 文件测试在第二个网络分页中断，尚未覆盖入库块提交后的中断。应补充该中断点测试，再让持久化进度与恢复检查点对应同一处理位置。
 
 ---
 
@@ -260,7 +270,6 @@
 - [ ] **140.** `internal/api/strm.go:33-39` Emby / 播放器每次 HEAD、GET、Range 都走 DB + downurl（限流 4rps / 2 并发）+ CDN HEAD → 按 `(pickCode, UA)` 做短 TTL 缓存。
 - [ ] **141.** `internal/netx/ssrf.go:103-119,152,206` 同一主机 3 次 DNS 解析（请求前 `ValidateSafeURL`、每次重定向、拨号时），拨号那次已覆盖 DNS 重绑定 → `ValidateSafeURL` 只做语法校验。
 - [ ] **142.** `internal/drive/account.go` 缓存未命中无 singleflight，并发 `Open()` 同时请求 `/open/user/info`；`accountCacheMu` 可并入 `d.mu`；`internal/drive/token.go:13-57` refresh_token 被吊销后不标记凭证失效，每个请求都发起一次注定失败的刷新。
-- [ ] **144.** `internal/catalogue/service.go:239-251` `MovieSummary`、`:254-264` `BrowseMovies` 走完整 `projectMovies → MovieStates`（2 次 DB 查询）后丢弃投影结果。
 - [ ] **145.** `internal/javdb/movie.go:105-141,147-174` `ResolveMovieID` 每次查询前对累积的数百候选全量 `matchCandidates`，`codeid.Normalize` 每次最多 8 个正则，`IsFormatEquivalent` 两边重复 Normalize → 预计算 `normCode`。
 - [ ] **146.** `internal/javdb/route.go:112` 非 full 模式用 5ms ticker 轮询（最长 60s，每秒唤醒 200 次）→ 按最早截止时间的单个 `time.Timer`。
 - [ ] **147.** `internal/subtitle/label.go:89-100` `[]rune(text)` 将最多 10MB 文本整体转换（约 40MB 分配）后再截取前 15000 个；`containsRune` 在 40 元素切片中线性查找 → range 计数 + map。
@@ -317,7 +326,6 @@
 - [ ] **182.** `catalogue.MovieDetail` 重新声明 `domain.MovieDetail` 的字段而非内嵌；`domain/library.go` 实际存放 MovieSummary / Media / OfflineSubmission，`ScanProgress` 位于 `source.go`，文件名与内容不符；`ScanPayload.Checkpoint` 是 JSON 中嵌套 JSON 字符串 → 结构化字段。
 - [ ] **183.** `internal/app/app.go` 初始化失败分支仍重复列出资源 Close；此前 scrape worker 清理遗漏已修复。评估以清理栈或局部辅助方式减少重复，必须保持资源逆序关闭，并明确哪些对象在构造成功前已有后台工作；不强制改成半初始化 App。
 - [ ] **184.** 导出默认值仍有重复：`internal/export/export.go` 保留 `./data/emby` 和硬编码 8080 的 defaultPublicURL，与 config.Load 推导不一致；app 的 EmbyDir 兜底已在第 103 项删除。统一在配置入口确定，底层导出使用明确配置。另核实前端 emby-url.ts、network-section.tsx 的 URL scheme/host 格式化重复，以及 netx/ip.go 注释与实现的差异。
-- [ ] **185.** 磁力排序规则（字幕 > 高清 > 体积 > 文件数）在 `javdb/magnet.go:54-71` 与 `magnet/aggregator.go:104-118` 各一份。
 
 ---
 

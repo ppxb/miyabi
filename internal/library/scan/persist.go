@@ -151,16 +151,38 @@ func (r *scanRun) processPageTx(ctx context.Context, tx *ent.Tx, directoryPath s
 	if err := SaveScanProgress(ctx, tx.Task, r.taskID, *r.payload); err != nil {
 		return err
 	}
-	if r.scanner.tasksSvc != nil {
-		if indexChanged {
-			r.scanner.tasksSvc.NotifyLibraryChanged()
-		} else if offlineChanged {
-			r.scanner.tasksSvc.NotifyOfflineChanged()
-		} else {
-			r.scanner.tasksSvc.Notify()
-		}
+	var change tasks.Change
+	if indexChanged {
+		change = tasks.ChangeLibrary
+	} else if offlineChanged {
+		change = tasks.ChangeOffline
 	}
+	r.notifyAfterCommit(tx, change)
 	return nil
+}
+
+// Keep revisions and wakeups consistent with committed scan data.
+func (r *scanRun) notifyAfterCommit(tx *ent.Tx, change tasks.Change) {
+	svc := r.scanner.tasksSvc
+	if svc == nil {
+		return
+	}
+	tx.OnCommit(func(next ent.Committer) ent.Committer {
+		return ent.CommitFunc(func(ctx context.Context, tx *ent.Tx) error {
+			if err := next.Commit(ctx, tx); err != nil {
+				return err
+			}
+			switch change {
+			case tasks.ChangeLibrary:
+				svc.NotifyLibraryChanged()
+			case tasks.ChangeOffline:
+				svc.NotifyOfflineChanged()
+			default:
+				svc.Notify()
+			}
+			return nil
+		})
+	})
 }
 
 // IndexDownloadedMovie binds a completed download target to a movie record with its known JavDB ID.
