@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：172 条待处理，7 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：171 条待处理，8 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -54,7 +54,10 @@
 - [x] **65.** `internal/library/scan/reconcile.go:20,27-46` `embyOpts ...any` 按 string 出现顺序解析 embyDir / publicURL / strmToken，类型不安全；`ProcessScanPageTx` 9 个参数 → 改为 `*Scanner` 方法。
   - 实现：生产入库与收尾逻辑改为 scanRun.processPageTx / reconcileTx，直接使用任务状态和 Scanner 依赖，scanID 统一读取 payload.ScanID。删除 embyOpts ...any 及位置解析，显式传入 export.Config；保留数据源 Session 提交与导出配置锁边界，跨包测试使用的事务入口同步改为类型明确的参数。
   - 验证：library（含 scan/scrape）、offline、app 测试通过，覆盖断点恢复、入库及导出清理回滚、离线任务并发更新；已有导出配置与通知测试同步迁移。未进行真实 115/Emby 联调，待整体复查。
-- [ ] **66.** `web/src/api/movie-detail-cache.ts`（202 行）+ `discover.ts:160-202`：Query 缓存外再维护 `WeakMap<QueryClient, Map>` 全局卡片索引，订阅 QueryCache 每次 `removed` 全量重建；带引用计数、并发上限 2 的请求队列；`useSyncExternalStore` 手动订阅 → `placeholderData` 从 `getQueriesData` 查找 + queryFn 内约 10 行信号量；`discover.ts:163-165` 的 `prioritize` 多余。
+- [x] **66.** `web/src/api/movie-detail-cache.ts`（202 行）+ `discover.ts:160-202`：Query 缓存外再维护 `WeakMap<QueryClient, Map>` 全局卡片索引，订阅 QueryCache 每次 `removed` 全量重建；带引用计数、并发上限 2 的请求队列；`useSyncExternalStore` 手动订阅 → `placeholderData` 从 `getQueriesData` 查找 + queryFn 内约 10 行信号量；`discover.ts:163-165` 的 `prioritize` 多余。
+  - 方案修正：JavDB 推荐仅提供基础引用，卡片所需标题等字段必须补全；保留可见性触发、后台两路并发、共享消费者、撤销未开始请求、点击优先及导航请求复用。placeholderData 不能替代跨查询订阅，不按原候选方案强行删除调度和 useSyncExternalStore。
+  - 实现：删除额外 WeakMap 卡片索引、永久 QueryCache 订阅和全量重建，直接从 Query 缓存选取最新卡片；集中卡片查询范围与订阅过滤，订阅随组件卸载释放，忽略无关查询移除。列表替换后不再残留已移除卡片，完整详情缓存不混入列表数据。
+  - 验证：Vitest 113 项、typecheck、lint 通过，保留并发/优先/取消/导航复用测试，新增列表替换与移除、失效缓存补全、相关事件订阅与释放测试。未进行浏览器交互及真实 JavDB 联调，待整体复查。
 - [ ] **67.** `web/src/api/browse-history-store.ts`（199 行）+ `browse-history.ts`：为"已浏览"徽章做 localStorage 持久化 + 服务端合并 + 50 条批量 + 10s 防抖 + beacon + 5000 截断（:178-183，服务端返回全部，不一致）；测试专用 `unref`（:136-139）进入生产代码；:47 注释引用已不存在的 `REFACTOR_PLAN`；`browse-history.ts:13` 每卡片 effect 调 `init()`，:15 `subscribe` 每次渲染新建 → `useQuery` + 乐观 `useMutation`，整个 store 删除。
 - [ ] **68.** `web/src/lib/pan-login.ts:11-19` `panLoginShouldRetry` 等价于 `retry: 4`，却配 146 行测试解释 react-query 内部行为；115 专用逻辑不应在 `lib/`。
 - [ ] **69.** `internal/drive/events.go` 整套 eventBus（RWMutex + 自增 ID + map + 取消函数）只有 `library.go:80` 一个订阅者且丢弃取消函数 → 单个 listener 字段。

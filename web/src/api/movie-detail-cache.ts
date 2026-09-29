@@ -14,92 +14,48 @@ export const discoverKeys = {
 
 const detailStaleTime = 5 * 60_000
 
-type CardEntry = {
-  card: DiscoverMovie
-  updatedAt: number
-  isInvalidated: boolean
+function containsMovieCards(key: readonly unknown[], id: string) {
+  return (
+    key[0] === 'discover' &&
+    (key[1] === 'movies' ||
+      key[1] === 'search' ||
+      (key[1] === 'movie' && key.length === 3 && key[2] === id))
+  )
 }
 
-type ClientIndex = {
-  cards: Map<string, CardEntry>
-}
-
-const clientIndexes = new WeakMap<QueryClient, ClientIndex>()
-
-function getClientIndex(client: QueryClient): ClientIndex {
-  let index = clientIndexes.get(client)
-  if (!index) {
-    const activeIndex: ClientIndex = { cards: new Map() }
-    index = activeIndex
-    clientIndexes.set(client, index)
-
-    const cache = client.getQueryCache()
-    const updateFromQuery = (query: ReturnType<typeof cache.findAll>[number]) => {
-      const key = query.queryKey
-      if (!Array.isArray(key) || key[0] !== 'discover') return
-      const kind = key[1]
-      const { data, dataUpdatedAt, isInvalidated } = query.state
-      if (!data) return
-
-      if (kind === 'movie' && key.length === 3 && typeof key[2] === 'string') {
-        const id = key[2]
-        const card = data as DiscoverMovieDetail
-        const existing = activeIndex.cards.get(id)
-        if (!existing || dataUpdatedAt >= existing.updatedAt) {
-          activeIndex.cards.set(id, { card, updatedAt: dataUpdatedAt, isInvalidated })
-        }
-      } else if (kind === 'movies' || kind === 'search') {
-        if (Array.isArray(data)) {
-          for (const item of data as DiscoverMovie[]) {
-            if (item && item.id) {
-              const existing = activeIndex.cards.get(item.id)
-              if (!existing || dataUpdatedAt >= existing.updatedAt) {
-                activeIndex.cards.set(item.id, {
-                  card: item,
-                  updatedAt: dataUpdatedAt,
-                  isInvalidated
-                })
-              }
-            }
-          }
-        }
-      }
-    }
-
-    const rebuild = () => {
-      activeIndex.cards.clear()
-      for (const query of cache.findAll({ queryKey: discoverKeys.all })) {
-        updateFromQuery(query)
-      }
-    }
-
-    rebuild()
-
-    cache.subscribe(event => {
-      if (event.type === 'updated' || event.type === 'added') {
-        updateFromQuery(event.query)
-      } else if (event.type === 'removed') {
-        rebuild()
-      }
-    })
-  }
-  return index
-}
-
-// List results already contain everything a card needs. Read them in place;
-// never seed an incomplete list item into the full-detail query.
+// QueryCache is the only source of card data. Keep list items out of the
+// full-detail query, which also contains the upstream recommendation lists.
 export function findCachedMovieCard(client: QueryClient, id: string, freshOnly = false) {
-  const index = getClientIndex(client)
-  const entry = index.cards.get(id)
-  if (!entry) return undefined
-
-  if (freshOnly) {
-    const oldest = Date.now() - detailStaleTime
-    if (entry.updatedAt < oldest || entry.isInvalidated) {
-      return undefined
+  let newest: { card: DiscoverMovie; updatedAt: number; invalidated: boolean } | undefined
+  for (const query of client.getQueryCache().findAll({ queryKey: discoverKeys.all })) {
+    if (!containsMovieCards(query.queryKey, id)) continue
+    const { data, dataUpdatedAt, isInvalidated } = query.state
+    const card =
+      query.queryKey[1] === 'movie'
+        ? (data as DiscoverMovieDetail | undefined)
+        : (data as DiscoverMovie[] | undefined)?.find(item => item.id === id)
+    if (card && (!newest || dataUpdatedAt >= newest.updatedAt)) {
+      newest = { card, updatedAt: dataUpdatedAt, invalidated: isInvalidated }
     }
   }
-  return entry.card
+  if (
+    !newest ||
+    (freshOnly && (newest.invalidated || Date.now() - newest.updatedAt > detailStaleTime))
+  )
+    return undefined
+  return newest.card
+}
+
+// List/search updates can supply a recommendation without its own detail fetch.
+// Subscribe only while the card is mounted, and ignore unrelated cache removals.
+export function subscribeMovieCard(client: QueryClient, id: string, notify: () => void) {
+  return client.getQueryCache().subscribe(event => {
+    if (
+      containsMovieCards(event.query.queryKey, id) &&
+      (event.type === 'removed' || (event.type === 'updated' && event.action.type === 'success'))
+    )
+      notify()
+  })
 }
 
 type DetailRequest = { id: string; consumers: number; started: boolean }

@@ -6,7 +6,8 @@ import { QueryClient, QueryObserver } from '@tanstack/react-query'
 import {
   createMovieDetailLoader,
   discoverKeys,
-  findCachedMovieCard
+  findCachedMovieCard,
+  subscribeMovieCard
 } from '@/api/movie-detail-cache'
 import type { DiscoverMovieDetail } from '@/api/discover'
 import { observeRecommendation } from '@/features/movie-detail/recommendation-visibility'
@@ -300,4 +301,52 @@ test('brief intersections do not enqueue work and leaving or unmounting releases
   assert.equal(observer.disconnected, true)
   vi.advanceTimersByTime(1000)
   assert.equal(requested, 2)
+})
+
+test('card lookup follows list replacement and removal without retaining orphaned entries', () => {
+  const { client } = fixture()
+  const older = movie('one', 'Older search result')
+  const newer = movie('one', 'Newer list result')
+  client.setQueryData(discoverKeys.search({ query: 'one' }), [older], { updatedAt: 100 })
+  client.setQueryData(discoverKeys.movies({ page: 1 }), [newer], { updatedAt: 200 })
+  assert.equal(findCachedMovieCard(client, 'one'), newer)
+  client.setQueryData(discoverKeys.movies({ page: 1 }), [movie('two')])
+  assert.equal(findCachedMovieCard(client, 'one'), older)
+  client.removeQueries({ queryKey: discoverKeys.search({ query: 'one' }) })
+  assert.equal(findCachedMovieCard(client, 'one'), undefined)
+})
+
+test('invalidated card data stays displayable but no longer suppresses a detail request', async () => {
+  const { client, recommend, requests } = fixture()
+  const card = movie('one')
+  client.setQueryData(discoverKeys.movies({ page: 1 }), [card])
+  await client.invalidateQueries({ queryKey: discoverKeys.movies({ page: 1 }) })
+  assert.equal(findCachedMovieCard(client, 'one'), card)
+  assert.equal(findCachedMovieCard(client, 'one', true), undefined)
+  recommend('one')
+  await setImmediate()
+  assert.equal(requests.length, 1)
+  requests[0]!.resolve(movie('one'))
+})
+
+test('card subscriptions follow relevant cache changes and unsubscribe on disposal', () => {
+  const { client } = fixture()
+  const notify = vi.fn()
+  const stop = subscribeMovieCard(client, 'one', notify)
+  onTestFinished(stop)
+  const card = movie('one')
+  client.setQueryData(discoverKeys.search({ query: 'one' }), [card])
+  assert.equal(notify.mock.calls.length, 1)
+  assert.equal(findCachedMovieCard(client, 'one'), card)
+  client.setQueryData(discoverKeys.magnets('one'), [])
+  client.setQueryData(discoverKeys.movie('two'), movie('two'))
+  client.removeQueries({ queryKey: discoverKeys.magnets('one') })
+  client.removeQueries({ queryKey: discoverKeys.movie('two') })
+  assert.equal(notify.mock.calls.length, 1)
+  client.removeQueries({ queryKey: discoverKeys.search({ query: 'one' }) })
+  assert.equal(notify.mock.calls.length, 2)
+  assert.equal(findCachedMovieCard(client, 'one'), undefined)
+  stop()
+  client.setQueryData(discoverKeys.movie('one'), card)
+  assert.equal(notify.mock.calls.length, 2)
 })

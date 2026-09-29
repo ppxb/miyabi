@@ -2,7 +2,12 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useCallback, useEffect, useSyncExternalStore } from 'react'
 
 import { apiGet, apiPost, apiPut } from './client'
-import { createMovieDetailLoader, discoverKeys, findCachedMovieCard } from './movie-detail-cache'
+import {
+  createMovieDetailLoader,
+  discoverKeys,
+  findCachedMovieCard,
+  subscribeMovieCard
+} from './movie-detail-cache'
 
 export { discoverKeys }
 
@@ -170,22 +175,7 @@ export function useRecommendationMovie(id: string) {
   const queryClient = useQueryClient()
   const query = useQuery({ ...movieDetails.options(id), enabled: false })
   const subscribe = useCallback(
-    (notify: () => void) =>
-      queryClient.getQueryCache().subscribe(event => {
-        if (
-          event.type !== 'removed' &&
-          !(event.type === 'updated' && event.action.type === 'success')
-        )
-          return
-        const [namespace, kind, key] = event.query.queryKey
-        if (
-          namespace === 'discover' &&
-          (kind === 'movies' ||
-            kind === 'search' ||
-            (kind === 'movie' && event.query.queryKey.length === 3 && key === id))
-        )
-          notify()
-      }),
+    (notify: () => void) => subscribeMovieCard(queryClient, id, notify),
     [queryClient, id]
   )
   const snapshot = useCallback(() => findCachedMovieCard(queryClient, id), [queryClient, id])
