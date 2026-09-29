@@ -3,7 +3,7 @@ import { CheckIcon, CloudDownloadIcon, CopyIcon, LoaderCircleIcon } from 'lucide
 import { useState } from 'react'
 
 import type { DiscoverMagnet, useDiscoverMagnets } from '@/api/discover'
-import { ApiError } from '@/api/client'
+import { describeApiError, isPanUnauthorized } from '@/api/client'
 import {
   isOfflineTaskActive,
   useAddOffline,
@@ -38,7 +38,7 @@ export function MovieMagnets({
   query: ReturnType<typeof useDiscoverMagnets>
 }) {
   const account = usePanAccount(Boolean(query.data?.length))
-  const unauthorized = account.error instanceof ApiError && account.error.status === 401
+  const unauthorized = isPanUnauthorized(account.error)
   const connected = account.data?.connected === true && !unauthorized
   const accountID = connected ? (account.data?.account?.id ?? '') : ''
   const offline = useOfflineTasks(movieID, accountID, account.data?.directory?.id ?? '')
@@ -189,11 +189,7 @@ function MagnetCard({
                       notifyTaskError(
                         `offline:submit-error:${movieID}`,
                         '加入 115 失败',
-                        error instanceof ApiError
-                          ? error.status === 401
-                            ? '115 登录已失效，请前往设置重新登录。'
-                            : error.message
-                          : '请检查后端服务和 115 连接后重试。'
+                        describeApiError(error)
                       )
                     }
                   })

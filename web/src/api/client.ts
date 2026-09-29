@@ -1,11 +1,21 @@
 export class ApiError extends Error {
   constructor(
     message: string,
-    public readonly status: number
+    public readonly status: number,
+    public readonly code?: string
   ) {
     super(message)
     this.name = 'ApiError'
   }
+}
+
+export function isPanUnauthorized(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'PAN_UNAUTHORIZED'
+}
+
+export function describeApiError(error: unknown): string {
+  if (isPanUnauthorized(error)) return '115 登录已失效，请前往设置重新登录。'
+  return error instanceof ApiError ? error.message : '请检查后端服务和网络后重试。'
 }
 
 type QueryValue = string | number | readonly string[] | undefined
@@ -111,7 +121,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       notifyUnauthorized()
     }
 
-    throw new ApiError(message, response.status)
+    throw new ApiError(message, response.status, code)
   }
   return response.json() as Promise<T>
 }

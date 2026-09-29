@@ -93,7 +93,8 @@
   - 已配置 Vitest 并迁移现有测试，统一使用 `@/` 导入，移除 `allowImportingTsExtensions`；合并 movie-state-cache 和 offline-state，保留有独立职责的缓存、存储和计算模块。类型检查及生产构建通过；测试已迁移为 TypeScript，源码、测试与 Vitest 配置统一纳入 web/tsconfig.json；使用 tsconfigPaths 解析别名，类型检查与 15 个测试文件、98 个用例全部通过。
 - [x] **55.** 前端 discover 浏览状态放在内存 zustand（`web/src/stores/discover.ts`），而 library / search 用 URL search params；`metadata-search-page.tsx:47-51` 用 effect 双向同步；订阅页 tab / 选中演员（`subscriptions/page.tsx:26-27`）用本地 useState，返回即丢失 → 统一 `validateSearch`。
   - 发现页 tab、各 tab 页码与分类筛选，订阅页 tab、演员编号与分页均改用路由 validateSearch；移除 discover store 和元数据页 effect 同步，详情链接通过 URL 传递通用筛选。新增内存路由测试覆盖详情往返、刷新恢复和非法参数。
-- [ ] **56.** 前端错误处理位置不统一：`api/subscriptions.ts` 在 hook 内 toast，其余在组件；"115 登录已失效"映射在 `library/page.tsx:72-76` 与 `movie-detail/magnets.tsx:192-196` 各写一遍；"query.error → invalidate account"在 `pan.ts:121-125`、`library.ts:71-76`、`offline.ts:90-94`、`pan.ts:140-144` 重复 → `QueryCache/MutationCache({ onError })` 统一。
+- [x] **56.** 前端错误处理位置不统一：`api/subscriptions.ts` 在 hook 内 toast，其余在组件；"115 登录已失效"映射在 `library/page.tsx:72-76` 与 `movie-detail/magnets.tsx:192-196` 各写一遍；"query.error → invalidate account"在 `pan.ts:121-125`、`library.ts:71-76`、`offline.ts:90-94`、`pan.ts:140-144` 重复 → `QueryCache/MutationCache({ onError })` 统一。
+  - 后端补充 PAN_UNAUTHORIZED、PAN_DIRECTORY_REQUIRED、PAN_SOURCE_CHANGED 错误码，ApiError 保留 code；QueryCache/MutationCache 统一刷新相关状态，按 mutation meta 显式启用错误 toast，批量入库只保留弹窗内错误。统一文案并区分本站鉴权失效，测试覆盖普通 400、并发刷新、自刷新循环及重复提示。
 - [ ] **57.** pan 包 json tag 语义混用：`pan.File`、`FilePage`、`Account` 带 API 输出 tag，被 `api/pan.go` 直接返回；`pan.OfflineTask` 的 tag 却是 115 线上字段名（如 `percentDone`）。
 
 ---

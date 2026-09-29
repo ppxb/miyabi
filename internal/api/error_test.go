@@ -50,16 +50,18 @@ func TestErrorMiddlewareMapsDomainErrorsToStatusAndMessage(t *testing.T) {
 		err     error
 		status  int
 		message string
+		code    string
 	}{
 		{name: "bad request wrapper", err: BadRequest(errors.New("page must be positive")), status: http.StatusBadRequest, message: "page must be positive"},
 		{name: "outer classification wins", err: BadRequest(domain.E(domain.KindConflict, "参数冲突", nil)), status: http.StatusBadRequest, message: "参数冲突"},
 		{name: "login rate limit", err: ErrTooManyLoginAttempts, status: http.StatusTooManyRequests, message: ErrTooManyLoginAttempts.PublicMessage()},
-		{name: "media directory required", err: drive.ErrMediaDirectoryRequired, status: http.StatusBadRequest, message: drive.ErrMediaDirectoryRequired.PublicMessage()},
+		{name: "media directory required", err: drive.ErrMediaDirectoryRequired, status: http.StatusBadRequest, message: drive.ErrMediaDirectoryRequired.PublicMessage(), code: "PAN_DIRECTORY_REQUIRED"},
 		{name: "magnet not found", err: fmt.Errorf("add: %w", offline.ErrMagnetNotFound), status: http.StatusBadRequest, message: offline.ErrMagnetNotFound.PublicMessage()},
 		{name: "invalid proxy", err: proxyValidationError(), status: http.StatusBadRequest, message: "代理配置无效: 代理地址必须包含协议（如 http://）与主机地址"},
 		{name: "cache busy", err: maintenance.ErrCacheBusy, status: http.StatusConflict, message: maintenance.ErrCacheBusy.PublicMessage()},
 		{name: "file missing", err: fmt.Errorf("影片文件不存在，请重新扫描: %w", fs.ErrNotExist), status: http.StatusNotFound, message: "影片文件不存在，请重新扫描: file does not exist"},
-		{name: "pan unauthorized", err: fmt.Errorf("list: %w", pan.ErrUnauthorized), status: http.StatusUnauthorized, message: pan.ErrUnauthorized.PublicMessage()},
+		{name: "pan unauthorized", err: fmt.Errorf("list: %w", pan.ErrUnauthorized), status: http.StatusUnauthorized, message: pan.ErrUnauthorized.PublicMessage(), code: "PAN_UNAUTHORIZED"},
+		{name: "source changed", err: fmt.Errorf("submit: %w", drive.ErrSourceChanged), status: http.StatusConflict, message: drive.ErrSourceChanged.PublicMessage(), code: "PAN_SOURCE_CHANGED"},
 		{name: "access password", err: ErrAccessPassword, status: http.StatusUnauthorized, message: ErrAccessPassword.PublicMessage()},
 		{name: "upstream gateway error", err: domain.E(domain.KindUpstream, "上游服务异常", errors.New("javdb timeout")), status: http.StatusBadGateway, message: "上游服务异常"},
 
@@ -77,9 +79,13 @@ func TestErrorMiddlewareMapsDomainErrorsToStatusAndMessage(t *testing.T) {
 			}
 			var body struct {
 				Error string `json:"error"`
+				Code  string `json:"code"`
 			}
 			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 				t.Fatalf("body is not JSON: %v\n%s", err, response.Body)
+			}
+			if body.Code != scenario.code {
+				t.Fatalf("code = %q, want %q", body.Code, scenario.code)
 			}
 			if body.Error != scenario.message {
 				t.Fatalf("message = %q, want %q", body.Error, scenario.message)

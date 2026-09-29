@@ -1,6 +1,6 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { ApiError, apiGet, apiPost } from '@/api/client'
+import { apiGet, apiPost } from '@/api/client'
 import { invalidateMovieStates } from '@/api/movie-states'
 import { panKeys, type PanAccountStatus } from '@/api/pan'
 import type { LibrarySource } from '@/api/tasks'
@@ -87,11 +87,6 @@ export function useAddOffline(movieID: string) {
       )
       void invalidateMovieStates(queryClient)
       void queryClient.invalidateQueries({ queryKey: offlineKeys.all })
-    },
-    onError: error => {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 400)) {
-        void queryClient.invalidateQueries({ queryKey: panKeys.account })
-      }
     }
   })
 }

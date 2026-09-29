@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { ApiError, apiGet, apiPost } from '@/api/client'
+import { apiGet, apiPost } from '@/api/client'
 import { panKeys, type PanAccountStatus } from '@/api/pan'
 import { taskKeys, type LibrarySource, type ScanTask, type Task } from '@/api/tasks'
 
@@ -67,12 +67,6 @@ export function useStartLibraryScan() {
         ...(tasks ?? []).filter(item => item.id !== task.id)
       ])
       return queryClient.invalidateQueries({ queryKey: taskKeys.all })
-    },
-    onError: error => {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 400)) {
-        void queryClient.invalidateQueries({ queryKey: panKeys.account })
-        void queryClient.invalidateQueries({ queryKey: libraryKeys.all })
-      }
     }
   })
 }

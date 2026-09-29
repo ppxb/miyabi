@@ -151,6 +151,7 @@ test('401 with code UNAUTHORIZED dispatches miyabi:unauthorized', async () => {
   await assert.rejects(apiPost('/api/test'), error => {
     assert.ok(error instanceof ApiError)
     assert.equal(error.status, 401)
+    assert.equal(error.code, 'UNAUTHORIZED')
     return true
   })
 

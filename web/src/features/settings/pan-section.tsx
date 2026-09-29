@@ -1,6 +1,6 @@
 import { CloudIcon, LoaderCircleIcon, LogOutIcon, QrCodeIcon, RefreshCwIcon } from 'lucide-react'
 
-import { ApiError } from '@/api/client'
+import { isPanUnauthorized } from '@/api/client'
 import { useDisconnectPan, usePanAccount } from '@/api/pan'
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
@@ -13,7 +13,7 @@ import { SettingRow, SettingsSection } from './shared'
 export function PanSection() {
   const account = usePanAccount()
   const disconnect = useDisconnectPan()
-  const unauthorized = account.error instanceof ApiError && account.error.status === 401
+  const unauthorized = isPanUnauthorized(account.error)
   const connected = account.data?.connected === true && !unauthorized
   const profile = account.data?.account
 

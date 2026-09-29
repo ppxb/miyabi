@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
 
-import { ApiError, apiDelete, apiGet, apiPost, apiPut } from '@/api/client'
+import { apiDelete, apiGet, apiPost, apiPut } from '@/api/client'
 import { resetMovieStates } from '@/api/movie-states'
 import { taskKeys } from '@/api/tasks'
 import { PAN_LOGIN_POLL_MS, panLoginPollDelay, panLoginShouldRetry } from '@/lib/pan-login'
@@ -112,18 +111,11 @@ export function useDisconnectPan() {
 }
 
 export function usePanFiles(accountID: string, directoryID: string, page: number) {
-  const queryClient = useQueryClient()
-  const query = useQuery({
+  return useQuery({
     queryKey: panKeys.files(accountID, directoryID, page),
     queryFn: ({ signal }) =>
       apiGet<PanFilePage>('/api/pan/files', { directory_id: directoryID, page }, signal)
   })
-  useEffect(() => {
-    if (query.error instanceof ApiError && query.error.status === 401) {
-      void queryClient.invalidateQueries({ queryKey: panKeys.account })
-    }
-  }, [query.error, queryClient])
-  return query
 }
 
 export function useSelectPanDirectory(accountID: string) {
@@ -136,11 +128,6 @@ export function useSelectPanDirectory(accountID: string) {
       queryClient.setQueryData<PanAccountStatus>(panKeys.account, status =>
         status?.account?.id === accountID ? { ...status, directory } : status
       )
-    },
-    onError: error => {
-      if (error instanceof ApiError && error.status === 401) {
-        void queryClient.invalidateQueries({ queryKey: panKeys.account })
-      }
     }
   })
 }

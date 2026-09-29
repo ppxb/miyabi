@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from './client'
+import { apiDelete, apiGet, apiPatch, apiPost } from './client'
 
 export type SubscriptionKind = 'movie' | 'actor'
 
@@ -46,10 +46,6 @@ export const subscriptionKeys = {
     ['subscriptions', 'list', kind, { page, limit }] as const,
   feed: (actorID: number | null, page = 1, limit = SUBSCRIPTION_PAGE_SIZE) =>
     ['subscriptions', 'feed', actorID ?? 'all', { page, limit }] as const
-}
-
-function describeError(error: unknown) {
-  return error instanceof ApiError ? error.message : '请检查后端服务和网络后重试。'
 }
 
 const listOptions = {
@@ -133,7 +129,7 @@ export function useAddSubscription() {
               : '出现磁力后可在订阅页手动入库。'
       })
     },
-    onError: error => toast.error('订阅失败', { description: describeError(error) })
+    meta: { errorTitle: '订阅失败' }
   })
 }
 
@@ -151,7 +147,7 @@ export function useUpdateSubscription() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
     },
-    onError: error => toast.error('更新订阅失败', { description: describeError(error) })
+    meta: { errorTitle: '更新订阅失败' }
   })
 }
 
@@ -163,7 +159,7 @@ export function useRemoveSubscription() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
     },
-    onError: error => toast.error('取消订阅失败', { description: describeError(error) })
+    meta: { errorTitle: '取消订阅失败' }
   })
 }
 
@@ -179,7 +175,7 @@ export function useEnqueueSubscription() {
         toast.info(item.code, { description: '暂无符合偏好的磁力，出现后会自动加入 115。' })
       }
     },
-    onError: error => toast.error('入库失败', { description: describeError(error) })
+    meta: { errorTitle: '入库失败' }
   })
 }
 
@@ -188,7 +184,6 @@ export function useBatchEnqueueSubscriptions() {
   return useMutation({
     mutationFn: (payload: { ids?: number[]; all?: boolean }) =>
       apiPost<{ task_id: number }>('/api/subscriptions/enqueue', payload),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all }),
-    onError: error => toast.error('批量入库失败', { description: describeError(error) })
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
   })
 }

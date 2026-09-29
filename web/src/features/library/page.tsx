@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { LoaderCircleIcon, RefreshCwIcon, ScanLineIcon } from 'lucide-react'
 
-import { ApiError } from '@/api/client'
+import { describeApiError } from '@/api/client'
 import { LIBRARY_PAGE_SIZE, useLibraryMovies, useStartLibraryScan } from '@/api/library'
 import { isScanTask, isTaskActive, useTasks } from '@/api/tasks'
 import { AppPage } from '@/components/app-page'
@@ -69,11 +69,7 @@ export function LibraryPage({
                       notifyTaskError(
                         'scan:submit-error',
                         '无法创建扫描任务',
-                        error instanceof ApiError
-                          ? error.status === 401
-                            ? '115 登录已失效，请前往设置重新登录。'
-                            : error.message
-                          : '请检查后端服务和 115 连接后重试。'
+                        describeApiError(error)
                       )
                     }
                   })

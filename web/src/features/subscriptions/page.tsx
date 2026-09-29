@@ -1,6 +1,7 @@
 import { CloudDownloadIcon, LoaderCircleIcon, XIcon } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { describeApiError } from '@/api/client'
 
 import {
   SUBSCRIPTION_PAGE_SIZE,
@@ -252,7 +253,7 @@ export function SubscriptionsPage({
                 : `为选中的 ${selectedIDs.length} 部影片创建入库任务？任务按磁力偏好逐部加入 115，每部之间随机间隔 1.5 到 3 秒。`}
             </DialogDescription>
           </DialogHeader>
-          {batch.error ? <InlineError>{batch.error.message}</InlineError> : null}
+          {batch.error ? <InlineError>{describeApiError(batch.error)}</InlineError> : null}
           <DialogFooter>
             <Button
               type="button"
