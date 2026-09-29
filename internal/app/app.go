@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -56,10 +55,8 @@ type App struct {
 }
 
 // New initializes all services, database connections, and registers task handlers.
+// cfg must be initialized by config.Load or supplied with explicit configuration.
 func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
-	if cfg.EmbyDir == "" {
-		cfg.EmbyDir = filepath.Join(cfg.DataDir, "emby")
-	}
 	ctx := context.Background()
 	store, err := database.Open(ctx, cfg.DataDir)
 	if err != nil {

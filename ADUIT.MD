@@ -181,7 +181,9 @@
   - 已完成：刮削直接复用 database.LibraryFiles，删除重复 fileScope；增加 domain.LocalAccountID，统一本地扫描任务、重试、入库与查询的账号标识，保留原存储值。字幕来源 local 属于不同语义，不借用账号常量。
   - 实现：Movies 与 MatchingMovies 共用接收数据源快照的包内 libraryScope；列表返回的数据源和筛选条件使用同一次读取结果。继续展示当前挂载账号/根目录及全部本地影片，无挂载时仅展示本地影片。
   - 验证：library（含 scan/scrape）、catalogue、offline、api、app 包测试及 git diff --check 通过；新增混合本地根目录、当前挂载、其他账号/根目录及卸载后的列表与身份匹配一致性测试，保留刮削数据源隔离和本地导入覆盖。未进行浏览器或真实上游联调，待整体复查。
-- [ ] **103.** `internal/app/app.go` 的 EmbyDir 兜底与 `config.Load` 重复；核实直接调用 App.New 的测试和调用方需求后，统一配置初始化职责。旧的 Emby Config 读取、activePublicURL 及代理非空判断描述已失效。默认导出路径与 PublicURL 一并按第 184 条处理。
+- [x] **103.** `internal/app/app.go` 的 EmbyDir 兜底与 `config.Load` 重复；核实直接调用 App.New 的测试和调用方需求后，统一配置初始化职责。旧的 Emby Config 读取、activePublicURL 及代理非空判断描述已失效。默认导出路径与 PublicURL 一并按第 184 条处理。
+  - 已完成：确认唯一生产入口先调用 config.Load；删除 App.New 对 EmbyDir 的重复补齐及配置改写，明确接收已初始化配置。生命周期测试显式提供原默认目录，其他直接调用测试已有显式目录。
+  - 验证：config、app、cmd/miyabi 包测试及 git diff --check 通过，覆盖默认环境配置、启动/关闭、本地目录切换和重启恢复。底层 export 的默认路径及 PublicURL 仍留在第 184 项处理，未进行浏览器测试。
 - [ ] **104.** `internal/config/config.go:50` `MIYABI_EMBY_URL` 未文档化旧别名；:101-119 `validate` 重复 Trim、EmbyDir 空检查不可能触发；日志级别 `logging.Validate` 校验一次、main 中 `UnmarshalText` 再解析一次 → Config 直接存 `slog.Level`，删除 `internal/logging`（28 行）。
 - [ ] **105.** `internal/database/viewed.go` 的 `migrateViewedMovies` 为全部旧浏览记录写入同一时间，可能丢失原有顺序。核实旧数组顺序及保留策略；迁移已纳入版本管理，不能因当前开发数据库迁完就删除或重排迁移步骤。若要修正已升级数据，应新增迁移并明确可恢复的信息。
 - [ ] **106.** ✔ 前端零引用 UI：`components/ui/popover.tsx`、`components/ui/dropdown-menu.tsx`；`ui/textarea.tsx` 仅被零引用的 `InputGroupTextarea` 使用；零引用导出 `AvatarBadge` / `AvatarGroup` / `AvatarGroupCount`、`CardFooter` / `CardAction`、`TabsContent`、`tabsListVariants`、`badgeVariants`、`InputGroupText`、`SelectLabel` / `SelectSeparator`、`BreadcrumbEllipsis`。
@@ -294,7 +296,7 @@
 
 - [ ] **182.** `catalogue.MovieDetail` 重新声明 `domain.MovieDetail` 的字段而非内嵌；`domain/library.go` 实际存放 MovieSummary / Media / OfflineSubmission，`ScanProgress` 位于 `source.go`，文件名与内容不符；`ScanPayload.Checkpoint` 是 JSON 中嵌套 JSON 字符串 → 结构化字段。
 - [ ] **183.** `internal/app/app.go` 初始化失败分支仍重复列出资源 Close；此前 scrape worker 清理遗漏已修复。评估以清理栈或局部辅助方式减少重复，必须保持资源逆序关闭，并明确哪些对象在构造成功前已有后台工作；不强制改成半初始化 App。
-- [ ] **184.** 导出默认值仍有重复：`internal/export/export.go` 保留 `./data/emby` 和硬编码 8080 的 defaultPublicURL，与 config.Load 推导不一致；app 也有 EmbyDir 兜底。统一在配置入口确定，底层导出使用明确配置。另核实前端 emby-url.ts、network-section.tsx 的 URL scheme/host 格式化重复，以及 netx/ip.go 注释与实现的差异。
+- [ ] **184.** 导出默认值仍有重复：`internal/export/export.go` 保留 `./data/emby` 和硬编码 8080 的 defaultPublicURL，与 config.Load 推导不一致；app 的 EmbyDir 兜底已在第 103 项删除。统一在配置入口确定，底层导出使用明确配置。另核实前端 emby-url.ts、network-section.tsx 的 URL scheme/host 格式化重复，以及 netx/ip.go 注释与实现的差异。
 - [ ] **185.** 磁力排序规则（字幕 > 高清 > 体积 > 文件数）在 `javdb/magnet.go:54-71` 与 `magnet/aggregator.go:104-118` 各一份。
 
 ---

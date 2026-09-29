@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -15,8 +16,10 @@ import (
 )
 
 func TestAppLifecycle(t *testing.T) {
+	dataDir := t.TempDir()
 	cfg := &config.Config{
-		DataDir:  t.TempDir(),
+		DataDir:  dataDir,
+		EmbyDir:  filepath.Join(dataDir, "emby"),
 		Listen:   "127.0.0.1:0",
 		LogLevel: "info",
 	}
