@@ -10,7 +10,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useDiscoverStore } from '@/stores/discover'
+import type { CategoryFilters as CategoryValues } from './search'
 import { CommonFilterSelect } from './common-filter-select'
 import { DISCOVER_ZONES as zones } from './constants'
 
@@ -18,9 +18,13 @@ export const MAIN_CATEGORY = 'main'
 // Month requires a year; duration has no slot in the upstream filter mask.
 export const UNSUPPORTED_CATEGORIES = new Set(['month', 'duration'])
 
-export function CategoryFilters() {
-  const category = useDiscoverStore(state => state.category)
-  const updateCategory = useDiscoverStore(state => state.updateCategory)
+export function CategoryFilters({
+  category,
+  updateCategory
+}: {
+  category: CategoryValues
+  updateCategory: (filters: Partial<CategoryValues>) => void
+}) {
   const { zone, categoryID, tagID, main } = category
   const taxonomy = useDiscoverTags(zone)
   const mainOptions = taxonomy.data?.find(item => item.id === MAIN_CATEGORY)?.tags ?? []

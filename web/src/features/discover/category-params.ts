@@ -1,5 +1,5 @@
 import type { BrowseMoviesParams } from '@/api/discover'
-import type { CategoryFilters } from '@/stores/discover'
+import type { CategoryFilters } from './search'
 
 export function categoryBrowseParams({
   zone,

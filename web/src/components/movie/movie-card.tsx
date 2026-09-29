@@ -14,6 +14,7 @@ export function DiscoverMovieCard({ movie }: { movie: DiscoverMovie }) {
   return (
     <Link
       to="/discover/$movieId"
+      search={previous => ({ main: previous.main || undefined })}
       params={{ movieId: movie.id }}
       className="block rounded-2xl outline-ring"
     >

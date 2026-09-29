@@ -55,6 +55,7 @@ function RecommendationCard({ movie }: { movie: MovieReference }) {
     <div ref={cardRef} className="relative h-full min-w-0">
       <Link
         to="/discover/$movieId"
+        search={previous => ({ main: previous.main || undefined })}
         params={{ movieId: movie.id }}
         className="relative block h-full rounded-2xl outline-ring"
         onFocus={() => {

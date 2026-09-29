@@ -1,8 +1,7 @@
-import { Link } from '@tanstack/react-router'
+import { Link, useSearch } from '@tanstack/react-router'
 
 import { Badge } from '@/components/ui/badge'
 import type { MetadataTarget } from '@/features/discover/metadata-search'
-import { useDiscoverStore } from '@/stores/discover'
 
 export function MetadataLink({
   kind,
@@ -11,7 +10,7 @@ export function MetadataLink({
   zone,
   badge = false
 }: MetadataTarget & { badge?: boolean }) {
-  const main = useDiscoverStore(state => state.category.main)
+  const main = useSearch({ strict: false, select: search => search.main ?? '' })
   const link = (
     <Link
       to="/discover/search"

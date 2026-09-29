@@ -1,17 +1,27 @@
 import { AppPage } from '@/components/app-page'
 import { PageHeader } from '@/components/page-header'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { type DiscoverView, useDiscoverStore } from '@/stores/discover'
+import { getRouteApi } from '@tanstack/react-router'
+import { categoryFromSearch, updateCategorySearch, type DiscoverView } from './search'
 import { BrowseResults } from './browse-results'
 import { CategoryContent } from './category-content'
 import { DISCOVER_PAGE_SIZE as PAGE_SIZE } from './constants'
 
+const route = getRouteApi('/discover')
+
 export function DiscoverPage() {
-  const view = useDiscoverStore(state => state.view)
-  const pages = useDiscoverStore(state => state.pages)
-  const setView = useDiscoverStore(state => state.setView)
-  const setPage = useDiscoverStore(state => state.setPage)
-  const page = pages[view]
+  const search = route.useSearch()
+  const navigate = route.useNavigate()
+  const view = search.view ?? 'released'
+  const page = search[`${view}Page`] ?? 1
+  const setPage = (view: DiscoverView, page: number) =>
+    void navigate({
+      search: previous => ({ ...previous, [`${view}Page`]: page > 1 ? page : undefined })
+    })
+  const setView = (view: DiscoverView) =>
+    void navigate({
+      search: previous => ({ ...previous, view: view === 'released' ? undefined : view })
+    })
 
   return (
     <AppPage>
@@ -26,7 +36,14 @@ export function DiscoverPage() {
         </Tabs>
 
         {view === 'category' ? (
-          <CategoryContent page={page} onPageChange={next => setPage('category', next)} />
+          <CategoryContent
+            category={categoryFromSearch(search)}
+            onCategoryChange={filters =>
+              void navigate({ search: previous => updateCategorySearch(previous, filters) })
+            }
+            page={page}
+            onPageChange={next => setPage('category', next)}
+          />
         ) : (
           <BrowseResults
             key={view}

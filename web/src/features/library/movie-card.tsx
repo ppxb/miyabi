@@ -38,6 +38,7 @@ function LibraryMovieCardContent({ movie, canHover }: { movie: LibraryMovie; can
         {movie.javdb_id ? (
           <Link
             to="/discover/$movieId"
+            search={previous => ({ main: previous.main || undefined })}
             params={{ movieId: movie.javdb_id }}
             className="block min-w-0 rounded-2xl outline-ring"
             onClick={() => setOpen(false)}

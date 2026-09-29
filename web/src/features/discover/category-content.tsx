@@ -1,18 +1,21 @@
 import { useDiscoverTags } from '@/api/discover'
-import { useDiscoverStore } from '@/stores/discover'
+import type { CategoryFilters as CategoryValues } from './search'
 import { BrowseResults } from './browse-results'
 import { CategoryFilters, MAIN_CATEGORY, UNSUPPORTED_CATEGORIES } from './category-filters'
 import { categoryBrowseParams } from './category-params'
 import { DISCOVER_PAGE_SIZE as PAGE_SIZE } from './constants'
 
 export function CategoryContent({
+  category,
+  onCategoryChange,
   page,
   onPageChange
 }: {
+  category: CategoryValues
+  onCategoryChange: (filters: Partial<CategoryValues>) => void
   page: number
   onPageChange: (page: number) => void
 }) {
-  const category = useDiscoverStore(state => state.category)
   const { zone, categoryID } = category
   const taxonomy = useDiscoverTags(zone)
   const categories = (taxonomy.data ?? []).filter(
@@ -22,7 +25,7 @@ export function CategoryContent({
 
   return (
     <div className="space-y-6">
-      <CategoryFilters />
+      <CategoryFilters category={category} updateCategory={onCategoryChange} />
       <BrowseResults
         params={{
           page,

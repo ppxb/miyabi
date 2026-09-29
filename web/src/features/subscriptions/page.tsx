@@ -27,13 +27,19 @@ import { ActorSubscriptions } from './actor-subscriptions'
 import { MovieSubscriptions } from './movie-subscriptions'
 import { isPendingSubscription } from './subscription-card'
 
-type SubscriptionsView = 'movies' | 'actors'
+import type { SubscriptionsSearch, SubscriptionsView } from './search'
 
-export function SubscriptionsPage() {
-  const [view, setView] = useState<SubscriptionsView>('movies')
-  const [selectedActorID, setSelectedActorID] = useState<number | null>(null)
-  const [page, setPage] = useState(1)
-  const [actorPage, setActorPage] = useState(1)
+export function SubscriptionsPage({
+  search,
+  onSearchChange
+}: {
+  search: SubscriptionsSearch
+  onSearchChange: (search: SubscriptionsSearch) => void
+}) {
+  const view = search.view ?? 'movies'
+  const selectedActorID = search.actorID ?? null
+  const page = search.page ?? 1
+  const actorPage = search.actorPage ?? 1
 
   const targets = useSubscriptionTargets()
   const movies = useSubscriptions('movie', page, SUBSCRIPTION_PAGE_SIZE, view === 'movies')
@@ -69,16 +75,16 @@ export function SubscriptionsPage() {
   }
 
   function handleTabChange(nextView: SubscriptionsView) {
-    setView(nextView)
-    setPage(1)
-    leaveSelection()
-    setSelectedActorID(null)
+    onSearchChange({
+      ...search,
+      view: nextView === 'movies' ? undefined : nextView,
+      page: undefined,
+      actorID: undefined
+    })
   }
 
   function handleSelectActor(id: number | null) {
-    setSelectedActorID(id)
-    setPage(1)
-    leaveSelection()
+    onSearchChange({ ...search, actorID: id ?? undefined, page: undefined })
   }
 
   function handleSelect(id: number) {
@@ -191,8 +197,12 @@ export function SubscriptionsPage() {
             actors={actors}
             page={actorPage}
             onPageChange={next => {
-              setActorPage(next)
-              handleSelectActor(null)
+              onSearchChange({
+                ...search,
+                actorPage: next > 1 ? next : undefined,
+                actorID: undefined,
+                page: undefined
+              })
             }}
             selectedID={selectedActorID}
             onSelectID={handleSelectActor}
@@ -223,7 +233,7 @@ export function SubscriptionsPage() {
           page={page}
           hasMore={currentItems.length === SUBSCRIPTION_PAGE_SIZE}
           disabled={currentQuery.isFetching}
-          onPageChange={setPage}
+          onPageChange={page => onSearchChange({ ...search, page: page > 1 ? page : undefined })}
         />
       </div>
 

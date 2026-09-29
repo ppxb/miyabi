@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { BellPlusIcon, BellRingIcon, LoaderCircleIcon } from 'lucide-react'
 
 import { useDiscoverMovies, useDiscoverTags, type JavDBZone } from '@/api/discover'
@@ -17,7 +16,6 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useDiscoverStore } from '@/stores/discover'
 import { CommonFilterSelect } from './common-filter-select'
 import { DISCOVER_PAGE_SIZE, DISCOVER_ZONES } from './constants'
 import { metadataBrowseParams } from './metadata-params'
@@ -35,20 +33,8 @@ export function MetadataSearchPage({
   onZoneChange: (zone: JavDBZone | undefined) => void
   onMainChange: (main: string) => void
 }) {
-  const categoryZone = useDiscoverStore(state => state.category.zone)
-  const updateCategory = useDiscoverStore(state => state.updateCategory)
-  const taxonomy = useDiscoverTags(
-    search.kind === 'tag' ? (search.zone ?? categoryZone) : categoryZone
-  )
+  const taxonomy = useDiscoverTags(search.kind === 'tag' ? (search.zone ?? 'censored') : 'censored')
   const mainOptions = taxonomy.data?.find(category => category.id === 'main')?.tags ?? []
-
-  // Preserve the active common filter when opening another movie's metadata,
-  // including when this search was reached through a bookmark or browser back.
-  useEffect(() => {
-    if (useDiscoverStore.getState().category.main !== search.main) {
-      updateCategory({ main: search.main })
-    }
-  }, [search.main, updateCategory])
 
   const movies = useDiscoverMovies({
     page: search.page,

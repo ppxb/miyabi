@@ -138,6 +138,7 @@ export function SubscriptionCard({
       ) : (
         <Link
           to="/discover/$movieId"
+          search={previous => ({ main: previous.main || undefined })}
           params={{ movieId: item.target_id }}
           className="block h-full rounded-2xl outline-ring"
         >
