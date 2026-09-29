@@ -57,13 +57,8 @@ export function apiPatch<T>(path: string, body?: unknown): Promise<T> {
   })
 }
 
-export function apiPut<T>(
-  path: string,
-  body: unknown,
-  options?: Pick<RequestInit, 'keepalive' | 'signal'>
-): Promise<T> {
+export function apiPut<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, {
-    ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)

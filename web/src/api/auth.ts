@@ -9,18 +9,16 @@ export type AccessGateConfig = {
 
 export type LoginResponse = {
   success: boolean
-  expires_at?: number
 }
 
 export const authKeys = {
   config: ['auth', 'config'] as const
 }
 
-export function useAccessGateConfig(enabled = true) {
+export function useAccessGateConfig() {
   return useQuery({
     queryKey: authKeys.config,
     queryFn: ({ signal }) => apiGet<AccessGateConfig>('/api/auth/config', undefined, signal),
-    enabled,
     staleTime: 60_000
   })
 }
@@ -34,19 +32,6 @@ export function useAccessGateLogin() {
         enabled: true,
         authenticated: true
       })
-    }
-  })
-}
-
-export function useAccessGateLogout() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: () => apiPost<{ success: boolean }>('/api/auth/logout'),
-    onSuccess: () => {
-      queryClient.setQueryData<AccessGateConfig>(authKeys.config, prev => ({
-        enabled: prev?.enabled ?? true,
-        authenticated: false
-      }))
     }
   })
 }

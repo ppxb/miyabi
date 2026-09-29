@@ -4,6 +4,7 @@ import { apiGet, apiPost } from '@/api/client'
 import { invalidateMovieStates } from '@/api/movie-states'
 import { panKeys, type PanAccountStatus } from '@/api/pan'
 import type { LibrarySource } from '@/api/tasks'
+import { sameSource } from '@/lib/source'
 
 export function isOfflineTaskActive(task: OfflineSubmission) {
   return task.phase === 'downloading' || task.processing
@@ -77,8 +78,7 @@ export function useAddOffline(movieID: string) {
         return
       }
       queryClient.setQueryData<OfflineActivity>(offlineKeys.activity, activity =>
-        activity?.source?.account_id === submission.account_id &&
-        activity.source.directory.id === submission.directory_id
+        activity && sameSource(activity.source, submission)
           ? {
               ...activity,
               tasks: [submission, ...activity.tasks.filter(task => task.hash !== submission.hash)]

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { LibraryMovieCard } from '@/features/library/movie-card'
 import { LibraryScanButton } from '@/features/library/scan-button'
 import { useTaskConnection } from '@/features/tasks/task-events'
+import { sameSource } from '@/lib/source'
 
 export function LibraryPage({
   page,
@@ -25,14 +26,7 @@ export function LibraryPage({
   const tasks = useTasks()
   const connection = useTaskConnection()
   const source = library.data?.source
-  const latest = tasks.data
-    ?.filter(isScanTask)
-    .find(
-      task =>
-        source !== undefined &&
-        task.source.account_id === source.account_id &&
-        task.source.directory.id === source.directory.id
-    )
+  const latest = tasks.data?.filter(isScanTask).find(task => sameSource(task.source, source))
   const scanning = latest !== undefined && isTaskActive(latest)
 
   return (

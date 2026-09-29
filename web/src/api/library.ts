@@ -37,7 +37,6 @@ type LibraryPage = {
 
 export const libraryKeys = {
   all: ['library'] as const,
-  movieLists: ['library', 'movies'] as const,
   movies: (page: number) => ['library', 'movies', page] as const
 }
 

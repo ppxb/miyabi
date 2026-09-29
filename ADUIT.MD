@@ -193,7 +193,7 @@
   - 已完成：尚未执行的迁移按数组位置写入递减微秒时间以保留顺序，时间仅为排序用途，不声称还原实际浏览时刻；继续过滤空 ID、保留首次重复项且不覆盖表中已有记录。迁移版本和步骤顺序不变。
   - 已升级数据边界：旧数组已删除，迁移产生的同时间记录无法可靠区别于正常批量浏览，不新增猜测性重排迁移，已有记录保持不变。
   - 验证：database、library、api、app 包测试及 git diff --check 通过；迁移测试新增最终查询顺序断言，保留空值/重复项、已有时间戳、事务回滚与重开不重复迁移覆盖。未进行浏览器测试。
-- [ ] **107.** 前端零引用 / 无意义项：
+- [x] **107.** 前端零引用 / 无意义项：
   - `api/auth.ts:45-57` `useAccessGateLogout` 无调用（后端 `POST /auth/logout` 随之无人使用），`LoginResponse.expires_at` 不读；
   - `auth.ts:20`、`discover.ts:134`、`:160`、`:235` 的 `enabled` 参数从未传入；
   - `client.ts:53` `apiPut` 的 `options`（keepalive/signal）是播放记录删除残留；
@@ -202,6 +202,10 @@
   - `api/tasks.ts:74` `isBatchTask` 外部无人使用；`library.ts:40` `movieLists` 未使用；`discover.ts:7` `discoverKeys` 再导出未使用；
   - `api/tasks.ts:28-38` ScanTask 10 个前端不读字段（`current_path`、`directories_*`、`files_scanned`、`removed_*` 等）；
   - `task-notification-diff.ts:18` `NotificationEntry.playable` 是删除播放器后的遗留命名（实为"已入库"）。
+  - 已完成：删除无调用的退出 hook、LoginResponse.expires_at、四个查询 hook 的闲置 enabled 参数、apiPut 的闲置 options、Toast ID/discoverKeys 重复导出、movieLists 和 api/tasks 的无调用 isBatchTask；通知内部 playable 改为 inLibrary。保留推荐卡片的按需加载开关及搜索词非空条件。
+  - 数据源：媒体库任务匹配、任务通知及离线提交后的活动缓存更新复用 sameSource。directory_id 对应真实离线提交结构，保留以支持与 directory.id 的比较；账号连接状态校验具有不同职责，继续保留原判断。
+  - 范围修正：ScanTask 字段保留用于描述完整 API 响应，browse-history-store 已删除无需重复处理；后端退出登录接口按第 109 项单独核实，本次不删除。
+  - 验证：前端 119 项测试、typecheck、lint、修改文件格式化及 git diff --check 通过；新增跨结构数据源比较、账号/目录不同及空值测试，保留任务通知和查询调度覆盖。未进行浏览器测试。
 - [ ] **108.** 后端 `catalogue/service.go:398-401` 已随列表计算 `state` 与 `library_id`，前端从不读取 `DiscoverMovie.state`（`api/discover.ts:47,66`），见第 150 条。
 - [ ] **109.** 重新评估前端未调用的接口是否仍承担运维、外部调用或手动恢复职责：`GET /discover/movies/:id/offline`、`POST /library/scan/local`、`POST /auth/logout`。本地扫描接口已支持后台入队与配置路径校验；“前端未调用”本身不能作为删除理由。
 - [ ] **110.** 删除属性后残留空行：`ui/input-group.tsx:13`（原 `role="group"`）、`ui/breadcrumb.tsx:57/68/82`（原 role / aria-hidden / aria-current）、`ui/dialog.tsx:62-64` 删除了 `sr-only` 文案、`search/page.tsx:67`、`settings/pan-section.tsx:40/62/76`、`pan-directory-row.tsx:34`；`internal/domain/video.go:30-31` 双空行（唯一 gofmt 报告）。

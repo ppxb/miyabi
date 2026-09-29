@@ -1,5 +1,6 @@
 import type { OfflineActivity, OfflineSubmission } from '../../api/offline'
 import type { BatchTask, ScanTask, Task } from '../../api/tasks'
+import { sameSource } from '../../lib/source'
 
 function isScanTask(task: Task): task is ScanTask {
   return task.type === 'scan'
@@ -15,7 +16,7 @@ function isTaskActive(task: Task): boolean {
 
 export type NotificationEntry = {
   active: boolean
-  playable?: boolean
+  inLibrary?: boolean
   retryable?: boolean
   fingerprint: string
 }
@@ -77,12 +78,7 @@ export function diffTaskNotifications(ctx: DiffContext): DiffResult {
   const batches = ctx.tasks.filter(isBatchTask)
 
   for (const task of scans) {
-    if (
-      !source ||
-      task.offline_task_id ||
-      task.source.account_id !== source.account_id ||
-      task.source.directory.id !== source.directory.id
-    ) {
+    if (task.offline_task_id || !sameSource(task.source, source)) {
       continue
     }
     const id = scanToastID(task.id)
@@ -133,7 +129,7 @@ export function diffTaskNotifications(ctx: DiffContext): DiffResult {
     const fp = `${task.status}|${task.phase}|${task.processing}|${task.library_id ?? ''}|${task.progress}|${task.error ?? ''}|${scanPart}|${scan?.updated_at ?? ''}|${retryable}|${waitingForOffline}`
     const entry: NotificationEntry = {
       active,
-      playable: task.phase === 'in_library',
+      inLibrary: task.phase === 'in_library',
       retryable,
       fingerprint: fp
     }
@@ -153,7 +149,7 @@ export function diffTaskNotifications(ctx: DiffContext): DiffResult {
       }
     }
 
-    if (!active && task.phase !== 'in_library' && old?.playable) {
+    if (!active && task.phase !== 'in_library' && old?.inLibrary) {
       dismissIDs.push(id)
     }
   }

@@ -88,10 +88,6 @@ export function isScanTask(task: Task): task is ScanTask {
   return task.type === 'scan'
 }
 
-export function isBatchTask(task: Task): task is BatchTask {
-  return task.type === 'subscription_batch'
-}
-
 export function isTaskActive(task: Task) {
   return task.status === 'queued' || task.status === 'running'
 }

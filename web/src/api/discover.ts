@@ -9,8 +9,6 @@ import {
   subscribeMovieCard
 } from './movie-detail-cache'
 
-export { discoverKeys }
-
 export type MovieState = 'not_in_library' | 'saving' | 'processing' | 'in_library'
 export type ReleaseStatus = 'unknown' | 'released' | 'upcoming'
 export type JavDBZone = 'censored' | 'uncensored' | 'western' | 'fc2' | 'anime'
@@ -136,11 +134,10 @@ const movieDetails = createMovieDetailLoader((id, signal) =>
   apiGet<DiscoverMovieDetail>(`/api/discover/movies/${encodeURIComponent(id)}`, undefined, signal)
 )
 
-export function useDiscoverMovies(params: BrowseMoviesParams, enabled = true) {
+export function useDiscoverMovies(params: BrowseMoviesParams) {
   return useQuery({
     queryKey: discoverKeys.movies(params),
     placeholderData: keepPreviousData,
-    enabled,
     queryFn: ({ signal }) =>
       apiGet<DiscoverMovie[]>(
         '/api/discover/movies',
@@ -162,12 +159,12 @@ export function useDiscoverMovies(params: BrowseMoviesParams, enabled = true) {
   })
 }
 
-export function useDiscoverMovie(id: string, enabled = true) {
+export function useDiscoverMovie(id: string) {
   const queryClient = useQueryClient()
-  const query = useQuery({ ...movieDetails.options(id), enabled })
+  const query = useQuery(movieDetails.options(id))
   useEffect(() => {
-    if (enabled) movieDetails.prioritize(queryClient, id)
-  }, [queryClient, id, enabled])
+    movieDetails.prioritize(queryClient, id)
+  }, [queryClient, id])
   return query
 }
 
@@ -222,11 +219,10 @@ export function useSearchMovies(params: SearchMoviesParams) {
   })
 }
 
-export function useDiscoverTags(zone: JavDBZone, enabled = true) {
+export function useDiscoverTags(zone: JavDBZone) {
   return useQuery({
     queryKey: discoverKeys.tags(zone),
     queryFn: ({ signal }) => apiGet<TagCategory[]>('/api/discover/tags', { zone }, signal),
-    enabled,
     staleTime: 24 * 60 * 60_000
   })
 }
