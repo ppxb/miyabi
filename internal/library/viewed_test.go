@@ -14,7 +14,7 @@ func TestViewedMovies_CRUDAndOrdering(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 
-	svc := New(store.Client, nil, nil, nil)
+	svc := New(store.Client, nil, nil, nil, Options{})
 
 	// Initially empty
 	ids, err := svc.ViewedMovieIDs(ctx)

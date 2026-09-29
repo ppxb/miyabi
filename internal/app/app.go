@@ -23,7 +23,6 @@ import (
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/javdb"
 	"github.com/ppxb/miyabi/internal/library"
-	"github.com/ppxb/miyabi/internal/library/scan"
 	"github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/maintenance"
 	"github.com/ppxb/miyabi/internal/monitor"
@@ -82,7 +81,10 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		return nil, fmt.Errorf("initialize images cache: %w", err)
 	}
 
-	libSvc := library.New(store.Client, driveSvc, taskSvc, images)
+	exportMgr := export.NewManager(export.Config{
+		EmbyDir: cfg.EmbyDir, PublicURL: cfg.PublicURL, STRMToken: cfg.STRMToken,
+	})
+	libSvc := library.New(store.Client, driveSvc, taskSvc, images, library.Options{ExportManager: exportMgr})
 	catalogueSvc, err := catalogue.New(ctx, store.Client, javdb.Options{}, networkSvc.ProxyManager(), libSvc)
 	if err != nil {
 		driveSvc.Close()
@@ -92,16 +94,11 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 
 	offlineSvc := offline.New(store.Client, catalogueSvc, driveSvc, taskSvc, libSvc, cfg.Runtime.OfflineSubmitTimeout)
 	monitorSvc := monitor.New(store.Client, catalogueSvc, offlineSvc, taskSvc)
-	scrapeSvc := scrape.New(store.Client, driveSvc, catalogueSvc, images, taskSvc)
-	maintenanceSvc, err := maintenance.New(cfg.DataDir, store.Client, images, scrapeSvc)
-	if err != nil {
-		catalogueSvc.Close()
-		driveSvc.Close()
-		_ = store.Close()
-		return nil, fmt.Errorf("initialize maintenance service: %w", err)
-	}
-
 	subtitleSvc := subtitle.NewService(store.Client, subtitle.NewFinder(networkSvc.ProxyManager()))
+	gfriendsClient := gfriends.New(cfg.DataDir, &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: netx.NewTransport(networkSvc.ProxyManager()),
+	})
 	syncActors := cfg.EmbySyncActors
 	embySvc, err := emby.NewService(ctx, store.Client, emby.Config{
 		Enabled:    cfg.EmbyEnabled,
@@ -111,6 +108,11 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		LocalDir:   cfg.EmbyDir,
 		SyncActors: &syncActors,
 		PublicURL:  cfg.PublicURL,
+	}, emby.Dependencies{
+		GFriends:          gfriendsClient,
+		Media:             catalogueSvc,
+		ExportManager:     exportMgr,
+		ScheduleLocalScan: libSvc.ScheduleLocalScan,
 	})
 	if err != nil {
 		catalogueSvc.Close()
@@ -118,47 +120,26 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		_ = store.Close()
 		return nil, fmt.Errorf("initialize emby service: %w", err)
 	}
-
-	gfriendsClient := gfriends.New(cfg.DataDir, &http.Client{
-		Timeout:   30 * time.Second,
-		Transport: netx.NewTransport(networkSvc.ProxyManager()),
+	// This is the only cycle: library -> Emby -> catalogue -> library.
+	// Bind it before starting task pools or accepting requests.
+	libSvc.SetMediaNotifier(embySvc)
+	scrapeSvc := scrape.New(store.Client, driveSvc, catalogueSvc, images, taskSvc, scrape.Dependencies{
+		ExportManager: exportMgr, MediaNotifier: embySvc, Subtitles: subtitleSvc,
 	})
-	embySvc.SetGFriends(gfriendsClient)
-	embySvc.SetMediaFetcher(catalogueSvc)
-
-	activeEmbyDir := cfg.EmbyDir
-	activePublicURL := cfg.PublicURL
-	if embyCfg, err := embySvc.Config(ctx); err == nil {
-		if embyCfg.LocalDir != "" {
-			activeEmbyDir = embyCfg.LocalDir
-		}
-		if embyCfg.PublicURL != "" {
-			activePublicURL = embyCfg.PublicURL
-		}
+	maintenanceSvc, err := maintenance.New(cfg.DataDir, store.Client, images, scrapeSvc)
+	if err != nil {
+		scrapeSvc.Close()
+		embySvc.Close()
+		catalogueSvc.Close()
+		driveSvc.Close()
+		_ = store.Close()
+		return nil, fmt.Errorf("initialize maintenance service: %w", err)
 	}
 
-	exportMgr := export.NewManager(export.Config{
-		EmbyDir:   activeEmbyDir,
-		PublicURL: activePublicURL,
-		STRMToken: cfg.STRMToken,
-	})
-
-	scrapeSvc.SetExportManager(exportMgr)
-	scrapeSvc.SetMediaNotifier(embySvc)
-	scrapeSvc.SetSubtitles(subtitleSvc)
-
-	libSvc.SetExportManager(exportMgr)
-	libSvc.SetMediaNotifier(embySvc)
-	libSvc.SetPacing(scan.DefaultPacing)
-
-	embySvc.SetSTRMToken(cfg.STRMToken)
-	embySvc.SetExportManager(exportMgr)
-	embySvc.SetLocalScanScheduler(libSvc.ScheduleLocalScan)
 	if err := libSvc.ScheduleLocalScan(ctx); err != nil {
 		logger.ErrorContext(ctx, "failed to queue startup Emby directory scan", "error", err)
 	}
-
-	if activePublicURL != "" && activeEmbyDir != "" {
+	if exportCfg := exportMgr.Config(); exportCfg.PublicURL != "" && exportCfg.EmbyDir != "" {
 		embySvc.StartStartupSTRMRewrite()
 	}
 

@@ -237,12 +237,12 @@ func libraryBaseFixture(t testing.TB) (*Service, *drive.Drive, *ent.Client, doma
 	if err != nil {
 		t.Fatal(err)
 	}
-	lib := library.New(store.Client, driveSvc, taskSvc, images)
+	lib := library.New(store.Client, driveSvc, taskSvc, images, library.Options{Pacing: func(context.Context) error { return nil }})
 	if _, err := lib.EnqueueScan(t.Context(), source); err != nil {
 		t.Fatal(err)
 	}
 
-	scrapeSvc := scrapePkg.New(store.Client, driveSvc, nil, images, taskSvc)
+	scrapeSvc := scrapePkg.New(store.Client, driveSvc, nil, images, taskSvc, scrapePkg.Dependencies{})
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScan, lib.Scan, lib.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScrape, scrapeSvc.Scrape, scrapeSvc.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindCover, scrapeSvc.Cover, scrapeSvc.Finished))

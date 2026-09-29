@@ -84,24 +84,28 @@ func (service *Service) exportConfig() export.Config {
 	return export.Config{}
 }
 
-// New creates a new scrape Service.
-func New(db *ent.Client, d *drive.Drive, discover Discoverer, images *mediaimage.Cache, notifier Notifier) *Service {
+type Dependencies struct {
+	ExportManager *export.Manager
+	MediaNotifier MediaNotifier
+	Subtitles     SubtitleExporter
+}
+
+// New installs dependencies before starting subtitle workers.
+func New(db *ent.Client, d *drive.Drive, discover Discoverer, images *mediaimage.Cache, notifier Notifier, deps Dependencies) *Service {
 	service := &Service{
-		db:       db,
-		drive:    d,
-		discover: discover,
-		images:   images,
-		notifier: notifier,
-		dirCache: make(map[string]dirCacheEntry),
-		dirTTL:   defaultDirCacheTTL,
+		db:            db,
+		drive:         d,
+		discover:      discover,
+		images:        images,
+		notifier:      notifier,
+		dirCache:      make(map[string]dirCacheEntry),
+		dirTTL:        defaultDirCacheTTL,
+		exportMgr:     deps.ExportManager,
+		mediaNotifier: deps.MediaNotifier,
+		subtitles:     deps.Subtitles,
 	}
 	service.subtitleQueue = newSubtitleQueue(service, defaultSubtitleConcurrency, defaultSubtitleQueueCapacity, nil)
 	return service
-}
-
-// SetExportManager configures the unified export manager.
-func (service *Service) SetExportManager(mgr *export.Manager) {
-	service.exportMgr = mgr
 }
 
 // SetEmbyExport configures the local Emby export directory, public URL written into .strm files, and optional STRM token.
@@ -116,11 +120,6 @@ func (service *Service) SetEmbyExport(embyDir, publicURL, strmToken string) {
 	})
 }
 
-// SetMediaNotifier configures the notifier for Emby media updates.
-func (service *Service) SetMediaNotifier(notifier MediaNotifier) {
-	service.mediaNotifier = notifier
-}
-
 // Close releases resources and terminates background workers.
 func (service *Service) Close() {
 	if service == nil {
@@ -129,11 +128,6 @@ func (service *Service) Close() {
 	if service.subtitleQueue != nil {
 		service.subtitleQueue.Close()
 	}
-}
-
-// SetSubtitles sets the optional subtitle exporter.
-func (service *Service) SetSubtitles(subtitles SubtitleExporter) {
-	service.subtitles = subtitles
 }
 
 // Images returns the underlying image cache.

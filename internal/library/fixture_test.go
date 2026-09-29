@@ -22,19 +22,19 @@ import (
 
 type panStub struct {
 	drive.Client
-	account        func(context.Context, string) (pan.Account, error)
-	beginLogin     func(context.Context) (*pan.Login, error)
-	loginStatus    func(context.Context, *pan.Login) (pan.LoginState, error)
-	exchangeToken  func(context.Context, *pan.Login) (pan.Tokens, error)
-	refreshToken   func(context.Context, string) (pan.Tokens, error)
-	list           func(context.Context, string, string, int, int) (pan.FilePage, error)
-	info           func(context.Context, string, string) (pan.FileInfo, error)
-	readMetadata   func(context.Context, string, string, int64) ([]byte, error)
-	addOffline     func(context.Context, string, string, string) (string, error)
-	removeOffline  func(context.Context, string, string) error
-	offlineTasks   func(context.Context, string, int) (pan.OfflinePage, error)
-	playURL        func(context.Context, string, string, string) ([]pan.PlaySource, error)
-	openMedia      func(context.Context, string, string, http.Header) (*http.Response, error)
+	account       func(context.Context, string) (pan.Account, error)
+	beginLogin    func(context.Context) (*pan.Login, error)
+	loginStatus   func(context.Context, *pan.Login) (pan.LoginState, error)
+	exchangeToken func(context.Context, *pan.Login) (pan.Tokens, error)
+	refreshToken  func(context.Context, string) (pan.Tokens, error)
+	list          func(context.Context, string, string, int, int) (pan.FilePage, error)
+	info          func(context.Context, string, string) (pan.FileInfo, error)
+	readMetadata  func(context.Context, string, string, int64) ([]byte, error)
+	addOffline    func(context.Context, string, string, string) (string, error)
+	removeOffline func(context.Context, string, string) error
+	offlineTasks  func(context.Context, string, int) (pan.OfflinePage, error)
+	playURL       func(context.Context, string, string, string) ([]pan.PlaySource, error)
+	openMedia     func(context.Context, string, string, http.Header) (*http.Response, error)
 }
 
 func (client *panStub) Close() {
@@ -214,13 +214,13 @@ func libraryFixture(t testing.TB) (*Service, domain.TaskInfo, scan.Payload) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lib := New(store.Client, driveSvc, taskSvc, images)
+	lib := New(store.Client, driveSvc, taskSvc, images, Options{Pacing: func(context.Context) error { return nil }})
 	queued, err := lib.EnqueueScan(t.Context(), source)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	scrape := scrapePkg.New(store.Client, driveSvc, nil, images, taskSvc)
+	scrape := scrapePkg.New(store.Client, driveSvc, nil, images, taskSvc, scrapePkg.Dependencies{})
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScan, lib.Scan, lib.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScrape, scrape.Scrape, scrape.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindCover, scrape.Cover, scrape.Finished))

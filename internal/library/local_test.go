@@ -22,11 +22,10 @@ func TestLocalScanWorkflow(t *testing.T) {
 	t.Cleanup(func() { _ = store.Close() })
 	registry := tasks.NewRegistry()
 	queue := tasks.NewService(store.Client, registry)
-	lib := New(store.Client, nil, queue, nil)
-	registry.Register(tasks.NewHandler(tasks.KindScan, lib.Scan, lib.Finished))
 	root := t.TempDir()
 	mgr := export.NewManager(export.Config{EmbyDir: root})
-	lib.SetExportManager(mgr)
+	lib := New(store.Client, nil, queue, nil, Options{ExportManager: mgr})
+	registry.Register(tasks.NewHandler(tasks.KindScan, lib.Scan, lib.Finished))
 	if err := os.WriteFile(filepath.Join(root, "ABC-123.strm"), []byte("https://example.com/video"), 0600); err != nil {
 		t.Fatal(err)
 	}

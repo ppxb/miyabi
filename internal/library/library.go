@@ -71,14 +71,21 @@ type Service struct {
 	scanLock     syncx.ContextLock
 }
 
-func New(database *ent.Client, d *drive.Drive, tasks *tasks.Service, images *mediaimage.Cache) *Service {
+type Options struct {
+	ExportManager *export.Manager
+	// Pacing defaults to scan.DefaultPacing; tests can provide a no-op.
+	Pacing func(context.Context) error
+}
+
+func New(database *ent.Client, d *drive.Drive, tasks *tasks.Service, images *mediaimage.Cache, options Options) *Service {
 	svc := &Service{
 		database:     database,
 		drive:        d,
 		tasks:        tasks,
 		images:       images,
-		scanner:      scan.New(d, database, images, tasks),
+		scanner:      scan.New(d, database, images, tasks, options.ExportManager, options.Pacing),
 		localScanner: scan.NewLocalScanner(database, images),
+		exportMgr:    options.ExportManager,
 	}
 	if d != nil && tasks != nil {
 		d.SubscribeMount(func(ctx context.Context, event drive.MountEvent) error {
@@ -141,19 +148,7 @@ func (s *Service) MatchingMovies(ctx context.Context, javdbIDs []string, codes [
 	return result, nil
 }
 
-func (s *Service) SetExportManager(mgr *export.Manager) {
-	s.exportMgr = mgr
-	s.scanner.SetExportManager(mgr)
-}
-
-func (s *Service) SetEmbyExport(embyDir, publicURL, strmToken string) {
-	s.scanner.SetEmbyExport(embyDir, publicURL, strmToken)
-}
-
-func (s *Service) SetPacing(pace func(context.Context) error) {
-	s.scanner.SetPacing(pace)
-}
-
+// SetMediaNotifier binds the library/Emby cycle before task workers start.
 func (s *Service) SetMediaNotifier(notifier scan.MediaNotifier) {
 	s.scanner.SetMediaNotifier(notifier)
 	s.localScanner.SetMediaNotifier(notifier)

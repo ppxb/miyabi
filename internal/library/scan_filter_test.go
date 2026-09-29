@@ -174,7 +174,7 @@ func TestNFOIdentifiesOnlyEligibleVideosAndSmallFilesDoNotMakeDirectoryShared(t 
 		lib.database.File.Query().Where(file.FileIDEQ("auxiliary")).OnlyX(ctx).MovieID != nil {
 		t.Fatal("NFO inference did not distinguish the feature from its auxiliary file")
 	}
-	scrapeSvc := scrape.New(lib.database, lib.drive, nil, lib.images, lib.tasks)
+	scrapeSvc := scrape.New(lib.database, lib.drive, nil, lib.images, lib.tasks, scrape.Dependencies{})
 	sess, err := lib.drive.OpenSource(ctx, source)
 	if err != nil {
 		t.Fatal(err)

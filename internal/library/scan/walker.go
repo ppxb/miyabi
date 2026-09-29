@@ -49,32 +49,18 @@ type Scanner struct {
 }
 
 // New creates a new Scanner with the provided dependencies.
-func New(driveSvc *drive.Drive, db *ent.Client, images *mediaimage.Cache, tasksSvc *tasks.Service) *Scanner {
+func New(driveSvc *drive.Drive, db *ent.Client, images *mediaimage.Cache, tasksSvc *tasks.Service, exportMgr *export.Manager, pace func(context.Context) error) *Scanner {
+	if pace == nil {
+		pace = DefaultPacing
+	}
 	return &Scanner{
-		driveSvc: driveSvc,
-		db:       db,
-		images:   images,
-		tasksSvc: tasksSvc,
+		driveSvc:  driveSvc,
+		db:        db,
+		images:    images,
+		tasksSvc:  tasksSvc,
+		exportMgr: exportMgr,
+		pace:      pace,
 	}
-}
-
-func (s *Scanner) SetExportManager(mgr *export.Manager) {
-	s.exportMgr = mgr
-}
-
-func (s *Scanner) SetEmbyExport(embyDir, publicURL, strmToken string) {
-	if s.exportMgr == nil {
-		s.exportMgr = export.NewManager(export.Config{})
-	}
-	s.exportMgr.Set(export.Config{
-		EmbyDir:   embyDir,
-		PublicURL: publicURL,
-		STRMToken: strmToken,
-	})
-}
-
-func (s *Scanner) SetPacing(pace func(context.Context) error) {
-	s.pace = pace
 }
 
 func (s *Scanner) SetMediaNotifier(notifier MediaNotifier) {

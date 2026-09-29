@@ -16,8 +16,43 @@ import (
 
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/export"
 	"github.com/ppxb/miyabi/internal/gfriends"
 )
+
+func TestConstructorRestoresExportConfigAndInjectsScanScheduler(t *testing.T) {
+	ctx := t.Context()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	saved := Config{LocalDir: t.TempDir(), PublicURL: "http://saved.example"}
+	if err := database.SaveSetting(ctx, store.Client, SettingKey, saved); err != nil {
+		t.Fatal(err)
+	}
+	mgr := export.NewManager(export.Config{EmbyDir: t.TempDir(), PublicURL: "http://default.example", STRMToken: "playback-token"})
+	var scheduled []export.Config
+	svc, err := NewService(ctx, store.Client, Config{LocalDir: mgr.Config().EmbyDir, PublicURL: mgr.Config().PublicURL}, Dependencies{
+		ExportManager:     mgr,
+		ScheduleLocalScan: func(context.Context) error { scheduled = append(scheduled, mgr.Config()); return nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer svc.Close()
+	want := export.Config{EmbyDir: saved.LocalDir, PublicURL: saved.PublicURL, STRMToken: "playback-token"}
+	if got := mgr.Config(); got != want {
+		t.Fatalf("constructor returned with stale export config: %+v", got)
+	}
+	want.EmbyDir = t.TempDir()
+	if err := svc.UpdateConfig(ctx, Config{LocalDir: want.EmbyDir, PublicURL: want.PublicURL}); err != nil {
+		t.Fatal(err)
+	}
+	if len(scheduled) != 1 || scheduled[0] != want {
+		t.Fatalf("scheduler saw incomplete dependencies or stale configuration: %+v", scheduled)
+	}
+}
 
 func TestEmbyConfig_Normalize(t *testing.T) {
 	cfg := Config{
@@ -131,7 +166,7 @@ func TestEmbyService_Ping(t *testing.T) {
 		Enabled:   true,
 		ServerURL: server.URL,
 		APIKey:    "valid-token",
-	})
+	}, Dependencies{})
 	if err != nil {
 		t.Fatalf("NewService failed: %v", err)
 	}
@@ -183,7 +218,7 @@ func TestEmbyService_NotifyUpdatedBatch(t *testing.T) {
 		APIKey:    "valid-token",
 		LocalDir:  "/app/data/emby",
 		MediaPath: "/media",
-	})
+	}, Dependencies{})
 	if err != nil {
 		t.Fatalf("NewService failed: %v", err)
 	}
@@ -243,7 +278,7 @@ func TestEmbyService_NotifyUpdatedDeleted(t *testing.T) {
 		APIKey:    "valid-token",
 		LocalDir:  localDir,
 		MediaPath: "/media",
-	})
+	}, Dependencies{})
 	if err != nil {
 		t.Fatalf("NewService failed: %v", err)
 	}
@@ -347,23 +382,22 @@ func TestEmbyService_SyncActorAvatars(t *testing.T) {
 	}
 	defer store.Close()
 
+	// Configure gfriends client with custom fastly URL via test cache
+	cacheDir := t.TempDir()
+	_ = os.WriteFile(cacheDir+"/gfriends_tree.json", treeBytes, 0644)
+	gClient := gfriends.New(cacheDir, gfriendsServer.Client())
+
 	syncActors := true
 	svc, err := NewService(context.Background(), store.Client, Config{
 		Enabled:    true,
 		ServerURL:  embyServer.URL,
 		APIKey:     "valid-token",
 		SyncActors: &syncActors,
-	})
+	}, Dependencies{GFriends: gClient})
 	if err != nil {
 		t.Fatalf("NewService failed: %v", err)
 	}
 	defer svc.Close()
-
-	// Configure gfriends client with custom fastly URL via test cache
-	cacheDir := t.TempDir()
-	_ = os.WriteFile(cacheDir+"/gfriends_tree.json", treeBytes, 0644)
-	gClient := gfriends.New(cacheDir, gfriendsServer.Client())
-	svc.SetGFriends(gClient)
 
 	// Test ListPersonsWithoutAvatar
 	missing, err := svc.ListPersonsWithoutAvatar(t.Context())
@@ -509,19 +543,20 @@ func TestAvatarFailureIsRetriedOnNextSync(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	svc, err := NewService(t.Context(), store.Client, Config{Enabled: true, ServerURL: server.URL, APIKey: "test"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer svc.Close()
 	calls := 0
-	svc.SetMediaFetcher(mediaFetcherFunc(func(context.Context, string) (domain.Media, error) {
+	media := mediaFetcherFunc(func(context.Context, string) (domain.Media, error) {
 		calls++
 		if calls == 1 {
 			return domain.Media{}, errors.New("temporary network failure")
 		}
 		return domain.Media{ContentType: "image/png", Body: []byte("avatar")}, nil
-	}))
+	})
+	svc, err := NewService(t.Context(), store.Client, Config{Enabled: true, ServerURL: server.URL, APIKey: "test"}, Dependencies{Media: media})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer svc.Close()
+
 	if _, err := svc.SyncActorAvatars(t.Context()); err != nil {
 		t.Fatal(err)
 	}

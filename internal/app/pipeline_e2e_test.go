@@ -18,6 +18,7 @@ import (
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/export"
 
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/task"
@@ -276,14 +277,15 @@ func newPipelineFixture(t *testing.T) *pipelineFixture {
 		t.Fatal(err)
 	}
 	catalogueClient := &fakeCatalogue{ids: make(map[string]string), details: make(map[string]domain.MovieDetail), cover: fixtureJPEG(t, 600, 400)}
-	library := library.New(store.Client, d, taskSvc, images)
+	library := library.New(store.Client, d, taskSvc, images, library.Options{Pacing: func(context.Context) error { return nil }})
 	discover, err := catalogue.NewWithClients(ctx, store.Client, catalogueClient, nil, library)
 	if err != nil {
 		t.Fatal(err)
 	}
 	embyDir := t.TempDir()
-	scrape := scrapePkg.New(store.Client, d, discover, images, taskSvc)
-	scrape.SetEmbyExport(embyDir, "http://127.0.0.1:8080", "")
+	scrape := scrapePkg.New(store.Client, d, discover, images, taskSvc, scrapePkg.Dependencies{
+		ExportManager: export.NewManager(export.Config{EmbyDir: embyDir, PublicURL: "http://127.0.0.1:8080"}),
+	})
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScan, library.Scan, library.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScrape, scrape.Scrape, scrape.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindCover, scrape.Cover, scrape.Finished))

@@ -52,14 +52,20 @@ type Service struct {
 	syncing           atomic.Bool
 	avatarNotFoundMu  sync.Mutex
 	avatarNotFound    map[string]time.Time
-	strmToken         string
 	exportMgr         *export.Manager
 	updateMu          sync.Mutex
 	scheduleLocalScan func(context.Context) error
 }
 
-// NewService instantiates an Emby service, restoring config from database or using defaults.
-func NewService(ctx context.Context, db *ent.Client, initial Config) (*Service, error) {
+type Dependencies struct {
+	GFriends          *gfriends.Client
+	Media             MediaFetcher
+	ExportManager     *export.Manager
+	ScheduleLocalScan func(context.Context) error
+}
+
+// NewService restores configuration and installs dependencies before starting workers.
+func NewService(ctx context.Context, db *ent.Client, initial Config, deps Dependencies) (*Service, error) {
 	loaded, found, err := database.LoadSetting[Config](ctx, db, SettingKey)
 	if err != nil {
 		return nil, fmt.Errorf("load emby setting: %w", err)
@@ -84,10 +90,19 @@ func NewService(ctx context.Context, db *ent.Client, initial Config) (*Service, 
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		queue:          make(chan string, 1000),
-		ctx:            subCtx,
-		cancel:         cancel,
-		avatarNotFound: make(map[string]time.Time),
+		queue:             make(chan string, 1000),
+		ctx:               subCtx,
+		cancel:            cancel,
+		avatarNotFound:    make(map[string]time.Time),
+		gfriends:          deps.GFriends,
+		media:             deps.Media,
+		exportMgr:         deps.ExportManager,
+		scheduleLocalScan: deps.ScheduleLocalScan,
+	}
+	if s.exportMgr != nil {
+		cfgExport := s.exportMgr.Config()
+		cfgExport.EmbyDir, cfgExport.PublicURL = cfg.LocalDir, cfg.PublicURL
+		s.exportMgr.Set(cfgExport)
 	}
 
 	s.wg.Add(1)
@@ -112,37 +127,9 @@ func (s *Service) Close() {
 	s.wg.Wait()
 }
 
-// SetGFriends configures the GFriends client for actor avatar resolution.
-func (s *Service) SetGFriends(g *gfriends.Client) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.gfriends = g
-}
-
 // MediaFetcher downloads catalogue images such as JavDB actor avatars.
 type MediaFetcher interface {
 	Media(ctx context.Context, rawURL string) (domain.Media, error)
-}
-
-// SetMediaFetcher configures the fallback source for actors missing from GFriends.
-func (s *Service) SetMediaFetcher(media MediaFetcher) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.media = media
-}
-
-// SetSTRMToken configures the playback authorization token written into .strm files.
-func (s *Service) SetSTRMToken(token string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.strmToken = token
-}
-
-// SetExportManager configures the unified export manager.
-func (s *Service) SetExportManager(mgr *export.Manager) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.exportMgr = mgr
 }
 
 // ScheduleActorSync schedules an actor avatar sync run after the given delay.
@@ -181,11 +168,6 @@ func (s *Service) Config(context.Context) (Config, error) {
 	return cfg, nil
 }
 
-// SetLocalScanScheduler wires automatic local imports during application setup.
-func (s *Service) SetLocalScanScheduler(schedule func(context.Context) error) {
-	s.scheduleLocalScan = schedule
-}
-
 // UpdateConfig validates and persists the new configuration to the database.
 func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 	s.updateMu.Lock()
@@ -198,7 +180,7 @@ func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 		cfg.PublicURL = s.defaultPublicURL
 	}
 	oldPublicURL := s.cfg.PublicURL
-	token := s.strmToken
+	token := s.exportMgr.Config().STRMToken
 	s.mu.Unlock()
 
 	if err := cfg.Normalize(); err != nil {
