@@ -3,10 +3,10 @@ package subtitle
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
-	"github.com/go-resty/resty/v2"
 	"github.com/ppxb/miyabi/internal/codeid"
 	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/netx"
@@ -21,7 +21,7 @@ type Provider interface {
 // Finder searches online providers and downloads their subtitles.
 type Finder struct {
 	providers     []Provider
-	client        *resty.Client
+	client        *http.Client
 	allowLoopback bool
 }
 
@@ -32,7 +32,7 @@ func WithAllowLoopbackForTesting(allow bool) FinderOption {
 	return func(f *Finder) {
 		f.allowLoopback = allow
 		if allow {
-			f.client = netx.NewDirectRestyClient(netx.RestyOptions{Timeout: 10 * time.Second})
+			f.client = &http.Client{Timeout: 10 * time.Second, Transport: netx.NewTransport(nil)}
 		}
 	}
 }

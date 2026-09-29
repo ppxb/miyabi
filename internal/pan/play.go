@@ -96,22 +96,20 @@ func (client *Client) PlayURL(ctx context.Context, accessToken, pickCode, userAg
 // OpenMedia streams CDN responses without the API rate limiter or OAuth headers.
 // The caller owns the body, including for unsuccessful HTTP responses.
 func (client *Client) OpenMedia(ctx context.Context, method, address string, headers http.Header) (*http.Response, error) {
-	ua := strings.TrimSpace(headers.Get("User-Agent"))
-	if ua == "" {
-		ua = "__EMPTY__"
-	}
-	request := client.media.R().SetContext(ctx).SetDoNotParseResponse(true).
-		SetHeader("User-Agent", ua).SetHeader("Accept-Encoding", "identity")
-	for _, name := range []string{"Range", "If-Range"} {
-		if value := headers.Get(name); value != "" {
-			request.SetHeader(name, value)
+	request, err := http.NewRequestWithContext(ctx, method, address, nil)
+	var response *http.Response
+	if err == nil {
+		// An explicitly empty value suppresses net/http's default User-Agent.
+		request.Header.Set("User-Agent", strings.TrimSpace(headers.Get("User-Agent")))
+		request.Header.Set("Accept-Encoding", "identity")
+		for _, name := range []string{"Range", "If-Range"} {
+			if value := headers.Get(name); value != "" {
+				request.Header.Set(name, value)
+			}
 		}
+		response, err = client.media.Do(request)
 	}
-	response, err := request.Execute(method, address)
 	if err != nil {
-		if response != nil && response.RawBody() != nil {
-			response.RawBody().Close()
-		}
 		// net/http includes signed CDN URLs in url.Error; keep only its underlying cause.
 		var requestError *url.Error
 		if errors.As(err, &requestError) {
@@ -119,5 +117,5 @@ func (client *Client) OpenMedia(ctx context.Context, method, address string, hea
 		}
 		return nil, fmt.Errorf("request 115 media: %w", err)
 	}
-	return response.RawResponse, nil
+	return response, nil
 }

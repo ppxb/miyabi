@@ -166,7 +166,7 @@ func TestOpenMediaStreamsRangeAndHeadWithoutCredentials(t *testing.T) {
 			client := New()
 			defer client.Close()
 			body := &observedMediaBody{Reader: strings.NewReader("fixture video")}
-			client.media.SetTransport(offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
+			client.media.Transport = offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
 				if request.Method != method || request.UserAgent() != "" || request.Header.Get("Range") != "bytes=2-5" || request.Header.Get("If-Range") != `"fixture-etag"` {
 					t.Errorf("method or media headers were lost: %s %#v", request.Method, request.Header)
 				}
@@ -174,7 +174,7 @@ func TestOpenMediaStreamsRangeAndHeadWithoutCredentials(t *testing.T) {
 					t.Error("browser credentials were forwarded to the CDN")
 				}
 				return &http.Response{StatusCode: http.StatusPartialContent, Header: http.Header{"Content-Range": {"bytes 2-5/13"}}, Body: body, Request: request}, nil
-			}))
+			})
 			response, err := client.OpenMedia(t.Context(), method, "https://cdn.example/video?sign=fixture", http.Header{
 				"Range": {"bytes=2-5"}, "If-Range": {`"fixture-etag"`}, "Authorization": {"Bearer private"}, "Cookie": {"private=value"},
 			})
@@ -184,7 +184,7 @@ func TestOpenMediaStreamsRangeAndHeadWithoutCredentials(t *testing.T) {
 			if body.reads != 0 || response.StatusCode != http.StatusPartialContent || response.Header.Get("Content-Range") != "bytes 2-5/13" {
 				t.Fatal("OpenMedia buffered the response or lost its range status")
 			}
-			if client.media.GetClient().Timeout != 0 {
+			if client.media.Timeout != 0 {
 				t.Fatal("long video transfers must not inherit the API total timeout")
 			}
 			response.Body.Close()
@@ -198,9 +198,9 @@ func TestOpenMediaStreamsRangeAndHeadWithoutCredentials(t *testing.T) {
 func TestMediaRequestErrorRedactsURLAndPreservesCancellation(t *testing.T) {
 	client := New()
 	defer client.Close()
-	client.media.SetTransport(offlineRoundTrip(func(*http.Request) (*http.Response, error) {
+	client.media.Transport = offlineRoundTrip(func(*http.Request) (*http.Response, error) {
 		return nil, context.Canceled
-	}))
+	})
 	_, err := client.OpenMedia(t.Context(), http.MethodGet, "https://cdn.example/video?secret=fixture", nil)
 	if !errors.Is(err, context.Canceled) || strings.Contains(err.Error(), "secret") || strings.Contains(err.Error(), "cdn.example") {
 		t.Fatalf("unsafe or unrecognizable media error: %v", err)

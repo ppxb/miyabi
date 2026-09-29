@@ -116,3 +116,53 @@ func TestSafeDownload_PermitsLocalProxy(t *testing.T) {
 		t.Fatalf("expected proxied subtitle content, got: %s", string(body))
 	}
 }
+
+func TestSafeDownloadLimitsAndRedirects(t *testing.T) {
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/private":
+			w.Header().Set("Location", "http://127.0.0.1/private")
+			w.WriteHeader(http.StatusFound)
+		case "/loop":
+			w.Header().Set("Location", "http://93.184.216.34/loop")
+			w.WriteHeader(http.StatusFound)
+		case "/redirect":
+			w.Header().Set("Location", "http://93.184.216.34/body")
+			w.WriteHeader(http.StatusFound)
+		case "/error":
+			w.WriteHeader(http.StatusServiceUnavailable)
+		default:
+			_, _ = w.Write([]byte("12345"))
+		}
+	}))
+	defer proxy.Close()
+	manager, err := NewProxyManager(ProxyConfig{Enabled: true, URL: proxy.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := NewSafeDownloadClient(manager, time.Second)
+	defer client.CloseIdleConnections()
+	for _, tc := range []struct {
+		path    string
+		limit   int64
+		failure string
+	}{
+		{"/body", 5, ""},
+		{"/body", 4, "exceeded"},
+		{"/redirect", 5, ""},
+		{"/private", 5, "redirect blocked"},
+		{"/loop", 5, "stopped after"},
+		{"/error", 5, "status code 503"},
+	} {
+		t.Run(tc.path+tc.failure, func(t *testing.T) {
+			body, err := SafeDownload(t.Context(), client, "http://93.184.216.34"+tc.path, WithMaxBytes(tc.limit))
+			if tc.failure == "" {
+				if err != nil || string(body) != "12345" {
+					t.Fatalf("download %q: %v", body, err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tc.failure) {
+				t.Fatalf("expected %q, got %v", tc.failure, err)
+			}
+		})
+	}
+}

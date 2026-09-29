@@ -15,10 +15,7 @@ import (
 
 func newMediaClient(options Options) *resty.Client {
 	restyOptions := netx.RestyOptions{Timeout: options.Timeout}
-	client := netx.NewDirectRestyClient(restyOptions)
-	if options.Proxy != nil {
-		client = netx.NewRestyClient(options.Proxy, restyOptions)
-	}
+	client := netx.NewRestyClient(options.Proxy, restyOptions)
 	return client.
 		SetHeader("User-Agent", userAgent).
 		SetRedirectPolicy(resty.NoRedirectPolicy())

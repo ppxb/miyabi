@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"net/url"
 	"path/filepath"
 	"sync"
 	"time"
@@ -28,6 +27,7 @@ import (
 	"github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/maintenance"
 	"github.com/ppxb/miyabi/internal/monitor"
+	"github.com/ppxb/miyabi/internal/netx"
 	"github.com/ppxb/miyabi/internal/offline"
 	"github.com/ppxb/miyabi/internal/strm"
 	"github.com/ppxb/miyabi/internal/subtitle"
@@ -123,15 +123,9 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		return nil, fmt.Errorf("initialize emby service: %w", err)
 	}
 
-	gfriendsTransport := http.DefaultTransport.(*http.Transport).Clone()
-	if network.ProxyManager() != nil {
-		gfriendsTransport.Proxy = func(*http.Request) (*url.URL, error) {
-			return network.ProxyManager().Resolve(), nil
-		}
-	}
 	gfriendsClient := gfriends.New(cfg.DataDir, &http.Client{
 		Timeout:   30 * time.Second,
-		Transport: gfriendsTransport,
+		Transport: netx.NewTransport(network.ProxyManager()),
 	})
 	embySvc.SetGFriends(gfriendsClient)
 	embySvc.SetMediaFetcher(catalogueSvc)

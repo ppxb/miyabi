@@ -10,8 +10,6 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	"github.com/go-resty/resty/v2"
 )
 
 const (
@@ -122,8 +120,8 @@ func ValidateSafeURL(ctx context.Context, rawURL string, allowLoopback bool) (*u
 }
 
 // NewSafeTransport creates an http.Transport with SSRF protection at dial time.
-func NewSafeTransport(proxyManager *ProxyManager, options RestyOptions) *http.Transport {
-	transport := newTransport(options)
+func NewSafeTransport(proxyManager *ProxyManager) *http.Transport {
+	transport := NewTransport(proxyManager)
 
 	dialer := &net.Dialer{
 		Timeout:   10 * time.Second,
@@ -183,41 +181,32 @@ func NewSafeTransport(proxyManager *ProxyManager, options RestyOptions) *http.Tr
 		return nil, firstErr
 	}
 
-	if proxyManager != nil {
-		transport.Proxy = func(*http.Request) (*url.URL, error) {
-			return proxyManager.Resolve(), nil
-		}
-	}
-
 	return transport
 }
 
-// NewSafeDownloadClient creates a Resty client configured with SSRF protection,
-// strict redirect checks, timeout, and response body size limits.
-func NewSafeDownloadClient(proxyManager *ProxyManager, timeout time.Duration) *resty.Client {
+// NewSafeDownloadClient applies SSRF protection, redirect checks and a timeout.
+// SafeDownload enforces the response body size limit.
+func NewSafeDownloadClient(proxyManager *ProxyManager, timeout time.Duration) *http.Client {
 	if timeout <= 0 {
 		timeout = 20 * time.Second
 	}
 
-	transport := NewSafeTransport(proxyManager, RestyOptions{Timeout: timeout})
+	transport := NewSafeTransport(proxyManager)
 
-	client := resty.New().
-		SetTimeout(timeout).
-		SetTransport(transport).
-		SetRedirectPolicy(
-			resty.RedirectPolicyFunc(func(req *http.Request, via []*http.Request) error {
-				if len(via) >= MaxRedirects {
-					return fmt.Errorf("stopped after %d redirects", MaxRedirects)
-				}
-				// Re-validate target URL on every redirect hop
-				if _, err := ValidateSafeURL(req.Context(), req.URL.String(), false); err != nil {
-					return fmt.Errorf("redirect blocked: %w", err)
-				}
-				return nil
-			}),
-		)
-
-	return client
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= MaxRedirects {
+				return fmt.Errorf("stopped after %d redirects", MaxRedirects)
+			}
+			// Re-validate target URL on every redirect hop
+			if _, err := ValidateSafeURL(req.Context(), req.URL.String(), false); err != nil {
+				return fmt.Errorf("redirect blocked: %w", err)
+			}
+			return nil
+		},
+	}
 }
 
 // DownloadOption configures SafeDownload behavior.
@@ -244,7 +233,7 @@ func WithAllowLoopback(allow bool) DownloadOption {
 
 // SafeDownload performs a safe HTTP GET download, verifying URL, enforcing SSRF checks,
 // and reading at most maxBytes (defaulting to MaxSafeDownloadBytes if <= 0).
-func SafeDownload(ctx context.Context, client *resty.Client, targetURL string, opts ...DownloadOption) ([]byte, error) {
+func SafeDownload(ctx context.Context, client *http.Client, targetURL string, opts ...DownloadOption) ([]byte, error) {
 	cfg := downloadOptions{
 		maxBytes:      MaxSafeDownloadBytes,
 		allowLoopback: false,
@@ -257,21 +246,22 @@ func SafeDownload(ctx context.Context, client *resty.Client, targetURL string, o
 		return nil, fmt.Errorf("safe url check failed: %w", err)
 	}
 
-	resp, err := client.R().
-		SetContext(ctx).
-		SetDoNotParseResponse(true).
-		Get(targetURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create download request: %w", err)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("download request failed: %w", err)
 	}
-	defer resp.RawBody().Close()
+	defer resp.Body.Close()
 
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("download status code %d", resp.StatusCode())
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("download status code %d", resp.StatusCode)
 	}
 
 	// Limit reader to maxBytes + 1 to detect overflow
-	limitedReader := io.LimitReader(resp.RawBody(), cfg.maxBytes+1)
+	limitedReader := io.LimitReader(resp.Body, cfg.maxBytes+1)
 	body, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, fmt.Errorf("reading response body failed: %w", err)

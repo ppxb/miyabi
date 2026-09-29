@@ -22,13 +22,8 @@ type SubtitleCatProvider struct {
 }
 
 func NewSubtitleCatProvider(proxyManager *netx.ProxyManager) *SubtitleCatProvider {
-	var client *resty.Client
 	opts := netx.RestyOptions{Timeout: 15 * time.Second}
-	if proxyManager != nil {
-		client = netx.NewRestyClient(proxyManager, opts)
-	} else {
-		client = netx.NewDirectRestyClient(opts)
-	}
+	client := netx.NewRestyClient(proxyManager, opts)
 	return &SubtitleCatProvider{origin: defaultSubtitleCatOrigin, client: client}
 }
 

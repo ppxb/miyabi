@@ -23,22 +23,26 @@ type RestyOptions struct {
 // NewRestyClient creates a client whose proxy is resolved from the manager on
 // every request, so configuration changes apply without rebuilding it.
 func NewRestyClient(manager *ProxyManager, options RestyOptions) *resty.Client {
-	transport := newTransport(options)
-	transport.Proxy = func(*http.Request) (*url.URL, error) {
-		return manager.Resolve(), nil
-	}
+	transport := NewTransport(manager)
+	transport.ResponseHeaderTimeout = options.ResponseHeaderTimeout
 	return resty.New().SetTimeout(options.Timeout).SetTransport(transport)
 }
 
 // NewDirectRestyClient creates a client that never reads the proxy manager.
 func NewDirectRestyClient(options RestyOptions) *resty.Client {
-	return resty.New().SetTimeout(options.Timeout).SetTransport(newTransport(options))
+	return NewRestyClient(nil, options)
 }
 
-func newTransport(options RestyOptions) *http.Transport {
+// NewTransport resolves the configured proxy for each request. A nil manager
+// always connects directly, ignoring HTTP_PROXY and HTTPS_PROXY.
+func NewTransport(manager *ProxyManager) *http.Transport {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
-	transport.ResponseHeaderTimeout = options.ResponseHeaderTimeout
+	if manager != nil {
+		transport.Proxy = func(*http.Request) (*url.URL, error) {
+			return manager.Resolve(), nil
+		}
+	}
 	return transport
 }
 

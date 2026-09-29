@@ -22,7 +22,7 @@ const (
 
 type Client struct {
 	http    *resty.Client
-	media   *resty.Client
+	media   *http.Client
 	limiter *rate.Limiter
 }
 
@@ -163,16 +163,18 @@ func New() *Client {
 		return false
 	})
 
+	mediaTransport := netx.NewTransport(nil)
+	mediaTransport.ResponseHeaderTimeout = requestTimeout
 	return &Client{
 		http:    httpClient,
-		media:   netx.NewDirectRestyClient(netx.RestyOptions{ResponseHeaderTimeout: requestTimeout}).SetPreRequestHook(preserveEmptyUserAgent),
+		media:   &http.Client{Transport: mediaTransport},
 		limiter: limiter,
 	}
 }
 
 func (client *Client) Close() {
 	client.http.GetClient().CloseIdleConnections()
-	client.media.GetClient().CloseIdleConnections()
+	client.media.CloseIdleConnections()
 }
 
 func (client *Client) request(request *resty.Request, method, endpoint string) (*resty.Response, error) {
