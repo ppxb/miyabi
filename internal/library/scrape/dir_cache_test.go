@@ -21,7 +21,6 @@ type mockSession struct {
 }
 
 func (m *mockSession) Source() domain.LibrarySource { return m.source }
-func (m *mockSession) Version() uint64              { return 1 }
 func (m *mockSession) List(ctx context.Context, dirID string, offset int) (pan.FilePage, error) {
 	m.listCalls.Add(1)
 	if m.listFunc != nil {

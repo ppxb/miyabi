@@ -46,7 +46,7 @@ func (d *Drive) SelectDirectory(ctx context.Context, directoryID string) (domain
 	}
 	directory := domain.LibraryDirectory{
 		ID: directoryID, Name: files.Path[len(files.Path)-1].Name,
-		Path: DirectoryPath(files.Path),
+		Path: directoryPath(files.Path),
 	}
 	record := mountRecord{AccountID: account.ID, LibraryDirectory: directory}
 
@@ -147,9 +147,9 @@ func WithinSource(info pan.FileInfo, source domain.LibrarySource) bool {
 		slices.ContainsFunc(info.Path, func(dir pan.Directory) bool { return dir.ID == source.Directory.ID })
 }
 
-// DirectoryPath builds a root-anchored path string from 115 path segments,
+// directoryPath builds a root-anchored path string from 115 path segments,
 // skipping the root folder (ID "0").
-func DirectoryPath(segments []pan.Directory) string {
+func directoryPath(segments []pan.Directory) string {
 	names := make([]string, 0, len(segments))
 	for _, directory := range segments {
 		if directory.ID != "0" && directory.Name != "" {
@@ -161,7 +161,7 @@ func DirectoryPath(segments []pan.Directory) string {
 
 // FilePath builds a root-anchored path string from 115 path segments and a file name.
 func FilePath(segments []pan.Directory, name string) string {
-	dir := DirectoryPath(segments)
+	dir := directoryPath(segments)
 	if dir == "/" {
 		return "/" + name
 	}

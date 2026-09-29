@@ -250,8 +250,8 @@ func TestSessionsTrackTheMountTheyWereIssuedAgainst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sess.Source() != testSource || sess.Version() != d.snapshot().authorizationVersion {
-		t.Fatalf("session = %+v v%d", sess.Source(), sess.Version())
+	if sess.Source() != testSource {
+		t.Fatalf("session source = %+v", sess.Source())
 	}
 	if _, err := d.OpenSource(ctx, domain.LibrarySource{AccountID: testSource.AccountID, Directory: domain.LibraryDirectory{ID: "other"}}); !errors.Is(err, ErrSourceChanged) {
 		t.Fatalf("session for another source = %v", err)
@@ -314,29 +314,6 @@ func TestOpenRequiresAMountedDirectoryOfTheVerifiedAccount(t *testing.T) {
 	}
 }
 
-func TestValidateSourceFollowsAuthorizationAndClose(t *testing.T) {
-	d, client := mountedTestDrive(t)
-	version := d.snapshot().authorizationVersion
-	if !d.ValidateSource(testSource, version) {
-		t.Fatal("current source rejected")
-	}
-	if d.ValidateSource(testSource, version-1) {
-		t.Fatal("previous authorization accepted")
-	}
-	selectTestDirectory(t, d, client, domain.LibraryDirectory{ID: "20", Name: "Other", Path: "/Other"})
-	if d.ValidateSource(testSource, version) {
-		t.Fatal("replaced mount accepted")
-	}
-	current := *d.Source()
-	if !d.ValidateSource(current, d.snapshot().authorizationVersion) {
-		t.Fatal("new mount rejected")
-	}
-	d.Close()
-	if d.ValidateSource(current, d.snapshot().authorizationVersion) {
-		t.Fatal("closed drive accepted")
-	}
-}
-
 func TestWithinSource(t *testing.T) {
 	source := testSource
 	for name, test := range map[string]struct {
@@ -376,8 +353,8 @@ func TestDirectoryPath(t *testing.T) {
 			want:     "/Media/Jav",
 		},
 	} {
-		if got := DirectoryPath(tt.segments); got != tt.want {
-			t.Errorf("%s: DirectoryPath() = %q, want %q", name, got, tt.want)
+		if got := directoryPath(tt.segments); got != tt.want {
+			t.Errorf("%s: directoryPath() = %q, want %q", name, got, tt.want)
 		}
 	}
 }

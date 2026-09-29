@@ -264,16 +264,6 @@ func newMountedDrive(t testing.TB, database *ent.Client, client *panStub, source
 	return d
 }
 
-// authorizationVersion is the version a session issued right now would carry.
-func authorizationVersion(t testing.TB, d *drive.Drive) uint64 {
-	t.Helper()
-	sess, err := d.Open(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return sess.Version()
-}
-
 func libraryFixture(t testing.TB) testLibraryFixture {
 	t.Helper()
 	store, err := database.Open(t.Context(), t.TempDir())

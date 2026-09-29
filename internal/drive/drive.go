@@ -177,13 +177,6 @@ func (d *Drive) StartWork() (func(), bool) {
 	return d.work.Done, true
 }
 
-// ValidateSource checks whether the drive has not been closed, is still authenticated,
-// and matches the given source and authorization version.
-func (d *Drive) ValidateSource(source domain.LibrarySource, version uint64) bool {
-	s := d.snapshot()
-	return !s.closed && s.matchesSource(source, version) && s.tokens.AccessToken != ""
-}
-
 // Commit executes a database transaction under the drive commit lock.
 func (d *Drive) Commit(ctx context.Context, fn func(tx *ent.Tx) error) error {
 	if err := d.commit.Lock(ctx); err != nil {
