@@ -64,21 +64,31 @@ func (t *panTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, req.Context().Err()
 	}
 
-	// 2. Comply with global Retry-After backoff window
-	t.mu.Lock()
-	blockRemaining := time.Until(t.retryAfter)
-	t.mu.Unlock()
-	if blockRemaining > 0 {
-		select {
-		case <-time.After(blockRemaining):
-		case <-req.Context().Done():
-			return nil, req.Context().Err()
+	// Wait for the shared deadline before rate limiting each attempt. Recheck
+	// after both waits: another in-flight response may extend the deadline.
+	for {
+		t.mu.Lock()
+		remaining := time.Until(t.retryAfter)
+		t.mu.Unlock()
+		if remaining > 0 {
+			timer := time.NewTimer(remaining)
+			select {
+			case <-timer.C:
+			case <-req.Context().Done():
+				timer.Stop()
+				return nil, req.Context().Err()
+			}
+			continue
 		}
-	}
-
-	// 3. Enforce rate limit before every attempt, including all internal retries
-	if err := t.limiter.Wait(req.Context()); err != nil {
-		return nil, err
+		if err := t.limiter.Wait(req.Context()); err != nil {
+			return nil, err
+		}
+		t.mu.Lock()
+		blocked := time.Now().Before(t.retryAfter)
+		t.mu.Unlock()
+		if !blocked {
+			break
+		}
 	}
 
 	// 4. Perform actual network call
@@ -128,18 +138,9 @@ func New() *Client {
 
 	httpClient.SetRetryCount(3)
 	httpClient.SetRetryWaitTime(1 * time.Second)
-	// Allow sufficient max wait time so Resty does not truncate Retry-After headers (e.g. Retry-After: 60)
+	// Retry-After is enforced by panTransport for every request. Resty only
+	// supplies the normal retry backoff when scheduling another attempt.
 	httpClient.SetRetryMaxWaitTime(120 * time.Second)
-	httpClient.SetRetryAfter(func(client *resty.Client, resp *resty.Response) (time.Duration, error) {
-		if resp == nil {
-			return 0, nil
-		}
-		wait := parseRetryAfter(resp.Header().Get("Retry-After"))
-		if wait > 0 {
-			return wait, nil
-		}
-		return 0, nil
-	})
 	httpClient.AddRetryCondition(func(r *resty.Response, err error) bool {
 		if r != nil && r.StatusCode() == http.StatusTooManyRequests {
 			return true

@@ -2,11 +2,13 @@ package pan
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -140,12 +142,7 @@ func TestPanTransport_RespectsRetryAfter(t *testing.T) {
 	restyClient.SetTransport(transport)
 	restyClient.SetRetryCount(2)
 	restyClient.SetRetryMaxWaitTime(10 * time.Second)
-	restyClient.SetRetryAfter(func(c *resty.Client, resp *resty.Response) (time.Duration, error) {
-		if resp == nil {
-			return 0, nil
-		}
-		return parseRetryAfter(resp.Header().Get("Retry-After")), nil
-	})
+	restyClient.SetRetryWaitTime(10 * time.Millisecond)
 	restyClient.AddRetryCondition(func(r *resty.Response, err error) bool {
 		return r != nil && r.StatusCode() == http.StatusTooManyRequests
 	})
@@ -165,4 +162,104 @@ func TestPanTransport_RespectsRetryAfter(t *testing.T) {
 	if elapsed < 950*time.Millisecond {
 		t.Errorf("retry happened too early (%v), did not respect Retry-After: 1s", elapsed)
 	}
+}
+
+func TestPanTransportRechecksExtendedDeadline(t *testing.T) {
+	for _, stage := range []string{"backoff", "rate limit"} {
+		t.Run(stage, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				limiter := rate.NewLimiter(rate.Inf, 1)
+				if stage == "rate limit" {
+					limiter = rate.NewLimiter(rate.Every(2*time.Second), 1)
+					limiter.Allow()
+				}
+				called := make(chan time.Time, 1)
+				transport := newPanTransport(offlineRoundTrip(func(*http.Request) (*http.Response, error) {
+					called <- time.Now()
+					return &http.Response{StatusCode: 200, Header: make(http.Header), Body: http.NoBody}, nil
+				}), limiter, 2)
+				start := time.Now()
+				if stage == "backoff" {
+					transport.retryAfter = start.Add(2 * time.Second)
+				}
+				done := make(chan error, 1)
+				req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.com", nil)
+				go func() {
+					resp, err := transport.RoundTrip(req)
+					if resp != nil {
+						resp.Body.Close()
+					}
+					done <- err
+				}()
+				synctest.Wait()
+				time.Sleep(time.Second)
+				transport.mu.Lock()
+				transport.retryAfter = start.Add(5 * time.Second)
+				transport.mu.Unlock()
+				time.Sleep(time.Second)
+				synctest.Wait()
+				select {
+				case <-called:
+					t.Fatal("request escaped through the old deadline")
+				default:
+				}
+				time.Sleep(3 * time.Second)
+				if err := <-done; err != nil {
+					t.Fatal(err)
+				}
+				if at := <-called; at.Before(start.Add(5 * time.Second)) {
+					t.Fatalf("request started at %v", at)
+				}
+			})
+		})
+	}
+}
+
+func TestPanTransportCancelBackoffReleasesSlot(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		transport := newPanTransport(offlineRoundTrip(func(*http.Request) (*http.Response, error) {
+			t.Error("canceled backoff reached network")
+			return nil, errors.New("unexpected request")
+		}), rate.NewLimiter(rate.Inf, 1), 1)
+		transport.retryAfter = time.Now().Add(time.Minute)
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.com", nil)
+		done := make(chan error, 1)
+		go func() { _, err := transport.RoundTrip(req); done <- err }()
+		synctest.Wait()
+		cancel()
+		if err := <-done; !errors.Is(err, context.Canceled) {
+			t.Fatalf("cancellation=%v", err)
+		}
+		if len(transport.inFlight) != 0 {
+			t.Fatal("cancellation leaked concurrency slot")
+		}
+	})
+}
+
+func TestPanClientRetryAfterUsesSharedTransport(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		client := New()
+		defer client.Close()
+		transport := client.http.GetClient().Transport.(*panTransport)
+		attempts := 0
+		start := time.Now()
+		transport.base = offlineRoundTrip(func(*http.Request) (*http.Response, error) {
+			attempts++
+			if attempts == 1 {
+				return &http.Response{StatusCode: 429, Header: http.Header{"Retry-After": {"5"}}, Body: http.NoBody}, nil
+			}
+			if time.Since(start) != 5*time.Second {
+				t.Errorf("retry delay=%v", time.Since(start))
+			}
+			return &http.Response{StatusCode: 200, Header: make(http.Header), Body: http.NoBody}, nil
+		})
+		if _, err := client.request(client.http.R().SetContext(t.Context()), http.MethodGet, "http://example.com"); err != nil {
+			t.Fatal(err)
+		}
+		if attempts != 2 {
+			t.Fatalf("attempts=%d", attempts)
+		}
+	})
 }

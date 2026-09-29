@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：167 条待处理，12 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：166 条待处理，13 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -71,7 +71,10 @@
 - [x] **70.** `internal/netx/ssrf.go:216-236` functional options 只剩 `WithAllowLoopback`（测试开关，且 dialer 仍拦 loopback，所以 `subtitle.WithAllowLoopbackForTesting` 被迫换直连 client）；`WithMaxBytes` 仅测试使用。
   - 实现：删除 DownloadOption、WithMaxBytes、WithAllowLoopback 及字幕 WithAllowLoopbackForTesting；URL 校验不再暴露放行回环地址的参数，SafeDownload 固定 5MB 上限。字幕导出测试使用公开 IP 形式的 URL 与模拟 Transport，不再通过生产开关替换安全客户端；保留生产连接、重定向及代理校验逻辑。
   - 验证：netx、subtitle、app、library（含 scan/scrape）测试通过；实际验证 5MB/超出 1 字节边界，新增直接拨号拦截测试，保留本机 URL、重定向至本机、重定向次数、本地代理及字幕导出覆盖。未进行真实字幕来源联调，待整体复查。
-- [ ] **71.** `internal/pan/client.go:91-98` 与 `:137-146` Retry-After 两套：`panTransport` 全局 `retryAfter` 窗口 + resty `SetRetryAfter` 各等一遍。
+- [x] **71.** `internal/pan/client.go:91-98` 与 `:137-146` Retry-After 两套：`panTransport` 全局 `retryAfter` 窗口 + resty `SetRetryAfter` 各等一遍。
+  - 核实：原来的两层等待通常重叠，并非必然双倍；实际风险是共享截止时间延长后，已等待请求未重新检查。
+  - 实现：删除 Resty SetRetryAfter 回调，由 panTransport 统一解析并执行共享等待，在退避与限速等待后重新检查截止时间；保留重试次数、条件、普通退避、限速和并发上限。
+  - 验证：pan、drive、offline、app 测试通过；使用 testing/synctest 验证退避/限速期间延期、取消释放并发名额，并通过生产 New 客户端验证 Retry-After: 5 只等待 5 秒。原有重试限速、并发上限测试通过；未进行真实 115 限流联调，待整体复查。
 - [ ] **72.** `internal/pan/client.go:59-62`、`play.go:29-36` 用魔法字符串 `"__EMPTY__"` 作 UA 哨兵，在 RoundTrip 中改写 req（违反 RoundTripper 约定），`Header.Del` 后紧跟赋值多余；`pan/offline_test.go` 被迫复制该逻辑 → resty `SetPreRequestHook`。
 - [ ] **73.** `internal/config/runtime.go` 4 个从未被覆盖的常量包成 struct + `DefaultRuntime()`，`runtime_test.go` 仅断言常量本身 → 普通常量放到使用处。
 - [ ] **74.** `internal/api/access_gate.go` / `auth.go:16-21`：`NewAccessGateService(password, jwtSecret ...string)` 用可变参数模拟可选；`GenerateToken(subject, ttl)` 实参永远是 `"admin"` 与 `defaultTokenTTL`；`VerifyToken` 返回的 `*Claims` 全被 `_` 丢弃，禁用时返回 `(nil, nil)`；`SignToken` / `VerifyToken` / `Claims` / `BadRequest` 仅包内使用却导出。
