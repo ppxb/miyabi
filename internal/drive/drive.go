@@ -72,7 +72,6 @@ type Drive struct {
 	mu                   sync.Mutex
 	commit               syncx.ContextLock
 	tokens               pan.Tokens
-	session              *loginSession
 	directory            mountRecord
 	authorizationVersion uint64
 	credentialVersion    uint64
@@ -86,6 +85,7 @@ type Drive struct {
 	cachedAccountTime       time.Time
 	cachedCredentialVersion uint64
 
+	login  qrLogin
 	events *eventBus
 }
 
@@ -102,13 +102,15 @@ func NewWithClient(ctx context.Context, db *ent.Client, client Client) (*Drive, 
 	if err != nil {
 		return nil, err
 	}
-	return &Drive{
+	d := &Drive{
 		database:  db,
 		client:    client,
 		tokens:    tokens,
 		directory: directory,
 		events:    newEventBus(),
-	}, nil
+	}
+	d.login.drive = d
+	return d, nil
 }
 
 func (d *Drive) Close() {

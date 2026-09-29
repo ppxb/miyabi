@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ppxb/miyabi/internal/database"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
@@ -18,6 +19,54 @@ func testPollWindow(t *testing.T, window time.Duration) {
 	previous := loginPollWindow
 	loginPollWindow = window
 	t.Cleanup(func() { loginPollWindow = previous })
+}
+
+func TestLateQRCodeCannotRestoreReplacedLogin(t *testing.T) {
+	for _, action := range []string{"disconnect", "login"} {
+		t.Run(action, func(t *testing.T) {
+			d, client := mountedTestDrive(t)
+			started := make(chan struct{})
+			hold, release := testGate(t)
+			var calls atomic.Int32
+			client.beginLogin = func(context.Context) (*pan.Login, error) {
+				if calls.Add(1) == 1 {
+					close(started)
+					<-hold
+				}
+				return &pan.Login{QRCode: []byte("qr")}, nil
+			}
+			finished := make(chan error, 1)
+			go func() {
+				_, err := d.BeginLogin(t.Context())
+				finished <- err
+			}()
+			await(t, started)
+			var current LoginSession
+			if action == "disconnect" {
+				if _, err := d.Disconnect(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				var err error
+				current, err = d.BeginLogin(t.Context())
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			release()
+			var conflict *domain.Error
+			if err := await(t, finished); !errors.As(err, &conflict) || conflict.Kind != domain.KindConflict {
+				t.Fatalf("replaced QR request = %v, want conflict", err)
+			}
+			if action == "login" {
+				if status, err := d.LoginStatus(t.Context(), current.ID); err != nil || status.State != pan.LoginAuthorized {
+					t.Fatalf("replacement login = %+v, %v", status, err)
+				}
+			} else if status, err := d.Account(t.Context()); err != nil || status.Connected {
+				t.Fatalf("account after disconnect = %+v, %v", status, err)
+			}
+		})
+	}
 }
 
 func TestLoginPollsShareExchangeAfterCallerCancellation(t *testing.T) {
@@ -229,7 +278,7 @@ func TestLoginExpiresAfterItsLifetime(t *testing.T) {
 		t.Fatal(err)
 	}
 	d.mu.Lock()
-	d.session.startedAt = time.Now().Add(-loginLifetime - time.Minute)
+	d.login.session.startedAt = time.Now().Add(-loginLifetime - time.Minute)
 	d.mu.Unlock()
 	if status, err := d.LoginStatus(t.Context(), login.ID); err != nil || status.State != pan.LoginExpired {
 		t.Fatalf("stale login = %+v, %v", status, err)

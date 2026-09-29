@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：177 条待处理，2 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：176 条待处理，3 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -32,7 +32,9 @@
 - [x] **59.** `internal/library/scan/walker.go:76-263` `Scanner.Run` 约 190 行：参数校验、定向单文件、断点恢复、BFS、限速、NFO、分块入库、进度上报 + 两个闭包；:77 多余别名 → 拆 `runTargetFile` / `walk` / `indexDirectory`。
   - 实现：Run 保留 payload 校验、数据源会话和 scanID 初始化，单次扫描状态由私有 scanRun 承载；runTarget、walk、indexDirectory 分别负责定向扫描、断点与 BFS 遍历、单目录分页及分块入库。复用现有事务与进度保存函数，保持检查点格式、取消和导出锁边界。
   - 验证：library（含 scan/scrape）、app、offline、tasks 测试通过；新增 205 个视频在第二页取消后恢复的回归测试，验证未提交不完整目录、scanID 沿用、跨入库批次文件与进度完整。未进行真实 115 联调，待整体复查。
-- [ ] **60.** `internal/drive/drive.go:69-90` `Drive`：二维码登录状态机 + token 刷新 + 账号缓存 + 挂载持久化 + 事件 + Session 签发 + 工作计数，含 2 mutex、1 ContextLock、2 singleflight、1 WaitGroup、3 个版本号 → 拆出二维码登录（约 180 行）。
+- [x] **60.** `internal/drive/drive.go:69-90` `Drive`：二维码登录状态机 + token 刷新 + 账号缓存 + 挂载持久化 + 事件 + Session 签发 + 工作计数，含 2 mutex、1 ContextLock、2 singleflight、1 WaitGroup、3 个版本号 → 拆出二维码登录（约 180 行）。
+  - 实现：二维码登录状态机提取到 login.go 的私有 qrLogin，集中管理会话、轮询合并、超时、状态变化与凭据兑换；Drive 保留凭据提交、版本更新、账号缓存及挂载一致性。共用原有状态锁和提交锁，保持对外接口及关闭等待语义。
+  - 验证：drive、library（含 scan/scrape）、offline、app、api 测试通过；保留轮询共享、取消、过期及旧凭据防覆盖测试，新增二维码生成请求晚返回与断开/新登录交错的回归测试。未运行 race 检测或真实 115 扫码联调，待整体复查。
 - [ ] **61.** `internal/gfriends/client.go:78-143` `EnsureIndex` 持写锁执行两个镜像的网络下载（各 30s），期间所有 `Lookup` 阻塞；`FetchAvatar`（208-234）复制镜像循环；stale 回退（136-141）把 `loadedAt` 设为 now，一次故障后 7 天不重试。
 - [ ] **62.** `web/src/features/library/page.tsx` 仍内联扫描状态推导、响应式 Tooltip 按钮和 mutation 回调；错误文案已使用公共 describeApiError。评估提取 LibraryScanButton，以减少页面编排中的业务细节。
 
