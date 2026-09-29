@@ -24,7 +24,7 @@ func TestEmbyDirectoryAutomaticallyQueuesLocalScan(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "ABC-123.strm"), []byte("https://example.com/video"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	cfg := &config.Config{DataDir: t.TempDir(), EmbyDir: root, PublicURL: "http://localhost:8080", Listen: "127.0.0.1:0", Runtime: config.DefaultRuntime()}
+	cfg := &config.Config{DataDir: t.TempDir(), EmbyDir: root, PublicURL: "http://localhost:8080", Listen: "127.0.0.1:0"}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	a, err := New(cfg, logger)
 	if err != nil {

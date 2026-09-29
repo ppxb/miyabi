@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/ppxb/miyabi/internal/config"
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/task"
@@ -73,7 +72,7 @@ func TestSubscriptionBatchesDoNotBlockLibraryWorkers(t *testing.T) {
 	scan := store.Client.Task.Create().SetType(string(tasks.KindScan)).SetStatus(task.StatusRunning).SaveX(ctx)
 	scrape := store.Client.Task.Create().SetType(string(tasks.KindScrape)).SaveX(ctx)
 	cover := store.Client.Task.Create().SetType(string(tasks.KindCover)).SaveX(ctx)
-	pools := newTaskPools(service, config.DefaultRuntime().TaskPoolWorkers, logger)
+	pools := newTaskPools(service, logger)
 	runCtx, cancel := context.WithCancel(ctx)
 	stopped := make(chan error, 2)
 	var workers sync.WaitGroup
@@ -129,7 +128,7 @@ func TestSubscriptionBatchesDoNotBlockLibraryWorkers(t *testing.T) {
 	close(batchGate)
 	resumedCtx, stop := context.WithCancel(ctx)
 	defer stop()
-	for _, pool := range newTaskPools(service, config.DefaultRuntime().TaskPoolWorkers, logger) {
+	for _, pool := range newTaskPools(service, logger) {
 		startPool(pool, resumedCtx)
 	}
 	for _, id := range []int{batch.ID, secondBatch.ID} {

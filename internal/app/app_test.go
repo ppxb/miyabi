@@ -19,7 +19,6 @@ func TestAppLifecycle(t *testing.T) {
 		DataDir:  t.TempDir(),
 		Listen:   "127.0.0.1:0",
 		LogLevel: "info",
-		Runtime:  config.DefaultRuntime(),
 	}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 

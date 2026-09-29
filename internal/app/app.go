@@ -34,6 +34,13 @@ import (
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
+const (
+	offlineSyncInterval  = 30 * time.Second
+	monitorCheckInterval = 5 * time.Minute
+	// Bound a remote offline submission after detaching from its caller.
+	offlineSubmitTimeout = 2 * time.Minute
+)
+
 // App is the composition root assembling services, background workers, and the HTTP server.
 type App struct {
 	cfg       *config.Config
@@ -92,7 +99,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		return nil, fmt.Errorf("initialize catalogue service: %w", err)
 	}
 
-	offlineSvc := offline.New(store.Client, catalogueSvc, driveSvc, taskSvc, libSvc, cfg.Runtime.OfflineSubmitTimeout)
+	offlineSvc := offline.New(store.Client, catalogueSvc, driveSvc, taskSvc, libSvc, offlineSubmitTimeout)
 	monitorSvc := monitor.New(store.Client, catalogueSvc, offlineSvc, taskSvc)
 	subtitleSvc := subtitle.NewService(store.Client, subtitle.NewFinder(networkSvc.ProxyManager()))
 	gfriendsClient := gfriends.New(cfg.DataDir, &http.Client{
@@ -148,7 +155,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	taskRegistry.Register(tasks.NewHandler(tasks.KindCover, scrapeSvc.Cover, scrapeSvc.Finished))
 	taskRegistry.Register(tasks.NewHandler(tasks.KindSubscriptionBatch, monitorSvc.BatchHandler, monitorSvc.BatchFinished))
 
-	pools := newTaskPools(taskSvc, cfg.Runtime.TaskPoolWorkers, logger)
+	pools := newTaskPools(taskSvc, logger)
 
 	router := api.NewRouter(api.Dependencies{
 		Logger:         logger,
@@ -211,11 +218,11 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	go func() {
 		defer workers.Done()
-		tasks.RunPeriodic(ctx, a.logger, "sync 115 offline tasks", a.cfg.Runtime.OfflineSyncInterval, nil, a.offline.Sync)
+		tasks.RunPeriodic(ctx, a.logger, "sync 115 offline tasks", offlineSyncInterval, nil, a.offline.Sync)
 	}()
 	go func() {
 		defer workers.Done()
-		tasks.RunPeriodic(ctx, a.logger, "monitor", a.cfg.Runtime.MonitorCheckInterval, a.monitors.Pending(), a.monitors.Check)
+		tasks.RunPeriodic(ctx, a.logger, "monitor", monitorCheckInterval, a.monitors.Pending(), a.monitors.Check)
 	}()
 
 	serverError := make(chan error, 1)
