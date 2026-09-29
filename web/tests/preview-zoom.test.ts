@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 
 import {
+  type Point,
+  type ZoomView,
   FIT_VIEW,
   MAX_SCALE,
   MIN_SCALE,
@@ -24,7 +26,7 @@ const UHD = { width: 1920, height: 1080 }
 const WIDE = { width: 1600, height: 900 }
 
 /** Point of the image that sits under `anchor`, in image coordinates. */
-function anchoredPoint(view, anchor) {
+function anchoredPoint(view: ZoomView, anchor: Point) {
   return { x: (anchor.x - view.x) / view.scale, y: (anchor.y - view.y) / view.scale }
 }
 
@@ -119,7 +121,7 @@ test('every clamped view either covers the stage or stays centered on that axis'
       const view = clampView({ scale, x: offset, y: offset }, base, STAGE)
       const width = base.width * view.scale
       const height = base.height * view.scale
-      const covers = (extent, stage, value) =>
+      const covers = (extent: number, stage: number, value: number) =>
         extent >= stage
           ? value - extent / 2 <= -stage / 2 + 1e-9 && value + extent / 2 >= stage / 2 - 1e-9
           : value === 0

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 
-import { taskProgressState } from '@/features/tasks/task-progress-state'
+import { taskProgressState, type TaskStage } from '@/features/tasks/task-progress-state'
 
 test('scan and download workflows advance through their own stages', () => {
   assert.equal(taskProgressState('scanning').value, 0)
@@ -22,8 +22,9 @@ test('waiting phases describe what the workflow is waiting for', () => {
 })
 
 test('an unknown or unavailable phase stays indeterminate instead of crashing', () => {
+  // Simulate an unknown stage received from a newer backend.
   for (const phase of ['future-stage', 'downloading']) {
-    assert.deepEqual(taskProgressState(phase), { label: '等待进度同步', value: null })
+    assert.deepEqual(taskProgressState(phase as TaskStage), { label: '等待进度同步', value: null })
   }
 })
 

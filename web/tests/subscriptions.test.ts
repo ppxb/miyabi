@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import { test, onTestFinished } from 'vitest'
-import { QueryClient, QueryObserver } from '@tanstack/react-query'
+import {
+  QueryClient,
+  QueryObserver,
+  type QueryObserverOptions,
+  type QueryObserverResult,
+  type QueryKey
+} from '@tanstack/react-query'
 
 import { subscriptionKeys, SUBSCRIPTION_PAGE_SIZE } from '@/api/subscriptions'
 
@@ -16,18 +22,23 @@ function createTestClient() {
   return client
 }
 
-function observe(client, options) {
+function observe<TQuery, TData = TQuery, TKey extends QueryKey = QueryKey>(
+  client: QueryClient,
+  options: QueryObserverOptions<TQuery, Error, TData, TQuery, TKey>
+) {
   const observer = new QueryObserver(client, options)
   const unsubscribe = observer.subscribe(() => {})
   onTestFinished(unsubscribe)
   return observer
 }
 
-function settled(observer) {
+function settled<TQuery, TData, TKey extends QueryKey>(
+  observer: QueryObserver<TQuery, Error, TData, TQuery, TKey>
+) {
   if (observer.getCurrentResult().fetchStatus === 'idle') {
     return Promise.resolve(observer.getCurrentResult())
   }
-  return new Promise(resolve => {
+  return new Promise<QueryObserverResult<TData, Error>>(resolve => {
     const unsubscribe = observer.subscribe(result => {
       if (result.fetchStatus !== 'idle') return
       unsubscribe()
@@ -52,7 +63,7 @@ test('subscription targets indexes more than 100 items with O(1) map lookup', as
     queryFn: () => mockTargets,
     staleTime: Infinity,
     select: targets => {
-      const map = new Map()
+      const map = new Map<string, (typeof targets)[number]>()
       for (const item of targets) {
         map.set(item.target_id, item)
       }
@@ -61,6 +72,7 @@ test('subscription targets indexes more than 100 items with O(1) map lookup', as
   })
 
   const result = await settled(observer)
+  assert.ok(result.data)
   assert.equal(result.data.list.length, 150)
   assert.equal(result.data.map.size, 150)
 

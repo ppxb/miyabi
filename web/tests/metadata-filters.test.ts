@@ -38,14 +38,17 @@ test('clearing the common filter preserves the tag search', () => {
   )
 })
 
-for (const kind of ['actor', 'maker', 'series', 'director']) {
+for (const kind of ['actor', 'maker', 'series', 'director'] as const) {
   test(`${kind} searches apply the common filter without sending a forbidden zone or tag filter`, () => {
     const search = { kind, id: 'entity-1', name: '条目', page: 1, main: 'c', zone: 'uncensored' }
+    // Exercise malformed persisted search state with a forbidden zone.
+    // @ts-expect-error Entity searches do not accept a zone.
     assert.deepEqual(metadataBrowseParams(search), {
       entityType: kind,
       entityID: 'entity-1',
       main: ['c']
     })
+    // @ts-expect-error Preserve the malformed zone when clearing the filter.
     assert.deepEqual(metadataBrowseParams({ ...search, main: '' }), {
       entityType: kind,
       entityID: 'entity-1'

@@ -1,14 +1,13 @@
-import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   resolve: {
-    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) }
+    tsconfigPaths: true
   },
   test: {
     environment: 'node',
-    include: ['tests/**/*.test.{mjs,ts,tsx}'],
-    setupFiles: ['./tests/setup.mjs'],
+    include: ['tests/**/*.test.{ts,tsx}'],
+    setupFiles: ['./tests/setup.ts'],
     restoreMocks: true,
     unstubGlobals: true
   }

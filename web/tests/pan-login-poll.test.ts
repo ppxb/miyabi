@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { test } from 'vitest'
+import { test, vi, afterAll } from 'vitest'
+import type { QueryObserverResult } from '@tanstack/react-query'
+import type { PanLoginState } from '@/api/pan'
 
 import {
   PAN_LOGIN_MAX_FAILURES,
@@ -44,7 +46,7 @@ for (const scenario of [
     input: { failed: true, state: 'waiting' },
     want: false
   }
-]) {
+] as const) {
   test(scenario.name, () => {
     assert.equal(panLoginPollDelay(scenario.input), scenario.want)
   })
@@ -52,11 +54,12 @@ for (const scenario of [
 
 // react-query treats a missing `window` as a server and never polls on an
 // interval there, so it has to see a browser before it loads.
-globalThis.window = {}
+vi.stubGlobal('window', {})
+afterAll(() => vi.unstubAllGlobals())
 const { QueryClient, QueryObserver } = await import('@tanstack/react-query')
 
 // Mirrors usePanLoginStatus. Only the delays are shortened so a test finishes.
-function observePanLogin(queryFn) {
+function observePanLogin(queryFn: () => Promise<{ state: PanLoginState }>) {
   const client = new QueryClient()
   const observer = new QueryObserver(client, {
     queryKey: ['pan', 'login', 'fixture'],
@@ -71,12 +74,12 @@ function observePanLogin(queryFn) {
         state: query.state.data?.state
       }) && 1
   })
-  const seen = []
+  const seen: QueryObserverResult<{ state: PanLoginState }>[] = []
   const stop = observer.subscribe(result => seen.push(result))
   return { observer, seen, stop }
 }
 
-async function until(condition) {
+async function until(condition: () => boolean) {
   const deadline = Date.now() + 5000
   while (!condition()) {
     if (Date.now() > deadline) throw new Error('condition was not met in time')
@@ -84,7 +87,7 @@ async function until(condition) {
   }
 }
 
-function sleep(ms) {
+function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
-import { test } from 'vitest'
+import { test, vi } from 'vitest'
 
 import { BrowseHistoryStore } from '@/api/browse-history-store'
 
 test('BrowseHistoryStore tracks viewed IDs and deduplicates entries', async () => {
-  const synced = []
+  const synced: string[] = []
   const store = new BrowseHistoryStore({
     syncViewed: async ids => {
       synced.push(...ids)
@@ -45,7 +45,7 @@ test('BrowseHistoryStore keeps pending entries when sync fails', async () => {
 })
 
 test('BrowseHistoryStore batch triggers flush at 50 items', async () => {
-  const syncedBatches = []
+  const syncedBatches: string[][] = []
   const store = new BrowseHistoryStore({
     syncViewed: async ids => {
       syncedBatches.push([...ids])
@@ -60,7 +60,7 @@ test('BrowseHistoryStore batch triggers flush at 50 items', async () => {
   store.recordView('item-49')
   await new Promise(resolve => setTimeout(resolve, 10))
   assert.equal(syncedBatches.length, 1)
-  assert.equal(syncedBatches[0].length, 50)
+  assert.equal(syncedBatches[0]!.length, 50)
   assert.equal(store.getPendingCount(), 0)
 })
 
@@ -69,23 +69,23 @@ test('BrowseHistoryStore flushKeepalive clears pending and persists state', () =
   const originalNavDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
   const originalLocalStorage = globalThis.localStorage
 
-  const storage = new Map()
-  const beacons = []
+  const storage = new Map<string, string>()
+  const beacons: { url: string | URL; blob: Blob }[] = []
 
   const mockStorage = {
-    getItem: key => storage.get(key) ?? null,
-    setItem: (key, val) => storage.set(key, val),
-    removeItem: key => storage.delete(key)
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, val: string) => storage.set(key, val),
+    removeItem: (key: string) => storage.delete(key)
   }
-  globalThis.localStorage = mockStorage
-  globalThis.window = {
+  vi.stubGlobal('localStorage', mockStorage)
+  vi.stubGlobal('window', {
     addEventListener: () => {},
     removeEventListener: () => {},
     localStorage: mockStorage
-  }
+  })
   Object.defineProperty(globalThis, 'navigator', {
     value: {
-      sendBeacon: (url, blob) => {
+      sendBeacon: (url: string | URL, blob: Blob) => {
         beacons.push({ url, blob })
         return true
       }
@@ -101,10 +101,10 @@ test('BrowseHistoryStore flushKeepalive clears pending and persists state', () =
     store.flushKeepalive()
 
     assert.equal(beacons.length, 1)
-    assert.equal(beacons[0].url, '/api/discover/viewed')
+    assert.equal(beacons[0]!.url, '/api/discover/viewed')
     assert.equal(store.getPendingCount(), 0)
 
-    const saved = JSON.parse(storage.get('test:keepalive_clear'))
+    const saved = JSON.parse(storage.get('test:keepalive_clear')!)
     assert.deepEqual(saved.pending, [])
     assert.deepEqual(saved.ids, ['movie-1'])
   } finally {
@@ -121,27 +121,24 @@ test('BrowseHistoryStore flushKeepalive does not send duplicate beacon while flu
   const originalNavDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
   const originalLocalStorage = globalThis.localStorage
 
-  const storage = new Map()
-  const beacons = []
-  let resolveSync
-  const syncPromise = new Promise(resolve => {
-    resolveSync = resolve
-  })
+  const storage = new Map<string, string>()
+  const beacons: { url: string | URL; blob: Blob }[] = []
+  const { promise: syncPromise, resolve: resolveSync } = Promise.withResolvers<void>()
 
   const mockStorage = {
-    getItem: key => storage.get(key) ?? null,
-    setItem: (key, val) => storage.set(key, val),
-    removeItem: key => storage.delete(key)
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, val: string) => storage.set(key, val),
+    removeItem: (key: string) => storage.delete(key)
   }
-  globalThis.localStorage = mockStorage
-  globalThis.window = {
+  vi.stubGlobal('localStorage', mockStorage)
+  vi.stubGlobal('window', {
     addEventListener: () => {},
     removeEventListener: () => {},
     localStorage: mockStorage
-  }
+  })
   Object.defineProperty(globalThis, 'navigator', {
     value: {
-      sendBeacon: (url, blob) => {
+      sendBeacon: (url: string | URL, blob: Blob) => {
         beacons.push({ url, blob })
         return true
       }
@@ -183,11 +180,14 @@ test('keepalive fallback preserves failed batches and acknowledges only successf
   const originalWindow = globalThis.window
   const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
   const originalFetch = globalThis.fetch
-  const saved = new Map()
-  globalThis.window = {
+  const saved = new Map<string, string>()
+  vi.stubGlobal('window', {
     addEventListener: () => {},
-    localStorage: { getItem: key => saved.get(key), setItem: (key, value) => saved.set(key, value) }
-  }
+    localStorage: {
+      getItem: (key: string) => saved.get(key),
+      setItem: (key: string, value: string) => saved.set(key, value)
+    }
+  })
   Object.defineProperty(globalThis, 'navigator', {
     value: { sendBeacon: () => false },
     configurable: true
@@ -196,7 +196,7 @@ test('keepalive fallback preserves failed batches and acknowledges only successf
     const store = new BrowseHistoryStore({ storageKey: 'test:fallback' })
     store.recordView('first')
     for (const fail of [
-      async () => ({ ok: false }),
+      async () => new Response(null, { status: 500 }),
       async () => {
         throw new Error('offline')
       }
@@ -204,27 +204,25 @@ test('keepalive fallback preserves failed batches and acknowledges only successf
       globalThis.fetch = fail
       await store.flushKeepalive()
       assert.equal(store.getPendingCount(), 1)
-      assert.deepEqual(JSON.parse(saved.get('test:fallback')).pending, ['first'])
+      assert.deepEqual(JSON.parse(saved.get('test:fallback')!).pending, ['first'])
     }
-    let finish
+    const { promise: response, resolve: finish } = Promise.withResolvers<Response>()
     let requests = 0
     globalThis.fetch = () => {
       requests++
-      return new Promise(resolve => {
-        finish = resolve
-      })
+      return response
     }
     const pending = store.flushKeepalive()
     await store.flushKeepalive()
     assert.equal(requests, 1)
     store.recordView('second')
-    finish({ ok: true })
+    finish(new Response())
     await pending
-    assert.deepEqual(JSON.parse(saved.get('test:fallback')).pending, ['second'])
+    assert.deepEqual(JSON.parse(saved.get('test:fallback')!).pending, ['second'])
   } finally {
     globalThis.window = originalWindow
     globalThis.fetch = originalFetch
     if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator)
-    else delete globalThis.navigator
+    else Reflect.deleteProperty(globalThis, 'navigator')
   }
 })

@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
+import type { ScanTask, BatchTask, Task } from '@/api/tasks'
+import type { OfflineSubmission } from '@/api/offline'
+import type { DiffContext } from '@/features/tasks/task-notification-diff'
+import { offlineSubmission } from './fixtures'
 
 import {
   diffTaskNotifications,
@@ -13,7 +17,7 @@ const dummySource = {
 }
 
 test('offline failures gain retry actions when their scan arrives later', () => {
-  const task = {
+  const task = offlineSubmission({
     task_id: 9,
     scan_task_id: 1,
     status: 'done',
@@ -21,8 +25,8 @@ test('offline failures gain retry actions when their scan arrives later', () => 
     processing: false,
     progress: 100,
     error: 'metadata failed'
-  }
-  const context = {
+  })
+  const context: DiffContext = {
     tasks: [],
     activity: { source: dummySource, tasks: [task] },
     waiting: false,
@@ -37,8 +41,8 @@ test('offline failures gain retry actions when their scan arrives later', () => 
   const scan = makeScanTask({ status: 'failed', can_retry: true, offline_task_id: 9 })
   const second = diffTaskNotifications({ ...context, tasks: [scan], previous: first.nextEntries })
   assert.equal(second.actions.length, 1)
-  assert.equal(second.actions[0].type, 'notify_offline')
-  assert.equal(second.actions[0].scan.can_retry, true)
+  assert.ok(second.actions[0]?.type === 'notify_offline')
+  assert.equal(second.actions[0].scan?.can_retry, true)
   const third = diffTaskNotifications({ ...context, tasks: [scan], previous: second.nextEntries })
   assert.equal(third.actions.length, 0)
 })
@@ -54,7 +58,7 @@ for (const kind of ['scan', 'batch', 'offline']) {
             updated_at: '2026-09-28T10:00:00Z',
             ...(kind === 'offline' ? { offline_task_id: 9 } : {})
           })
-    const offline = {
+    const offline: OfflineSubmission = offlineSubmission({
       task_id: 9,
       scan_task_id: failed.id,
       status: 'done',
@@ -62,9 +66,9 @@ for (const kind of ['scan', 'batch', 'offline']) {
       processing: false,
       progress: 100,
       error: 'metadata failed'
-    }
+    })
     const id = kind === 'offline' ? 'offline:9' : `${kind}:${failed.id}`
-    const context = {
+    const context: DiffContext = {
       tasks: [failed],
       activity: { source: dummySource, tasks: kind === 'offline' ? [offline] : [] },
       waiting: false,
@@ -77,12 +81,12 @@ for (const kind of ['scan', 'batch', 'offline']) {
     }
     const first = diffTaskNotifications(context)
     for (const success of [false, true]) {
-      const retried = {
+      const retried: Task = {
         ...failed,
         updated_at: '2026-09-28T10:01:00Z',
         ...(success ? { status: 'done', can_retry: false } : {})
       }
-      const refreshed = {
+      const refreshed: DiffContext = {
         ...context,
         tasks: [retried],
         previous: first.nextEntries,
@@ -94,7 +98,7 @@ for (const kind of ['scan', 'batch', 'offline']) {
       }
       const result = diffTaskNotifications(refreshed)
       assert.equal(result.actions.length, 1)
-      assert.equal(result.actions[0].type, `notify_${kind}`)
+      assert.equal(result.actions[0]!.type, `notify_${kind}`)
       assert.equal(
         diffTaskNotifications({ ...refreshed, previous: result.nextEntries }).actions.length,
         0
@@ -111,12 +115,14 @@ for (const kind of ['scan', 'batch', 'offline']) {
   })
 }
 
-function makeScanTask(overrides = {}) {
+function makeScanTask(overrides: Partial<ScanTask> = {}): ScanTask {
   return {
     id: 1,
     type: 'scan',
     status: 'running',
     progress: 20,
+    created_at: '2026-09-28T09:00:00Z',
+    updated_at: '2026-09-28T09:00:00Z',
     source: dummySource,
     scan: {
       stage: 'scanning',
@@ -131,20 +137,20 @@ function makeScanTask(overrides = {}) {
       removed_files: 0,
       removed_movies: 0,
       metadata_total: 15,
-      metadata_completed: 0,
-      artwork_total: 0,
-      artwork_completed: 0
+      metadata_completed: 0
     },
     ...overrides
   }
 }
 
-function makeBatchTask(overrides = {}) {
+function makeBatchTask(overrides: Partial<BatchTask> = {}): BatchTask {
   return {
     id: 2,
     type: 'subscription_batch',
     status: 'running',
     progress: 50,
+    created_at: '2026-09-28T09:00:00Z',
+    updated_at: '2026-09-28T09:00:00Z',
     batch: {
       total: 10,
       processed: 5,
@@ -193,8 +199,8 @@ test('diffTaskNotifications announces new active tasks and tracks them', () => {
   })
 
   assert.equal(result.actions.length, 2)
-  assert.equal(result.actions[0].type, 'notify_scan')
-  assert.equal(result.actions[1].type, 'notify_batch')
+  assert.equal(result.actions[0]!.type, 'notify_scan')
+  assert.equal(result.actions[1]!.type, 'notify_batch')
   assert.equal(result.dismissIDs.length, 0)
   assert.equal(result.nextEntries.size, 2)
 })
@@ -259,7 +265,7 @@ test('diffTaskNotifications notifies when task status changes to completed and c
   })
 
   assert.equal(second.actions.length, 1)
-  assert.equal(second.actions[0].type, 'notify_scan')
+  assert.equal(second.actions[0]!.type, 'notify_scan')
 
   // Third pass: task is removed from tasks list
   const third = diffTaskNotifications({

@@ -8,18 +8,44 @@ import {
   discoverKeys,
   findCachedMovieCard
 } from '@/api/movie-detail-cache'
+import type { DiscoverMovieDetail } from '@/api/discover'
 import { observeRecommendation } from '@/features/movie-detail/recommendation-visibility'
 
-function movie(id, title = `Title ${id}`) {
-  return { id, code: `ABP-${id}`, title, cover: `https://media.example/${id}.jpg` }
+function movie(id: string, title = `Title ${id}`): DiscoverMovieDetail {
+  return {
+    id,
+    code: `ABP-${id}`,
+    title,
+    cover: `https://media.example/${id}.jpg`,
+    origin_title: title,
+    release_date: '',
+    duration: 0,
+    rating: 0,
+    thumbnail: '',
+    preview_images: [],
+    preview_video: '',
+    magnets_count: 0,
+    has_subtitle: false,
+    has_preview: false,
+    actors: [],
+    tags: [],
+    state: 'not_in_library',
+    release_status: 'unknown',
+    zone: 'censored',
+    actor_movies: [],
+    related_movies: []
+  }
 }
 
 function fixture() {
   const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } })
-  const requests = []
-  const releases = []
+  const requests: ({
+    id: string
+    signal?: AbortSignal
+  } & PromiseWithResolvers<DiscoverMovieDetail>)[] = []
+  const releases: (() => void)[] = []
   const loader = createMovieDetailLoader((id, signal) => {
-    const pending = Promise.withResolvers()
+    const pending = Promise.withResolvers<DiscoverMovieDetail>()
     signal?.addEventListener('abort', () => pending.reject(signal.reason), { once: true })
     requests.push({ id, signal, ...pending })
     return pending.promise
@@ -32,12 +58,12 @@ function fixture() {
     client,
     loader,
     requests,
-    recommend(id) {
+    recommend(id: string) {
       const release = loader.request(client, id)
       releases.push(release)
       return release
     },
-    observe(id, enabled = true) {
+    observe(id: string, enabled = true) {
       const observer = new QueryObserver(client, { ...loader.options(id), enabled })
       observer.subscribe(() => {})
       releases.push(() => observer.destroy())
@@ -69,14 +95,14 @@ test('both recommendation groups share two background slots and cancel unstarted
   leaveThree()
   leaveThree()
   leaveFourFirst()
-  requests[0].resolve(movie('one'))
+  requests[0]!.resolve(movie('one'))
   await setImmediate()
   assert.deepEqual(
     requests.map(request => request.id),
     ['one', 'two', 'four']
   )
-  requests[1].resolve(movie('two'))
-  requests[2].resolve(movie('four'))
+  requests[1]!.resolve(movie('two'))
+  requests[2]!.resolve(movie('four'))
   await setImmediate()
   assert.equal(requests.length, 3)
 })
@@ -101,8 +127,13 @@ test('browsed and searched cards avoid detail requests without populating full-d
     requests.map(request => request.id),
     ['one']
   )
-  const full = { ...browsed, actor_movies: [], related_movies: [], zone: 'censored' }
-  requests[0].resolve(full)
+  const full: DiscoverMovieDetail = {
+    ...browsed,
+    actor_movies: [],
+    related_movies: [],
+    zone: 'censored'
+  }
+  requests[0]!.resolve(full)
   await setImmediate()
   assert.deepEqual(client.getQueryData(discoverKeys.movie('one')), full)
 })
@@ -121,9 +152,9 @@ test('stale card data remains usable while details refresh and unrelated caches 
     ['one']
   )
   assert.equal(findCachedMovieCard(client, 'one'), old)
-  requests[0].resolve(movie('one', 'Updated title'))
+  requests[0]!.resolve(movie('one', 'Updated title'))
   await setImmediate()
-  assert.equal(findCachedMovieCard(client, 'one').title, 'Updated title')
+  assert.equal(findCachedMovieCard(client, 'one')?.title, 'Updated title')
 })
 
 test('queued cards recheck newly available list data before using an upstream slot', async () => {
@@ -133,8 +164,8 @@ test('queued cards recheck newly available list data before using an upstream sl
   recommend('three')
   await setImmediate()
   client.setQueryData(discoverKeys.search({ query: 'ABP-3' }), [movie('three')])
-  requests[0].resolve(movie('one'))
-  requests[1].resolve(movie('two'))
+  requests[0]!.resolve(movie('one'))
+  requests[1]!.resolve(movie('two'))
   await setImmediate()
   assert.deepEqual(
     requests.map(request => request.id),
@@ -163,7 +194,7 @@ test('clicking a queued recommendation bypasses background work and reuses the r
   await setImmediate()
   assert.equal(requests.length, 3)
   const full = { ...movie('four'), actor_movies: [], related_movies: [] }
-  requests[2].resolve(full)
+  requests[2]!.resolve(full)
   await setImmediate()
   assert.deepEqual(detail.getCurrentResult().data, full)
   assert.equal(requests.filter(request => request.id === 'four').length, 1)
@@ -176,10 +207,10 @@ test('a click before visibility loading also survives the observer gap', async (
   card.destroy()
   await setImmediate()
   const detail = observe('one')
-  requests[0].resolve(movie('one'))
+  requests[0]!.resolve(movie('one'))
   await setImmediate()
   assert.equal(requests.length, 1)
-  assert.equal(detail.getCurrentResult().data.title, 'Title one')
+  assert.equal(detail.getCurrentResult().data?.title, 'Title one')
 })
 
 test('a failed card releases its slot and retries only on explicit demand', async () => {
@@ -188,63 +219,64 @@ test('a failed card releases its slot and retries only on explicit demand', asyn
   recommend('two')
   recommend('three')
   await setImmediate()
-  requests[0].reject(new Error('Fixture upstream unavailable'))
+  requests[0]!.reject(new Error('Fixture upstream unavailable'))
   await setImmediate()
   assert.deepEqual(
     requests.map(request => request.id),
     ['one', 'two', 'three']
   )
-  assert.equal(client.getQueryState(discoverKeys.movie('one')).status, 'error')
+  assert.equal(client.getQueryState(discoverKeys.movie('one'))?.status, 'error')
   recommend('one')
   await setImmediate()
   assert.equal(requests.length, 3)
   loader.prefetch(client, 'one')
-  requests[3].resolve(movie('one'))
+  requests[3]!.resolve(movie('one'))
   await setImmediate()
-  assert.equal(client.getQueryState(discoverKeys.movie('one')).status, 'success')
+  assert.equal(client.getQueryState(discoverKeys.movie('one'))?.status, 'success')
 })
 
 test('normal foreground detail requests remain cancelable', async () => {
   const { observe, requests } = fixture()
   const detail = observe('one')
   assert.equal(requests.length, 1)
-  assert.equal(requests[0].signal.aborted, false)
+  assert.equal(requests[0]!.signal?.aborted, false)
   detail.destroy()
-  assert.equal(requests[0].signal.aborted, true)
+  assert.equal(requests[0]!.signal?.aborted, true)
   await setImmediate()
 })
 
 test('brief intersections do not enqueue work and leaving or unmounting releases it', () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-  let observer
-  const original = Object.getOwnPropertyDescriptor(globalThis, 'IntersectionObserver')
-  globalThis.IntersectionObserver = class {
-    constructor(notify, options) {
-      this.notify = notify
-      this.options = options
-      observer = this
+  const observers: MockIntersectionObserver[] = []
+  class MockIntersectionObserver {
+    element?: Element
+    disconnected = false
+    constructor(
+      private notify: (entries: Pick<IntersectionObserverEntry, 'isIntersecting'>[]) => void
+    ) {
+      observers.push(this)
     }
-    observe(element) {
+    observe(element: Element) {
       this.element = element
     }
     disconnect() {
       this.disconnected = true
     }
-    enter(visible) {
+    enter(visible: boolean) {
       this.notify([{ isIntersecting: visible }])
     }
   }
-  onTestFinished(() => {
-    if (original) Object.defineProperty(globalThis, 'IntersectionObserver', original)
-    else delete globalThis.IntersectionObserver
-  })
+  vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
   let requested = 0
   let released = 0
-  const element = {}
+  // The observer only uses element identity; no DOM methods are invoked.
+  const element = {} as Element
   const dispose = observeRecommendation(element, () => {
     requested++
     return () => released++
   })
+  const observer = observers[0]
+  assert.ok(observer)
   assert.equal(observer.element, element)
   observer.enter(true)
   vi.advanceTimersByTime(199)

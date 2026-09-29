@@ -5,15 +5,16 @@ import { ApiError, apiPost, clearLegacyAuthToken, notifyUnauthorized } from '@/a
 
 test('requests use cookies without reading or sending a stored JWT', async () => {
   const originalStorage = globalThis.localStorage
-  globalThis.localStorage = {
+  vi.stubGlobal('localStorage', {
     getItem() {
       throw new Error('must not read credentials')
     }
-  }
+  })
   onTestFinished(() => {
     globalThis.localStorage = originalStorage
   })
-  vi.spyOn(globalThis, 'fetch').mockImplementation(async (path, init) => {
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (_path, init) => {
+    assert.ok(init)
     assert.equal(init.credentials, 'same-origin')
     assert.equal(new Headers(init.headers).has('Authorization'), false)
     assert.equal(new Headers(init.headers).get('Content-Type'), 'application/json')
@@ -31,15 +32,15 @@ test('upgrade removes only the legacy JWT and tolerates blocked storage', () => 
     ['miyabi_jwt_token', 'old-token'],
     ['miyabi-theme', 'dark']
   ])
-  globalThis.localStorage = { removeItem: key => storage.delete(key) }
+  vi.stubGlobal('localStorage', { removeItem: (key: string) => storage.delete(key) })
   clearLegacyAuthToken()
   assert.equal(storage.has('miyabi_jwt_token'), false)
   assert.equal(storage.get('miyabi-theme'), 'dark')
-  globalThis.localStorage = {
+  vi.stubGlobal('localStorage', {
     removeItem() {
       throw new Error('blocked')
     }
-  }
+  })
   assert.doesNotThrow(clearLegacyAuthToken)
 })
 
@@ -117,19 +118,22 @@ test('cancellation while reading an error body remains cancellation', async () =
 })
 
 test('401 with code UNAUTHORIZED dispatches miyabi:unauthorized', async () => {
-  const events = []
+  const events: string[] = []
   const storage = new Map([['miyabi_jwt_token', 'test-token']])
   const originalWindow = globalThis.window
   const originalLocalStorage = globalThis.localStorage
 
-  globalThis.localStorage = {
-    getItem: key => storage.get(key) ?? null,
-    setItem: (key, val) => storage.set(key, val),
-    removeItem: key => storage.delete(key)
-  }
-  globalThis.window = {
-    dispatchEvent: event => events.push(event.type)
-  }
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, val: string) => storage.set(key, val),
+    removeItem: (key: string) => storage.delete(key)
+  })
+  vi.stubGlobal('window', {
+    dispatchEvent: (event: Event) => {
+      events.push(event.type)
+      return true
+    }
+  })
 
   onTestFinished(() => {
     globalThis.window = originalWindow
@@ -155,19 +159,22 @@ test('401 with code UNAUTHORIZED dispatches miyabi:unauthorized', async () => {
 })
 
 test('401 without code UNAUTHORIZED preserves token and does not dispatch miyabi:unauthorized', async () => {
-  const events = []
+  const events: string[] = []
   const storage = new Map([['miyabi_jwt_token', 'test-token']])
   const originalWindow = globalThis.window
   const originalLocalStorage = globalThis.localStorage
 
-  globalThis.localStorage = {
-    getItem: key => storage.get(key) ?? null,
-    setItem: (key, val) => storage.set(key, val),
-    removeItem: key => storage.delete(key)
-  }
-  globalThis.window = {
-    dispatchEvent: event => events.push(event.type)
-  }
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, val: string) => storage.set(key, val),
+    removeItem: (key: string) => storage.delete(key)
+  })
+  vi.stubGlobal('window', {
+    dispatchEvent: (event: Event) => {
+      events.push(event.type)
+      return true
+    }
+  })
 
   onTestFinished(() => {
     globalThis.window = originalWindow
@@ -194,19 +201,22 @@ test('401 without code UNAUTHORIZED preserves token and does not dispatch miyabi
 })
 
 test('notifyUnauthorized dispatches miyabi:unauthorized', () => {
-  const events = []
+  const events: string[] = []
   const storage = new Map([['miyabi_jwt_token', 'test-token']])
   const originalWindow = globalThis.window
   const originalLocalStorage = globalThis.localStorage
 
-  globalThis.localStorage = {
-    getItem: key => storage.get(key) ?? null,
-    setItem: (key, val) => storage.set(key, val),
-    removeItem: key => storage.delete(key)
-  }
-  globalThis.window = {
-    dispatchEvent: event => events.push(event.type)
-  }
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, val: string) => storage.set(key, val),
+    removeItem: (key: string) => storage.delete(key)
+  })
+  vi.stubGlobal('window', {
+    dispatchEvent: (event: Event) => {
+      events.push(event.type)
+      return true
+    }
+  })
 
   try {
     notifyUnauthorized()

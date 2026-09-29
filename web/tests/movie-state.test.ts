@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import { test, onTestFinished } from 'vitest'
 import { setImmediate } from 'node:timers/promises'
-import { QueryClient, QueryObserver } from '@tanstack/react-query'
+import {
+  QueryClient,
+  QueryObserver,
+  type QueryObserverOptions,
+  type QueryObserverResult,
+  type QueryKey
+} from '@tanstack/react-query'
 
 import {
   createMovieStateLoader,
@@ -11,6 +17,9 @@ import {
   resetMovieStates
 } from '@/api/movie-states'
 import { isOfflineTaskActive } from '@/api/offline'
+import type { MovieState } from '@/api/discover'
+import type { MovieIdentity, MovieStateResult } from '@/api/movie-states'
+import { offlineSubmission } from './fixtures'
 
 function queryClient() {
   const client = new QueryClient()
@@ -18,18 +27,23 @@ function queryClient() {
   return client
 }
 
-function observe(client, options) {
+function observe<TQuery, TData = TQuery, TKey extends QueryKey = QueryKey>(
+  client: QueryClient,
+  options: QueryObserverOptions<TQuery, Error, TData, TQuery, TKey>
+) {
   const observer = new QueryObserver(client, options)
   const unsubscribe = observer.subscribe(() => {})
   onTestFinished(unsubscribe)
   return observer
 }
 
-function settled(observer) {
+function settled<TQuery, TData, TKey extends QueryKey>(
+  observer: QueryObserver<TQuery, Error, TData, TQuery, TKey>
+) {
   if (observer.getCurrentResult().fetchStatus === 'idle') {
     return Promise.resolve(observer.getCurrentResult())
   }
-  return new Promise(resolve => {
+  return new Promise<QueryObserverResult<TData, Error>>(resolve => {
     const unsubscribe = observer.subscribe(result => {
       if (result.fetchStatus !== 'idle') return
       unsubscribe()
@@ -51,8 +65,8 @@ test('a grid and detail share movie state and batch requests without fetching ca
   })
   await settled(catalogue)
 
-  let state = 'saving'
-  const requests = []
+  let state: MovieState = 'saving'
+  const requests: MovieIdentity[][] = []
   const load = createMovieStateLoader(async movies => {
     requests.push(movies)
     return movies.map(({ id }) => ({ id, state, ...(state === 'in_library' && { library_id: 7 }) }))
@@ -63,15 +77,15 @@ test('a grid and detail share movie state and batch requests without fetching ca
   const detail = observe(client, movieStateOptions(load, { id: '0', code: 'ABP-0' }))
   await Promise.all([...cards, detail].map(settled))
   assert.equal(requests.length, 1)
-  assert.equal(requests[0].length, 24)
-  assert.deepEqual(detail.getCurrentResult().data, cards[0].getCurrentResult().data)
+  assert.equal(requests[0]!.length, 24)
+  assert.deepEqual(detail.getCurrentResult().data, cards[0]!.getCurrentResult().data)
 
   state = 'in_library'
   await invalidateMovieStates(client)
   assert.equal(requests.length, 2)
   assert.equal(catalogueLoads, 1)
-  assert.equal(client.getQueryState(['discover', 'movie', '0']).isInvalidated, false)
-  for (const view of [cards[0], detail]) {
+  assert.equal(client.getQueryState(['discover', 'movie', '0'])?.isInvalidated, false)
+  for (const view of [cards[0]!, detail]) {
     assert.deepEqual(view.getCurrentResult().data, { state: 'in_library', library_id: 7 })
   }
 
@@ -85,7 +99,7 @@ test('a grid and detail share movie state and batch requests without fetching ca
 
 test('newly opened and previously inactive movies read current state after a missed event', async () => {
   const client = queryClient()
-  let state = 'saving'
+  let state: MovieState = 'saving'
   const load = createMovieStateLoader(async movies => movies.map(({ id }) => ({ id, state })))
   const identity = { id: 'one', code: 'ABP-001', state: 'in_library', library_id: 99 }
   const first = observe(client, movieStateOptions(load, identity))
@@ -109,15 +123,15 @@ test('newly opened and previously inactive movies read current state after a mis
 
 test('switching source clears library state and late responses cannot restore it', async () => {
   const client = queryClient()
-  const requests = []
+  const requests: ({ movies: MovieIdentity[] } & PromiseWithResolvers<MovieStateResult[]>)[] = []
   const load = createMovieStateLoader(movies => {
-    const response = Promise.withResolvers()
+    const response = Promise.withResolvers<MovieStateResult[]>()
     requests.push({ movies, ...response })
     return response.promise
   })
   const observer = observe(client, movieStateOptions(load, { id: 'one', code: 'ABP-001' }))
   await setImmediate()
-  requests[0].resolve([{ id: 'one', state: 'in_library', library_id: 1 }])
+  requests[0]!.resolve([{ id: 'one', state: 'in_library', library_id: 1 }])
   await settled(observer)
 
   const previousRefresh = invalidateMovieStates(client)
@@ -129,16 +143,16 @@ test('switching source clears library state and late responses cannot restore it
   assert.equal(observer.getCurrentResult().isPlaceholderData, true)
   assert.deepEqual(observer.getCurrentResult().data, { state: 'not_in_library' })
 
-  requests[2].resolve([{ id: 'one', state: 'not_in_library' }])
+  requests[2]!.resolve([{ id: 'one', state: 'not_in_library' }])
   await reset
-  requests[1].resolve([{ id: 'one', state: 'in_library', library_id: 1 }])
+  requests[1]!.resolve([{ id: 'one', state: 'in_library', library_id: 1 }])
   await previousRefresh
   await setImmediate()
   assert.deepEqual(client.getQueryData(movieStateKeys.movie('one')), { state: 'not_in_library' })
 })
 
 test('state requests respect the batch limit and skip cancelled subscriptions', async () => {
-  const requests = []
+  const requests: MovieIdentity[][] = []
   const load = createMovieStateLoader(async movies => {
     requests.push(movies)
     return movies.map(({ id }) => ({ id, state: 'not_in_library' }))
@@ -147,18 +161,16 @@ test('state requests respect the batch limit and skip cancelled subscriptions', 
   const aborted = load({ id: 'aborted', code: 'ABP-000' }, controller.signal)
   controller.abort()
   const rejection = assert.rejects(aborted, { name: 'AbortError' })
-  const active = Array.from({ length: 205 }, (_, id) =>
-    load(
-      { id: String(id), code: `ABP-${id}`, title: 'Do not send catalogue metadata' },
-      new AbortController().signal
-    )
-  )
+  const active = Array.from({ length: 205 }, (_, id) => {
+    const identity = { id: String(id), code: `ABP-${id}`, title: 'Do not send catalogue metadata' }
+    return load(identity, new AbortController().signal)
+  })
   await Promise.all([...active, rejection])
   assert.deepEqual(
     requests.map(movies => movies.length),
     [100, 100, 5]
   )
-  assert.deepEqual(Object.keys(requests[0][0]).sort(), ['code', 'id'])
+  assert.deepEqual(Object.keys(requests[0]![0]!).sort(), ['code', 'id'])
 })
 
 test('an incomplete state response fails only the missing movie and can recover on refresh', async () => {
@@ -181,9 +193,24 @@ test('an incomplete state response fails only the missing movie and can recover 
 })
 
 test('playable downloads remain active while background processing continues', () => {
-  assert.equal(isOfflineTaskActive({ phase: 'in_library', processing: true }), true)
-  assert.equal(isOfflineTaskActive({ phase: 'in_library', processing: false }), false)
-  assert.equal(isOfflineTaskActive({ phase: 'downloading', processing: false }), true)
-  assert.equal(isOfflineTaskActive({ phase: 'processing', processing: true }), true)
-  assert.equal(isOfflineTaskActive({ phase: 'available', processing: false }), false)
+  assert.equal(
+    isOfflineTaskActive(offlineSubmission({ phase: 'in_library', processing: true })),
+    true
+  )
+  assert.equal(
+    isOfflineTaskActive(offlineSubmission({ phase: 'in_library', processing: false })),
+    false
+  )
+  assert.equal(
+    isOfflineTaskActive(offlineSubmission({ phase: 'downloading', processing: false })),
+    true
+  )
+  assert.equal(
+    isOfflineTaskActive(offlineSubmission({ phase: 'processing', processing: true })),
+    true
+  )
+  assert.equal(
+    isOfflineTaskActive(offlineSubmission({ phase: 'available', processing: false })),
+    false
+  )
 })
