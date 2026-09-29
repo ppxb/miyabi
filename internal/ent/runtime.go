@@ -284,40 +284,32 @@ func init() {
 	subtitleDescMovieID := subtitleFields[0].Descriptor()
 	// subtitle.MovieIDValidator is a validator for the "movie_id" field. It is called by the builders before save.
 	subtitle.MovieIDValidator = subtitleDescMovieID.Validators[0].(func(int) error)
-	// subtitleDescFileID is the schema descriptor for file_id field.
-	subtitleDescFileID := subtitleFields[1].Descriptor()
-	// subtitle.DefaultFileID holds the default value on creation for the file_id field.
-	subtitle.DefaultFileID = subtitleDescFileID.Default.(string)
-	// subtitleDescPickCode is the schema descriptor for pick_code field.
-	subtitleDescPickCode := subtitleFields[2].Descriptor()
-	// subtitle.DefaultPickCode holds the default value on creation for the pick_code field.
-	subtitle.DefaultPickCode = subtitleDescPickCode.Default.(string)
 	// subtitleDescName is the schema descriptor for name field.
-	subtitleDescName := subtitleFields[3].Descriptor()
+	subtitleDescName := subtitleFields[1].Descriptor()
 	// subtitle.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	subtitle.NameValidator = subtitleDescName.Validators[0].(func(string) error)
 	// subtitleDescLanguage is the schema descriptor for language field.
-	subtitleDescLanguage := subtitleFields[4].Descriptor()
+	subtitleDescLanguage := subtitleFields[2].Descriptor()
 	// subtitle.DefaultLanguage holds the default value on creation for the language field.
 	subtitle.DefaultLanguage = subtitleDescLanguage.Default.(string)
 	// subtitleDescFormat is the schema descriptor for format field.
-	subtitleDescFormat := subtitleFields[5].Descriptor()
+	subtitleDescFormat := subtitleFields[3].Descriptor()
 	// subtitle.DefaultFormat holds the default value on creation for the format field.
 	subtitle.DefaultFormat = subtitleDescFormat.Default.(string)
 	// subtitleDescVersionTag is the schema descriptor for version_tag field.
-	subtitleDescVersionTag := subtitleFields[6].Descriptor()
+	subtitleDescVersionTag := subtitleFields[4].Descriptor()
 	// subtitle.DefaultVersionTag holds the default value on creation for the version_tag field.
 	subtitle.DefaultVersionTag = subtitleDescVersionTag.Default.(string)
 	// subtitleDescSource is the schema descriptor for source field.
-	subtitleDescSource := subtitleFields[7].Descriptor()
+	subtitleDescSource := subtitleFields[5].Descriptor()
 	// subtitle.DefaultSource holds the default value on creation for the source field.
 	subtitle.DefaultSource = subtitleDescSource.Default.(string)
 	// subtitleDescSourceURL is the schema descriptor for source_url field.
-	subtitleDescSourceURL := subtitleFields[8].Descriptor()
+	subtitleDescSourceURL := subtitleFields[6].Descriptor()
 	// subtitle.DefaultSourceURL holds the default value on creation for the source_url field.
 	subtitle.DefaultSourceURL = subtitleDescSourceURL.Default.(string)
 	// subtitleDescStoragePath is the schema descriptor for storage_path field.
-	subtitleDescStoragePath := subtitleFields[9].Descriptor()
+	subtitleDescStoragePath := subtitleFields[7].Descriptor()
 	// subtitle.DefaultStoragePath holds the default value on creation for the storage_path field.
 	subtitle.DefaultStoragePath = subtitleDescStoragePath.Default.(string)
 	tagMixin := schema.Tag{}.Mixin()

@@ -1,15 +1,9 @@
 package subtitle
 
 import (
-	"context"
 	"path/filepath"
 	"strings"
 )
-
-// Reader reads files from the mounted 115 directory.
-type Reader interface {
-	Read(ctx context.Context, pickCode string, limit int64) ([]byte, error)
-}
 
 // Target locates the exported .strm file a movie's subtitles accompany.
 type Target struct {

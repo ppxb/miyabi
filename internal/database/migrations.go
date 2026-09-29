@@ -20,6 +20,7 @@ var migrations = []struct {
 	{"migrate offline downloads", migrateOfflineDownloads},
 	{"migrate metadata snapshots", migrateMetadataSnapshots},
 	{"migrate viewed movies", migrateViewedMovies},
+	{"remove 115 subtitle storage", dropPanSubtitleStorage},
 }
 
 func runMigrations(ctx context.Context, db *sql.DB, through int) error {

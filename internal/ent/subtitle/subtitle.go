@@ -20,10 +20,6 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// FieldMovieID holds the string denoting the movie_id field in the database.
 	FieldMovieID = "movie_id"
-	// FieldFileID holds the string denoting the file_id field in the database.
-	FieldFileID = "file_id"
-	// FieldPickCode holds the string denoting the pick_code field in the database.
-	FieldPickCode = "pick_code"
 	// FieldName holds the string denoting the name field in the database.
 	FieldName = "name"
 	// FieldLanguage holds the string denoting the language field in the database.
@@ -57,8 +53,6 @@ var Columns = []string{
 	FieldCreatedAt,
 	FieldUpdatedAt,
 	FieldMovieID,
-	FieldFileID,
-	FieldPickCode,
 	FieldName,
 	FieldLanguage,
 	FieldFormat,
@@ -87,10 +81,6 @@ var (
 	UpdateDefaultUpdatedAt func() time.Time
 	// MovieIDValidator is a validator for the "movie_id" field. It is called by the builders before save.
 	MovieIDValidator func(int) error
-	// DefaultFileID holds the default value on creation for the "file_id" field.
-	DefaultFileID string
-	// DefaultPickCode holds the default value on creation for the "pick_code" field.
-	DefaultPickCode string
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
 	// DefaultLanguage holds the default value on creation for the "language" field.
@@ -128,16 +118,6 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByMovieID orders the results by the movie_id field.
 func ByMovieID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMovieID, opts...).ToFunc()
-}
-
-// ByFileID orders the results by the file_id field.
-func ByFileID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldFileID, opts...).ToFunc()
-}
-
-// ByPickCode orders the results by the pick_code field.
-func ByPickCode(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldPickCode, opts...).ToFunc()
 }
 
 // ByName orders the results by the name field.

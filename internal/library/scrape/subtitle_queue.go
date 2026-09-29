@@ -11,9 +11,8 @@ import (
 
 // SubtitleTask exports the subtitles of one movie after its artwork and .strm are written.
 type SubtitleTask struct {
-	MovieID     int
-	MetaPayload MetadataPayload
-	Target      subtitlemeta.Target
+	MovieID int
+	Target  subtitlemeta.Target
 }
 
 // SubtitleQueue is a bounded, concurrency-controlled background worker queue for subtitle processing.
@@ -128,7 +127,7 @@ func (q *SubtitleQueue) process(task SubtitleTask) {
 	ctx, cancel := context.WithTimeout(q.ctx, 2*time.Minute)
 	defer cancel()
 
-	written, err := q.service.subtitles.Export(ctx, nil, task.MovieID, task.Target)
+	written, err := q.service.subtitles.Export(ctx, task.MovieID, task.Target)
 	if err != nil {
 		q.logger.WarnContext(ctx, "export subtitles", "code", task.Target.Code, "error", err)
 	}

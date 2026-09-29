@@ -7095,8 +7095,6 @@ type SubtitleMutation struct {
 	id            *int
 	created_at    *time.Time
 	updated_at    *time.Time
-	file_id       *string
-	pick_code     *string
 	name          *string
 	language      *string
 	format        *string
@@ -7316,78 +7314,6 @@ func (m *SubtitleMutation) OldMovieID(ctx context.Context) (v int, err error) {
 // ResetMovieID resets all changes to the "movie_id" field.
 func (m *SubtitleMutation) ResetMovieID() {
 	m.movie = nil
-}
-
-// SetFileID sets the "file_id" field.
-func (m *SubtitleMutation) SetFileID(s string) {
-	m.file_id = &s
-}
-
-// FileID returns the value of the "file_id" field in the mutation.
-func (m *SubtitleMutation) FileID() (r string, exists bool) {
-	v := m.file_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldFileID returns the old "file_id" field's value of the Subtitle entity.
-// If the Subtitle object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SubtitleMutation) OldFileID(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldFileID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldFileID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldFileID: %w", err)
-	}
-	return oldValue.FileID, nil
-}
-
-// ResetFileID resets all changes to the "file_id" field.
-func (m *SubtitleMutation) ResetFileID() {
-	m.file_id = nil
-}
-
-// SetPickCode sets the "pick_code" field.
-func (m *SubtitleMutation) SetPickCode(s string) {
-	m.pick_code = &s
-}
-
-// PickCode returns the value of the "pick_code" field in the mutation.
-func (m *SubtitleMutation) PickCode() (r string, exists bool) {
-	v := m.pick_code
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldPickCode returns the old "pick_code" field's value of the Subtitle entity.
-// If the Subtitle object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SubtitleMutation) OldPickCode(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldPickCode is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldPickCode requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldPickCode: %w", err)
-	}
-	return oldValue.PickCode, nil
-}
-
-// ResetPickCode resets all changes to the "pick_code" field.
-func (m *SubtitleMutation) ResetPickCode() {
-	m.pick_code = nil
 }
 
 // SetName sets the "name" field.
@@ -7703,7 +7629,7 @@ func (m *SubtitleMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SubtitleMutation) Fields() []string {
-	fields := make([]string, 0, 12)
+	fields := make([]string, 0, 10)
 	if m.created_at != nil {
 		fields = append(fields, subtitle.FieldCreatedAt)
 	}
@@ -7712,12 +7638,6 @@ func (m *SubtitleMutation) Fields() []string {
 	}
 	if m.movie != nil {
 		fields = append(fields, subtitle.FieldMovieID)
-	}
-	if m.file_id != nil {
-		fields = append(fields, subtitle.FieldFileID)
-	}
-	if m.pick_code != nil {
-		fields = append(fields, subtitle.FieldPickCode)
 	}
 	if m.name != nil {
 		fields = append(fields, subtitle.FieldName)
@@ -7754,10 +7674,6 @@ func (m *SubtitleMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdatedAt()
 	case subtitle.FieldMovieID:
 		return m.MovieID()
-	case subtitle.FieldFileID:
-		return m.FileID()
-	case subtitle.FieldPickCode:
-		return m.PickCode()
 	case subtitle.FieldName:
 		return m.Name()
 	case subtitle.FieldLanguage:
@@ -7787,10 +7703,6 @@ func (m *SubtitleMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldUpdatedAt(ctx)
 	case subtitle.FieldMovieID:
 		return m.OldMovieID(ctx)
-	case subtitle.FieldFileID:
-		return m.OldFileID(ctx)
-	case subtitle.FieldPickCode:
-		return m.OldPickCode(ctx)
 	case subtitle.FieldName:
 		return m.OldName(ctx)
 	case subtitle.FieldLanguage:
@@ -7834,20 +7746,6 @@ func (m *SubtitleMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMovieID(v)
-		return nil
-	case subtitle.FieldFileID:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetFileID(v)
-		return nil
-	case subtitle.FieldPickCode:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetPickCode(v)
 		return nil
 	case subtitle.FieldName:
 		v, ok := value.(string)
@@ -7958,12 +7856,6 @@ func (m *SubtitleMutation) ResetField(name string) error {
 		return nil
 	case subtitle.FieldMovieID:
 		m.ResetMovieID()
-		return nil
-	case subtitle.FieldFileID:
-		m.ResetFileID()
-		return nil
-	case subtitle.FieldPickCode:
-		m.ResetPickCode()
 		return nil
 	case subtitle.FieldName:
 		m.ResetName()

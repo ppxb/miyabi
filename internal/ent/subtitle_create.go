@@ -57,34 +57,6 @@ func (_c *SubtitleCreate) SetMovieID(v int) *SubtitleCreate {
 	return _c
 }
 
-// SetFileID sets the "file_id" field.
-func (_c *SubtitleCreate) SetFileID(v string) *SubtitleCreate {
-	_c.mutation.SetFileID(v)
-	return _c
-}
-
-// SetNillableFileID sets the "file_id" field if the given value is not nil.
-func (_c *SubtitleCreate) SetNillableFileID(v *string) *SubtitleCreate {
-	if v != nil {
-		_c.SetFileID(*v)
-	}
-	return _c
-}
-
-// SetPickCode sets the "pick_code" field.
-func (_c *SubtitleCreate) SetPickCode(v string) *SubtitleCreate {
-	_c.mutation.SetPickCode(v)
-	return _c
-}
-
-// SetNillablePickCode sets the "pick_code" field if the given value is not nil.
-func (_c *SubtitleCreate) SetNillablePickCode(v *string) *SubtitleCreate {
-	if v != nil {
-		_c.SetPickCode(*v)
-	}
-	return _c
-}
-
 // SetName sets the "name" field.
 func (_c *SubtitleCreate) SetName(v string) *SubtitleCreate {
 	_c.mutation.SetName(v)
@@ -223,14 +195,6 @@ func (_c *SubtitleCreate) defaults() {
 		v := subtitle.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
-	if _, ok := _c.mutation.FileID(); !ok {
-		v := subtitle.DefaultFileID
-		_c.mutation.SetFileID(v)
-	}
-	if _, ok := _c.mutation.PickCode(); !ok {
-		v := subtitle.DefaultPickCode
-		_c.mutation.SetPickCode(v)
-	}
 	if _, ok := _c.mutation.Language(); !ok {
 		v := subtitle.DefaultLanguage
 		_c.mutation.SetLanguage(v)
@@ -272,12 +236,6 @@ func (_c *SubtitleCreate) check() error {
 		if err := subtitle.MovieIDValidator(v); err != nil {
 			return &ValidationError{Name: "movie_id", err: fmt.Errorf(`ent: validator failed for field "Subtitle.movie_id": %w`, err)}
 		}
-	}
-	if _, ok := _c.mutation.FileID(); !ok {
-		return &ValidationError{Name: "file_id", err: errors.New(`ent: missing required field "Subtitle.file_id"`)}
-	}
-	if _, ok := _c.mutation.PickCode(); !ok {
-		return &ValidationError{Name: "pick_code", err: errors.New(`ent: missing required field "Subtitle.pick_code"`)}
 	}
 	if _, ok := _c.mutation.Name(); !ok {
 		return &ValidationError{Name: "name", err: errors.New(`ent: missing required field "Subtitle.name"`)}
@@ -342,14 +300,6 @@ func (_c *SubtitleCreate) createSpec() (*Subtitle, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(subtitle.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
-	}
-	if value, ok := _c.mutation.FileID(); ok {
-		_spec.SetField(subtitle.FieldFileID, field.TypeString, value)
-		_node.FileID = value
-	}
-	if value, ok := _c.mutation.PickCode(); ok {
-		_spec.SetField(subtitle.FieldPickCode, field.TypeString, value)
-		_node.PickCode = value
 	}
 	if value, ok := _c.mutation.Name(); ok {
 		_spec.SetField(subtitle.FieldName, field.TypeString, value)
@@ -469,30 +419,6 @@ func (u *SubtitleUpsert) SetMovieID(v int) *SubtitleUpsert {
 // UpdateMovieID sets the "movie_id" field to the value that was provided on create.
 func (u *SubtitleUpsert) UpdateMovieID() *SubtitleUpsert {
 	u.SetExcluded(subtitle.FieldMovieID)
-	return u
-}
-
-// SetFileID sets the "file_id" field.
-func (u *SubtitleUpsert) SetFileID(v string) *SubtitleUpsert {
-	u.Set(subtitle.FieldFileID, v)
-	return u
-}
-
-// UpdateFileID sets the "file_id" field to the value that was provided on create.
-func (u *SubtitleUpsert) UpdateFileID() *SubtitleUpsert {
-	u.SetExcluded(subtitle.FieldFileID)
-	return u
-}
-
-// SetPickCode sets the "pick_code" field.
-func (u *SubtitleUpsert) SetPickCode(v string) *SubtitleUpsert {
-	u.Set(subtitle.FieldPickCode, v)
-	return u
-}
-
-// UpdatePickCode sets the "pick_code" field to the value that was provided on create.
-func (u *SubtitleUpsert) UpdatePickCode() *SubtitleUpsert {
-	u.SetExcluded(subtitle.FieldPickCode)
 	return u
 }
 
@@ -650,34 +576,6 @@ func (u *SubtitleUpsertOne) SetMovieID(v int) *SubtitleUpsertOne {
 func (u *SubtitleUpsertOne) UpdateMovieID() *SubtitleUpsertOne {
 	return u.Update(func(s *SubtitleUpsert) {
 		s.UpdateMovieID()
-	})
-}
-
-// SetFileID sets the "file_id" field.
-func (u *SubtitleUpsertOne) SetFileID(v string) *SubtitleUpsertOne {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.SetFileID(v)
-	})
-}
-
-// UpdateFileID sets the "file_id" field to the value that was provided on create.
-func (u *SubtitleUpsertOne) UpdateFileID() *SubtitleUpsertOne {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.UpdateFileID()
-	})
-}
-
-// SetPickCode sets the "pick_code" field.
-func (u *SubtitleUpsertOne) SetPickCode(v string) *SubtitleUpsertOne {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.SetPickCode(v)
-	})
-}
-
-// UpdatePickCode sets the "pick_code" field to the value that was provided on create.
-func (u *SubtitleUpsertOne) UpdatePickCode() *SubtitleUpsertOne {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.UpdatePickCode()
 	})
 }
 
@@ -1015,34 +913,6 @@ func (u *SubtitleUpsertBulk) SetMovieID(v int) *SubtitleUpsertBulk {
 func (u *SubtitleUpsertBulk) UpdateMovieID() *SubtitleUpsertBulk {
 	return u.Update(func(s *SubtitleUpsert) {
 		s.UpdateMovieID()
-	})
-}
-
-// SetFileID sets the "file_id" field.
-func (u *SubtitleUpsertBulk) SetFileID(v string) *SubtitleUpsertBulk {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.SetFileID(v)
-	})
-}
-
-// UpdateFileID sets the "file_id" field to the value that was provided on create.
-func (u *SubtitleUpsertBulk) UpdateFileID() *SubtitleUpsertBulk {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.UpdateFileID()
-	})
-}
-
-// SetPickCode sets the "pick_code" field.
-func (u *SubtitleUpsertBulk) SetPickCode(v string) *SubtitleUpsertBulk {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.SetPickCode(v)
-	})
-}
-
-// UpdatePickCode sets the "pick_code" field to the value that was provided on create.
-func (u *SubtitleUpsertBulk) UpdatePickCode() *SubtitleUpsertBulk {
-	return u.Update(func(s *SubtitleUpsert) {
-		s.UpdatePickCode()
 	})
 }
 

@@ -200,8 +200,7 @@ func (service *Service) subtitleTask(input MetadataPayload, videos []pan.File) *
 		return nil
 	}
 	return &SubtitleTask{
-		MovieID:     input.MovieID,
-		MetaPayload: input,
+		MovieID: input.MovieID,
 		Target: subtitlemeta.Target{
 			Dir:           EmbyMovieDir(service.exportConfig().EmbyDir, input.Code),
 			Stem:          nfo.FileStem(input.Code),

@@ -24,10 +24,6 @@ type Subtitle struct {
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 	// MovieID holds the value of the "movie_id" field.
 	MovieID int `json:"movie_id,omitempty"`
-	// FileID holds the value of the "file_id" field.
-	FileID string `json:"file_id,omitempty"`
-	// PickCode holds the value of the "pick_code" field.
-	PickCode string `json:"pick_code,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
 	// Language holds the value of the "language" field.
@@ -75,7 +71,7 @@ func (*Subtitle) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case subtitle.FieldID, subtitle.FieldMovieID:
 			values[i] = new(sql.NullInt64)
-		case subtitle.FieldFileID, subtitle.FieldPickCode, subtitle.FieldName, subtitle.FieldLanguage, subtitle.FieldFormat, subtitle.FieldVersionTag, subtitle.FieldSource, subtitle.FieldSourceURL, subtitle.FieldStoragePath:
+		case subtitle.FieldName, subtitle.FieldLanguage, subtitle.FieldFormat, subtitle.FieldVersionTag, subtitle.FieldSource, subtitle.FieldSourceURL, subtitle.FieldStoragePath:
 			values[i] = new(sql.NullString)
 		case subtitle.FieldCreatedAt, subtitle.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -117,18 +113,6 @@ func (_m *Subtitle) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field movie_id", values[i])
 			} else if value.Valid {
 				_m.MovieID = int(value.Int64)
-			}
-		case subtitle.FieldFileID:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field file_id", values[i])
-			} else if value.Valid {
-				_m.FileID = value.String
-			}
-		case subtitle.FieldPickCode:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field pick_code", values[i])
-			} else if value.Valid {
-				_m.PickCode = value.String
 			}
 		case subtitle.FieldName:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -221,12 +205,6 @@ func (_m *Subtitle) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("movie_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.MovieID))
-	builder.WriteString(", ")
-	builder.WriteString("file_id=")
-	builder.WriteString(_m.FileID)
-	builder.WriteString(", ")
-	builder.WriteString("pick_code=")
-	builder.WriteString(_m.PickCode)
 	builder.WriteString(", ")
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)

@@ -49,34 +49,6 @@ func (_u *SubtitleUpdate) SetNillableMovieID(v *int) *SubtitleUpdate {
 	return _u
 }
 
-// SetFileID sets the "file_id" field.
-func (_u *SubtitleUpdate) SetFileID(v string) *SubtitleUpdate {
-	_u.mutation.SetFileID(v)
-	return _u
-}
-
-// SetNillableFileID sets the "file_id" field if the given value is not nil.
-func (_u *SubtitleUpdate) SetNillableFileID(v *string) *SubtitleUpdate {
-	if v != nil {
-		_u.SetFileID(*v)
-	}
-	return _u
-}
-
-// SetPickCode sets the "pick_code" field.
-func (_u *SubtitleUpdate) SetPickCode(v string) *SubtitleUpdate {
-	_u.mutation.SetPickCode(v)
-	return _u
-}
-
-// SetNillablePickCode sets the "pick_code" field if the given value is not nil.
-func (_u *SubtitleUpdate) SetNillablePickCode(v *string) *SubtitleUpdate {
-	if v != nil {
-		_u.SetPickCode(*v)
-	}
-	return _u
-}
-
 // SetName sets the "name" field.
 func (_u *SubtitleUpdate) SetName(v string) *SubtitleUpdate {
 	_u.mutation.SetName(v)
@@ -260,12 +232,6 @@ func (_u *SubtitleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(subtitle.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if value, ok := _u.mutation.FileID(); ok {
-		_spec.SetField(subtitle.FieldFileID, field.TypeString, value)
-	}
-	if value, ok := _u.mutation.PickCode(); ok {
-		_spec.SetField(subtitle.FieldPickCode, field.TypeString, value)
-	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(subtitle.FieldName, field.TypeString, value)
 	}
@@ -352,34 +318,6 @@ func (_u *SubtitleUpdateOne) SetMovieID(v int) *SubtitleUpdateOne {
 func (_u *SubtitleUpdateOne) SetNillableMovieID(v *int) *SubtitleUpdateOne {
 	if v != nil {
 		_u.SetMovieID(*v)
-	}
-	return _u
-}
-
-// SetFileID sets the "file_id" field.
-func (_u *SubtitleUpdateOne) SetFileID(v string) *SubtitleUpdateOne {
-	_u.mutation.SetFileID(v)
-	return _u
-}
-
-// SetNillableFileID sets the "file_id" field if the given value is not nil.
-func (_u *SubtitleUpdateOne) SetNillableFileID(v *string) *SubtitleUpdateOne {
-	if v != nil {
-		_u.SetFileID(*v)
-	}
-	return _u
-}
-
-// SetPickCode sets the "pick_code" field.
-func (_u *SubtitleUpdateOne) SetPickCode(v string) *SubtitleUpdateOne {
-	_u.mutation.SetPickCode(v)
-	return _u
-}
-
-// SetNillablePickCode sets the "pick_code" field if the given value is not nil.
-func (_u *SubtitleUpdateOne) SetNillablePickCode(v *string) *SubtitleUpdateOne {
-	if v != nil {
-		_u.SetPickCode(*v)
 	}
 	return _u
 }
@@ -596,12 +534,6 @@ func (_u *SubtitleUpdateOne) sqlSave(ctx context.Context) (_node *Subtitle, err 
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(subtitle.FieldUpdatedAt, field.TypeTime, value)
-	}
-	if value, ok := _u.mutation.FileID(); ok {
-		_spec.SetField(subtitle.FieldFileID, field.TypeString, value)
-	}
-	if value, ok := _u.mutation.PickCode(); ok {
-		_spec.SetField(subtitle.FieldPickCode, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(subtitle.FieldName, field.TypeString, value)

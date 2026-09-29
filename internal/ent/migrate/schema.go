@@ -199,8 +199,6 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "file_id", Type: field.TypeString, Default: ""},
-		{Name: "pick_code", Type: field.TypeString, Default: ""},
 		{Name: "name", Type: field.TypeString},
 		{Name: "language", Type: field.TypeString, Default: "zh-CN"},
 		{Name: "format", Type: field.TypeString, Default: "srt"},
@@ -218,7 +216,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "subtitles_movies_subtitles",
-				Columns:    []*schema.Column{SubtitlesColumns[12]},
+				Columns:    []*schema.Column{SubtitlesColumns[10]},
 				RefColumns: []*schema.Column{MoviesColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -227,12 +225,7 @@ var (
 			{
 				Name:    "subtitle_movie_id",
 				Unique:  false,
-				Columns: []*schema.Column{SubtitlesColumns[12]},
-			},
-			{
-				Name:    "subtitle_file_id",
-				Unique:  false,
-				Columns: []*schema.Column{SubtitlesColumns[3]},
+				Columns: []*schema.Column{SubtitlesColumns[10]},
 			},
 		},
 	}

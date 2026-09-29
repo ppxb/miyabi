@@ -7,8 +7,7 @@ import (
 	"entgo.io/ent/schema/index"
 )
 
-// Subtitle is a subtitle track of a movie. Tracks found beside 115 videos
-// keep their file_id and pick_code; online tracks keep their source_url.
+// Subtitle is an online subtitle track of a movie.
 // storage_path is the file exported beside the movie's .strm, empty until exported.
 type Subtitle struct {
 	ent.Schema
@@ -22,10 +21,6 @@ func (Subtitle) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int("movie_id").
 			Positive(),
-		field.String("file_id").
-			Default(""),
-		field.String("pick_code").
-			Default(""),
 		field.String("name").
 			NotEmpty(),
 		field.String("language").
@@ -56,6 +51,5 @@ func (Subtitle) Edges() []ent.Edge {
 func (Subtitle) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("movie_id"),
-		index.Fields("file_id"),
 	}
 }

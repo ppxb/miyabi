@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：160 条待处理，19 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：156 条待处理，23 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -101,10 +101,14 @@
 ## 五、冗余 / 死代码
 
 ### 115 字幕删除（d6a8a0c）残留
-- [ ] **78.** `internal/library/scan/subtitle.go` 已删除，但 `scan/subtitle_test.go` 仍保留旧命名测试。检查它们现在调用的生产路径和有效断言；失去测试目标的用例可删除，仍覆盖字幕匹配行为的用例应重命名或迁移。与第 239 条一起处理。
-- [ ] **79.** `internal/subtitle/service.go`：`SourcePan`（:25）、`Reader` 接口（:32）、`exportPanTrack`（:114）、`IndexPanTrack`（:209）；`Export` 的 `reader` 参数恒为 nil（`scrape/subtitle_queue.go:131`），`scrape/scrape.go:50` 的 `SubtitleExporter` 签名仍带 `subtitle.Reader`；:69-70 注释 "Subtitles stored with the 115 videos come first" 过时；历史 `pick_code != ''` 行永远 pending → 一次性 `DELETE`。
-- [ ] **80.** `internal/ent/schema/subtitle.go:10-12,25-28,59`：`file_id`、`pick_code` 字段、`index.Fields("file_id")` 及过时注释 → 删除并重新生成 ent。
-- [ ] **81.** `internal/library/scrape/subtitle_queue.go:15` `SubtitleTask.MetaPayload` 只写不读。
+- [x] **78.** `internal/library/scan/subtitle.go` 已删除，但 `scan/subtitle_test.go` 仍保留旧命名测试。检查它们现在调用的生产路径和有效断言；失去测试目标的用例可删除，仍覆盖字幕匹配行为的用例应重命名或迁移。与第 239 条一起处理。
+  - 已完成：确认 IndexDirectorySubtitles 仅存在于测试专用实现，删除 scan/subtitle_test.go 与 subtitle_fixture_test.go；生产番号识别和影片匹配测试保留。go test ./... 通过，待整体复查。
+- [x] **79.** `internal/subtitle/service.go`：`SourcePan`（:25）、`Reader` 接口（:32）、`exportPanTrack`（:114）、`IndexPanTrack`（:209）；`Export` 的 `reader` 参数恒为 nil（`scrape/subtitle_queue.go:131`），`scrape/scrape.go:50` 的 `SubtitleExporter` 签名仍带 `subtitle.Reader`；:69-70 注释 "Subtitles stored with the 115 videos come first" 过时；历史 `pick_code != ''` 行永远 pending → 一次性 `DELETE`。
+  - 已完成：删除 SourcePan、IndexPanTrack、exportPanTrack、domain/subtitle.Reader 及 Export 的 reader 参数；在线字幕继续写入 Emby 目录。原描述修正：已导出且文件存在的旧记录原本可复用，未导出的记录才会跳过。现按停用 115 字幕的决定由版本迁移删除旧记录，不删除磁盘文件。在线字幕测试覆盖去重、数量限制、重复导出无下载、缺失重下载及硬字幕跳过；go test ./... 通过，待整体复查。
+- [x] **80.** `internal/ent/schema/subtitle.go:10-12,25-28,59`：`file_id`、`pick_code` 字段、`index.Fields("file_id")` 及过时注释 → 删除并重新生成 ent。
+  - 已完成：移除字幕 file_id、pick_code 和 file_id 索引并重新生成 Ent；追加第 6 个版本迁移，清理 source=115 或旧文件标识非空的记录和旧列/索引，不重排历史迁移。升级及再次打开测试验证在线记录与本地文件保留，go test ./... 通过；未在用户实际数据库执行，待整体复查。
+- [x] **81.** `internal/library/scrape/subtitle_queue.go:15` `SubtitleTask.MetaPayload` 只写不读。
+  - 已完成：删除 SubtitleTask.MetaPayload 及入队赋值，任务只携带 MovieID 和 Target；go test ./... 通过，待整体复查。
 
 ### 旧快照 / sidecar 残留
 - [ ] **82.** `internal/library/scrape/cover.go:126-128` 固定 `LocalExport: true`，而 `snapshot.go:124` `Matches` 此时直接 `return true` → `DirectorySnapshot`、`NewDirectorySnapshot`、`Sidecar`、`ObservedDirectory.Sidecar`、`Matches` 比对逻辑，以及 `walker.go:106` 全库 `DirectoryObservations`（每文件名 + SHA1 常驻内存）只服务老数据；每次 cover 仍计算 `nfo.Encode` + 两次 SHA1；`writeSidecars` 名不副实。
@@ -326,4 +330,5 @@
 
 - [ ] **238.** `internal/codeid/prototype_test.go` 以 `prototypeResolve` / `prototypeMatch` 重写一遍 `javdb.ResolveMovieID`，`prototypeQueries` 已与生产 `Queries` 分歧，文件头注释过时——测的是副本而非生产代码 → 迁到 javdb 包基于 fixture transport 测真实实现；`corpus_test.go:18` 与 `random_corpus_test.go:12` 语料加载器几乎相同 → `loadSamples(t, file, n)`。
 - [ ] **239.** 随生产路径清理重新评估相关测试：scan/subtitle_test.go 的旧命名与断言、scrape/dir_cache_test.go、subtitle 中 115 导出路径等。UploadSidecar 已删除；snapshot_test.go 已覆盖 movie 快照，不应按旧快照测试整体删除。保留断点恢复、快照失效、历史封面任务 JSON 兼容等有效回归测试，按当前生产调用逐项决定删除或迁移。
+  - 第 78–80 项已删除旧 115 字幕扫描测试和专用实现，将混合导出测试改为在线字幕测试，并增加旧字幕存储迁移测试；这部分不再作为待办，其余测试归属与覆盖评估保留。
 - [ ] **240.** 复核低收益或重复测试：runtime 常量、简单 domain helper、任务容器基本操作、健康检查重复路径，以及 app 包中实际测试 library/scrape 的用例归属。pan 客户端测试已增加真实请求路径覆盖，不能沿用“未测 New”的旧结论；前端测试已迁移为 `.test.ts`，pan-login-poll.test.ts 的失败预算与恢复行为应保留，是否缩减需按实际覆盖收益判断。

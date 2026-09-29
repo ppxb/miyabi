@@ -83,8 +83,8 @@ func TestPlayerStorageIsDroppedWithoutChangingLibraryRecords(t *testing.T) {
 		}
 	})
 	film := store.Client.Movie.Create().SetCode("ABP-001").SetTitle("Existing title").SaveX(ctx)
-	track := store.Client.Subtitle.Create().SetMovie(film).SetName("ABP-001.zh-CN.srt").SetSource("115").
-		SetFileID("sub").SetPickCode("pick").SaveX(ctx)
+	track := store.Client.Subtitle.Create().SetMovie(film).SetName("ABP-001.zh-CN.srt").SetSource("SubtitleCat").
+		SetSourceURL("https://example.com/subtitle").SaveX(ctx)
 	// Installations with the in-app player stored watch state and player-only subtitle settings.
 	for _, statement := range []string{
 		"PRAGMA user_version = 0",
@@ -119,7 +119,7 @@ func TestPlayerStorageIsDroppedWithoutChangingLibraryRecords(t *testing.T) {
 	if got := store.Client.Movie.GetX(ctx, film.ID); got.Title != film.Title {
 		t.Fatalf("migration changed movie metadata: %+v", got)
 	}
-	if got := store.Client.Subtitle.GetX(ctx, track.ID); got.PickCode != "pick" || got.Name != track.Name {
+	if got := store.Client.Subtitle.GetX(ctx, track.ID); got.SourceURL != track.SourceURL || got.Name != track.Name {
 		t.Fatalf("migration changed a subtitle track: %+v", got)
 	}
 	// New tracks no longer supply the dropped NOT NULL columns.

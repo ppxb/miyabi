@@ -14,7 +14,6 @@ import (
 	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
-	"github.com/ppxb/miyabi/internal/pan"
 )
 
 const (
@@ -29,12 +28,6 @@ func (fixedProvider) Name() string { return "fixture" }
 
 func (provider fixedProvider) Search(context.Context, string) ([]Candidate, error) {
 	return provider, nil
-}
-
-type panReader map[string]string
-
-func (reader panReader) Read(_ context.Context, pickCode string, _ int64) ([]byte, error) {
-	return []byte(reader[pickCode]), nil
 }
 
 type subtitleTransport func(*http.Request) (*http.Response, error)
@@ -79,9 +72,9 @@ func exportedFiles(t *testing.T, dir string) []string {
 	return names
 }
 
-func TestExportWritesPanSubtitlesThenOnlineSubtitlesOfOtherKinds(t *testing.T) {
+func TestExportWritesDistinctOnlineSubtitlesAndReusesExports(t *testing.T) {
 	service, db, movieID, target := exportFixture(t, map[string]string{
-		"/same-kind.srt":   simplifiedSRT + "different upload\n",
+		"/same-kind.srt":   simplifiedSRT,
 		"/traditional.srt": traditionalSRT,
 		"/duplicate.srt":   traditionalSRT,
 		"/styled.ass":      simplifiedASS,
@@ -94,22 +87,11 @@ func TestExportWritesPanSubtitlesThenOnlineSubtitlesOfOtherKinds(t *testing.T) {
 		Candidate{Name: "ABP-123.vtt", URL: "/extra.vtt", Format: "vtt", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard},
 	)
 	ctx := t.Context()
-	tx, err := db.Tx(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := IndexPanTrack(ctx, tx, movieID, pan.File{ID: "sub", PickCode: "pick", Name: "ABP-123.srt"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
-
-	written, err := service.Export(ctx, panReader{"pick": simplifiedSRT}, movieID, target)
+	written, err := service.Export(ctx, movieID, target)
 	if err != nil || written != MaxTracks {
 		t.Fatalf("Export = %d, %v", written, err)
 	}
-	// The 115 subtitle claims zh-CN SRT, so the online SRT of that kind is skipped.
+	// The first online subtitle claims zh-CN SRT.
 	// The unlabelled download is detected as Traditional; its byte-identical copy is skipped.
 	want := []string{"ABP-123.zh-CN.ass", "ABP-123.zh-CN.srt", "ABP-123.zh-TW.srt"}
 	if got := exportedFiles(t, target.Dir); strings.Join(got, ",") != strings.Join(want, ",") {
@@ -117,18 +99,18 @@ func TestExportWritesPanSubtitlesThenOnlineSubtitlesOfOtherKinds(t *testing.T) {
 	}
 	body, err := os.ReadFile(filepath.Join(target.Dir, "ABP-123.zh-CN.srt"))
 	if err != nil || string(body) != "\uFEFF"+simplifiedSRT {
-		t.Fatalf("115 subtitle was not exported as UTF-8: %q, %v", body, err)
+		t.Fatalf("online subtitle was not exported as UTF-8: %q, %v", body, err)
 	}
-	pan := db.Subtitle.Query().Where(subtitle.FileIDEQ("sub")).OnlyX(ctx)
-	if pan.StoragePath != filepath.Join(target.Dir, "ABP-123.zh-CN.srt") || pan.Source != SourcePan {
-		t.Fatalf("115 subtitle record = %+v", pan)
-	}
-	if count := db.Subtitle.Query().Where(subtitle.SourceURLNEQ("")).CountX(ctx); count != 2 {
+	if count := db.Subtitle.Query().Where(subtitle.SourceURLNEQ("")).CountX(ctx); count != MaxTracks {
 		t.Fatalf("online subtitle records = %d", count)
 	}
 
 	// A second export finds every kind in place and downloads nothing.
-	if written, err := service.Export(ctx, panReader{}, movieID, target); err != nil || written != 0 {
+	service.finder.client.Transport = subtitleTransport(func(*http.Request) (*http.Response, error) {
+		t.Fatal("repeated export downloaded an existing subtitle")
+		return nil, nil
+	})
+	if written, err := service.Export(ctx, movieID, target); err != nil || written != 0 {
 		t.Fatalf("repeat Export = %d, %v", written, err)
 	}
 }
@@ -137,14 +119,14 @@ func TestExportReplacesRemovedOnlineSubtitles(t *testing.T) {
 	service, db, movieID, target := exportFixture(t, map[string]string{"/first.srt": simplifiedSRT},
 		Candidate{Name: "ABP-123.chs.srt", URL: "/first.srt", Format: "srt", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard})
 	ctx := t.Context()
-	if written, err := service.Export(ctx, panReader{}, movieID, target); err != nil || written != 1 {
+	if written, err := service.Export(ctx, movieID, target); err != nil || written != 1 {
 		t.Fatalf("Export = %d, %v", written, err)
 	}
 	path := filepath.Join(target.Dir, "ABP-123.zh-CN.srt")
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	if written, err := service.Export(ctx, panReader{}, movieID, target); err != nil || written != 1 {
+	if written, err := service.Export(ctx, movieID, target); err != nil || written != 1 {
 		t.Fatalf("Export after removal = %d, %v", written, err)
 	}
 	if !fileExists(path) || db.Subtitle.Query().CountX(ctx) != 1 {
@@ -156,7 +138,7 @@ func TestExportSkipsOnlineSearchForHardSubtitledVideos(t *testing.T) {
 	service, db, movieID, target := exportFixture(t, map[string]string{"/first.srt": simplifiedSRT},
 		Candidate{Name: "ABP-123.chs.srt", URL: "/first.srt", Format: "srt", Language: subtitlemeta.LangSimplifiedChinese, Version: subtitlemeta.VersionStandard})
 	target.HardSubtitled = true
-	if written, err := service.Export(t.Context(), panReader{}, movieID, target); err != nil || written != 0 {
+	if written, err := service.Export(t.Context(), movieID, target); err != nil || written != 0 {
 		t.Fatalf("Export = %d, %v", written, err)
 	}
 	if db.Subtitle.Query().CountX(t.Context()) != 0 {
@@ -202,7 +184,7 @@ func TestExportDeletesOrphanPendingSubtitles(t *testing.T) {
 		SetStoragePath(filepath.Join(target.Dir, "non-existent.srt")).
 		SaveX(ctx)
 
-	if _, err := service.Export(ctx, panReader{}, movieID, target); err != nil {
+	if _, err := service.Export(ctx, movieID, target); err != nil {
 		t.Fatalf("Export = %v", err)
 	}
 

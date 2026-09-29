@@ -48,7 +48,7 @@ type Notifier interface {
 
 // SubtitleExporter writes a movie's subtitles beside its exported .strm file.
 type SubtitleExporter interface {
-	Export(ctx context.Context, reader subtitlemeta.Reader, movieID int, target subtitlemeta.Target) (int, error)
+	Export(ctx context.Context, movieID int, target subtitlemeta.Target) (int, error)
 }
 
 const defaultDirCacheTTL = 45 * time.Second
