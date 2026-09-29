@@ -1,9 +1,11 @@
 package gfriends
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,6 +25,48 @@ func treeResponse(body string) *http.Response {
 
 const testTree = `{"Content":{"S":{"Actor.jpg":"avatar.jpg?t=1"}}}`
 
+func TestCacheWriteFailureKeepsDownloadedIndex(t *testing.T) {
+	for _, directoryFailure := range []bool{true, false} {
+		name := "write index"
+		if directoryFailure {
+			name = "create directory"
+		}
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			wantLog := "write gfriends index cache"
+			if directoryFailure {
+				dir = filepath.Join(dir, "not-a-directory")
+				if err := os.WriteFile(dir, []byte("occupied"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				wantLog = "create gfriends cache directory"
+			} else if err := os.Mkdir(filepath.Join(dir, "gfriends_tree.json"), 0755); err != nil {
+				t.Fatal(err)
+			}
+			var logs bytes.Buffer
+			previous := slog.Default()
+			slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+			t.Cleanup(func() { slog.SetDefault(previous) })
+			calls := 0
+			client := New(dir, &http.Client{Transport: testTransport(func(*http.Request) (*http.Response, error) {
+				calls++
+				return treeResponse(testTree), nil
+			})})
+			for range 2 {
+				if err := client.EnsureIndex(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if path, ok := client.Lookup("Actor"); !ok || path != "Content/S/avatar.jpg?t=1" || calls != 1 {
+				t.Fatalf("lookup = %q, %t; downloads = %d", path, ok, calls)
+			}
+			if !strings.Contains(logs.String(), wantLog) || !strings.Contains(logs.String(), "level=WARN") || !strings.Contains(logs.String(), "error=") {
+				t.Fatalf("missing cache failure warning: %s", logs.String())
+			}
+		})
+	}
+}
+
 func TestRefreshLeavesIndexReadableAndCoalescesCallers(t *testing.T) {
 	started, release := make(chan struct{}), make(chan struct{})
 	var unblock sync.Once
@@ -39,7 +83,7 @@ func TestRefreshLeavesIndexReadableAndCoalescesCallers(t *testing.T) {
 			return nil, r.Context().Err()
 		}
 	})})
-	c.installIndex(buildIndex(FileTree{Content: map[string]map[string]string{"S": {"Old.jpg": "old.jpg"}}}), time.Now().Add(-2*CacheExpiration))
+	c.installIndex(buildIndex(fileTree{Content: map[string]map[string]string{"S": {"Old.jpg": "old.jpg"}}}), time.Now().Add(-2*cacheExpiration))
 	done := make(chan error, 9)
 	go func() { done <- c.EnsureIndex(t.Context()) }()
 	<-started
@@ -86,7 +130,7 @@ func TestRefreshLeavesIndexReadableAndCoalescesCallers(t *testing.T) {
 }
 
 func TestDiskCacheKeepsItsAgeAndRetriesAfterFailure(t *testing.T) {
-	for _, age := range []time.Duration{time.Hour, 2 * CacheExpiration} {
+	for _, age := range []time.Duration{time.Hour, 2 * cacheExpiration} {
 		t.Run(age.String(), func(t *testing.T) {
 			dir := t.TempDir()
 			path := filepath.Join(dir, "gfriends_tree.json")
@@ -117,7 +161,7 @@ func TestDiskCacheKeepsItsAgeAndRetriesAfterFailure(t *testing.T) {
 			if _, ok := c.Lookup("Actor"); !ok {
 				t.Fatal("disk fallback missing")
 			}
-			if age < CacheExpiration {
+			if age < cacheExpiration {
 				if calls.Load() != 0 {
 					t.Fatal("fresh disk cache downloaded again")
 				}
@@ -256,7 +300,7 @@ func TestInvalidRefreshPreservesMemoryAndDiskCache(t *testing.T) {
 	if err := os.WriteFile(path, []byte(testTree), 0644); err != nil {
 		t.Fatal(err)
 	}
-	stamp := time.Now().Add(-2 * CacheExpiration)
+	stamp := time.Now().Add(-2 * cacheExpiration)
 	if err := os.Chtimes(path, stamp, stamp); err != nil {
 		t.Fatal(err)
 	}

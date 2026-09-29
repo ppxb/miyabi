@@ -12,7 +12,7 @@ import (
 func TestGFriendsClient_LookupAndCache(t *testing.T) {
 	tempDir := t.TempDir()
 
-	tree := FileTree{
+	tree := fileTree{
 		Content: map[string]map[string]string{
 			"S": {
 				"三上悠亜.jpg":       "三上悠亜.jpg?t=12345",
@@ -81,13 +81,13 @@ func TestGFriendsClient_LookupAndCache(t *testing.T) {
 }
 
 func TestGFriendsClient_PrefersFirstFolderDeterministically(t *testing.T) {
-	tree := FileTree{Content: map[string]map[string]string{
+	tree := fileTree{Content: map[string]map[string]string{
 		"2-Other":  {"三上悠亜.jpg": "三上悠亜.jpg?t=2"},
 		"0-Manual": {"三上悠亜.jpg": "三上悠亜.jpg?t=0"},
 		"1-Studio": {"三上 悠亜.jpg": "三上悠亜.jpg?t=1"},
 	}}
 	for range 20 {
-		client := New("", nil)
+		client := New("", &http.Client{})
 		client.index = buildIndex(tree)
 		if rel, _ := client.Lookup("三上悠亜"); rel != "Content/0-Manual/三上悠亜.jpg?t=0" {
 			t.Fatalf("Lookup chose %q", rel)

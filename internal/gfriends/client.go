@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"maps"
 	"net/http"
 	"net/url"
@@ -19,16 +20,16 @@ import (
 )
 
 const (
-	DefaultFastlyURL = "https://fastly.jsdelivr.net/gh/gfriends/gfriends@master"
-	DefaultRawURL    = "https://raw.githubusercontent.com/gfriends/gfriends/master"
-	CacheExpiration  = 7 * 24 * time.Hour
+	defaultFastlyURL = "https://fastly.jsdelivr.net/gh/gfriends/gfriends@master"
+	defaultRawURL    = "https://raw.githubusercontent.com/gfriends/gfriends/master"
+	cacheExpiration  = 7 * 24 * time.Hour
 	indexRetryDelay  = 5 * time.Minute
 )
 
 // mirrors serve the same repository; the CDN is tried before GitHub.
-var mirrors = []string{DefaultFastlyURL, DefaultRawURL}
+var mirrors = []string{defaultFastlyURL, defaultRawURL}
 
-type FileTree struct {
+type fileTree struct {
 	Content map[string]map[string]string `json:"Content"`
 }
 
@@ -43,10 +44,8 @@ type Client struct {
 	refreshErr error
 }
 
+// New uses the caller's HTTP client, including its timeout and proxy policy.
 func New(dataDir string, httpClient *http.Client) *Client {
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 30 * time.Second}
-	}
 	return &Client{
 		dataDir:    dataDir,
 		httpClient: httpClient,
@@ -119,8 +118,11 @@ func (c *Client) EnsureIndex(ctx context.Context) error {
 		return c.refreshErr
 	}
 	if c.dataDir != "" {
-		_ = os.MkdirAll(c.dataDir, 0755)
-		_ = os.WriteFile(cacheFile, body, 0644)
+		if err := os.MkdirAll(c.dataDir, 0755); err != nil {
+			slog.WarnContext(ctx, "create gfriends cache directory", "path", c.dataDir, "error", err)
+		} else if err := os.WriteFile(cacheFile, body, 0644); err != nil {
+			slog.WarnContext(ctx, "write gfriends index cache", "path", cacheFile, "error", err)
+		}
 	}
 	c.installIndex(index, time.Now())
 	return nil
@@ -140,7 +142,7 @@ func readCachedIndex(path string) (map[string]string, time.Time, error) {
 }
 
 func parseIndex(data []byte) (map[string]string, error) {
-	var tree FileTree
+	var tree fileTree
 	if err := json.Unmarshal(data, &tree); err != nil {
 		return nil, err
 	}
@@ -154,7 +156,7 @@ func parseIndex(data []byte) (map[string]string, error) {
 func (c *Client) indexReady() (bool, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	if !c.loadedAt.IsZero() && time.Since(c.loadedAt) < CacheExpiration {
+	if !c.loadedAt.IsZero() && time.Since(c.loadedAt) < cacheExpiration {
 		return true, nil
 	}
 	if time.Now().Before(c.retryAt) {
@@ -177,7 +179,7 @@ func (c *Client) installIndex(index map[string]string, updatedAt time.Time) {
 
 // buildIndex indexes folders in name order and keeps the first image per
 // actor, so the chosen avatar does not depend on map iteration order.
-func buildIndex(tree FileTree) map[string]string {
+func buildIndex(tree fileTree) map[string]string {
 	index := make(map[string]string)
 	for _, folder := range slices.Sorted(maps.Keys(tree.Content)) {
 		for alias, target := range tree.Content[folder] {
