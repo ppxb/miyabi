@@ -4,7 +4,7 @@ import "testing"
 
 func TestMagnetsDecodesUnitsAndRanksResources(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v1/movies/movie-exact/magnets|zh-TW": fixtureFile(t, "magnets.json"),
+		"/api/v1/movies/movie-exact/magnets": fixtureFile(t, "magnets.json"),
 	}}
 	magnets, err := clientWithTransport(transport).Magnets(t.Context(), "movie-exact")
 	if err != nil {
@@ -24,7 +24,7 @@ func TestMagnetsDecodesUnitsAndRanksResources(t *testing.T) {
 func TestMagnetsRejectsMalformedInfoHash(t *testing.T) {
 	for _, hash := range []string{"", "abc", "not-a-hash"} {
 		transport := &fixtureTransport{responses: map[string][]byte{
-			"/api/v1/movies/movie/magnets|zh-TW": []byte(`{"success":1,"data":{"magnets":[{"hash":"` + hash + `"}]}}`),
+			"/api/v1/movies/movie/magnets": []byte(`{"success":1,"data":{"magnets":[{"hash":"` + hash + `"}]}}`),
 		}}
 		if _, err := clientWithTransport(transport).Magnets(t.Context(), "movie"); err == nil {
 			t.Errorf("accepted invalid hash %q", hash)

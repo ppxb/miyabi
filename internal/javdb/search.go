@@ -26,7 +26,7 @@ func (c *Client) Search(ctx context.Context, keyword string, options domain.Sear
 	}
 
 	var data wireMoviesData
-	if err := c.getJSON(ctx, "/api/v2/search", params, defaultLanguage, &data); err != nil {
+	if err := c.getJSON(ctx, "/api/v2/search", params, &data); err != nil {
 		return nil, err
 	}
 	return moviesFromWire(ctx, data.Movies)

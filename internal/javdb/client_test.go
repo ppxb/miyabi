@@ -25,7 +25,6 @@ func (transport *stubTransport) getJSON(
 	context.Context,
 	string,
 	url.Values,
-	string,
 	any,
 ) error {
 	transport.calls++
@@ -143,7 +142,7 @@ func TestClientReusesCachedRouteWithoutSelecting(t *testing.T) {
 			if err := client.Initialize(t.Context()); err != nil {
 				t.Fatal(err)
 			}
-			if err := client.getJSON(t.Context(), "/test", nil, defaultLanguage, nil); err != nil {
+			if err := client.getJSON(t.Context(), "/test", nil, nil); err != nil {
 				t.Fatal(err)
 			}
 			if selections != 0 || transport.calls != 1 {
@@ -197,7 +196,7 @@ func TestClientReplaysOnceAfterRouteFailure(t *testing.T) {
 		return replacementState, nil
 	}
 
-	if err := client.getJSON(t.Context(), "/test", nil, defaultLanguage, nil); err != nil {
+	if err := client.getJSON(t.Context(), "/test", nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if failedTransport.calls != 1 || replacementTransport.calls != 1 || selections != 1 {
@@ -231,7 +230,7 @@ func TestClientDoesNotReselectForProtocolOrClientErrors(t *testing.T) {
 				return nil, nil
 			}
 
-			err := client.getJSON(t.Context(), "/test", nil, defaultLanguage, nil)
+			err := client.getJSON(t.Context(), "/test", nil, nil)
 			if !errors.Is(err, test.err) {
 				t.Fatalf("error = %v, want %v", err, test.err)
 			}
@@ -255,7 +254,7 @@ func TestClientReselectsForGatewayErrorsButOnlyReplaysOnce(t *testing.T) {
 			client.current.Store(state)
 			return state, nil
 		}
-		if err := client.getJSON(t.Context(), "/test", nil, defaultLanguage, nil); !errors.Is(err, replacement.err) {
+		if err := client.getJSON(t.Context(), "/test", nil, nil); !errors.Is(err, replacement.err) {
 			t.Fatalf("HTTP %d error = %v", code, err)
 		}
 		if failed.calls != 1 || replacement.calls != 1 || selections != 1 {

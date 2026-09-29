@@ -19,7 +19,7 @@ func (c *Client) Browse(ctx context.Context, options domain.BrowseOptions) ([]do
 	}
 
 	var data wireMoviesData
-	if err := c.getJSON(ctx, "/api/v1/movies/tags", params, defaultLanguage, &data); err != nil {
+	if err := c.getJSON(ctx, "/api/v1/movies/tags", params, &data); err != nil {
 		return nil, err
 	}
 	return moviesFromWire(ctx, data.Movies)

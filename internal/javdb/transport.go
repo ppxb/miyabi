@@ -73,10 +73,9 @@ func (t *transport) getJSON(
 	ctx context.Context,
 	path string,
 	params url.Values,
-	language string,
 	destination any,
 ) error {
-	request, err := t.newRequest(ctx, path, params, language, time.Now().Unix())
+	request, err := t.newRequest(ctx, path, params, time.Now().Unix())
 	if err != nil {
 		return err
 	}
@@ -106,7 +105,6 @@ func (t *transport) newRequest(
 	ctx context.Context,
 	path string,
 	params url.Values,
-	language string,
 	timestamp int64,
 ) (*http.Request, error) {
 	query := url.Values{
@@ -134,10 +132,7 @@ func (t *transport) newRequest(
 	if err != nil {
 		return nil, fmt.Errorf("create JavDB request: %w", err)
 	}
-	if language == "" {
-		language = defaultLanguage
-	}
-	request.Header.Set("accept-language", language)
+	request.Header.Set("accept-language", defaultLanguage)
 	request.Header.Set("connection", "keep-alive")
 	request.Header.Set("jdsignature", signature(timestamp))
 	request.Header.Set("user-agent", userAgent)

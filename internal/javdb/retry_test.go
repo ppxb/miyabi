@@ -18,8 +18,8 @@ import (
 
 type retryTransport func() error
 
-func (f retryTransport) getJSON(context.Context, string, url.Values, string, any) error { return f() }
-func (retryTransport) closeIdleConnections()                                            {}
+func (f retryTransport) getJSON(context.Context, string, url.Values, any) error { return f() }
+func (retryTransport) closeIdleConnections()                                    {}
 
 func TestRetryAfterFormats(t *testing.T) {
 	now := time.Date(2026, 9, 28, 12, 0, 0, 0, time.UTC)
@@ -39,7 +39,7 @@ func TestRetryAfterFormats(t *testing.T) {
 		StatusCode: 429, Header: fhttp.Header{"Retry-After": []string{"60"}}, Body: io.NopCloser(strings.NewReader("limited")),
 	}}}
 	var response *HTTPError
-	if err := tr.getJSON(t.Context(), "/test", nil, "", nil); !errors.As(err, &response) || response.RetryAfter != time.Minute {
+	if err := tr.getJSON(t.Context(), "/test", nil, nil); !errors.As(err, &response) || response.RetryAfter != time.Minute {
 		t.Fatalf("transport discarded Retry-After: %v", err)
 	}
 }
@@ -63,7 +63,7 @@ func TestClientRetries429OnSameRoute(t *testing.T) {
 			t.Fatal("429 caused route failover")
 			return nil, nil
 		}
-		if err := client.getJSON(t.Context(), "/test", nil, "", nil); err != nil {
+		if err := client.getJSON(t.Context(), "/test", nil, nil); err != nil {
 			t.Fatal(err)
 		}
 		if len(calls) != 3 || calls[1] != 5*time.Second || calls[2] != 7*time.Second {
@@ -81,7 +81,7 @@ func TestClientLimits429RetriesAndHonorsLongCooldown(t *testing.T) {
 				client := &Client{limiter: rate.NewLimiter(rate.Inf, 1)}
 				client.current.Store(&routeState{transport: retryTransport(func() error { calls++; return &HTTPError{StatusCode: 429, RetryAfter: delay} })})
 				var response *HTTPError
-				if err := client.getJSON(t.Context(), "/test", nil, "", nil); !errors.As(err, &response) || response.StatusCode != 429 {
+				if err := client.getJSON(t.Context(), "/test", nil, nil); !errors.As(err, &response) || response.StatusCode != 429 {
 					t.Fatalf("limit error = %v", err)
 				}
 				if delay == 0 {
@@ -92,7 +92,7 @@ func TestClientLimits429RetriesAndHonorsLongCooldown(t *testing.T) {
 					if calls != 1 || time.Since(start) != 0 {
 						t.Fatalf("long Retry-After was truncated: %d, %v", calls, time.Since(start))
 					}
-					if err := client.getJSON(t.Context(), "/another", nil, "", nil); !errors.As(err, &response) || calls != 1 {
+					if err := client.getJSON(t.Context(), "/another", nil, nil); !errors.As(err, &response) || calls != 1 {
 						t.Fatalf("another caller ignored cooldown: %d, %v", calls, err)
 					}
 				}
@@ -110,14 +110,14 @@ func TestClientCooldownIsSharedExtendedAndCancelable(t *testing.T) {
 		client.deferRequests(10 * time.Second)
 		ctx, cancel := context.WithCancel(t.Context())
 		finished := make(chan error, 3)
-		go func() { finished <- client.getJSON(ctx, "/canceled", nil, "", nil) }()
+		go func() { finished <- client.getJSON(ctx, "/canceled", nil, nil) }()
 		synctest.Wait()
 		cancel()
 		if err := <-finished; !errors.Is(err, context.Canceled) {
 			t.Fatalf("cancel cooldown: %v", err)
 		}
 		for range 2 {
-			go func() { finished <- client.getJSON(t.Context(), "/test", nil, "", nil) }()
+			go func() { finished <- client.getJSON(t.Context(), "/test", nil, nil) }()
 		}
 		synctest.Wait()
 		time.Sleep(5 * time.Second)
@@ -157,7 +157,7 @@ func TestClientRechecksCooldownAfterWaitingForRateToken(t *testing.T) {
 		})})
 		finished := make(chan error, 2)
 		for range 2 {
-			go func() { finished <- client.getJSON(t.Context(), "/test", nil, "", nil) }()
+			go func() { finished <- client.getJSON(t.Context(), "/test", nil, nil) }()
 		}
 		for range 2 {
 			if err := <-finished; err != nil {

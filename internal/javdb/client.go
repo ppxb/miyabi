@@ -27,7 +27,7 @@ type routeState struct {
 }
 
 type jsonTransport interface {
-	getJSON(context.Context, string, url.Values, string, any) error
+	getJSON(context.Context, string, url.Values, any) error
 	closeIdleConnections()
 }
 
@@ -265,7 +265,6 @@ func (c *Client) getJSON(
 	ctx context.Context,
 	path string,
 	params url.Values,
-	language string,
 	destination any,
 ) error {
 	state, err := c.ensureRoute(ctx)
@@ -281,7 +280,7 @@ func (c *Client) getJSON(
 		if current := c.current.Load(); current != nil {
 			state = current
 		}
-		err = state.transport.getJSON(ctx, path, params, language, destination)
+		err = state.transport.getJSON(ctx, path, params, destination)
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -406,7 +405,7 @@ func probeHost(ctx context.Context, host string, proxy *url.URL, options Options
 		onStart(started)
 	}
 	var startup map[string]any
-	if err := transport.getJSON(ctx, "/api/v1/startup", nil, defaultLanguage, &startup); err != nil {
+	if err := transport.getJSON(ctx, "/api/v1/startup", nil, &startup); err != nil {
 		return 0, nil, err
 	}
 	return time.Since(started), startup, nil

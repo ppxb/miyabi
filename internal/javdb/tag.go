@@ -21,7 +21,6 @@ func (c *Client) Tags(ctx context.Context, zone domain.Zone) ([]domain.TagCatego
 		ctx,
 		"/api/v2/tags",
 		url.Values{"type": {strconv.Itoa(code)}},
-		defaultLanguage,
 		&data,
 	); err != nil {
 		return nil, err

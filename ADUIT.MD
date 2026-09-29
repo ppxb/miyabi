@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：152 条待处理，27 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：151 条待处理，28 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -123,7 +123,9 @@
   - 方案修正：RouteStatus.Manual 仍用于手动选线、持久化恢复和代理变更策略，保留；仅删除 ensureRoute 的无效手动偏好分支、preferredHost 及 Route 的 CachedHost 兜底。
   - 已完成：routeState 仅保存生效主机、延迟、手动标记和 transport；候选列表仅保存在 lastProbe，公共状态统一组合返回。探测失败保留当前线路并显示最新失败结果，取消不覆盖状态，代理重建继续保留手动选择。
   - 验证：javdb、catalogue、api、app 包测试通过；新增本地 HTTP 模拟测试覆盖手动/自动探测失败、取消、成功切换及候选列表返回，保留缓存恢复与请求失败自动切换测试。未进行浏览器或真实 JavDB 联调，待整体复查。
-- [ ] **88.** `internal/javdb/client.go:254-260` `getJSON` 的 `language` 参数所有调用点都传 `defaultLanguage`，`transport.go:132-134` `if language == ""` 死代码。
+- [x] **88.** `internal/javdb/client.go:254-260` `getJSON` 的 `language` 参数所有调用点都传 `defaultLanguage`，`transport.go:132-134` `if language == ""` 死代码。
+  - 已完成：移除 Client、jsonTransport、transport 和请求构造中的 language 参数，统一在 newRequest 设置 accept-language=defaultLanguage（zh-TW），删除空值兜底；各 API、探测和测试桩同步简化，测试响应按路径索引。
+  - 验证：javdb、catalogue、api、app 包测试通过；请求构造测试直接断言 zh-TW 请求头，保留签名、解析、限流重试与线路切换覆盖，git diff --check 通过。未做真实 JavDB 联调，待整体复查。
 - [ ] **89.** `internal/catalogue/service.go:344-361`、`types.go:77-87` `Facets()`、`Facets`、`FacetItem` 无 API / 生产使用，仅 `TestFacets`。
 - [ ] **90.** `internal/javdb/magnet.go:81-94` `Find` 中 `JavDBID` 为空走 `ResolveMovieID` 分支不可达（`catalogue/magnets.go:66` 总带 JavDBID）；`magnet.go:54-71` 排序与 `aggregator.go:104-118` 同一规则重复。
 - [ ] **91.** `internal/javdb/client.go:52-66` + `internal/catalogue/service.go:56,65`：唯一调用 `app.go:89` 传 `javdb.Options{}`，Timeout / RPS / Burst 负值校验与 `DeviceUUID` 回退永不触发 → `catalogue.New` 不再接收 Options。

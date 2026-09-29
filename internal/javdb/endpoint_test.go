@@ -13,9 +13,8 @@ import (
 )
 
 type fixtureCall struct {
-	path     string
-	params   url.Values
-	language string
+	path   string
+	params url.Values
 }
 
 type fixtureTransport struct {
@@ -27,13 +26,12 @@ func (transport *fixtureTransport) getJSON(
 	_ context.Context,
 	path string,
 	params url.Values,
-	language string,
 	destination any,
 ) error {
-	transport.calls = append(transport.calls, fixtureCall{path: path, params: params, language: language})
-	body, ok := transport.responses[path+"|"+language]
+	transport.calls = append(transport.calls, fixtureCall{path: path, params: params})
+	body, ok := transport.responses[path]
 	if !ok {
-		return fmt.Errorf("missing fixture for %s in %s", path, language)
+		return fmt.Errorf("missing fixture for %s", path)
 	}
 	return decodeEnvelope(body, destination)
 }
@@ -57,7 +55,7 @@ func clientWithTransport(transport jsonTransport) *Client {
 
 func TestSearchDecodesMoviesAndBuildsParams(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v2/search|zh-TW": fixtureFile(t, "search.json"),
+		"/api/v2/search": fixtureFile(t, "search.json"),
 	}}
 	client := clientWithTransport(transport)
 
@@ -79,7 +77,7 @@ func TestSearchDecodesMoviesAndBuildsParams(t *testing.T) {
 	}
 
 	call := transport.calls[0]
-	if call.path != "/api/v2/search" || call.language != defaultLanguage {
+	if call.path != "/api/v2/search" {
 		t.Fatalf("call = %#v", call)
 	}
 	for key, want := range map[string]string{
@@ -94,7 +92,7 @@ func TestSearchDecodesMoviesAndBuildsParams(t *testing.T) {
 
 func TestBrowseUsesDocumentedFilterMask(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v1/movies/tags|zh-TW": fixtureFile(t, "browse.json"),
+		"/api/v1/movies/tags": fixtureFile(t, "browse.json"),
 	}}
 	client := clientWithTransport(transport)
 
@@ -154,7 +152,7 @@ func TestBrowseWithoutZoneKeepsTheFilterMask(t *testing.T) {
 
 func TestBrowsePreservesWesternSceneNumbers(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v1/movies/tags|zh-TW": fixtureFile(t, "browse_western.json"),
+		"/api/v1/movies/tags": fixtureFile(t, "browse_western.json"),
 	}}
 	client := clientWithTransport(transport)
 	movies, err := client.Browse(t.Context(), domain.BrowseOptions{
@@ -180,7 +178,7 @@ func TestMovieReferencesPreserveWesternSceneNumbers(t *testing.T) {
 
 func TestBrowsePreservesCatalogueNumberSegments(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v1/movies/tags|zh-TW": fixtureFile(t, "browse_catalogue_numbers.json"),
+		"/api/v1/movies/tags": fixtureFile(t, "browse_catalogue_numbers.json"),
 	}}
 	client := clientWithTransport(transport)
 	movies, err := client.Browse(t.Context(), domain.BrowseOptions{
@@ -206,7 +204,7 @@ func TestBrowsePreservesCatalogueNumberSegments(t *testing.T) {
 
 func TestMovieDetailMapsGraphWithoutPlot(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v4/movies/movie-exact|zh-TW": fixtureFile(t, "movie.json"),
+		"/api/v4/movies/movie-exact": fixtureFile(t, "movie.json"),
 	}}
 	client := clientWithTransport(transport)
 
@@ -240,7 +238,7 @@ func TestMovieDetailMapsGraphWithoutPlot(t *testing.T) {
 
 func TestMovieDetailPreservesMultipartNumbers(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v4/movies/movie-multipart|zh-TW": fixtureFile(t, "movie_multipart.json"),
+		"/api/v4/movies/movie-multipart": fixtureFile(t, "movie_multipart.json"),
 	}}
 	client := clientWithTransport(transport)
 	movie, err := client.MovieDetail(t.Context(), "movie-multipart")
@@ -257,7 +255,7 @@ func TestMovieDetailPreservesMultipartNumbers(t *testing.T) {
 
 func TestMovieDetailPreservesNamedNumbers(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v4/movies/named-itsuki|zh-TW": fixtureFile(t, "movie_named.json"),
+		"/api/v4/movies/named-itsuki": fixtureFile(t, "movie_named.json"),
 	}}
 	client := clientWithTransport(transport)
 	movie, err := client.MovieDetail(t.Context(), "named-itsuki")
@@ -315,7 +313,7 @@ func TestBrowseBuildsEntityFilters(t *testing.T) {
 
 func TestResolveMovieIDRequiresExactNormalizedMatch(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v2/search|zh-TW": fixtureFile(t, "search.json"),
+		"/api/v2/search": fixtureFile(t, "search.json"),
 	}}
 	client := clientWithTransport(transport)
 
@@ -358,7 +356,7 @@ func TestResolveMovieIDDuplicateMatches(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			transport := &fixtureTransport{responses: map[string][]byte{
-				"/api/v2/search|zh-TW": []byte(`{"success":1,"data":{"movies":` + test.movies + `}}`),
+				"/api/v2/search": []byte(`{"success":1,"data":{"movies":` + test.movies + `}}`),
 			}}
 			client := clientWithTransport(transport)
 			id, err := client.ResolveMovieID(t.Context(), "abp123")
@@ -442,7 +440,7 @@ func TestResolveMovieIDFormatEquivalence(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			transport := &fixtureTransport{responses: map[string][]byte{
-				"/api/v2/search|zh-TW": []byte(`{"success":1,"data":{"movies":` + tt.movies + `}}`),
+				"/api/v2/search": []byte(`{"success":1,"data":{"movies":` + tt.movies + `}}`),
 			}}
 			client := clientWithTransport(transport)
 			id, err := client.ResolveMovieID(t.Context(), tt.input)
@@ -468,10 +466,9 @@ func (transport *queryFixtureTransport) getJSON(
 	_ context.Context,
 	path string,
 	params url.Values,
-	language string,
 	destination any,
 ) error {
-	transport.calls = append(transport.calls, fixtureCall{path: path, params: params, language: language})
+	transport.calls = append(transport.calls, fixtureCall{path: path, params: params})
 	q := params.Get("q")
 	body, ok := transport.responses[q]
 	if !ok {
@@ -521,8 +518,8 @@ func TestResolveMovieIDFC2ProviderVariant(t *testing.T) {
 
 func TestAnimeDetailAndCatalogueQueriesUseTheAnimeSection(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v4/movies/anime|zh-TW": []byte(`{"success":1,"data":{"movie":{"id":"anime","number":"GLOD-0436","type":4}}}`),
-		"/api/v2/tags|zh-TW":         fixtureFile(t, "tags_zh.json"),
+		"/api/v4/movies/anime": []byte(`{"success":1,"data":{"movie":{"id":"anime","number":"GLOD-0436","type":4}}}`),
+		"/api/v2/tags":         fixtureFile(t, "tags_zh.json"),
 	}}
 	client := clientWithTransport(transport)
 	detail, err := client.MovieDetail(t.Context(), "anime")
@@ -565,7 +562,7 @@ func TestMoviePreviewsOmitEmptyEntriesAndKeepAvailableURLs(t *testing.T) {
 
 func TestResolveMovieIDKeepsLetterVariantsDistinct(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v2/search|zh-TW": []byte(`{"success":1,"data":{"movies":[{"id":"base","number":"FJIN-106"},{"id":"variant","number":"FJIN-106a"}]}}`),
+		"/api/v2/search": []byte(`{"success":1,"data":{"movies":[{"id":"base","number":"FJIN-106"},{"id":"variant","number":"FJIN-106a"}]}}`),
 	}}
 	client := clientWithTransport(transport)
 	for code, want := range map[string]string{"FJIN-106": "base", "fjin106a": "variant"} {
@@ -581,7 +578,7 @@ func TestResolveMovieIDKeepsLetterVariantsDistinct(t *testing.T) {
 
 func TestResolveMovieIDMatchesDistributorLabelInSameResults(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v2/search|zh-TW": []byte(`{"success":1,"data":{"movies":[
+		"/api/v2/search": []byte(`{"success":1,"data":{"movies":[
 			{"id":"similar","number":"LUXU-1099"},
 			{"id":"longer","number":"LUXU-18990"},
 			{"id":"variant","number":"LUXU-1899-C"},
@@ -600,7 +597,7 @@ func TestResolveMovieIDMatchesDistributorLabelInSameResults(t *testing.T) {
 
 func TestResolveMovieIDPrefersExactOverRelaxedCandidate(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v2/search|zh-TW": []byte(`{"success":1,"data":{"movies":[
+		"/api/v2/search": []byte(`{"success":1,"data":{"movies":[
 			{"id":"relaxed","number":"GIRI-001"},
 			{"id":"exact","number":"1000GIRI-001"}
 		]}}`),
@@ -637,7 +634,7 @@ func TestResolveMovieIDSearchesRelaxedCandidates(t *testing.T) {
 
 func TestResolveMovieIDKeepsMultipartNumbersDistinct(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v2/search|zh-TW": []byte(`{"success":1,"data":{"movies":[
+		"/api/v2/search": []byte(`{"success":1,"data":{"movies":[
 			{"id":"partial","number":"HEYDOUGA-4030"},
 			{"id":"different-series","number":"HEYDOUGA-4031-2347"},
 			{"id":"different-movie","number":"HEYDOUGA-4030-2348"},
@@ -662,7 +659,7 @@ func TestResolveMovieIDKeepsMultipartNumbersDistinct(t *testing.T) {
 
 func TestResolveMovieIDKeepsNamedNumbersDistinct(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v2/search|zh-TW": fixtureFile(t, "browse_catalogue_numbers.json"),
+		"/api/v2/search": fixtureFile(t, "browse_catalogue_numbers.json"),
 	}}
 	client := clientWithTransport(transport)
 	for code, want := range map[string]string{
@@ -686,9 +683,9 @@ func TestResolveMovieIDKeepsNamedNumbersDistinct(t *testing.T) {
 	}
 }
 
-func TestTagsOnlyRequestsTraditionalChinese(t *testing.T) {
+func TestTagsUsesSingleRequest(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v2/tags|zh-TW": fixtureFile(t, "tags_zh.json"),
+		"/api/v2/tags": fixtureFile(t, "tags_zh.json"),
 	}}
 	client := clientWithTransport(transport)
 
@@ -703,7 +700,7 @@ func TestTagsOnlyRequestsTraditionalChinese(t *testing.T) {
 		categories[0].Tags[0].ID != "tag-1" {
 		t.Fatalf("tags = %#v", categories[0].Tags)
 	}
-	if len(transport.calls) != 1 || transport.calls[0].language != defaultLanguage {
+	if len(transport.calls) != 1 {
 		t.Fatalf("calls = %#v", transport.calls)
 	}
 }

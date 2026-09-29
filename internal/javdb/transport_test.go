@@ -37,7 +37,6 @@ func TestTransportBuildsSignedAppRequest(t *testing.T) {
 		context.Background(),
 		"/api/v2/search",
 		url.Values{"q": {"SSIS-589"}},
-		"zh-TW",
 		1784134914,
 	)
 	if err != nil {
@@ -50,6 +49,9 @@ func TestTransportBuildsSignedAppRequest(t *testing.T) {
 	}
 	if query.Get("app_version") != appVersion || query.Get("platform") != "android" {
 		t.Fatalf("public params = %v", query)
+	}
+	if got := request.Header.Get("accept-language"); got != "zh-TW" {
+		t.Fatalf("accept-language = %q, want zh-TW", got)
 	}
 	if got := request.Header.Get("jdsignature"); got != signature(1784134914) {
 		t.Fatalf("jdsignature = %q", got)
@@ -69,7 +71,7 @@ func TestTransportClassifiesResponseReadFailureAsNetworkError(t *testing.T) {
 		}},
 	}
 
-	err := transport.getJSON(context.Background(), "/api/v2/search", nil, defaultLanguage, nil)
+	err := transport.getJSON(context.Background(), "/api/v2/search", nil, nil)
 	var network *networkError
 	if !errors.As(err, &network) || !strings.Contains(err.Error(), "read JavDB response") {
 		t.Fatalf("error = %v, want networkError", err)
@@ -99,7 +101,7 @@ func TestTransportLimitsResponseBodyExceedingMax(t *testing.T) {
 		}},
 	}
 
-	err := transport.getJSON(context.Background(), "/api/v2/search", nil, defaultLanguage, nil)
+	err := transport.getJSON(context.Background(), "/api/v2/search", nil, nil)
 	var network *networkError
 	if !errors.As(err, &network) || !strings.Contains(err.Error(), "exceeded") {
 		t.Fatalf("error = %v, want networkError with exceeded limit", err)
@@ -108,4 +110,3 @@ func TestTransportLimitsResponseBodyExceedingMax(t *testing.T) {
 
 var _ io.ReadCloser = failingBody{}
 var _ io.ReadCloser = infiniteBody{}
-

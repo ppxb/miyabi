@@ -24,7 +24,6 @@ func (c *Client) MovieDetail(ctx context.Context, movieID string) (domain.MovieD
 		ctx,
 		"/api/v4/movies/"+url.PathEscape(movieID),
 		nil,
-		defaultLanguage,
 		&data,
 	); err != nil {
 		return domain.MovieDetail{}, err

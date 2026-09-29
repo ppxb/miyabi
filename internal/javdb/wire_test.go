@@ -123,7 +123,7 @@ func TestMovieDetailSkipsInvalidRecommendationsAndReportsOptionalFields(t *testi
 	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
 	t.Cleanup(func() { slog.SetDefault(previous) })
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v4/movies/main|zh-TW": []byte(`{"success":1,"data":{"movie":{
+		"/api/v4/movies/main": []byte(`{"success":1,"data":{"movie":{
 			"id":"main","number":"ABP-001","title":"Fixture title","cover_url":"https://media.example/cover.jpg","type":9,
 			"actors":[{"id":"actor-1","name":"Fixture actor","gender":9}],
 			"actor_movies":[
@@ -181,7 +181,7 @@ func TestMovieDetailReturnsEmptyRecommendationArrays(t *testing.T) {
 	for _, recommendations := range []string{"", `,"actor_movies":null,"relative_movies":null`,
 		`,"actor_movies":[{}],"relative_movies":[{"id":"missing-number"}]`} {
 		transport := &fixtureTransport{responses: map[string][]byte{
-			"/api/v4/movies/main|zh-TW": []byte(`{"success":1,"data":{"movie":{"id":"main","number":"ABP-001","type":0` + recommendations + `}}}`),
+			"/api/v4/movies/main": []byte(`{"success":1,"data":{"movie":{"id":"main","number":"ABP-001","type":0` + recommendations + `}}}`),
 		}}
 		detail, err := clientWithTransport(transport).MovieDetail(t.Context(), "main")
 		if err != nil || detail.ActorMovies == nil || detail.RelatedMovies == nil ||
@@ -208,7 +208,7 @@ func TestMovieDetailMapsMissingAndUnknownTypesWithoutGuessing(t *testing.T) {
 	} {
 		t.Run(test.field, func(t *testing.T) {
 			transport := &fixtureTransport{responses: map[string][]byte{
-				"/api/v4/movies/main|zh-TW": []byte(`{"success":1,"data":{"movie":{"id":"main","number":"ABP-001"` + test.field + `}}}`),
+				"/api/v4/movies/main": []byte(`{"success":1,"data":{"movie":{"id":"main","number":"ABP-001"` + test.field + `}}}`),
 			}}
 			detail, err := clientWithTransport(transport).MovieDetail(t.Context(), "main")
 			if err != nil || detail.Zone != test.want || detail.ID != "main" {
@@ -239,7 +239,7 @@ func TestMovieDetailStillRejectsIncorrectJSONTypes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			transport := &fixtureTransport{responses: map[string][]byte{"/api/v4/movies/main|zh-TW": body}}
+			transport := &fixtureTransport{responses: map[string][]byte{"/api/v4/movies/main": body}}
 			_, err = clientWithTransport(transport).MovieDetail(t.Context(), "main")
 			var typeError *json.UnmarshalTypeError
 			if !errors.As(err, &typeError) {
@@ -251,7 +251,7 @@ func TestMovieDetailStillRejectsIncorrectJSONTypes(t *testing.T) {
 
 func TestSearchAndResolutionRetainMoviesWithUnknownGender(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v2/search|zh-TW": []byte(`{"success":1,"data":{"movies":[
+		"/api/v2/search": []byte(`{"success":1,"data":{"movies":[
 			{"id":"first","number":"ABP-001","actors":[{"id":"actor-1","gender":9}]},
 			{"id":"second","number":"ABP-002","actors":[{"id":"actor-2"}]}
 		]}}`),
@@ -270,7 +270,7 @@ func TestSearchAndResolutionRetainMoviesWithUnknownGender(t *testing.T) {
 		`{"id":"missing-number"}`,
 		`{"id":"duplicate","number":"ABP-001","actors":[{"gender":9}]}`,
 	} {
-		transport.responses["/api/v2/search|zh-TW"] = []byte(`{"success":1,"data":{"movies":[{"id":"exact","number":"ABP-001"},` + other + `]}}`)
+		transport.responses["/api/v2/search"] = []byte(`{"success":1,"data":{"movies":[{"id":"exact","number":"ABP-001"},` + other + `]}}`)
 		if id, err := client.ResolveMovieID(t.Context(), "ABP-001"); err == nil || id != "" {
 			t.Fatalf("incomplete or ambiguous search resolved to %q: %v", id, err)
 		}
@@ -279,7 +279,7 @@ func TestSearchAndResolutionRetainMoviesWithUnknownGender(t *testing.T) {
 
 func TestMovieDetailPreservesUnknownReferences(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v4/movies/main|zh-TW": []byte(`{"success":1,"data":{"movie":{
+		"/api/v4/movies/main": []byte(`{"success":1,"data":{"movie":{
 			"id":"main","number":"GLOD-0436","type":1,
 			"actor_movies":[{"id":"letter-serial","number":"KNB-M014"}],
 			"relative_movies":[{"id":"unfamiliar","number":"作品/限定 #007"}]
@@ -298,7 +298,7 @@ func TestMovieDetailPreservesUnknownReferences(t *testing.T) {
 
 func TestResolveMovieIDKeepsCompleteUnfamiliarNumbers(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
-		"/api/v2/search|zh-TW": []byte(`{"success":1,"data":{"movies":[
+		"/api/v2/search": []byte(`{"success":1,"data":{"movies":[
 			{"id":"partial","number":"M-014"},
 			{"id":"neighbor","number":"KNB-M015"},
 			{"id":"exact","number":"knb-m014"},

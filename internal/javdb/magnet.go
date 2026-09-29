@@ -20,7 +20,7 @@ func (c *Client) Magnets(ctx context.Context, movieID string) ([]domain.Magnet, 
 		return nil, errors.New("JavDB movie ID is required")
 	}
 	var data wireMagnetsData
-	if err := c.getJSON(ctx, "/api/v1/movies/"+url.PathEscape(movieID)+"/magnets", nil, defaultLanguage, &data); err != nil {
+	if err := c.getJSON(ctx, "/api/v1/movies/"+url.PathEscape(movieID)+"/magnets", nil, &data); err != nil {
 		return nil, err
 	}
 	magnets := make([]domain.Magnet, len(data.Magnets))
