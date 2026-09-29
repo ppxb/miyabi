@@ -54,3 +54,5 @@ func (c *Config) Normalize() error {
 	}
 	return nil
 }
+
+func (c Config) ready() bool { return c.Enabled && c.ServerURL != "" && c.APIKey != "" }

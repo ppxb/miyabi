@@ -1,20 +1,20 @@
-# Miyabi 当前审计待办
+# Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；移除 62 条已勾选记录及 63、86、223 三条已失效待办，剩余 179 条。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：178 条待处理，1 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
-> 原编号保留，不重新编号；已完成记录与修复经过通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
+> 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
 
 ## 处理顺序与原则
 
 - **优先核实行为与安全问题**：235、237（敏感日志与代理信任）、167（图片抓取边界）、244（非番号误识别）。
 - **再处理明显的阻塞与重复工作**：61、129、131、142、148、149；按当前调用链和测试确认影响。
-- **结构整理按模块进行**：58、60、64、65、184；保留任务分池、重启恢复、错误退避和协议兼容语义。
+- **结构整理按模块进行**：60、64、65、184；保留任务分池、重启恢复、错误退避和协议兼容语义。
 - **前端优先保证交互与可访问性**：186–189、206、220–221、230–234，再处理布局与样式统一。
 - **死代码与测试一起核对**：78–83、85、93–109、238–240。只有确认失去生产职责和有效覆盖后才删除；不能只凭文件短、单实现或前端未调用下结论。
 - **方案是候选，不是强制指令**：已有公共实现优先复用；历史迁移的删除需先明确支持的升级起点，不能以本机迁完代替兼容策略。
-- **完成后从本清单移除**；混合条目只移除已解决部分。编号互引若指向已移除项，可在 Git 历史中追溯。
+- **新完成的条目不删除**：保留原问题，勾选并记录实现、验证结果及未验证范围；勾选表示实现完成，不表示整体复查通过。混合条目保留已完成与未完成部分的状态说明，全部完成后再统一复查和决定归档。编号互引若指向此前已移除项，可在 Git 历史中追溯。
 
 ---
 
@@ -26,7 +26,9 @@
 
 ## 三、上帝代码
 
-- [ ] **58.** `internal/emby/service.go` 仍集成配置持久化、HTTP 请求、批量通知、全库刷新、演员头像同步和后台 STRM 重写。导出配置已集中到 export.Manager，旧的 exporter 扇出同步已移除。评估拆分 client / notifier / actors / config，收敛 URL/header 构造、启用条件及退出 flush 的重复；API key 日志风险与第 235 条一起处理。
+- [x] **58.** `internal/emby/service.go` 集中承担配置持久化、HTTP 请求、批量通知、全库刷新、演员头像同步和后台 STRM 重写，职责过多；需收敛请求构造、认证、启用条件及退出 flush 的重复。
+  - 实现：提取 `internal/emby/client.go` 统一 HTTP 请求、X-Emby-Token 认证和错误处理；提取 `actors.go` 独立管理同步定时、单次执行、取消和退出等待。Service 保留配置与通知协调；配置变更取消旧同步，每轮同步使用同一份服务器配置。合并通知 flush，关闭时补发缓冲通知。
+  - 验证：`go test ./...` 通过，新增请求格式、同步取消与等待、服务器切换、退出通知回归测试。未运行 race 检测（当前 CGO 关闭），未进行真实 Emby 联调；待整体复查。每批通知后的全库刷新策略仍按第 129 条处理。
 - [ ] **59.** `internal/library/scan/walker.go:76-263` `Scanner.Run` 约 190 行：参数校验、定向单文件、断点恢复、BFS、限速、NFO、分块入库、进度上报 + 两个闭包；:77 多余别名 → 拆 `runTargetFile` / `walk` / `indexDirectory`。
 - [ ] **60.** `internal/drive/drive.go:69-90` `Drive`：二维码登录状态机 + token 刷新 + 账号缓存 + 挂载持久化 + 事件 + Session 签发 + 工作计数，含 2 mutex、1 ContextLock、2 singleflight、1 WaitGroup、3 个版本号 → 拆出二维码登录（约 180 行）。
 - [ ] **61.** `internal/gfriends/client.go:78-143` `EnsureIndex` 持写锁执行两个镜像的网络下载（各 30s），期间所有 `Lookup` 阻塞；`FetchAvatar`（208-234）复制镜像循环；stale 回退（136-141）把 `loadedAt` 设为 now，一次故障后 7 天不重试。
@@ -73,7 +75,7 @@
 - [ ] **90.** `internal/javdb/magnet.go:81-94` `Find` 中 `JavDBID` 为空走 `ResolveMovieID` 分支不可达（`catalogue/magnets.go:66` 总带 JavDBID）；`magnet.go:54-71` 排序与 `aggregator.go:104-118` 同一规则重复。
 - [ ] **91.** `internal/javdb/client.go:52-66` + `internal/catalogue/service.go:56,65`：唯一调用 `app.go:89` 传 `javdb.Options{}`，Timeout / RPS / Burst 负值校验与 `DeviceUUID` 回退永不触发 → `catalogue.New` 不再接收 Options。
 - [ ] **92.** `internal/drive/drive.go:179-184` `ValidateSource`、`internal/drive/session.go:18,70-72` `Session.Version()` 仅测试使用（导致 scrape 的 `mockSession` 也必须实现）；`mount.go:152` `DirectoryPath` 仅包内使用。
-- [ ] **93.** 零生产调用 / 仅测试使用：`scan/persist.go:22` `ProcessScanPage`、`scan/reconcile.go:20` `ReconcileScan`（只包事务）、`scan/identity.go:127` `HasEligibleVideos`（零调用）；`scrape` 的 `Images()`（:124）、`LockArtwork`（:134）、`Directories`（:272）、`InvalidateDirCache`（:356）、`SetDirTTL`（:368）；`scrape/nfo_source.go:18` `ArtworkOrigin.NFO`（只写不读）；`library/library.go:62` `Service.images`（只赋值）；`library/viewed.go:25` `ViewedMovieIDs(ctx, limit ...int)` 无人传 limit（`api/discover.go:28` 接口也跟着带）；`scrape/subtitle_queue.go:68` `Enqueue` 返回的 bool 无人使用；大量仅包内使用的导出函数（`CanIdentifyVideo`、`IdentifyScanVideos`、`ResolveSingleNFO`、`IndexDownloadedMovie`、`RemoveUnreferencedMovies`、`SaveScanProgress`、`ReportScan`、`SidecarByName`、`FindDirectoryNFO`、`VerifyCoverOrigin`、emby 的 `Ping` / `RefreshLibrary` / `ListPersonsWithoutAvatar` / `UploadPersonAvatar` / `SyncActorAvatars` / `PersonItem`）→ 改小写。
+- [ ] **93.** 零生产调用 / 仅测试使用：`scan/persist.go:22` `ProcessScanPage`、`scan/reconcile.go:20` `ReconcileScan`（只包事务）、`scan/identity.go:127` `HasEligibleVideos`（零调用）；`scrape` 的 `Images()`（:124）、`LockArtwork`（:134）、`Directories`（:272）、`InvalidateDirCache`（:356）、`SetDirTTL`（:368）；`scrape/nfo_source.go:18` `ArtworkOrigin.NFO`（只写不读）；`library/library.go:62` `Service.images`（只赋值）；`library/viewed.go:25` `ViewedMovieIDs(ctx, limit ...int)` 无人传 limit（`api/discover.go:28` 接口也跟着带）；`scrape/subtitle_queue.go:68` `Enqueue` 返回的 bool 无人使用；大量仅包内使用的导出函数（`CanIdentifyVideo`、`IdentifyScanVideos`、`ResolveSingleNFO`、`IndexDownloadedMovie`、`RemoveUnreferencedMovies`、`SaveScanProgress`、`ReportScan`、`SidecarByName`、`FindDirectoryNFO`、`VerifyCoverOrigin`、emby client 的 `PersonItem`）→ 改小写。
 - [ ] **94.** 任务业务已迁入 library / monitor。重新检查 `internal/tasks` 与迁移后包的导出边界、包装方法和重复入口；`Service.Registry()` 已被 `app/task_workers.go` 使用，不再属于“仅测试调用”。仅对当前没有外部调用且无接口职责的符号缩小可见性。
 - [ ] **95.** Subscription `zone` 字段（schema:38、monitor Item、`AddMovieOptions`、`AddActorOptions`、`UpdateOptions`、API 输入）写入、继承、返回，前后端从不读取；订阅状态 `"error"`（schema:41、`monitor/service.go:34`、前端 subscription-card）从未被设置；`monitor.Status` 与 ent `subscription.Status` 重复。
 - [ ] **96.** `internal/subtitle`：`Provider.Name()` 从未通过接口调用（`subtitlecat.go:167` 另写死 `"SubtitleCat"`）；`finder.go:29-37` `WithAllowLoopbackForTesting` 测试开关进入生产结构体；`DecodeToUTF8` 最后的 `ToValidUTF8` 兜底实际走不到。
@@ -127,7 +129,7 @@
 - [ ] **126.** `internal/library/workflow.go` 的 metadataGroups 仍通过 payload 中的 `scan_task_id` 聚合 scrape/cover 子任务；`internal/api/sse.go` 的多个连接可能重复计算同一任务快照。快照已移出 task 表，删除“大快照逐行解析”的旧描述。通过查询计划和负载数据评估 parent_id 列/索引，以及共享快照或通知合并。
 - [ ] **127.** `internal/tasks/bus.go:69-75` `Notify()` 同时唤醒 pool：扫描分页进度（`scan/persist.go:171,230`、`reconcile.go:151`）、`SaveSubscriptionBatch`、`ChangeOffline`（每 30s）都会让 pool 空跑 Claim；`queue.go:66` Claim 自身又 Notify → 拆分 `WakePool()` 与 `NotifyUI()`。
 - [ ] **128.** `internal/ent/schema/task.go:37-42` `index.Fields("status", "created_at")` 的 `created_at` 从未用于过滤 / 排序，热点查询均为 `type + status + ORDER BY id` → `index.Fields("type", "status")`，删除单列 `type` 索引。
-- [ ] **129.** ✔ `internal/emby/service.go:403` `sendBatch` 每批 `/Library/Media/Updated` 增量通知后无条件调用 `RefreshLibrary`（`/Library/Refresh` 全库扫描），扫描期间约每 3 秒一次 → 删除。
+- [ ] **129.** ✔ `internal/emby/service.go` 的 `sendBatch` 每批 `/Library/Media/Updated` 增量通知后仍调用 `client.refresh`（`/Library/Refresh` 全库扫描），扫描期间约每 3 秒一次 → 删除。
 - [ ] **130.** `internal/library/scan/movies.go:29` `MatchMovies` 每页 100 个 `LIKE '%code'` 以 OR 连接 → 全表扫描；:38-45 codes × records 双重循环；:56 `slices.Contains` 去重 O(n²) → 增加 `canonical_code` 索引列 + 等值 IN，去重用 map。
 - [ ] **131.** `internal/library/scan/local.go` 已通过后台任务执行，但仍逐文件开事务并调用 MatchMovies；图片解码/重编码在 SQLite 写事务内，NotifyUpdated 在事务提交前调用。评估批量匹配、缩短事务以及提交后通知。
 - [ ] **132.** `internal/library/scan/reconcile.go:94-142` 全量扫描加载所有已刮削影片的 files / actors / tags；每部影片 `images.Exists` 3 次 stat + `ExportLocalMovie` stat / 写文件均在 SQLite 写事务内，长时间占写锁；:139 刮削任务逐条 `Create().Exec` → 事务外导出 + `CreateBulk`。
@@ -271,7 +273,7 @@
 
 ## 十五、安全（顺带发现）
 
-- [ ] **235.** 核查日志中的敏感查询参数：`internal/api/router.go` 请求日志可能记录 STRM URL 的 `token`；Emby 请求也有 query 形式的 API key。网页登录 URL token 通道已删除，不再列为待办。对实际日志入口统一脱敏，并验证错误日志和代理日志是否仍会泄漏。
+- [ ] **235.** 核查日志中的敏感查询参数：`internal/api/router.go` 请求日志可能记录 STRM URL 的 `token`。Emby client 已统一使用 X-Emby-Token 请求头，网页登录 URL token 通道也已删除，不再列为待办。对实际日志入口统一脱敏，并验证错误日志和代理日志是否仍会泄漏。
 - [ ] **236.** `GET /api/settings/emby` 明文返回 APIKey → 打码返回，提交时回填。
 - [ ] **237.** `internal/api/auth.go:164` 无论代理是否可信都信任 `X-Forwarded-Proto`；`router.go:45-49` `SetTrustedProxies` 错误被忽略，解析失败时部分列表静默生效 → 在 `config.Load` 校验。
 
