@@ -4,19 +4,19 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ppxb/miyabi/internal/network"
 	"github.com/ppxb/miyabi/internal/netx"
 )
 
 type NetworkManager interface {
-	Network(context.Context) (netx.ProxyConfig, error)
+	Config() netx.ProxyConfig
 	UpdateNetwork(context.Context, netx.ProxyConfig) error
-	TestNetwork(context.Context, netx.ProxyConfig) (netx.NetworkTestResponse, error)
+	TestNetwork(context.Context, netx.ProxyConfig) (network.TestResult, error)
 }
 
 func networkHandler(network NetworkManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		config, err := network.Network(c.Request.Context())
-		respond(c, config, err)
+		respond(c, network.Config(), nil)
 	}
 }
 
@@ -30,8 +30,7 @@ func networkUpdateHandler(network NetworkManager) gin.HandlerFunc {
 			c.Error(err)
 			return
 		}
-		updated, err := network.Network(c.Request.Context())
-		respond(c, updated, err)
+		respond(c, network.Config(), nil)
 	}
 }
 
@@ -39,11 +38,7 @@ func networkUpdateHandler(network NetworkManager) gin.HandlerFunc {
 // with the saved configuration when the body is empty.
 func networkTestHandler(network NetworkManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		config, err := network.Network(c.Request.Context())
-		if err != nil {
-			c.Error(err)
-			return
-		}
+		config := network.Config()
 		if c.Request.ContentLength != 0 {
 			bodyConfig, ok := bindJSON[netx.ProxyConfig](c)
 			if !ok {

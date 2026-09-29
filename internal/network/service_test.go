@@ -1,4 +1,4 @@
-package app
+package network
 
 import (
 	"fmt"
@@ -17,28 +17,28 @@ func TestNetworkServiceDefaultsToDirectAndPersistsUpdates(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 
-	service, err := NewNetworkService(t.Context(), store.Client)
+	service, err := New(t.Context(), store.Client)
 	if err != nil {
 		t.Fatal(err)
 	}
-	config, err := service.Network(t.Context())
-	if err != nil || config != (netx.ProxyConfig{}) || service.ProxyManager().Resolve() != nil {
-		t.Fatalf("initial network config = %+v, err=%v", config, err)
+	config := service.Config()
+	if config != (netx.ProxyConfig{}) || service.ProxyManager().Resolve() != nil {
+		t.Fatalf("initial network config = %+v", config)
 	}
 
 	want := netx.ProxyConfig{Enabled: true, URL: "http://127.0.0.1:7890"}
 	if err := service.UpdateNetwork(t.Context(), want); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := service.Network(t.Context()); got != want {
+	if got := service.Config(); got != want {
 		t.Fatalf("updated config = %+v, want %+v", got, want)
 	}
 
-	restarted, err := NewNetworkService(t.Context(), store.Client)
+	restarted, err := New(t.Context(), store.Client)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, _ := restarted.Network(t.Context()); got != want || restarted.ProxyManager().Resolve() == nil {
+	if got := restarted.Config(); got != want || restarted.ProxyManager().Resolve() == nil {
 		t.Fatalf("persisted config = %+v", got)
 	}
 }
@@ -49,14 +49,14 @@ func TestNetworkServiceRejectsInvalidUpdateWithoutChangingCurrentValue(t *testin
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
-	service, err := NewNetworkService(t.Context(), store.Client)
+	service, err := New(t.Context(), store.Client)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := service.UpdateNetwork(t.Context(), netx.ProxyConfig{Enabled: true, URL: "ftp://127.0.0.1:21"}); err == nil {
 		t.Fatal("invalid proxy URL was accepted")
 	}
-	if got, _ := service.Network(t.Context()); got != (netx.ProxyConfig{}) {
+	if got := service.Config(); got != (netx.ProxyConfig{}) {
 		t.Fatalf("invalid update changed config: %+v", got)
 	}
 }
@@ -67,7 +67,7 @@ func TestNetworkServiceConcurrentUpdatesStayConsistent(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
-	service, err := NewNetworkService(t.Context(), store.Client)
+	service, err := New(t.Context(), store.Client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,10 +85,7 @@ func TestNetworkServiceConcurrentUpdatesStayConsistent(t *testing.T) {
 	wg.Wait()
 
 	// Memory config must match the persisted database config
-	memConfig, err := service.Network(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
+	memConfig := service.Config()
 	dbConfig, _, err := database.LoadSetting[netx.ProxyConfig](t.Context(), store.Client, networkProxySetting)
 	if err != nil {
 		t.Fatal(err)

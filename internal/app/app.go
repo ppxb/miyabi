@@ -27,6 +27,7 @@ import (
 	"github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/maintenance"
 	"github.com/ppxb/miyabi/internal/monitor"
+	"github.com/ppxb/miyabi/internal/network"
 	"github.com/ppxb/miyabi/internal/netx"
 	"github.com/ppxb/miyabi/internal/offline"
 	"github.com/ppxb/miyabi/internal/strm"
@@ -60,7 +61,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
-	network, err := NewNetworkService(ctx, store.Client)
+	networkSvc, err := network.New(ctx, store.Client)
 	if err != nil {
 		_ = store.Close()
 		return nil, fmt.Errorf("initialize network service: %w", err)
@@ -82,7 +83,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	}
 
 	libSvc := library.New(store.Client, driveSvc, taskSvc, images)
-	catalogueSvc, err := catalogue.New(ctx, store.Client, javdb.Options{}, network.ProxyManager(), libSvc)
+	catalogueSvc, err := catalogue.New(ctx, store.Client, javdb.Options{}, networkSvc.ProxyManager(), libSvc)
 	if err != nil {
 		driveSvc.Close()
 		_ = store.Close()
@@ -100,7 +101,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		return nil, fmt.Errorf("initialize maintenance service: %w", err)
 	}
 
-	subtitleSvc := subtitle.NewService(store.Client, subtitle.NewFinder(network.ProxyManager()))
+	subtitleSvc := subtitle.NewService(store.Client, subtitle.NewFinder(networkSvc.ProxyManager()))
 	syncActors := cfg.EmbySyncActors
 	embySvc, err := emby.NewService(ctx, store.Client, emby.Config{
 		Enabled:    cfg.EmbyEnabled,
@@ -120,7 +121,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 
 	gfriendsClient := gfriends.New(cfg.DataDir, &http.Client{
 		Timeout:   30 * time.Second,
-		Transport: netx.NewTransport(network.ProxyManager()),
+		Transport: netx.NewTransport(networkSvc.ProxyManager()),
 	})
 	embySvc.SetGFriends(gfriendsClient)
 	embySvc.SetMediaFetcher(catalogueSvc)
@@ -181,7 +182,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Tasks:          &taskViews{Service: taskSvc, database: store.Client, library: libSvc, monitor: monitorSvc},
 		Artwork:        scrapeSvc,
 		Maintenance:    maintenanceSvc,
-		Network:        network,
+		Network:        networkSvc,
 		Emby:           embySvc,
 		Frontend:       miyabi.Frontend(),
 		STRMToken:      cfg.STRMToken,
