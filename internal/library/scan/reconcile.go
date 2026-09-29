@@ -48,7 +48,7 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 	if err != nil {
 		return fmt.Errorf("remove missing file indexes: %w", err)
 	}
-	removed, err := RemoveUnreferencedMovies(ctx, tx, movies)
+	removed, err := removeUnreferencedMovies(ctx, tx, movies)
 	if err != nil {
 		return err
 	}

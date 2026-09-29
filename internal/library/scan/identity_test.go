@@ -94,8 +94,8 @@ func TestCanIdentifyVideo(t *testing.T) {
 		{"too small", pan.File{Name: "ABP-001.mp4", Size: (100 << 20) - 1}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := CanIdentifyVideo(tc.file); got != tc.valid {
-				t.Fatalf("CanIdentifyVideo(%+v) = %v, want %v", tc.file, got, tc.valid)
+			if got := canIdentifyVideo(tc.file); got != tc.valid {
+				t.Fatalf("canIdentifyVideo(%+v) = %v, want %v", tc.file, got, tc.valid)
 			}
 		})
 	}

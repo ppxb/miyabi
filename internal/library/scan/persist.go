@@ -121,7 +121,7 @@ func (r *scanRun) processPageTx(ctx context.Context, tx *ent.Tx, directoryPath s
 				return fmt.Errorf("mark unchanged scanned files: %w", err)
 			}
 		}
-		removed, err := RemoveUnreferencedMovies(ctx, tx, previousMovies)
+		removed, err := removeUnreferencedMovies(ctx, tx, previousMovies)
 		if err != nil {
 			return err
 		}
@@ -183,8 +183,8 @@ func IndexDownloadedMovie(ctx context.Context, tx *ent.Tx, payload Payload) (int
 	return record.ID, nil
 }
 
-// RemoveUnreferencedMovies deletes movie records that no longer have any associated media files and returns their codes.
-func RemoveUnreferencedMovies(ctx context.Context, tx *ent.Tx, ids []int) ([]string, error) {
+// removeUnreferencedMovies deletes movie records that no longer have any associated media files and returns their codes.
+func removeUnreferencedMovies(ctx context.Context, tx *ent.Tx, ids []int) ([]string, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}

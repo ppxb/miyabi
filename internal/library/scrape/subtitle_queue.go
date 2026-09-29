@@ -63,23 +63,21 @@ func newSubtitleQueue(service *Service, concurrency, capacity int, logger *slog.
 }
 
 // Enqueue adds a subtitle task to the queue if not already pending and queue has capacity.
-// It returns true if enqueued, false if deduplicated or dropped due to queue overflow.
-func (q *SubtitleQueue) Enqueue(task SubtitleTask) bool {
+func (q *SubtitleQueue) Enqueue(task SubtitleTask) {
 	q.mu.Lock()
 	if q.ctx != nil && q.ctx.Err() != nil {
 		q.mu.Unlock()
-		return false
+		return
 	}
 	if q.pending[task.MovieID] {
 		q.mu.Unlock()
-		return false // Deduplicate: already queued or running
+		return // Deduplicate: already queued or running
 	}
 	q.pending[task.MovieID] = true
 	q.mu.Unlock()
 
 	select {
 	case q.tasks <- task:
-		return true
 	default:
 		// Queue full: safely drop and clear pending state to prevent memory leak
 		q.mu.Lock()
@@ -91,7 +89,6 @@ func (q *SubtitleQueue) Enqueue(task SubtitleTask) bool {
 				"movie_id", task.MovieID,
 			)
 		}
-		return false
 	}
 }
 

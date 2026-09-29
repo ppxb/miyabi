@@ -13,14 +13,10 @@ import (
 const maxViewedMovies = 5000
 
 // ViewedMovieIDs returns viewed JavDB IDs, ordered by most recently viewed first.
-func (s *Service) ViewedMovieIDs(ctx context.Context, limit ...int) ([]string, error) {
-	max := maxViewedMovies
-	if len(limit) > 0 && limit[0] > 0 {
-		max = limit[0]
-	}
+func (s *Service) ViewedMovieIDs(ctx context.Context) ([]string, error) {
 	records, err := s.database.ViewedMovie.Query().
 		Order(ent.Desc(viewedmovie.FieldViewedAt), ent.Desc(viewedmovie.FieldID)).
-		Limit(max).
+		Limit(maxViewedMovies).
 		Select(viewedmovie.FieldJavdbID).
 		All(ctx)
 	if err != nil {

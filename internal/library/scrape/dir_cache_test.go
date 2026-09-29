@@ -60,10 +60,9 @@ func (m *mockSession) OfflineTasks(ctx context.Context, page int) (pan.OfflinePa
 	return pan.OfflinePage{}, nil
 }
 
-func TestDirectoryEntries_CacheAndInvalidation(t *testing.T) {
+func TestDirectoryEntries_CacheAndExpiration(t *testing.T) {
 	service := &Service{
 		dirCache: make(map[string]dirCacheEntry),
-		dirTTL:   time.Minute,
 	}
 
 	source := domain.LibrarySource{
@@ -110,10 +109,12 @@ func TestDirectoryEntries_CacheAndInvalidation(t *testing.T) {
 		t.Fatalf("expected still 1 list call (cache hit), got %d", sess.listCalls.Load())
 	}
 
-	// Invalidate cache
-	service.InvalidateDirCache("acc-1", "dir-100")
+	// Expire the cached listing so the next read queries the source again.
+	entry := service.dirCache["acc-1:dir-100"]
+	entry.expiresAt = time.Now().Add(-time.Second)
+	service.dirCache["acc-1:dir-100"] = entry
 
-	// Third read after invalidation: should query session again
+	// Third read after expiration: should query session again
 	files3, err := service.directoryEntries(ctx, sess, "dir-100")
 	if err != nil {
 		t.Fatalf("third directoryEntries failed: %v", err)
@@ -122,7 +123,7 @@ func TestDirectoryEntries_CacheAndInvalidation(t *testing.T) {
 		t.Fatalf("expected 2 files, got %d", len(files3))
 	}
 	if sess.listCalls.Load() != 2 {
-		t.Fatalf("expected 2 list calls after invalidation, got %d", sess.listCalls.Load())
+		t.Fatalf("expected 2 list calls after expiration, got %d", sess.listCalls.Load())
 	}
 }
 

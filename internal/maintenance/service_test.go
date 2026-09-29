@@ -174,8 +174,8 @@ func TestDataCleanupPreservesAllLibraryAndUnfinishedTaskReferences(t *testing.T)
 func TestDataCleanupAndCoverWorkShareAnExclusiveGate(t *testing.T) {
 	service := dataFixture(t)
 	unused := dataArtwork(t, service, 70)
-	if err := service.scrape.(*scrape.Service).LockArtwork(t.Context()); err != nil {
-		t.Fatal(err)
+	if !service.scrape.TryLockArtwork() {
+		t.Fatal("could not acquire artwork gate")
 	}
 	if _, err := service.ClearCache(t.Context()); !errors.Is(err, ErrCacheBusy) {
 		t.Fatalf("cleanup entered an active artwork operation: %v", err)

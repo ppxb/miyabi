@@ -71,7 +71,6 @@ type Service struct {
 
 	dirMu    sync.RWMutex
 	dirCache map[string]dirCacheEntry
-	dirTTL   time.Duration
 
 	exportMgr     *export.Manager
 	mediaNotifier MediaNotifier
@@ -99,7 +98,6 @@ func New(db *ent.Client, d *drive.Drive, discover Discoverer, images *mediaimage
 		images:        images,
 		notifier:      notifier,
 		dirCache:      make(map[string]dirCacheEntry),
-		dirTTL:        defaultDirCacheTTL,
 		exportMgr:     deps.ExportManager,
 		mediaNotifier: deps.MediaNotifier,
 		subtitles:     deps.Subtitles,
@@ -130,19 +128,9 @@ func (service *Service) Close() {
 	}
 }
 
-// Images returns the underlying image cache.
-func (service *Service) Images() *mediaimage.Cache {
-	return service.images
-}
-
 // TryLockArtwork attempts to acquire the artwork lock for cache maintenance.
 func (service *Service) TryLockArtwork() bool {
 	return service.artwork.TryLock()
-}
-
-// LockArtwork acquires the artwork lock.
-func (service *Service) LockArtwork(ctx context.Context) error {
-	return service.artwork.Lock(ctx)
 }
 
 // UnlockArtwork releases the artwork lock.
@@ -255,10 +243,6 @@ type MovieDirectory struct {
 
 // Directories returns all directories containing media files for the movie.
 func (service *Service) Directories(ctx context.Context, sess drive.Session, input MetadataPayload) ([]MovieDirectory, error) {
-	return service.directories(ctx, sess, input)
-}
-
-func (service *Service) directories(ctx context.Context, sess drive.Session, input MetadataPayload) ([]MovieDirectory, error) {
 	files, err := service.db.File.Query().Where(fileScope(input.Source), file.MovieIDEQ(input.MovieID)).
 		Order(ent.Asc(file.FieldParentID), ent.Asc(file.FieldFileID)).All(ctx)
 	if err != nil {
@@ -322,34 +306,11 @@ func (service *Service) directoryEntries(ctx context.Context, sess drive.Session
 	if service.dirCache == nil {
 		service.dirCache = make(map[string]dirCacheEntry)
 	}
-	ttl := service.dirTTL
-	if ttl <= 0 {
-		ttl = defaultDirCacheTTL
-	}
 	service.dirCache[key] = dirCacheEntry{
 		files:     files,
-		expiresAt: time.Now().Add(ttl),
+		expiresAt: time.Now().Add(defaultDirCacheTTL),
 	}
 	service.dirMu.Unlock()
 
 	return slices.Clone(files), nil
-}
-
-// InvalidateDirCache purges cached directory entries for the specified directory.
-func (service *Service) InvalidateDirCache(accountID, dirID string) {
-	service.dirMu.Lock()
-	defer service.dirMu.Unlock()
-	if service.dirCache != nil {
-		if accountID != "" {
-			delete(service.dirCache, accountID+":"+dirID)
-		}
-		delete(service.dirCache, dirID)
-	}
-}
-
-// SetDirTTL configures the directory cache TTL (used for tests or tuning).
-func (service *Service) SetDirTTL(ttl time.Duration) {
-	service.dirMu.Lock()
-	service.dirTTL = ttl
-	service.dirMu.Unlock()
 }

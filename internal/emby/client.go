@@ -88,21 +88,21 @@ func (c *embyClient) refresh(ctx context.Context, cfg Config) error {
 	return c.request(ctx, cfg, http.MethodPost, "/Library/Refresh", nil, "", nil)
 }
 
-type PersonItem struct {
+type personItem struct {
 	Name            string            `json:"Name"`
 	ID              string            `json:"Id"`
 	PrimaryImageTag string            `json:"PrimaryImageTag,omitempty"`
 	ImageTags       map[string]string `json:"ImageTags,omitempty"`
 }
 
-func (c *embyClient) personsWithoutAvatar(ctx context.Context, cfg Config) ([]PersonItem, error) {
+func (c *embyClient) personsWithoutAvatar(ctx context.Context, cfg Config) ([]personItem, error) {
 	var result struct {
-		Items []PersonItem `json:"Items"`
+		Items []personItem `json:"Items"`
 	}
 	if err := c.request(ctx, cfg, http.MethodGet, "/Persons", nil, "", &result); err != nil {
 		return nil, err
 	}
-	var missing []PersonItem
+	var missing []personItem
 	for _, person := range result.Items {
 		if person.ID != "" && strings.TrimSpace(person.Name) != "" && person.PrimaryImageTag == "" && person.ImageTags["Primary"] == "" {
 			missing = append(missing, person)

@@ -135,7 +135,7 @@ func (goldenLibrary) Movies(context.Context, int, int) (library.Page, error) {
 	}}, nil
 }
 
-func (goldenLibrary) ViewedMovieIDs(context.Context, ...int) ([]string, error) {
+func (goldenLibrary) ViewedMovieIDs(context.Context) ([]string, error) {
 	return []string{"movie-exact"}, nil
 }
 

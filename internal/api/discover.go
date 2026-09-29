@@ -23,7 +23,7 @@ type CatalogueManager interface {
 }
 
 type ViewedManager interface {
-	ViewedMovieIDs(context.Context, ...int) ([]string, error)
+	ViewedMovieIDs(context.Context) ([]string, error)
 	AddViewedMovieIDs(context.Context, []string) error
 }
 

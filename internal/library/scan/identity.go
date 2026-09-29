@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"slices"
 	"strings"
 
 	"github.com/ppxb/miyabi/internal/codeid"
@@ -14,8 +13,8 @@ import (
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
-// CanIdentifyVideo reports whether a file meets the requirements for a feature video or STRM.
-func CanIdentifyVideo(entry pan.File) bool {
+// canIdentifyVideo reports whether a file meets the requirements for a feature video or STRM.
+func canIdentifyVideo(entry pan.File) bool {
 	if entry.IsDirectory {
 		return false
 	}
@@ -38,7 +37,7 @@ func IdentifyScanVideos(payload Payload, videos []Video, previous map[string]*en
 		video := &videos[index]
 		old := previous[video.ID]
 		switch {
-		case !CanIdentifyVideo(video.File):
+		case !canIdentifyVideo(video.File):
 			// Auxiliary files cannot inherit an old or downloaded identity.
 			video.Code = ""
 		case payload.OfflineTaskID != 0 && payload.TargetID != "":
@@ -64,7 +63,7 @@ func ResolveNFOCodes(ctx context.Context, sess drive.Session, sidecars []pan.Fil
 	var firstCode string
 	shared := false
 	for _, video := range videos {
-		if !CanIdentifyVideo(video.File) || video.Code == "" {
+		if !canIdentifyVideo(video.File) || video.Code == "" {
 			continue
 		}
 		if firstCode == "" {
@@ -76,7 +75,7 @@ func ResolveNFOCodes(ctx context.Context, sess drive.Session, sidecars []pan.Fil
 	codes := make(map[string]string)
 	for i := range videos {
 		video := &videos[i]
-		if !CanIdentifyVideo(video.File) || (video.Code == "" && (shared || len(sidecars) != 1)) {
+		if !canIdentifyVideo(video.File) || (video.Code == "" && (shared || len(sidecars) != 1)) {
 			continue
 		}
 		entry, found := findNFO(video.Code, shared, sidecars)
@@ -115,7 +114,7 @@ func ResolveNFOCodes(ctx context.Context, sess drive.Session, sidecars []pan.Fil
 // A targeted download checks only its matching NFO, not other movies' metadata.
 func resolveTargetNFO(ctx context.Context, sess drive.Session, videos []Video) error {
 	video := videos[0]
-	if !CanIdentifyVideo(video.File) {
+	if !canIdentifyVideo(video.File) {
 		return nil
 	}
 	entries, err := drive.DirectoryEntries(ctx, sess, video.ParentID)
@@ -128,7 +127,7 @@ func resolveTargetNFO(ctx context.Context, sess drive.Session, videos []Video) e
 		if !entry.IsDirectory && strings.EqualFold(path.Ext(entry.Name), ".nfo") {
 			sidecars = append(sidecars, entry)
 		}
-		if entry.ID != video.ID && CanIdentifyVideo(entry) {
+		if entry.ID != video.ID && canIdentifyVideo(entry) {
 			code, _ := codeid.Parse(entry.Name)
 			shared = shared || code == "" || !codeid.IsEquivalent(video.Code, code)
 		}
@@ -138,11 +137,4 @@ func resolveTargetNFO(ctx context.Context, sess drive.Session, videos []Video) e
 		return nil
 	}
 	return ResolveNFOCodes(ctx, sess, []pan.File{entry}, videos)
-}
-
-// HasEligibleVideos returns whether the given videos slice contains any eligible feature video.
-func HasEligibleVideos(videos []Video) bool {
-	return slices.ContainsFunc(videos, func(v Video) bool {
-		return CanIdentifyVideo(v.File)
-	})
 }

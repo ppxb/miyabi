@@ -17,7 +17,7 @@ type viewedStub struct {
 	ids []string
 }
 
-func (stub *viewedStub) ViewedMovieIDs(_ context.Context, _ ...int) ([]string, error) {
+func (stub *viewedStub) ViewedMovieIDs(_ context.Context) ([]string, error) {
 	return stub.ids, nil
 }
 

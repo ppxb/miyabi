@@ -201,7 +201,12 @@ func newMountedDrive(t testing.TB, database *ent.Client, client *panStub, source
 	return d
 }
 
-func libraryFixture(t testing.TB) (*Service, domain.TaskInfo, scan.Payload) {
+type libraryTestService struct {
+	*Service
+	images *mediaimage.Cache
+}
+
+func libraryFixture(t testing.TB) (*libraryTestService, domain.TaskInfo, scan.Payload) {
 	t.Helper()
 	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {
@@ -215,7 +220,7 @@ func libraryFixture(t testing.TB) (*Service, domain.TaskInfo, scan.Payload) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lib := New(store.Client, driveSvc, taskSvc, images, Options{Pacing: func(context.Context) error { return nil }})
+	lib := &libraryTestService{Service: New(store.Client, driveSvc, taskSvc, images, Options{Pacing: func(context.Context) error { return nil }}), images: images}
 	queued, err := lib.EnqueueScan(t.Context(), source)
 	if err != nil {
 		t.Fatal(err)
@@ -228,7 +233,7 @@ func libraryFixture(t testing.TB) (*Service, domain.TaskInfo, scan.Payload) {
 	return lib, queued, scan.Payload{Source: source, Scan: domain.ScanProgress{Stage: "scanning"}}
 }
 
-func panConcurrencyFixture(t *testing.T) (*Service, *panStub) {
+func panConcurrencyFixture(t *testing.T) (*libraryTestService, *panStub) {
 	t.Helper()
 	lib, _, _ := libraryFixture(t)
 	return lib, stubOf(t, lib.drive)
@@ -238,7 +243,7 @@ func fixtureVideo(id, name string) scan.Video {
 	return scan.IdentifyVideo(pan.File{ID: id, ParentID: "10", Name: name, Size: 1 << 30})
 }
 
-func identifyScanVideosForTest(ctx context.Context, lib *Service, payload scan.Payload, entries []pan.File) (map[string]scan.Video, error) {
+func identifyScanVideosForTest(ctx context.Context, lib *libraryTestService, payload scan.Payload, entries []pan.File) (map[string]scan.Video, error) {
 	previous, err := lib.database.File.Query().WithMovie().All(ctx)
 	if err != nil {
 		return nil, err
@@ -261,12 +266,12 @@ func identifyScanVideosForTest(ctx context.Context, lib *Service, payload scan.P
 	return result, nil
 }
 
-func indexScanPage(ctx context.Context, lib *Service, taskID int, scanID, directoryPath string, videos []scan.Video, payload *scan.Payload) error {
+func indexScanPage(ctx context.Context, lib *libraryTestService, taskID int, scanID, directoryPath string, videos []scan.Video, payload *scan.Payload) error {
 	payload.ScanID = scanID
 	return scan.ProcessScanPage(ctx, lib.database, taskID, directoryPath, videos, payload, nil, lib.tasks)
 }
 
-func reconcileScan(ctx context.Context, lib *Service, taskID int, scanID string, payload *scan.Payload) error {
+func reconcileScan(ctx context.Context, lib *libraryTestService, taskID int, scanID string, payload *scan.Payload) error {
 	payload.ScanID = scanID
 	return scan.ReconcileScan(ctx, lib.database, taskID, payload, lib.images, lib.tasks, export.Config{}, nil)
 }

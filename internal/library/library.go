@@ -61,7 +61,6 @@ type Page struct {
 }
 
 type Service struct {
-	images       *mediaimage.Cache
 	database     *ent.Client
 	drive        *drive.Drive
 	tasks        *tasks.Service
@@ -82,7 +81,6 @@ func New(database *ent.Client, d *drive.Drive, tasks *tasks.Service, images *med
 		database:     database,
 		drive:        d,
 		tasks:        tasks,
-		images:       images,
 		scanner:      scan.New(d, database, images, tasks, options.ExportManager, options.Pacing),
 		localScanner: scan.NewLocalScanner(database, images),
 		exportMgr:    options.ExportManager,

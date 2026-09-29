@@ -110,7 +110,7 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 		return nil, err
 	}
 	// Verify current video locations before exporting local files.
-	directories, err := service.directories(ctx, sess, input.MetadataPayload)
+	directories, err := service.Directories(ctx, sess, input.MetadataPayload)
 	if err != nil {
 		return nil, err
 	}

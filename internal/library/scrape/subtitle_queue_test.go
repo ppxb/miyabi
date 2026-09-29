@@ -22,22 +22,26 @@ func TestSubtitleQueue_DeduplicationAndCapacity(t *testing.T) {
 	task3 := SubtitleTask{MovieID: 103}
 
 	// 1. Initial enqueue succeeds
-	if !q.Enqueue(task1) {
+	q.Enqueue(task1)
+	if len(q.tasks) != 1 {
 		t.Fatal("expected task1 to be enqueued")
 	}
 
 	// 2. Duplicate enqueue for the same movie ID is rejected
-	if q.Enqueue(task1) {
+	q.Enqueue(task1)
+	if len(q.tasks) != 1 {
 		t.Fatal("expected duplicate task1 to be rejected")
 	}
 
 	// 3. Second unique task fills the buffer (capacity 2)
-	if !q.Enqueue(task2) {
+	q.Enqueue(task2)
+	if len(q.tasks) != 2 {
 		t.Fatal("expected task2 to be enqueued")
 	}
 
 	// 4. Third task exceeds capacity and is dropped cleanly
-	if q.Enqueue(task3) {
+	q.Enqueue(task3)
+	if len(q.tasks) != 2 {
 		t.Fatal("expected task3 to be dropped due to full queue")
 	}
 
@@ -50,6 +54,9 @@ func TestSubtitleQueue_DeduplicationAndCapacity(t *testing.T) {
 		t.Fatal("tasks 101 and 102 should be in pending map")
 	}
 	q.mu.Unlock()
+	if first, second := <-q.tasks, <-q.tasks; first != task1 || second != task2 {
+		t.Fatalf("queued tasks = %+v, %+v", first, second)
+	}
 }
 
 func TestSubtitleQueue_GracefulShutdown(t *testing.T) {
@@ -57,17 +64,17 @@ func TestSubtitleQueue_GracefulShutdown(t *testing.T) {
 	q := newSubtitleQueue(service, 2, 8, nil)
 
 	task := SubtitleTask{MovieID: 201}
-	if !q.Enqueue(task) {
-		t.Fatal("expected task to be enqueued")
-	}
+	q.Enqueue(task)
 
-	// Close waits for workers to drain and exit
+	// Close waits for active workers to exit.
 	q.Close()
 
-	// After close, enqueue must return false
+	// After close, new tasks must not enter the queue or pending map.
+	queued := len(q.tasks)
 	taskAfterClose := SubtitleTask{MovieID: 202}
-	if q.Enqueue(taskAfterClose) {
-		t.Fatal("enqueue after close should return false")
+	q.Enqueue(taskAfterClose)
+	if len(q.tasks) != queued || q.pending[202] {
+		t.Fatal("enqueue after close accepted a task")
 	}
 }
 

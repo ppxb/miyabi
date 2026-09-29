@@ -19,7 +19,7 @@ import (
 )
 
 type completedScanFixture struct {
-	lib      *Service
+	lib      *libraryTestService
 	queued   domain.TaskInfo
 	payload  scan.Payload
 	covered  *ent.Task
