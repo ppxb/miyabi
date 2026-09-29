@@ -3,6 +3,8 @@ package pan
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -262,4 +264,106 @@ func TestPanClientRetryAfterUsesSharedTransport(t *testing.T) {
 			t.Fatalf("attempts=%d", attempts)
 		}
 	})
+}
+
+func TestPanClientLongRetryAfterDoesNotConsumeIOTimeout(t *testing.T) {
+	for _, seconds := range []int{60, 120} {
+		for _, method := range []string{http.MethodGet, http.MethodPost} {
+			t.Run(fmt.Sprintf("%s/%d", method, seconds), func(t *testing.T) {
+				synctest.Test(t, func(t *testing.T) {
+					client := New()
+					defer client.Close()
+					transport := client.http.GetClient().Transport.(*panTransport)
+					attempts := 0
+					start := time.Now()
+					transport.base = offlineRoundTrip(func(req *http.Request) (*http.Response, error) {
+						attempts++
+						if deadline, ok := req.Context().Deadline(); !ok || deadline.Sub(time.Now()) != requestTimeout {
+							t.Error("network attempt did not receive a fresh I/O deadline")
+						}
+						if attempts == 1 {
+							return &http.Response{StatusCode: 429, Header: http.Header{"Retry-After": {fmt.Sprint(seconds)}}, Body: http.NoBody}, nil
+						}
+						return &http.Response{StatusCode: 200, Header: make(http.Header), Body: http.NoBody}, nil
+					})
+					_, err := client.request(client.http.R().SetContext(t.Context()), method, "http://example.com")
+					if err != nil || attempts != 2 || time.Since(start) != time.Duration(seconds)*time.Second {
+						t.Fatalf("attempts=%d elapsed=%s err=%v", attempts, time.Since(start), err)
+					}
+				})
+			})
+		}
+	}
+}
+
+type blockedResponseBody struct {
+	ctx    context.Context
+	closed bool
+}
+
+func (b *blockedResponseBody) Read([]byte) (int, error) { <-b.ctx.Done(); return 0, b.ctx.Err() }
+func (b *blockedResponseBody) Close() error             { b.closed = true; return nil }
+
+func TestPanClientStillBoundsHeadersAndBody(t *testing.T) {
+	for _, stage := range []string{"headers", "body"} {
+		t.Run(stage, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				client := New()
+				defer client.Close()
+				transport := client.http.GetClient().Transport.(*panTransport)
+				var body *blockedResponseBody
+				attempts := 0
+				start := time.Now()
+				transport.base = offlineRoundTrip(func(req *http.Request) (*http.Response, error) {
+					attempts++
+					if stage == "headers" {
+						<-req.Context().Done()
+						return nil, req.Context().Err()
+					}
+					body = &blockedResponseBody{ctx: req.Context()}
+					return &http.Response{StatusCode: 200, Header: make(http.Header), Body: body}, nil
+				})
+				_, err := client.request(client.http.R().SetContext(t.Context()), http.MethodPost, "http://example.com")
+				if !errors.Is(err, context.DeadlineExceeded) || attempts != 1 || time.Since(start) != requestTimeout {
+					t.Fatalf("attempts=%d elapsed=%s err=%v", attempts, time.Since(start), err)
+				}
+				if body != nil && !body.closed {
+					t.Fatal("timed out body not closed")
+				}
+			})
+		})
+	}
+}
+
+func TestPanResponseDeadlineEndsAtEOFOrClose(t *testing.T) {
+	for _, read := range []bool{false, true} {
+		t.Run(fmt.Sprint(read), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var networkCtx context.Context
+				transport := newPanTransport(offlineRoundTrip(func(req *http.Request) (*http.Response, error) {
+					networkCtx = req.Context()
+					return &http.Response{StatusCode: 200, Header: make(http.Header), Body: http.NoBody}, nil
+				}), rate.NewLimiter(rate.Inf, 1), 1)
+				req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://example.com", nil)
+				resp, err := transport.RoundTrip(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if networkCtx.Err() != nil {
+					t.Fatal("deadline canceled before body consumption")
+				}
+				if read {
+					if _, err := io.ReadAll(resp.Body); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					resp.Body.Close()
+				}
+				if !errors.Is(networkCtx.Err(), context.Canceled) {
+					t.Fatal("finished response retained its timer")
+				}
+				resp.Body.Close()
+			})
+		})
+	}
 }

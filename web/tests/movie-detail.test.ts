@@ -350,3 +350,59 @@ test('card subscriptions follow relevant cache changes and unsubscribe on dispos
   client.setQueryData(discoverKeys.movie('one'), card)
   assert.equal(notify.mock.calls.length, 2)
 })
+
+test('visible cached cards enter the shared queue when their list data disappears', async () => {
+  const { client, recommend, requests } = fixture()
+  const key = discoverKeys.movies({ page: 1 })
+  client.setQueryData(key, [movie('three')])
+  recommend('one')
+  recommend('two')
+  recommend('three')
+  await setImmediate()
+  assert.deepEqual(
+    requests.map(request => request.id),
+    ['one', 'two']
+  )
+  client.setQueryData(key, [])
+  await setImmediate()
+  assert.equal(requests.length, 2, 'reload bypassed the two background slots')
+  requests[0]!.resolve(movie('one'))
+  await setImmediate()
+  assert.deepEqual(
+    requests.map(request => request.id),
+    ['one', 'two', 'three']
+  )
+  requests[1]!.resolve(movie('two'))
+  requests[2]!.resolve(movie('three'))
+  await setImmediate()
+  assert.equal(findCachedMovieCard(client, 'three')?.title, 'Title three')
+})
+
+test('cached card subscriptions are released on leaving and shared consumers still reload', async () => {
+  const { client, recommend, requests } = fixture()
+  const key = discoverKeys.search({ query: 'ABP' })
+  client.setQueryData(key, [movie('one'), movie('two')])
+  const leaveOne = recommend('one')
+  const leaveTwoFirst = recommend('two')
+  recommend('two')
+  leaveOne()
+  leaveTwoFirst()
+  client.removeQueries({ queryKey: key })
+  await setImmediate()
+  assert.deepEqual(
+    requests.map(request => request.id),
+    ['two']
+  )
+  requests[0]!.resolve(movie('two'))
+})
+
+test('leaving immediately after cache removal cancels the pending reload', async () => {
+  const { client, recommend, requests } = fixture()
+  const key = discoverKeys.movies({ page: 1 })
+  client.setQueryData(key, [movie('one')])
+  const leave = recommend('one')
+  client.removeQueries({ queryKey: key })
+  leave()
+  await setImmediate()
+  assert.equal(requests.length, 0)
+})

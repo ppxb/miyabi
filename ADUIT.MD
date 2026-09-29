@@ -58,6 +58,7 @@
   - 方案修正：JavDB 推荐仅提供基础引用，卡片所需标题等字段必须补全；保留可见性触发、后台两路并发、共享消费者、撤销未开始请求、点击优先及导航请求复用。placeholderData 不能替代跨查询订阅，不按原候选方案强行删除调度和 useSyncExternalStore。
   - 实现：删除额外 WeakMap 卡片索引、永久 QueryCache 订阅和全量重建，直接从 Query 缓存选取最新卡片；集中卡片查询范围与订阅过滤，订阅随组件卸载释放，忽略无关查询移除。列表替换后不再残留已移除卡片，完整详情缓存不混入列表数据。
   - 验证：Vitest 113 项、typecheck、lint 通过，保留并发/优先/取消/导航复用测试，新增列表替换与移除、失效缓存补全、相关事件订阅与释放测试。未进行浏览器交互及真实 JavDB 联调，待整体复查。
+  - 复查修复：可见性 request 在初次命中缓存时也保留临时订阅；列表替换/移除导致数据缺失时重新进入同一补全队列，离屏释放订阅与未开始请求。新增缓存消失后补全、双并发限制、共享消费者及移除后立即离屏测试；全量 Vitest 115 项、typecheck、lint 通过。
 - [x] **67.** `web/src/api/browse-history-store.ts`（199 行）+ `browse-history.ts`：为"已浏览"徽章做 localStorage 持久化 + 服务端合并 + 50 条批量 + 10s 防抖 + beacon + 5000 截断（:178-183，服务端返回全部，不一致）；测试专用 `unref`（:136-139）进入生产代码；:47 注释引用已不存在的 `REFACTOR_PLAN`；`browse-history.ts:13` 每卡片 effect 调 `init()`，:15 `subscribe` 每次渲染新建 → `useQuery` + 乐观 `useMutation`，整个 store 删除。
   - 核实与取舍：当前服务端同样限制 5000 条，原文“服务端返回全部”已不适用。采用服务端记录与 Query 缓存；用户已接受未提交成功就关闭页面的记录不再跨重启补发，旧 localStorage 待提交内容不再读取。
   - 实现：删除 BrowseHistoryStore、localStorage 合并、延迟批量、退出 beacon 和手动订阅；共享 useQuery 获取记录，useMutation 立即提交并短期重试网络/服务端错误，useMutationState 提供提交中乐观徽章，失败不回滚其他记录。成功后仅更新缓存，保留服务端同步时间，过期后随页面挂载或窗口聚焦同步；查询合并请求期间新确认的记录，避免首次加载覆盖新记录，本地缓存同样限制 5000 条。保持空 ID 和同 ID 进行中提交去重。
@@ -75,6 +76,7 @@
   - 核实：原来的两层等待通常重叠，并非必然双倍；实际风险是共享截止时间延长后，已等待请求未重新检查。
   - 实现：删除 Resty SetRetryAfter 回调，由 panTransport 统一解析并执行共享等待，在退避与限速等待后重新检查截止时间；保留重试次数、条件、普通退避、限速和并发上限。
   - 验证：pan、drive、offline、app 测试通过；使用 testing/synctest 验证退避/限速期间延期、取消释放并发名额，并通过生产 New 客户端验证 Retry-After: 5 只等待 5 秒。原有重试限速、并发上限测试通过；未进行真实 115 限流联调，待整体复查。
+  - 复查修复：取消外层 http.Client 总超时，在传输层完成并发/限流等待后创建 35 秒网络 I/O deadline，覆盖响应头和响应体读取，EOF/Close 释放计时器；仍继承调用方取消与截止时间。新增 GET/POST 的 60/120 秒 Retry-After、响应头/体超时与计时器释放测试，pan、drive、offline、app 测试通过。
 - [x] **72.** `internal/pan/client.go:59-62`、`play.go:29-36` 用魔法字符串 `"__EMPTY__"` 作 UA 哨兵，在 RoundTrip 中改写 req（违反 RoundTripper 约定），`Header.Del` 后紧跟赋值多余；`pan/offline_test.go` 被迫复制该逻辑 → resty `SetPreRequestHook`。
   - 核实与实现：请求改写此前已迁移到 SetPreRequestHook，RoundTrip 与测试不再复制 UA 改写。本次将三个位置的特殊字符串统一为私有 emptyUserAgentSentinel，保留显式空 UA 不被 Resty 默认值替换的行为。
   - 验证：go test ./internal/pan 通过，已有播放/下载自定义 UA 与空 UA 测试通过；未进行真实播放器与 115 联调，待整体复查。

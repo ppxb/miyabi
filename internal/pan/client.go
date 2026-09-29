@@ -1,8 +1,10 @@
 package pan
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -27,7 +29,7 @@ type Client struct {
 }
 
 const (
-	// requestTimeout bounds one API call; media transfers only bound the
+	// requestTimeout bounds network I/O after throttling; media transfers only bound the
 	// wait for response headers because video bodies stream for hours.
 	requestTimeout = 35 * time.Second
 	// requestGap keeps the client under the 4 req/s that 115 tolerates safely.
@@ -91,8 +93,17 @@ func (t *panTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 	}
 
-	// 4. Perform actual network call
-	resp, err := t.base.RoundTrip(req)
+	// Start the I/O deadline only after admission and shared backoff. Keep it
+	// alive until the response body is consumed or closed.
+	ctx, cancel := context.WithTimeout(req.Context(), requestTimeout)
+	resp, err := t.base.RoundTrip(req.Clone(ctx))
+	if err != nil {
+		cancel()
+	} else if resp != nil {
+		resp.Body = &timedResponseBody{ReadCloser: resp.Body, cancel: cancel}
+	} else {
+		cancel()
+	}
 	if err == nil && resp != nil {
 		if wait := parseRetryAfter(resp.Header.Get("Retry-After")); wait > 0 {
 			t.mu.Lock()
@@ -104,6 +115,24 @@ func (t *panTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 	}
 	return resp, err
+}
+
+type timedResponseBody struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (b *timedResponseBody) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	if err != nil {
+		b.cancel()
+	}
+	return n, err
+}
+
+func (b *timedResponseBody) Close() error {
+	defer b.cancel()
+	return b.ReadCloser.Close()
 }
 
 func parseRetryAfter(header string) time.Duration {
@@ -126,7 +155,9 @@ func parseRetryAfter(header string) time.Duration {
 // New creates a 115 client. 115 is always reached directly: routing it through
 // the upstream proxy is slower and trips risk control.
 func New() *Client {
-	httpClient := netx.NewDirectRestyClient(netx.RestyOptions{Timeout: requestTimeout}).SetPreRequestHook(preserveEmptyUserAgent)
+	// panTransport starts the timeout after shared throttling; a Client timeout
+	// here would also count Retry-After waits against the I/O budget.
+	httpClient := netx.NewDirectRestyClient(netx.RestyOptions{}).SetTimeout(0).SetPreRequestHook(preserveEmptyUserAgent)
 	limiter := rate.NewLimiter(rate.Every(requestGap), 1)
 
 	baseTransport := httpClient.GetClient().Transport

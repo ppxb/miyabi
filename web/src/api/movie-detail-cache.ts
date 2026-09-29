@@ -116,7 +116,7 @@ export function createMovieDetailLoader(
     }
   }
 
-  function request(client: QueryClient, id: string) {
+  function enqueue(client: QueryClient, id: string) {
     if (
       findCachedMovieCard(client, id, true) ||
       client.getQueryState(discoverKeys.movie(id))?.status === 'error'
@@ -139,6 +139,25 @@ export function createMovieDetailLoader(
       if (!current.started && current.consumers === 0 && queue.requests.get(id) === current) {
         queue.requests.delete(id)
       }
+    }
+  }
+
+  // A visible card stays interested even when its initial data comes from a
+  // list. Cache replacement/removal may require a later detail request.
+  function request(client: QueryClient, id: string) {
+    let release = enqueue(client, id)
+    let disposed = false
+    const unsubscribe = subscribeMovieCard(client, id, () => {
+      queueMicrotask(() => {
+        if (disposed || findCachedMovieCard(client, id)) return
+        release()
+        release = enqueue(client, id)
+      })
+    })
+    return () => {
+      disposed = true
+      unsubscribe()
+      release()
     }
   }
 
