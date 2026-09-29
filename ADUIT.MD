@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：176 条待处理，3 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：175 条待处理，4 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -35,7 +35,9 @@
 - [x] **60.** `internal/drive/drive.go:69-90` `Drive`：二维码登录状态机 + token 刷新 + 账号缓存 + 挂载持久化 + 事件 + Session 签发 + 工作计数，含 2 mutex、1 ContextLock、2 singleflight、1 WaitGroup、3 个版本号 → 拆出二维码登录（约 180 行）。
   - 实现：二维码登录状态机提取到 login.go 的私有 qrLogin，集中管理会话、轮询合并、超时、状态变化与凭据兑换；Drive 保留凭据提交、版本更新、账号缓存及挂载一致性。共用原有状态锁和提交锁，保持对外接口及关闭等待语义。
   - 验证：drive、library（含 scan/scrape）、offline、app、api 测试通过；保留轮询共享、取消、过期及旧凭据防覆盖测试，新增二维码生成请求晚返回与断开/新登录交错的回归测试。未运行 race 检测或真实 115 扫码联调，待整体复查。
-- [ ] **61.** `internal/gfriends/client.go:78-143` `EnsureIndex` 持写锁执行两个镜像的网络下载（各 30s），期间所有 `Lookup` 阻塞；`FetchAvatar`（208-234）复制镜像循环；stale 回退（136-141）把 `loadedAt` 设为 now，一次故障后 7 天不重试。
+- [x] **61.** `internal/gfriends/client.go:78-143` `EnsureIndex` 持写锁执行两个镜像的网络下载（各 30s），期间所有 `Lookup` 阻塞；`FetchAvatar`（208-234）复制镜像循环；stale 回退（136-141）把 `loadedAt` 设为 now，一次故障后 7 天不重试。
+  - 实现：复用 ContextLock 串行化并发刷新，磁盘读取、下载及索引构建放在读写锁外，短暂加锁替换索引；保留旧索引和磁盘修改时间，下载失败独立退避 5 分钟，取消不计入失败退避。索引与头像共用镜像下载逻辑，索引解析失败继续尝试下一镜像。
+  - 验证：gfriends、emby、app 测试通过；新增刷新期间查询、并发请求合并、等待取消、缓存年龄、旧缓存回退、失败退避与恢复、取消后重试及镜像回退测试。未运行 race 检测或真实 GFriends/Emby 联调，待整体复查。
 - [ ] **62.** `web/src/features/library/page.tsx` 仍内联扫描状态推导、响应式 Tooltip 按钮和 mutation 回调；错误文案已使用公共 describeApiError。评估提取 LibraryScanButton，以减少页面编排中的业务细节。
 
 ---
@@ -176,7 +178,7 @@
 - [ ] **165.** `internal/library/viewed.go:91-110` Count + 查最旧 + Delete 三步 → 单条 `DELETE … WHERE id NOT IN (SELECT id … ORDER BY viewed_at DESC LIMIT ?)`。
 - [ ] **166.** `internal/api/router.go:139-158` `installFrontend` 中 `fs.Stat` 对目录也成功，FileServer 会列出 `/assets/` 目录清单；带哈希的静态资源无长缓存头。
 - [ ] **167.** `internal/javdb/media.go:29-43` `FetchMedia` 接受任意 https 主机且 body 无大小上限，`/image` 成为登录后任意抓取器 → 限定 JavDB CDN 域名或复用 `netx.SafeDownload` + 上限。
-- [ ] **168.** `internal/gfriends/client.go:236` `errors.Join(errors.New(...), lastErr)` → `fmt.Errorf("fetch avatar: %w", lastErr)`；:113 Filetree 读取无大小限制。
+- [ ] **168.** `internal/gfriends/client.go:236` `errors.Join(errors.New(...), lastErr)` → `fmt.Errorf("fetch avatar: %w", lastErr)`；:113 Filetree 读取无大小限制。 第 61 项已将头像下载错误改为 fmt.Errorf 包装；Filetree 大小限制仍待处理。
 - [ ] **169.** `web/src/api/client.ts:30-61` `apiPost` / `apiPatch` / `apiPut` JSON 体逻辑重复 3 遍 → `sendJSON(method, path, body)`；`apiGet(path, undefined, signal)` 出现 15 次 → `apiGet(path, { query, signal })`；:85-89 `imageURL` 不属于请求客户端。
 - [ ] **170.** 查询键的组织和命名仍不统一：discoverKeys 位于 `web/src/api/movie-detail-cache.ts`，`pan.ts` 存在 library/offline 字面量键，subscriptionSettingsKey 与其他配置键风格不同。评估集中管理或按 API 模块导出，避免重复定义与循环依赖；已删除 JavBus API 文件的引用不再适用。
 - [ ] **171.** `web/src/api/network.ts` 更新失败时同时回滚和 invalidate，核实是否需要两者；Emby、订阅设置与网络设置的乐观更新策略不同，应按失败恢复和交互需求明确规则，而不是机械要求所有设置采用同一方式。JavBus 设置 API 已删除。

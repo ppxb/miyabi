@@ -3,7 +3,6 @@ package gfriends
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -15,12 +14,15 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ppxb/miyabi/internal/syncx"
 )
 
 const (
 	DefaultFastlyURL = "https://fastly.jsdelivr.net/gh/gfriends/gfriends@master"
 	DefaultRawURL    = "https://raw.githubusercontent.com/gfriends/gfriends/master"
 	CacheExpiration  = 7 * 24 * time.Hour
+	indexRetryDelay  = 5 * time.Minute
 )
 
 // mirrors serve the same repository; the CDN is tried before GitHub.
@@ -36,6 +38,9 @@ type Client struct {
 	mu         sync.RWMutex
 	index      map[string]string // normalized name -> relative path e.g. "Content/9-Javrave/xxx.jpg?t=..."
 	loadedAt   time.Time
+	refresh    syncx.ContextLock
+	retryAt    time.Time
+	refreshErr error
 }
 
 func New(dataDir string, httpClient *http.Client) *Client {
@@ -65,102 +70,104 @@ func (c *Client) Lookup(name string) (string, bool) {
 	return "", false
 }
 
-// EnsureIndex loads the filetree index from disk or downloads it if expired/missing.
+// EnsureIndex serializes refreshes without blocking readers of the current index.
 func (c *Client) EnsureIndex(ctx context.Context) error {
-	c.mu.RLock()
-	hasIndex := len(c.index) > 0 && time.Since(c.loadedAt) < CacheExpiration
-	c.mu.RUnlock()
-
-	if hasIndex {
-		return nil
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if len(c.index) > 0 && time.Since(c.loadedAt) < CacheExpiration {
-		return nil
+	if ready, err := c.indexReady(); ready {
+		return err
+	}
+	if err := c.refresh.Lock(ctx); err != nil {
+		return err
+	}
+	defer c.refresh.Unlock()
+	if ready, err := c.indexReady(); ready {
+		return err
 	}
 
 	cacheFile := filepath.Join(c.dataDir, "gfriends_tree.json")
-	if info, err := os.Stat(cacheFile); err == nil && time.Since(info.ModTime()) < CacheExpiration {
-		if err := c.loadFromFile(cacheFile); err == nil {
-			return nil
+	c.mu.RLock()
+	loaded := !c.loadedAt.IsZero()
+	c.mu.RUnlock()
+	if !loaded && c.dataDir != "" {
+		if tree, updatedAt, err := readCachedTree(cacheFile); err == nil {
+			c.installIndex(tree, updatedAt)
+			if ready, err := c.indexReady(); ready {
+				return err
+			}
 		}
 	}
 
-	// Download from remote
 	var tree FileTree
-	var downloadErr error
-	for _, mirror := range mirrors {
-		u := mirror + "/Filetree.json"
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-		if err != nil {
-			downloadErr = err
-			continue
-		}
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			downloadErr = err
-			continue
-		}
-		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			downloadErr = fmt.Errorf("status code: %d", resp.StatusCode)
-			continue
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			downloadErr = err
-			continue
-		}
-
-		if err := json.Unmarshal(body, &tree); err != nil {
-			downloadErr = err
-			continue
-		}
-
-		// Save to cache file
-		if c.dataDir != "" {
-			_ = os.MkdirAll(c.dataDir, 0755)
-			_ = os.WriteFile(cacheFile, body, 0644)
-		}
-
-		c.buildIndexLocked(tree)
-		c.loadedAt = time.Now()
-		return nil
-	}
-
-	// If download failed but we have an old cached file, fallback to it
-	if _, err := os.Stat(cacheFile); err == nil {
-		if err := c.loadFromFile(cacheFile); err == nil {
-			return nil
-		}
-	}
-
-	return fmt.Errorf("download gfriends filetree: %w", downloadErr)
-}
-
-func (c *Client) loadFromFile(path string) error {
-	data, err := os.ReadFile(path)
+	body, err := c.download(ctx, "Filetree.json", 0, func(data []byte) error {
+		tree = FileTree{}
+		return json.Unmarshal(data, &tree)
+	})
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		c.retryAt = time.Now().Add(indexRetryDelay)
+		c.refreshErr = fmt.Errorf("download gfriends filetree: %w", err)
+		if !c.loadedAt.IsZero() {
+			return nil
+		}
+		return c.refreshErr
 	}
-	var tree FileTree
-	if err := json.Unmarshal(data, &tree); err != nil {
-		return err
+	if c.dataDir != "" {
+		_ = os.MkdirAll(c.dataDir, 0755)
+		_ = os.WriteFile(cacheFile, body, 0644)
 	}
-	c.buildIndexLocked(tree)
-	c.loadedAt = time.Now()
+	c.installIndex(tree, time.Now())
 	return nil
 }
 
-// buildIndexLocked indexes folders in name order and keeps the first image per
+func readCachedTree(path string) (FileTree, time.Time, error) {
+	var tree FileTree
+	info, err := os.Stat(path)
+	if err != nil {
+		return tree, time.Time{}, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return tree, time.Time{}, err
+	}
+	err = json.Unmarshal(data, &tree)
+	return tree, info.ModTime(), err
+}
+
+func (c *Client) indexReady() (bool, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if !c.loadedAt.IsZero() && time.Since(c.loadedAt) < CacheExpiration {
+		return true, nil
+	}
+	if time.Now().Before(c.retryAt) {
+		if !c.loadedAt.IsZero() {
+			return true, nil
+		}
+		return true, c.refreshErr
+	}
+	return false, nil
+}
+
+func (c *Client) installIndex(tree FileTree, updatedAt time.Time) {
+	index := buildIndex(tree)
+	c.mu.Lock()
+	c.index = index
+	c.loadedAt = updatedAt
+	c.retryAt = time.Time{}
+	c.refreshErr = nil
+	c.mu.Unlock()
+}
+
+// buildIndex indexes folders in name order and keeps the first image per
 // actor, so the chosen avatar does not depend on map iteration order.
-func (c *Client) buildIndexLocked(tree FileTree) {
-	c.index = make(map[string]string)
+func buildIndex(tree FileTree) map[string]string {
+	index := make(map[string]string)
 	for _, folder := range slices.Sorted(maps.Keys(tree.Content)) {
 		for alias, target := range tree.Content[folder] {
 			name := strings.TrimSuffix(alias, ".jpg")
@@ -173,12 +180,13 @@ func (c *Client) buildIndexLocked(tree FileTree) {
 			// Store relative path e.g. Content/folder/target
 			rel := fmt.Sprintf("Content/%s/%s", folder, target)
 			for _, key := range []string{norm, strings.ReplaceAll(norm, " ", "")} {
-				if _, found := c.index[key]; !found {
-					c.index[key] = rel
+				if _, found := index[key]; !found {
+					index[key] = rel
 				}
 			}
 		}
 	}
+	return index
 }
 
 // FetchAvatar downloads the avatar bytes for the specified actor.
@@ -205,10 +213,21 @@ func (c *Client) FetchAvatar(ctx context.Context, name string) ([]byte, error) {
 	}
 	escapedPath := strings.Join(escapedParts, "/")
 
+	data, err := c.download(ctx, escapedPath, 10<<20, nil)
+	if err != nil {
+		return nil, fmt.Errorf("fetch avatar failed: %w", err)
+	}
+	return data, nil
+}
+
+// download tries the next mirror on transport, HTTP, read or validation failure.
+func (c *Client) download(ctx context.Context, path string, limit int64, validate func([]byte) error) ([]byte, error) {
 	var lastErr error
 	for _, mirror := range mirrors {
-		u := mirror + "/" + escapedPath
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, mirror+"/"+path, nil)
 		if err != nil {
 			lastErr = err
 			continue
@@ -223,17 +242,22 @@ func (c *Client) FetchAvatar(ctx context.Context, name string) ([]byte, error) {
 			lastErr = fmt.Errorf("download status: %d", resp.StatusCode)
 			continue
 		}
-
-		data, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB limit
+		var reader io.Reader = resp.Body
+		if limit > 0 {
+			reader = io.LimitReader(reader, limit)
+		}
+		data, err := io.ReadAll(reader)
 		resp.Body.Close()
+		if err == nil && validate != nil {
+			err = validate(data)
+		}
 		if err != nil {
 			lastErr = err
 			continue
 		}
 		return data, nil
 	}
-
-	return nil, errors.Join(errors.New("fetch avatar failed"), lastErr)
+	return nil, lastErr
 }
 
 func normalizeName(s string) string {
