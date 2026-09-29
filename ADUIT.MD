@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：153 条待处理，26 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：152 条待处理，27 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -119,7 +119,10 @@
   - 已完成：删除 exportLocalMedia 中无数据源过滤且吞错的数据库兜底，移除无用 ctx/stem 参数。视频仍由受数据源约束的目录查询提供并逐个校验位置；保留本地单文件、多段视频导出测试，go test ./... 通过，待整体复查。
 
 ### 其它死代码（已 grep 确认）
-- [ ] **87.** `internal/javdb/client.go:291-294`、`route.go:45,102-104,171-173,185-188`：`preferredHost`、`RouteStatus.Manual`、`ensureRoute` 的 ManualRoute 分支在生产中不可达（仅 `route_test.go:43` 使用）；`client.go:168-176` `Route()` 中 `state == nil` 拼 `CachedHost` 分支不可达；`routeState.status.Candidates` 与 `lastProbe` 双份真相（:36、:362）。
+- [x] **87.** `internal/javdb/client.go:291-294`、`route.go:45,102-104,171-173,185-188`：`preferredHost`、`RouteStatus.Manual`、`ensureRoute` 的 ManualRoute 分支在生产中不可达（仅 `route_test.go:43` 使用）；`client.go:168-176` `Route()` 中 `state == nil` 拼 `CachedHost` 分支不可达；`routeState.status.Candidates` 与 `lastProbe` 双份真相（:36、:362）。
+  - 方案修正：RouteStatus.Manual 仍用于手动选线、持久化恢复和代理变更策略，保留；仅删除 ensureRoute 的无效手动偏好分支、preferredHost 及 Route 的 CachedHost 兜底。
+  - 已完成：routeState 仅保存生效主机、延迟、手动标记和 transport；候选列表仅保存在 lastProbe，公共状态统一组合返回。探测失败保留当前线路并显示最新失败结果，取消不覆盖状态，代理重建继续保留手动选择。
+  - 验证：javdb、catalogue、api、app 包测试通过；新增本地 HTTP 模拟测试覆盖手动/自动探测失败、取消、成功切换及候选列表返回，保留缓存恢复与请求失败自动切换测试。未进行浏览器或真实 JavDB 联调，待整体复查。
 - [ ] **88.** `internal/javdb/client.go:254-260` `getJSON` 的 `language` 参数所有调用点都传 `defaultLanguage`，`transport.go:132-134` `if language == ""` 死代码。
 - [ ] **89.** `internal/catalogue/service.go:344-361`、`types.go:77-87` `Facets()`、`Facets`、`FacetItem` 无 API / 生产使用，仅 `TestFacets`。
 - [ ] **90.** `internal/javdb/magnet.go:81-94` `Find` 中 `JavDBID` 为空走 `ResolveMovieID` 分支不可达（`catalogue/magnets.go:66` 总带 JavDBID）；`magnet.go:54-71` 排序与 `aggregator.go:104-118` 同一规则重复。

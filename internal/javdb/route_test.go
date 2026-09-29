@@ -33,18 +33,18 @@ func TestAPIHostsFromStartup(t *testing.T) {
 	}
 }
 
-func TestSelectRouteFullRetainsAvailableManualPreference(t *testing.T) {
+func TestSelectRouteFullMeasuresCachedHostWithoutPreferringIt(t *testing.T) {
 	check := func(_ context.Context, host string, _ func(time.Time)) (time.Duration, map[string]any, error) {
 		if host == "https://cached.example" {
 			return 12 * time.Millisecond, nil, nil
 		}
 		return time.Millisecond, nil, nil
 	}
-	result, err := selectRoute(t.Context(), routeSelection{full: true, preferredHost: "https://cached.example"}, check)
+	result, err := selectRoute(t.Context(), routeSelection{full: true, hosts: []string{"https://cached.example"}}, check)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Host != "https://cached.example" || !result.Manual || len(result.Candidates) != len(bootstrapHosts)+1 {
+	if result.Host != bootstrapHosts[0] || result.Manual || len(result.Candidates) != len(bootstrapHosts)+1 {
 		t.Fatalf("result = %#v", result)
 	}
 	for _, candidate := range result.Candidates {

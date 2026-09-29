@@ -21,7 +21,9 @@ import (
 
 type routeState struct {
 	transport jsonTransport
-	status    RouteStatus
+	host      string
+	latency   time.Duration
+	manual    bool
 }
 
 type jsonTransport interface {
@@ -127,7 +129,7 @@ func (c *Client) Reselect(ctx context.Context) (RouteStatus, error) {
 	if err != nil {
 		return RouteStatus{}, err
 	}
-	return state.status, nil
+	return c.routeStatus(state), nil
 }
 
 // SelectRoute verifies a known candidate before changing the active route.
@@ -163,26 +165,28 @@ func (c *Client) SelectRoute(ctx context.Context, rawHost string) (RouteStatus, 
 	if err != nil {
 		return RouteStatus{}, err
 	}
-	return state.status, nil
+	return c.routeStatus(state), nil
 }
 
 // Route returns the active route, if the client has been initialized.
 func (c *Client) Route() (RouteStatus, bool) {
 	state := c.current.Load()
+	return c.routeStatus(state), state != nil
+}
+
+// routeStatus combines the active selection with the latest probe results.
+// Failed probes update candidates without replacing the active transport.
+func (c *Client) routeStatus(state *routeState) RouteStatus {
 	var status RouteStatus
 	if state != nil {
-		status = state.status
+		status.Host, status.Latency, status.Manual = state.host, state.latency, state.manual
 	}
 	if candidates := c.lastProbe.Load(); candidates != nil {
 		status.Candidates = *candidates
-	} else if state == nil {
-		hosts := slices.Clone(bootstrapHosts)
-		if c.options.CachedHost != "" {
-			hosts = append(hosts, c.options.CachedHost)
-		}
-		status.Candidates = routeCandidates(hosts, nil)
+	} else {
+		status.Candidates = routeCandidates(bootstrapHosts, nil)
 	}
-	return status, state != nil
+	return status
 }
 
 func (c *Client) routeHosts() []string {
@@ -233,7 +237,7 @@ func (c *Client) watchProxy() {
 				slog.WarnContext(c.routeContext, "JavDB transport keeps previous proxy after change", "error", err)
 				continue
 			}
-			if state != nil && !state.status.Manual {
+			if state != nil && !state.manual {
 				go func() { _, _ = c.Reselect(c.routeContext) }()
 			}
 		}
@@ -252,9 +256,9 @@ func (c *Client) reinstall() (*routeState, error) {
 	if previous == nil {
 		return nil, nil
 	}
-	state := &routeState{transport: previous.transport, status: previous.status}
-	c.current.Store(state)
-	return state, nil
+	state := *previous
+	c.current.Store(&state)
+	return &state, nil
 }
 
 func (c *Client) getJSON(
@@ -314,11 +318,7 @@ func (c *Client) ensureRoute(ctx context.Context) (*routeState, error) {
 		if state := c.current.Load(); state != nil {
 			return state, nil
 		}
-		options := routeSelection{full: true, hosts: c.routeHosts()}
-		if c.options.ManualRoute {
-			options.preferredHost = c.options.CachedHost
-		}
-		return c.selector(ctx, options)
+		return c.selector(ctx, routeSelection{full: true, hosts: c.routeHosts()})
 	})
 }
 
@@ -378,7 +378,9 @@ func (c *Client) installRoute(ctx context.Context, status RouteStatus) (*routeSt
 	}
 	state := &routeState{
 		transport: transport,
-		status:    status,
+		host:      status.Host,
+		latency:   status.Latency,
+		manual:    status.Manual,
 	}
 	previous := c.current.Swap(state)
 	c.lastProbe.Store(&status.Candidates)

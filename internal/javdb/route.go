@@ -33,9 +33,8 @@ const (
 var backupKey, backupIV = backupKeyMaterial()
 
 type routeSelection struct {
-	full          bool
-	hosts         []string
-	preferredHost string
+	full  bool
+	hosts []string
 }
 
 // onStart records the request start after transport construction.
@@ -91,9 +90,6 @@ func selectRoute(ctx context.Context, options routeSelection, check probe) (Rout
 	}
 	for _, host := range options.hosts {
 		start(host)
-	}
-	if options.preferredHost != "" {
-		start(options.preferredHost)
 	}
 
 	var dynamic []string
@@ -161,9 +157,6 @@ func selectRoute(ctx context.Context, options routeSelection, check probe) (Rout
 	// Ties follow dynamic response order, then bootstrap and previously known hosts.
 	hosts := append(dynamic, bootstrapHosts...)
 	hosts = append(hosts, options.hosts...)
-	if options.preferredHost != "" {
-		hosts = append(hosts, options.preferredHost)
-	}
 	result := RouteStatus{Candidates: routeCandidates(hosts, known)}
 	var selected probeResult
 	for _, host := range hosts {
@@ -174,10 +167,6 @@ func selectRoute(ctx context.Context, options routeSelection, check probe) (Rout
 	}
 	if selected.host == "" {
 		return result, fmt.Errorf("select JavDB route: %w", errors.Join(failures...))
-	}
-	if preferred, ok := known[options.preferredHost]; ok && preferred.err == nil {
-		selected = preferred
-		result.Manual = true
 	}
 	result.Host = selected.host
 	result.Latency = selected.latency
