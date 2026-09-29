@@ -267,9 +267,9 @@ func TestEmbyService_NotifyUpdatedBatch(t *testing.T) {
 	defer svc.Close()
 
 	// Enqueue notifications (with duplicates)
-	svc.NotifyUpdated("/app/data/emby/IPX/IPX-123")
-	svc.NotifyUpdated("/app/data/emby/IPX/IPX-123")
-	svc.NotifyUpdated("/app/data/emby/SSIS/SSIS-456")
+	svc.NotifyUpdated(t.Context(), "/app/data/emby/IPX/IPX-123")
+	svc.NotifyUpdated(t.Context(), "/app/data/emby/IPX/IPX-123")
+	svc.NotifyUpdated(t.Context(), "/app/data/emby/SSIS/SSIS-456")
 
 	select {
 	case updates := <-receivedUpdates:
@@ -326,8 +326,8 @@ func TestEmbyService_NotifyUpdatedDeleted(t *testing.T) {
 	}
 	defer svc.Close()
 
-	svc.NotifyUpdated(existingMovieDir)
-	svc.NotifyUpdated(deletedMovieDir)
+	svc.NotifyUpdated(t.Context(), existingMovieDir)
+	svc.NotifyUpdated(t.Context(), deletedMovieDir)
 
 	select {
 	case updates := <-receivedUpdates:

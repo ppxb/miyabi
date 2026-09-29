@@ -10,6 +10,7 @@ import (
 // EmbyManager defines the contract for reading, saving, and testing Emby settings.
 type EmbyManager interface {
 	Config(context.Context) (emby.Config, error)
+	RetryPending(context.Context) error
 	UpdateConfig(context.Context, emby.Config) error
 	Test(context.Context, emby.Config) (emby.ServerInfo, error)
 }

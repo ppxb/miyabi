@@ -9,6 +9,9 @@ import (
 // Actor is the predicate function for actor builders.
 type Actor func(*sql.Selector)
 
+// EmbyNotification is the predicate function for embynotification builders.
+type EmbyNotification func(*sql.Selector)
+
 // File is the predicate function for file builders.
 type File func(*sql.Selector)
 

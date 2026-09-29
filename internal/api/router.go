@@ -86,8 +86,8 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	settingsAPI.PUT("/subscription", subscriptionSettingsUpdateHandler(deps.Monitor))
 
 	protected.GET("/library/movies", libraryMoviesHandler(deps.Library))
-	protected.POST("/library/scan", libraryScanHandler(deps.Library))
-	protected.POST("/library/scan/local", libraryLocalScanHandler(deps.Library))
+	protected.POST("/library/scan", libraryScanHandler(deps.Library, deps.Emby))
+	protected.POST("/library/scan/local", libraryLocalScanHandler(deps.Library, deps.Emby))
 	protected.GET("/library/artwork/:key", libraryArtworkHandler(deps.Artwork))
 
 	protected.GET("/tasks", noStore(), tasksHandler(deps.Tasks))

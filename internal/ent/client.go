@@ -16,6 +16,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/ppxb/miyabi/internal/ent/actor"
+	"github.com/ppxb/miyabi/internal/ent/embynotification"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
@@ -34,6 +35,8 @@ type Client struct {
 	Schema *migrate.Schema
 	// Actor is the client for interacting with the Actor builders.
 	Actor *ActorClient
+	// EmbyNotification is the client for interacting with the EmbyNotification builders.
+	EmbyNotification *EmbyNotificationClient
 	// File is the client for interacting with the File builders.
 	File *FileClient
 	// Movie is the client for interacting with the Movie builders.
@@ -64,6 +67,7 @@ func NewClient(opts ...Option) *Client {
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.Actor = NewActorClient(c.config)
+	c.EmbyNotification = NewEmbyNotificationClient(c.config)
 	c.File = NewFileClient(c.config)
 	c.Movie = NewMovieClient(c.config)
 	c.OfflineDownload = NewOfflineDownloadClient(c.config)
@@ -163,18 +167,19 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:             ctx,
-		config:          cfg,
-		Actor:           NewActorClient(cfg),
-		File:            NewFileClient(cfg),
-		Movie:           NewMovieClient(cfg),
-		OfflineDownload: NewOfflineDownloadClient(cfg),
-		Setting:         NewSettingClient(cfg),
-		Subscription:    NewSubscriptionClient(cfg),
-		Subtitle:        NewSubtitleClient(cfg),
-		Tag:             NewTagClient(cfg),
-		Task:            NewTaskClient(cfg),
-		ViewedMovie:     NewViewedMovieClient(cfg),
+		ctx:              ctx,
+		config:           cfg,
+		Actor:            NewActorClient(cfg),
+		EmbyNotification: NewEmbyNotificationClient(cfg),
+		File:             NewFileClient(cfg),
+		Movie:            NewMovieClient(cfg),
+		OfflineDownload:  NewOfflineDownloadClient(cfg),
+		Setting:          NewSettingClient(cfg),
+		Subscription:     NewSubscriptionClient(cfg),
+		Subtitle:         NewSubtitleClient(cfg),
+		Tag:              NewTagClient(cfg),
+		Task:             NewTaskClient(cfg),
+		ViewedMovie:      NewViewedMovieClient(cfg),
 	}, nil
 }
 
@@ -192,18 +197,19 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:             ctx,
-		config:          cfg,
-		Actor:           NewActorClient(cfg),
-		File:            NewFileClient(cfg),
-		Movie:           NewMovieClient(cfg),
-		OfflineDownload: NewOfflineDownloadClient(cfg),
-		Setting:         NewSettingClient(cfg),
-		Subscription:    NewSubscriptionClient(cfg),
-		Subtitle:        NewSubtitleClient(cfg),
-		Tag:             NewTagClient(cfg),
-		Task:            NewTaskClient(cfg),
-		ViewedMovie:     NewViewedMovieClient(cfg),
+		ctx:              ctx,
+		config:           cfg,
+		Actor:            NewActorClient(cfg),
+		EmbyNotification: NewEmbyNotificationClient(cfg),
+		File:             NewFileClient(cfg),
+		Movie:            NewMovieClient(cfg),
+		OfflineDownload:  NewOfflineDownloadClient(cfg),
+		Setting:          NewSettingClient(cfg),
+		Subscription:     NewSubscriptionClient(cfg),
+		Subtitle:         NewSubtitleClient(cfg),
+		Tag:              NewTagClient(cfg),
+		Task:             NewTaskClient(cfg),
+		ViewedMovie:      NewViewedMovieClient(cfg),
 	}, nil
 }
 
@@ -233,8 +239,8 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.Actor, c.File, c.Movie, c.OfflineDownload, c.Setting, c.Subscription,
-		c.Subtitle, c.Tag, c.Task, c.ViewedMovie,
+		c.Actor, c.EmbyNotification, c.File, c.Movie, c.OfflineDownload, c.Setting,
+		c.Subscription, c.Subtitle, c.Tag, c.Task, c.ViewedMovie,
 	} {
 		n.Use(hooks...)
 	}
@@ -244,8 +250,8 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.Actor, c.File, c.Movie, c.OfflineDownload, c.Setting, c.Subscription,
-		c.Subtitle, c.Tag, c.Task, c.ViewedMovie,
+		c.Actor, c.EmbyNotification, c.File, c.Movie, c.OfflineDownload, c.Setting,
+		c.Subscription, c.Subtitle, c.Tag, c.Task, c.ViewedMovie,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -256,6 +262,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
 	case *ActorMutation:
 		return c.Actor.mutate(ctx, m)
+	case *EmbyNotificationMutation:
+		return c.EmbyNotification.mutate(ctx, m)
 	case *FileMutation:
 		return c.File.mutate(ctx, m)
 	case *MovieMutation:
@@ -425,6 +433,139 @@ func (c *ActorClient) mutate(ctx context.Context, m *ActorMutation) (Value, erro
 		return (&ActorDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Actor mutation op: %q", m.Op())
+	}
+}
+
+// EmbyNotificationClient is a client for the EmbyNotification schema.
+type EmbyNotificationClient struct {
+	config
+}
+
+// NewEmbyNotificationClient returns a client for the EmbyNotification from the given config.
+func NewEmbyNotificationClient(c config) *EmbyNotificationClient {
+	return &EmbyNotificationClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `embynotification.Hooks(f(g(h())))`.
+func (c *EmbyNotificationClient) Use(hooks ...Hook) {
+	c.hooks.EmbyNotification = append(c.hooks.EmbyNotification, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `embynotification.Intercept(f(g(h())))`.
+func (c *EmbyNotificationClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EmbyNotification = append(c.inters.EmbyNotification, interceptors...)
+}
+
+// Create returns a builder for creating a EmbyNotification entity.
+func (c *EmbyNotificationClient) Create() *EmbyNotificationCreate {
+	mutation := newEmbyNotificationMutation(c.config, OpCreate)
+	return &EmbyNotificationCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EmbyNotification entities.
+func (c *EmbyNotificationClient) CreateBulk(builders ...*EmbyNotificationCreate) *EmbyNotificationCreateBulk {
+	return &EmbyNotificationCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EmbyNotificationClient) MapCreateBulk(slice any, setFunc func(*EmbyNotificationCreate, int)) *EmbyNotificationCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EmbyNotificationCreateBulk{err: fmt.Errorf("calling to EmbyNotificationClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EmbyNotificationCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EmbyNotificationCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EmbyNotification.
+func (c *EmbyNotificationClient) Update() *EmbyNotificationUpdate {
+	mutation := newEmbyNotificationMutation(c.config, OpUpdate)
+	return &EmbyNotificationUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EmbyNotificationClient) UpdateOne(_m *EmbyNotification) *EmbyNotificationUpdateOne {
+	mutation := newEmbyNotificationMutation(c.config, OpUpdateOne, withEmbyNotification(_m))
+	return &EmbyNotificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EmbyNotificationClient) UpdateOneID(id int) *EmbyNotificationUpdateOne {
+	mutation := newEmbyNotificationMutation(c.config, OpUpdateOne, withEmbyNotificationID(id))
+	return &EmbyNotificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EmbyNotification.
+func (c *EmbyNotificationClient) Delete() *EmbyNotificationDelete {
+	mutation := newEmbyNotificationMutation(c.config, OpDelete)
+	return &EmbyNotificationDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EmbyNotificationClient) DeleteOne(_m *EmbyNotification) *EmbyNotificationDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EmbyNotificationClient) DeleteOneID(id int) *EmbyNotificationDeleteOne {
+	builder := c.Delete().Where(embynotification.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EmbyNotificationDeleteOne{builder}
+}
+
+// Query returns a query builder for EmbyNotification.
+func (c *EmbyNotificationClient) Query() *EmbyNotificationQuery {
+	return &EmbyNotificationQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEmbyNotification},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EmbyNotification entity by its id.
+func (c *EmbyNotificationClient) Get(ctx context.Context, id int) (*EmbyNotification, error) {
+	return c.Query().Where(embynotification.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EmbyNotificationClient) GetX(ctx context.Context, id int) *EmbyNotification {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *EmbyNotificationClient) Hooks() []Hook {
+	return c.hooks.EmbyNotification
+}
+
+// Interceptors returns the client interceptors.
+func (c *EmbyNotificationClient) Interceptors() []Interceptor {
+	return c.inters.EmbyNotification
+}
+
+func (c *EmbyNotificationClient) mutate(ctx context.Context, m *EmbyNotificationMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EmbyNotificationCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EmbyNotificationUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EmbyNotificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EmbyNotificationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EmbyNotification mutation op: %q", m.Op())
 	}
 }
 
@@ -1740,11 +1881,11 @@ func (c *ViewedMovieClient) mutate(ctx context.Context, m *ViewedMovieMutation) 
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Actor, File, Movie, OfflineDownload, Setting, Subscription, Subtitle, Tag, Task,
-		ViewedMovie []ent.Hook
+		Actor, EmbyNotification, File, Movie, OfflineDownload, Setting, Subscription,
+		Subtitle, Tag, Task, ViewedMovie []ent.Hook
 	}
 	inters struct {
-		Actor, File, Movie, OfflineDownload, Setting, Subscription, Subtitle, Tag, Task,
-		ViewedMovie []ent.Interceptor
+		Actor, EmbyNotification, File, Movie, OfflineDownload, Setting, Subscription,
+		Subtitle, Tag, Task, ViewedMovie []ent.Interceptor
 	}
 )

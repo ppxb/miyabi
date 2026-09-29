@@ -68,7 +68,7 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 					}
 					_ = os.Remove(filepath.Dir(movieDir)) // Keep non-empty prefix directories.
 					if r.scanner.notifier != nil {
-						r.scanner.notifier.NotifyUpdated(movieDir)
+						cleanupErrors = append(cleanupErrors, r.scanner.notifier.NotifyUpdated(ctx, movieDir))
 					}
 				}
 				return errors.Join(cleanupErrors...)
@@ -104,8 +104,14 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 				}
 				if cached {
 					if cfg.EmbyDir != "" {
-						if err := scrape.ExportLocalMovie(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken, record, r.scanner.images, r.scanner.notifier); err != nil {
+						written, err := scrape.ExportLocalMovie(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken, record, r.scanner.images)
+						if err != nil {
 							return fmt.Errorf("export local movie %s: %w", record.Code, err)
+						}
+						if written && r.scanner.notifier != nil {
+							if err := r.scanner.notifier.NotifyUpdatedTx(ctx, tx, scrape.EmbyMovieDir(cfg.EmbyDir, record.Code)); err != nil {
+								return err
+							}
 						}
 					}
 					continue

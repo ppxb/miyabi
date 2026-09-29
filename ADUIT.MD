@@ -27,6 +27,7 @@
 ## 三、上帝代码
 
 - [x] **58.** `internal/emby/service.go` 集中承担配置持久化、HTTP 请求、批量通知、全库刷新、演员头像同步和后台 STRM 重写，职责过多；需收敛请求构造、认证、启用条件及退出 flush 的重复。
+  - 后续完善：Emby 通知改为数据库按目录持久化、版本去重和退避重试（15 秒起，最长 5 分钟），成功后条件删除；手动媒体库/本地扫描触发补发，重启保留待办。事务内导出通知随事务提交，更新期间的旧成功/失败不覆盖新版本。按用户要求静默运行，不新增页面状态或提示；全量 Go 测试通过，未做真实 Emby 联调。
   - 实现：提取 `internal/emby/client.go` 统一 HTTP 请求、X-Emby-Token 认证和错误处理；提取 `actors.go` 独立管理同步定时、单次执行、取消和退出等待。Service 保留配置与通知协调；配置变更取消旧同步，每轮同步使用同一份服务器配置。合并通知 flush，关闭时补发缓冲通知。
   - 验证：`go test ./...` 通过，新增请求格式、同步取消与等待、服务器切换、退出通知回归测试。未运行 race 检测（当前 CGO 关闭），未进行真实 Emby 联调；待整体复查。每批通知后的全库刷新策略仍按第 129 条处理。
 - [x] **59.** `internal/library/scan/walker.go:76-263` `Scanner.Run` 约 190 行：参数校验、定向单文件、断点恢复、BFS、限速、NFO、分块入库、进度上报 + 两个闭包；:77 多余别名 → 拆 `runTargetFile` / `walk` / `indexDirectory`。
@@ -189,7 +190,7 @@
 - [ ] **128.** `internal/ent/schema/task.go:37-42` `index.Fields("status", "created_at")` 的 `created_at` 从未用于过滤 / 排序，热点查询均为 `type + status + ORDER BY id` → `index.Fields("type", "status")`，删除单列 `type` 索引。
 - [ ] **129.** ✔ `internal/emby/service.go` 的 `sendBatch` 每批 `/Library/Media/Updated` 增量通知后仍调用 `client.refresh`（`/Library/Refresh` 全库扫描），扫描期间约每 3 秒一次 → 删除。
 - [ ] **130.** `internal/library/scan/movies.go:29` `MatchMovies` 每页 100 个 `LIKE '%code'` 以 OR 连接 → 全表扫描；:38-45 codes × records 双重循环；:56 `slices.Contains` 去重 O(n²) → 增加 `canonical_code` 索引列 + 等值 IN，去重用 map。
-- [ ] **131.** `internal/library/scan/local.go` 已通过后台任务执行，但仍逐文件开事务并调用 MatchMovies；图片解码/重编码在 SQLite 写事务内，NotifyUpdated 在事务提交前调用。评估批量匹配、缩短事务以及提交后通知。
+- [ ] **131.** `internal/library/scan/local.go` 已通过后台任务执行，但仍逐文件开事务并调用 MatchMovies；图片解码/重编码在 SQLite 写事务内；Emby 通知现已同事务持久化并在提交后发送。评估批量匹配、缩短事务；通知事务语义已修复。
 - [ ] **132.** `internal/library/scan/reconcile.go:94-142` 全量扫描加载所有已刮削影片的 files / actors / tags；每部影片 `images.Exists` 3 次 stat + `ExportLocalMovie` stat / 写文件均在 SQLite 写事务内，长时间占写锁；:139 刮削任务逐条 `Create().Exec` → 事务外导出 + `CreateBulk`。
 - [ ] **133.** `internal/library/scrape/scrape.go` 每个刮削任务仍用 cover payload 的 `scrape_task_id` 执行 Exist 查询，评估关联列或索引。旧的“扫描时从 task 表批量读取元数据快照”已随快照迁入 movie 解决；与第 126 条共同处理任务关联查询。
 - [ ] **134.** `internal/library/scrape/cover.go:45-53` `service.artwork.Lock` 覆盖整个 `processCover`（含 JavDB 封面下载、115 列目录、`sess.Info`、本地导出）→ 所有 cover 串行，刮削期间 `ClearCache` 永远返回"忙" → 只锁"保存图片到提交引用"一段。

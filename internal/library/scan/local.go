@@ -267,7 +267,9 @@ func (s *LocalScanner) ingestMedia(
 			}
 		}
 		if s.notifier != nil {
-			s.notifier.NotifyUpdated(filepath.Dir(mediaPath))
+			if err := s.notifier.NotifyUpdatedTx(ctx, tx, filepath.Dir(mediaPath)); err != nil {
+				return err
+			}
 		}
 		return nil
 	})

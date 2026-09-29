@@ -438,10 +438,15 @@ type testMediaNotifier struct {
 	notified []string
 }
 
-func (n *testMediaNotifier) NotifyUpdated(path string) {
+func (n *testMediaNotifier) NotifyUpdated(_ context.Context, path string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.notified = append(n.notified, path)
+	return nil
+}
+
+func (n *testMediaNotifier) NotifyUpdatedTx(ctx context.Context, _ *ent.Tx, path string) error {
+	return n.NotifyUpdated(ctx, path)
 }
 
 func TestScanReconcile_CleansUpEmbyDirectoryAndNotifiesEmbyOnMovieDeletion(t *testing.T) {

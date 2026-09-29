@@ -134,7 +134,7 @@ func TestServiceCloseFlushesBufferedNotifications(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc.NotifyUpdated(t.TempDir())
+	svc.NotifyUpdated(t.Context(), t.TempDir())
 	svc.Close()
 	select {
 	case <-updates:

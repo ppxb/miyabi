@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ppxb/miyabi/internal/ent/actor"
+	"github.com/ppxb/miyabi/internal/ent/embynotification"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
@@ -46,6 +47,41 @@ func init() {
 	actorDescName := actorFields[1].Descriptor()
 	// actor.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	actor.NameValidator = actorDescName.Validators[0].(func(string) error)
+	embynotificationMixin := schema.EmbyNotification{}.Mixin()
+	embynotificationMixinFields0 := embynotificationMixin[0].Fields()
+	_ = embynotificationMixinFields0
+	embynotificationFields := schema.EmbyNotification{}.Fields()
+	_ = embynotificationFields
+	// embynotificationDescCreatedAt is the schema descriptor for created_at field.
+	embynotificationDescCreatedAt := embynotificationMixinFields0[0].Descriptor()
+	// embynotification.DefaultCreatedAt holds the default value on creation for the created_at field.
+	embynotification.DefaultCreatedAt = embynotificationDescCreatedAt.Default.(func() time.Time)
+	// embynotificationDescUpdatedAt is the schema descriptor for updated_at field.
+	embynotificationDescUpdatedAt := embynotificationMixinFields0[1].Descriptor()
+	// embynotification.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	embynotification.DefaultUpdatedAt = embynotificationDescUpdatedAt.Default.(func() time.Time)
+	// embynotification.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	embynotification.UpdateDefaultUpdatedAt = embynotificationDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// embynotificationDescPath is the schema descriptor for path field.
+	embynotificationDescPath := embynotificationFields[0].Descriptor()
+	// embynotification.PathValidator is a validator for the "path" field. It is called by the builders before save.
+	embynotification.PathValidator = embynotificationDescPath.Validators[0].(func(string) error)
+	// embynotificationDescRevision is the schema descriptor for revision field.
+	embynotificationDescRevision := embynotificationFields[1].Descriptor()
+	// embynotification.DefaultRevision holds the default value on creation for the revision field.
+	embynotification.DefaultRevision = embynotificationDescRevision.Default.(int)
+	// embynotificationDescAttempts is the schema descriptor for attempts field.
+	embynotificationDescAttempts := embynotificationFields[2].Descriptor()
+	// embynotification.DefaultAttempts holds the default value on creation for the attempts field.
+	embynotification.DefaultAttempts = embynotificationDescAttempts.Default.(int)
+	// embynotificationDescNextAttemptAt is the schema descriptor for next_attempt_at field.
+	embynotificationDescNextAttemptAt := embynotificationFields[3].Descriptor()
+	// embynotification.DefaultNextAttemptAt holds the default value on creation for the next_attempt_at field.
+	embynotification.DefaultNextAttemptAt = embynotificationDescNextAttemptAt.Default.(func() time.Time)
+	// embynotificationDescLastError is the schema descriptor for last_error field.
+	embynotificationDescLastError := embynotificationFields[4].Descriptor()
+	// embynotification.DefaultLastError holds the default value on creation for the last_error field.
+	embynotification.DefaultLastError = embynotificationDescLastError.Default.(string)
 	fileMixin := schema.File{}.Mixin()
 	fileMixinFields0 := fileMixin[0].Fields()
 	_ = fileMixinFields0

@@ -132,6 +132,8 @@ func (q *SubtitleQueue) process(task SubtitleTask) {
 		q.logger.WarnContext(ctx, "export subtitles", "code", task.Target.Code, "error", err)
 	}
 	if written > 0 && q.service.mediaNotifier != nil {
-		q.service.mediaNotifier.NotifyUpdated(task.Target.Dir)
+		if err := q.service.mediaNotifier.NotifyUpdated(ctx, task.Target.Dir); err != nil {
+			q.logger.ErrorContext(ctx, "persist subtitle notification", "error", err)
+		}
 	}
 }

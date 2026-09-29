@@ -21,6 +21,18 @@ func (f ActorFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ActorMutation", m)
 }
 
+// The EmbyNotificationFunc type is an adapter to allow the use of ordinary
+// function as EmbyNotification mutator.
+type EmbyNotificationFunc func(context.Context, *ent.EmbyNotificationMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EmbyNotificationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EmbyNotificationMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EmbyNotificationMutation", m)
+}
+
 // The FileFunc type is an adapter to allow the use of ordinary
 // function as File mutator.
 type FileFunc func(context.Context, *ent.FileMutation) (ent.Value, error)

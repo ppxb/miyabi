@@ -54,8 +54,14 @@ func libraryMoviesHandler(library LibraryManager) gin.HandlerFunc {
 	}
 }
 
-func libraryScanHandler(library LibraryManager) gin.HandlerFunc {
+func libraryScanHandler(library LibraryManager, emby EmbyManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if emby != nil {
+			if err := emby.RetryPending(c.Request.Context()); err != nil {
+				c.Error(err)
+				return
+			}
+		}
 		task, err := library.StartScan(c.Request.Context())
 		accepted(c, task, err)
 	}
@@ -65,13 +71,19 @@ type localScanRequest struct {
 	Path string `json:"path"`
 }
 
-func libraryLocalScanHandler(library LibraryManager) gin.HandlerFunc {
+func libraryLocalScanHandler(library LibraryManager, emby EmbyManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req localScanRequest
 		if c.Request.Body != nil && c.Request.ContentLength != 0 {
 			var ok bool
 			req, ok = bindJSON[localScanRequest](c)
 			if !ok {
+				return
+			}
+		}
+		if emby != nil {
+			if err := emby.RetryPending(c.Request.Context()); err != nil {
+				c.Error(err)
 				return
 			}
 		}

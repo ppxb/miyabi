@@ -25,6 +25,30 @@ var (
 		Columns:    ActorsColumns,
 		PrimaryKey: []*schema.Column{ActorsColumns[0]},
 	}
+	// EmbyNotificationsColumns holds the columns for the "emby_notifications" table.
+	EmbyNotificationsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "path", Type: field.TypeString, Unique: true},
+		{Name: "revision", Type: field.TypeInt, Default: 1},
+		{Name: "attempts", Type: field.TypeInt, Default: 0},
+		{Name: "next_attempt_at", Type: field.TypeTime},
+		{Name: "last_error", Type: field.TypeString, Default: ""},
+	}
+	// EmbyNotificationsTable holds the schema information for the "emby_notifications" table.
+	EmbyNotificationsTable = &schema.Table{
+		Name:       "emby_notifications",
+		Columns:    EmbyNotificationsColumns,
+		PrimaryKey: []*schema.Column{EmbyNotificationsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "embynotification_next_attempt_at",
+				Unique:  false,
+				Columns: []*schema.Column{EmbyNotificationsColumns[6]},
+			},
+		},
+	}
 	// FilesColumns holds the columns for the "files" table.
 	FilesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -346,6 +370,7 @@ var (
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		ActorsTable,
+		EmbyNotificationsTable,
 		FilesTable,
 		MoviesTable,
 		OfflineDownloadsTable,

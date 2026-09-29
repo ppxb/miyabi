@@ -27,7 +27,7 @@ type Service struct {
 	defaultPublicURL  string
 	client            *embyClient
 	actors            *actorSync
-	queue             chan string
+	wakeNotifications chan struct{}
 	ctx               context.Context
 	cancel            context.CancelFunc
 	wg                sync.WaitGroup
@@ -67,7 +67,7 @@ func NewService(ctx context.Context, db *ent.Client, initial Config, deps Depend
 		cfg:               cfg,
 		defaultPublicURL:  initial.PublicURL,
 		client:            newEmbyClient(),
-		queue:             make(chan string, 1000),
+		wakeNotifications: make(chan struct{}, 1),
 		ctx:               subCtx,
 		cancel:            cancel,
 		exportMgr:         deps.ExportManager,
@@ -90,7 +90,7 @@ func NewService(ctx context.Context, db *ent.Client, initial Config, deps Depend
 	return s, nil
 }
 
-// Close flushes the pending queue and stops background workers.
+// Close makes a final delivery attempt; outstanding updates remain in the database.
 func (s *Service) Close() {
 	s.cancel()
 	s.actors.close()
@@ -160,7 +160,7 @@ func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 			return domain.E(domain.KindBusy, "Emby 设置已保存，但本地扫描入队失败，请重新保存重试", err)
 		}
 	}
-	return nil
+	return s.RetryPending(ctx)
 }
 
 // StartStartupSTRMRewrite uses the shared manager's current configuration.
@@ -182,7 +182,9 @@ func (s *Service) startSTRMRewrite(mgr *export.Manager) {
 			slog.Error("failed to rewrite STRM files", "error", err)
 		} else if count > 0 {
 			slog.Info("rewrote STRM files", "count", count)
-			s.NotifyUpdated(mgr.Config().EmbyDir)
+			if err := s.NotifyUpdated(s.ctx, mgr.Config().EmbyDir); err != nil {
+				slog.Error("persist Emby notification", "error", err)
+			}
 		}
 	}()
 }
@@ -197,78 +199,7 @@ func (s *Service) Test(ctx context.Context, cfg Config) (ServerInfo, error) {
 	return s.client.ping(ctx, Config{ServerURL: serverURL, APIKey: apiKey})
 }
 
-// NotifyUpdated enqueues a directory to be batched and notified to Emby.
-func (s *Service) NotifyUpdated(localPath string) {
-	s.mu.RLock()
-	enabled := s.cfg.ready()
-	s.mu.RUnlock()
-
-	if !enabled || s.ctx.Err() != nil || strings.TrimSpace(localPath) == "" {
-		return
-	}
-
-	select {
-	case s.queue <- localPath:
-	default:
-		slog.Warn("emby notification queue full, dropping path", "path", localPath)
-	}
-}
-
-func (s *Service) worker(ctx context.Context) {
-	defer s.wg.Done()
-	ticker := time.NewTicker(3 * time.Second)
-	defer ticker.Stop()
-
-	pending := make(map[string]bool)
-
-	flush := func(flushCtx context.Context) {
-		if len(pending) == 0 {
-			return
-		}
-		paths := make([]string, 0, len(pending))
-		for p := range pending {
-			paths = append(paths, p)
-		}
-		clear(pending)
-
-		if err := s.sendBatch(flushCtx, paths); err != nil {
-			slog.WarnContext(flushCtx, "failed to notify emby of updated media", "count", len(paths), "error", err)
-		} else {
-			slog.InfoContext(flushCtx, "notified emby of updated media", "count", len(paths))
-			s.actors.schedule(25 * time.Second)
-		}
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			// Include buffered notifications that have not reached the pending set yet.
-			for {
-				select {
-				case item := <-s.queue:
-					pending[item] = true
-				default:
-					shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-					flush(shutdownCtx)
-					cancel()
-					return
-				}
-			}
-		case item := <-s.queue:
-			pending[item] = true
-			if len(pending) >= 50 {
-				flush(ctx)
-			}
-		case <-ticker.C:
-			flush(ctx)
-		}
-	}
-}
-
-func (s *Service) sendBatch(ctx context.Context, localPaths []string) error {
-	s.mu.RLock()
-	cfg := s.cfg
-	s.mu.RUnlock()
+func (s *Service) sendBatch(ctx context.Context, cfg Config, localPaths []string) error {
 
 	if !cfg.ready() || len(localPaths) == 0 {
 		return nil

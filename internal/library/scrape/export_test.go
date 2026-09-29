@@ -16,7 +16,6 @@ import (
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
-
 func TestExportLocalMovie_ScrapedRecordExportsMissingSidecars(t *testing.T) {
 	tempDir := t.TempDir()
 	embyDir := filepath.Join(tempDir, "emby")
@@ -39,7 +38,6 @@ func TestExportLocalMovie_ScrapedRecordExportsMissingSidecars(t *testing.T) {
 	if err != nil {
 		t.Fatalf("restore artwork: %v", err)
 	}
-
 
 	// Create movie in database with ScrapeStatusDone
 	releaseDate := time.Date(2026, 9, 22, 0, 0, 0, 0, time.UTC)
@@ -107,7 +105,7 @@ func TestExportLocalMovie_ScrapedRecordExportsMissingSidecars(t *testing.T) {
 	}
 
 	// Call ExportLocalMovie
-	err = ExportLocalMovie(embyDir, "http://127.0.0.1:8080", "testtoken", loadedMovie, images)
+	_, err = ExportLocalMovie(embyDir, "http://127.0.0.1:8080", "testtoken", loadedMovie, images)
 	if err != nil {
 		t.Fatalf("ExportLocalMovie failed: %v", err)
 	}
@@ -143,7 +141,6 @@ func TestExportLocalMovie_ScrapedRecordExportsMissingSidecars(t *testing.T) {
 		t.Fatalf("fanart data missing or empty: %v", err)
 	}
 
-
 	// 4. Verify STRM still exists and has token
 	sData, err := os.ReadFile(strmPath)
 	if err != nil || !strings.Contains(string(sData), "token=testtoken") {
@@ -151,7 +148,7 @@ func TestExportLocalMovie_ScrapedRecordExportsMissingSidecars(t *testing.T) {
 	}
 
 	// 5. Subsequent call returns nil cleanly without error (noop check)
-	err = ExportLocalMovie(embyDir, "http://127.0.0.1:8080", "testtoken", loadedMovie, images)
+	_, err = ExportLocalMovie(embyDir, "http://127.0.0.1:8080", "testtoken", loadedMovie, images)
 	if err != nil {
 		t.Fatalf("second ExportLocalMovie failed: %v", err)
 	}
@@ -405,6 +402,3 @@ func TestExportEmbyMedia_MultiVideoOrder(t *testing.T) {
 		t.Fatalf("expected cd2 strm to contain vid-part2, got %s", string(cd2Bytes))
 	}
 }
-
-
-

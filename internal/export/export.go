@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/ppxb/miyabi/internal/codeid"
+	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/netx"
 	"github.com/ppxb/miyabi/internal/nfo"
 )
@@ -106,5 +107,6 @@ func RewriteSTRM(ctx context.Context, embyDir, publicURL, strmToken string) (int
 
 // MediaNotifier receives notifications when exported media directories are written or updated.
 type MediaNotifier interface {
-	NotifyUpdated(localPath string)
+	NotifyUpdated(ctx context.Context, localPath string) error
+	NotifyUpdatedTx(ctx context.Context, tx *ent.Tx, localPath string) error
 }

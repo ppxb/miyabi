@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/ppxb/miyabi/internal/ent/actor"
+	"github.com/ppxb/miyabi/internal/ent/embynotification"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
@@ -82,16 +83,17 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			actor.Table:           actor.ValidColumn,
-			file.Table:            file.ValidColumn,
-			movie.Table:           movie.ValidColumn,
-			offlinedownload.Table: offlinedownload.ValidColumn,
-			setting.Table:         setting.ValidColumn,
-			subscription.Table:    subscription.ValidColumn,
-			subtitle.Table:        subtitle.ValidColumn,
-			tag.Table:             tag.ValidColumn,
-			task.Table:            task.ValidColumn,
-			viewedmovie.Table:     viewedmovie.ValidColumn,
+			actor.Table:            actor.ValidColumn,
+			embynotification.Table: embynotification.ValidColumn,
+			file.Table:             file.ValidColumn,
+			movie.Table:            movie.ValidColumn,
+			offlinedownload.Table:  offlinedownload.ValidColumn,
+			setting.Table:          setting.ValidColumn,
+			subscription.Table:     subscription.ValidColumn,
+			subtitle.Table:         subtitle.ValidColumn,
+			tag.Table:              tag.ValidColumn,
+			task.Table:             task.ValidColumn,
+			viewedmovie.Table:      viewedmovie.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

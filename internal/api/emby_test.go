@@ -15,9 +15,10 @@ import (
 )
 
 type stubEmbyManager struct {
-	cfg  emby.Config
-	info emby.ServerInfo
-	err  error
+	retryCalls int
+	cfg        emby.Config
+	info       emby.ServerInfo
+	err        error
 }
 
 func (s *stubEmbyManager) Config(context.Context) (emby.Config, error) {
@@ -104,3 +105,5 @@ func TestEmbyEndpoints(t *testing.T) {
 		t.Fatalf("expected 502, got %d", rec.Code)
 	}
 }
+
+func (s *stubEmbyManager) RetryPending(context.Context) error { s.retryCalls++; return s.err }
