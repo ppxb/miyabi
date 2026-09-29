@@ -8,7 +8,7 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 )
 
-var ErrTooManyLoginAttempts = domain.E(domain.KindBusy, "尝试登录失败次数过多，已被封禁 24 小时", nil)
+var ErrTooManyLoginAttempts = domain.E(domain.KindRateLimited, "尝试登录失败次数过多，已被封禁 24 小时", nil)
 
 type ipLoginRecord struct {
 	failures  int
@@ -59,7 +59,7 @@ func (l *loginRateLimiter) check(ip string) error {
 		} else {
 			timeStr = fmt.Sprintf("%d 分钟", minutes)
 		}
-		return domain.E(domain.KindBusy, fmt.Sprintf("尝试登录失败次数过多，已被封禁（剩余 %s）", timeStr), ErrTooManyLoginAttempts)
+		return domain.E(domain.KindRateLimited, fmt.Sprintf("尝试登录失败次数过多，已被封禁（剩余 %s）", timeStr), ErrTooManyLoginAttempts)
 	}
 
 	// If block has expired or window has elapsed, clean up

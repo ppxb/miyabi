@@ -10,15 +10,15 @@ import (
 type Kind int
 
 const (
-	KindUnexpected   Kind = iota
-	KindInvalid           // 400 Bad Request
-	KindUnauthorized      // 401 Unauthorized
-	KindNotFound          // 404 Not Found
-	KindConflict          // 409 Conflict
-	KindBusy              // 409 Conflict / 503 Busy
-	KindUpstream          // 502 Bad Gateway
-	KindCanceled          // 499 Client Closed Request
-	KindInternal          // 500 Internal Server Error
+	KindUnexpected   Kind = iota // 500 Internal Server Error
+	KindInvalid                  // 400 Bad Request
+	KindUnauthorized             // 401 Unauthorized
+	KindNotFound                 // 404 Not Found
+	KindConflict                 // 409 Conflict
+	KindBusy                     // 409 Conflict
+	KindUpstream                 // 502 Bad Gateway
+	KindCanceled                 // 499 Client Closed Request
+	KindRateLimited              // 429 Too Many Requests
 )
 
 func (k Kind) String() string {
@@ -37,8 +37,8 @@ func (k Kind) String() string {
 		return "upstream"
 	case KindCanceled:
 		return "canceled"
-	case KindInternal:
-		return "internal"
+	case KindRateLimited:
+		return "rate_limited"
 	default:
 		return "unexpected"
 	}
@@ -88,13 +88,15 @@ func (e *Error) Unwrap() error {
 	return e.Cause
 }
 
+func (e *Error) DomainKind() Kind { return e.Kind }
+
 // PublicMessage returns the user-facing message safe to be exposed via API.
 func (e *Error) PublicMessage() string {
 	if e == nil {
 		return ""
 	}
 	switch e.Kind {
-	case KindUnexpected, KindInternal:
+	case KindUnexpected:
 		return "内部服务错误"
 	}
 	if e.Message != "" {
@@ -111,6 +113,8 @@ func (e *Error) PublicMessage() string {
 		return "资源状态冲突"
 	case KindBusy:
 		return "服务正忙，请稍后重试"
+	case KindRateLimited:
+		return "请求过于频繁，请稍后重试"
 	case KindUpstream:
 		return "上游服务异常"
 	case KindCanceled:
@@ -120,22 +124,18 @@ func (e *Error) PublicMessage() string {
 	}
 }
 
-// IsKind checks if an error or any error in its unwrap chain is a domain.Error with the specified Kind.
+// IsKind uses the same classification as KindOf. A nil error matches no kind.
 func IsKind(err error, kind Kind) bool {
-	var de *Error
-	if errors.As(err, &de) {
-		return de.Kind == kind
-	}
-	return false
+	return err != nil && KindOf(err) == kind
 }
 
-// HasKind allows external error types to supply a domain Kind.
+// HasKind is the common classification contract for Error and external errors.
 type HasKind interface {
 	DomainKind() Kind
 }
 
 // PublicMessage returns the user-facing text for any error: the first
-// PublicMessage() in the unwrap chain, or a default safe message for unexpected/internal errors.
+// PublicMessage() in the unwrap chain, or a default safe message for unexpected errors.
 func PublicMessage(err error) string {
 	if err == nil {
 		return ""
@@ -147,21 +147,19 @@ func PublicMessage(err error) string {
 		}
 	}
 	switch KindOf(err) {
-	case KindUnexpected, KindInternal:
+	case KindUnexpected:
 		return "内部服务错误"
 	default:
 		return err.Error()
 	}
 }
 
-// KindOf returns the domain Kind of the error, or KindUnexpected if not recognized.
+// KindOf uses the first HasKind in errors.As traversal (outer wrappers take
+// precedence; joined errors are visited depth-first, left-to-right). Unclassified
+// missing-file errors are NotFound; other errors and nil return KindUnexpected.
 func KindOf(err error) Kind {
 	if err == nil {
 		return KindUnexpected
-	}
-	var de *Error
-	if errors.As(err, &de) {
-		return de.Kind
 	}
 	var hk HasKind
 	if errors.As(err, &hk) {

@@ -233,7 +233,7 @@ func TestAuth_RateLimiterTriggers(t *testing.T) {
 		}
 	}
 
-	// 6th attempt should be blocked with 409 Conflict (domain.KindBusy maps to 409 or 429)
+	// 6th attempt is rate-limited with HTTP 429.
 	{
 		body, _ := json.Marshal(map[string]string{"password": password})
 		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
@@ -242,8 +242,8 @@ func TestAuth_RateLimiterTriggers(t *testing.T) {
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusConflict {
-			t.Fatalf("expected blocked with StatusConflict (KindBusy), got %d: %s", rec.Code, rec.Body.String())
+		if rec.Code != http.StatusTooManyRequests {
+			t.Fatalf("expected blocked with StatusTooManyRequests (KindRateLimited), got %d: %s", rec.Code, rec.Body.String())
 		}
 	}
 }
@@ -282,8 +282,8 @@ func TestAuth_UntrustedProxiesIgnoreSpoofedIP(t *testing.T) {
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusConflict {
-			t.Fatalf("expected blocked with StatusConflict even with spoofed X-Forwarded-For, got %d: %s", rec.Code, rec.Body.String())
+		if rec.Code != http.StatusTooManyRequests {
+			t.Fatalf("expected blocked with StatusTooManyRequests even with spoofed X-Forwarded-For, got %d: %s", rec.Code, rec.Body.String())
 		}
 	}
 }

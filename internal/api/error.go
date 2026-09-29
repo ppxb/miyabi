@@ -60,6 +60,8 @@ func httpStatusForKind(kind domain.Kind) int {
 		return http.StatusNotFound
 	case domain.KindConflict, domain.KindBusy:
 		return http.StatusConflict
+	case domain.KindRateLimited:
+		return http.StatusTooManyRequests
 	case domain.KindUpstream:
 		return http.StatusBadGateway
 	case domain.KindCanceled:
@@ -78,7 +80,7 @@ func mapErrorStatus(err error) (int, domain.Kind) {
 	case ent.IsNotFound(err), errors.Is(err, fs.ErrNotExist):
 		return http.StatusNotFound, domain.KindNotFound
 	default:
-		return http.StatusInternalServerError, domain.KindInternal
+		return http.StatusInternalServerError, domain.KindUnexpected
 	}
 }
 

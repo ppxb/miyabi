@@ -52,6 +52,8 @@ func TestErrorMiddlewareMapsDomainErrorsToStatusAndMessage(t *testing.T) {
 		message string
 	}{
 		{name: "bad request wrapper", err: BadRequest(errors.New("page must be positive")), status: http.StatusBadRequest, message: "page must be positive"},
+		{name: "outer classification wins", err: BadRequest(domain.E(domain.KindConflict, "参数冲突", nil)), status: http.StatusBadRequest, message: "参数冲突"},
+		{name: "login rate limit", err: ErrTooManyLoginAttempts, status: http.StatusTooManyRequests, message: ErrTooManyLoginAttempts.PublicMessage()},
 		{name: "media directory required", err: drive.ErrMediaDirectoryRequired, status: http.StatusBadRequest, message: drive.ErrMediaDirectoryRequired.PublicMessage()},
 		{name: "magnet not found", err: fmt.Errorf("add: %w", offline.ErrMagnetNotFound), status: http.StatusBadRequest, message: offline.ErrMagnetNotFound.PublicMessage()},
 		{name: "invalid proxy", err: proxyValidationError(), status: http.StatusBadRequest, message: "代理配置无效: 代理地址必须包含协议（如 http://）与主机地址"},
