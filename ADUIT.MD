@@ -79,11 +79,13 @@
 - [x] **41.** cover 快照存于已完成 cover 任务的 payload（`scrape/snapshot.go:153-190`、`scrape.go:167-169`），导致 task 表永远不能清理、每次扫描需对全表 `json_extract` → 快照 / `videos_fingerprint` 存到 movie 行。
 - [x] **42.** `internal/config/runtime.go:24` `TaskPoolWorkers: 1` 硬编码：订阅批量（每条 sleep 1.5-3s，500 条约 30 分钟）与 scan/scrape/cover 共用唯一 worker，阻塞所有扫描（含离线完成后的 `EnqueueTargetedScan`）→ 批量任务独立执行。
 - [x] **43.** ✔ 本地 Emby 目录扫描接入 `scan` 后台任务：启动及保存 Emby 设置时自动入队，同目录活动任务复用；与 115 扫描串行，并与 STRM 重写及导出互斥。`POST /api/library/scan/local` 返回 202 任务信息，仅接受当前配置的本地目录；执行和重试校验目录是否已变更，跳过目录中的符号链接，支持任务状态、失败重试和重启恢复。首次启动导出目录尚不存在时跳过自动扫描。
+  - 复查补充：切换本地目录也触发 STRM 重写，即使 PublicURL 未变；回归测试确认新目录使用当前地址及 token，旧目录保持不变。
 - [x] **44.** ✔ 网页登录统一使用 HttpOnly Cookie 携带 JWT，保留签名与有效期校验；登录 JSON 不再返回 token，移除 localStorage 存取及 Bearer 注入、网页登录 URL token 通道，启动时清理旧存储。SSE、图片及 beacon 继续使用 Cookie，API 写请求采用标准库跨来源保护；独立 STRM 播放 token 保持可用。
 - [x] **45.** ✔ `netx.NewTransport(manager)` 统一标准 HTTP Transport 和动态代理配置，nil 时强制直连且不读取环境代理；Resty、安全下载及 GFriends 复用，删除字幕与 JavDB 图片客户端的重复分支和多余初始化。`SafeDownload`、`OpenMedia` 改用 `net/http`，保留下载大小限制、SSRF/重定向检查及媒体流的 UA、Range、HEAD、超时行为；需要浏览器 TLS 指纹的客户端继续独立使用。
 - [x] **46.** ✔ `netx.ProxiedFingerprintClient` 统一指纹客户端接口、代理订阅、重建替换及关闭释放；重建失败保留旧客户端，关闭后禁止重建。JavDB 与 JavBus 正式请求复用此管理逻辑，分别保留线路重选和健康探测；JavDB 线路探测仍使用固定代理的临时客户端，两站 `Probe` 保留各自检测语义。
 - [x] **47.** ✔ 删除 JavBus 详情参数及 HTML 缓存，消除无效容量上限与过期删除竞争；保留 catalogue 按影片缓存最终磁力结果及并发请求合并。外层缓存失效后重新获取 JavBus 详情参数，避免继续复用旧参数。
 - [x] **48.** ✔ 明确 JavDB 为主数据源：`Provider` 改为 `JavDBClient`，保留 JavDB 专属线路类型并要求磁力来源能力；JavBus 改为仅包含磁力查询、可用性和关闭能力的可选 `JavBusSource`。生产与 `NewWithClients` 共用组装逻辑，始终创建聚合器，删除直接读取磁力的备用分支；测试通过构造参数注入客户端，验证单源去重及补充源失败后的重试与缓存行为。
+  - 复查补充：JavDB 详情临时失败导致 JavBus 无法补查时，降级结果不进入磁力缓存；下次请求重试详情及补充源，完整查询后才缓存。
 - [x] **49.** ✔ 选线结果直接使用 `javdb.RouteStatus`，删除重复 `routeResult` 及逐字段搬运；保留前端毫秒格式投影与数据库恢复记录。catalogue 当前线路只读取 JavDB，删除保存状态的显示回退；`lastSavedRoute` 仅用于避免重复写库，成功保存后才更新。已验证启动恢复、保存失败后重试及无活动线路时不显示旧线路。
 - [x] **50.** ✔ 历史迁移统一由 database 的有序列表执行，使用 `PRAGMA user_version` 记录进度；每步数据修改和版本递增同事务提交，失败回滚并在重启后续迁。保留“播放器旧字段清理 → Ent 建表/索引 → 数据迁移”的依赖顺序，浏览记录迁移移出 app/library；兼容旧元数据迁移标记，拒绝未知高版本，已完成步骤不再重复探测和执行。
 - [x] **51.** ✔ 网络设置服务及连通性结果类型迁入 `internal/network`，app 仅负责组装，netx 不再包含网站专属测试结果；配置读取简化为 `Config() netx.ProxyConfig`，删除无效的 context/error 传递。保留整体 Context 与客户端请求两层超时，API JSON 格式不变；迁移原有测试，并将 network/netx 纳入依赖方向检查。

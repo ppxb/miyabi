@@ -61,6 +61,52 @@ func TestMagnetsOptionalSourceFailureDoesNotCachePartialResults(t *testing.T) {
 
 type countingJavBusHTTP struct{ calls atomic.Int32 }
 
+type recoveringDetailProvider struct {
+	stubProviderWithMagnets
+	calls int
+}
+
+func (p *recoveringDetailProvider) MovieDetail(ctx context.Context, id string) (domain.MovieDetail, error) {
+	p.calls++
+	if p.calls == 1 {
+		return domain.MovieDetail{}, errors.New("temporary detail failure")
+	}
+	return p.stubProviderWithMagnets.MovieDetail(ctx, id)
+}
+
+func TestMagnetsRetriesDetailBeforeCachingSupplementedResult(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	primary := &recoveringDetailProvider{stubProviderWithMagnets: stubProviderWithMagnets{
+		magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "primary"}},
+	}}
+	upstream := &countingJavBusHTTP{}
+	service, err := NewWithClients(t.Context(), store.Client, primary, javbus.NewForTest(true, upstream), &stubLocalState{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+	for i, wantDetailCalls := range []int{1, 2, 2} {
+		magnets, err := service.Magnets(t.Context(), "movie-1")
+		if err != nil || len(magnets) != 1 {
+			t.Fatalf("request %d: magnets=%+v error=%v", i, magnets, err)
+		}
+		if primary.calls != wantDetailCalls {
+			t.Fatalf("request %d: detail calls=%d want=%d", i, primary.calls, wantDetailCalls)
+		}
+		wantUpstreamCalls := int32(1)
+		if i == 0 {
+			wantUpstreamCalls = 0
+		}
+		if got := upstream.calls.Load(); got != wantUpstreamCalls {
+			t.Fatalf("request %d: supplement calls=%d want=%d", i, got, wantUpstreamCalls)
+		}
+	}
+}
+
 func (c *countingJavBusHTTP) Do(*http.Request) (*http.Response, error) {
 	c.calls.Add(1)
 	return &http.Response{StatusCode: 404, Body: io.NopCloser(strings.NewReader("not found")), Header: make(http.Header)}, nil

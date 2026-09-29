@@ -54,6 +54,53 @@ func TestConstructorRestoresExportConfigAndInjectsScanScheduler(t *testing.T) {
 	}
 }
 
+func TestSwitchLocalDirectoryRewritesSTRMWithoutChangingPublicURL(t *testing.T) {
+	ctx := t.Context()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	oldRoot, newRoot := t.TempDir(), t.TempDir()
+	mgr := export.NewManager(export.Config{EmbyDir: oldRoot, PublicURL: "http://current.example", STRMToken: "current-token"})
+	svc, err := NewService(ctx, store.Client, Config{LocalDir: oldRoot, PublicURL: mgr.Config().PublicURL}, Dependencies{ExportManager: mgr})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer svc.Close()
+	stale := export.STRMContent("http://previous.example", "123", "old-token")
+	for _, root := range []string{oldRoot, newRoot} {
+		if err := os.WriteFile(filepath.Join(root, "ABC-123.strm"), stale, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := svc.UpdateConfig(ctx, Config{LocalDir: newRoot, PublicURL: mgr.Config().PublicURL}); err != nil {
+		t.Fatal(err)
+	}
+	want := export.STRMContent("http://current.example", "123", "current-token")
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		got, err := os.ReadFile(filepath.Join(newRoot, "ABC-123.strm"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bytes.Equal(got, want) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("new directory retained stale STRM: %s", got)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	got, err := os.ReadFile(filepath.Join(oldRoot, "ABC-123.strm"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, stale) {
+		t.Fatalf("previous directory was unexpectedly rewritten: %s", got)
+	}
+}
+
 func TestEmbyConfig_Normalize(t *testing.T) {
 	cfg := Config{
 		Enabled:   true,

@@ -17,16 +17,20 @@ const aggregatorTimeout = 8 * time.Second
 func (service *Service) Magnets(ctx context.Context, movieID string) ([]Magnet, error) {
 	magnets, err := cachedJavDB(ctx, service, service.magnets, movieID, func(ctx context.Context) ([]domain.Magnet, error) {
 		ref := domain.MovieRef{JavDBID: movieID}
+		detailFailed := false
 		if service.javbus != nil && service.javbus.Available() {
 			if detail, err := service.CatalogueDetail(ctx, movieID); err == nil {
 				ref.Code, ref.Zone = detail.Code, detail.Zone
+			} else {
+				detailFailed = true
 			}
 		}
 		magnets, partial, err := service.aggregator.FindDetailed(ctx, ref)
 		if err != nil {
 			return nil, err
 		}
-		if partial {
+		// Missing detail prevents JavBus from participating; retry it on the next request.
+		if partial || detailFailed {
 			return magnets, ErrDoNotCache
 		}
 		return magnets, nil

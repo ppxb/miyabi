@@ -180,6 +180,7 @@ func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 		cfg.PublicURL = s.defaultPublicURL
 	}
 	oldPublicURL := s.cfg.PublicURL
+	oldLocalDir := s.cfg.LocalDir
 	token := s.exportMgr.Config().STRMToken
 	s.mu.Unlock()
 
@@ -203,7 +204,7 @@ func (s *Service) UpdateConfig(ctx context.Context, cfg Config) error {
 			STRMToken: token,
 		})
 	}
-	if oldPublicURL != cfg.PublicURL && exportMgr != nil {
+	if exportMgr != nil && (oldPublicURL != cfg.PublicURL || oldLocalDir != cfg.LocalDir) {
 		s.startSTRMRewrite(exportMgr)
 	}
 
