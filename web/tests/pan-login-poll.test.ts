@@ -1,154 +1,94 @@
 import assert from 'node:assert/strict'
-import { test, vi, afterAll } from 'vitest'
-import type { QueryObserverResult } from '@tanstack/react-query'
-import type { PanLoginState } from '@/api/pan'
+import { beforeEach, onTestFinished, test, vi } from 'vitest'
+import { QueryClient, QueryObserver } from '@tanstack/react-query'
+import { panLoginOptions } from '@/api/pan'
 
-import {
-  PAN_LOGIN_MAX_FAILURES,
-  PAN_LOGIN_POLL_MS,
-  panLoginPollDelay,
-  panLoginShouldRetry
-} from '@/lib/pan-login'
+// QueryObserver must detect a browser before the query module is evaluated.
+vi.hoisted(() => vi.stubGlobal('window', {}))
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.stubGlobal('window', { location: { origin: 'http://localhost' } })
+})
 
-for (const scenario of [
-  {
-    name: 'a waiting login keeps polling',
-    input: { failed: false, state: 'waiting' },
-    want: PAN_LOGIN_POLL_MS
-  },
-  {
-    name: 'a scanned login keeps polling until the phone confirms',
-    input: { failed: false, state: 'scanned' },
-    want: PAN_LOGIN_POLL_MS
-  },
-  {
-    name: 'the first answer has not arrived yet',
-    input: { failed: false, state: undefined },
-    want: PAN_LOGIN_POLL_MS
-  },
-  {
-    name: 'a completed login stops polling',
-    input: { failed: false, state: 'authorized' },
-    want: false
-  },
-  {
-    name: 'an expired login stops polling so the dialog can refresh it',
-    input: { failed: false, state: 'expired' },
-    want: false
-  },
-  {
-    name: 'a login the user canceled on their phone stops polling',
-    input: { failed: false, state: 'canceled' },
-    want: false
-  },
-  {
-    name: 'a poll that spent its failure budget stops polling for the dialog',
-    input: { failed: true, state: 'waiting' },
-    want: false
-  }
-] as const) {
-  test(scenario.name, () => {
-    assert.equal(panLoginPollDelay(scenario.input), scenario.want)
-  })
-}
-
-// react-query treats a missing `window` as a server and never polls on an
-// interval there, so it has to see a browser before it loads.
-vi.stubGlobal('window', {})
-afterAll(() => vi.unstubAllGlobals())
-const { QueryClient, QueryObserver } = await import('@tanstack/react-query')
-
-// Mirrors usePanLoginStatus. Only the delays are shortened so a test finishes.
-function observePanLogin(queryFn: () => Promise<{ state: PanLoginState }>) {
+function observeLogin(id = 'fixture') {
   const client = new QueryClient()
-  const observer = new QueryObserver(client, {
-    queryKey: ['pan', 'login', 'fixture'],
-    queryFn,
-    retry: panLoginShouldRetry,
-    retryDelay: 1,
-    staleTime: 0,
-    gcTime: 0,
-    refetchInterval: query =>
-      panLoginPollDelay({
-        failed: query.state.status === 'error',
-        state: query.state.data?.state
-      }) && 1
-  })
-  const seen: QueryObserverResult<{ state: PanLoginState }>[] = []
+  const observer = new QueryObserver(client, panLoginOptions(id))
+  const seen: ReturnType<typeof observer.getCurrentResult>[] = []
   const stop = observer.subscribe(result => seen.push(result))
-  return { observer, seen, stop }
-}
-
-async function until(condition: () => boolean) {
-  const deadline = Date.now() + 5000
-  while (!condition()) {
-    if (Date.now() > deadline) throw new Error('condition was not met in time')
-    await sleep(2)
-  }
-}
-
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-test('an unreachable backend spends the whole failure budget before the dialog hears of it', async () => {
-  let calls = 0
-  const { observer, seen, stop } = observePanLogin(async () => {
-    calls++
-    throw new Error(`connection refused ${calls}`)
-  })
-  try {
-    await until(() => observer.getCurrentResult().isError)
-    assert.equal(calls, PAN_LOGIN_MAX_FAILURES)
-    assert.equal(observer.getCurrentResult().failureCount, PAN_LOGIN_MAX_FAILURES)
-    const retries = seen.filter(result => !result.isError)
-    assert.ok(
-      retries.some(result => result.failureCount > 0),
-      'retries never showed as such'
-    )
-    await sleep(25)
-    assert.equal(calls, PAN_LOGIN_MAX_FAILURES, 'polling went on after the budget was spent')
-  } finally {
+  onTestFinished(() => {
     stop()
-  }
+    client.clear()
+  })
+  return { observer, seen }
+}
+
+test('an unreachable backend stops after five failures without further polling', async () => {
+  const fetch = vi.fn().mockRejectedValue(new TypeError('connection refused'))
+  vi.stubGlobal('fetch', fetch)
+  const { observer, seen } = observeLogin()
+  await vi.advanceTimersByTimeAsync(6000)
+  assert.equal(fetch.mock.calls.length, 5)
+  assert.equal(observer.getCurrentResult().isError, true)
+  assert.equal(observer.getCurrentResult().failureCount, 5)
+  assert.ok(seen.some(result => !result.isError && result.failureCount > 0))
+  await vi.advanceTimersByTimeAsync(30_000)
+  assert.equal(fetch.mock.calls.length, 5)
 })
 
-test('a burst of failures inside the budget keeps the last answer and keeps polling', async () => {
-  let calls = 0
-  const { observer, seen, stop } = observePanLogin(async () => {
-    calls++
-    if (calls === 2 || calls === 3) throw new Error(`connection reset ${calls}`)
-    return { state: 'scanned' }
-  })
-  try {
-    await until(() => calls >= 5)
-    assert.ok(
-      seen.every(result => !result.isError),
-      'a burst inside the budget was reported as an error'
-    )
-    const failing = seen.filter(result => result.failureCount > 0)
-    assert.equal(Math.max(...failing.map(result => result.failureCount)), 2)
-    assert.ok(
-      failing.every(result => result.data?.state === 'scanned'),
-      'the scanned answer was dropped while retrying'
-    )
-    assert.equal(observer.getCurrentResult().failureCount, 0)
-  } finally {
-    stop()
-  }
+test('transient failures keep the scanned answer and resume polling', async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ state: 'scanned' }))
+    .mockRejectedValueOnce(new TypeError('connection reset'))
+    .mockRejectedValueOnce(new TypeError('connection reset'))
+    .mockImplementation(() => Promise.resolve(Response.json({ state: 'scanned' })))
+  vi.stubGlobal('fetch', fetch)
+  const { observer, seen } = observeLogin()
+  await vi.advanceTimersByTimeAsync(4500)
+  assert.equal(fetch.mock.calls.length, 4)
+  assert.ok(seen.every(result => !result.isError))
+  const retrying = seen.filter(result => result.failureCount > 0)
+  assert.equal(Math.max(...retrying.map(result => result.failureCount)), 2)
+  assert.ok(retrying.every(result => result.data?.state === 'scanned'))
+  assert.equal(observer.getCurrentResult().failureCount, 0)
+  await vi.advanceTimersByTimeAsync(1500)
+  assert.equal(fetch.mock.calls.length, 5)
 })
 
-test('a finished login is not polled again', async () => {
-  let calls = 0
-  const { observer, stop } = observePanLogin(async () => {
-    calls++
-    return { state: 'authorized' }
+for (const state of ['authorized', 'expired', 'canceled'] as const) {
+  test(`${state} stops further login polling`, async () => {
+    const fetch = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ state })))
+    vi.stubGlobal('fetch', fetch)
+    const { observer } = observeLogin()
+    await vi.advanceTimersByTimeAsync(30_000)
+    assert.equal(observer.getCurrentResult().data?.state, state)
+    assert.equal(fetch.mock.calls.length, 1)
   })
-  try {
-    await until(() => observer.getCurrentResult().isSuccess)
-    await sleep(25)
-    assert.equal(calls, 1)
-  } finally {
-    stop()
-  }
+}
+
+test('waiting polls advance to scanned and authorized using the real endpoint', async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ state: 'waiting' }))
+    .mockResolvedValueOnce(Response.json({ state: 'scanned' }))
+    .mockResolvedValueOnce(Response.json({ state: 'authorized' }))
+  vi.stubGlobal('fetch', fetch)
+  const { observer } = observeLogin('qr/id')
+  await vi.advanceTimersByTimeAsync(0)
+  assert.equal(observer.getCurrentResult().data?.state, 'waiting')
+  assert.equal(fetch.mock.calls[0]![0], '/api/pan/login/qr%2Fid')
+  await vi.advanceTimersByTimeAsync(1500)
+  assert.equal(observer.getCurrentResult().data?.state, 'scanned')
+  await vi.advanceTimersByTimeAsync(1500)
+  assert.equal(observer.getCurrentResult().data?.state, 'authorized')
+  await vi.advanceTimersByTimeAsync(30_000)
+  assert.equal(fetch.mock.calls.length, 3)
+})
+
+test('an empty session ID never starts a login request', async () => {
+  const fetch = vi.fn()
+  vi.stubGlobal('fetch', fetch)
+  observeLogin('')
+  await vi.advanceTimersByTimeAsync(30_000)
+  assert.equal(fetch.mock.calls.length, 0)
 })

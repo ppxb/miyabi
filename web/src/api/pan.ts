@@ -1,9 +1,14 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient
+} from '@tanstack/react-query'
 
 import { apiDelete, apiGet, apiPost, apiPut } from '@/api/client'
 import { resetMovieStates } from '@/api/movie-states'
 import { taskKeys } from '@/api/tasks'
-import { PAN_LOGIN_POLL_MS, panLoginPollDelay, panLoginShouldRetry } from '@/lib/pan-login'
 
 export type PanDirectory = {
   id: string
@@ -81,20 +86,30 @@ export function useBeginPanLogin() {
   })
 }
 
-export function usePanLoginStatus(id: string) {
-  return useQuery({
+const loginPollInterval = 1500
+
+export function panLoginOptions(id: string) {
+  return queryOptions({
     queryKey: panKeys.login(id),
     queryFn: ({ signal }) =>
       apiGet<PanLoginStatus>(`/api/pan/login/${encodeURIComponent(id)}`, undefined, signal),
     enabled: id !== '',
-    retry: panLoginShouldRetry,
-    retryDelay: PAN_LOGIN_POLL_MS,
+    // Four retries plus the first attempt preserve the five-failure budget.
+    retry: 4,
+    retryDelay: loginPollInterval,
     staleTime: 0,
     gcTime: 0,
     refetchOnReconnect: false,
-    refetchInterval: query =>
-      panLoginPollDelay({ failed: query.state.status === 'error', state: query.state.data?.state })
+    refetchInterval: query => {
+      if (query.state.status === 'error') return false
+      const state = query.state.data?.state
+      return !state || state === 'waiting' || state === 'scanned' ? loginPollInterval : false
+    }
   })
+}
+
+export function usePanLoginStatus(id: string) {
+  return useQuery(panLoginOptions(id))
 }
 
 export function useDisconnectPan() {

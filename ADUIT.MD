@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：170 条待处理，9 条已完成、待整体复查。
+> 清单整理：2026-09-29；此前已移除 62 条已勾选记录及 63、86、223 三条已失效待办。当前保留 179 条：169 条待处理，10 条已完成、待整体复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；本轮起新完成的条目保留在文档中，勾选并补充实现与验证说明，供全部完成后整体复查。此前清理的记录可通过 Git 历史查看。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮仅核对受近期改动影响的条目，并非重新验证全部待办。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -62,7 +62,9 @@
   - 核实与取舍：当前服务端同样限制 5000 条，原文“服务端返回全部”已不适用。采用服务端记录与 Query 缓存；用户已接受未提交成功就关闭页面的记录不再跨重启补发，旧 localStorage 待提交内容不再读取。
   - 实现：删除 BrowseHistoryStore、localStorage 合并、延迟批量、退出 beacon 和手动订阅；共享 useQuery 获取记录，useMutation 立即提交并短期重试网络/服务端错误，useMutationState 提供提交中乐观徽章，失败不回滚其他记录。成功后仅更新缓存，保留服务端同步时间，过期后随页面挂载或窗口聚焦同步；查询合并请求期间新确认的记录，避免首次加载覆盖新记录，本地缓存同样限制 5000 条。保持空 ID 和同 ID 进行中提交去重。
   - 验证：初次迁移生产 build 通过；后续减少全量刷新优化经 Vitest 115 项、typecheck、lint 验证，覆盖查询共享、立即提交、并发成功/失败、首次 GET 合并、提交不触发 GET、不延后缓存过期、服务端淘汰替换、5000 条上限及查询/提交重试。浏览器徽章、跨页面及网络切换交互待用户验证，待整体复查。
-- [ ] **68.** `web/src/lib/pan-login.ts:11-19` `panLoginShouldRetry` 等价于 `retry: 4`，却配 146 行测试解释 react-query 内部行为；115 专用逻辑不应在 `lib/`。
+- [x] **68.** `web/src/lib/pan-login.ts:11-19` `panLoginShouldRetry` 等价于 `retry: 4`，却配 146 行测试解释 react-query 内部行为；115 专用逻辑不应在 `lib/`。
+  - 实现：登录查询配置收拢到 pan.ts 的 panLoginOptions，usePanLoginStatus 直接复用；使用 retry: 4 保持首次请求加四次重试的预算，删除 lib/pan-login.ts。保留 1500ms 间隔、禁用重连刷新及错误/终态停止轮询。
+  - 验证：测试直接使用生产 options 和 API 查询函数，mock fetch 配合 Vitest 模拟时间，覆盖五次失败后停止、短暂失败保留 scanned、三个终态、waiting→scanned→authorized、URL 编码及空会话不请求。全量 Vitest 112 项、typecheck、lint 通过；未进行真实扫码与浏览器断网联调，待整体复查。
 - [ ] **69.** `internal/drive/events.go` 整套 eventBus（RWMutex + 自增 ID + map + 取消函数）只有 `library.go:80` 一个订阅者且丢弃取消函数 → 单个 listener 字段。
 - [ ] **70.** `internal/netx/ssrf.go:216-236` functional options 只剩 `WithAllowLoopback`（测试开关，且 dialer 仍拦 loopback，所以 `subtitle.WithAllowLoopbackForTesting` 被迫换直连 client）；`WithMaxBytes` 仅测试使用。
 - [ ] **71.** `internal/pan/client.go:91-98` 与 `:137-146` Retry-After 两套：`panTransport` 全局 `retryAfter` 窗口 + resty `SetRetryAfter` 各等一遍。
