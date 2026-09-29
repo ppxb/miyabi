@@ -9,7 +9,6 @@ import {
   subscribeMovieCard
 } from './movie-detail-cache'
 
-export type MovieState = 'not_in_library' | 'saving' | 'processing' | 'in_library'
 export type ReleaseStatus = 'unknown' | 'released' | 'upcoming'
 export type JavDBZone = 'censored' | 'uncensored' | 'western' | 'fc2' | 'anime'
 export type JavDBEntityType = 'actor' | 'series' | 'maker' | 'director'
@@ -47,7 +46,6 @@ export type NamedEntity = {
 
 export type DiscoverMovie = {
   id: string
-  library_id?: number
   code: string
   title: string
   origin_title: string
@@ -66,7 +64,6 @@ export type DiscoverMovie = {
   series?: NamedEntity
   maker?: NamedEntity
   director?: NamedEntity
-  state: MovieState
   release_status: ReleaseStatus
 }
 

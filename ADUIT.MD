@@ -206,7 +206,9 @@
   - 数据源：媒体库任务匹配、任务通知及离线提交后的活动缓存更新复用 sameSource。directory_id 对应真实离线提交结构，保留以支持与 directory.id 的比较；账号连接状态校验具有不同职责，继续保留原判断。
   - 范围修正：ScanTask 字段保留用于描述完整 API 响应，browse-history-store 已删除无需重复处理；后端退出登录接口按第 109 项单独核实，本次不删除。
   - 验证：前端 119 项测试、typecheck、lint、修改文件格式化及 git diff --check 通过；新增跨结构数据源比较、账号/目录不同及空值测试，保留任务通知和查询调度覆盖。未进行浏览器测试。
-- [ ] **108.** 后端 `catalogue/service.go:398-401` 已随列表计算 `state` 与 `library_id`，前端从不读取 `DiscoverMovie.state`（`api/discover.ts:47,66`），见第 150 条。
+- [x] **108.** 后端 `catalogue/service.go:398-401` 已随列表计算 `state` 与 `library_id`，前端从不读取 `DiscoverMovie.state`（`api/discover.ts:47,66`），见第 150 条。
+  - 已完成：列表、搜索和详情 DTO 删除 state/library_id，projectMovies 改为不依赖 Service 或数据库的资料投影函数，仅处理发行日期和 release_status；删除对应的本地状态查询与无用错误返回。前端 MovieLocalState/MovieState 独立定义，继续通过 movie-states 接口更新。
+  - 验证：catalogue、api、library（含 scan/scrape）、monitor、offline、app 包测试通过；新增非空搜索/列表/详情不访问 LocalState 的回归测试，身份匹配测试转向 MovieStates，保留日期规范化和状态变化覆盖。API golden 差异仅移除资料响应中的两个字段；前端 119 项测试、typecheck、lint 及 git diff --check 通过。未进行浏览器测试。
 - [ ] **109.** 重新评估前端未调用的接口是否仍承担运维、外部调用或手动恢复职责：`GET /discover/movies/:id/offline`、`POST /library/scan/local`、`POST /auth/logout`。本地扫描接口已支持后台入队与配置路径校验；“前端未调用”本身不能作为删除理由。
 - [ ] **110.** 删除属性后残留空行：`ui/input-group.tsx:13`（原 `role="group"`）、`ui/breadcrumb.tsx:57/68/82`（原 role / aria-hidden / aria-current）、`ui/dialog.tsx:62-64` 删除了 `sr-only` 文案、`search/page.tsx:67`、`settings/pan-section.tsx:40/62/76`、`pan-directory-row.tsx:34`；`internal/domain/video.go:30-31` 双空行（唯一 gofmt 报告）。
 - [ ] **111.** `cn` 导入不统一：`ui/hover-card.tsx:2`、`ui/popover.tsx:2`、`ui/dropdown-menu.tsx:2` 直接 `from 'cn'`，其余 `@/lib/utils`；`dropdown-menu.tsx` 未过 oxfmt（双引号、长行）。
@@ -257,7 +259,8 @@
 - [ ] **147.** `internal/subtitle/label.go:89-100` `[]rune(text)` 将最多 10MB 文本整体转换（约 40MB 分配）后再截取前 15000 个；`containsRune` 在 40 元素切片中线性查找 → range 计数 + map。
 - [ ] **148.** `internal/monitor/check.go:48-56` 每轮只查 10 部影片 / 5 个演员后等 5 分钟，500 个订阅约 2.8 小时才查完；`service.go:137` `EnqueueSingle` 每条读一次 config、新建 Picker；`BatchHandler` 先 `Subscription.Get` 一次，`EnqueueSingle` 再 Get 一次；`check.go:94-108` "继续等待"分支更新 checks 却不发 `NotifyMonitorChanged`。
 - [ ] **149.** `internal/library/library.go:222` 分页 `ORDER BY created_at DESC, id DESC`，movie 表无 `(created_at, id)` 索引；`scan/local.go:223-227` fileID 取 `sha256(rel)`，不同扫描根目录下相对路径相同会冲突，已存在记录不更新 path。
-- [ ] **150.** 前端列表已带 `state`，每个 `MovieStateBadge` 再批量 `POST /api/discover/movie-states`，形成"列表 → 状态"瀑布 → 用列表数据 seed（`initialData` + `initialDataUpdatedAt`），或后端从列表 DTO 删除 state。
+- [x] **150.** 前端列表已带 `state`，每个 `MovieStateBadge` 再批量 `POST /api/discover/movie-states`，形成"列表 → 状态"瀑布 → 用列表数据 seed（`initialData` + `initialDataUpdatedAt`），或后端从列表 DTO 删除 state。
+  - 与第 108 项一并处理，采用删除资料 DTO 中本地状态的方案，消除后端重复查询；保留前端批量状态请求、事件失效及账号切换重置。资料加载后再请求状态的顺序仍存在，不将旧资料缓存用于初始化实时状态。
 - [ ] **151.** `web/src/features/tasks/task-events.tsx:115-123` 连接后首个 `changes` 事件因 `revisions` 为 undefined，把 library / offline / movie-states / subscriptions 四类全部失效 → 每次打开页面重复请求一次；:38 `reconnect` 中的 `invalidateQueries` 多余 → 首个事件仅作基线，断线重连后才强制刷新。
 - [ ] **152.** 复核 `refetchOnMount: 'always'` 与 staleTime 的组合：`web/src/api/tasks.ts`、`movie-states.ts`、`subscriptions.ts`、设置类查询等。全局默认值现位于 `api/query-client.ts`；JavBus 设置查询已删除。按事件同步和重连恢复需求决定刷新策略，不应仅因 staleTime 与 always 共存就机械删除。
 - [ ] **153.** `web/src/api/offline.ts:66-88` `useAddOffline` 成功后 `setQueryData` + `invalidate` + SSE 再失效，同一数据刷新三次；:48-57 `useOfflineTasks` 在 select 中重复过滤（后端已按数据源返回），与全局查询共用 key 使其 `enabled` 形同虚设；`library.ts:56-70` 两个分支最终都 invalidate。

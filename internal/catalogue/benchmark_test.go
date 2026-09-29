@@ -37,22 +37,11 @@ func BenchmarkMovieProjection(b *testing.B) {
 			ReleaseDate: "2026-01-01",
 		}
 	}
-	local := &stubLocalState{
-		source: &domain.LibrarySource{AccountID: "100", Directory: domain.LibraryDirectory{ID: "10"}},
-		movies: []domain.LocalMovie{
-			{ID: 1, Code: "ABP-001"},
-			{ID: 2, Code: "ABP-002"},
-		},
-	}
-	service := &Service{local: local}
 	ctx := b.Context()
 
 	b.ReportAllocs()
 	for b.Loop() {
-		projected, err := service.projectMovies(ctx, movies)
-		if err != nil {
-			b.Fatal(err)
-		}
+		projected := projectMovies(ctx, movies)
 		benchmarkCatalogueResult = projected
 	}
 }

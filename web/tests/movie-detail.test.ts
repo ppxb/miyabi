@@ -30,7 +30,6 @@ function movie(id: string, title = `Title ${id}`): DiscoverMovieDetail {
     has_preview: false,
     actors: [],
     tags: [],
-    state: 'not_in_library',
     release_status: 'unknown',
     zone: 'censored',
     actor_movies: [],

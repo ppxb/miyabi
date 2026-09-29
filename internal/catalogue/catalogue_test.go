@@ -11,9 +11,7 @@ import (
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
-	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/setting"
-	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/javdb"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -130,70 +128,7 @@ func TestNewRestoresPersistedRoute(t *testing.T) {
 	}
 }
 
-func TestProjectMoviesAddsLibraryTaskAndReleaseState(t *testing.T) {
-	store, err := database.Open(t.Context(), t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-
-	source := domain.LibrarySource{
-		AccountID: "100", Directory: domain.LibraryDirectory{ID: "10", Name: "Movies", Path: "/Movies"},
-	}
-	localState := &stubLocalState{
-		source: &source,
-		movies: []domain.LocalMovie{{ID: 42, Code: "ABP-001"}},
-	}
-
-	store.Client.OfflineDownload.Create().SetHash("saving").SetCode("ABP-002").SetJavdbID("two").
-		SetAccountID(source.AccountID).SetDirectoryID(source.Directory.ID).SaveX(t.Context())
-	store.Client.Task.Create().SetType("scrape").SetStatus(task.StatusRunning).
-		SetPayload(taskPayloadJSON(t, map[string]any{"code": "ABP-003"})).SaveX(t.Context())
-	for _, status := range []offlinedownload.Status{offlinedownload.StatusDone, offlinedownload.StatusFailed} {
-		store.Client.OfflineDownload.Create().SetHash(string(status)).SetCode("ABP-003").SetJavdbID("three").
-			SetAccountID(source.AccountID).SetDirectoryID(source.Directory.ID).SetStatus(status).SaveX(t.Context())
-	}
-	store.Client.OfflineDownload.Create().SetHash("unrelated").SetCode("ABP-999").SetJavdbID("unrelated").
-		SetAccountID(source.AccountID).SetDirectoryID(source.Directory.ID).SaveX(t.Context())
-
-	today := time.Now().In(time.Local)
-	tomorrow := today.AddDate(0, 0, 1).Format("2006-01-02")
-	service := &Service{database: store.Client, local: localState}
-	movies, err := service.projectMovies(t.Context(), []domain.Movie{
-		{ID: "one", Code: "ABP-001", ReleaseDate: today.Format("2006-01-02")},
-		{ID: "two", Code: "ABP-002", ReleaseDate: tomorrow},
-		{ID: "three", Code: "ABP-003"},
-		{ID: "one", Code: "ABP-001", ReleaseDate: "2026-02-30"},
-		{ID: "two", Code: "ABP-002", ReleaseDate: "TBA"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if movies[0].State != MovieInLibrary || movies[0].ReleaseStatus != ReleaseReleased || movies[0].LibraryID != 42 {
-		t.Fatalf("library movie = %#v", movies[0])
-	}
-	if movies[1].State != MovieSaving || movies[1].ReleaseStatus != ReleaseUpcoming {
-		t.Fatalf("saving movie = %#v", movies[1])
-	}
-	if movies[2].State != MovieNotInLibrary || movies[2].ReleaseStatus != ReleaseUnknown {
-		t.Fatalf("remote movie = %#v", movies[2])
-	}
-	if movies[3].State != MovieInLibrary || movies[3].ReleaseStatus != ReleaseUnknown ||
-		movies[3].ReleaseDate != "" || movies[3].LibraryID != 42 {
-		t.Fatalf("invalid date changed library state: %#v", movies[3])
-	}
-	if movies[4].State != MovieSaving || movies[4].ReleaseStatus != ReleaseUnknown || movies[4].ReleaseDate != "" {
-		t.Fatalf("invalid date changed task state: %#v", movies[4])
-	}
-}
-
 func TestProjectMoviesOmitsInvalidDatesWithoutMutatingCatalogue(t *testing.T) {
-	store, err := database.Open(t.Context(), t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-	service := &Service{database: store.Client}
 	now := time.Now().In(time.Local)
 	today := now.Format("2006-01-02")
 	past := now.AddDate(0, 0, -1).Format("2006-01-02")
@@ -221,9 +156,9 @@ func TestProjectMoviesOmitsInvalidDatesWithoutMutatingCatalogue(t *testing.T) {
 			Title: "Fixture title", ReleaseDate: test.input,
 		}
 	}
-	result, err := service.projectMovies(t.Context(), source)
-	if err != nil || len(result) != len(source) {
-		t.Fatalf("optional dates blocked the page: %#v, %v", result, err)
+	result := projectMovies(t.Context(), source)
+	if len(result) != len(source) {
+		t.Fatalf("optional dates blocked the page: %#v", result)
 	}
 	for index, test := range cases {
 		movie := result[index]
@@ -238,14 +173,13 @@ func TestProjectMoviesOmitsInvalidDatesWithoutMutatingCatalogue(t *testing.T) {
 }
 
 func TestProjectEmptyMoviesSkipsDatabase(t *testing.T) {
-	service := &Service{}
-	result, err := service.projectMovies(t.Context(), nil)
-	if err != nil || result == nil || len(result) != 0 {
-		t.Fatalf("empty projection = %#v, error = %v", result, err)
+	result := projectMovies(t.Context(), nil)
+	if result == nil || len(result) != 0 {
+		t.Fatalf("empty projection = %#v", result)
 	}
 }
 
-func TestProjectionUsesSourceIDBeforeCatalogueSpelling(t *testing.T) {
+func TestMovieStatesUsesSourceIDBeforeCatalogueSpelling(t *testing.T) {
 	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -277,7 +211,11 @@ func TestProjectionUsesSourceIDBeforeCatalogueSpelling(t *testing.T) {
 		{ID: "conflicting-id", Code: "GLOD-0436"},
 		{ID: "queued-id", Code: "Current.Number"},
 	}
-	result, err := service.projectMovies(ctx, sourceMovies)
+	identities := make([]MovieIdentity, len(sourceMovies))
+	for i, item := range sourceMovies {
+		identities[i] = MovieIdentity{ID: item.ID, Code: item.Code}
+	}
+	result, err := service.MovieStates(ctx, identities)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,14 +230,15 @@ func TestProjectionUsesSourceIDBeforeCatalogueSpelling(t *testing.T) {
 
 type stubProviderWithMagnets struct {
 	magnets []domain.Magnet
+	movies  []domain.Movie
 }
 
 func (s *stubProviderWithMagnets) Close() {}
 func (s *stubProviderWithMagnets) Search(context.Context, string, domain.SearchOptions) ([]domain.Movie, error) {
-	return nil, nil
+	return s.movies, nil
 }
 func (s *stubProviderWithMagnets) Browse(context.Context, domain.BrowseOptions) ([]domain.Movie, error) {
-	return nil, nil
+	return s.movies, nil
 }
 func (s *stubProviderWithMagnets) MovieDetail(context.Context, string) (domain.MovieDetail, error) {
 	return domain.MovieDetail{Movie: domain.Movie{ID: "movie-1", Code: "SSIS-001"}}, nil

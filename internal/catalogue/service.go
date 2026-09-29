@@ -160,7 +160,7 @@ func (service *Service) Search(
 	if err != nil {
 		return nil, fmt.Errorf("search JavDB: %w", err)
 	}
-	return service.projectMovies(ctx, movies)
+	return projectMovies(ctx, movies), nil
 }
 
 func (service *Service) Browse(
@@ -174,7 +174,7 @@ func (service *Service) Browse(
 	if err != nil {
 		return nil, fmt.Errorf("browse JavDB: %w", err)
 	}
-	return service.projectMovies(ctx, movies)
+	return projectMovies(ctx, movies), nil
 }
 
 func (service *Service) CatalogueDetail(ctx context.Context, movieID string) (domain.MovieDetail, error) {
@@ -195,10 +195,7 @@ func (service *Service) MovieDetail(ctx context.Context, movieID string) (MovieD
 	if err != nil {
 		return MovieDetail{}, fmt.Errorf("get JavDB movie detail: %w", err)
 	}
-	projected, err := service.projectMovies(ctx, []domain.Movie{movie.Movie})
-	if err != nil {
-		return MovieDetail{}, err
-	}
+	projected := projectMovies(ctx, []domain.Movie{movie.Movie})
 	return MovieDetail{
 		Movie:         projected[0],
 		Zone:          movie.Zone,
@@ -313,20 +310,12 @@ func (service *Service) Reselect(ctx context.Context) (RouteStatus, error) {
 	return service.Route(), nil
 }
 
-func (service *Service) projectMovies(
+func projectMovies(
 	ctx context.Context,
 	source []domain.Movie,
-) ([]Movie, error) {
+) []Movie {
 	if len(source) == 0 {
-		return []Movie{}, nil
-	}
-	identities := make([]MovieIdentity, len(source))
-	for index, item := range source {
-		identities[index] = MovieIdentity{ID: item.ID, Code: item.Code}
-	}
-	states, err := service.MovieStates(ctx, identities)
-	if err != nil {
-		return nil, err
+		return []Movie{}
 	}
 
 	now := time.Now().In(time.Local)
@@ -349,12 +338,10 @@ func (service *Service) projectMovies(
 		}
 		result[index] = Movie{
 			Movie:         item,
-			LibraryID:     states[index].LibraryID,
-			State:         states[index].State,
 			ReleaseStatus: releaseStatus,
 		}
 	}
-	return result, nil
+	return result
 }
 
 func (service *Service) persistActiveRoute(ctx context.Context) error {

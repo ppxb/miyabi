@@ -24,11 +24,9 @@ const (
 	ReleaseUpcoming ReleaseStatus = "upcoming"
 )
 
-// Movie combines JavDB catalogue metadata with local library presence and release status.
+// Movie combines JavDB catalogue metadata with release status.
 type Movie struct {
 	domain.Movie
-	LibraryID     int           `json:"library_id,omitempty"`
-	State         MovieState    `json:"state"`
 	ReleaseStatus ReleaseStatus `json:"release_status"`
 }
 

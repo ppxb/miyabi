@@ -5,7 +5,8 @@ import { apiPost } from '@/api/client'
 import type { DiscoverMovie } from '@/api/discover'
 
 export type MovieIdentity = Pick<DiscoverMovie, 'id' | 'code'>
-export type MovieLocalState = Pick<DiscoverMovie, 'state' | 'library_id'>
+export type MovieState = 'not_in_library' | 'saving' | 'processing' | 'in_library'
+export type MovieLocalState = { state: MovieState; library_id?: number }
 export type MovieStateResult = MovieLocalState & { id: string }
 type StateLoader = (movie: MovieIdentity, signal: AbortSignal) => Promise<MovieLocalState>
 type PendingState = {

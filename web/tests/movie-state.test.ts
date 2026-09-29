@@ -17,7 +17,7 @@ import {
   resetMovieStates
 } from '@/api/movie-states'
 import { isOfflineTaskActive } from '@/api/offline'
-import type { MovieState } from '@/api/discover'
+import type { MovieState } from '@/api/movie-states'
 import type { MovieIdentity, MovieStateResult } from '@/api/movie-states'
 import { offlineSubmission } from './fixtures'
 

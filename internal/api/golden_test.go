@@ -62,8 +62,8 @@ func (goldenDiscover) Browse(context.Context, domain.BrowseOptions) ([]catalogue
 		Thumbnail: "https://media.example/thumb-near.jpg", Cover: "https://media.example/cover-near.jpg",
 		PreviewImages: []domain.PreviewImage{}, Actors: []domain.Actor{}, Tags: []domain.Tag{}}
 	return []catalogue.Movie{
-		{Movie: goldenMovie(), LibraryID: 7, State: catalogue.MovieInLibrary, ReleaseStatus: catalogue.ReleaseReleased},
-		{Movie: bare, State: catalogue.MovieNotInLibrary, ReleaseStatus: catalogue.ReleaseUpcoming},
+		{Movie: goldenMovie(), ReleaseStatus: catalogue.ReleaseReleased},
+		{Movie: bare, ReleaseStatus: catalogue.ReleaseUpcoming},
 	}, nil
 }
 
@@ -73,7 +73,7 @@ func (stub goldenDiscover) Search(context.Context, string, domain.SearchOptions)
 
 func (goldenDiscover) MovieDetail(context.Context, string) (catalogue.MovieDetail, error) {
 	return catalogue.MovieDetail{
-		Movie:         catalogue.Movie{Movie: goldenMovie(), State: catalogue.MovieSaving, ReleaseStatus: catalogue.ReleaseReleased},
+		Movie:         catalogue.Movie{Movie: goldenMovie(), ReleaseStatus: catalogue.ReleaseReleased},
 		Zone:          domain.ZoneCensored,
 		ActorMovies:   []domain.MovieReference{{ID: "actor-movie-1", Code: "ABP-124", Thumbnail: "https://media.example/actor-movie.jpg"}},
 		RelatedMovies: []domain.MovieReference{{ID: "related-movie-1", Code: "SONE-001", Thumbnail: "https://media.example/related-movie.jpg"}},

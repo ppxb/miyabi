@@ -55,8 +55,6 @@
       "id": "director-1",
       "name": "Director"
     },
-    "library_id": 7,
-    "state": "in_library",
     "release_status": "released"
   },
   {
@@ -76,7 +74,6 @@
     "has_preview": false,
     "actors": [],
     "tags": [],
-    "state": "not_in_library",
     "release_status": "upcoming"
   }
 ]
