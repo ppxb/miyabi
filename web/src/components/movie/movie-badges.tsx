@@ -1,6 +1,6 @@
 import { useIsMovieViewed } from '@/api/browse-history'
 import type { DiscoverMovie } from '@/api/discover'
-import type { MovieIdentity } from '@/api/movie-state-cache'
+import type { MovieIdentity } from '@/api/movie-states'
 import { useMovieState } from '@/api/movie-states'
 import { Badge } from '@/components/ui/badge'
 

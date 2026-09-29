@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test, onTestFinished } from 'vitest'
 import { setImmediate } from 'node:timers/promises'
 import { QueryClient, QueryObserver } from '@tanstack/react-query'
 
@@ -9,19 +9,19 @@ import {
   movieStateKeys,
   movieStateOptions,
   resetMovieStates
-} from '../src/api/movie-state-cache.ts'
-import { isOfflineTaskActive } from '../src/lib/offline-state.ts'
+} from '@/api/movie-states'
+import { isOfflineTaskActive } from '@/api/offline'
 
-function queryClient(t) {
+function queryClient() {
   const client = new QueryClient()
-  t.after(() => client.clear())
+  onTestFinished(() => client.clear())
   return client
 }
 
-function observe(t, client, options) {
+function observe(client, options) {
   const observer = new QueryObserver(client, options)
   const unsubscribe = observer.subscribe(() => {})
-  t.after(unsubscribe)
+  onTestFinished(unsubscribe)
   return observer
 }
 
@@ -38,10 +38,10 @@ function settled(observer) {
   })
 }
 
-test('a grid and detail share movie state and batch requests without fetching catalogue data', async t => {
-  const client = queryClient(t)
+test('a grid and detail share movie state and batch requests without fetching catalogue data', async () => {
+  const client = queryClient()
   let catalogueLoads = 0
-  const catalogue = observe(t, client, {
+  const catalogue = observe(client, {
     queryKey: ['discover', 'movie', '0'],
     queryFn: () => {
       catalogueLoads++
@@ -58,9 +58,9 @@ test('a grid and detail share movie state and batch requests without fetching ca
     return movies.map(({ id }) => ({ id, state, ...(state === 'in_library' && { library_id: 7 }) }))
   })
   const cards = Array.from({ length: 24 }, (_, id) =>
-    observe(t, client, movieStateOptions(load, { id: String(id), code: `ABP-${id}` }))
+    observe(client, movieStateOptions(load, { id: String(id), code: `ABP-${id}` }))
   )
-  const detail = observe(t, client, movieStateOptions(load, { id: '0', code: 'ABP-0' }))
+  const detail = observe(client, movieStateOptions(load, { id: '0', code: 'ABP-0' }))
   await Promise.all([...cards, detail].map(settled))
   assert.equal(requests.length, 1)
   assert.equal(requests[0].length, 24)
@@ -83,22 +83,22 @@ test('a grid and detail share movie state and batch requests without fetching ca
   assert.deepEqual(detail.getCurrentResult().data, { state: 'in_library', library_id: 7 })
 })
 
-test('newly opened and previously inactive movies read current state after a missed event', async t => {
-  const client = queryClient(t)
+test('newly opened and previously inactive movies read current state after a missed event', async () => {
+  const client = queryClient()
   let state = 'saving'
   const load = createMovieStateLoader(async movies => movies.map(({ id }) => ({ id, state })))
   const identity = { id: 'one', code: 'ABP-001', state: 'in_library', library_id: 99 }
-  const first = observe(t, client, movieStateOptions(load, identity))
+  const first = observe(client, movieStateOptions(load, identity))
   await settled(first)
   first.destroy()
 
   state = 'not_in_library'
   await invalidateMovieStates(client)
-  const reopened = observe(t, client, movieStateOptions(load, identity))
+  const reopened = observe(client, movieStateOptions(load, identity))
   await settled(reopened)
   assert.deepEqual(reopened.getCurrentResult().data, { state: 'not_in_library' })
 
-  const newMovie = observe(t, client, movieStateOptions(load, { ...identity, id: 'two' }))
+  const newMovie = observe(client, movieStateOptions(load, { ...identity, id: 'two' }))
   // Old catalogue projections never report library state before local verification.
   assert.equal(newMovie.getCurrentResult().isPlaceholderData, true)
   assert.deepEqual(newMovie.getCurrentResult().data, { state: 'not_in_library' })
@@ -107,15 +107,15 @@ test('newly opened and previously inactive movies read current state after a mis
   assert.deepEqual(newMovie.getCurrentResult().data, { state: 'not_in_library' })
 })
 
-test('switching source clears library state and late responses cannot restore it', async t => {
-  const client = queryClient(t)
+test('switching source clears library state and late responses cannot restore it', async () => {
+  const client = queryClient()
   const requests = []
   const load = createMovieStateLoader(movies => {
     const response = Promise.withResolvers()
     requests.push({ movies, ...response })
     return response.promise
   })
-  const observer = observe(t, client, movieStateOptions(load, { id: 'one', code: 'ABP-001' }))
+  const observer = observe(client, movieStateOptions(load, { id: 'one', code: 'ABP-001' }))
   await setImmediate()
   requests[0].resolve([{ id: 'one', state: 'in_library', library_id: 1 }])
   await settled(observer)
@@ -161,16 +161,16 @@ test('state requests respect the batch limit and skip cancelled subscriptions', 
   assert.deepEqual(Object.keys(requests[0][0]).sort(), ['code', 'id'])
 })
 
-test('an incomplete state response fails only the missing movie and can recover on refresh', async t => {
-  const client = queryClient(t)
+test('an incomplete state response fails only the missing movie and can recover on refresh', async () => {
+  const client = queryClient()
   let missing = true
   const load = createMovieStateLoader(async movies =>
     movies
       .filter(({ id }) => !missing || id !== 'one')
       .map(({ id }) => ({ id, state: 'in_library', library_id: 7 }))
   )
-  const one = observe(t, client, movieStateOptions(load, { id: 'one', code: 'ABP-001' }))
-  const two = observe(t, client, movieStateOptions(load, { id: 'two', code: 'ABP-002' }))
+  const one = observe(client, movieStateOptions(load, { id: 'one', code: 'ABP-001' }))
+  const two = observe(client, movieStateOptions(load, { id: 'two', code: 'ABP-002' }))
   await Promise.all([one, two].map(settled))
   assert.equal(one.getCurrentResult().isError, true)
   assert.equal(two.getCurrentResult().isSuccess, true)

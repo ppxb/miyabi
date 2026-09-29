@@ -1,4 +1,4 @@
-import { clamp } from './math.ts'
+import { clamp } from './math'
 
 export type PageItem = number | 'ellipsis-left' | 'ellipsis-right'
 

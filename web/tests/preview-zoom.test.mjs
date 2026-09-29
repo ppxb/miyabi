@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 
 import {
   FIT_VIEW,
@@ -17,7 +17,7 @@ import {
   stepIndex,
   wheelZoomFactor,
   zoomAt
-} from '../src/features/movie-detail/preview-zoom.ts'
+} from '@/features/movie-detail/preview-zoom'
 
 const STAGE = { width: 1200, height: 800 }
 const UHD = { width: 1920, height: 1080 }
@@ -38,7 +38,10 @@ test('containSize fits the image inside the stage and keeps its aspect ratio', (
 
 test('containSize never magnifies a small original past its own pixels', () => {
   assert.deepEqual(containSize({ width: 400, height: 225 }, STAGE), { width: 400, height: 225 })
-  assert.deepEqual(containSize({ width: 400, height: 225 }, STAGE, true), { width: 1200, height: 675 })
+  assert.deepEqual(containSize({ width: 400, height: 225 }, STAGE, true), {
+    width: 1200,
+    height: 675
+  })
 })
 
 test('containSize falls back to the stage for missing sizes', () => {

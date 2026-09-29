@@ -1,13 +1,10 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test, onTestFinished } from 'vitest'
 import { QueryClient, QueryObserver } from '@tanstack/react-query'
 
-import {
-  subscriptionKeys,
-  SUBSCRIPTION_PAGE_SIZE
-} from '../src/api/subscriptions.ts'
+import { subscriptionKeys, SUBSCRIPTION_PAGE_SIZE } from '@/api/subscriptions'
 
-function createTestClient(t) {
+function createTestClient() {
   const client = new QueryClient({
     defaultOptions: {
       queries: {
@@ -15,14 +12,14 @@ function createTestClient(t) {
       }
     }
   })
-  t.after(() => client.clear())
+  onTestFinished(() => client.clear())
   return client
 }
 
-function observe(t, client, options) {
+function observe(client, options) {
   const observer = new QueryObserver(client, options)
   const unsubscribe = observer.subscribe(() => {})
-  t.after(unsubscribe)
+  onTestFinished(unsubscribe)
   return observer
 }
 
@@ -39,8 +36,8 @@ function settled(observer) {
   })
 }
 
-test('subscription targets indexes more than 100 items with O(1) map lookup', async t => {
-  const client = createTestClient(t)
+test('subscription targets indexes more than 100 items with O(1) map lookup', async () => {
+  const client = createTestClient()
 
   // Generate 150 subscription targets (beyond old 100 limit)
   const mockTargets = Array.from({ length: 150 }, (_, i) => ({
@@ -50,7 +47,7 @@ test('subscription targets indexes more than 100 items with O(1) map lookup', as
     status: i % 2 === 0 ? 'waiting' : 'added'
   }))
 
-  const observer = observe(t, client, {
+  const observer = observe(client, {
     queryKey: subscriptionKeys.targets('movie'),
     queryFn: () => mockTargets,
     staleTime: Infinity,
@@ -74,13 +71,13 @@ test('subscription targets indexes more than 100 items with O(1) map lookup', as
   assert.equal(result.data.map.get('movie-nonexistent'), undefined)
 })
 
-test('subscriptionKeys.all invalidates all target and paginated list queries', async t => {
-  const client = createTestClient(t)
+test('subscriptionKeys.all invalidates all target and paginated list queries', async () => {
+  const client = createTestClient()
 
   let targetsCalls = 0
   let listCalls = 0
 
-  const targetsObserver = observe(t, client, {
+  const targetsObserver = observe(client, {
     queryKey: subscriptionKeys.targets('movie'),
     queryFn: () => {
       targetsCalls++
@@ -88,7 +85,7 @@ test('subscriptionKeys.all invalidates all target and paginated list queries', a
     }
   })
 
-  const listObserver = observe(t, client, {
+  const listObserver = observe(client, {
     queryKey: subscriptionKeys.list('movie', 1, SUBSCRIPTION_PAGE_SIZE),
     queryFn: () => {
       listCalls++

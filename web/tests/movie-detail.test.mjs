@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test, onTestFinished, vi } from 'vitest'
 import { setImmediate } from 'node:timers/promises'
 import { QueryClient, QueryObserver } from '@tanstack/react-query'
 
@@ -7,14 +7,14 @@ import {
   createMovieDetailLoader,
   discoverKeys,
   findCachedMovieCard
-} from '../src/api/movie-detail-cache.ts'
-import { observeRecommendation } from '../src/features/movie-detail/recommendation-visibility.ts'
+} from '@/api/movie-detail-cache'
+import { observeRecommendation } from '@/features/movie-detail/recommendation-visibility'
 
 function movie(id, title = `Title ${id}`) {
   return { id, code: `ABP-${id}`, title, cover: `https://media.example/${id}.jpg` }
 }
 
-function fixture(t) {
+function fixture() {
   const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } })
   const requests = []
   const releases = []
@@ -24,7 +24,7 @@ function fixture(t) {
     requests.push({ id, signal, ...pending })
     return pending.promise
   })
-  t.after(() => {
+  onTestFinished(() => {
     for (const release of releases) release()
     client.clear()
   })
@@ -46,15 +46,15 @@ function fixture(t) {
   }
 }
 
-test('unseen cards read cache without starting detail requests', async t => {
-  const { observe, requests } = fixture(t)
+test('unseen cards read cache without starting detail requests', async () => {
+  const { observe, requests } = fixture()
   for (let id = 0; id < 16; id++) observe(String(id), false)
   await setImmediate()
   assert.equal(requests.length, 0)
 })
 
-test('both recommendation groups share two background slots and cancel unstarted work', async t => {
-  const { recommend, requests } = fixture(t)
+test('both recommendation groups share two background slots and cancel unstarted work', async () => {
+  const { recommend, requests } = fixture()
   recommend('one')
   recommend('two')
   const leaveThree = recommend('three')
@@ -81,8 +81,8 @@ test('both recommendation groups share two background slots and cancel unstarted
   assert.equal(requests.length, 3)
 })
 
-test('browsed and searched cards avoid detail requests without populating full-detail cache', async t => {
-  const { client, loader, recommend, requests } = fixture(t)
+test('browsed and searched cards avoid detail requests without populating full-detail cache', async () => {
+  const { client, loader, recommend, requests } = fixture()
   const browsed = movie('one')
   const searched = movie('two')
   client.setQueryData(discoverKeys.movies({ page: 1 }), [browsed])
@@ -107,8 +107,8 @@ test('browsed and searched cards avoid detail requests without populating full-d
   assert.deepEqual(client.getQueryData(discoverKeys.movie('one')), full)
 })
 
-test('stale card data remains usable while details refresh and unrelated caches are ignored', async t => {
-  const { client, recommend, requests } = fixture(t)
+test('stale card data remains usable while details refresh and unrelated caches are ignored', async () => {
+  const { client, recommend, requests } = fixture()
   const old = movie('one', 'Cached title')
   client.setQueryData(discoverKeys.movies({ page: 1 }), [old], { updatedAt: Date.now() - 600_000 })
   client.setQueryData(discoverKeys.magnets('one'), [{ id: 'one', title: 'Not a movie' }])
@@ -126,8 +126,8 @@ test('stale card data remains usable while details refresh and unrelated caches 
   assert.equal(findCachedMovieCard(client, 'one').title, 'Updated title')
 })
 
-test('queued cards recheck newly available list data before using an upstream slot', async t => {
-  const { client, recommend, requests } = fixture(t)
+test('queued cards recheck newly available list data before using an upstream slot', async () => {
+  const { client, recommend, requests } = fixture()
   recommend('one')
   recommend('two')
   recommend('three')
@@ -142,8 +142,8 @@ test('queued cards recheck newly available list data before using an upstream sl
   )
 })
 
-test('clicking a queued recommendation bypasses background work and reuses the request after navigation', async t => {
-  const { client, loader, recommend, requests, observe } = fixture(t)
+test('clicking a queued recommendation bypasses background work and reuses the request after navigation', async () => {
+  const { client, loader, recommend, requests, observe } = fixture()
   recommend('one')
   recommend('two')
   recommend('three')
@@ -169,8 +169,8 @@ test('clicking a queued recommendation bypasses background work and reuses the r
   assert.equal(requests.filter(request => request.id === 'four').length, 1)
 })
 
-test('a click before visibility loading also survives the observer gap', async t => {
-  const { client, loader, requests, observe } = fixture(t)
+test('a click before visibility loading also survives the observer gap', async () => {
+  const { client, loader, requests, observe } = fixture()
   const card = observe('one', false)
   loader.prefetch(client, 'one')
   card.destroy()
@@ -182,8 +182,8 @@ test('a click before visibility loading also survives the observer gap', async t
   assert.equal(detail.getCurrentResult().data.title, 'Title one')
 })
 
-test('a failed card releases its slot and retries only on explicit demand', async t => {
-  const { client, loader, recommend, requests } = fixture(t)
+test('a failed card releases its slot and retries only on explicit demand', async () => {
+  const { client, loader, recommend, requests } = fixture()
   recommend('one')
   recommend('two')
   recommend('three')
@@ -204,8 +204,8 @@ test('a failed card releases its slot and retries only on explicit demand', asyn
   assert.equal(client.getQueryState(discoverKeys.movie('one')).status, 'success')
 })
 
-test('normal foreground detail requests remain cancelable', async t => {
-  const { observe, requests } = fixture(t)
+test('normal foreground detail requests remain cancelable', async () => {
+  const { observe, requests } = fixture()
   const detail = observe('one')
   assert.equal(requests.length, 1)
   assert.equal(requests[0].signal.aborted, false)
@@ -214,8 +214,8 @@ test('normal foreground detail requests remain cancelable', async t => {
   await setImmediate()
 })
 
-test('brief intersections do not enqueue work and leaving or unmounting releases it', t => {
-  t.mock.timers.enable({ apis: ['setTimeout'] })
+test('brief intersections do not enqueue work and leaving or unmounting releases it', () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
   let observer
   const original = Object.getOwnPropertyDescriptor(globalThis, 'IntersectionObserver')
   globalThis.IntersectionObserver = class {
@@ -234,7 +234,7 @@ test('brief intersections do not enqueue work and leaving or unmounting releases
       this.notify([{ isIntersecting: visible }])
     }
   }
-  t.after(() => {
+  onTestFinished(() => {
     if (original) Object.defineProperty(globalThis, 'IntersectionObserver', original)
     else delete globalThis.IntersectionObserver
   })
@@ -247,25 +247,25 @@ test('brief intersections do not enqueue work and leaving or unmounting releases
   })
   assert.equal(observer.element, element)
   observer.enter(true)
-  t.mock.timers.tick(199)
+  vi.advanceTimersByTime(199)
   observer.enter(false)
-  t.mock.timers.tick(1000)
+  vi.advanceTimersByTime(1000)
   assert.equal(requested, 0)
 
   observer.enter(true)
-  t.mock.timers.tick(200)
+  vi.advanceTimersByTime(200)
   assert.equal(requested, 1)
   observer.enter(true)
-  t.mock.timers.tick(200)
+  vi.advanceTimersByTime(200)
   assert.equal(requested, 1)
   observer.enter(false)
   assert.equal(released, 1)
 
   observer.enter(true)
-  t.mock.timers.tick(200)
+  vi.advanceTimersByTime(200)
   dispose()
   assert.equal(released, 2)
   assert.equal(observer.disconnected, true)
-  t.mock.timers.tick(1000)
+  vi.advanceTimersByTime(1000)
   assert.equal(requested, 2)
 })

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 
-import { metadataBrowseParams } from '../src/features/discover/metadata-params.ts'
+import { metadataBrowseParams } from '@/features/discover/metadata-params'
 
 test('local tag searches work across zones while preserving the common filter', () => {
   assert.deepEqual(

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 
 import {
   diffTaskNotifications,
   scanFingerprint,
   batchFingerprint
-} from '../src/features/tasks/task-notification-diff.ts'
+} from '@/features/tasks/task-notification-diff'
 
 const dummySource = {
   account_id: 'acc1',
@@ -14,13 +14,24 @@ const dummySource = {
 
 test('offline failures gain retry actions when their scan arrives later', () => {
   const task = {
-    task_id: 9, scan_task_id: 1, status: 'done', phase: 'in_library',
-    processing: false, progress: 100, error: 'metadata failed'
+    task_id: 9,
+    scan_task_id: 1,
+    status: 'done',
+    phase: 'in_library',
+    processing: false,
+    progress: 100,
+    error: 'metadata failed'
   }
   const context = {
-    tasks: [], activity: { source: dummySource, tasks: [task] },
-    waiting: false, isTasksError: false, isActivityError: false,
-    previous: new Map(), dismissed: new Set(), announced: new Set(), initialized: true
+    tasks: [],
+    activity: { source: dummySource, tasks: [task] },
+    waiting: false,
+    isTasksError: false,
+    isActivityError: false,
+    previous: new Map(),
+    dismissed: new Set(),
+    announced: new Set(),
+    initialized: true
   }
   const first = diffTaskNotifications(context)
   const scan = makeScanTask({ status: 'failed', can_retry: true, offline_task_id: 9 })
@@ -34,42 +45,68 @@ test('offline failures gain retry actions when their scan arrives later', () => 
 
 for (const kind of ['scan', 'batch', 'offline']) {
   test(`${kind} retry results update visible notifications even if active state is missed`, () => {
-    const failed = kind === 'batch'
-      ? makeBatchTask({ status: 'done', can_retry: true, updated_at: '2026-09-28T10:00:00Z' })
-      : makeScanTask({
-          status: 'failed', can_retry: true, updated_at: '2026-09-28T10:00:00Z',
-          ...(kind === 'offline' ? { offline_task_id: 9 } : {})
-        })
+    const failed =
+      kind === 'batch'
+        ? makeBatchTask({ status: 'done', can_retry: true, updated_at: '2026-09-28T10:00:00Z' })
+        : makeScanTask({
+            status: 'failed',
+            can_retry: true,
+            updated_at: '2026-09-28T10:00:00Z',
+            ...(kind === 'offline' ? { offline_task_id: 9 } : {})
+          })
     const offline = {
-      task_id: 9, scan_task_id: failed.id, status: 'done', phase: 'in_library',
-      processing: false, progress: 100, error: 'metadata failed'
+      task_id: 9,
+      scan_task_id: failed.id,
+      status: 'done',
+      phase: 'in_library',
+      processing: false,
+      progress: 100,
+      error: 'metadata failed'
     }
     const id = kind === 'offline' ? 'offline:9' : `${kind}:${failed.id}`
     const context = {
-      tasks: [failed], activity: { source: dummySource, tasks: kind === 'offline' ? [offline] : [] },
-      waiting: false, isTasksError: false, isActivityError: false,
-      previous: new Map(), dismissed: new Set(), announced: new Set([id]), initialized: true
+      tasks: [failed],
+      activity: { source: dummySource, tasks: kind === 'offline' ? [offline] : [] },
+      waiting: false,
+      isTasksError: false,
+      isActivityError: false,
+      previous: new Map(),
+      dismissed: new Set(),
+      announced: new Set([id]),
+      initialized: true
     }
     const first = diffTaskNotifications(context)
     for (const success of [false, true]) {
       const retried = {
-        ...failed, updated_at: '2026-09-28T10:01:00Z',
+        ...failed,
+        updated_at: '2026-09-28T10:01:00Z',
         ...(success ? { status: 'done', can_retry: false } : {})
       }
       const refreshed = {
-        ...context, tasks: [retried], previous: first.nextEntries,
+        ...context,
+        tasks: [retried],
+        previous: first.nextEntries,
         activity: {
           ...context.activity,
-          tasks: kind === 'offline' ? [{ ...offline, error: success ? undefined : offline.error }] : []
+          tasks:
+            kind === 'offline' ? [{ ...offline, error: success ? undefined : offline.error }] : []
         }
       }
       const result = diffTaskNotifications(refreshed)
       assert.equal(result.actions.length, 1)
       assert.equal(result.actions[0].type, `notify_${kind}`)
-      assert.equal(diffTaskNotifications({ ...refreshed, previous: result.nextEntries }).actions.length, 0)
-      assert.equal(diffTaskNotifications({
-        ...refreshed, announced: new Set(), dismissed: new Set([id])
-      }).actions.length, 0)
+      assert.equal(
+        diffTaskNotifications({ ...refreshed, previous: result.nextEntries }).actions.length,
+        0
+      )
+      assert.equal(
+        diffTaskNotifications({
+          ...refreshed,
+          announced: new Set(),
+          dismissed: new Set([id])
+        }).actions.length,
+        0
+      )
     }
   })
 }
@@ -133,7 +170,9 @@ test('fingerprint produces consistent and discriminative strings', () => {
   assert.equal(typeof bfp1, 'string')
   assert.equal(bfp1, batchFingerprint(b1))
 
-  const b2 = makeBatchTask({ batch: { total: 10, processed: 6, submitted: 6, waiting: 0, failed: 0 } })
+  const b2 = makeBatchTask({
+    batch: { total: 10, processed: 6, submitted: 6, waiting: 0, failed: 0 }
+  })
   assert.notEqual(bfp1, batchFingerprint(b2))
 })
 

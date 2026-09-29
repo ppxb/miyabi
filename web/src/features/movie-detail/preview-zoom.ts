@@ -1,4 +1,4 @@
-import { clamp } from '../../lib/math.ts'
+import { clamp } from '../../lib/math'
 
 export type Size = { width: number; height: number }
 

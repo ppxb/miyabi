@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 
-import { BrowseHistoryStore } from '../src/api/browse-history-store.ts'
+import { BrowseHistoryStore } from '@/api/browse-history-store'
 
 test('BrowseHistoryStore tracks viewed IDs and deduplicates entries', async () => {
   const synced = []
@@ -75,7 +75,7 @@ test('BrowseHistoryStore flushKeepalive clears pending and persists state', () =
   const mockStorage = {
     getItem: key => storage.get(key) ?? null,
     setItem: (key, val) => storage.set(key, val),
-    removeItem: key => storage.delete(key),
+    removeItem: key => storage.delete(key)
   }
   globalThis.localStorage = mockStorage
   globalThis.window = {
@@ -131,7 +131,7 @@ test('BrowseHistoryStore flushKeepalive does not send duplicate beacon while flu
   const mockStorage = {
     getItem: key => storage.get(key) ?? null,
     setItem: (key, val) => storage.set(key, val),
-    removeItem: key => storage.delete(key),
+    removeItem: key => storage.delete(key)
   }
   globalThis.localStorage = mockStorage
   globalThis.window = {
@@ -179,8 +179,6 @@ test('BrowseHistoryStore flushKeepalive does not send duplicate beacon while flu
   }
 })
 
-
-
 test('keepalive fallback preserves failed batches and acknowledges only successful IDs', async () => {
   const originalWindow = globalThis.window
   const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
@@ -190,11 +188,19 @@ test('keepalive fallback preserves failed batches and acknowledges only successf
     addEventListener: () => {},
     localStorage: { getItem: key => saved.get(key), setItem: (key, value) => saved.set(key, value) }
   }
-  Object.defineProperty(globalThis, 'navigator', { value: { sendBeacon: () => false }, configurable: true })
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { sendBeacon: () => false },
+    configurable: true
+  })
   try {
     const store = new BrowseHistoryStore({ storageKey: 'test:fallback' })
     store.recordView('first')
-    for (const fail of [async () => ({ ok: false }), async () => { throw new Error('offline') }]) {
+    for (const fail of [
+      async () => ({ ok: false }),
+      async () => {
+        throw new Error('offline')
+      }
+    ]) {
       globalThis.fetch = fail
       await store.flushKeepalive()
       assert.equal(store.getPendingCount(), 1)
@@ -202,7 +208,12 @@ test('keepalive fallback preserves failed batches and acknowledges only successf
     }
     let finish
     let requests = 0
-    globalThis.fetch = () => { requests++; return new Promise(resolve => { finish = resolve }) }
+    globalThis.fetch = () => {
+      requests++
+      return new Promise(resolve => {
+        finish = resolve
+      })
+    }
     const pending = store.flushKeepalive()
     await store.flushKeepalive()
     assert.equal(requests, 1)

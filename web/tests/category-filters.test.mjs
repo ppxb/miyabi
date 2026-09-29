@@ -1,18 +1,18 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test, onTestFinished } from 'vitest'
 
-import { categoryBrowseParams } from '../src/features/discover/category-params.ts'
-import { useDiscoverStore } from '../src/stores/discover.ts'
+import { categoryBrowseParams } from '@/features/discover/category-params'
+import { useDiscoverStore } from '@/stores/discover'
 
-function discoverStore(t) {
+function discoverStore() {
   const previous = useDiscoverStore.getState()
   useDiscoverStore.setState(useDiscoverStore.getInitialState(), true)
-  t.after(() => useDiscoverStore.setState(previous, true))
+  onTestFinished(() => useDiscoverStore.setState(previous, true))
   return useDiscoverStore
 }
 
-test('subcategory changes preserve the common filter and reset only the category page', t => {
-  const store = discoverStore(t)
+test('subcategory changes preserve the common filter and reset only the category page', () => {
+  const store = discoverStore()
   const { updateCategory, setPage } = store.getState()
   setPage('released', 4)
   setPage('upcoming', 2)
@@ -34,8 +34,8 @@ test('subcategory changes preserve the common filter and reset only the category
   assert.deepEqual(store.getState().pages, { released: 4, upcoming: 2, category: 1 })
 })
 
-test('year browsing combines the common filter with a year instead of a tag ID', t => {
-  const store = discoverStore(t)
+test('year browsing combines the common filter with a year instead of a tag ID', () => {
+  const store = discoverStore()
   const { updateCategory } = store.getState()
   updateCategory({ categoryID: 'category-1', tagID: 'tag-1', main: 'm' })
   updateCategory({ categoryID: 'year', tagID: '' })
@@ -52,8 +52,8 @@ test('year browsing combines the common filter with a year instead of a tag ID',
   })
 })
 
-test('the common filter and selected subcategory can be cleared independently', t => {
-  const store = discoverStore(t)
+test('the common filter and selected subcategory can be cleared independently', () => {
+  const store = discoverStore()
   const { updateCategory, setPage } = store.getState()
   updateCategory({ categoryID: 'category-1', tagID: 'tag-1', main: 'm' })
   setPage('category', 3)
@@ -72,8 +72,8 @@ test('the common filter and selected subcategory can be cleared independently', 
   })
 })
 
-test('selecting a common filter replaces the previous choice and resets pagination', t => {
-  const store = discoverStore(t)
+test('selecting a common filter replaces the previous choice and resets pagination', () => {
+  const store = discoverStore()
   const { updateCategory, setPage } = store.getState()
   updateCategory({ categoryID: 'category-1', tagID: 'tag-1', main: 'm' })
   setPage('category', 3)

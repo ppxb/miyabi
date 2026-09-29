@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 
-import { libraryMovieMetadata } from '../src/features/library/movie-metadata.ts'
+import { libraryMovieMetadata } from '@/features/library/movie-metadata'
 
 test('library hover links use scraped JavDB IDs instead of local database IDs', () => {
   const metadata = libraryMovieMetadata({

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 
-import { parseSearchPage, MAX_PAGE } from '../src/lib/search-schema.ts'
+import { parseSearchPage, MAX_PAGE } from '@/lib/search-schema'
 
 test('parseSearchPage accepts valid pages', () => {
   assert.equal(parseSearchPage(undefined), undefined)

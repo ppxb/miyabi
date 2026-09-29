@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 
-import { taskProgressState } from '../src/features/tasks/task-progress-state.ts'
+import { taskProgressState } from '@/features/tasks/task-progress-state'
 
 test('scan and download workflows advance through their own stages', () => {
   assert.equal(taskProgressState('scanning').value, 0)

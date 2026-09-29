@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 
 import type { OfflineSubmission } from '@/api/offline'
 import { isTaskActive, type BatchTask, type ScanTask } from '@/api/tasks'
-import { isOfflineTaskActive } from '@/lib/offline-state'
+import { isOfflineTaskActive } from '@/api/offline'
 import { scanStage } from './scan-status'
 import { TaskProgress } from './task-progress'
 import { TaskToastActions } from './task-toast-actions'

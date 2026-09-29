@@ -1,12 +1,13 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError, apiGet, apiPost } from '@/api/client'
-import { invalidateMovieStates } from '@/api/movie-state-cache'
+import { invalidateMovieStates } from '@/api/movie-states'
 import { panKeys, type PanAccountStatus } from '@/api/pan'
 import type { LibrarySource } from '@/api/tasks'
-import { isOfflineTaskActive } from '@/lib/offline-state'
 
-export { isOfflineTaskActive } from '@/lib/offline-state'
+export function isOfflineTaskActive(task: OfflineSubmission) {
+  return task.phase === 'downloading' || task.processing
+}
 
 export type OfflineSubmission = {
   task_id: number

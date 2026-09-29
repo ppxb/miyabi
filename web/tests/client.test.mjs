@@ -1,15 +1,19 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test, onTestFinished, vi } from 'vitest'
 
-import { ApiError, apiPost, clearLegacyAuthToken, notifyUnauthorized } from '../src/api/client.ts'
+import { ApiError, apiPost, clearLegacyAuthToken, notifyUnauthorized } from '@/api/client'
 
-test('requests use cookies without reading or sending a stored JWT', async t => {
+test('requests use cookies without reading or sending a stored JWT', async () => {
   const originalStorage = globalThis.localStorage
   globalThis.localStorage = {
-    getItem() { throw new Error('must not read credentials') }
+    getItem() {
+      throw new Error('must not read credentials')
+    }
   }
-  t.after(() => { globalThis.localStorage = originalStorage })
-  t.mock.method(globalThis, 'fetch', async (path, init) => {
+  onTestFinished(() => {
+    globalThis.localStorage = originalStorage
+  })
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (path, init) => {
     assert.equal(init.credentials, 'same-origin')
     assert.equal(new Headers(init.headers).has('Authorization'), false)
     assert.equal(new Headers(init.headers).get('Content-Type'), 'application/json')
@@ -18,15 +22,24 @@ test('requests use cookies without reading or sending a stored JWT', async t => 
   await apiPost('/api/test', { value: 1 })
 })
 
-test('upgrade removes only the legacy JWT and tolerates blocked storage', t => {
+test('upgrade removes only the legacy JWT and tolerates blocked storage', () => {
   const originalStorage = globalThis.localStorage
-  t.after(() => { globalThis.localStorage = originalStorage })
-  const storage = new Map([['miyabi_jwt_token', 'old-token'], ['miyabi-theme', 'dark']])
+  onTestFinished(() => {
+    globalThis.localStorage = originalStorage
+  })
+  const storage = new Map([
+    ['miyabi_jwt_token', 'old-token'],
+    ['miyabi-theme', 'dark']
+  ])
   globalThis.localStorage = { removeItem: key => storage.delete(key) }
   clearLegacyAuthToken()
   assert.equal(storage.has('miyabi_jwt_token'), false)
   assert.equal(storage.get('miyabi-theme'), 'dark')
-  globalThis.localStorage = { removeItem() { throw new Error('blocked') } }
+  globalThis.localStorage = {
+    removeItem() {
+      throw new Error('blocked')
+    }
+  }
   assert.doesNotThrow(clearLegacyAuthToken)
 })
 
@@ -60,10 +73,8 @@ for (const scenario of [
     message: '请求失败（HTTP 503）'
   }))
 ]) {
-  test(scenario.name, async t => {
-    t.mock.method(
-      globalThis,
-      'fetch',
+  test(scenario.name, async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
       async () =>
         new Response(scenario.body, {
           status: scenario.status,
@@ -84,8 +95,8 @@ for (const error of [
   new TypeError('Failed to fetch'),
   new DOMException('The request was aborted', 'AbortError')
 ]) {
-  test(`fetch failures preserve the original ${error.name}`, async t => {
-    t.mock.method(globalThis, 'fetch', async () => {
+  test(`fetch failures preserve the original ${error.name}`, async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
       throw error
     })
 
@@ -93,19 +104,19 @@ for (const error of [
   })
 }
 
-test('cancellation while reading an error body remains cancellation', async t => {
+test('cancellation while reading an error body remains cancellation', async () => {
   const error = new DOMException('The request was aborted', 'AbortError')
   const body = new ReadableStream({
     start(controller) {
       controller.error(error)
     }
   })
-  t.mock.method(globalThis, 'fetch', async () => new Response(body, { status: 401 }))
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(body, { status: 401 }))
 
   await assert.rejects(apiPost('/api/test'), actual => actual === error)
 })
 
-test('401 with code UNAUTHORIZED dispatches miyabi:unauthorized', async t => {
+test('401 with code UNAUTHORIZED dispatches miyabi:unauthorized', async () => {
   const events = []
   const storage = new Map([['miyabi_jwt_token', 'test-token']])
   const originalWindow = globalThis.window
@@ -114,24 +125,22 @@ test('401 with code UNAUTHORIZED dispatches miyabi:unauthorized', async t => {
   globalThis.localStorage = {
     getItem: key => storage.get(key) ?? null,
     setItem: (key, val) => storage.set(key, val),
-    removeItem: key => storage.delete(key),
+    removeItem: key => storage.delete(key)
   }
   globalThis.window = {
-    dispatchEvent: event => events.push(event.type),
+    dispatchEvent: event => events.push(event.type)
   }
 
-  t.after(() => {
+  onTestFinished(() => {
     globalThis.window = originalWindow
     globalThis.localStorage = originalLocalStorage
   })
 
-  t.mock.method(
-    globalThis,
-    'fetch',
+  vi.spyOn(globalThis, 'fetch').mockImplementation(
     async () =>
       new Response(JSON.stringify({ error: '认证令牌已过期', code: 'UNAUTHORIZED' }), {
         status: 401,
-        statusText: 'Unauthorized',
+        statusText: 'Unauthorized'
       })
   )
 
@@ -145,7 +154,7 @@ test('401 with code UNAUTHORIZED dispatches miyabi:unauthorized', async t => {
   assert.deepEqual(events, ['miyabi:unauthorized'])
 })
 
-test('401 without code UNAUTHORIZED preserves token and does not dispatch miyabi:unauthorized', async t => {
+test('401 without code UNAUTHORIZED preserves token and does not dispatch miyabi:unauthorized', async () => {
   const events = []
   const storage = new Map([['miyabi_jwt_token', 'test-token']])
   const originalWindow = globalThis.window
@@ -154,24 +163,22 @@ test('401 without code UNAUTHORIZED preserves token and does not dispatch miyabi
   globalThis.localStorage = {
     getItem: key => storage.get(key) ?? null,
     setItem: (key, val) => storage.set(key, val),
-    removeItem: key => storage.delete(key),
+    removeItem: key => storage.delete(key)
   }
   globalThis.window = {
-    dispatchEvent: event => events.push(event.type),
+    dispatchEvent: event => events.push(event.type)
   }
 
-  t.after(() => {
+  onTestFinished(() => {
     globalThis.window = originalWindow
     globalThis.localStorage = originalLocalStorage
   })
 
-  t.mock.method(
-    globalThis,
-    'fetch',
+  vi.spyOn(globalThis, 'fetch').mockImplementation(
     async () =>
       new Response(JSON.stringify({ error: '115 登录已失效' }), {
         status: 401,
-        statusText: 'Unauthorized',
+        statusText: 'Unauthorized'
       })
   )
 
@@ -195,10 +202,10 @@ test('notifyUnauthorized dispatches miyabi:unauthorized', () => {
   globalThis.localStorage = {
     getItem: key => storage.get(key) ?? null,
     setItem: (key, val) => storage.set(key, val),
-    removeItem: key => storage.delete(key),
+    removeItem: key => storage.delete(key)
   }
   globalThis.window = {
-    dispatchEvent: event => events.push(event.type),
+    dispatchEvent: event => events.push(event.type)
   }
 
   try {
@@ -210,5 +217,3 @@ test('notifyUnauthorized dispatches miyabi:unauthorized', () => {
     globalThis.localStorage = originalLocalStorage
   }
 })
-
-

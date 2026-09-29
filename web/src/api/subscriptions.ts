@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from './client.ts'
+import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from './client'
 
 export type SubscriptionKind = 'movie' | 'actor'
 

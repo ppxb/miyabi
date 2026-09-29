@@ -11,7 +11,7 @@ import {
 } from 'react'
 
 import { notifyUnauthorized } from '@/api/client'
-import { invalidateMovieStates } from '@/api/movie-state-cache'
+import { invalidateMovieStates } from '@/api/movie-states'
 import { libraryKeys } from '@/api/library'
 import { offlineKeys } from '@/api/offline'
 import { subscriptionKeys } from '@/api/subscriptions'

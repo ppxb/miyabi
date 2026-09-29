@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 
 import {
   PAN_LOGIN_MAX_FAILURES,
   PAN_LOGIN_POLL_MS,
   panLoginPollDelay,
   panLoginShouldRetry
-} from '../src/lib/pan-login.ts'
+} from '@/lib/pan-login'
 
 for (const scenario of [
   {
@@ -66,8 +66,10 @@ function observePanLogin(queryFn) {
     staleTime: 0,
     gcTime: 0,
     refetchInterval: query =>
-      panLoginPollDelay({ failed: query.state.status === 'error', state: query.state.data?.state }) &&
-      1
+      panLoginPollDelay({
+        failed: query.state.status === 'error',
+        state: query.state.data?.state
+      }) && 1
   })
   const seen = []
   const stop = observer.subscribe(result => seen.push(result))
@@ -97,7 +99,10 @@ test('an unreachable backend spends the whole failure budget before the dialog h
     assert.equal(calls, PAN_LOGIN_MAX_FAILURES)
     assert.equal(observer.getCurrentResult().failureCount, PAN_LOGIN_MAX_FAILURES)
     const retries = seen.filter(result => !result.isError)
-    assert.ok(retries.some(result => result.failureCount > 0), 'retries never showed as such')
+    assert.ok(
+      retries.some(result => result.failureCount > 0),
+      'retries never showed as such'
+    )
     await sleep(25)
     assert.equal(calls, PAN_LOGIN_MAX_FAILURES, 'polling went on after the budget was spent')
   } finally {

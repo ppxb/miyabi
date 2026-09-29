@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { useEffect } from 'react'
 
 import { ApiError, apiDelete, apiGet, apiPost, apiPut } from '@/api/client'
-import { resetMovieStates } from '@/api/movie-state-cache'
+import { resetMovieStates } from '@/api/movie-states'
 import { taskKeys } from '@/api/tasks'
 import { PAN_LOGIN_POLL_MS, panLoginPollDelay, panLoginShouldRetry } from '@/lib/pan-login'
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 
-import { combineServerUrl, splitServerUrl } from '../src/features/settings/emby-url.ts'
+import { combineServerUrl, splitServerUrl } from '@/features/settings/emby-url'
 
 test('splitServerUrl extracts host and port correctly', () => {
   assert.deepEqual(splitServerUrl('http://10.32.217.101:8096'), {

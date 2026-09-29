@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test } from 'vitest'
 
-import { getPageNumbers } from '../src/lib/pagination.ts'
+import { getPageNumbers } from '@/lib/pagination'
 
 test('small totals list every page', () => {
   assert.deepEqual(getPageNumbers(1, 1), [1])
