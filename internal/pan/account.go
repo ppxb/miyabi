@@ -8,22 +8,22 @@ import (
 )
 
 type Account struct {
-	ID     string       `json:"id"`
-	Name   string       `json:"name"`
-	Avatar string       `json:"avatar"`
-	Level  string       `json:"level"`
-	Space  AccountSpace `json:"space"`
+	ID     string
+	Name   string
+	Avatar string
+	Level  string
+	Space  AccountSpace
 }
 
 type AccountSpace struct {
-	Total     SpaceAmount `json:"total"`
-	Used      SpaceAmount `json:"used"`
-	Remaining SpaceAmount `json:"remaining"`
+	Total     SpaceAmount
+	Used      SpaceAmount
+	Remaining SpaceAmount
 }
 
 type SpaceAmount struct {
-	Bytes     int64  `json:"bytes"`
-	Formatted string `json:"formatted"`
+	Bytes     int64
+	Formatted string
 }
 
 type wireSpaceAmount struct {

@@ -95,7 +95,8 @@
   - 发现页 tab、各 tab 页码与分类筛选，订阅页 tab、演员编号与分页均改用路由 validateSearch；移除 discover store 和元数据页 effect 同步，详情链接通过 URL 传递通用筛选。新增内存路由测试覆盖详情往返、刷新恢复和非法参数。
 - [x] **56.** 前端错误处理位置不统一：`api/subscriptions.ts` 在 hook 内 toast，其余在组件；"115 登录已失效"映射在 `library/page.tsx:72-76` 与 `movie-detail/magnets.tsx:192-196` 各写一遍；"query.error → invalidate account"在 `pan.ts:121-125`、`library.ts:71-76`、`offline.ts:90-94`、`pan.ts:140-144` 重复 → `QueryCache/MutationCache({ onError })` 统一。
   - 后端补充 PAN_UNAUTHORIZED、PAN_DIRECTORY_REQUIRED、PAN_SOURCE_CHANGED 错误码，ApiError 保留 code；QueryCache/MutationCache 统一刷新相关状态，按 mutation meta 显式启用错误 toast，批量入库只保留弹窗内错误。统一文案并区分本站鉴权失效，测试覆盖普通 400、并发刷新、自刷新循环及重复提示。
-- [ ] **57.** pan 包 json tag 语义混用：`pan.File`、`FilePage`、`Account` 带 API 输出 tag，被 `api/pan.go` 直接返回；`pan.OfflineTask` 的 tag 却是 115 线上字段名（如 `percentDone`）。
+- [x] **57.** pan 包 json tag 语义混用：`pan.File`、`FilePage`、`Account` 带 API 输出 tag，被 `api/pan.go` 直接返回；`pan.OfflineTask` 的 tag 却是 115 线上字段名（如 `percentDone`）。
+  - pan 账号、文件与离线任务改为内部数据类型；API 层显式映射账号/文件响应，115 离线任务使用私有 wire 类型解析。保留现有 JSON 字段、空集合语义和历史封面任务格式，增加响应及持久化兼容测试。
 
 ---
 

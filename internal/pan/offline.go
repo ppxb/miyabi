@@ -9,35 +9,35 @@ import (
 )
 
 type OfflineTask struct {
-	Hash        string `json:"info_hash"`
-	Status      int    `json:"status"`
-	Progress    int    `json:"percentDone"`
-	FileID      string `json:"file_id"`
-	DirectoryID string `json:"wp_path_id"`
+	Hash        string
+	Status      int
+	Progress    int
+	FileID      string
+	DirectoryID string
 }
 
-// 115 can return fractional percentages or numeric strings alongside integer
-// progress. Normalize at the boundary so one download cannot reject a page.
-func (task *OfflineTask) UnmarshalJSON(data []byte) error {
-	type offlineTask OfflineTask
-	var result struct {
-		offlineTask
-		Progress json.Number `json:"percentDone"`
-	}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return err
-	}
+type offlineTaskWire struct {
+	Hash        string      `json:"info_hash"`
+	Status      int         `json:"status"`
+	Progress    json.Number `json:"percentDone"`
+	FileID      string      `json:"file_id"`
+	DirectoryID string      `json:"wp_path_id"`
+}
+
+// 115 can return fractional percentages or numeric strings alongside integers.
+func (wire offlineTaskWire) task() (OfflineTask, error) {
 	var progress float64
-	if result.Progress != "" {
+	if wire.Progress != "" {
 		var err error
-		progress, err = result.Progress.Float64()
+		progress, err = wire.Progress.Float64()
 		if err != nil {
-			return fmt.Errorf("decode 115 offline progress: %w", err)
+			return OfflineTask{}, fmt.Errorf("decode 115 offline progress: %w", err)
 		}
 	}
-	*task = OfflineTask(result.offlineTask)
-	task.Progress = int(max(0, min(100, progress)))
-	return nil
+	return OfflineTask{
+		Hash: wire.Hash, Status: wire.Status, Progress: int(max(0, min(100, progress))),
+		FileID: wire.FileID, DirectoryID: wire.DirectoryID,
+	}, nil
 }
 
 // RemoveOffline removes download history only. Source files are never deleted.
@@ -55,8 +55,8 @@ func (client *Client) RemoveOffline(ctx context.Context, accessToken, hash strin
 }
 
 type OfflinePage struct {
-	PageCount int           `json:"page_count"`
-	Tasks     []OfflineTask `json:"tasks"`
+	PageCount int
+	Tasks     []OfflineTask
 }
 
 func (client *Client) AddOffline(ctx context.Context, accessToken, uri, directoryID string) (string, error) {
@@ -95,7 +95,10 @@ func (client *Client) AddOffline(ctx context.Context, accessToken, uri, director
 func (client *Client) OfflineTasks(ctx context.Context, accessToken string, page int) (OfflinePage, error) {
 	type offlineTasksWire struct {
 		apiResponse
-		Data *OfflinePage `json:"data"`
+		Data *struct {
+			PageCount int               `json:"page_count"`
+			Tasks     []offlineTaskWire `json:"tasks"`
+		} `json:"data"`
 	}
 	result, err := apiRequest[offlineTasksWire](
 		client,
@@ -110,5 +113,16 @@ func (client *Client) OfflineTasks(ctx context.Context, accessToken string, page
 	if result.Data == nil {
 		return OfflinePage{}, fmt.Errorf("115 offline task list is missing data")
 	}
-	return *result.Data, nil
+	pageResult := OfflinePage{PageCount: result.Data.PageCount}
+	if result.Data.Tasks != nil {
+		pageResult.Tasks = make([]OfflineTask, len(result.Data.Tasks))
+	}
+	for i, wire := range result.Data.Tasks {
+		task, err := wire.task()
+		if err != nil {
+			return OfflinePage{}, err
+		}
+		pageResult.Tasks[i] = task
+	}
+	return pageResult, nil
 }

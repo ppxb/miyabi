@@ -35,7 +35,7 @@ type panDirectoryInput struct {
 func panAccountHandler(pan DriveManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		account, err := pan.Account(c.Request.Context())
-		respond(c, account, err)
+		respond(c, accountResponse(account), err)
 	}
 }
 
@@ -60,7 +60,7 @@ func panLoginStatusHandler(pan DriveManager) gin.HandlerFunc {
 func panDisconnectHandler(pan DriveManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		status, err := pan.Disconnect(c.Request.Context())
-		respond(c, status, err)
+		respond(c, accountResponse(status), err)
 	}
 }
 
@@ -71,7 +71,7 @@ func panFilesHandler(pan DriveManager) gin.HandlerFunc {
 			return
 		}
 		files, err := pan.Files(c.Request.Context(), query.DirectoryID, query.Page)
-		respond(c, files, err)
+		respond(c, filesResponse(files), err)
 	}
 }
 

@@ -12,25 +12,25 @@ import (
 )
 
 type Directory struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID   string
+	Name string
 }
 
 type File struct {
-	ID          string `json:"id"`
-	ParentID    string `json:"parent_id"`
-	Name        string `json:"name"`
-	IsDirectory bool   `json:"is_directory"`
-	Size        int64  `json:"size"`
-	PickCode    string `json:"pick_code"`
-	SHA1        string `json:"sha1"`
+	ID          string
+	ParentID    string
+	Name        string
+	IsDirectory bool
+	Size        int64
+	PickCode    string
+	SHA1        string
 }
 
 type FilePage struct {
-	Files   []File      `json:"files"`
-	Path    []Directory `json:"path"`
-	Total   int         `json:"total"`
-	HasMore bool        `json:"has_more"`
+	Files   []File
+	Path    []Directory
+	Total   int
+	HasMore bool
 }
 
 func (client *Client) List(ctx context.Context, accessToken, directoryID string, offset, limit int) (FilePage, error) {
@@ -100,4 +100,3 @@ func SHA1(body []byte) string {
 	sum := sha1.Sum(body)
 	return strings.ToUpper(hex.EncodeToString(sum[:]))
 }
-

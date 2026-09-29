@@ -72,8 +72,13 @@ func TestAddOfflineChecksTheIndividualSubmissionResult(t *testing.T) {
 }
 
 func TestOfflineTasksDecodesMixedProgress(t *testing.T) {
-	for _, progress := range []string{"42", "42.75", `"42.75"`} {
-		t.Run(progress, func(t *testing.T) {
+	for _, tc := range []struct {
+		progress string
+		want     int
+	}{
+		{"42", 42}, {"42.75", 42}, {`"42.75"`, 42}, {`"42"`, 42}, {"null", 0}, {"-5", 0}, {"120.5", 100},
+	} {
+		t.Run(tc.progress, func(t *testing.T) {
 			client := New()
 			defer client.Close()
 			client.http.SetTransport(offlineRoundTrip(func(request *http.Request) (*http.Response, error) {
@@ -84,7 +89,7 @@ func TestOfflineTasksDecodesMixedProgress(t *testing.T) {
 					{"info_hash":"downloading","status":1,"percentDone":%s,"wp_path_id":"42"},
 					{"info_hash":"completed","status":2,"percentDone":100.0,"file_id":"video","wp_path_id":"42"},
 					{"info_hash":"queued","status":0,"percentDone":null,"wp_path_id":"42"}
-				]}}`, progress)
+				]}}`, tc.progress)
 				return &http.Response{
 					StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}},
 					Body: io.NopCloser(strings.NewReader(body)), Request: request,
@@ -95,7 +100,7 @@ func TestOfflineTasksDecodesMixedProgress(t *testing.T) {
 				t.Fatalf("one in-progress download blocked the completed task: %v", err)
 			}
 			if page.PageCount != 2 || len(page.Tasks) != 3 || page.Tasks[0].Hash != "downloading" ||
-				page.Tasks[0].Progress != 42 || page.Tasks[0].DirectoryID != "42" ||
+				page.Tasks[0].Progress != tc.want || page.Tasks[0].DirectoryID != "42" ||
 				page.Tasks[1].Status != 2 || page.Tasks[1].Progress != 100 || page.Tasks[1].FileID != "video" ||
 				page.Tasks[2].Progress != 0 {
 				t.Fatalf("unexpected offline page: %+v", page)

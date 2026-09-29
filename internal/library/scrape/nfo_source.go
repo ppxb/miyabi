@@ -2,6 +2,7 @@ package scrape
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path"
 	"strings"
@@ -18,6 +19,38 @@ type ArtworkOrigin struct {
 	NFO    pan.File `json:"nfo"`
 	Poster pan.File `json:"poster"`
 	Fanart pan.File `json:"fanart"`
+}
+
+// Keep persisted cover tasks compatible independently of the pan client model.
+type artworkFileJSON struct {
+	ID          string `json:"id"`
+	ParentID    string `json:"parent_id"`
+	Name        string `json:"name"`
+	IsDirectory bool   `json:"is_directory"`
+	Size        int64  `json:"size"`
+	PickCode    string `json:"pick_code"`
+	SHA1        string `json:"sha1"`
+}
+
+type artworkOriginJSON struct {
+	NFO    artworkFileJSON `json:"nfo"`
+	Poster artworkFileJSON `json:"poster"`
+	Fanart artworkFileJSON `json:"fanart"`
+}
+
+func (origin ArtworkOrigin) MarshalJSON() ([]byte, error) {
+	return json.Marshal(artworkOriginJSON{
+		NFO: artworkFileJSON(origin.NFO), Poster: artworkFileJSON(origin.Poster), Fanart: artworkFileJSON(origin.Fanart),
+	})
+}
+
+func (origin *ArtworkOrigin) UnmarshalJSON(data []byte) error {
+	var stored artworkOriginJSON
+	if err := json.Unmarshal(data, &stored); err != nil {
+		return err
+	}
+	*origin = ArtworkOrigin{NFO: pan.File(stored.NFO), Poster: pan.File(stored.Poster), Fanart: pan.File(stored.Fanart)}
+	return nil
 }
 
 // MovieDirectory describes a 115 directory containing movie files and sidecars.
