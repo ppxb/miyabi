@@ -123,6 +123,55 @@ func TestProxyManagerResolveReturnsCopy(t *testing.T) {
 	}
 }
 
+func TestProxyManagerNotifiesOnlyForEffectiveChanges(t *testing.T) {
+	manager, err := NewProxyManager(ProxyConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updates := manager.Subscribe()
+	defer manager.Unsubscribe(updates)
+	for _, step := range []struct {
+		name   string
+		config ProxyConfig
+		active string
+		notify bool
+	}{
+		{"save disabled URL", ProxyConfig{URL: "http://127.0.0.1:7890"}, "", false},
+		{"edit disabled URL", ProxyConfig{URL: "http://127.0.0.1:7891"}, "", false},
+		{"enable", ProxyConfig{Enabled: true, URL: "http://127.0.0.1:7891"}, "http://127.0.0.1:7891", true},
+		{"same proxy", ProxyConfig{Enabled: true, URL: "http://127.0.0.1:7891"}, "http://127.0.0.1:7891", false},
+		{"equivalent scheme", ProxyConfig{Enabled: true, URL: "HTTP://127.0.0.1:7891"}, "http://127.0.0.1:7891", false},
+		{"switch proxy", ProxyConfig{Enabled: true, URL: "http://127.0.0.1:7892"}, "http://127.0.0.1:7892", true},
+		{"disable", ProxyConfig{URL: "http://127.0.0.1:7892"}, "", true},
+		{"clear disabled URL", ProxyConfig{}, "", false},
+	} {
+		t.Run(step.name, func(t *testing.T) {
+			if err := manager.Update(step.config); err != nil {
+				t.Fatal(err)
+			}
+			if got := manager.Config(); got != step.config {
+				t.Fatalf("saved config = %+v, want %+v", got, step.config)
+			}
+			var active string
+			if proxy := manager.Resolve(); proxy != nil {
+				active = proxy.String()
+			}
+			if active != step.active {
+				t.Fatalf("active proxy = %q, want %q", active, step.active)
+			}
+			var notified bool
+			select {
+			case <-updates:
+				notified = true
+			default:
+			}
+			if notified != step.notify {
+				t.Fatalf("notification = %t, want %t", notified, step.notify)
+			}
+		})
+	}
+}
+
 func TestNormalizeTrimsAndResolves(t *testing.T) {
 	config, proxy, err := Normalize(ProxyConfig{Enabled: true, URL: " http://127.0.0.1:7890 "})
 	if err != nil || config.URL != "http://127.0.0.1:7890" || proxy == nil || proxy.Host != "127.0.0.1:7890" {

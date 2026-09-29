@@ -158,7 +158,9 @@
   - 已完成：Provider 仅保留 Search，删除两家 Provider 和测试桩的 Name 方法，候选来源仍为原名称“迅雷”和“SubtitleCat”。DecodeToUTF8 直接使用 Decoder.Bytes，删除流式包装和不可达的 ToValidUTF8 兜底；保留 UTF-8、GB18030、Big5 顺序及畸形字节替换行为。
   - 现状修正：WithAllowLoopbackForTesting 已在此前清理中移除，Finder 使用统一安全下载客户端；现有测试替换 transport 提供响应，不绕过 URL 校验，本次无需重复修改。
   - 验证：subtitle、netx、library/scrape、app 包测试及 git diff --check 通过；新增畸形/截断编码、空输入和仅 BOM 覆盖，保留来源解析、UTF-8/GB18030 转换、SRT/ASS 格式及安全下载测试。未进行浏览器或真实字幕站联调，待整体复查。
-- [ ] **97.** `internal/netx/proxy.go:88-94` `sameConfig` 蕴含 `sameURL`，`!sameConfig || !sameURL` 实为 `!sameConfig`，与注释"只在生效代理变化时广播"相反（Enabled=false 改 URL 也重建 tls-client）→ 条件改为 `!sameURL`；:73-79 `resolve` 中 `!Enabled ||` 冗余；:131-133 `parseProxyURL` 的 `raw == ""` 分支死代码。
+- [x] **97.** `internal/netx/proxy.go:88-94` `sameConfig` 蕴含 `sameURL`，`!sameConfig || !sameURL` 实为 `!sameConfig`，与注释"只在生效代理变化时广播"相反（Enabled=false 改 URL 也重建 tls-client）→ 条件改为 `!sameURL`；:73-79 `resolve` 中 `!Enabled ||` 冗余；:131-133 `parseProxyURL` 的 `raw == ""` 分支死代码。
+  - 已完成：Apply 始终更新配置，仅在生效代理 URL 变化时广播；禁用时修改/清空 URL 和等效协议大小写变更不再触发客户端刷新。Normalize 已保证禁用时 parsed 为 nil、空 URL 提前返回，因此删除 resolve 的 Enabled 重复判断及 parseProxyURL 的空值分支。
+  - 验证：netx、network、javdb、javbus、catalogue、api、app 包测试及 git diff --check 通过；新增连续状态变更测试覆盖配置保存、生效代理、禁用修改、启用、重复更新、等效 URL、代理切换及停用通知，保留真实本地 HTTP 代理切换和进行中请求覆盖。未进行浏览器或真实上游联调，待整体复查。
 - [ ] **98.** `internal/netx/ssrf.go:59-60` 255.255.255.255 分支已被 :58 `ip4[0] >= 240` 覆盖；:103 多余中间变量；:191-193 `timeout <= 0` 兜底唯一调用传固定 20s；:157/:176 `ips` 为空时返回 `(nil, nil)`。
 - [ ] **99.** `internal/codeid/codeid.go:132-144` `Layers.stripPrefix` 与 `:247-262` `Candidates` 两套"去前缀"逻辑，正则（`layerNumeric` vs `numericPattern`）已分歧；`Parse`（60-62）与 `Layers`（111-116）去噪流程重复；:344 `UnpaddedNumericCandidate` 仅包内使用；:350-362、:329-334 冗余分支；:95-101 正则 var 块散落；:180、:187 对恒为单元素的 `layers[0]` 循环。
 - [ ] **100.** `internal/gfriends/client.go:21-23,29` `DefaultFastlyURL`、`DefaultRawURL`、`CacheExpiration`、`FileTree` 无外部使用却导出；:42-44 nil httpClient 默认值死代码；:127-128 写缓存错误被静默吞掉。

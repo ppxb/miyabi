@@ -71,7 +71,7 @@ func (m *ProxyManager) Resolve() *url.URL {
 }
 
 func (state *proxyState) resolve() *url.URL {
-	if !state.config.Enabled || state.proxy == nil {
+	if state.proxy == nil {
 		return nil
 	}
 	proxy := *state.proxy
@@ -86,9 +86,8 @@ func (m *ProxyManager) Apply(normalized ProxyConfig, parsed *url.URL) {
 	previous := m.current.Load()
 	sameURL := (previous.proxy == nil && parsed == nil) ||
 		(previous.proxy != nil && parsed != nil && previous.proxy.String() == parsed.String())
-	sameConfig := previous.config == normalized
 	m.current.Store(&proxyState{config: normalized, proxy: parsed})
-	if !sameConfig || !sameURL {
+	if !sameURL {
 		m.broadcastLocked()
 	}
 }
@@ -134,9 +133,6 @@ func (m *ProxyManager) broadcastLocked() {
 }
 
 func parseProxyURL(raw string) (*url.URL, error) {
-	if raw == "" {
-		return nil, nil
-	}
 	proxy, err := url.Parse(raw)
 	if err != nil {
 		return nil, invalidProxy("代理地址格式错误", err)
