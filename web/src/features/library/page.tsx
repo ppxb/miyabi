@@ -10,7 +10,6 @@ import { MovieGridLayout } from '@/components/movie/movie-grid'
 import { MovieGridSkeleton } from '@/components/movie/movie-grid-skeleton'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { LibraryMovieCard } from '@/features/library/movie-card'
 import { LibraryScanButton } from '@/features/library/scan-button'
 import { useTaskConnection } from '@/features/tasks/task-events'
@@ -39,16 +38,15 @@ export function LibraryPage({
   return (
     <AppPage>
       <PageHeader title="媒体库" description="来自 115 网盘的影片索引" inlineActions>
-        {library.isPending ? (
-          <Skeleton className="h-9 w-9 rounded-4xl sm:w-30" />
-        ) : source ? (
-          <LibraryScanButton
-            scanning={scanning}
-            connected={connection.status === 'connected'}
-            failed={latest?.status === 'failed'}
-            onStarted={() => onPageChange(1)}
-          />
-        ) : library.isSuccess ? (
+        <LibraryScanButton
+          loading={library.isPending}
+          available={!!source}
+          scanning={scanning}
+          connected={connection.status === 'connected'}
+          failed={latest?.status === 'failed'}
+          onStarted={() => onPageChange(1)}
+        />
+        {library.isSuccess && !source ? (
           <Button asChild>
             <Link to="/settings">挂载媒体目录</Link>
           </Button>

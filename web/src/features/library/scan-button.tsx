@@ -3,21 +3,30 @@ import { LoaderCircleIcon, RefreshCwIcon, ScanLineIcon } from 'lucide-react'
 import { describeApiError } from '@/api/client'
 import { useStartLibraryScan } from '@/api/library'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { notifyScanTask, notifyTaskError } from '@/features/tasks/task-toast'
 
 export function LibraryScanButton({
+  loading,
+  available,
   scanning,
   connected,
   failed,
   onStarted
 }: {
+  loading: boolean
+  available: boolean
   scanning: boolean
   connected: boolean
   failed: boolean
   onStarted: () => void
 }) {
   const startScan = useStartLibraryScan()
+  // Keep the mutation observer mounted while pagination replaces the visible control.
+  if (loading) return <Skeleton className="h-9 w-9 rounded-4xl sm:w-30" />
+  if (!available) return null
+
   const processing = scanning && connected
   const scanLabel = scanning
     ? processing

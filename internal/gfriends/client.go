@@ -91,18 +91,19 @@ func (c *Client) EnsureIndex(ctx context.Context) error {
 	loaded := !c.loadedAt.IsZero()
 	c.mu.RUnlock()
 	if !loaded && c.dataDir != "" {
-		if tree, updatedAt, err := readCachedTree(cacheFile); err == nil {
-			c.installIndex(tree, updatedAt)
+		if index, updatedAt, err := readCachedIndex(cacheFile); err == nil {
+			c.installIndex(index, updatedAt)
 			if ready, err := c.indexReady(); ready {
 				return err
 			}
 		}
 	}
 
-	var tree FileTree
+	var index map[string]string
 	body, err := c.download(ctx, "Filetree.json", 0, func(data []byte) error {
-		tree = FileTree{}
-		return json.Unmarshal(data, &tree)
+		var err error
+		index, err = parseIndex(data)
+		return err
 	})
 	if err != nil {
 		if ctx.Err() != nil {
@@ -121,22 +122,33 @@ func (c *Client) EnsureIndex(ctx context.Context) error {
 		_ = os.MkdirAll(c.dataDir, 0755)
 		_ = os.WriteFile(cacheFile, body, 0644)
 	}
-	c.installIndex(tree, time.Now())
+	c.installIndex(index, time.Now())
 	return nil
 }
 
-func readCachedTree(path string) (FileTree, time.Time, error) {
-	var tree FileTree
+func readCachedIndex(path string) (map[string]string, time.Time, error) {
 	info, err := os.Stat(path)
 	if err != nil {
-		return tree, time.Time{}, err
+		return nil, time.Time{}, err
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return tree, time.Time{}, err
+		return nil, time.Time{}, err
 	}
-	err = json.Unmarshal(data, &tree)
-	return tree, info.ModTime(), err
+	index, err := parseIndex(data)
+	return index, info.ModTime(), err
+}
+
+func parseIndex(data []byte) (map[string]string, error) {
+	var tree FileTree
+	if err := json.Unmarshal(data, &tree); err != nil {
+		return nil, err
+	}
+	index := buildIndex(tree)
+	if len(index) == 0 {
+		return nil, fmt.Errorf("gfriends filetree contains no usable avatars")
+	}
+	return index, nil
 }
 
 func (c *Client) indexReady() (bool, error) {
@@ -154,8 +166,7 @@ func (c *Client) indexReady() (bool, error) {
 	return false, nil
 }
 
-func (c *Client) installIndex(tree FileTree, updatedAt time.Time) {
-	index := buildIndex(tree)
+func (c *Client) installIndex(index map[string]string, updatedAt time.Time) {
 	c.mu.Lock()
 	c.index = index
 	c.loadedAt = updatedAt
@@ -173,7 +184,7 @@ func buildIndex(tree FileTree) map[string]string {
 			name := strings.TrimSuffix(alias, ".jpg")
 			name = strings.TrimSuffix(name, ".png")
 			norm := normalizeName(name)
-			if norm == "" {
+			if norm == "" || strings.TrimSpace(target) == "" {
 				continue
 			}
 

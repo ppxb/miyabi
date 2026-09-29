@@ -39,7 +39,7 @@ func TestRefreshLeavesIndexReadableAndCoalescesCallers(t *testing.T) {
 			return nil, r.Context().Err()
 		}
 	})})
-	c.installIndex(FileTree{Content: map[string]map[string]string{"S": {"Old.jpg": "old.jpg"}}}, time.Now().Add(-2*CacheExpiration))
+	c.installIndex(buildIndex(FileTree{Content: map[string]map[string]string{"S": {"Old.jpg": "old.jpg"}}}), time.Now().Add(-2*CacheExpiration))
 	done := make(chan error, 9)
 	go func() { done <- c.EnsureIndex(t.Context()) }()
 	<-started
@@ -219,5 +219,87 @@ func TestCanceledRefreshDoesNotDelayNextAttempt(t *testing.T) {
 	}
 	if calls != 2 {
 		t.Fatalf("requests = %d", calls)
+	}
+}
+
+func TestInvalidIndexesTryNextMirror(t *testing.T) {
+	for _, body := range []string{`{}`, `null`, `{"Content":{}}`, `{"Content":{"S":{}}}`, `{"Content":{"S":{"Actor.jpg":""}}}`} {
+		t.Run(body, func(t *testing.T) {
+			calls := 0
+			c := New(t.TempDir(), &http.Client{Transport: testTransport(func(*http.Request) (*http.Response, error) {
+				calls++
+				if calls == 1 {
+					return treeResponse(body), nil
+				}
+				return treeResponse(testTree), nil
+			})})
+			if err := c.EnsureIndex(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if calls != 2 {
+				t.Fatalf("mirror attempts = %d", calls)
+			}
+			if _, ok := c.Lookup("Actor"); !ok {
+				t.Fatal("valid fallback not installed")
+			}
+			data, err := os.ReadFile(filepath.Join(c.dataDir, "gfriends_tree.json"))
+			if err != nil || string(data) != testTree {
+				t.Fatalf("persisted cache = %q, %v", data, err)
+			}
+		})
+	}
+}
+
+func TestInvalidRefreshPreservesMemoryAndDiskCache(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "gfriends_tree.json")
+	if err := os.WriteFile(path, []byte(testTree), 0644); err != nil {
+		t.Fatal(err)
+	}
+	stamp := time.Now().Add(-2 * CacheExpiration)
+	if err := os.Chtimes(path, stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	c := New(dir, &http.Client{Transport: testTransport(func(*http.Request) (*http.Response, error) { calls++; return treeResponse(`{}`), nil })})
+	for range 2 {
+		if err := c.EnsureIndex(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, ok := c.Lookup("Actor"); !ok {
+		t.Fatal("old avatar lost")
+	}
+	if calls != len(mirrors) || !c.loadedAt.Equal(info.ModTime()) || c.retryAt.IsZero() {
+		t.Fatal("invalid refresh did not retain cache age and backoff")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || string(data) != testTree {
+		t.Fatalf("old disk cache overwritten: %q, %v", data, err)
+	}
+	c.retryAt = time.Now().Add(-time.Second)
+	if err := c.EnsureIndex(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2*len(mirrors) {
+		t.Fatal("invalid response prevented retry")
+	}
+}
+
+func TestInvalidDiskIndexDoesNotSuppressDownload(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gfriends_tree.json"), []byte(`null`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	c := New(dir, &http.Client{Transport: testTransport(func(*http.Request) (*http.Response, error) { return treeResponse(testTree), nil })})
+	if err := c.EnsureIndex(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := c.Lookup("Actor"); !ok {
+		t.Fatal("invalid disk cache treated as fresh")
 	}
 }
