@@ -1,5 +1,4 @@
 import type { PropsWithChildren } from 'react'
-import { useRouterState } from '@tanstack/react-router'
 import { BellIcon, CompassIcon, FilmIcon, SearchIcon, SettingsIcon } from 'lucide-react'
 
 import { FloatingNav, type FloatingNavItem } from '@/components/floating-nav'
@@ -16,17 +15,10 @@ const NAV_ITEMS: FloatingNavItem[] = [
 ]
 
 export function AppShell({ children }: PropsWithChildren) {
-  const pathname = useRouterState({
-    select: state => state.location.pathname
-  })
-  const activeId = NAV_ITEMS.find(item =>
-    item.to === '/' ? pathname === '/' : pathname.startsWith(item.to)
-  )?.id
-
   return (
     <TaskEventsProvider>
       <div className="relative min-h-dvh">
-        <FloatingNav items={NAV_ITEMS} activeId={activeId} />
+        <FloatingNav items={NAV_ITEMS} />
         {children}
         <Toaster position="top-right" closeButton duration={6000} />
         <TaskNotifications />
