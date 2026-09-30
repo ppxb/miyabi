@@ -3,6 +3,7 @@ package javbus
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -37,6 +38,9 @@ func TestParseMagnetsHTML_SSIS001(t *testing.T) {
 		}
 		if len(m.Sources) != 1 || m.Sources[0] != "javbus" {
 			t.Errorf("expected source to be javbus, got %v", m.Sources)
+		}
+		if m.HD != slices.Contains(m.Tags, "高清") || m.HasSubtitle != slices.Contains(m.Tags, "字幕") {
+			t.Errorf("display tags disagree with site flags: %+v", m)
 		}
 	}
 
@@ -73,6 +77,16 @@ func TestParseMagnetsHTML_SSIS001(t *testing.T) {
 	}
 	if len(second.Tags) != 1 || second.Tags[0] != "高清" {
 		t.Errorf("second magnet tags mismatch: %v", second.Tags)
+	}
+}
+
+func TestParseMagnetsHTMLSkipsInvalidHashes(t *testing.T) {
+	for _, hash := range []string{"", "abc", "not-a-hash"} {
+		body := `<tr><td><a href="magnet:?xt=urn:btih:` + hash + `">SSIS-001</a></td><td>1GB</td><td>2026-09-30</td></tr>`
+		magnets, err := parseMagnetsHTML(body)
+		if err != nil || len(magnets) != 0 {
+			t.Errorf("invalid hash %q: magnets = %+v, error = %v", hash, magnets, err)
+		}
 	}
 }
 

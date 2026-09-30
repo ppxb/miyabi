@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -84,21 +83,13 @@ func (a *Aggregator) FindDetailed(ctx context.Context, ref domain.MovieRef) ([]d
 			continue
 		}
 		for _, m := range res.magnets {
-			hash := strings.ToLower(strings.TrimSpace(m.Hash))
-			if hash == "" {
-				continue
-			}
-			if existing, ok := merged[hash]; ok {
+			if existing, ok := merged[m.Hash]; ok {
 				mergeMagnet(existing, m, res.source)
 				continue
 			}
 			entry := m
-			entry.Hash = hash
-			if len(entry.Sources) == 0 {
-				entry.Sources = []string{res.source}
-			}
-			merged[hash] = &entry
-			order = append(order, hash)
+			merged[m.Hash] = &entry
+			order = append(order, m.Hash)
 		}
 	}
 

@@ -43,7 +43,7 @@ func TestPickerSubtitleRequired(t *testing.T) {
 		t.Fatal("expected no match when subtitle is required and missing")
 	}
 	// An inferred subtitle satisfies the requirement too.
-	if _, ok := p.Pick([]domain.Magnet{{Hash: "h3", Name: "SSIS-001-C"}}); !ok {
+	if _, ok := p.Pick([]domain.Magnet{{Hash: "h3", Name: "SSIS-001-C", Tags: []string{domain.MagnetTagSubtitle}, Inferred: true}}); !ok {
 		t.Fatal("expected an inferred subtitle to satisfy the requirement")
 	}
 }
@@ -61,13 +61,16 @@ func TestPickerHDRequired(t *testing.T) {
 	if _, ok := p.Pick(magnets[:1]); ok {
 		t.Fatal("expected no match when HD is required and missing")
 	}
+	if _, ok := p.Pick([]domain.Magnet{{Hash: "h3", Name: "SSIS-001 4K", Tags: []string{domain.MagnetTag4K}, Inferred: true}}); !ok {
+		t.Fatal("expected inferred 4K to satisfy the HD requirement")
+	}
 }
 
 func TestPickerUncensoredExclude(t *testing.T) {
 	p := NewPicker(Preferences{Subtitle: PreferenceAny, HD: PreferenceAny, Uncensored: UncensoredExclude})
 	magnets := []domain.Magnet{
-		{Hash: "h1", Name: "SSIS-001-UC 无码破解", Size: 5000},
-		{Hash: "h2", Name: "SSIS-001.Leaked.720p", Size: 4000},
+		{Hash: "h1", Name: "SSIS-001-UC 无码破解", Size: 5000, Tags: []string{domain.MagnetTagSubtitle, domain.MagnetTagUncensored, domain.MagnetTagCracked}, Inferred: true},
+		{Hash: "h2", Name: "SSIS-001.Leaked.720p", Size: 4000, Tags: []string{domain.MagnetTagCracked}, Inferred: true},
 		{Hash: "h3", Name: "SSIS-001 Standard", Size: 3000},
 	}
 	best, ok := p.Pick(magnets)
@@ -83,7 +86,7 @@ func TestPickerUncensoredRequired(t *testing.T) {
 	p := NewPicker(Preferences{Subtitle: PreferenceAny, HD: PreferenceAny, Uncensored: UncensoredRequired})
 	magnets := []domain.Magnet{
 		{Hash: "h1", Name: "SSIS-001 Standard", Size: 5000},
-		{Hash: "h2", Name: "SSIS-001-UC 破解版", Size: 3000},
+		{Hash: "h2", Name: "SSIS-001-UC 破解版", Size: 3000, Tags: []string{domain.MagnetTagSubtitle, domain.MagnetTagUncensored, domain.MagnetTagCracked}, Inferred: true},
 	}
 	best, ok := p.Pick(magnets)
 	if !ok || best.Hash != "h2" {

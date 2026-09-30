@@ -278,7 +278,7 @@ func TestServiceMagnetsWithAggregator(t *testing.T) {
 	}
 	defer store.Close()
 
-	const hash = "abcdef0123456789abcdef0123456789abcdef0123"
+	const hash = "abcdef0123456789abcdef0123456789abcdef01"
 	provider := &stubProviderWithMagnets{
 		magnets: []domain.Magnet{
 			{
@@ -287,10 +287,12 @@ func TestServiceMagnetsWithAggregator(t *testing.T) {
 				Size:        2000,
 				HasSubtitle: true,
 				Sources:     []string{"javdb"},
+				Tags:        []string{domain.MagnetTagSubtitle},
 			},
 			{
-				Hash: hash,
-				Name: "duplicate from primary source",
+				Hash:    hash,
+				Name:    "duplicate from primary source",
+				Sources: []string{domain.MagnetSourceJavDB},
 			},
 		},
 	}

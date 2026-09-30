@@ -97,15 +97,13 @@ type candidate struct {
 
 // Pick filters by the required and excluded preferences, scores the rest by
 // the preferred ones, and returns the best magnet. The second result is false
-// when nothing qualifies.
+// when nothing qualifies. Input magnets must already include aggregated inference tags.
 func (p *Picker) Pick(magnets []domain.Magnet) (domain.Magnet, bool) {
 	var passed []candidate
 	for _, m := range magnets {
-		// Callers usually pass aggregated magnets; applying again is a no-op.
-		ApplyInference(&m)
 		verifiedSubtitle := m.HasSubtitle
 		inferredSubtitle := !verifiedSubtitle && hasTag(m, domain.MagnetTagSubtitle)
-		verifiedHD := m.HD || hasTag(m, domain.MagnetTagHD)
+		verifiedHD := m.HD
 		inferredHD := !verifiedHD && hasTag(m, domain.MagnetTag4K)
 		uncensored := IsUncensored(m)
 

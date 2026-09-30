@@ -1,6 +1,7 @@
 package javdb
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/domain"
@@ -23,6 +24,23 @@ func TestMagnetsDecodesUnitsAndPreservesSourceOrder(t *testing.T) {
 	}
 	if magnets[2].Size != 1024*1024*1024 || !magnets[2].HasSubtitle || !magnets[2].HD || magnets[2].FilesCount != 3 || magnets[2].CreatedAt != "2026-08-03" {
 		t.Fatalf("magnet metadata = %#v", magnets[2])
+	}
+	for _, item := range magnets {
+		if !slices.Equal(item.Sources, []string{domain.MagnetSourceJavDB}) ||
+			item.HD != slices.Contains(item.Tags, domain.MagnetTagHD) ||
+			item.HasSubtitle != slices.Contains(item.Tags, domain.MagnetTagSubtitle) {
+			t.Errorf("source metadata disagrees with site flags: %+v", item)
+		}
+	}
+}
+
+func TestMagnetsNormalizeInfoHash(t *testing.T) {
+	transport := &fixtureTransport{responses: map[string][]byte{
+		"/api/v1/movies/movie/magnets": []byte(`{"success":1,"data":{"magnets":[{"hash":"ABCDEF0123456789ABCDEF0123456789ABCDEF01"}]}}`),
+	}}
+	magnets, err := clientWithTransport(transport).Magnets(t.Context(), "movie")
+	if err != nil || len(magnets) != 1 || magnets[0].Hash != "abcdef0123456789abcdef0123456789abcdef01" {
+		t.Fatalf("normalized magnets = %+v, error = %v", magnets, err)
 	}
 }
 

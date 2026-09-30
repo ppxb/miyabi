@@ -32,7 +32,7 @@ func (s *recoveringJavBusSource) Find(_ context.Context, ref domain.MovieRef) ([
 	if ref.Code != "SSIS-001" || ref.JavDBID != "movie-1" {
 		return nil, errors.New("missing primary catalogue identity")
 	}
-	return []domain.Magnet{{Hash: "2222222222222222222222222222222222222222", Name: "supplement"}}, nil
+	return []domain.Magnet{{Hash: "2222222222222222222222222222222222222222", Name: "supplement", Sources: []string{domain.MagnetSourceJavBus}}}, nil
 }
 
 func TestMagnetsOptionalSourceFailureDoesNotCachePartialResults(t *testing.T) {
@@ -41,7 +41,7 @@ func TestMagnetsOptionalSourceFailureDoesNotCachePartialResults(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	primary := &stubProviderWithMagnets{magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "primary"}}}
+	primary := &stubProviderWithMagnets{magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "primary", Sources: []string{domain.MagnetSourceJavDB}}}}
 	supplement := &recoveringJavBusSource{}
 	service, err := NewWithClients(t.Context(), store.Client, primary, supplement, &stubLocalState{})
 	if err != nil {
@@ -87,7 +87,7 @@ func TestMagnetsRetriesDetailBeforeCachingSupplementedResult(t *testing.T) {
 	}
 	defer store.Close()
 	primary := &recoveringDetailProvider{stubProviderWithMagnets: stubProviderWithMagnets{
-		magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "primary"}},
+		magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "primary", Sources: []string{domain.MagnetSourceJavDB}}},
 	}}
 	upstream := &countingJavBusHTTP{}
 	service, err := NewWithClients(t.Context(), store.Client, primary, javbus.NewForTest(true, upstream), &stubLocalState{})
@@ -134,7 +134,7 @@ func TestMagnets_WithAvailableJavBus(t *testing.T) {
 
 	provider := &detailCountingProvider{
 		stubProviderWithMagnets: stubProviderWithMagnets{
-			magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "SSIS-001"}},
+			magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "SSIS-001", Sources: []string{domain.MagnetSourceJavDB}}},
 		},
 	}
 	upstream := &countingJavBusHTTP{}
@@ -184,7 +184,7 @@ func TestMagnets_WithUnavailableJavBus(t *testing.T) {
 
 	provider := &detailCountingProvider{
 		stubProviderWithMagnets: stubProviderWithMagnets{
-			magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "SSIS-001"}},
+			magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "SSIS-001", Sources: []string{domain.MagnetSourceJavDB}}},
 		},
 	}
 	javbusClient := javbus.NewForTest(false)

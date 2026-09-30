@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：117 条待处理，8 条已完成、待复查。
+> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：116 条待处理，9 条已完成、待复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；完成项经复查确认后可移除，已提交的历史记录可通过 Git 追溯。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮核对现存已完成项的实现、调用链和回归覆盖，并非重新验证全部待办，也未重审此前移除的 62 条记录。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -65,7 +65,10 @@
   - 已完成：删除 MovieStates 中重复的 source 判空及 Close 中必需依赖 JavDB 的判空；time.Now() 直接用于本地发行日期判断。Magnets、CatalogueMagnets、HasMagnet 共用 cachedMagnets，只有 API 返回构造 URI，CatalogueMagnets 用一次切片复制保留原有返回列表隔离，HasMagnet 直接检查缓存中的哈希。
   - 保留：JavBus 在 NewWithClients 中明确可选，保留它的判空；媒体库来源入口校验、任务账号/目录范围、聚合排序、部分结果不缓存、详情失败重试、错误包装与路由持久化行为不变。
   - 验证：扩展现有磁力测试，覆盖三个入口共享缓存、替换返回列表元素不污染缓存、哈希大小写匹配/未命中，以及跨入口的部分来源失败重试与成功后缓存；catalogue、magnet、monitor、offline、api、app 包测试及 catalogue 的 go vet、git diff --check 通过，保留媒体库状态和发行日期测试。未进行浏览器或真实上游联调。
-- [ ] **120.** `internal/magnet/aggregator.go:75,84-86` Hash 小写化、`Sources` 为空兜底（各来源已保证）；`picker.go:108`、`quality.go:158` `m.HD || hasTag(m, MagnetTagHD)`（根源：`domain.Magnet` 同时用 bool 与 Tags 表达 HD/字幕）；`picker.go:105` 对已聚合结果再次 `ApplyInference`。
+- [x] **120.** `internal/magnet/aggregator.go:75,84-86` Hash 小写化、`Sources` 为空兜底（各来源已保证）；`picker.go:108`、`quality.go:158` `m.HD || hasTag(m, MagnetTagHD)`（根源：`domain.Magnet` 同时用 bool 与 Tags 表达 HD/字幕）；`picker.go:105` 对已聚合结果再次 `ApplyInference`。
+  - 已完成：确认 JavDB/JavBus 已返回有效小写哈希和来源信息后，删除聚合层重复的哈希转换、空哈希过滤与 Sources 兜底，并明确 Source 输入约定。名称推断仅在聚合完成后执行，Picker 删除二次 ApplyInference；站方高清直接读取 HD，推断高清仍读取 4K 标签。
+  - 范围修正：HasSubtitle/HD 用于区分站方标注与名称推断，Tags 同时承担页面展示和推断标签，保留两者及现有评分权重；不合并为单一字段。去重、来源合并、排序、超时、部分失败处理及订阅筛选规则不变。
+  - 验证：来源测试覆盖大写哈希规范化、无效哈希拒绝/跳过、来源信息和站方标签一致性；筛选测试改用已推断的数据，补充 4K 满足高清条件及站方高清优先于推断，并新增聚合到筛选的权重、必需条件和无码筛选测试。magnet、javdb、javbus、catalogue、monitor、offline、api、app 包测试及 magnet/javdb/javbus/catalogue 的 go vet、git diff --check 通过。未进行浏览器或真实上游联调。
 - [ ] **121.** `internal/library/scrape`：`Close` 的 `service == nil`、`subtitleQueue != nil`；`newSubtitleQueue` 的 concurrency / capacity / logger 兜底（唯一调用传默认值）；`Enqueue` 的 `q.ctx != nil`、`q.logger != nil`；`worker` 的 `!ok`（channel 从不关闭）；`processCover` 与 `process` 两次判断 `subtitles != nil`；`ExportLocalMovie` 的 `record == nil` + `notifiers ...MediaNotifier` 表示可选；`scrape.go:339` `dirCache == nil`、:343 `ttl <= 0`；`findAvatar` 的 `s.db == nil`；`reconcile.go:112` `if images != nil`；`reconcile.go:58` 多余 `var err error`。
 - [ ] **122.** `internal/image` singleflight + Stat 检查 + `publishImage` 读回比较三层叠加 → 保留原子 rename + Stat；`internal/maintenance` 每次循环检查 `ctx.Err()`、检查 DB 文件 `IsRegular`。
 - [ ] **123.** `internal/monitor/service.go:108` `checking`、`internal/offline/service.go:52` `syncing` 互斥锁：生产中仅由一个 `RunPeriodic` 串行调用；`offline/add.go:20,30` `catalogue != nil` 两次；`sync.go:254` `library != nil` 只为测试；`sync.go:76` 重复过滤 `DirectoryID`、:94-96 每条检查 `ctx.Err()`、:154-159 身份校验冗余；`monitor/service.go:160,176` `limit > 0` / `max(page, 1)`（API 绑定已保证）；`tasks/pool.go:34` `logger == nil`。

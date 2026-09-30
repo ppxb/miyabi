@@ -46,10 +46,10 @@ func TestInfer(t *testing.T) {
 }
 
 func TestApplyInferenceKeepsSiteFlags(t *testing.T) {
-	m := domain.Magnet{Name: "SSIS-001 4K 破解版 中文字幕", Tags: []string{domain.MagnetTagHD}}
+	m := domain.Magnet{Name: "SSIS-001 4K 破解版 中文字幕", HD: true, Tags: []string{domain.MagnetTagHD}}
 	ApplyInference(&m)
-	if m.HasSubtitle {
-		t.Error("inference must not rewrite the site HasSubtitle flag")
+	if m.HasSubtitle || !m.HD {
+		t.Error("inference must not rewrite site flags")
 	}
 	if !m.Inferred {
 		t.Error("expected Inferred to be set when tags were added")

@@ -155,7 +155,7 @@ func HasSubtitle(m domain.Magnet) bool {
 
 // IsHD reports an HD label from the site or a 4K marker in the name.
 func IsHD(m domain.Magnet) bool {
-	return m.HD || hasTag(m, domain.MagnetTagHD) || hasTag(m, domain.MagnetTag4K)
+	return m.HD || hasTag(m, domain.MagnetTag4K)
 }
 
 // IsUncensored reports an uncensored or leaked release. Sites never label

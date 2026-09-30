@@ -10,7 +10,7 @@ func TestPickerScoringTiersAndInferredWeights(t *testing.T) {
 	p := NewPicker(Preferences{Subtitle: PreferencePreferred, HD: PreferencePreferred, Uncensored: UncensoredPreferred})
 
 	verifiedSub := domain.Magnet{Hash: "verified_sub", Name: "SSIS-001", HasSubtitle: true, Tags: []string{domain.MagnetTagSubtitle}, Size: 1000}
-	inferredSub := domain.Magnet{Hash: "inferred_sub", Name: "SSIS-001 中文字幕版", Size: 2000}
+	inferredSub := domain.Magnet{Hash: "inferred_sub", Name: "SSIS-001 中文字幕版", Size: 2000, Tags: []string{domain.MagnetTagSubtitle}, Inferred: true}
 	if best, _ := p.Pick([]domain.Magnet{inferredSub, verifiedSub}); best.Hash != "verified_sub" {
 		t.Fatalf("verified subtitle must outrank inferred, got %s", best.Hash)
 	}
@@ -21,9 +21,13 @@ func TestPickerScoringTiersAndInferredWeights(t *testing.T) {
 		t.Fatalf("subtitle must outrank HD, got %s", best.Hash)
 	}
 
-	uncenOnly := domain.Magnet{Hash: "uncen_only", Name: "SSIS-001 无码流出", Size: 5000}
+	uncenOnly := domain.Magnet{Hash: "uncen_only", Name: "SSIS-001 无码流出", Size: 5000, Tags: []string{domain.MagnetTagUncensored, domain.MagnetTagCracked}, Inferred: true}
 	if best, _ := p.Pick([]domain.Magnet{uncenOnly, hdOnly}); best.Hash != "hd_only" {
 		t.Fatalf("HD must outrank uncensored, got %s", best.Hash)
+	}
+	inferredHD := domain.Magnet{Hash: "inferred_hd", Name: "SSIS-001 4K", Size: 10000, Tags: []string{domain.MagnetTag4K}, Inferred: true}
+	if best, _ := p.Pick([]domain.Magnet{inferredHD, hdOnly}); best.Hash != "hd_only" {
+		t.Fatalf("verified HD must outrank inferred 4K, got %s", best.Hash)
 	}
 }
 
@@ -32,7 +36,7 @@ func TestPickerScoringTiersAndInferredWeights(t *testing.T) {
 func TestPickerVerifiedSubtitleSurvivesInferredTags(t *testing.T) {
 	p := NewPicker(DefaultPreferences())
 	verified4K := domain.Magnet{Hash: "a", Name: "SSIS-001-UC 4K", HasSubtitle: true, HD: true,
-		Tags: []string{domain.MagnetTagSubtitle, domain.MagnetTagHD}, Sources: []string{domain.MagnetSourceJavDB}, Size: 1000}
+		Tags: []string{domain.MagnetTagSubtitle, domain.MagnetTagHD, domain.MagnetTag4K, domain.MagnetTagUncensored}, Inferred: true, Sources: []string{domain.MagnetSourceJavDB}, Size: 1000}
 	verifiedPlain := domain.Magnet{Hash: "b", Name: "SSIS-001", HasSubtitle: true, HD: true,
 		Tags: []string{domain.MagnetTagSubtitle, domain.MagnetTagHD}, Sources: []string{domain.MagnetSourceJavDB}, Size: 500}
 	best, ok := p.Pick([]domain.Magnet{verifiedPlain, verified4K})
