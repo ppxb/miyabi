@@ -51,7 +51,7 @@ func TestEmbyEndpoints(t *testing.T) {
 			ID:         "test-id",
 		},
 	}
-	router := NewRouter(Dependencies{Emby: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	router := NewRouter(Dependencies{Access: NewAccessGateService("", ""), Emby: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 
 	// GET /api/settings/emby
 	rec := httptest.NewRecorder()

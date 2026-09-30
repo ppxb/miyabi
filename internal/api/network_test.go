@@ -36,7 +36,7 @@ func (stub *networkStub) TestNetwork(_ context.Context, config netx.ProxyConfig)
 
 func TestNetworkEndpointsReadAndWrite(t *testing.T) {
 	stub := &networkStub{config: netx.ProxyConfig{Enabled: true, URL: "http://user:secret@127.0.0.1:7890"}}
-	router := NewRouter(Dependencies{Network: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	router := NewRouter(Dependencies{Access: NewAccessGateService("", ""), Network: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 
 	get := httptest.NewRecorder()
 	router.ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/api/settings/network", nil))
@@ -68,7 +68,7 @@ func TestNetworkTestEndpoint(t *testing.T) {
 			JavBus: network.ProbeResult{Available: false, Error: "timeout"},
 		},
 	}
-	router := NewRouter(Dependencies{Network: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	router := NewRouter(Dependencies{Access: NewAccessGateService("", ""), Network: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 
 	post := httptest.NewRecorder()
 	router.ServeHTTP(post, httptest.NewRequest(http.MethodPost, "/api/settings/network/test", nil))

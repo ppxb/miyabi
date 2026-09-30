@@ -31,7 +31,7 @@ func TestLibraryMoviesDefaultToTwentyPerPage(t *testing.T) {
 	} {
 		t.Run(scenario.query, func(t *testing.T) {
 			stub := &libraryPageStub{}
-			router := NewRouter(Dependencies{Library: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+			router := NewRouter(Dependencies{Access: NewAccessGateService("", ""), Library: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 			response := httptest.NewRecorder()
 			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/library/movies"+scenario.query, nil))
 			if response.Code != http.StatusOK || stub.page != scenario.page || stub.limit != 20 {

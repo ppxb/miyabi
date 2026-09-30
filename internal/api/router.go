@@ -37,6 +37,7 @@ type Dependencies struct {
 	TrustedProxies []string
 }
 
+// NewRouter requires an Access gate, including when password protection is disabled.
 func NewRouter(deps Dependencies) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()

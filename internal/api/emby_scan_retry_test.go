@@ -30,7 +30,7 @@ func TestManualScansRetryEmbyEvenWhenLibraryScanCannotStart(t *testing.T) {
 				lib.err = domain.E(domain.KindBusy, "扫描暂不可用", nil)
 			}
 			emby := &stubEmbyManager{}
-			router := NewRouter(Dependencies{Library: lib, Emby: emby, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+			router := NewRouter(Dependencies{Access: NewAccessGateService("", ""), Library: lib, Emby: emby, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 			request := httptest.NewRequest(http.MethodPost, path, strings.NewReader("{}"))
 			request.Header.Set("Content-Type", "application/json")
 			recorder := httptest.NewRecorder()

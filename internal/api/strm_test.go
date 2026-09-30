@@ -45,6 +45,7 @@ func TestSTRMStreamHandlerRedirectsGET(t *testing.T) {
 		streamURL: "https://cdn.115.com/video/original.mp4?token=sig",
 	}
 	router := NewRouter(Dependencies{
+		Access: NewAccessGateService("", ""),
 		STRM:   stub,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
@@ -73,6 +74,7 @@ func TestSTRMStreamHandlerForwardsHEAD(t *testing.T) {
 		headStatus:  http.StatusOK,
 	}
 	router := NewRouter(Dependencies{
+		Access: NewAccessGateService("", ""),
 		STRM:   stub,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
@@ -100,6 +102,7 @@ func TestSTRMStreamHandlerTokenAuthentication(t *testing.T) {
 		streamURL: "https://cdn.115.com/video/original.mp4",
 	}
 	router := NewRouter(Dependencies{
+		Access:    NewAccessGateService("", ""),
 		STRM:      stub,
 		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 		STRMToken: "secret123",

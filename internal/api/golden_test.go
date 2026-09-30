@@ -225,6 +225,7 @@ func (goldenData) Info(context.Context) (maintenance.Info, error) {
 
 func goldenRouter() http.Handler {
 	return NewRouter(Dependencies{
+		Access: NewAccessGateService("", ""),
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Catalogue: goldenDiscover{}, Library: goldenLibrary{},
 		Tasks: goldenTasks{}, Offline: goldenOffline{}, Monitor: goldenSubscription{}, Drive: goldenPan{}, Maintenance: goldenData{},
 	})

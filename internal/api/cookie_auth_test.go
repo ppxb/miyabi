@@ -99,7 +99,7 @@ func TestCrossOriginMutations(t *testing.T) {
 			{"opaque origin", "", "null", false},
 		} {
 			t.Run(path+"/"+tc.name, func(t *testing.T) {
-				router := NewRouter(Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+				router := NewRouter(Dependencies{Access: NewAccessGateService("", ""), Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 				req := httptest.NewRequest(http.MethodPost, "http://miyabi.test"+path, nil)
 				req.Header.Set("Sec-Fetch-Site", tc.site)
 				req.Header.Set("Origin", tc.origin)

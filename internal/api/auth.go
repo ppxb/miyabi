@@ -31,7 +31,7 @@ type accessLoginResponse struct {
 
 func accessConfigHandler(gate AccessGate) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if gate == nil || !gate.Enabled() {
+		if !gate.Enabled() {
 			respond(c, gin.H{"enabled": false, "authenticated": true}, nil)
 			return
 		}
@@ -54,11 +54,9 @@ func accessConfigHandler(gate AccessGate) gin.HandlerFunc {
 func accessLoginHandler(gate AccessGate, limiter *loginRateLimiter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
-		if limiter != nil {
-			if err := limiter.check(ip); err != nil {
-				c.Error(err)
-				return
-			}
+		if err := limiter.check(ip); err != nil {
+			c.Error(err)
+			return
 		}
 
 		input, ok := bindJSON[accessLoginInput](c)
@@ -66,22 +64,13 @@ func accessLoginHandler(gate AccessGate, limiter *loginRateLimiter) gin.HandlerF
 			return
 		}
 
-		if gate == nil {
-			respond(c, accessLoginResponse{Success: true}, nil)
-			return
-		}
-
 		if err := gate.Verify(input.Password); err != nil {
-			if limiter != nil {
-				limiter.recordFailure(ip)
-			}
+			limiter.recordFailure(ip)
 			c.Error(err)
 			return
 		}
 
-		if limiter != nil {
-			limiter.recordSuccess(ip)
-		}
+		limiter.recordSuccess(ip)
 
 		var token string
 		var expiresAt int64
@@ -105,7 +94,7 @@ func accessLoginHandler(gate AccessGate, limiter *loginRateLimiter) gin.HandlerF
 
 func authMiddleware(gate AccessGate) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if gate == nil || !gate.Enabled() {
+		if !gate.Enabled() {
 			c.Next()
 			return
 		}

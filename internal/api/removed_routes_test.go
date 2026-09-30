@@ -3,7 +3,7 @@ package api
 import "testing"
 
 func TestRemovedRoutesLeaveActiveWorkflowsRegistered(t *testing.T) {
-	router := NewRouter(Dependencies{})
+	router := NewRouter(Dependencies{Access: NewAccessGateService("", "")})
 	routes := make(map[string]bool)
 	for _, route := range router.Routes() {
 		routes[route.Method+" "+route.Path] = true

@@ -164,7 +164,7 @@ func TestTaskEventsStreamsSnapshotsAndRevisionsUntilTheClientLeaves(t *testing.T
 
 func TestTaskEventsFailsBeforeStreamingWhenSnapshotIsUnavailable(t *testing.T) {
 	stub := &sseFailingTasks{}
-	router := NewRouter(Dependencies{Tasks: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	router := NewRouter(Dependencies{Access: NewAccessGateService("", ""), Tasks: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/tasks/events", nil))
 	if response.Code != http.StatusInternalServerError || !strings.Contains(response.Body.String(), "内部服务错误") {

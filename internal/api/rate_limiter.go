@@ -34,9 +34,6 @@ func newLoginRateLimiter(maxFailures int, window, blockDuration time.Duration) *
 }
 
 func (l *loginRateLimiter) check(ip string) error {
-	if l == nil {
-		return nil
-	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -71,9 +68,6 @@ func (l *loginRateLimiter) check(ip string) error {
 }
 
 func (l *loginRateLimiter) recordFailure(ip string) {
-	if l == nil {
-		return
-	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -94,9 +88,6 @@ func (l *loginRateLimiter) recordFailure(ip string) {
 }
 
 func (l *loginRateLimiter) recordSuccess(ip string) {
-	if l == nil {
-		return
-	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	delete(l.records, ip)

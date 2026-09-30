@@ -61,7 +61,7 @@ func strmAuthorized(c *gin.Context, token string, gate AccessGate) bool {
 	if token != "" && subtle.ConstantTimeCompare([]byte(c.Query("token")), []byte(token)) == 1 {
 		return true
 	}
-	if gate != nil && gate.Enabled() {
+	if gate.Enabled() {
 		session := extractToken(c)
 		if session == "" {
 			return false

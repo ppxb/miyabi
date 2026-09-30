@@ -68,6 +68,19 @@ func TestAuth_DisabledGateAllowsAll(t *testing.T) {
 	if !configResp.Authenticated {
 		t.Fatalf("expected authenticated=true when gate is disabled")
 	}
+
+	// Disabled password protection accepts login without issuing a session cookie.
+	login := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"password":"ignored"}`))
+	login.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	router.ServeHTTP(loginResponse, login)
+	var result accessLoginResponse
+	if err := json.Unmarshal(loginResponse.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if loginResponse.Code != http.StatusOK || !result.Success || result.ExpiresAt != 0 || len(loginResponse.Result().Cookies()) != 0 {
+		t.Fatalf("disabled gate login: status=%d body=%s cookies=%v", loginResponse.Code, loginResponse.Body, loginResponse.Result().Cookies())
+	}
 }
 
 func TestAuth_EnabledGateEnforcesJWT(t *testing.T) {
