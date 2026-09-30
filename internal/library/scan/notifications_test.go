@@ -51,7 +51,7 @@ func TestScanNotificationsFollowTransactionCommit(t *testing.T) {
 				if operation == "page" {
 					err = run.processPageTx(ctx, tx, "/Movies", []Video{{File: pan.File{ID: "new", Name: "new.mp4", Size: 1}}}, nil)
 				} else {
-					err = run.reconcileTx(ctx, tx, export.Config{})
+					err = run.reconcileTx(ctx, tx, export.Config{}, nil)
 				}
 				if err != nil {
 					t.Fatal(err)

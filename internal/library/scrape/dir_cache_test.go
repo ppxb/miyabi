@@ -8,16 +8,17 @@ import (
 	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
-	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
 type mockSession struct {
-	source    domain.LibrarySource
-	listCalls atomic.Int32
-	infoCalls atomic.Int32
-	listFunc  func(ctx context.Context, dirID string, offset int) (pan.FilePage, error)
-	infoFunc  func(ctx context.Context, fileID string) (pan.FileInfo, error)
+	drive.Session // These cache tests exercise only Source, List and Info.
+	source        domain.LibrarySource
+	listCalls     atomic.Int32
+	infoCalls     atomic.Int32
+	listFunc      func(ctx context.Context, dirID string, offset int) (pan.FilePage, error)
+	infoFunc      func(ctx context.Context, fileID string) (pan.FileInfo, error)
 }
 
 func (m *mockSession) Source() domain.LibrarySource { return m.source }
@@ -35,31 +36,6 @@ func (m *mockSession) Info(ctx context.Context, fileID string) (pan.FileInfo, er
 	}
 	return pan.FileInfo{File: pan.File{ID: fileID}}, nil
 }
-func (m *mockSession) Read(ctx context.Context, pickCode string, limit int64) ([]byte, error) {
-	return nil, nil
-}
-func (m *mockSession) Commit(ctx context.Context, fn func(tx *ent.Tx) error) error {
-	return nil
-}
-func (m *mockSession) CommitAccount(ctx context.Context, fn func(tx *ent.Tx) error) error {
-	return nil
-}
-func (m *mockSession) PlayURL(ctx context.Context, pickCode, userAgent string) ([]pan.PlaySource, error) {
-	return nil, nil
-}
-func (m *mockSession) DownloadURL(ctx context.Context, pickCode, userAgent string) (string, error) {
-	return "", nil
-}
-func (m *mockSession) AddOffline(ctx context.Context, magnet string) (string, error) {
-	return "", nil
-}
-func (m *mockSession) RemoveOffline(ctx context.Context, hash string) error {
-	return nil
-}
-func (m *mockSession) OfflineTasks(ctx context.Context, page int) (pan.OfflinePage, error) {
-	return pan.OfflinePage{}, nil
-}
-
 func TestDirectoryEntries_CacheAndExpiration(t *testing.T) {
 	service := &Service{
 		dirCache: make(map[string]dirCacheEntry),

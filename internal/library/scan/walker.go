@@ -135,10 +135,28 @@ func (r *scanRun) savePage(ctx context.Context, directoryPath string, videos []V
 }
 
 func (r *scanRun) reconcile(ctx context.Context) error {
+	// Cover jobs acquire artwork protection before export configuration and
+	// source protection; keep the same order while restoring cached exports.
+	if r.scanner.images != nil {
+		if err := r.scanner.images.LockArtwork(ctx); err != nil {
+			return err
+		}
+		defer r.scanner.images.UnlockArtwork()
+	}
 	return r.scanner.exportMgr.WithConfig(func(expCfg export.Config) error {
-		return r.session.Commit(ctx, func(tx *ent.Tx) error {
-			return r.reconcileTx(ctx, tx, expCfg)
-		})
+		finish := func() error {
+			reusable, err := r.prepareReconcile(ctx, expCfg)
+			if err != nil {
+				return err
+			}
+			return ent.WithTx(ctx, r.scanner.db, func(tx *ent.Tx) error {
+				return r.reconcileTx(ctx, tx, expCfg, reusable)
+			})
+		}
+		if r.session != nil {
+			return r.session.WithSource(ctx, finish)
+		}
+		return finish()
 	})
 }
 

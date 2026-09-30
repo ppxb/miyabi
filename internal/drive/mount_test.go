@@ -279,6 +279,9 @@ func TestSessionsTrackTheMountTheyWereIssuedAgainst(t *testing.T) {
 		"read":   func() error { _, err := sess.Read(ctx, "pick-f1", 1024); return err },
 		"play":   func() error { _, err := sess.PlayURL(ctx, "pick-f1", ""); return err },
 		"commit": func() error { return sess.Commit(ctx, func(*ent.Tx) error { return nil }) },
+		"guard": func() error {
+			return sess.WithSource(ctx, func() error { t.Error("stale source callback ran"); return nil })
+		},
 	} {
 		if err := call(); !errors.Is(err, ErrSourceChanged) {
 			t.Fatalf("%s on a replaced mount = %v", name, err)
