@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：113 条待处理，12 条已完成、待复查。
+> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：112 条待处理，13 条已完成、待复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；完成项经复查确认后可移除，已提交的历史记录可通过 Git 追溯。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮核对现存已完成项的实现、调用链和回归覆盖，并非重新验证全部待办，也未重审此前移除的 62 条记录。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -82,7 +82,10 @@
   - 已完成：确认 Check/Sync 各自由唯一 RunPeriodic 串行调度后删除整轮锁，保留原锁提供的入口取消检查；离线提交直接使用必需的 catalogue 校验磁力并读取番号，完成任务直接使用 library。订阅列表和演员动态使用 API 已校验的分页值，任务池删除 logger 兜底，测试显式提供依赖。
   - 同步边界：远端结果已按 InfoHash 匹配，记录的账号及哈希在现有生产流程中不修改，删除 UpdateTask 内重复身份比对；保留按账号/磁力加锁、事务内重读、防止完成状态回退、账号会话校验及当前目录与下载来源匹配后才安排扫描的限制。原重复 DirectoryID 过滤已不存在；逐条取消检查保留，避免一页大量无关任务延迟取消。
   - 验证：新增定时器与唤醒信号串行执行、未知磁力在提交前拒绝、按远端 InfoHash 大小写无关匹配且忽略无关任务的测试；复用并发去重、取消后持久化、目录切换、旧响应防回退和分页覆盖。monitor、offline、tasks、drive、library（含 scan/scrape）、api、app 包测试及 monitor/offline/tasks 的 go vet、git diff --check 通过。未进行浏览器、真实 115 联调或 race 检测。
-- [ ] **124.** `internal/offline/projection.go` 已使用独立 OfflineDownload 表，不再有旧 JSON hash 分组。当前空 hash 会使整次 Activity 投影报错，而 schema 已要求 hash 非空；核实遗留坏数据的实际入口，再决定移除冗余检查或采用记录日志并跳过的策略。
+- [x] **124.** `internal/offline/projection.go` 已使用独立 OfflineDownload 表，不再有旧 JSON hash 分组。当前空 hash 会使整次 Activity 投影报错，而 schema 已要求 hash 非空；核实遗留坏数据的实际入口，再决定移除冗余检查或采用记录日志并跳过的策略。
+  - 已完成：核对正常写入与旧任务迁移后，删除 submissions 中重复的空 hash 报错分支，不增加日志跳过或数据兼容逻辑；账号/目录范围、历史去重、任务状态及文件关联投影不变。
+  - 保留：Ent 的 NotEmpty 校验在创建和更新时拒绝空 hash；直接 SQL 写入的旧任务迁移先检查 hash，遇到无效历史会报错并回滚，不会将空 hash 导入新表。
+  - 验证：复用空 hash 写入拒绝、无效历史迁移回滚和离线状态投影测试；offline、database、api、app 包测试及 offline 的 go vet、git diff --check 通过。未新增重复覆盖简单分支删除的测试，未进行浏览器或真实 115 联调。
 - [ ] **125.** 前端：`access-gate.tsx:14,25` `sessionUnlocked`（onSuccess 已写入缓存）；`lib/math.ts:3` 处理 -0；`api/client.ts:66,71,80,106` 四处 `typeof window === 'undefined'`（SPA，且 :18 直接使用 `window.location.origin`）；`components/error-state.tsx:34` 外层重复判断 `retry.onRetry`；`task-progress-state.ts:21` 手写 clamp（`lib/math` 已有）；`lib/search-schema.ts:3` `errorMessage` 参数无意义；`stores/settings.ts:17` `partialize` 多余。
 
 ---

@@ -52,9 +52,6 @@ func (service *Service) submissions(ctx context.Context, records []*ent.OfflineD
 	var scanIDs []int
 	var fileIDs []string
 	for _, record := range records {
-		if record.Hash == "" {
-			return nil, fmt.Errorf("offline task %d is missing magnet hash", record.ID)
-		}
 		if source == nil || source.AccountID != record.AccountID || source.Directory.ID != record.DirectoryID ||
 			record.Status == offlinedownload.StatusRunning {
 			continue
