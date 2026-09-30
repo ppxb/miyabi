@@ -75,9 +75,7 @@ export function clearLegacyAuthToken(): void {
 }
 
 export function notifyUnauthorized(): void {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('miyabi:unauthorized'))
-  }
+  window.dispatchEvent(new CustomEvent('miyabi:unauthorized'))
 }
 
 // JavDB CDN hosts are not reachable from every browser network, so images go through the backend.

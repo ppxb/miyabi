@@ -13,7 +13,7 @@ export const Route = createFileRoute('/search')({
     if (typeof q !== 'string') {
       throw new Error('搜索条件无效')
     }
-    const page = parseSearchPage(search.page, '搜索条件无效')
+    const page = parseSearchPage(search.page)
     const keyword = q.trim()
     return keyword ? { q: keyword, ...(page ? { page } : {}) } : {}
   },

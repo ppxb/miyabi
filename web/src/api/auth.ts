@@ -1,4 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  mutationOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient
+} from '@tanstack/react-query'
 
 import { apiGet, apiPost } from '@/api/client'
 
@@ -23,15 +29,19 @@ export function useAccessGateConfig() {
   })
 }
 
-export function useAccessGateLogin() {
-  const queryClient = useQueryClient()
-  return useMutation({
+export function accessGateLoginOptions(queryClient: QueryClient) {
+  return mutationOptions({
     mutationFn: (password: string) => apiPost<LoginResponse>('/api/auth/login', { password }),
-    onSuccess: () => {
+    onSuccess: async () => {
+      await queryClient.cancelQueries({ queryKey: authKeys.config })
       queryClient.setQueryData<AccessGateConfig>(authKeys.config, {
         enabled: true,
         authenticated: true
       })
     }
   })
+}
+
+export function useAccessGateLogin() {
+  return useMutation(accessGateLoginOptions(useQueryClient()))
 }

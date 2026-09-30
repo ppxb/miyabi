@@ -1,4 +1,5 @@
 import type { ScanTask } from '@/api/tasks'
+import { clamp } from '@/lib/math'
 
 export type TaskStage = ScanTask['scan']['stage'] | 'downloading' | 'locating'
 
@@ -18,7 +19,7 @@ export function taskProgressState(current: TaskStage, offline = false, progress 
   const active = visible[index]
   if (!active) return { label: '等待进度同步', value: null }
 
-  const percent = Number.isFinite(progress) ? Math.min(100, Math.max(0, progress)) : 0
+  const percent = Number.isFinite(progress) ? clamp(progress, 0, 100) : 0
   // Completion is the final marker; each preceding stage occupies one interval.
   const value = stage === 'done' ? 100 : ((index + percent / 100) / (visible.length - 1)) * 100
   const label =

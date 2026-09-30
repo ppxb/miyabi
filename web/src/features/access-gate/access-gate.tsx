@@ -11,11 +11,9 @@ export function AccessGate({ children }: PropsWithChildren) {
   const config = useAccessGateConfig()
   const login = useAccessGateLogin()
   const [password, setPassword] = useState('')
-  const [sessionUnlocked, setSessionUnlocked] = useState(false)
 
   useEffect(() => {
     function handleUnauthorized() {
-      setSessionUnlocked(false)
       void config.refetch()
     }
 
@@ -25,10 +23,7 @@ export function AccessGate({ children }: PropsWithChildren) {
     }
   }, [config])
 
-  const isGranted =
-    config.data?.enabled === false ||
-    config.data?.authenticated === true ||
-    sessionUnlocked
+  const isGranted = config.data?.enabled === false || config.data?.authenticated === true
 
   if (isGranted) return children
 
@@ -37,7 +32,6 @@ export function AccessGate({ children }: PropsWithChildren) {
     login.mutate(password, {
       onSuccess: () => {
         setPassword('')
-        setSessionUnlocked(true)
       }
     })
   }

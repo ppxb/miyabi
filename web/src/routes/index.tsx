@@ -7,7 +7,7 @@ import { parseSearchPage } from '@/lib/search-schema'
 
 export const Route = createFileRoute('/')({
   validateSearch: (search: Record<string, unknown>): { page?: number } => {
-    const page = parseSearchPage(search.page, '媒体库页码无效')
+    const page = parseSearchPage(search.page)
     return page ? { page } : {}
   },
   component: LibraryRoute,

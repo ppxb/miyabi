@@ -11,8 +11,11 @@ type RetryProps = {
   retryLabel?: string
 }
 
-function RetryAction({ onRetry, retrying, retryLabel = '重试' }: RetryProps) {
-  if (!onRetry) return null
+function RetryAction({
+  onRetry,
+  retrying,
+  retryLabel = '重试'
+}: RetryProps & { onRetry: () => void }) {
   return (
     <Button type="button" variant="outline" size="sm" disabled={retrying} onClick={onRetry}>
       <RefreshCwIcon className={cn('size-4', retrying && 'animate-spin')} />
@@ -24,6 +27,7 @@ function RetryAction({ onRetry, retrying, retryLabel = '重试' }: RetryProps) {
 export function ErrorState({
   message,
   className,
+  onRetry,
   ...retry
 }: RetryProps & { message: string; className?: string }) {
   return (
@@ -31,7 +35,7 @@ export function ErrorState({
       emoji="(･o･;)"
       title={message}
       className={className}
-      actions={retry.onRetry ? <RetryAction {...retry} /> : undefined}
+      actions={onRetry ? <RetryAction onRetry={onRetry} {...retry} /> : undefined}
     />
   )
 }
@@ -39,12 +43,13 @@ export function ErrorState({
 export function InlineError({
   children,
   className,
+  onRetry,
   ...retry
 }: RetryProps & { children: ReactNode; className?: string }) {
   return (
     <div className={cn('flex min-w-0 flex-wrap items-center gap-3', className)}>
       <p className="min-w-0 text-sm text-destructive">{children}</p>
-      <RetryAction {...retry} />
+      {onRetry ? <RetryAction onRetry={onRetry} {...retry} /> : null}
     </div>
   )
 }

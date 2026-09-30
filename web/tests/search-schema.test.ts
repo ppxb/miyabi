@@ -14,11 +14,11 @@ test('parseSearchPage accepts valid pages', () => {
   assert.equal(parseSearchPage(MAX_PAGE), MAX_PAGE)
 })
 
-test('parseSearchPage rejects invalid inputs with custom error message', () => {
+test('parseSearchPage rejects invalid pages', () => {
   for (const invalid of [0, -1, 1.5, 'abc', NaN, Infinity, MAX_PAGE + 1]) {
     assert.throws(
-      () => parseSearchPage(invalid, '自定义错误'),
-      err => err instanceof Error && err.message === '自定义错误'
+      () => parseSearchPage(invalid),
+      err => err instanceof Error && err.message === '页码无效'
     )
   }
 })
