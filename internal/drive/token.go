@@ -56,7 +56,7 @@ func (d *Drive) refreshTokens(ctx context.Context, expected snapshot) error {
 	}
 }
 
-func withPanToken[T any](ctx context.Context, d *Drive, expected snapshot, request func(string) (T, error)) (T, error) {
+func withPanToken[T any](ctx context.Context, d *Drive, expected snapshot, request func(snapshot) (T, error)) (T, error) {
 	var zero T
 	refreshed := false
 	for {
@@ -72,7 +72,7 @@ func withPanToken[T any](ctx context.Context, d *Drive, expected snapshot, reque
 		}
 		expiresSoon := !current.tokens.ExpiresAt.IsZero() && time.Until(current.tokens.ExpiresAt) <= 30*time.Second
 		if refreshed || !expiresSoon {
-			value, err := request(current.tokens.AccessToken)
+			value, err := request(current)
 			if refreshed || !errors.Is(err, pan.ErrUnauthorized) {
 				return value, err
 			}
@@ -87,11 +87,12 @@ func withPanToken[T any](ctx context.Context, d *Drive, expected snapshot, reque
 }
 
 func withPanSourceToken[T any](ctx context.Context, d *Drive, expected snapshot, request func(string) (T, error)) (T, error) {
-	return withPanToken(ctx, d, expected, func(token string) (T, error) {
-		if _, err := d.sourceState(expected.source(), expected.authorizationVersion); err != nil {
+	return withPanToken(ctx, d, expected, func(current snapshot) (T, error) {
+		// Check the same snapshot that supplied this attempt's credentials.
+		if !current.matchesSource(expected.source(), expected.authorizationVersion) {
 			var zero T
-			return zero, err
+			return zero, ErrSourceChanged
 		}
-		return request(token)
+		return request(current.tokens.AccessToken)
 	})
 }

@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：123 条待处理，2 条已完成、待复查。
+> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：122 条待处理，3 条已完成、待复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；完成项经复查确认后可移除，已提交的历史记录可通过 Git 追溯。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮核对现存已完成项的实现、调用链和回归覆盖，并非重新验证全部待办，也未重审此前移除的 62 条记录。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -41,7 +41,10 @@
   - 已完成：提前刷新和未授权后刷新共用一个循环、一个请求入口和一个刷新入口；最多执行两轮、刷新一次，每轮重新读取凭据并检查取消和关闭状态。提前刷新后仍未授权直接返回，网络错误不触发凭据刷新。
   - 保留：refreshTokens 入口的取消检查用于阻止已取消请求启动独立共享刷新；singleflight、刷新前后凭据版本校验、持久化提交锁及关闭等待语义不变，不将独立刷新生命周期的检查当作冗余删除。
   - 验证：新增提前刷新后再次未授权、请求取消后返回未授权的调用次数测试；drive、library（含 scan/scrape）、offline、app、api 包测试及 drive 的 go vet、git diff --check 通过，保留并发合并、旧令牌延迟拒绝、取消等待、账号/目录切换和关闭回归测试。未进行真实 115 联调或 race 检测。
-- [ ] **114.** `internal/drive/session.go` 每次调用执行 `sourceState` 3~4 次（显式一次、`withPanSourceToken` 内一次、重试一次、`checkSource` 一次）。
+- [x] **114.** `internal/drive/session.go` 每次调用执行 `sourceState` 3~4 次（显式一次、`withPanSourceToken` 内一次、重试一次、`checkSource` 一次）。
+  - 已完成：withPanToken 将当轮已校验的凭据快照传给请求回调，withPanSourceToken 直接在同一快照上检查数据源，删除每次请求/重试前额外的 sourceState 加锁读取；账号查询、目录导航、账号级离线查询及测试回调同步使用快照中的 AccessToken，不新增包装层或配置开关。
+  - 范围修正：入口 sourceState 用于在令牌刷新前拒绝失效会话，成功响应后的 checkSource 用于拒绝等待期间已失效的结果，两者保留；事务提交仍在锁内校验。AddOffline 继续返回已被 115 接受的结果供业务持久化，OfflineTasks 仍按账号而非挂载目录校验。正常读取路径的 sourceState 调用从三处减少到入口和响应后两处，不把跨异步阶段的检查视作冗余。
+  - 验证：新增目录清除/退出账号后拒绝旧读取结果、失效会话不启动提前刷新的测试；drive、library（含 scan/scrape）、offline、app、api、strm 包测试及 drive 的 go vet、git diff --check 通过，保留刷新期间目录切换、凭据防覆盖和离线提交成功后原始来源记录测试。未进行真实 115 联调或 race 检测。
 - [ ] **115.** `internal/pan/client.go:48-50` `maxInFlight <= 0`、:127-129 `baseTransport == nil`、`SetRetryAfter` 中 `resp == nil` / `wait > 0`、:241-244 可直接 `return result, result.err()`；`auth.go:99-115` `Status == nil`、`case 0`、`default` 三处返回同值；`upload.go:44` 局部变量名 `init`。
 - [ ] **116.** `internal/strm/relay.go:35-37,78-80` `relay.drive == nil`、:65 `source.URL != ""`、`downloadURL != ""`（pan 层已保证）。
 - [ ] **117.** `internal/javbus/client.go:149,214` `errors.Is(ctx.Err(), Canceled) || errors.Is(ctx.Err(), DeadlineExceeded)` 等价 `ctx.Err() != nil`；:70 `rate.Every(time.Second/time.Duration(defaultRate))` 即 `rate.Limit(1)`；:297 `c.client != nil`；`parser.go:57` `Contains("/doc/driver-verify") || Contains("driver-verify")`；`parser.go:128,132` 显式零值。

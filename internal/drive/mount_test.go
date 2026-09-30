@@ -296,6 +296,57 @@ func TestSessionsTrackTheMountTheyWereIssuedAgainst(t *testing.T) {
 	}
 }
 
+func TestSessionRejectsReadResultsAfterSourceChanges(t *testing.T) {
+	for _, action := range []string{"directory", "disconnect"} {
+		t.Run(action, func(t *testing.T) {
+			d, client := mountedTestDrive(t)
+			ctx := t.Context()
+			sess, err := d.Open(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			client.list = func(context.Context, string, string, int, int) (pan.FilePage, error) {
+				if action == "disconnect" {
+					_, err = d.Disconnect(ctx)
+				} else {
+					err = d.ClearDirectory(ctx)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				return pan.FilePage{Files: []pan.File{{ID: "old-source-file"}}, Total: 1}, nil
+			}
+			page, err := sess.List(ctx, testSource.Directory.ID, 0)
+			if !errors.Is(err, ErrSourceChanged) || len(page.Files) != 0 || page.Total != 0 {
+				t.Fatalf("old source response escaped validation: %+v, %v", page, err)
+			}
+		})
+	}
+}
+
+func TestExpiredSessionStopsBeforeRefreshingTokens(t *testing.T) {
+	d, client := mountedTestDrive(t)
+	ctx := t.Context()
+	sess, err := d.Open(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.ClearDirectory(ctx); err != nil {
+		t.Fatal(err)
+	}
+	expireTokens(d)
+	var refreshes atomic.Int32
+	client.refreshToken = func(context.Context, string) (pan.Tokens, error) {
+		refreshes.Add(1)
+		return testTokens("unexpected"), nil
+	}
+	_, err = sess.List(ctx, testSource.Directory.ID, 0)
+	d.Close()
+	if !errors.Is(err, ErrSourceChanged) || refreshes.Load() != 0 {
+		t.Fatalf("invalid session started a refresh: refreshes=%d err=%v", refreshes.Load(), err)
+	}
+}
+
 func TestOpenRequiresAMountedDirectoryOfTheVerifiedAccount(t *testing.T) {
 	d, client := mountFixture(t)
 	ctx := t.Context()

@@ -15,8 +15,8 @@ import (
 // Files retrieves a single page of directory items from 115 for folder navigation.
 func (d *Drive) Files(ctx context.Context, directoryID string, page int) (pan.FilePage, error) {
 	state := d.snapshot()
-	files, err := withPanToken(ctx, d, state, func(token string) (pan.FilePage, error) {
-		return d.client.List(ctx, token, directoryID, (page-1)*100, 100)
+	files, err := withPanToken(ctx, d, state, func(current snapshot) (pan.FilePage, error) {
+		return d.client.List(ctx, current.tokens.AccessToken, directoryID, (page-1)*100, 100)
 	})
 	if err != nil {
 		return pan.FilePage{}, fmt.Errorf("list 115 directory: %w", err)
@@ -35,8 +35,8 @@ func (d *Drive) SelectDirectory(ctx context.Context, directoryID string) (domain
 	if err != nil {
 		return domain.LibraryDirectory{}, fmt.Errorf("get 115 account for directory: %w", err)
 	}
-	files, err := withPanToken(ctx, d, state, func(token string) (pan.FilePage, error) {
-		return d.client.List(ctx, token, directoryID, 0, 1)
+	files, err := withPanToken(ctx, d, state, func(current snapshot) (pan.FilePage, error) {
+		return d.client.List(ctx, current.tokens.AccessToken, directoryID, 0, 1)
 	})
 	if err != nil {
 		return domain.LibraryDirectory{}, fmt.Errorf("get 115 media directory: %w", err)

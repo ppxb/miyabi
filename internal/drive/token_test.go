@@ -30,7 +30,8 @@ func TestConcurrentUnauthorizedRequestsShareRefresh(t *testing.T) {
 	finished := make(chan error, requests)
 	for i := range requests {
 		go func() {
-			_, err := withPanToken(t.Context(), d, state, func(token string) (string, error) {
+			_, err := withPanToken(t.Context(), d, state, func(current snapshot) (string, error) {
+				token := current.tokens.AccessToken
 				if token == state.tokens.AccessToken {
 					entered <- struct{}{}
 					if i == requests-1 {
@@ -86,7 +87,7 @@ func TestCanceledRefreshWaiterStillPersistsRotatedTokens(t *testing.T) {
 	var requests atomic.Int32
 	finished := make(chan error, 1)
 	go func() {
-		_, err := withPanToken(ctx, d, d.snapshot(), func(string) (struct{}, error) {
+		_, err := withPanToken(ctx, d, d.snapshot(), func(snapshot) (struct{}, error) {
 			requests.Add(1)
 			return struct{}{}, nil
 		})
@@ -190,7 +191,7 @@ func TestOnlyRetriesExplicitAuthorizationRejection(t *testing.T) {
 				refreshes++
 				return testTokens("refreshed"), nil
 			}
-			_, err := withPanToken(t.Context(), d, d.snapshot(), func(string) (struct{}, error) {
+			_, err := withPanToken(t.Context(), d, d.snapshot(), func(snapshot) (struct{}, error) {
 				requests++
 				return struct{}{}, failure
 			})
@@ -214,9 +215,9 @@ func TestProactiveRefreshDoesNotRetryRejectedRequest(t *testing.T) {
 		refreshes++
 		return refreshed, nil
 	}
-	_, err := withPanToken(t.Context(), d, d.snapshot(), func(token string) (struct{}, error) {
+	_, err := withPanToken(t.Context(), d, d.snapshot(), func(current snapshot) (struct{}, error) {
 		requests++
-		if token != refreshed.AccessToken {
+		if current.tokens.AccessToken != refreshed.AccessToken {
 			t.Errorf("request used token before proactive refresh")
 		}
 		return struct{}{}, pan.ErrUnauthorized
@@ -236,7 +237,7 @@ func TestCanceledAuthorizationRejectionDoesNotStartRefresh(t *testing.T) {
 		return testTokens("unexpected"), nil
 	}
 	requests := 0
-	_, err := withPanToken(ctx, d, d.snapshot(), func(string) (struct{}, error) {
+	_, err := withPanToken(ctx, d, d.snapshot(), func(snapshot) (struct{}, error) {
 		requests++
 		cancel()
 		return struct{}{}, pan.ErrUnauthorized

@@ -58,8 +58,8 @@ func (d *Drive) invalidateAccountCache() {
 }
 
 func (d *Drive) fetchAccount(ctx context.Context, state snapshot) (pan.Account, error) {
-	account, err := withPanToken(ctx, d, state, func(token string) (pan.Account, error) {
-		return d.client.Account(ctx, token)
+	account, err := withPanToken(ctx, d, state, func(current snapshot) (pan.Account, error) {
+		return d.client.Account(ctx, current.tokens.AccessToken)
 	})
 	if err != nil {
 		return pan.Account{}, fmt.Errorf("get 115 account: %w", err)

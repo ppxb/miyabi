@@ -181,8 +181,8 @@ func (s *sourceSession) RemoveOffline(ctx context.Context, hash string) error {
 
 func (s *sourceSession) OfflineTasks(ctx context.Context, page int) (pan.OfflinePage, error) {
 	state := snapshot{credentialVersion: s.credentialVersion}
-	return withPanToken(ctx, s.drive, state, func(token string) (pan.OfflinePage, error) {
-		return s.drive.client.OfflineTasks(ctx, token, page)
+	return withPanToken(ctx, s.drive, state, func(current snapshot) (pan.OfflinePage, error) {
+		return s.drive.client.OfflineTasks(ctx, current.tokens.AccessToken, page)
 	})
 }
 
