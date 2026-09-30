@@ -169,9 +169,11 @@ func TestMigrateOfflineDownloadsRollsBackInvalidHistory(t *testing.T) {
 			}
 			defer store.Close()
 			setMigrationVersion(t, store, 2)
-			// This legacy database predates the JSON expression index.
-			if _, err := store.db.ExecContext(ctx, "DROP INDEX task_scan_workflow"); err != nil {
-				t.Fatal(err)
+			// This legacy database predates both task JSON expression indexes.
+			for _, name := range []string{"task_scan_workflow", "task_cover_parent"} {
+				if _, err := store.db.ExecContext(ctx, "DROP INDEX "+name); err != nil {
+					t.Fatal(err)
+				}
 			}
 			good := store.Client.Task.Create().SetType("offline").SetPayload(json.RawMessage(`{"hash":"valid"}`)).SaveX(ctx)
 			bad := store.Client.Task.Create().SetType("offline").SaveX(ctx)

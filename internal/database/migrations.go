@@ -25,6 +25,7 @@ var migrations = []struct {
 	{"index metadata workflow tasks", indexMetadataWorkflowTasks},
 	{"remove obsolete task queue index", dropTaskCreatedAtIndex},
 	{"backfill movie matching keys", backfillMovieMatchKeys},
+	{"index cover task parents", indexCoverTaskParents},
 }
 
 func runMigrations(ctx context.Context, db *sql.DB, through int) error {
