@@ -79,10 +79,10 @@ func (service *Service) info(ctx context.Context, retained map[string]bool) (Inf
 	if err != nil {
 		return Info{}, err
 	}
+	if err := ctx.Err(); err != nil {
+		return Info{}, err
+	}
 	for _, suffix := range []string{"", "-wal", "-shm"} {
-		if err := ctx.Err(); err != nil {
-			return Info{}, err
-		}
 		info, err := os.Stat(filepath.Join(service.directory, "miyabi.db"+suffix))
 		if suffix != "" && os.IsNotExist(err) {
 			continue
