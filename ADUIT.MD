@@ -1,15 +1,16 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：111 条待处理，14 条已完成、待复查。
+> 清单整理：2026-09-30；本轮移除复查通过的第 112–125 项，共 14 条。当前保留 111 条，均为待处理项。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；完成项经复查确认后可移除，已提交的历史记录可通过 Git 追溯。第 37 项未完成的导出默认值清理保留在第 184 项。
-> 本轮核对现存已完成项的实现、调用链和回归覆盖，并非重新验证全部待办，也未重审此前移除的 62 条记录。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
+> 本轮复查范围为第 112–125 项的实现、生产调用链与回归覆盖；其余待办和历史已移除条目不在本轮复查范围内。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
 
 ## 本轮复查结论（2026-09-30）
 
-- 已移除的 52 项：58–62、64–83、85、87–105、107–111、150、245。扫描事务通知和恢复计数的补修已完成，相关回归测试保留在代码中。
-- 验证：Go 全量测试、go vet、前端 119 项测试、TypeScript、oxlint、Vite 生产构建通过。未进行浏览器或真实上游联调；CGO_ENABLED=0，未运行 race 检测。
+- 结论：第 112–125 项全部通过复查，未发现本轮修复范围内的问题遗漏、新增回归或需要进一步重构的实现；删除完成记录及空章节，保留有效回归测试。本次仅修改审计文档。
+- 核对重点：必需依赖的生产初始化、令牌刷新次数与来源快照、备用域名损坏后的健康线路保留、磁力校验与推断归属、字幕关闭等待、离线任务身份与终态保护、历史数据迁移校验，以及前端登录缓存时序与错误组件布局。必要边界检查保留，不按原始审计建议机械删除。
+- 验证：Go 全量测试、go vet、前端全部 22 个测试文件 / 124 项测试、TypeScript、oxlint、oxfmt 格式检查、Vite 生产构建及 git diff --check 均通过。未进行浏览器或真实上游联调；CGO_ENABLED=0，未运行 race 检测。
 - 保留问题：shadcn CLI 因现有依赖引用 zod/v3 启动失败（ERR_PACKAGE_PATH_NOT_EXPORTED），用户要求保留依赖现状，尚未修复。应用直接导入 cn 已通过类型检查和构建。
 - 已接受的行为边界：不猜测性重排此前已迁移的浏览记录；影片资料与实时状态仍分别请求。第 244 项继续暂缓。
 
@@ -29,67 +30,6 @@
 
 - [ ] **244.** `internal/codeid/codeid.go:38-55,59-93` `filenamePattern`：正则前缀匹配规则对个别非番号文件名存在误提取（如相机默认命名的 `VID-20220326`、`IMG-XXXX`、包含分辨率标签的 `MAYLI-1080P` 等被当作番号提取并提交上游查询）→ 建立常见非番号前缀黑名单（如 `VID`, `IMG`, `DSC`, `MOV` 等）与分辨率标记过滤，避免无效请求与限流损耗。
   - 暂缓：按用户要求撤回本次特例过滤及对应测试，不增加相机前缀、时间戳或分辨率硬编码规则；后续如处理，应先评估更通用的方案。已有通用候选降级规则保持不变。
-
----
-
-## 六、过度防御
-
-- [x] **112.** `internal/api/auth.go:35/58/70/76/83/117`、`strm.go:64` 的 `gate == nil` 生产不可能成立；`rate_limiter.go:37/74/98` `limiter != nil` 与方法内 `l == nil` 双重防御；`accessLoginHandler` gate 为 nil 返回 `Success: true` 死路径 → 测试统一传 `NewAccessGateService("")`。
-  - 已完成：确认 app 始终注入门禁对象、NewRouter 始终创建登录限流器，删除 handler/中间件/STRM 中的门禁空值分支及限流器调用方、方法内的重复空值检查。测试显式传入当前双参数构造函数 NewAccessGateService("", "")，不增加兜底对象或包装层；密码开关、限流阈值、Cookie/JWT 与 STRM 令牌规则不变。
-  - 验证：api、app、strm、cmd/miyabi 包测试通过；扩展禁用门禁测试验证登录成功且不签发 Cookie，保留失败封禁、成功清零、代理 IP 防伪造、过期/篡改 JWT、SSE 和 STRM 授权覆盖。未进行浏览器或真实播放器联调。
-- [x] **113.** `internal/drive/token.go:59-105` `withPanToken` 中 `current.closed` 检查 3 次、`ctx.Err()` 3 次 + `refreshTokens` 入口再一次 → 合并为最多 2 次的循环。
-  - 已完成：提前刷新和未授权后刷新共用一个循环、一个请求入口和一个刷新入口；最多执行两轮、刷新一次，每轮重新读取凭据并检查取消和关闭状态。提前刷新后仍未授权直接返回，网络错误不触发凭据刷新。
-  - 保留：refreshTokens 入口的取消检查用于阻止已取消请求启动独立共享刷新；singleflight、刷新前后凭据版本校验、持久化提交锁及关闭等待语义不变，不将独立刷新生命周期的检查当作冗余删除。
-  - 验证：新增提前刷新后再次未授权、请求取消后返回未授权的调用次数测试；drive、library（含 scan/scrape）、offline、app、api 包测试及 drive 的 go vet、git diff --check 通过，保留并发合并、旧令牌延迟拒绝、取消等待、账号/目录切换和关闭回归测试。未进行真实 115 联调或 race 检测。
-- [x] **114.** `internal/drive/session.go` 每次调用执行 `sourceState` 3~4 次（显式一次、`withPanSourceToken` 内一次、重试一次、`checkSource` 一次）。
-  - 已完成：withPanToken 将当轮已校验的凭据快照传给请求回调，withPanSourceToken 直接在同一快照上检查数据源，删除每次请求/重试前额外的 sourceState 加锁读取；账号查询、目录导航、账号级离线查询及测试回调同步使用快照中的 AccessToken，不新增包装层或配置开关。
-  - 范围修正：入口 sourceState 用于在令牌刷新前拒绝失效会话，成功响应后的 checkSource 用于拒绝等待期间已失效的结果，两者保留；事务提交仍在锁内校验。AddOffline 继续返回已被 115 接受的结果供业务持久化，OfflineTasks 仍按账号而非挂载目录校验。正常读取路径的 sourceState 调用从三处减少到入口和响应后两处，不把跨异步阶段的检查视作冗余。
-  - 验证：新增目录清除/退出账号后拒绝旧读取结果、失效会话不启动提前刷新的测试；drive、library（含 scan/scrape）、offline、app、api、strm 包测试及 drive 的 go vet、git diff --check 通过，保留刷新期间目录切换、凭据防覆盖和离线提交成功后原始来源记录测试。未进行真实 115 联调或 race 检测。
-- [x] **115.** `internal/pan/client.go:48-50` `maxInFlight <= 0`、:127-129 `baseTransport == nil`、`SetRetryAfter` 中 `resp == nil` / `wait > 0`、:241-244 可直接 `return result, result.err()`；`auth.go:99-115` `Status == nil`、`case 0`、`default` 三处返回同值；`upload.go:44` 局部变量名 `init`。
-  - 已完成：确认 newPanTransport 调用方均传正并发数、NewDirectRestyClient 必定设置 Transport 后，删除两处无效兜底；apiRequest 直接返回 result 与 result.err()。扫码状态改为 int，缺失、null、零及未知值统一由 default 返回等待，已扫码/授权/过期/取消映射不变。
-  - 现状修正：SetRetryAfter 回调及 upload.go 已不存在，无需重复清理；当前传输层响应与有效等待时间判断保留，限流、共享退避、I/O 超时与取消语义不变。
-  - 验证：扫码状态表补充显式 null 用例；pan、drive、library（含 scan/scrape）、offline、strm、app、api 包测试及 pan 的 go vet、git diff --check 通过，覆盖扫码状态、请求错误、并发限制、长 Retry-After、取消及响应头/体超时。未进行真实 115 或浏览器联调。
-- [x] **116.** `internal/strm/relay.go:35-37,78-80` `relay.drive == nil`、:65 `source.URL != ""`、`downloadURL != ""`（pan 层已保证）。
-  - 已完成：确认生产构造始终传入 Drive 后，删除 StreamURL/Probe 的空依赖分支；下载成功直接返回，只有 ErrDownloadUnavailable 才回退。播放列表非空、URL 非空和正分辨率由 pan 校验，移除 STRM 重复过滤和无有效流兜底；保留缺少提取码的实际错误路径、原画/最高分辨率选择及错误映射。
-  - 测试归属：STRM 测试桩不再返回空播放列表却无错误；原无效 URL 假成功用例改为校验上游错误传递。pan 保留空播放列表/URL 测试并补充分辨率缺失用例，STRM 新增无原画时选择最高分辨率测试。
-  - 验证：strm、pan、drive、api、app 包测试及 strm/pan 的 go vet、git diff --check 通过，保留直链优先、致命错误不回退、UA 一致性、HEAD 探测和 API 授权测试。未进行浏览器或真实 Emby/115 播放联调。
-- [x] **117.** `internal/javbus/client.go:149,214` `errors.Is(ctx.Err(), Canceled) || errors.Is(ctx.Err(), DeadlineExceeded)` 等价 `ctx.Err() != nil`；:70 `rate.Every(time.Second/time.Duration(defaultRate))` 即 `rate.Limit(1)`；:297 `c.client != nil`；`parser.go:57` `Contains("/doc/driver-verify") || Contains("driver-verify")`；`parser.go:128,132` 显式零值。
-  - 已完成：详情与磁力请求改用 ctx.Err() != nil 判断并返回原始上下文错误；限速直接使用 rate.Limit(defaultRate)，保持每秒 1 次、突发 2 次。验证页检测仅保留 driver-verify 子串，删除磁力结构体中 FilesCount/Inferred 的显式零值。
-  - 现状修正：Close 已无空客户端分支；确认构造时始终设置客户端后，删除健康探测中的同类空值检查。保留指纹客户端与测试客户端各自的关闭路径，健康探测周期及代理变更逻辑不变。
-  - 验证：新增详情/磁力请求各自取消、超时的四个场景，确认原始错误返回且不禁用来源；javbus、magnet、catalogue、network、api、app 包测试及 javbus 的 go vet、git diff --check 通过，保留验证页、磁力解析、来源跳过和代理变更覆盖。未进行浏览器或真实 JavBus 联调。
-- [x] **118.** `internal/javdb/route.go:277` `utf8.Valid`；`route.go:217-256`、`client.go:369-389` 解析到 `map[string]any` 再逐层断言 → typed struct；`route.go:49` 类型 `probe` 与方法 `c.probe` 同名。
-  - 已完成：startup 响应与解密后的备用域名改用专用结构体，apiDomains 直接解码为字符串切片，移除 map 与逐层类型断言；函数类型改名 probeFunc。可选 backup_domains_data 用 RawMessage 延后解码，字段类型错误或解密失败仍不影响已探测成功的基础线路参与选线。
-  - 保留：utf8.Valid 用于拒绝非法 UTF-8，encoding/json 会替换字符串中的非法字节，不能代替此检查。保留字段缺失与显式 null 的区分、Base64/AES/填充检查、域名规范化与去重；选线时序和优先规则不变。
-  - 验证：新增字段缺失/null/类型错误、异常密文、非法 UTF-8/JSON、域名规范化/去重测试，以及本地 HTTP 探测下备用数据损坏仍选中基础线路的回归测试；javdb、catalogue、network、api、app 包测试及 javdb 的 go vet、git diff --check 通过。未进行浏览器或真实 JavDB 联调。
-- [x] **119.** `internal/catalogue/state.go:60` `source == nil` 在 :32 已判断；`service.go:163-168` nil 检查；`service.go:379` `time.Now().In(time.Local)`；`magnets.go:80-90` 先投影 URI 再剥离。
-  - 已完成：删除 MovieStates 中重复的 source 判空及 Close 中必需依赖 JavDB 的判空；time.Now() 直接用于本地发行日期判断。Magnets、CatalogueMagnets、HasMagnet 共用 cachedMagnets，只有 API 返回构造 URI，CatalogueMagnets 用一次切片复制保留原有返回列表隔离，HasMagnet 直接检查缓存中的哈希。
-  - 保留：JavBus 在 NewWithClients 中明确可选，保留它的判空；媒体库来源入口校验、任务账号/目录范围、聚合排序、部分结果不缓存、详情失败重试、错误包装与路由持久化行为不变。
-  - 验证：扩展现有磁力测试，覆盖三个入口共享缓存、替换返回列表元素不污染缓存、哈希大小写匹配/未命中，以及跨入口的部分来源失败重试与成功后缓存；catalogue、magnet、monitor、offline、api、app 包测试及 catalogue 的 go vet、git diff --check 通过，保留媒体库状态和发行日期测试。未进行浏览器或真实上游联调。
-- [x] **120.** `internal/magnet/aggregator.go:75,84-86` Hash 小写化、`Sources` 为空兜底（各来源已保证）；`picker.go:108`、`quality.go:158` `m.HD || hasTag(m, MagnetTagHD)`（根源：`domain.Magnet` 同时用 bool 与 Tags 表达 HD/字幕）；`picker.go:105` 对已聚合结果再次 `ApplyInference`。
-  - 已完成：确认 JavDB/JavBus 已返回有效小写哈希和来源信息后，删除聚合层重复的哈希转换、空哈希过滤与 Sources 兜底，并明确 Source 输入约定。名称推断仅在聚合完成后执行，Picker 删除二次 ApplyInference；站方高清直接读取 HD，推断高清仍读取 4K 标签。
-  - 范围修正：HasSubtitle/HD 用于区分站方标注与名称推断，Tags 同时承担页面展示和推断标签，保留两者及现有评分权重；不合并为单一字段。去重、来源合并、排序、超时、部分失败处理及订阅筛选规则不变。
-  - 验证：来源测试覆盖大写哈希规范化、无效哈希拒绝/跳过、来源信息和站方标签一致性；筛选测试改用已推断的数据，补充 4K 满足高清条件及站方高清优先于推断，并新增聚合到筛选的权重、必需条件和无码筛选测试。magnet、javdb、javbus、catalogue、monitor、offline、api、app 包测试及 magnet/javdb/javbus/catalogue 的 go vet、git diff --check 通过。未进行浏览器或真实上游联调。
-- [x] **121.** `internal/library/scrape`：`Close` 的 `service == nil`、`subtitleQueue != nil`；`newSubtitleQueue` 的 concurrency / capacity / logger 兜底（唯一调用传默认值）；`Enqueue` 的 `q.ctx != nil`、`q.logger != nil`；`worker` 的 `!ok`（channel 从不关闭）；`processCover` 与 `process` 两次判断 `subtitles != nil`；`ExportLocalMovie` 的 `record == nil` + `notifiers ...MediaNotifier` 表示可选；`scrape.go:339` `dirCache == nil`、:343 `ttl <= 0`；`findAvatar` 的 `s.db == nil`；`reconcile.go:112` `if images != nil`；`reconcile.go:58` 多余 `var err error`。
-  - 已完成：字幕队列构造直接使用 2 个 worker、256 个缓冲位及 slog.Default()，删除无实际配置需求的参数和兜底；移除 Service/队列、context/logger 的空值分支及从不关闭的 channel 接收检查。字幕服务的可选检查集中在 subtitleTask 创建入口，worker 不再重复检查。
-  - 依赖清理：删除目录缓存的重复初始化、ExportLocalMovie 的记录/图片缓存判空，以及现 scan/reconcile.go 的图片缓存判空和多余 err 声明；现 emby/actors.go 的 findAvatar 移除数据库判空，保留可选媒体获取器检查。字幕去重、满队列清理、取消、两分钟超时、关闭等待、45 秒目录缓存和导出/事务通知顺序不变。
-  - 现状修正：原可变通知参数和 ttl <= 0 已不存在；原 logger 调用实际传 nil，本次直接在构造时初始化默认 logger。保留空番号、缺失图片、可选通知器等实际业务分支。
-  - 验证：关闭测试改为真实执行并阻塞字幕导出，验证取消传递、等待退出、清除运行中 pending 和关闭后拒绝入队；补充无字幕服务不创建任务，相关测试提供图片缓存并补齐队列清理。library（含 scan/scrape）、emby、maintenance、subtitle、api、app 包测试及 library/emby/maintenance 的 go vet、git diff --check 通过，覆盖目录缓存、导出、头像回退和扫描回滚。未进行浏览器或真实 Emby/115/字幕来源联调。
-- [x] **122.** `internal/image` singleflight + Stat 检查 + `publishImage` 读回比较三层叠加 → 保留原子 rename + Stat；`internal/maintenance` 每次循环检查 `ctx.Err()`、检查 DB 文件 `IsRegular`。
-  - 已完成：数据库、WAL、SHM 三个固定文件的容量统计在循环前统一检查取消，删除每次迭代的重复检查。
-  - 范围修正：图片写入的 singleflight 合并同一目标的并发写入，Stat 跳过已有缓存，publishImage 仅在重命名失败后读回确认目标内容，职责不同且正常写入不产生额外读回；Go 不保证 Windows 上 os.Rename 的原子性，因此保留现有发布流程。数据库 IsRegular 使用已有 Stat 结果，保留文件类型校验；图片目录遍历和删除规模不固定，保留逐项取消检查。
-  - 验证：maintenance、image、api、app 包测试及 maintenance 的 go vet、git diff --check 通过，覆盖数据库容量、缓存引用保留、取消、并发图片写入和失败清理。未新增针对简单检查移动的测试，未进行浏览器或真实上游联调。
-- [x] **123.** `internal/monitor/service.go:108` `checking`、`internal/offline/service.go:52` `syncing` 互斥锁：生产中仅由一个 `RunPeriodic` 串行调用；`offline/add.go:20,30` `catalogue != nil` 两次；`sync.go:254` `library != nil` 只为测试；`sync.go:76` 重复过滤 `DirectoryID`、:94-96 每条检查 `ctx.Err()`、:154-159 身份校验冗余；`monitor/service.go:160,176` `limit > 0` / `max(page, 1)`（API 绑定已保证）；`tasks/pool.go:34` `logger == nil`。
-  - 已完成：确认 Check/Sync 各自由唯一 RunPeriodic 串行调度后删除整轮锁，保留原锁提供的入口取消检查；离线提交直接使用必需的 catalogue 校验磁力并读取番号，完成任务直接使用 library。订阅列表和演员动态使用 API 已校验的分页值，任务池删除 logger 兜底，测试显式提供依赖。
-  - 同步边界：远端结果已按 InfoHash 匹配，记录的账号及哈希在现有生产流程中不修改，删除 UpdateTask 内重复身份比对；保留按账号/磁力加锁、事务内重读、防止完成状态回退、账号会话校验及当前目录与下载来源匹配后才安排扫描的限制。原重复 DirectoryID 过滤已不存在；逐条取消检查保留，避免一页大量无关任务延迟取消。
-  - 验证：新增定时器与唤醒信号串行执行、未知磁力在提交前拒绝、按远端 InfoHash 大小写无关匹配且忽略无关任务的测试；复用并发去重、取消后持久化、目录切换、旧响应防回退和分页覆盖。monitor、offline、tasks、drive、library（含 scan/scrape）、api、app 包测试及 monitor/offline/tasks 的 go vet、git diff --check 通过。未进行浏览器、真实 115 联调或 race 检测。
-- [x] **124.** `internal/offline/projection.go` 已使用独立 OfflineDownload 表，不再有旧 JSON hash 分组。当前空 hash 会使整次 Activity 投影报错，而 schema 已要求 hash 非空；核实遗留坏数据的实际入口，再决定移除冗余检查或采用记录日志并跳过的策略。
-  - 已完成：核对正常写入与旧任务迁移后，删除 submissions 中重复的空 hash 报错分支，不增加日志跳过或数据兼容逻辑；账号/目录范围、历史去重、任务状态及文件关联投影不变。
-  - 保留：Ent 的 NotEmpty 校验在创建和更新时拒绝空 hash；直接 SQL 写入的旧任务迁移先检查 hash，遇到无效历史会报错并回滚，不会将空 hash 导入新表。
-  - 验证：复用空 hash 写入拒绝、无效历史迁移回滚和离线状态投影测试；offline、database、api、app 包测试及 offline 的 go vet、git diff --check 通过。未新增重复覆盖简单分支删除的测试，未进行浏览器或真实 115 联调。
-- [x] **125.** 前端：`access-gate.tsx:14,25` `sessionUnlocked`（onSuccess 已写入缓存）；`lib/math.ts:3` 处理 -0；`api/client.ts:66,71,80,106` 四处 `typeof window === 'undefined'`（SPA，且 :18 直接使用 `window.location.origin`）；`components/error-state.tsx:34` 外层重复判断 `retry.onRetry`；`task-progress-state.ts:21` 手写 clamp（`lib/math` 已有）；`lib/search-schema.ts:3` `errorMessage` 参数无意义；`stores/settings.ts:17` `partialize` 多余。
-  - 已完成：移除 sessionUnlocked，登录成功先取消未结束的配置查询，再写入已认证缓存；登录选项沿用现有 mutationOptions 形式，供 hook 与真实 QueryClient 回归测试共用。删除剩余的一处 window 环境判断；任务进度复用 clamp；分页解析统一错误文案并调整两处调用；设置持久化删除 partialize，当前 JSON 存储内容不变。
-  - 范围修正：保留负零归一化，图片缩放边界确实可能产生 -0；保留非有限进度检查。ErrorState 外层条件用于避免空操作容器，改为两个调用方分别决定是否渲染，RetryAction 要求必传 onRetry 并删除内部判空。errorMessage 原有实际调用，但路由错误页面使用固定提示，删除参数不改变页面文案；报告中的四处 window 判断已过时。
-  - 验证：新增旧配置响应不能覆盖登录缓存、配置刷新后重新关闭门禁、登录失败及禁用门禁测试，以及无重试时不生成空容器、重试按钮禁用状态和文案的静态渲染测试。前端全部 22 个测试文件、124 个测试及生产构建、类型检查、Lint、格式检查、git diff --check 通过，复用分页、任务进度、图片缩放和未授权通知覆盖。未进行浏览器测试，未调整依赖或锁文件。
 
 ---
 
