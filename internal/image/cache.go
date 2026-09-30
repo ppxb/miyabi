@@ -2,6 +2,7 @@ package image
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/disintegration/imaging"
+	"github.com/ppxb/miyabi/internal/syncx"
 	_ "golang.org/x/image/webp" // Register WebP decoding for covers and NFO artwork.
 	"golang.org/x/sync/singleflight"
 )
@@ -20,7 +22,16 @@ const URLPrefix = "/api/library/artwork/"
 // Cache instances sharing a destination also share its in-flight write.
 var imageWrites singleflight.Group
 
-type Cache struct{ directory string }
+type Cache struct {
+	directory string
+	artwork   syncx.ContextLock
+}
+
+// Hold the artwork lock from cache writes through the commit of their database
+// references. Pruning takes the same lock before reading those references.
+func (cache *Cache) LockArtwork(ctx context.Context) error { return cache.artwork.Lock(ctx) }
+func (cache *Cache) TryLockArtwork() bool                  { return cache.artwork.TryLock() }
+func (cache *Cache) UnlockArtwork()                        { cache.artwork.Unlock() }
 
 type Artwork struct {
 	Poster    string `json:"poster"`

@@ -39,10 +39,10 @@ func (service *Service) Cover(ctx context.Context, job tasks.Job) error {
 
 	var subTask *SubtitleTask
 	err = func() error {
-		if err := service.artwork.Lock(ctx); err != nil {
+		if err := service.images.LockArtwork(ctx); err != nil {
 			return err
 		}
-		defer service.artwork.Unlock()
+		defer service.images.UnlockArtwork()
 
 		var err error
 		subTask, err = service.processCover(ctx, job, input)

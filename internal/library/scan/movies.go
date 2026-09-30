@@ -21,32 +21,67 @@ func MatchMovies(ctx context.Context, tx *ent.Tx, codes []string) (map[string]in
 	if len(codes) == 0 {
 		return nil, nil
 	}
+	matcher, err := loadMovieMatcher(ctx, tx, codes)
+	if err != nil {
+		return nil, err
+	}
+	matched := make(map[string]int, len(codes))
+	for _, code := range codes {
+		if record := matcher.find(code); record != nil {
+			matched[code] = record.ID
+		}
+	}
+	return matched, nil
+}
+
+// A transaction-local index also lets local imports see identity changes from
+// earlier NFOs in the batch without querying the same candidate groups again.
+type movieMatcher map[string][]*ent.Movie
+
+func loadMovieMatcher(ctx context.Context, tx *ent.Tx, codes []string) (movieMatcher, error) {
 	var keys []string
-	codeGroups := make(map[string][]string, len(codes))
+	groups := make(movieMatcher, len(codes))
 	for _, code := range codes {
 		key := codeid.MatchKey(code)
-		if _, found := codeGroups[key]; !found {
+		if _, found := groups[key]; !found {
 			keys = append(keys, key)
+			groups[key] = nil
 		}
-		codeGroups[key] = append(codeGroups[key], code)
 	}
-	records, err := tx.Movie.Query().Where(movie.CanonicalCodeIn(keys...)).Order(ent.Asc(movie.FieldID)).
+	records, err := tx.Movie.Query().Where(movie.CanonicalCodeIn(keys...)).
 		Select(movie.FieldID, movie.FieldCode, movie.FieldCanonicalCode, movie.FieldJavdbID).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load equivalent movies: %w", err)
 	}
 
-	matched := make(map[string]int, len(codes))
-	best := make(map[string]*ent.Movie, len(codes))
 	for _, record := range records {
-		for _, code := range codeGroups[record.CanonicalCode] {
-			previous := best[code]
-			if (previous == nil || movieRank(record, code) > movieRank(previous, code)) && codeid.IsEquivalent(record.Code, code) {
-				best[code], matched[code] = record, record.ID
-			}
+		groups.add(record)
+	}
+	return groups, nil
+}
+
+func (matcher movieMatcher) find(code string) *ent.Movie {
+	var best *ent.Movie
+	for _, record := range matcher[codeid.MatchKey(code)] {
+		if !codeid.IsEquivalent(record.Code, code) {
+			continue
+		}
+		if best == nil || movieRank(record, code) > movieRank(best, code) ||
+			(movieRank(record, code) == movieRank(best, code) && record.ID < best.ID) {
+			best = record
 		}
 	}
-	return matched, nil
+	return best
+}
+
+func (matcher movieMatcher) add(record *ent.Movie) {
+	matcher[record.CanonicalCode] = append(matcher[record.CanonicalCode], record)
+}
+
+func (matcher movieMatcher) remove(record *ent.Movie) {
+	matcher[record.CanonicalCode] = slices.DeleteFunc(matcher[record.CanonicalCode], func(candidate *ent.Movie) bool {
+		return candidate.ID == record.ID
+	})
 }
 
 // movieRank orders equivalent records: scraped first, then the exact number.

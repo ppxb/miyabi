@@ -21,7 +21,6 @@ import (
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/pan"
-	"github.com/ppxb/miyabi/internal/syncx"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -68,7 +67,6 @@ type Service struct {
 	notifier      Notifier
 	subtitles     SubtitleExporter
 	subtitleQueue *SubtitleQueue
-	artwork       syncx.ContextLock
 
 	dirMu    sync.RWMutex
 	dirCache map[string]dirCacheEntry
@@ -126,12 +124,12 @@ func (service *Service) Close() {
 
 // TryLockArtwork attempts to acquire the artwork lock for cache maintenance.
 func (service *Service) TryLockArtwork() bool {
-	return service.artwork.TryLock()
+	return service.images.TryLockArtwork()
 }
 
 // UnlockArtwork releases the artwork lock.
 func (service *Service) UnlockArtwork() {
-	service.artwork.Unlock()
+	service.images.UnlockArtwork()
 }
 
 // Artwork reads cached artwork bytes by key.

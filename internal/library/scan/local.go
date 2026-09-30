@@ -2,11 +2,8 @@ package scan
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io/fs"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,12 +12,8 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/ent/file"
-	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
-	"github.com/ppxb/miyabi/internal/library/scrape"
-	"github.com/ppxb/miyabi/internal/nfo"
 )
 
 // LocalScanResult summarizes the outcome of a local directory scan.
@@ -109,6 +102,7 @@ func (s *LocalScanner) Scan(ctx context.Context, rootDir string) (*LocalScanResu
 		return nil, fmt.Errorf("walk local directory %s: %w", rootDir, err)
 	}
 
+	batch := make([]localMedia, 0, localScanBatchSize)
 	for dir, group := range dirs {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
@@ -129,150 +123,28 @@ func (s *LocalScanner) Scan(ctx context.Context, rootDir string) (*LocalScanResu
 			}
 			result.MediaFiles++
 
-			nfoPath := findMatchingNFO(dir, stem, code, group.nfoFiles)
 			posterPath, fanartPath := findMatchingArtwork(dir, stem, group.imageFiles)
-			subPaths := findMatchingSubtitles(stem, group.subFiles)
-
-			if err := s.ingestMedia(ctx, rootDir, mediaPath, media.Name(), media.Size(), code, nfoPath, posterPath, fanartPath, subPaths, result); err != nil {
-				return nil, fmt.Errorf("ingest %s: %w", mediaPath, err)
+			batch = append(batch, localMedia{
+				path: mediaPath, name: media.Name(), size: media.Size(), code: code,
+				nfoPath:    findMatchingNFO(dir, stem, code, group.nfoFiles),
+				posterPath: posterPath, fanartPath: fanartPath,
+				subPaths: findMatchingSubtitles(stem, group.subFiles),
+			})
+			if len(batch) == localScanBatchSize {
+				if err := s.ingestBatch(ctx, rootDir, batch, result); err != nil {
+					return nil, err
+				}
+				batch = batch[:0]
 			}
 		}
 	}
 
+	if len(batch) > 0 {
+		if err := s.ingestBatch(ctx, rootDir, batch, result); err != nil {
+			return nil, err
+		}
+	}
 	return result, nil
-}
-
-func (s *LocalScanner) ingestMedia(
-	ctx context.Context,
-	rootDir, mediaPath, mediaName string,
-	mediaSize int64,
-	code string,
-	nfoPath, posterPath, fanartPath string,
-	subPaths []string,
-	result *LocalScanResult,
-) error {
-	return ent.WithTx(ctx, s.db, func(tx *ent.Tx) error {
-		matched, err := MatchMovies(ctx, tx, []string{code})
-		if err != nil {
-			return err
-		}
-		movieID, found := matched[code]
-		if !found {
-			created, err := tx.Movie.Create().SetCode(code).SetScrapeStatus(movie.ScrapeStatusPending).Save(ctx)
-			if err != nil {
-				return err
-			}
-			movieID = created.ID
-			result.MoviesAdded++
-		}
-
-		if nfoPath != "" {
-			nfoBytes, readErr := os.ReadFile(nfoPath)
-			if readErr != nil {
-				slog.WarnContext(ctx, "failed to read local NFO", "path", nfoPath, "error", readErr)
-			} else {
-				doc, decodeErr := nfo.Decode(nfoBytes)
-				if decodeErr != nil {
-					slog.WarnContext(ctx, "failed to decode local NFO", "path", nfoPath, "error", decodeErr)
-				} else {
-					result.NFORead++
-					if doc.Code != "" {
-						doc.Code = codeid.Normalize(doc.Code)
-					}
-					if doc.Code == "" {
-						doc.Code = code
-					}
-					if err := scrape.SaveMovieMetadata(ctx, tx, movieID, doc); err != nil {
-						slog.WarnContext(ctx, "failed to save movie metadata from local NFO", "path", nfoPath, "error", err)
-					} else {
-						if err := tx.Movie.UpdateOneID(movieID).SetScrapeStatus(movie.ScrapeStatusDone).Exec(ctx); err != nil {
-							return err
-						}
-					}
-				}
-			}
-		}
-
-		if s.images != nil && (posterPath != "" || fanartPath != "") {
-			var posterBytes, fanartBytes []byte
-			if posterPath != "" {
-				posterBytes, _ = os.ReadFile(posterPath)
-			}
-			if fanartPath != "" {
-				fanartBytes, _ = os.ReadFile(fanartPath)
-			}
-			if len(posterBytes) > 0 {
-				var artwork mediaimage.Artwork
-				var artErr error
-				if len(fanartBytes) > 0 {
-					artwork, artErr = s.images.Restore(posterBytes, fanartBytes)
-				} else {
-					artwork, artErr = s.images.FromCover(posterBytes)
-				}
-				if artErr == nil {
-					update := tx.Movie.UpdateOneID(movieID)
-					if artwork.Poster != "" {
-						update.SetPoster(artwork.Poster)
-					}
-					if artwork.Thumbnail != "" {
-						update.SetCover(artwork.Thumbnail)
-					}
-					if artwork.Fanart != "" {
-						update.SetFanarts([]string{artwork.Fanart})
-					}
-					if err := update.Exec(ctx); err != nil {
-						return err
-					}
-				}
-			}
-		}
-
-		fileID := ""
-		if domain.IsSTRM(mediaName) {
-			content, _ := os.ReadFile(mediaPath)
-			fileID = scrape.ParseSTRMFileID(string(content))
-		}
-		rel, relErr := filepath.Rel(rootDir, mediaPath)
-		if relErr != nil {
-			return fmt.Errorf("compute relative path for %s: %w", mediaPath, relErr)
-		}
-		if fileID == "" {
-			hash := sha256.Sum256([]byte(rel))
-			fileID = "local-" + hex.EncodeToString(hash[:16])
-		}
-
-		existingFile, err := tx.File.Query().Where(file.FileIDEQ(fileID)).First(ctx)
-		if ent.IsNotFound(err) {
-			_, err = tx.File.Create().
-				SetFileID(fileID).
-				SetName(mediaName).
-				SetSize(mediaSize).
-				SetAccountID(domain.LocalAccountID).
-				SetRootID(domain.LocalAccountID).
-				SetPath(rel).
-				SetMovieID(movieID).
-				Save(ctx)
-			if err != nil {
-				return err
-			}
-		} else if err == nil && (existingFile.MovieID == nil || *existingFile.MovieID != movieID) {
-			if err := tx.File.UpdateOneID(existingFile.ID).SetMovieID(movieID).Exec(ctx); err != nil {
-				return err
-			}
-		}
-
-		for _, subPath := range subPaths {
-			if err := indexLocalSubtitle(ctx, tx, movieID, subPath); err != nil {
-				return err
-			}
-		}
-		if s.notifier != nil {
-			if err := s.notifier.NotifyUpdatedTx(ctx, tx, filepath.Dir(mediaPath)); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
 }
 
 func isImageFile(name string) bool {
