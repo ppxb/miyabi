@@ -69,6 +69,7 @@ func (s *Service) RetryTask(ctx context.Context, id int) (domain.TaskInfo, error
 	}
 	s.tasks.NotifyLibraryChanged()
 	s.tasks.NotifyOfflineChanged()
+	s.tasks.WakePool()
 	parent, err = s.database.Task.Get(ctx, id)
 	if err != nil {
 		return domain.TaskInfo{}, err

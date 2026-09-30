@@ -211,6 +211,9 @@ func (s *Service) enqueueScan(ctx context.Context, source domain.LibrarySource, 
 	if err != nil {
 		return domain.TaskInfo{}, err
 	}
-	s.tasks.Notify()
+	s.tasks.NotifyUI()
+	if record.Status == task.StatusQueued {
+		s.tasks.WakePool()
+	}
 	return scanTaskInfo(record)
 }

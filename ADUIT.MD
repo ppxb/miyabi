@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-30；本轮移除复查通过的第 112–125 项，共 14 条。当前保留 111 条：110 条待处理，1 条已完成、待复查。
+> 清单整理：2026-09-30；本轮移除复查通过的第 112–125 项，共 14 条。当前保留 111 条：109 条待处理，2 条已完成、待复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；完成项经复查确认后可移除，已提交的历史记录可通过 Git 追溯。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮复查范围为第 112–125 项的实现、生产调用链与回归覆盖；其余待办和历史已移除条目不在本轮复查范围内。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -36,11 +36,14 @@
 ## 七、性能
 
 - [x] **126.** `internal/library/workflow.go` 的 metadataGroups 仍通过 payload 中的 `scan_task_id` 聚合 scrape/cover 子任务；`internal/api/sse.go` 的多个连接可能重复计算同一任务快照。快照已移出 task 表，删除“大快照逐行解析”的旧描述。通过查询计划和负载数据评估 parent_id 列/索引，以及共享快照或通知合并。
-  - 已完成：新增版本化迁移，为 json_extract(payload, '$.scan_task_id')、type、status、updated_at DESC、id DESC 建立 task_scan_workflow 表达式索引；保留现有 JSON 关联字段。taskViews 按 Bus 的通知版本共享只读快照，复用可取消锁合并并发查询；所有通知均推进内部版本，原有三类业务修订号及 SSE 协议不变。
+  - 已完成：新增版本化迁移，为 json_extract(payload, '$.scan_task_id')、type、status、updated_at DESC、id DESC 建立 task_scan_workflow 表达式索引；保留现有 JSON 关联字段。taskViews 按 Bus 的通知版本共享只读快照，复用可取消锁合并并发查询；所有界面通知均推进内部版本，原有三类业务修订号及 SSE 协议不变。
   - 时序与生命周期：查询结果记录开始读取时的版本，新通知不会被旧结果覆盖；失败不缓存，取消等待或当前查询后其他连接可继续读取。保留先订阅再读取、重连首帧及断开退订，不引入 TTL、后台刷新协程或多版本缓存。
   - 性能依据：前置评估使用项目 SQLite 驱动和实际 metadataGroups，合成 5 万条子任务中查询 20 个扫描任务，15 次读取平均约 76ms → 4.6ms；结果一致，查询计划命中表达式索引且省去临时排序。该数据仅代表本机合成负载，不代表生产耗时。
   - 验证：覆盖旧库升级与重复打开保留索引、任务内容不变、JSON 关联更新、参数化窗口查询命中索引、20 个并发读取只执行一轮查询、普通通知刷新、读取期间新通知、取消及失败恢复，以及本地 HTTP 下多个 SSE 连接共享更新和重连。修正旧迁移测试的版本夹具并补齐测试字幕队列清理；Go 全量测试、go vet、git diff --check 通过。未进行浏览器、真实上游联调或 race 检测，依赖和锁文件不变。
-- [ ] **127.** `internal/tasks/bus.go:69-75` `Notify()` 同时唤醒 pool：扫描分页进度（`scan/persist.go:171,230`、`reconcile.go:151`）、`SaveSubscriptionBatch`、`ChangeOffline`（每 30s）都会让 pool 空跑 Claim；`queue.go:66` Claim 自身又 Notify → 拆分 `WakePool()` 与 `NotifyUI()`。
+- [x] **127.** 任务进度和业务状态通知与任务池唤醒共用通道，扫描分页、批量任务进度、离线状态更新及 Claim 自身通知会触发空闲任务池重复查询。
+  - 已完成：Bus 分离 UI 订阅与工作线程订阅，`NotifyUI()` 和三类业务通知只刷新界面；`WakePool()` 只唤醒工作线程，不推进快照版本或业务修订号。删除旧 `Notify()`，Claim、Recover 和 Finish 不再广播任务池唤醒。
+  - 入队与并发：扫描、定向扫描、刮削/封面子任务、订阅批量任务及重试均在数据提交后显式唤醒；无新增刮削任务的 reconcile 只通知 UI。每个工作线程独立订阅，合并的入队通知仍能唤醒全部空闲线程；保留订阅先于恢复和领取、退出退订、启动恢复、失败退避及串行分池。
+  - 验证：确定性并发测试中，3 个空闲线程收到连续 400 次 UI/业务通知后仅有启动时的 3 次 Claim，无额外查询；一次入队唤醒可启动 3 个任务。覆盖通知隔离、合并、版本不变、Claim/Recover/Finish、入队与重试、扫描/定向扫描/封面任务提交及回滚，以及原有多池恢复和 SSE 共享快照回归；Go 全量测试、go vet、git diff --check 通过。未进行浏览器或真实上游联调；CGO_ENABLED=0，未运行 race 检测，依赖和锁文件未改动。
 - [ ] **128.** `internal/ent/schema/task.go:37-42` `index.Fields("status", "created_at")` 的 `created_at` 从未用于过滤 / 排序，热点查询均为 `type + status + ORDER BY id` → `index.Fields("type", "status")`，删除单列 `type` 索引。
 - [ ] **129.** ✔ `internal/emby/service.go` 的 `sendBatch` 每批 `/Library/Media/Updated` 增量通知后仍调用 `client.refresh`（`/Library/Refresh` 全库扫描），扫描期间约每 3 秒一次 → 删除。
 - [ ] **130.** `internal/library/scan/movies.go:29` `MatchMovies` 每页 100 个 `LIKE '%code'` 以 OR 连接 → 全表扫描；:38-45 codes × records 双重循环；:56 `slices.Contains` 去重 O(n²) → 增加 `canonical_code` 索引列 + 等值 IN，去重用 map。

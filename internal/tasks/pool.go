@@ -21,7 +21,7 @@ type PoolQueue interface {
 
 // PoolBus defines the notification wake operations required by the worker Pool.
 type PoolBus interface {
-	Subscribe() (<-chan struct{}, func())
+	SubscribePool() (<-chan struct{}, func())
 }
 
 // Pool coordinates concurrent background workers executing registered task handlers.
@@ -49,9 +49,14 @@ func NewPool(queue PoolQueue, bus PoolBus, registry *Registry, kinds []Kind, siz
 // Run starts the worker goroutines and waits for context cancellation.
 func (pool *Pool) Run(ctx context.Context) error {
 	// Subscribe before recovery and claiming so an enqueue cannot be missed.
-	// Each pool needs its own notification; sharing a channel can wake the wrong pool.
-	pending, unsubscribe := pool.bus.Subscribe()
-	defer unsubscribe()
+	// Each worker gets a wakeup so a coalesced batch can fill the pool without
+	// claims broadcasting another event to every pool.
+	pending := make([]<-chan struct{}, pool.size)
+	for i := range pending {
+		updates, unsubscribe := pool.bus.SubscribePool()
+		pending[i] = updates
+		defer unsubscribe()
+	}
 	if err := pool.queue.Recover(ctx, pool.kinds); err != nil {
 		if ctx.Err() != nil {
 			return nil
@@ -59,8 +64,8 @@ func (pool *Pool) Run(ctx context.Context) error {
 		return err
 	}
 	group, ctx := errgroup.WithContext(ctx)
-	for range pool.size {
-		group.Go(func() error { return pool.runWorker(ctx, pending) })
+	for _, updates := range pending {
+		group.Go(func() error { return pool.runWorker(ctx, updates) })
 	}
 	return group.Wait()
 }

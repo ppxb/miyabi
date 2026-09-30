@@ -29,7 +29,7 @@ func (q *Queue) Recover(ctx context.Context, kinds []Kind) error {
 	).SetStatus(task.StatusQueued).SetProgress(0).ClearError().Save(ctx); err != nil {
 		return fmt.Errorf("recover interrupted tasks: %w", err)
 	}
-	q.bus.Notify()
+	q.bus.NotifyUI()
 	return nil
 }
 
@@ -59,7 +59,7 @@ func (q *Queue) Claim(ctx context.Context, kinds []Kind) (*Job, error) {
 		if claimed == 0 {
 			continue
 		}
-		q.bus.Notify()
+		q.bus.NotifyUI()
 		return jobOf(record), nil
 	}
 }

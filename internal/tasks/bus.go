@@ -19,33 +19,50 @@ const (
 	ChangeMonitor
 )
 
-// Bus fans task notifications out to the worker pools and SSE subscribers.
+// Bus separates queued-work wakeups from task and business updates for SSE.
 type Bus struct {
 	mu          sync.Mutex
 	version     uint64
 	revisions   TaskRevisions
 	subscribers map[chan struct{}]struct{}
+	workers     map[chan struct{}]struct{}
 }
 
 func NewBus() *Bus {
-	return &Bus{subscribers: make(map[chan struct{}]struct{})}
+	return &Bus{subscribers: make(map[chan struct{}]struct{}), workers: make(map[chan struct{}]struct{})}
 }
 
-// Subscribe registers a worker pool or SSE listener. Notifications are coalesced.
+// Subscribe registers an SSE listener. Notifications are coalesced.
 func (b *Bus) Subscribe() (<-chan struct{}, func()) {
+	return b.subscribe(b.subscribers)
+}
+
+// SubscribePool registers one worker for queued-work wakeups.
+func (b *Bus) SubscribePool() (<-chan struct{}, func()) {
+	return b.subscribe(b.workers)
+}
+
+func (b *Bus) subscribe(listeners map[chan struct{}]struct{}) (<-chan struct{}, func()) {
 	updates := make(chan struct{}, 1)
 	b.mu.Lock()
-	b.subscribers[updates] = struct{}{}
+	listeners[updates] = struct{}{}
 	b.mu.Unlock()
 	return updates, func() {
 		b.mu.Lock()
-		delete(b.subscribers, updates)
+		delete(listeners, updates)
 		b.mu.Unlock()
 	}
 }
 
-// Notify wakes all subscribers without bumping business revisions.
-func (b *Bus) Notify() { b.publish(0) }
+// WakePool announces committed queued work without invalidating UI snapshots.
+func (b *Bus) WakePool() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	signal(b.workers)
+}
+
+// NotifyUI refreshes task views without bumping business revisions or waking workers.
+func (b *Bus) NotifyUI() { b.publish(0) }
 
 func (b *Bus) NotifyLibraryChanged() { b.publish(ChangeLibrary) }
 func (b *Bus) NotifyOfflineChanged() { b.publish(ChangeOffline) }
@@ -57,7 +74,7 @@ func (b *Bus) Revisions() TaskRevisions {
 	return b.revisions
 }
 
-// Version changes on every notification, including task progress updates.
+// Version changes on every UI notification, including task progress updates.
 func (b *Bus) Version() uint64 {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -77,7 +94,11 @@ func (b *Bus) publish(change Change) {
 	if change&ChangeMonitor != 0 {
 		b.revisions.Monitor++
 	}
-	for subscriber := range b.subscribers {
+	signal(b.subscribers)
+}
+
+func signal(listeners map[chan struct{}]struct{}) {
+	for subscriber := range listeners {
 		select {
 		case subscriber <- struct{}{}:
 		default:

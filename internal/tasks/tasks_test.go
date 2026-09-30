@@ -141,7 +141,7 @@ func TestBusSubscriptionsAndRevisions(t *testing.T) {
 	}
 
 	unsubscribe()
-	bus.Notify()
+	bus.NotifyUI()
 	select {
 	case <-ch:
 		t.Fatal("received notification after unsubscribe")
@@ -153,7 +153,7 @@ func TestBusVersionIncludesCoalescedProgressNotifications(t *testing.T) {
 	bus := tasks.NewBus()
 	updates, unsubscribe := bus.Subscribe()
 	defer unsubscribe()
-	for _, notify := range []func(){bus.Notify, bus.Notify, bus.NotifyLibraryChanged, bus.NotifyOfflineChanged, bus.NotifyMonitorChanged} {
+	for _, notify := range []func(){bus.NotifyUI, bus.NotifyUI, bus.NotifyLibraryChanged, bus.NotifyOfflineChanged, bus.NotifyMonitorChanged} {
 		before := bus.Version()
 		notify()
 		if bus.Version() != before+1 {
@@ -191,6 +191,17 @@ func TestQueueLifecycleAndHook(t *testing.T) {
 	))
 
 	svc := tasks.NewService(store.Client, registry)
+	updates, unsubscribe := svc.Subscribe()
+	defer unsubscribe()
+	work, stopWork := svc.SubscribePool()
+	defer stopWork()
+	assertUIOnly := func() {
+		t.Helper()
+		if len(updates) != 1 || len(work) != 0 {
+			t.Fatalf("queue status change: UI=%d worker=%d", len(updates), len(work))
+		}
+		<-updates
+	}
 
 	info, err := store.Client.Task.Create().SetType(string(tasks.KindScan)).SetPayload(json.RawMessage(`{}`)).Save(ctx)
 	if err != nil {
@@ -207,10 +218,12 @@ func TestQueueLifecycleAndHook(t *testing.T) {
 	if job == nil || job.ID != info.ID || job.Type != tasks.KindScan {
 		t.Fatalf("unexpected claimed job: %+v", job)
 	}
+	assertUIOnly()
 
 	if err := svc.Queue().Recover(ctx, []tasks.Kind{tasks.KindScan}); err != nil {
 		t.Fatalf("recover: %v", err)
 	}
+	assertUIOnly()
 	rec, err := store.Client.Task.Get(ctx, info.ID)
 	if err != nil || rec.Status != task.StatusQueued {
 		t.Fatalf("recovered task status: %+v, err=%v", rec, err)
@@ -220,11 +233,13 @@ func TestQueueLifecycleAndHook(t *testing.T) {
 	if err != nil || job == nil {
 		t.Fatalf("re-claim: %+v, err=%v", job, err)
 	}
+	assertUIOnly()
 
 	expectedErr := errors.New("scan failure")
 	if err := svc.Queue().Finish(ctx, job.ID, expectedErr); err != nil {
 		t.Fatalf("finish: %v", err)
 	}
+	assertUIOnly()
 
 	if !hookCalled.Load() {
 		t.Fatal("finished hook was not called on Finish")

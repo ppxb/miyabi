@@ -28,7 +28,8 @@ func (s *Service) enqueueSubscriptionBatch(ctx context.Context, ids []int) (int,
 	if err != nil {
 		return 0, fmt.Errorf("queue subscription batch: %w", err)
 	}
-	s.tasks.Notify()
+	s.tasks.NotifyUI()
+	s.tasks.WakePool()
 	return record.ID, nil
 }
 
@@ -46,7 +47,7 @@ func (s *Service) saveSubscriptionBatch(ctx context.Context, id int, payload bat
 	if err := s.database.Task.UpdateOneID(id).SetProgress(progress).SetPayload(encoded).Exec(ctx); err != nil {
 		return fmt.Errorf("save subscription batch %d: %w", id, err)
 	}
-	s.tasks.Notify()
+	s.tasks.NotifyUI()
 	return nil
 }
 

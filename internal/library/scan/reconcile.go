@@ -94,6 +94,7 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 	if err != nil {
 		return fmt.Errorf("find scanned metadata jobs: %w", err)
 	}
+	queued := false
 	for _, record := range moviesToScrape {
 		if record.ScrapeStatus == movie.ScrapeStatusDone && scrape.SnapshotMatches(record, r.payload.Source) {
 			cached, err := r.scanner.images.Exists(scrape.MovieArtwork(record))
@@ -130,6 +131,7 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 		if err := tx.Task.Create().SetType(tasks.KindScrape.String()).SetPayload(encoded).Exec(ctx); err != nil {
 			return fmt.Errorf("enqueue movie metadata: %w", err)
 		}
+		queued = true
 	}
 	r.payload.Scan.Stage = "done"
 	if err := SaveScanProgress(ctx, tx.Task, r.taskID, *r.payload); err != nil {
@@ -139,6 +141,6 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 	if r.payload.Scan.RemovedFiles > 0 || r.payload.Scan.RemovedMovies > 0 {
 		change = tasks.ChangeLibrary
 	}
-	r.notifyAfterCommit(tx, change)
+	r.notifyAfterCommit(tx, change, queued)
 	return nil
 }

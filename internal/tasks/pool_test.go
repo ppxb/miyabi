@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type mockPoolQueue struct {
 	claimFailures  int
 	finishFailures int
 	job            *Job
+	jobs           []*Job
 	finished       chan struct{}
 	recover        func(context.Context) error
 }
@@ -34,6 +36,11 @@ func (m *mockPoolQueue) Claim(ctx context.Context, kinds []Kind) (*Job, error) {
 	m.claimAttempts++
 	if m.claimAttempts <= m.claimFailures {
 		return nil, errors.New("sqlite: database is locked (5)")
+	}
+	if len(m.jobs) > 0 {
+		job := m.jobs[0]
+		m.jobs = m.jobs[1:]
+		return job, nil
 	}
 	job := m.job
 	m.job = nil
@@ -119,7 +126,7 @@ func TestPoolSubscribesBeforeRecoveryAndUnsubscribesOnExit(t *testing.T) {
 			failure := errors.New("fixture recovery failure")
 			queue := &mockPoolQueue{recover: func(context.Context) error {
 				bus.mu.Lock()
-				subscribed := len(bus.subscribers)
+				subscribed := len(bus.workers)
 				bus.mu.Unlock()
 				if subscribed != 1 {
 					t.Fatalf("recovery began without subscribing: %d", subscribed)
@@ -136,35 +143,89 @@ func TestPoolSubscribesBeforeRecoveryAndUnsubscribesOnExit(t *testing.T) {
 			}
 			bus.mu.Lock()
 			defer bus.mu.Unlock()
-			if len(bus.subscribers) != 0 {
+			if len(bus.workers) != 0 {
 				t.Fatal("pool left its wake subscription registered")
 			}
 		})
 	}
 }
 
-func TestBusBroadcastsWakeupsToEveryPoolAndObserver(t *testing.T) {
+func TestBusSeparatesWorkerWakeupsFromUIUpdates(t *testing.T) {
 	bus := NewBus()
-	var listeners []<-chan struct{}
+	updates, unsubscribe := bus.Subscribe()
+	defer unsubscribe()
+	var workers []<-chan struct{}
 	for range 3 {
-		listener, unsubscribe := bus.Subscribe()
+		listener, unsubscribe := bus.SubscribePool()
 		defer unsubscribe()
-		listeners = append(listeners, listener)
+		workers = append(workers, listener)
 	}
-	for _, notify := range []func(){bus.Notify, bus.NotifyLibraryChanged, bus.NotifyOfflineChanged, bus.NotifyMonitorChanged} {
+	for _, notify := range []func(){bus.NotifyUI, bus.NotifyLibraryChanged, bus.NotifyOfflineChanged, bus.NotifyMonitorChanged} {
 		notify()
-		notify() // Coalescing must not steal another listener's wakeup.
-		for i, listener := range listeners {
-			select {
-			case <-listener:
-			default:
-				t.Fatalf("listener %d missed the wakeup", i)
-			}
-			select {
-			case <-listener:
-				t.Fatalf("listener %d did not coalesce notifications", i)
-			default:
+		if len(updates) != 1 {
+			t.Fatal("UI subscriber missed an update")
+		}
+		for i, listener := range workers {
+			if len(listener) != 0 {
+				t.Fatalf("UI update woke worker %d", i)
 			}
 		}
 	}
+	<-updates
+	version, revisions := bus.Version(), bus.Revisions()
+	bus.WakePool()
+	bus.WakePool()
+	for i, listener := range workers {
+		if len(listener) != 1 {
+			t.Fatalf("worker %d did not receive one coalesced wakeup", i)
+		}
+	}
+	if len(updates) != 0 || bus.Version() != version || bus.Revisions() != revisions {
+		t.Fatal("worker wakeup invalidated UI state")
+	}
+}
+
+func TestIdlePoolIgnoresProgressAndOneWakeStartsConcurrentWorkers(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		bus := NewBus()
+		queue := &mockPoolQueue{}
+		registry := NewRegistry()
+		started := make(chan int, 3)
+		registry.Register(NewHandler(KindScan, func(ctx context.Context, job Job) error {
+			started <- job.ID
+			<-ctx.Done()
+			return ctx.Err()
+		}, nil))
+		stopped := make(chan error, 1)
+		go func() {
+			stopped <- NewPool(queue, bus, registry, []Kind{KindScan}, 3, slog.New(slog.NewTextHandler(io.Discard, nil))).Run(ctx)
+		}()
+		synctest.Wait()
+		for range 100 {
+			bus.NotifyUI()
+			bus.NotifyLibraryChanged()
+			bus.NotifyOfflineChanged()
+			bus.NotifyMonitorChanged()
+		}
+		synctest.Wait()
+		queue.mu.Lock()
+		attempts := queue.claimAttempts
+		queue.jobs = []*Job{{ID: 1, Type: KindScan}, {ID: 2, Type: KindScan}, {ID: 3, Type: KindScan}}
+		queue.mu.Unlock()
+		if attempts != 3 {
+			t.Fatalf("idle pool made %d claims, want only 3 startup claims", attempts)
+		}
+		bus.WakePool()
+		synctest.Wait()
+		if len(started) != 3 {
+			t.Fatalf("one enqueue wake only started %d of 3 workers", len(started))
+		}
+		cancel()
+		synctest.Wait()
+		if err := <-stopped; err != nil {
+			t.Fatal(err)
+		}
+	})
 }

@@ -144,13 +144,13 @@ func TestSubscriptionBatchesDoNotBlockLibraryWorkers(t *testing.T) {
 	}
 	// Each idle pool must wake for newly queued work using the same shared bus.
 	newScan := store.Client.Task.Create().SetType(string(tasks.KindScan)).SaveX(ctx)
-	service.Notify()
+	service.WakePool()
 	if started := awaitPan(t, libraryStarted); started.ID != newScan.ID {
 		t.Fatalf("library pool missed enqueue: %+v", started)
 	}
 	awaitPanCondition(t, func() bool { return store.Client.Task.GetX(ctx, newScan.ID).Status == task.StatusDone })
 	newBatch := store.Client.Task.Create().SetType(string(tasks.KindSubscriptionBatch)).SaveX(ctx)
-	service.Notify()
+	service.WakePool()
 	if started := awaitPan(t, batchStarted); started.ID != newBatch.ID {
 		t.Fatalf("batch pool missed enqueue: %+v", started)
 	}

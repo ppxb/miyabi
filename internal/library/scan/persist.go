@@ -163,12 +163,12 @@ func (r *scanRun) processPageTx(ctx context.Context, tx *ent.Tx, directoryPath s
 	} else if offlineChanged {
 		change = tasks.ChangeOffline
 	}
-	r.notifyAfterCommit(tx, change)
+	r.notifyAfterCommit(tx, change, false)
 	return nil
 }
 
 // Keep revisions and wakeups consistent with committed scan data.
-func (r *scanRun) notifyAfterCommit(tx *ent.Tx, change tasks.Change) {
+func (r *scanRun) notifyAfterCommit(tx *ent.Tx, change tasks.Change, queued bool) {
 	svc := r.scanner.tasksSvc
 	if svc == nil {
 		return
@@ -184,7 +184,10 @@ func (r *scanRun) notifyAfterCommit(tx *ent.Tx, change tasks.Change) {
 			case tasks.ChangeOffline:
 				svc.NotifyOfflineChanged()
 			default:
-				svc.Notify()
+				svc.NotifyUI()
+			}
+			if queued {
+				svc.WakePool()
 			}
 			return nil
 		})
@@ -257,7 +260,7 @@ func ReportScan(ctx context.Context, client *ent.TaskClient, taskID int, payload
 		return err
 	}
 	if tasksSvc != nil {
-		tasksSvc.Notify()
+		tasksSvc.NotifyUI()
 	}
 	return nil
 }

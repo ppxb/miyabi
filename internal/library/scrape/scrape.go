@@ -41,9 +41,10 @@ type Discoverer interface {
 	Media(ctx context.Context, url string) (domain.Media, error)
 }
 
-// Notifier notifies subscribers that library contents changed.
+// Notifier reports committed library updates and queued follow-up work.
 type Notifier interface {
 	NotifyLibraryChanged()
+	WakePool()
 }
 
 // SubtitleExporter writes a movie's subtitles beside its exported .strm file.
@@ -200,6 +201,7 @@ func (service *Service) Scrape(ctx context.Context, job tasks.Job) error {
 	}
 	if service.notifier != nil {
 		service.notifier.NotifyLibraryChanged()
+		service.notifier.WakePool()
 	}
 	return nil
 }

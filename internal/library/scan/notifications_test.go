@@ -11,7 +11,7 @@ import (
 )
 
 func TestScanNotificationsFollowTransactionCommit(t *testing.T) {
-	for _, operation := range []string{"page", "reconcile"} {
+	for _, operation := range []string{"page", "reconcile", "reconcile with scrape"} {
 		for _, commit := range []bool{false, true} {
 			outcome := "rollback"
 			if commit {
@@ -27,6 +27,8 @@ func TestScanNotificationsFollowTransactionCommit(t *testing.T) {
 				svc := tasks.NewService(store.Client, tasks.NewRegistry())
 				updates, unsubscribe := svc.Subscribe()
 				defer unsubscribe()
+				work, stopWork := svc.SubscribePool()
+				defer stopWork()
 				job := store.Client.Task.Create().SetType(tasks.KindScan.String()).SaveX(ctx)
 				payload := domain.ScanPayload{ScanID: "current", Source: domain.LibrarySource{
 					AccountID: "account", Directory: domain.LibraryDirectory{ID: "root"},
@@ -34,6 +36,11 @@ func TestScanNotificationsFollowTransactionCommit(t *testing.T) {
 				if operation == "reconcile" {
 					store.Client.File.Create().SetFileID("stale").SetName("old.mp4").SetSize(1).
 						SetAccountID("account").SetRootID("root").SetScanID("previous").ExecX(ctx)
+				}
+				if operation == "reconcile with scrape" {
+					film := store.Client.Movie.Create().SetCode("TEST-001").SaveX(ctx)
+					store.Client.File.Create().SetFileID("indexed").SetName("TEST-001.mp4").SetSize(1).
+						SetAccountID("account").SetRootID("root").SetScanID(payload.ScanID).SetMovieID(film.ID).ExecX(ctx)
 				}
 				tx, err := store.Client.Tx(ctx)
 				if err != nil {
@@ -52,6 +59,9 @@ func TestScanNotificationsFollowTransactionCommit(t *testing.T) {
 				if got := svc.Revisions().Library; got != 0 {
 					t.Fatalf("published library revision before commit: %d", got)
 				}
+				if len(work) != 0 {
+					t.Fatal("worker woke before scan transaction committed")
+				}
 				select {
 				case <-updates:
 					t.Fatal("woke subscribers before commit")
@@ -66,7 +76,7 @@ func TestScanNotificationsFollowTransactionCommit(t *testing.T) {
 					t.Fatal(err)
 				}
 				wantRevision := uint64(0)
-				if commit {
+				if commit && operation != "reconcile with scrape" {
 					wantRevision = 1
 				}
 				if got := svc.Revisions().Library; got != wantRevision {
@@ -83,11 +93,18 @@ func TestScanNotificationsFollowTransactionCommit(t *testing.T) {
 					}
 				}
 				wantFiles := 0
-				if operation == "page" && commit || operation == "reconcile" && !commit {
+				if operation == "page" && commit || operation == "reconcile" && !commit || operation == "reconcile with scrape" {
 					wantFiles = 1
 				}
 				if got := store.Client.File.Query().CountX(ctx); got != wantFiles {
 					t.Fatalf("committed file count = %d, want %d", got, wantFiles)
+				}
+				wantWork := 0
+				if commit && operation == "reconcile with scrape" {
+					wantWork = 1
+				}
+				if len(work) != wantWork {
+					t.Fatalf("worker notifications = %d, want %d", len(work), wantWork)
 				}
 			})
 		}

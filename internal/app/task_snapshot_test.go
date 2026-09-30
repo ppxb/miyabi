@@ -71,7 +71,7 @@ func TestTaskSnapshotsShareQueriesAndRefreshOnEveryNotification(t *testing.T) {
 	if queries.Load() != perLoad {
 		t.Fatalf("20 readers made %d queries, want one load (%d)", queries.Load(), perLoad)
 	}
-	for i, notify := range []func(){fix.Tasks.Notify, fix.Tasks.NotifyLibraryChanged, fix.Tasks.NotifyOfflineChanged, fix.Tasks.NotifyMonitorChanged} {
+	for i, notify := range []func(){fix.Tasks.NotifyUI, fix.Tasks.NotifyLibraryChanged, fix.Tasks.NotifyOfflineChanged, fix.Tasks.NotifyMonitorChanged} {
 		fix.DB.Task.UpdateOneID(fix.Queued.ID).SetProgress(i + 1).ExecX(t.Context())
 		notify()
 		queries.Store(0)
@@ -105,7 +105,7 @@ func TestTaskSnapshotReadDoesNotConsumeANewerNotification(t *testing.T) {
 	pending := readSnapshot(t.Context(), views)
 	<-started
 	fix.DB.Task.UpdateOneID(fix.Queued.ID).SetProgress(55).ExecX(t.Context())
-	fix.Tasks.Notify()
+	fix.Tasks.NotifyUI()
 	release <- struct{}{}
 	if got := <-pending; got.err != nil || got.items[0].Progress != 0 {
 		t.Fatalf("first read=%+v err=%v", got.items, got.err)
@@ -235,7 +235,7 @@ func TestTaskStreamsShareSnapshotsAndReconnectWithCurrentProgress(t *testing.T) 
 		t.Fatal("initial streams did not share one query round")
 	}
 	fix.DB.Task.UpdateOneID(fix.Queued.ID).SetProgress(42).ExecX(ctx)
-	fix.Tasks.Notify()
+	fix.Tasks.NotifyUI()
 	expectProgress(firstReader, 42)
 	expectProgress(secondReader, 42)
 	if queries.Load() != 2*perLoad {
@@ -249,7 +249,7 @@ func TestTaskStreamsShareSnapshotsAndReconnectWithCurrentProgress(t *testing.T) 
 		t.Fatal("reconnection did not reuse the current snapshot")
 	}
 	fix.DB.Task.UpdateOneID(fix.Queued.ID).SetProgress(70).ExecX(ctx)
-	fix.Tasks.Notify()
+	fix.Tasks.NotifyUI()
 	expectProgress(secondReader, 70)
 	expectProgress(reader, 70)
 	if queries.Load() != 3*perLoad {

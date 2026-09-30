@@ -191,6 +191,15 @@ func (s *Service) EnqueueTargetedScan(ctx context.Context, tx *ent.Tx, source do
 	if err != nil {
 		return 0, err
 	}
+	tx.OnCommit(func(next ent.Committer) ent.Committer {
+		return ent.CommitFunc(func(ctx context.Context, tx *ent.Tx) error {
+			if err := next.Commit(ctx, tx); err != nil {
+				return err
+			}
+			s.tasks.WakePool()
+			return nil
+		})
+	})
 	return taskRecord.ID, nil
 }
 
