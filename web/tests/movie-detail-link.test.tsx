@@ -3,7 +3,8 @@ import type { ComponentProps, MouseEvent } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { test, vi } from 'vitest'
 
-import { MovieDetailDialogContext, MovieDetailLink } from '@/features/movie-detail/detail-link'
+import { MovieDetailLink } from '@/features/movie-detail/detail-link'
+import { MovieDetailDialogContext } from '@/features/movie-detail/dialog-context'
 
 const { link } = vi.hoisted(() => ({ link: vi.fn() }))
 vi.mock('@tanstack/react-router', () => ({

@@ -1,9 +1,7 @@
 import { Link } from '@tanstack/react-router'
-import { createContext, useContext, type ComponentProps } from 'react'
+import { useContext, type ComponentProps } from 'react'
 
-export const MovieDetailDialogContext = createContext<
-  ((movieId: string, trigger: HTMLAnchorElement) => void) | null
->(null)
+import { MovieDetailDialogContext } from './dialog-context'
 
 export function MovieDetailLink({
   movieId,
@@ -14,11 +12,11 @@ export function MovieDetailLink({
 
   return (
     <Link
-      {...props}
       to="/discover/$movieId"
       params={{ movieId }}
       search={previous => ({ main: previous.main || undefined })}
       aria-haspopup="dialog"
+      {...props}
       onClick={event => {
         onClick?.(event)
         if (

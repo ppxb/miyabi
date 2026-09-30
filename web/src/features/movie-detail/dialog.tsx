@@ -10,7 +10,7 @@ import {
 } from 'react'
 
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { MovieDetailDialogContext } from './detail-link'
+import { MovieDetailDialogContext } from './dialog-context'
 import { MovieDetailSkeleton } from './skeleton'
 
 const MovieDetailContent = lazy(() =>

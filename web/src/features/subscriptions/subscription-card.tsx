@@ -6,6 +6,7 @@ import { MovieStateBadge } from '@/components/movie/movie-badges'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { MovieDetailLink } from '@/features/movie-detail/detail-link'
 import { cn } from 'cn'
 
@@ -28,8 +29,7 @@ export function isPendingSubscription(item: SubscriptionItem) {
   return item.status === 'waiting' || item.status === 'stale'
 }
 
-// One movie subscription in the grid. Selection mode mirrors the history page:
-// the whole card toggles the checkbox and stops navigating.
+// Keep the card mounted when switching between browsing and selection.
 export function SubscriptionCard({
   item,
   selecting,
@@ -68,52 +68,72 @@ export function SubscriptionCard({
           <Badge variant={statusVariant(item.status)}>{statusLabels[item.status]}</Badge>
         </>
       }
-    >
-      {!selecting ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="lg"
-          className="w-full"
-          disabled={busy}
-          onClick={event => {
-            event.preventDefault()
-            event.stopPropagation()
-            remove.mutate(item)
-          }}
-        >
-          {remove.isPending ? <LoaderCircleIcon className="animate-spin" /> : <Trash2Icon />}
-          取消订阅
-        </Button>
-      ) : null}
-    </MovieCard>
+      coverOverlay={
+        !selecting ? (
+          <div className="absolute top-2 right-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="icon-sm"
+                  disabled={busy}
+                  onClick={event => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    remove.mutate(item)
+                  }}
+                >
+                  {remove.isPending ? (
+                    <LoaderCircleIcon className="animate-spin" />
+                  ) : (
+                    <Trash2Icon />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">取消订阅</TooltipContent>
+            </Tooltip>
+          </div>
+        ) : undefined
+      }
+    />
   )
 
   return (
     <div className="relative h-full min-w-0">
-      {selecting ? (
-        <Button
-          type="button"
-          variant="ghost"
-          className={cn(
-            'block h-full w-full min-w-0 rounded-2xl p-0 text-left whitespace-normal hover:bg-transparent hover:text-current dark:hover:bg-transparent',
-            selected && 'ring-2 ring-success'
-          )}
-          disabled={disabled}
-          onClick={onSelect}
-        >
-          {card}
-        </Button>
-      ) : (
-        <MovieDetailLink movieId={item.target_id} className="block h-full rounded-2xl outline-ring">
-          {card}
-        </MovieDetailLink>
-      )}
+      <MovieDetailLink
+        movieId={item.target_id}
+        className={cn(
+          'block h-full rounded-2xl outline-ring',
+          selected && 'ring-2 ring-success',
+          selecting && disabled && 'cursor-not-allowed opacity-50'
+        )}
+        role={selecting ? 'checkbox' : undefined}
+        aria-checked={selecting ? selected : undefined}
+        aria-disabled={selecting ? disabled : undefined}
+        aria-haspopup={selecting ? false : 'dialog'}
+        tabIndex={selecting && disabled ? -1 : undefined}
+        onClick={event => {
+          if (!selecting) return
+          event.preventDefault()
+          if (!disabled) onSelect()
+        }}
+        onAuxClick={event => {
+          if (selecting) event.preventDefault()
+        }}
+        onKeyDown={event => {
+          if (!selecting || event.key !== ' ') return
+          event.preventDefault()
+          if (!disabled && !event.repeat) onSelect()
+        }}
+      >
+        {card}
+      </MovieDetailLink>
       {selecting ? (
         <Checkbox
           checked={selected}
           disabled={disabled}
           onCheckedChange={onSelect}
+          aria-label={`选择 ${item.code}`}
           className="absolute top-3 right-3 size-5 data-checked:border-success data-checked:bg-success data-checked:text-white"
         />
       ) : null}
