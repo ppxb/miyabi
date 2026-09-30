@@ -65,9 +65,14 @@ func UpdatedAt(v time.Time) predicate.Tag {
 	return predicate.Tag(sql.FieldEQ(FieldUpdatedAt, v))
 }
 
-// JavdbID applies equality check predicate on the "javdb_id" field. It's identical to JavdbIDEQ.
-func JavdbID(v string) predicate.Tag {
-	return predicate.Tag(sql.FieldEQ(FieldJavdbID, v))
+// Provider applies equality check predicate on the "provider" field. It's identical to ProviderEQ.
+func Provider(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldEQ(FieldProvider, v))
+}
+
+// SourceID applies equality check predicate on the "source_id" field. It's identical to SourceIDEQ.
+func SourceID(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldEQ(FieldSourceID, v))
 }
 
 // Name applies equality check predicate on the "name" field. It's identical to NameEQ.
@@ -165,69 +170,134 @@ func UpdatedAtLTE(v time.Time) predicate.Tag {
 	return predicate.Tag(sql.FieldLTE(FieldUpdatedAt, v))
 }
 
-// JavdbIDEQ applies the EQ predicate on the "javdb_id" field.
-func JavdbIDEQ(v string) predicate.Tag {
-	return predicate.Tag(sql.FieldEQ(FieldJavdbID, v))
+// ProviderEQ applies the EQ predicate on the "provider" field.
+func ProviderEQ(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldEQ(FieldProvider, v))
 }
 
-// JavdbIDNEQ applies the NEQ predicate on the "javdb_id" field.
-func JavdbIDNEQ(v string) predicate.Tag {
-	return predicate.Tag(sql.FieldNEQ(FieldJavdbID, v))
+// ProviderNEQ applies the NEQ predicate on the "provider" field.
+func ProviderNEQ(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldNEQ(FieldProvider, v))
 }
 
-// JavdbIDIn applies the In predicate on the "javdb_id" field.
-func JavdbIDIn(vs ...string) predicate.Tag {
-	return predicate.Tag(sql.FieldIn(FieldJavdbID, vs...))
+// ProviderIn applies the In predicate on the "provider" field.
+func ProviderIn(vs ...string) predicate.Tag {
+	return predicate.Tag(sql.FieldIn(FieldProvider, vs...))
 }
 
-// JavdbIDNotIn applies the NotIn predicate on the "javdb_id" field.
-func JavdbIDNotIn(vs ...string) predicate.Tag {
-	return predicate.Tag(sql.FieldNotIn(FieldJavdbID, vs...))
+// ProviderNotIn applies the NotIn predicate on the "provider" field.
+func ProviderNotIn(vs ...string) predicate.Tag {
+	return predicate.Tag(sql.FieldNotIn(FieldProvider, vs...))
 }
 
-// JavdbIDGT applies the GT predicate on the "javdb_id" field.
-func JavdbIDGT(v string) predicate.Tag {
-	return predicate.Tag(sql.FieldGT(FieldJavdbID, v))
+// ProviderGT applies the GT predicate on the "provider" field.
+func ProviderGT(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldGT(FieldProvider, v))
 }
 
-// JavdbIDGTE applies the GTE predicate on the "javdb_id" field.
-func JavdbIDGTE(v string) predicate.Tag {
-	return predicate.Tag(sql.FieldGTE(FieldJavdbID, v))
+// ProviderGTE applies the GTE predicate on the "provider" field.
+func ProviderGTE(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldGTE(FieldProvider, v))
 }
 
-// JavdbIDLT applies the LT predicate on the "javdb_id" field.
-func JavdbIDLT(v string) predicate.Tag {
-	return predicate.Tag(sql.FieldLT(FieldJavdbID, v))
+// ProviderLT applies the LT predicate on the "provider" field.
+func ProviderLT(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldLT(FieldProvider, v))
 }
 
-// JavdbIDLTE applies the LTE predicate on the "javdb_id" field.
-func JavdbIDLTE(v string) predicate.Tag {
-	return predicate.Tag(sql.FieldLTE(FieldJavdbID, v))
+// ProviderLTE applies the LTE predicate on the "provider" field.
+func ProviderLTE(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldLTE(FieldProvider, v))
 }
 
-// JavdbIDContains applies the Contains predicate on the "javdb_id" field.
-func JavdbIDContains(v string) predicate.Tag {
-	return predicate.Tag(sql.FieldContains(FieldJavdbID, v))
+// ProviderContains applies the Contains predicate on the "provider" field.
+func ProviderContains(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldContains(FieldProvider, v))
 }
 
-// JavdbIDHasPrefix applies the HasPrefix predicate on the "javdb_id" field.
-func JavdbIDHasPrefix(v string) predicate.Tag {
-	return predicate.Tag(sql.FieldHasPrefix(FieldJavdbID, v))
+// ProviderHasPrefix applies the HasPrefix predicate on the "provider" field.
+func ProviderHasPrefix(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldHasPrefix(FieldProvider, v))
 }
 
-// JavdbIDHasSuffix applies the HasSuffix predicate on the "javdb_id" field.
-func JavdbIDHasSuffix(v string) predicate.Tag {
-	return predicate.Tag(sql.FieldHasSuffix(FieldJavdbID, v))
+// ProviderHasSuffix applies the HasSuffix predicate on the "provider" field.
+func ProviderHasSuffix(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldHasSuffix(FieldProvider, v))
 }
 
-// JavdbIDEqualFold applies the EqualFold predicate on the "javdb_id" field.
-func JavdbIDEqualFold(v string) predicate.Tag {
-	return predicate.Tag(sql.FieldEqualFold(FieldJavdbID, v))
+// ProviderEqualFold applies the EqualFold predicate on the "provider" field.
+func ProviderEqualFold(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldEqualFold(FieldProvider, v))
 }
 
-// JavdbIDContainsFold applies the ContainsFold predicate on the "javdb_id" field.
-func JavdbIDContainsFold(v string) predicate.Tag {
-	return predicate.Tag(sql.FieldContainsFold(FieldJavdbID, v))
+// ProviderContainsFold applies the ContainsFold predicate on the "provider" field.
+func ProviderContainsFold(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldContainsFold(FieldProvider, v))
+}
+
+// SourceIDEQ applies the EQ predicate on the "source_id" field.
+func SourceIDEQ(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldEQ(FieldSourceID, v))
+}
+
+// SourceIDNEQ applies the NEQ predicate on the "source_id" field.
+func SourceIDNEQ(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldNEQ(FieldSourceID, v))
+}
+
+// SourceIDIn applies the In predicate on the "source_id" field.
+func SourceIDIn(vs ...string) predicate.Tag {
+	return predicate.Tag(sql.FieldIn(FieldSourceID, vs...))
+}
+
+// SourceIDNotIn applies the NotIn predicate on the "source_id" field.
+func SourceIDNotIn(vs ...string) predicate.Tag {
+	return predicate.Tag(sql.FieldNotIn(FieldSourceID, vs...))
+}
+
+// SourceIDGT applies the GT predicate on the "source_id" field.
+func SourceIDGT(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldGT(FieldSourceID, v))
+}
+
+// SourceIDGTE applies the GTE predicate on the "source_id" field.
+func SourceIDGTE(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldGTE(FieldSourceID, v))
+}
+
+// SourceIDLT applies the LT predicate on the "source_id" field.
+func SourceIDLT(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldLT(FieldSourceID, v))
+}
+
+// SourceIDLTE applies the LTE predicate on the "source_id" field.
+func SourceIDLTE(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldLTE(FieldSourceID, v))
+}
+
+// SourceIDContains applies the Contains predicate on the "source_id" field.
+func SourceIDContains(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldContains(FieldSourceID, v))
+}
+
+// SourceIDHasPrefix applies the HasPrefix predicate on the "source_id" field.
+func SourceIDHasPrefix(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldHasPrefix(FieldSourceID, v))
+}
+
+// SourceIDHasSuffix applies the HasSuffix predicate on the "source_id" field.
+func SourceIDHasSuffix(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldHasSuffix(FieldSourceID, v))
+}
+
+// SourceIDEqualFold applies the EqualFold predicate on the "source_id" field.
+func SourceIDEqualFold(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldEqualFold(FieldSourceID, v))
+}
+
+// SourceIDContainsFold applies the ContainsFold predicate on the "source_id" field.
+func SourceIDContainsFold(v string) predicate.Tag {
+	return predicate.Tag(sql.FieldContainsFold(FieldSourceID, v))
 }
 
 // NameEQ applies the EQ predicate on the "name" field.

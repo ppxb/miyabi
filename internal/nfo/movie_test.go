@@ -9,8 +9,8 @@ import (
 
 func TestActorAvatarSourceRoundTripsWithoutAnEmbyDownloadURL(t *testing.T) {
 	for _, input := range []string{
-		`<movie><num>ABP-001</num><actor><javdbid>actor-1</javdbid><name>Actor</name><thumb>https://cdn.example/encoded.jpg</thumb></actor></movie>`,
-		`<movie><num>ABP-001</num><actor><javdbid>actor-1</javdbid><name>Actor</name><miyabi_avatar>https://cdn.example/encoded.jpg</miyabi_avatar></actor></movie>`,
+		`<movie><num>ABP-001</num><actor provider="javdb"><sourceid>actor-1</sourceid><name>Actor</name><thumb>https://cdn.example/encoded.jpg</thumb></actor></movie>`,
+		`<movie><num>ABP-001</num><actor provider="javdb"><sourceid>actor-1</sourceid><name>Actor</name><miyabi_avatar>https://cdn.example/encoded.jpg</miyabi_avatar></actor></movie>`,
 	} {
 		doc, err := Decode([]byte(input))
 		if err != nil {
@@ -67,17 +67,17 @@ func TestUnfamiliarNumbersRoundTripWithSafeFilenames(t *testing.T) {
 	}
 }
 
-func TestRoundTripPreservesSourceIDsAndOmitsPlot(t *testing.T) {
+func TestRoundTripPreservesSourceIDsAndPlot(t *testing.T) {
 	input := []byte(`<movie>
   <title>Fixture &amp; title</title><num>ABP-001</num>
   <uniqueid type="javdb" default="true">fixture-movie</uniqueid>
   <premiered>2024-01-02</premiered><runtime>120</runtime><rating>4.5</rating>
-  <director javdbid="director-1">Director</director>
-  <studio javdbid="maker-1">Maker</studio><set javdbid="series-1"><name>Series</name></set>
-  <actor><name>Actor</name><javdbid>actor-1</javdbid><name_zht>演員</name_zht><gender>female</gender></actor>
-  <tag javdbid="tag-1" category="category-1" name_zht="標籤">Tag</tag>
+  <director provider="javdb" sourceid="director-1">Director</director>
+  <studio provider="javdb" sourceid="maker-1">Maker</studio><set provider="javdb" sourceid="series-1"><name>Series</name></set>
+  <actor provider="javdb"><name>Actor</name><sourceid>actor-1</sourceid><name_zht>演員</name_zht><gender>female</gender></actor>
+  <tag provider="javdb" sourceid="tag-1" category="category-1" name_zht="標籤">Tag</tag>
   <thumb aspect="poster">ABP-001-poster.jpg</thumb><fanart><thumb>ABP-001-fanart.jpg</thumb></fanart>
-  <plot>Must not be retained</plot>
+  <plot>Source synopsis</plot>
 </movie>`)
 	doc, err := Decode(input)
 	if err != nil {
@@ -87,8 +87,8 @@ func TestRoundTripPreservesSourceIDsAndOmitsPlot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(body), "plot") || strings.Contains(string(body), "Must not be retained") {
-		t.Fatal("NFO retained plot content")
+	if !strings.Contains(string(body), "<plot>Source synopsis</plot>") {
+		t.Fatal("NFO lost source synopsis")
 	}
 	got, err := Decode(body)
 	if err != nil {

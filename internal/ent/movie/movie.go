@@ -52,6 +52,8 @@ const (
 	FieldPoster = "poster"
 	// FieldFanarts holds the string denoting the fanarts field in the database.
 	FieldFanarts = "fanarts"
+	// FieldMetadata holds the string denoting the metadata field in the database.
+	FieldMetadata = "metadata"
 	// FieldMetadataSnapshot holds the string denoting the metadata_snapshot field in the database.
 	FieldMetadataSnapshot = "metadata_snapshot"
 	// FieldScrapeStatus holds the string denoting the scrape_status field in the database.
@@ -113,6 +115,7 @@ var Columns = []string{
 	FieldCover,
 	FieldPoster,
 	FieldFanarts,
+	FieldMetadata,
 	FieldMetadataSnapshot,
 	FieldScrapeStatus,
 }

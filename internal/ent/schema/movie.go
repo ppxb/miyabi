@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent/schema/index"
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/nfo"
 )
 
 type Movie struct {
@@ -69,6 +70,7 @@ func (Movie) Fields() []ent.Field {
 			Nillable(),
 		field.JSON("fanarts", []string{}).
 			Default(func() []string { return []string{} }),
+		field.JSON("metadata", &nfo.Movie{}).Optional(),
 		field.JSON("metadata_snapshot", &domain.MetadataSnapshot{}).Optional(),
 		field.Enum("scrape_status").
 			Values("pending", "done", "failed").

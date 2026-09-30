@@ -21,7 +21,11 @@ import (
 func TestScanRefreshesOutdatedPostersOnceWithoutDownloadingCovers(t *testing.T) {
 	fixture := newPipelineFixture(t)
 	ctx := t.Context()
-	face, err := imaging.Open("../image/testdata/faces.jpg")
+	path := os.Getenv("MIYABI_TEST_FACE_IMAGE")
+	if path == "" {
+		t.Skip("set MIYABI_TEST_FACE_IMAGE to a real portrait outside the repository")
+	}
+	face, err := imaging.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +66,7 @@ func TestScanRefreshesOutdatedPostersOnceWithoutDownloadingCovers(t *testing.T) 
 	}
 	calls := maps.Clone(fixture.catalogue.calls)
 	notifications := 0
-	service := scrapePkg.New(fixture.store.Client, fixture.driveService, fixture.discover, fixture.images, fixture.tasks,
+	service := scrapePkg.New(fixture.store.Client, fixture.driveService, fixtureMetadata{fixture.discover}, fixture.images, fixture.tasks,
 		scrapePkg.Dependencies{
 			ExportManager: export.NewManager(export.Config{EmbyDir: fixture.embyDir, PublicURL: "http://127.0.0.1:8080"}),
 			MediaNotifier: coverExportProbe{onUpdated: func(_ context.Context, path string) error {
@@ -79,8 +83,8 @@ func TestScanRefreshesOutdatedPostersOnceWithoutDownloadingCovers(t *testing.T) 
 		t.Fatal(err)
 	}
 	jobs := fixture.runQueue(t)
-	if len(jobs) != 3 || jobs[2].Type != tasks.KindCover {
-		t.Fatalf("expected scan/scrape/cover refresh: %+v", jobs)
+	if len(jobs) != 2 || jobs[1].Type != tasks.KindScrape {
+		t.Fatalf("expected scan/scrape refresh: %+v", jobs)
 	}
 	updated := fixture.store.Client.Movie.GetX(ctx, record.ID)
 	if updated.MetadataSnapshot.PosterVersion != mediaimage.PosterVersion || *updated.Poster == old.Poster {

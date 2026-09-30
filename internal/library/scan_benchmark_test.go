@@ -54,7 +54,7 @@ func BenchmarkScanPayload(b *testing.B) {
 func BenchmarkLibraryPage(b *testing.B) {
 	lib, _, payload := libraryFixture(b)
 	if err := ent.WithTx(b.Context(), lib.database, func(tx *ent.Tx) error {
-		label := tx.Tag.Create().SetJavdbID("tag").SetName("Fixture tag").SetCategoryID("category").SaveX(b.Context())
+		label := tx.Tag.Create().SetProvider("javdb").SetSourceID("tag").SetName("Fixture tag").SetCategoryID("category").SaveX(b.Context())
 		for i := range 500 {
 			film := tx.Movie.Create().SetCode(fmt.Sprintf("ABP-%04d", i)).SetTitle("Fixture title").AddTags(label).SaveX(b.Context())
 			var files []*ent.FileCreate

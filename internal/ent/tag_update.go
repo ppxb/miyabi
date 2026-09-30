@@ -35,16 +35,30 @@ func (_u *TagUpdate) SetUpdatedAt(v time.Time) *TagUpdate {
 	return _u
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (_u *TagUpdate) SetJavdbID(v string) *TagUpdate {
-	_u.mutation.SetJavdbID(v)
+// SetProvider sets the "provider" field.
+func (_u *TagUpdate) SetProvider(v string) *TagUpdate {
+	_u.mutation.SetProvider(v)
 	return _u
 }
 
-// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
-func (_u *TagUpdate) SetNillableJavdbID(v *string) *TagUpdate {
+// SetNillableProvider sets the "provider" field if the given value is not nil.
+func (_u *TagUpdate) SetNillableProvider(v *string) *TagUpdate {
 	if v != nil {
-		_u.SetJavdbID(*v)
+		_u.SetProvider(*v)
+	}
+	return _u
+}
+
+// SetSourceID sets the "source_id" field.
+func (_u *TagUpdate) SetSourceID(v string) *TagUpdate {
+	_u.mutation.SetSourceID(v)
+	return _u
+}
+
+// SetNillableSourceID sets the "source_id" field if the given value is not nil.
+func (_u *TagUpdate) SetNillableSourceID(v *string) *TagUpdate {
+	if v != nil {
+		_u.SetSourceID(*v)
 	}
 	return _u
 }
@@ -176,19 +190,19 @@ func (_u *TagUpdate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *TagUpdate) check() error {
-	if v, ok := _u.mutation.JavdbID(); ok {
-		if err := tag.JavdbIDValidator(v); err != nil {
-			return &ValidationError{Name: "javdb_id", err: fmt.Errorf(`ent: validator failed for field "Tag.javdb_id": %w`, err)}
+	if v, ok := _u.mutation.Provider(); ok {
+		if err := tag.ProviderValidator(v); err != nil {
+			return &ValidationError{Name: "provider", err: fmt.Errorf(`ent: validator failed for field "Tag.provider": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SourceID(); ok {
+		if err := tag.SourceIDValidator(v); err != nil {
+			return &ValidationError{Name: "source_id", err: fmt.Errorf(`ent: validator failed for field "Tag.source_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Name(); ok {
 		if err := tag.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Tag.name": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.CategoryID(); ok {
-		if err := tag.CategoryIDValidator(v); err != nil {
-			return &ValidationError{Name: "category_id", err: fmt.Errorf(`ent: validator failed for field "Tag.category_id": %w`, err)}
 		}
 	}
 	return nil
@@ -209,8 +223,11 @@ func (_u *TagUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(tag.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if value, ok := _u.mutation.JavdbID(); ok {
-		_spec.SetField(tag.FieldJavdbID, field.TypeString, value)
+	if value, ok := _u.mutation.Provider(); ok {
+		_spec.SetField(tag.FieldProvider, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SourceID(); ok {
+		_spec.SetField(tag.FieldSourceID, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(tag.FieldName, field.TypeString, value)
@@ -295,16 +312,30 @@ func (_u *TagUpdateOne) SetUpdatedAt(v time.Time) *TagUpdateOne {
 	return _u
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (_u *TagUpdateOne) SetJavdbID(v string) *TagUpdateOne {
-	_u.mutation.SetJavdbID(v)
+// SetProvider sets the "provider" field.
+func (_u *TagUpdateOne) SetProvider(v string) *TagUpdateOne {
+	_u.mutation.SetProvider(v)
 	return _u
 }
 
-// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
-func (_u *TagUpdateOne) SetNillableJavdbID(v *string) *TagUpdateOne {
+// SetNillableProvider sets the "provider" field if the given value is not nil.
+func (_u *TagUpdateOne) SetNillableProvider(v *string) *TagUpdateOne {
 	if v != nil {
-		_u.SetJavdbID(*v)
+		_u.SetProvider(*v)
+	}
+	return _u
+}
+
+// SetSourceID sets the "source_id" field.
+func (_u *TagUpdateOne) SetSourceID(v string) *TagUpdateOne {
+	_u.mutation.SetSourceID(v)
+	return _u
+}
+
+// SetNillableSourceID sets the "source_id" field if the given value is not nil.
+func (_u *TagUpdateOne) SetNillableSourceID(v *string) *TagUpdateOne {
+	if v != nil {
+		_u.SetSourceID(*v)
 	}
 	return _u
 }
@@ -449,19 +480,19 @@ func (_u *TagUpdateOne) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *TagUpdateOne) check() error {
-	if v, ok := _u.mutation.JavdbID(); ok {
-		if err := tag.JavdbIDValidator(v); err != nil {
-			return &ValidationError{Name: "javdb_id", err: fmt.Errorf(`ent: validator failed for field "Tag.javdb_id": %w`, err)}
+	if v, ok := _u.mutation.Provider(); ok {
+		if err := tag.ProviderValidator(v); err != nil {
+			return &ValidationError{Name: "provider", err: fmt.Errorf(`ent: validator failed for field "Tag.provider": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SourceID(); ok {
+		if err := tag.SourceIDValidator(v); err != nil {
+			return &ValidationError{Name: "source_id", err: fmt.Errorf(`ent: validator failed for field "Tag.source_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Name(); ok {
 		if err := tag.NameValidator(v); err != nil {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Tag.name": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.CategoryID(); ok {
-		if err := tag.CategoryIDValidator(v); err != nil {
-			return &ValidationError{Name: "category_id", err: fmt.Errorf(`ent: validator failed for field "Tag.category_id": %w`, err)}
 		}
 	}
 	return nil
@@ -499,8 +530,11 @@ func (_u *TagUpdateOne) sqlSave(ctx context.Context) (_node *Tag, err error) {
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(tag.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if value, ok := _u.mutation.JavdbID(); ok {
-		_spec.SetField(tag.FieldJavdbID, field.TypeString, value)
+	if value, ok := _u.mutation.Provider(); ok {
+		_spec.SetField(tag.FieldProvider, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SourceID(); ok {
+		_spec.SetField(tag.FieldSourceID, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(tag.FieldName, field.TypeString, value)

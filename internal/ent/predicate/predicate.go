@@ -15,6 +15,9 @@ type EmbyNotification func(*sql.Selector)
 // File is the predicate function for file builders.
 type File func(*sql.Selector)
 
+// MetadataCache is the predicate function for metadatacache builders.
+type MetadataCache func(*sql.Selector)
+
 // Movie is the predicate function for movie builders.
 type Movie func(*sql.Selector)
 

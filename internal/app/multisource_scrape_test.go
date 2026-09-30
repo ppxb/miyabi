@@ -1,0 +1,113 @@
+package app
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/ent/task"
+	"github.com/ppxb/miyabi/internal/export"
+	"github.com/ppxb/miyabi/internal/library/scrape"
+	"github.com/ppxb/miyabi/internal/metadata"
+	"github.com/ppxb/miyabi/internal/nfo"
+	"github.com/ppxb/miyabi/internal/tasks"
+)
+
+type workflowSource struct {
+	body      []byte
+	failImage bool
+	queries   int
+}
+
+func (*workflowSource) ID() string           { return "avbase" }
+func (*workflowSource) Supports(string) bool { return true }
+func (s *workflowSource) Fetch(_ context.Context, code string) (domain.MovieMetadata, error) {
+	s.queries++
+	return domain.MovieMetadata{Detail: domain.MovieDetail{Movie: domain.Movie{
+		Code: code, Title: "Independent metadata", Sources: []domain.SourceID{{Provider: "avbase", ID: code}},
+		Actors: []domain.Actor{{Provider: "avbase", ID: "42", Name: "Actor"}}, Tags: []domain.Tag{{Provider: "avbase", ID: "7", Name: "Tag"}},
+	}}, Images: []domain.ImageCandidate{{Provider: "avbase", URL: "https://fixture.example/cover.jpg", Role: "cover"}}}, nil
+}
+func (s *workflowSource) Media(context.Context, string) (domain.Media, error) {
+	if s.failImage {
+		return domain.Media{}, errors.New("image unavailable")
+	}
+	return domain.Media{Body: s.body, ContentType: "image/jpeg"}, nil
+}
+
+func TestMultiSourceScrapeWithoutJavDBResumesAfterImageFailure(t *testing.T) {
+	f := newPipelineFixture(t)
+	source := &workflowSource{body: f.catalogue.cover, failImage: true}
+	meta, err := metadata.New(t.Context(), f.store.Client, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(meta.Close)
+	service := scrape.New(f.store.Client, f.driveService, meta, f.images, f.tasks, scrape.Dependencies{ExportManager: export.NewManager(export.Config{EmbyDir: f.embyDir, PublicURL: "http://127.0.0.1:8080"})})
+	t.Cleanup(service.Close)
+	f.scrape = service
+	f.drive.addFile("101", "10", "ABP-123.mp4", 2<<30, []byte("video"))
+	if _, err := f.library.StartScan(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	jobs := f.runQueue(t)
+	if len(jobs) != 2 {
+		t.Fatalf("workflow has %d jobs", len(jobs))
+	}
+	record := f.store.Client.Movie.Query().OnlyX(t.Context())
+	job := f.store.Client.Task.GetX(t.Context(), jobs[1].ID)
+	payload, err := tasks.DecodePayload[scrape.Payload](job.Payload)
+	if err != nil || !payload.MetadataReady || payload.Completed || job.Status != task.StatusFailed || record.JavdbID != nil {
+		t.Fatalf("metadata was not checkpointed: %+v %+v %v", job, payload, err)
+	}
+	source.failImage = false
+	job.Update().SetStatus(task.StatusQueued).ExecX(t.Context())
+	f.runQueue(t)
+	record = f.store.Client.Movie.Query().WithActors().WithTags().OnlyX(t.Context())
+	if record.ScrapeStatus != movie.ScrapeStatusDone || record.JavdbID != nil || record.Title != "Independent metadata" || record.Edges.Actors[0].Provider != "avbase" || record.Edges.Tags[0].Provider != "avbase" {
+		t.Fatalf("source identity lost: %+v", record)
+	}
+	if source.queries != 1 || len(f.catalogue.calls) != 0 {
+		t.Fatalf("retry re-queried metadata or JavDB: %d %v", source.queries, f.catalogue.calls)
+	}
+	body, err := os.ReadFile(filepath.Join(f.embyDir, "ABP", "ABP-123", "ABP-123.nfo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := nfo.Decode(body)
+	if err != nil || doc.JavDBID() != "" || doc.IDs[0].Type != "avbase" || doc.Actors[0].Provider != "avbase" {
+		t.Fatalf("invalid NFO identities: %+v %v", doc, err)
+	}
+}
+
+func TestMetadataCheckpointFailureRollsBackMovieAndTask(t *testing.T) {
+	f := newPipelineFixture(t)
+	f.drive.addFile("101", "10", "ABP-123.mp4", 2<<30, []byte("video"))
+	f.addCatalogueMovie(fixtureDetail())
+	if _, err := f.library.StartScan(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	failure := errors.New("metadata checkpoint rollback")
+	f.store.Client.Task.Use(func(next ent.Mutator) ent.Mutator {
+		return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+			if raw, ok := m.(*ent.TaskMutation).Payload(); ok {
+				p, err := tasks.DecodePayload[scrape.Payload](raw)
+				if err == nil && p.MetadataReady {
+					return nil, failure
+				}
+			}
+			return next.Mutate(ctx, m)
+		})
+	})
+	jobs := f.runQueue(t)
+	record := f.store.Client.Movie.Query().OnlyX(t.Context())
+	checkpoint, err := tasks.DecodePayload[scrape.Payload](f.store.Client.Task.GetX(t.Context(), jobs[1].ID).Payload)
+	if err != nil || checkpoint.MetadataReady || record.Title != "" || record.Metadata != nil || f.store.Client.Actor.Query().CountX(t.Context()) != 0 {
+		t.Fatalf("metadata escaped rollback: %+v %+v %v", record, checkpoint, err)
+	}
+}

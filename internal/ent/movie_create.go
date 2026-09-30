@@ -17,6 +17,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/ent/tag"
+	"github.com/ppxb/miyabi/internal/nfo"
 )
 
 // MovieCreate is the builder for creating a Movie entity.
@@ -260,6 +261,12 @@ func (_c *MovieCreate) SetNillablePoster(v *string) *MovieCreate {
 // SetFanarts sets the "fanarts" field.
 func (_c *MovieCreate) SetFanarts(v []string) *MovieCreate {
 	_c.mutation.SetFanarts(v)
+	return _c
+}
+
+// SetMetadata sets the "metadata" field.
+func (_c *MovieCreate) SetMetadata(v *nfo.Movie) *MovieCreate {
+	_c.mutation.SetMetadata(v)
 	return _c
 }
 
@@ -547,6 +554,10 @@ func (_c *MovieCreate) createSpec() (*Movie, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Fanarts(); ok {
 		_spec.SetField(movie.FieldFanarts, field.TypeJSON, value)
 		_node.Fanarts = value
+	}
+	if value, ok := _c.mutation.Metadata(); ok {
+		_spec.SetField(movie.FieldMetadata, field.TypeJSON, value)
+		_node.Metadata = value
 	}
 	if value, ok := _c.mutation.MetadataSnapshot(); ok {
 		_spec.SetField(movie.FieldMetadataSnapshot, field.TypeJSON, value)
@@ -960,6 +971,24 @@ func (u *MovieUpsert) UpdateFanarts() *MovieUpsert {
 	return u
 }
 
+// SetMetadata sets the "metadata" field.
+func (u *MovieUpsert) SetMetadata(v *nfo.Movie) *MovieUpsert {
+	u.Set(movie.FieldMetadata, v)
+	return u
+}
+
+// UpdateMetadata sets the "metadata" field to the value that was provided on create.
+func (u *MovieUpsert) UpdateMetadata() *MovieUpsert {
+	u.SetExcluded(movie.FieldMetadata)
+	return u
+}
+
+// ClearMetadata clears the value of the "metadata" field.
+func (u *MovieUpsert) ClearMetadata() *MovieUpsert {
+	u.SetNull(movie.FieldMetadata)
+	return u
+}
+
 // SetMetadataSnapshot sets the "metadata_snapshot" field.
 func (u *MovieUpsert) SetMetadataSnapshot(v *domain.MetadataSnapshot) *MovieUpsert {
 	u.Set(movie.FieldMetadataSnapshot, v)
@@ -1368,6 +1397,27 @@ func (u *MovieUpsertOne) SetFanarts(v []string) *MovieUpsertOne {
 func (u *MovieUpsertOne) UpdateFanarts() *MovieUpsertOne {
 	return u.Update(func(s *MovieUpsert) {
 		s.UpdateFanarts()
+	})
+}
+
+// SetMetadata sets the "metadata" field.
+func (u *MovieUpsertOne) SetMetadata(v *nfo.Movie) *MovieUpsertOne {
+	return u.Update(func(s *MovieUpsert) {
+		s.SetMetadata(v)
+	})
+}
+
+// UpdateMetadata sets the "metadata" field to the value that was provided on create.
+func (u *MovieUpsertOne) UpdateMetadata() *MovieUpsertOne {
+	return u.Update(func(s *MovieUpsert) {
+		s.UpdateMetadata()
+	})
+}
+
+// ClearMetadata clears the value of the "metadata" field.
+func (u *MovieUpsertOne) ClearMetadata() *MovieUpsertOne {
+	return u.Update(func(s *MovieUpsert) {
+		s.ClearMetadata()
 	})
 }
 
@@ -1950,6 +2000,27 @@ func (u *MovieUpsertBulk) SetFanarts(v []string) *MovieUpsertBulk {
 func (u *MovieUpsertBulk) UpdateFanarts() *MovieUpsertBulk {
 	return u.Update(func(s *MovieUpsert) {
 		s.UpdateFanarts()
+	})
+}
+
+// SetMetadata sets the "metadata" field.
+func (u *MovieUpsertBulk) SetMetadata(v *nfo.Movie) *MovieUpsertBulk {
+	return u.Update(func(s *MovieUpsert) {
+		s.SetMetadata(v)
+	})
+}
+
+// UpdateMetadata sets the "metadata" field to the value that was provided on create.
+func (u *MovieUpsertBulk) UpdateMetadata() *MovieUpsertBulk {
+	return u.Update(func(s *MovieUpsert) {
+		s.UpdateMetadata()
+	})
+}
+
+// ClearMetadata clears the value of the "metadata" field.
+func (u *MovieUpsertBulk) ClearMetadata() *MovieUpsertBulk {
+	return u.Update(func(s *MovieUpsert) {
+		s.ClearMetadata()
 	})
 }
 

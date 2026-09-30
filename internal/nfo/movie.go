@@ -3,27 +3,36 @@ package nfo
 import (
 	"encoding/xml"
 	"fmt"
+	"github.com/ppxb/miyabi/internal/domain"
 	"net/url"
 )
 
 // Kodi reads the standard fields. Source IDs and category/gender attributes
-// keep a Miyabi rescan lossless without requesting JavDB again.
+// keep a Miyabi rescan lossless without requesting metadata sources again.
 type Movie struct {
-	XMLName   xml.Name   `xml:"movie" json:"-"`
-	Title     string     `xml:"title" json:"title"`
-	Code      string     `xml:"num" json:"code"`
-	IDs       []UniqueID `xml:"uniqueid" json:"ids"`
-	Premiered string     `xml:"premiered,omitempty" json:"premiered"`
-	Runtime   int        `xml:"runtime,omitempty" json:"runtime"`
-	Rating    float64    `xml:"rating,omitempty" json:"rating"`
-	Director  Entity     `xml:"director" json:"director"`
-	Studio    Entity     `xml:"studio" json:"studio"`
-	Set       Series     `xml:"set" json:"set"`
-	Actors    []Actor    `xml:"actor" json:"actors"`
-	Tags      []Tag      `xml:"tag" json:"tags"`
-	Genres    []string   `xml:"genre" json:"genres"`
-	Thumbs    []Thumb    `xml:"thumb" json:"thumbs"`
-	Fanart    string     `xml:"fanart>thumb,omitempty" json:"fanart"`
+	SelectedImage domain.ImageCandidate   `xml:"-" json:"selected_image,omitempty"`
+	Images        []domain.ImageCandidate `xml:"-" json:"images,omitempty"`
+	Summary       string                  `xml:"plot,omitempty" json:"summary,omitempty"`
+	RatingSource  string                  `xml:"rating_source,omitempty" json:"rating_source,omitempty"`
+	RatingMax     float64                 `xml:"rating_max,omitempty" json:"rating_max,omitempty"`
+	FieldSources  map[string]string       `xml:"-" json:"field_sources,omitempty"`
+	Previews      []domain.PreviewImage   `xml:"-" json:"previews,omitempty"`
+	PreviewVideo  string                  `xml:"trailer,omitempty" json:"preview_video,omitempty"`
+	XMLName       xml.Name                `xml:"movie" json:"-"`
+	Title         string                  `xml:"title" json:"title"`
+	Code          string                  `xml:"num" json:"code"`
+	IDs           []UniqueID              `xml:"uniqueid" json:"ids"`
+	Premiered     string                  `xml:"premiered,omitempty" json:"premiered"`
+	Runtime       int                     `xml:"runtime,omitempty" json:"runtime"`
+	Rating        float64                 `xml:"rating,omitempty" json:"rating"`
+	Director      Entity                  `xml:"director" json:"director"`
+	Studio        Entity                  `xml:"studio" json:"studio"`
+	Set           Series                  `xml:"set" json:"set"`
+	Actors        []Actor                 `xml:"actor" json:"actors"`
+	Tags          []Tag                   `xml:"tag" json:"tags"`
+	Genres        []string                `xml:"genre" json:"genres"`
+	Thumbs        []Thumb                 `xml:"thumb" json:"thumbs"`
+	Fanart        string                  `xml:"fanart>thumb,omitempty" json:"fanart"`
 }
 
 type UniqueID struct {
@@ -33,20 +42,23 @@ type UniqueID struct {
 }
 
 type Entity struct {
-	ID   string `xml:"javdbid,attr,omitempty" json:"id"`
-	Name string `xml:",chardata" json:"name"`
+	Provider string `xml:"provider,attr,omitempty" json:"provider,omitempty"`
+	ID       string `xml:"sourceid,attr,omitempty" json:"id"`
+	Name     string `xml:",chardata" json:"name"`
 }
 
 type Series struct {
-	ID   string `xml:"javdbid,attr,omitempty" json:"id"`
-	Name string `xml:"name,omitempty" json:"name"`
+	Provider string `xml:"provider,attr,omitempty" json:"provider,omitempty"`
+	ID       string `xml:"sourceid,attr,omitempty" json:"id"`
+	Name     string `xml:"name,omitempty" json:"name"`
 }
 
 type Actor struct {
-	ID      string `xml:"javdbid,omitempty" json:"id"`
-	Name    string `xml:"name" json:"name"`
-	NameZHT string `xml:"name_zht,omitempty" json:"name_zht"`
-	Gender  string `xml:"gender,omitempty" json:"gender"`
+	Provider string `xml:"provider,attr,omitempty" json:"provider,omitempty"`
+	ID       string `xml:"sourceid,omitempty" json:"id"`
+	Name     string `xml:"name" json:"name"`
+	NameZHT  string `xml:"name_zht,omitempty" json:"name_zht"`
+	Gender   string `xml:"gender,omitempty" json:"gender"`
 	// Actor images are uploaded by Miyabi after decoding, not fetched by Emby.
 	Thumb string `xml:"miyabi_avatar,omitempty" json:"thumb"`
 }
@@ -69,7 +81,8 @@ func (actor *Actor) UnmarshalXML(decoder *xml.Decoder, start xml.StartElement) e
 }
 
 type Tag struct {
-	ID         string `xml:"javdbid,attr,omitempty" json:"id"`
+	Provider   string `xml:"provider,attr,omitempty" json:"provider,omitempty"`
+	ID         string `xml:"sourceid,attr,omitempty" json:"id"`
 	CategoryID string `xml:"category,attr,omitempty" json:"category_id"`
 	NameZHT    string `xml:"name_zht,attr,omitempty" json:"name_zht"`
 	Name       string `xml:",chardata" json:"name"`

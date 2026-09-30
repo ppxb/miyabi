@@ -104,7 +104,7 @@ func (service *Service) retainedArtwork(ctx context.Context) (map[string]bool, e
 	// of that handoff, even when completion happens between the two queries.
 	var pending []mediaimage.Artwork
 	err := service.db.Task.Query().Where(
-		task.TypeEQ(tasks.KindCover.String()), task.StatusNEQ(task.StatusDone),
+		task.TypeEQ(tasks.KindScrape.String()), task.StatusNEQ(task.StatusDone),
 		func(selector *sql.Selector) {
 			selector.Select(
 				"coalesce("+tasks.JSONExtract(task.FieldPayload, "artwork", "poster")+", '') AS poster",

@@ -111,19 +111,19 @@ func TestDataCleanupPreservesAllLibraryAndUnfinishedTaskReferences(t *testing.T)
 	retained := append(artworkURLs(filmImages), artworkURLs(additional)...)
 	for index, status := range []task.Status{task.StatusQueued, task.StatusRunning, task.StatusFailed} {
 		artwork := dataArtwork(t, service, uint8(40+index*10))
-		payload, err := tasks.EncodePayload(scrape.CoverPayload{Artwork: &artwork})
+		payload, err := tasks.EncodePayload(scrape.Payload{Artwork: &artwork})
 		if err != nil {
 			t.Fatal(err)
 		}
-		db.Task.Create().SetType("cover").SetStatus(status).SetPayload(payload).ExecX(ctx)
+		db.Task.Create().SetType("scrape").SetStatus(status).SetPayload(payload).ExecX(ctx)
 		retained = append(retained, artworkURLs(artwork)...)
 	}
-	completed, err := tasks.EncodePayload(scrape.CoverPayload{Artwork: &unused})
+	completed, err := tasks.EncodePayload(scrape.Payload{Artwork: &unused})
 	if err != nil {
 		t.Fatal(err)
 	}
-	db.Task.Create().SetType("cover").SetStatus(task.StatusDone).SetPayload(completed).ExecX(ctx)
-	db.Task.Create().SetType("cover").ExecX(ctx) // A job without generated artwork.
+	db.Task.Create().SetType("scrape").SetStatus(task.StatusDone).SetPayload(completed).ExecX(ctx)
+	db.Task.Create().SetType("scrape").ExecX(ctx) // A job without generated artwork.
 
 	before, err := service.Info(ctx)
 	if err != nil || before.Cache.UnusedEntryCount != 3 || before.Cache.UnusedSizeBytes <= 0 {
@@ -223,11 +223,11 @@ func TestDataCleanupRetainsArtworkWhenCoverFinishesBetweenReferenceQueries(t *te
 			ctx := t.Context()
 			artwork := dataArtwork(t, service, 90)
 			film := service.db.Movie.Create().SetCode("ABP-123").SaveX(ctx)
-			payload, err := tasks.EncodePayload(scrape.CoverPayload{Artwork: &artwork})
+			payload, err := tasks.EncodePayload(scrape.Payload{Artwork: &artwork})
 			if err != nil {
 				t.Fatal(err)
 			}
-			job := service.db.Task.Create().SetType("cover").SetStatus(task.StatusRunning).SetPayload(payload).SaveX(ctx)
+			job := service.db.Task.Create().SetType("scrape").SetStatus(task.StatusRunning).SetPayload(payload).SaveX(ctx)
 			completed := false
 			intercept := ent.InterceptFunc(func(next ent.Querier) ent.Querier {
 				return ent.QuerierFunc(func(ctx context.Context, query ent.Query) (ent.Value, error) {

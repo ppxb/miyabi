@@ -51,9 +51,15 @@ func (_c *TagCreate) SetNillableUpdatedAt(v *time.Time) *TagCreate {
 	return _c
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (_c *TagCreate) SetJavdbID(v string) *TagCreate {
-	_c.mutation.SetJavdbID(v)
+// SetProvider sets the "provider" field.
+func (_c *TagCreate) SetProvider(v string) *TagCreate {
+	_c.mutation.SetProvider(v)
+	return _c
+}
+
+// SetSourceID sets the "source_id" field.
+func (_c *TagCreate) SetSourceID(v string) *TagCreate {
+	_c.mutation.SetSourceID(v)
 	return _c
 }
 
@@ -80,6 +86,14 @@ func (_c *TagCreate) SetNillableNameZht(v *string) *TagCreate {
 // SetCategoryID sets the "category_id" field.
 func (_c *TagCreate) SetCategoryID(v string) *TagCreate {
 	_c.mutation.SetCategoryID(v)
+	return _c
+}
+
+// SetNillableCategoryID sets the "category_id" field if the given value is not nil.
+func (_c *TagCreate) SetNillableCategoryID(v *string) *TagCreate {
+	if v != nil {
+		_c.SetCategoryID(*v)
+	}
 	return _c
 }
 
@@ -141,6 +155,10 @@ func (_c *TagCreate) defaults() {
 		v := tag.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.CategoryID(); !ok {
+		v := tag.DefaultCategoryID
+		_c.mutation.SetCategoryID(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -151,12 +169,20 @@ func (_c *TagCreate) check() error {
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		return &ValidationError{Name: "updated_at", err: errors.New(`ent: missing required field "Tag.updated_at"`)}
 	}
-	if _, ok := _c.mutation.JavdbID(); !ok {
-		return &ValidationError{Name: "javdb_id", err: errors.New(`ent: missing required field "Tag.javdb_id"`)}
+	if _, ok := _c.mutation.Provider(); !ok {
+		return &ValidationError{Name: "provider", err: errors.New(`ent: missing required field "Tag.provider"`)}
 	}
-	if v, ok := _c.mutation.JavdbID(); ok {
-		if err := tag.JavdbIDValidator(v); err != nil {
-			return &ValidationError{Name: "javdb_id", err: fmt.Errorf(`ent: validator failed for field "Tag.javdb_id": %w`, err)}
+	if v, ok := _c.mutation.Provider(); ok {
+		if err := tag.ProviderValidator(v); err != nil {
+			return &ValidationError{Name: "provider", err: fmt.Errorf(`ent: validator failed for field "Tag.provider": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.SourceID(); !ok {
+		return &ValidationError{Name: "source_id", err: errors.New(`ent: missing required field "Tag.source_id"`)}
+	}
+	if v, ok := _c.mutation.SourceID(); ok {
+		if err := tag.SourceIDValidator(v); err != nil {
+			return &ValidationError{Name: "source_id", err: fmt.Errorf(`ent: validator failed for field "Tag.source_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.Name(); !ok {
@@ -169,11 +195,6 @@ func (_c *TagCreate) check() error {
 	}
 	if _, ok := _c.mutation.CategoryID(); !ok {
 		return &ValidationError{Name: "category_id", err: errors.New(`ent: missing required field "Tag.category_id"`)}
-	}
-	if v, ok := _c.mutation.CategoryID(); ok {
-		if err := tag.CategoryIDValidator(v); err != nil {
-			return &ValidationError{Name: "category_id", err: fmt.Errorf(`ent: validator failed for field "Tag.category_id": %w`, err)}
-		}
 	}
 	return nil
 }
@@ -210,9 +231,13 @@ func (_c *TagCreate) createSpec() (*Tag, *sqlgraph.CreateSpec) {
 		_spec.SetField(tag.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
 	}
-	if value, ok := _c.mutation.JavdbID(); ok {
-		_spec.SetField(tag.FieldJavdbID, field.TypeString, value)
-		_node.JavdbID = value
+	if value, ok := _c.mutation.Provider(); ok {
+		_spec.SetField(tag.FieldProvider, field.TypeString, value)
+		_node.Provider = value
+	}
+	if value, ok := _c.mutation.SourceID(); ok {
+		_spec.SetField(tag.FieldSourceID, field.TypeString, value)
+		_node.SourceID = value
 	}
 	if value, ok := _c.mutation.Name(); ok {
 		_spec.SetField(tag.FieldName, field.TypeString, value)
@@ -306,15 +331,27 @@ func (u *TagUpsert) UpdateUpdatedAt() *TagUpsert {
 	return u
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (u *TagUpsert) SetJavdbID(v string) *TagUpsert {
-	u.Set(tag.FieldJavdbID, v)
+// SetProvider sets the "provider" field.
+func (u *TagUpsert) SetProvider(v string) *TagUpsert {
+	u.Set(tag.FieldProvider, v)
 	return u
 }
 
-// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
-func (u *TagUpsert) UpdateJavdbID() *TagUpsert {
-	u.SetExcluded(tag.FieldJavdbID)
+// UpdateProvider sets the "provider" field to the value that was provided on create.
+func (u *TagUpsert) UpdateProvider() *TagUpsert {
+	u.SetExcluded(tag.FieldProvider)
+	return u
+}
+
+// SetSourceID sets the "source_id" field.
+func (u *TagUpsert) SetSourceID(v string) *TagUpsert {
+	u.Set(tag.FieldSourceID, v)
+	return u
+}
+
+// UpdateSourceID sets the "source_id" field to the value that was provided on create.
+func (u *TagUpsert) UpdateSourceID() *TagUpsert {
+	u.SetExcluded(tag.FieldSourceID)
 	return u
 }
 
@@ -419,17 +456,31 @@ func (u *TagUpsertOne) UpdateUpdatedAt() *TagUpsertOne {
 	})
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (u *TagUpsertOne) SetJavdbID(v string) *TagUpsertOne {
+// SetProvider sets the "provider" field.
+func (u *TagUpsertOne) SetProvider(v string) *TagUpsertOne {
 	return u.Update(func(s *TagUpsert) {
-		s.SetJavdbID(v)
+		s.SetProvider(v)
 	})
 }
 
-// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
-func (u *TagUpsertOne) UpdateJavdbID() *TagUpsertOne {
+// UpdateProvider sets the "provider" field to the value that was provided on create.
+func (u *TagUpsertOne) UpdateProvider() *TagUpsertOne {
 	return u.Update(func(s *TagUpsert) {
-		s.UpdateJavdbID()
+		s.UpdateProvider()
+	})
+}
+
+// SetSourceID sets the "source_id" field.
+func (u *TagUpsertOne) SetSourceID(v string) *TagUpsertOne {
+	return u.Update(func(s *TagUpsert) {
+		s.SetSourceID(v)
+	})
+}
+
+// UpdateSourceID sets the "source_id" field to the value that was provided on create.
+func (u *TagUpsertOne) UpdateSourceID() *TagUpsertOne {
+	return u.Update(func(s *TagUpsert) {
+		s.UpdateSourceID()
 	})
 }
 
@@ -707,17 +758,31 @@ func (u *TagUpsertBulk) UpdateUpdatedAt() *TagUpsertBulk {
 	})
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (u *TagUpsertBulk) SetJavdbID(v string) *TagUpsertBulk {
+// SetProvider sets the "provider" field.
+func (u *TagUpsertBulk) SetProvider(v string) *TagUpsertBulk {
 	return u.Update(func(s *TagUpsert) {
-		s.SetJavdbID(v)
+		s.SetProvider(v)
 	})
 }
 
-// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
-func (u *TagUpsertBulk) UpdateJavdbID() *TagUpsertBulk {
+// UpdateProvider sets the "provider" field to the value that was provided on create.
+func (u *TagUpsertBulk) UpdateProvider() *TagUpsertBulk {
 	return u.Update(func(s *TagUpsert) {
-		s.UpdateJavdbID()
+		s.UpdateProvider()
+	})
+}
+
+// SetSourceID sets the "source_id" field.
+func (u *TagUpsertBulk) SetSourceID(v string) *TagUpsertBulk {
+	return u.Update(func(s *TagUpsert) {
+		s.SetSourceID(v)
+	})
+}
+
+// UpdateSourceID sets the "source_id" field to the value that was provided on create.
+func (u *TagUpsertBulk) UpdateSourceID() *TagUpsertBulk {
+	return u.Update(func(s *TagUpsert) {
+		s.UpdateSourceID()
 	})
 }
 

@@ -47,8 +47,8 @@ func TestRetryMetadataOnlyRequeuesFailedChildrenOnce(t *testing.T) {
 		kind   string
 		status task.Status
 	}{
-		{"scrape", task.StatusDone}, {"cover", task.StatusDone},
-		{"scrape", task.StatusFailed}, {"scrape", task.StatusDone}, {"cover", task.StatusFailed},
+		{"scrape", task.StatusDone}, {"scrape", task.StatusDone},
+		{"scrape", task.StatusFailed}, {"scrape", task.StatusDone}, {"scrape", task.StatusFailed},
 	} {
 		body, err := json.Marshal(map[string]any{"scan_task_id": parent.ID, "document": map[string]string{"title": "saved document"}, "artwork": map[string]string{"poster": "cached"}})
 		if err != nil {
@@ -89,7 +89,7 @@ func TestRetryMetadataOnlyRequeuesFailedChildrenOnce(t *testing.T) {
 		t.Fatal("retry restarted the scan or another workflow")
 	}
 	infos, err := lib.ListTasks(ctx)
-	if err != nil || len(infos) != 1 || infos[0].CanRetry || infos[0].Scan.MetadataTotal != 3 || infos[0].Scan.MetadataCompleted != 1 {
+	if err != nil || len(infos) != 1 || infos[0].CanRetry || infos[0].Scan.MetadataTotal != 5 || infos[0].Scan.MetadataCompleted != 3 {
 		t.Fatalf("retry projection = %+v, %v", infos, err)
 	}
 }

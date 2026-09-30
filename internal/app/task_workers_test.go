@@ -46,7 +46,7 @@ func TestSubscriptionBatchesDoNotBlockLibraryWorkers(t *testing.T) {
 	}, func(context.Context, *ent.Tx, tasks.Job, error) (tasks.Change, error) {
 		return tasks.ChangeOffline | tasks.ChangeMonitor, nil
 	}))
-	for _, kind := range []tasks.Kind{tasks.KindScan, tasks.KindScrape, tasks.KindCover} {
+	for _, kind := range []tasks.Kind{tasks.KindScan, tasks.KindScrape} {
 		registry.Register(tasks.NewHandler(kind, func(ctx context.Context, job tasks.Job) error {
 			if activeLibrary.Add(1) != 1 {
 				overlapped.Store(true)
@@ -71,7 +71,7 @@ func TestSubscriptionBatchesDoNotBlockLibraryWorkers(t *testing.T) {
 	secondBatch := store.Client.Task.Create().SetType(string(tasks.KindSubscriptionBatch)).SaveX(ctx)
 	scan := store.Client.Task.Create().SetType(string(tasks.KindScan)).SetStatus(task.StatusRunning).SaveX(ctx)
 	scrape := store.Client.Task.Create().SetType(string(tasks.KindScrape)).SaveX(ctx)
-	cover := store.Client.Task.Create().SetType(string(tasks.KindCover)).SaveX(ctx)
+	cover := store.Client.Task.Create().SetType(string(tasks.KindScrape)).SaveX(ctx)
 	pools := newTaskPools(service, logger)
 	runCtx, cancel := context.WithCancel(ctx)
 	stopped := make(chan error, 2)

@@ -51,9 +51,15 @@ func (_c *ActorCreate) SetNillableUpdatedAt(v *time.Time) *ActorCreate {
 	return _c
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (_c *ActorCreate) SetJavdbID(v string) *ActorCreate {
-	_c.mutation.SetJavdbID(v)
+// SetProvider sets the "provider" field.
+func (_c *ActorCreate) SetProvider(v string) *ActorCreate {
+	_c.mutation.SetProvider(v)
+	return _c
+}
+
+// SetSourceID sets the "source_id" field.
+func (_c *ActorCreate) SetSourceID(v string) *ActorCreate {
+	_c.mutation.SetSourceID(v)
 	return _c
 }
 
@@ -177,12 +183,20 @@ func (_c *ActorCreate) check() error {
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		return &ValidationError{Name: "updated_at", err: errors.New(`ent: missing required field "Actor.updated_at"`)}
 	}
-	if _, ok := _c.mutation.JavdbID(); !ok {
-		return &ValidationError{Name: "javdb_id", err: errors.New(`ent: missing required field "Actor.javdb_id"`)}
+	if _, ok := _c.mutation.Provider(); !ok {
+		return &ValidationError{Name: "provider", err: errors.New(`ent: missing required field "Actor.provider"`)}
 	}
-	if v, ok := _c.mutation.JavdbID(); ok {
-		if err := actor.JavdbIDValidator(v); err != nil {
-			return &ValidationError{Name: "javdb_id", err: fmt.Errorf(`ent: validator failed for field "Actor.javdb_id": %w`, err)}
+	if v, ok := _c.mutation.Provider(); ok {
+		if err := actor.ProviderValidator(v); err != nil {
+			return &ValidationError{Name: "provider", err: fmt.Errorf(`ent: validator failed for field "Actor.provider": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.SourceID(); !ok {
+		return &ValidationError{Name: "source_id", err: errors.New(`ent: missing required field "Actor.source_id"`)}
+	}
+	if v, ok := _c.mutation.SourceID(); ok {
+		if err := actor.SourceIDValidator(v); err != nil {
+			return &ValidationError{Name: "source_id", err: fmt.Errorf(`ent: validator failed for field "Actor.source_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.Name(); !ok {
@@ -236,9 +250,13 @@ func (_c *ActorCreate) createSpec() (*Actor, *sqlgraph.CreateSpec) {
 		_spec.SetField(actor.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
 	}
-	if value, ok := _c.mutation.JavdbID(); ok {
-		_spec.SetField(actor.FieldJavdbID, field.TypeString, value)
-		_node.JavdbID = value
+	if value, ok := _c.mutation.Provider(); ok {
+		_spec.SetField(actor.FieldProvider, field.TypeString, value)
+		_node.Provider = value
+	}
+	if value, ok := _c.mutation.SourceID(); ok {
+		_spec.SetField(actor.FieldSourceID, field.TypeString, value)
+		_node.SourceID = value
 	}
 	if value, ok := _c.mutation.Name(); ok {
 		_spec.SetField(actor.FieldName, field.TypeString, value)
@@ -336,15 +354,27 @@ func (u *ActorUpsert) UpdateUpdatedAt() *ActorUpsert {
 	return u
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (u *ActorUpsert) SetJavdbID(v string) *ActorUpsert {
-	u.Set(actor.FieldJavdbID, v)
+// SetProvider sets the "provider" field.
+func (u *ActorUpsert) SetProvider(v string) *ActorUpsert {
+	u.Set(actor.FieldProvider, v)
 	return u
 }
 
-// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
-func (u *ActorUpsert) UpdateJavdbID() *ActorUpsert {
-	u.SetExcluded(actor.FieldJavdbID)
+// UpdateProvider sets the "provider" field to the value that was provided on create.
+func (u *ActorUpsert) UpdateProvider() *ActorUpsert {
+	u.SetExcluded(actor.FieldProvider)
+	return u
+}
+
+// SetSourceID sets the "source_id" field.
+func (u *ActorUpsert) SetSourceID(v string) *ActorUpsert {
+	u.Set(actor.FieldSourceID, v)
+	return u
+}
+
+// UpdateSourceID sets the "source_id" field to the value that was provided on create.
+func (u *ActorUpsert) UpdateSourceID() *ActorUpsert {
+	u.SetExcluded(actor.FieldSourceID)
 	return u
 }
 
@@ -467,17 +497,31 @@ func (u *ActorUpsertOne) UpdateUpdatedAt() *ActorUpsertOne {
 	})
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (u *ActorUpsertOne) SetJavdbID(v string) *ActorUpsertOne {
+// SetProvider sets the "provider" field.
+func (u *ActorUpsertOne) SetProvider(v string) *ActorUpsertOne {
 	return u.Update(func(s *ActorUpsert) {
-		s.SetJavdbID(v)
+		s.SetProvider(v)
 	})
 }
 
-// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
-func (u *ActorUpsertOne) UpdateJavdbID() *ActorUpsertOne {
+// UpdateProvider sets the "provider" field to the value that was provided on create.
+func (u *ActorUpsertOne) UpdateProvider() *ActorUpsertOne {
 	return u.Update(func(s *ActorUpsert) {
-		s.UpdateJavdbID()
+		s.UpdateProvider()
+	})
+}
+
+// SetSourceID sets the "source_id" field.
+func (u *ActorUpsertOne) SetSourceID(v string) *ActorUpsertOne {
+	return u.Update(func(s *ActorUpsert) {
+		s.SetSourceID(v)
+	})
+}
+
+// UpdateSourceID sets the "source_id" field to the value that was provided on create.
+func (u *ActorUpsertOne) UpdateSourceID() *ActorUpsertOne {
+	return u.Update(func(s *ActorUpsert) {
+		s.UpdateSourceID()
 	})
 }
 
@@ -776,17 +820,31 @@ func (u *ActorUpsertBulk) UpdateUpdatedAt() *ActorUpsertBulk {
 	})
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (u *ActorUpsertBulk) SetJavdbID(v string) *ActorUpsertBulk {
+// SetProvider sets the "provider" field.
+func (u *ActorUpsertBulk) SetProvider(v string) *ActorUpsertBulk {
 	return u.Update(func(s *ActorUpsert) {
-		s.SetJavdbID(v)
+		s.SetProvider(v)
 	})
 }
 
-// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
-func (u *ActorUpsertBulk) UpdateJavdbID() *ActorUpsertBulk {
+// UpdateProvider sets the "provider" field to the value that was provided on create.
+func (u *ActorUpsertBulk) UpdateProvider() *ActorUpsertBulk {
 	return u.Update(func(s *ActorUpsert) {
-		s.UpdateJavdbID()
+		s.UpdateProvider()
+	})
+}
+
+// SetSourceID sets the "source_id" field.
+func (u *ActorUpsertBulk) SetSourceID(v string) *ActorUpsertBulk {
+	return u.Update(func(s *ActorUpsert) {
+		s.SetSourceID(v)
+	})
+}
+
+// UpdateSourceID sets the "source_id" field to the value that was provided on create.
+func (u *ActorUpsertBulk) UpdateSourceID() *ActorUpsertBulk {
+	return u.Update(func(s *ActorUpsert) {
+		s.UpdateSourceID()
 	})
 }
 

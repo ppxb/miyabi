@@ -27,19 +27,19 @@ func TestCoverSnapshotAndRecoveryCheckpointCommitTogether(t *testing.T) {
 			if _, err := fixture.library.StartScan(ctx); err != nil {
 				t.Fatal(err)
 			}
-			for _, handle := range []func(context.Context, tasks.Job) error{fixture.library.Scan, fixture.scrape.Scrape} {
+			{
 				job, err := fixture.tasks.Queue().Claim(ctx, []tasks.Kind{tasks.KindScan, tasks.KindScrape})
 				if err != nil || job == nil {
 					t.Fatalf("claim metadata: %+v, %v", job, err)
 				}
-				if err := handle(ctx, *job); err != nil {
+				if err := fixture.library.Scan(ctx, *job); err != nil {
 					t.Fatal(err)
 				}
 				if err := fixture.tasks.Queue().Finish(ctx, job.ID, nil); err != nil {
 					t.Fatal(err)
 				}
 			}
-			job, err := fixture.tasks.Queue().Claim(ctx, []tasks.Kind{tasks.KindCover})
+			job, err := fixture.tasks.Queue().Claim(ctx, []tasks.Kind{tasks.KindScrape})
 			if err != nil || job == nil {
 				t.Fatalf("claim cover: %+v, %v", job, err)
 			}
@@ -47,7 +47,7 @@ func TestCoverSnapshotAndRecoveryCheckpointCommitTogether(t *testing.T) {
 			fixture.store.Client.Task.Use(func(next ent.Mutator) ent.Mutator {
 				return ent.MutateFunc(func(ctx context.Context, mutation ent.Mutation) (ent.Value, error) {
 					if body, ok := mutation.(*ent.TaskMutation).Payload(); ok && failCommit {
-						var input scrapePkg.CoverPayload
+						var input scrapePkg.Payload
 						if err := json.Unmarshal(body, &input); err != nil {
 							return nil, err
 						}
@@ -58,7 +58,7 @@ func TestCoverSnapshotAndRecoveryCheckpointCommitTogether(t *testing.T) {
 					return next.Mutate(ctx, mutation)
 				})
 			})
-			err = fixture.scrape.Cover(ctx, *job)
+			err = fixture.scrape.Scrape(ctx, *job)
 			if failCommit {
 				if !errors.Is(err, rollback) {
 					t.Fatalf("checkpoint failure = %v", err)
@@ -69,12 +69,12 @@ func TestCoverSnapshotAndRecoveryCheckpointCommitTogether(t *testing.T) {
 				}
 				failCommit = false
 				saved := fixture.store.Client.Task.GetX(ctx, job.ID)
-				input, err := tasks.DecodePayload[scrapePkg.CoverPayload](saved.Payload)
+				input, err := tasks.DecodePayload[scrapePkg.Payload](saved.Payload)
 				if err != nil || input.Completed {
 					t.Fatalf("checkpoint escaped rollback: %+v, %v", input, err)
 				}
 				job.Payload = saved.Payload
-				if err := fixture.scrape.Cover(ctx, *job); err != nil {
+				if err := fixture.scrape.Scrape(ctx, *job); err != nil {
 					t.Fatal(err)
 				}
 			} else if err != nil {
@@ -93,17 +93,17 @@ func TestCoverSnapshotAndRecoveryCheckpointCommitTogether(t *testing.T) {
 				t.Fatalf("invalid checkpoint: %s, %v", saved.Payload, err)
 			}
 			// Simulate a crash after the export commit and before Queue.Finish.
-			if err := fixture.tasks.Queue().Recover(ctx, []tasks.Kind{tasks.KindCover}); err != nil {
+			if err := fixture.tasks.Queue().Recover(ctx, []tasks.Kind{tasks.KindScrape}); err != nil {
 				t.Fatal(err)
 			}
-			resumed, err := fixture.tasks.Queue().Claim(ctx, []tasks.Kind{tasks.KindCover})
+			resumed, err := fixture.tasks.Queue().Claim(ctx, []tasks.Kind{tasks.KindScrape})
 			if err != nil || resumed == nil || resumed.ID != job.ID {
 				t.Fatalf("recover cover: %+v, %v", resumed, err)
 			}
 			fixture.drive.mu.Lock()
 			delete(fixture.drive.files, "101") // Re-exporting would now fail position verification.
 			fixture.drive.mu.Unlock()
-			if err := fixture.scrape.Cover(ctx, *resumed); err != nil {
+			if err := fixture.scrape.Scrape(ctx, *resumed); err != nil {
 				t.Fatalf("completed cover ran again: %v", err)
 			}
 			if err := fixture.tasks.Queue().Finish(ctx, resumed.ID, nil); err != nil {

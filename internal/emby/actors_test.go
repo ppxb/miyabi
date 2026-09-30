@@ -23,8 +23,8 @@ import (
 
 type mediaFetcherFunc func(context.Context, string) (domain.Media, error)
 
-func (f mediaFetcherFunc) Media(ctx context.Context, rawURL string) (domain.Media, error) {
-	return f(ctx, rawURL)
+func (f mediaFetcherFunc) Image(ctx context.Context, candidate domain.ImageCandidate) (domain.Media, error) {
+	return f(ctx, candidate.URL)
 }
 
 func TestActorSync_FindAvatarFallsBackToJavDBMedia(t *testing.T) {
@@ -33,7 +33,7 @@ func TestActorSync_FindAvatarFallsBackToJavDBMedia(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	store.Client.Actor.Create().SetJavdbID("actor-1").SetName("三上悠亜").SetNameZht("三上悠亞").
+	store.Client.Actor.Create().SetProvider("javdb").SetSourceID("actor-1").SetName("三上悠亜").SetNameZht("三上悠亞").
 		SetAvatar("https://c0.jdbstatic.com/avatars/actor-1.jpg").ExecX(t.Context())
 
 	svc := &actorSync{db: store.Client}
@@ -86,7 +86,7 @@ func TestActorSync_NegativeCache(t *testing.T) {
 	}
 
 	// Now add actor to DB
-	store.Client.Actor.Create().SetJavdbID("act-new").SetName(actorName).SetNameZht(actorName).
+	store.Client.Actor.Create().SetProvider("javdb").SetSourceID("act-new").SetName(actorName).SetNameZht(actorName).
 		SetAvatar("https://example.com/avatar.jpg").ExecX(t.Context())
 
 	// Second lookup: hits negative cache, does not query DB or media fetcher
@@ -120,7 +120,7 @@ func TestAvatarFailureIsRetriedOnNextSync(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	store.Client.Actor.Create().SetJavdbID("retry-actor").SetName("Retry Actor").SetAvatar("https://example.com/avatar.jpg").ExecX(t.Context())
+	store.Client.Actor.Create().SetProvider("javdb").SetSourceID("retry-actor").SetName("Retry Actor").SetAvatar("https://example.com/avatar.jpg").ExecX(t.Context())
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/Persons" {
@@ -166,7 +166,7 @@ func TestAvatarSyncRepairsBrokenImagesAndPreservesHealthyOrUnverifiableImages(t 
 		t.Fatal(err)
 	}
 	defer store.Close()
-	store.Client.Actor.Create().SetJavdbID("fallback").SetName("Fallback").SetAvatar("https://cdn.example/encoded.jpg").ExecX(t.Context())
+	store.Client.Actor.Create().SetProvider("javdb").SetSourceID("fallback").SetName("Fallback").SetAvatar("https://cdn.example/encoded.jpg").ExecX(t.Context())
 	var body bytes.Buffer
 	if err := png.Encode(&body, image.NewRGBA(image.Rect(0, 0, 2, 3))); err != nil {
 		t.Fatal(err)

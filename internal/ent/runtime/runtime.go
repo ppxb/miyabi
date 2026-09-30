@@ -9,6 +9,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/embynotification"
 	"github.com/ppxb/miyabi/internal/ent/file"
+	"github.com/ppxb/miyabi/internal/ent/metadatacache"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/schema"
@@ -39,12 +40,16 @@ func init() {
 	actor.DefaultUpdatedAt = actorDescUpdatedAt.Default.(func() time.Time)
 	// actor.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	actor.UpdateDefaultUpdatedAt = actorDescUpdatedAt.UpdateDefault.(func() time.Time)
-	// actorDescJavdbID is the schema descriptor for javdb_id field.
-	actorDescJavdbID := actorFields[0].Descriptor()
-	// actor.JavdbIDValidator is a validator for the "javdb_id" field. It is called by the builders before save.
-	actor.JavdbIDValidator = actorDescJavdbID.Validators[0].(func(string) error)
+	// actorDescProvider is the schema descriptor for provider field.
+	actorDescProvider := actorFields[0].Descriptor()
+	// actor.ProviderValidator is a validator for the "provider" field. It is called by the builders before save.
+	actor.ProviderValidator = actorDescProvider.Validators[0].(func(string) error)
+	// actorDescSourceID is the schema descriptor for source_id field.
+	actorDescSourceID := actorFields[1].Descriptor()
+	// actor.SourceIDValidator is a validator for the "source_id" field. It is called by the builders before save.
+	actor.SourceIDValidator = actorDescSourceID.Validators[0].(func(string) error)
 	// actorDescName is the schema descriptor for name field.
-	actorDescName := actorFields[1].Descriptor()
+	actorDescName := actorFields[2].Descriptor()
 	// actor.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	actor.NameValidator = actorDescName.Validators[0].(func(string) error)
 	embynotificationMixin := schema.EmbyNotification{}.Mixin()
@@ -137,6 +142,16 @@ func init() {
 	fileDescScanID := fileFields[9].Descriptor()
 	// file.DefaultScanID holds the default value on creation for the scan_id field.
 	file.DefaultScanID = fileDescScanID.Default.(string)
+	metadatacacheFields := schema.MetadataCache{}.Fields()
+	_ = metadatacacheFields
+	// metadatacacheDescProvider is the schema descriptor for provider field.
+	metadatacacheDescProvider := metadatacacheFields[0].Descriptor()
+	// metadatacache.ProviderValidator is a validator for the "provider" field. It is called by the builders before save.
+	metadatacache.ProviderValidator = metadatacacheDescProvider.Validators[0].(func(string) error)
+	// metadatacacheDescCode is the schema descriptor for code field.
+	metadatacacheDescCode := metadatacacheFields[1].Descriptor()
+	// metadatacache.CodeValidator is a validator for the "code" field. It is called by the builders before save.
+	metadatacache.CodeValidator = metadatacacheDescCode.Validators[0].(func(string) error)
 	movieMixin := schema.Movie{}.Mixin()
 	movieHooks := schema.Movie{}.Hooks()
 	movie.Hooks[0] = movieHooks[0]
@@ -365,18 +380,22 @@ func init() {
 	tag.DefaultUpdatedAt = tagDescUpdatedAt.Default.(func() time.Time)
 	// tag.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	tag.UpdateDefaultUpdatedAt = tagDescUpdatedAt.UpdateDefault.(func() time.Time)
-	// tagDescJavdbID is the schema descriptor for javdb_id field.
-	tagDescJavdbID := tagFields[0].Descriptor()
-	// tag.JavdbIDValidator is a validator for the "javdb_id" field. It is called by the builders before save.
-	tag.JavdbIDValidator = tagDescJavdbID.Validators[0].(func(string) error)
+	// tagDescProvider is the schema descriptor for provider field.
+	tagDescProvider := tagFields[0].Descriptor()
+	// tag.ProviderValidator is a validator for the "provider" field. It is called by the builders before save.
+	tag.ProviderValidator = tagDescProvider.Validators[0].(func(string) error)
+	// tagDescSourceID is the schema descriptor for source_id field.
+	tagDescSourceID := tagFields[1].Descriptor()
+	// tag.SourceIDValidator is a validator for the "source_id" field. It is called by the builders before save.
+	tag.SourceIDValidator = tagDescSourceID.Validators[0].(func(string) error)
 	// tagDescName is the schema descriptor for name field.
-	tagDescName := tagFields[1].Descriptor()
+	tagDescName := tagFields[2].Descriptor()
 	// tag.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	tag.NameValidator = tagDescName.Validators[0].(func(string) error)
 	// tagDescCategoryID is the schema descriptor for category_id field.
-	tagDescCategoryID := tagFields[3].Descriptor()
-	// tag.CategoryIDValidator is a validator for the "category_id" field. It is called by the builders before save.
-	tag.CategoryIDValidator = tagDescCategoryID.Validators[0].(func(string) error)
+	tagDescCategoryID := tagFields[4].Descriptor()
+	// tag.DefaultCategoryID holds the default value on creation for the category_id field.
+	tag.DefaultCategoryID = tagDescCategoryID.Default.(string)
 	taskMixin := schema.Task{}.Mixin()
 	taskMixinFields0 := taskMixin[0].Fields()
 	_ = taskMixinFields0

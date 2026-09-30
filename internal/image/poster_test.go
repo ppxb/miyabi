@@ -5,6 +5,7 @@ import (
 	stdimage "image"
 	"image/color"
 	"image/png"
+	"os"
 	"testing"
 
 	"github.com/disintegration/imaging"
@@ -47,7 +48,11 @@ func TestPosterWindowKeepsFacesAndBounds(t *testing.T) {
 
 func posterFixture(t testing.TB) stdimage.Image {
 	t.Helper()
-	source, err := imaging.Open("testdata/faces.jpg")
+	path := os.Getenv("MIYABI_TEST_FACE_IMAGE")
+	if path == "" {
+		t.Skip("set MIYABI_TEST_FACE_IMAGE to a real portrait outside the repository")
+	}
+	source, err := imaging.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}

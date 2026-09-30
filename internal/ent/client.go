@@ -18,6 +18,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/embynotification"
 	"github.com/ppxb/miyabi/internal/ent/file"
+	"github.com/ppxb/miyabi/internal/ent/metadatacache"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/setting"
@@ -39,6 +40,8 @@ type Client struct {
 	EmbyNotification *EmbyNotificationClient
 	// File is the client for interacting with the File builders.
 	File *FileClient
+	// MetadataCache is the client for interacting with the MetadataCache builders.
+	MetadataCache *MetadataCacheClient
 	// Movie is the client for interacting with the Movie builders.
 	Movie *MovieClient
 	// OfflineDownload is the client for interacting with the OfflineDownload builders.
@@ -69,6 +72,7 @@ func (c *Client) init() {
 	c.Actor = NewActorClient(c.config)
 	c.EmbyNotification = NewEmbyNotificationClient(c.config)
 	c.File = NewFileClient(c.config)
+	c.MetadataCache = NewMetadataCacheClient(c.config)
 	c.Movie = NewMovieClient(c.config)
 	c.OfflineDownload = NewOfflineDownloadClient(c.config)
 	c.Setting = NewSettingClient(c.config)
@@ -172,6 +176,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Actor:            NewActorClient(cfg),
 		EmbyNotification: NewEmbyNotificationClient(cfg),
 		File:             NewFileClient(cfg),
+		MetadataCache:    NewMetadataCacheClient(cfg),
 		Movie:            NewMovieClient(cfg),
 		OfflineDownload:  NewOfflineDownloadClient(cfg),
 		Setting:          NewSettingClient(cfg),
@@ -202,6 +207,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Actor:            NewActorClient(cfg),
 		EmbyNotification: NewEmbyNotificationClient(cfg),
 		File:             NewFileClient(cfg),
+		MetadataCache:    NewMetadataCacheClient(cfg),
 		Movie:            NewMovieClient(cfg),
 		OfflineDownload:  NewOfflineDownloadClient(cfg),
 		Setting:          NewSettingClient(cfg),
@@ -239,8 +245,9 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.Actor, c.EmbyNotification, c.File, c.Movie, c.OfflineDownload, c.Setting,
-		c.Subscription, c.Subtitle, c.Tag, c.Task, c.ViewedMovie,
+		c.Actor, c.EmbyNotification, c.File, c.MetadataCache, c.Movie,
+		c.OfflineDownload, c.Setting, c.Subscription, c.Subtitle, c.Tag, c.Task,
+		c.ViewedMovie,
 	} {
 		n.Use(hooks...)
 	}
@@ -250,8 +257,9 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.Actor, c.EmbyNotification, c.File, c.Movie, c.OfflineDownload, c.Setting,
-		c.Subscription, c.Subtitle, c.Tag, c.Task, c.ViewedMovie,
+		c.Actor, c.EmbyNotification, c.File, c.MetadataCache, c.Movie,
+		c.OfflineDownload, c.Setting, c.Subscription, c.Subtitle, c.Tag, c.Task,
+		c.ViewedMovie,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -266,6 +274,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.EmbyNotification.mutate(ctx, m)
 	case *FileMutation:
 		return c.File.mutate(ctx, m)
+	case *MetadataCacheMutation:
+		return c.MetadataCache.mutate(ctx, m)
 	case *MovieMutation:
 		return c.Movie.mutate(ctx, m)
 	case *OfflineDownloadMutation:
@@ -715,6 +725,139 @@ func (c *FileClient) mutate(ctx context.Context, m *FileMutation) (Value, error)
 		return (&FileDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown File mutation op: %q", m.Op())
+	}
+}
+
+// MetadataCacheClient is a client for the MetadataCache schema.
+type MetadataCacheClient struct {
+	config
+}
+
+// NewMetadataCacheClient returns a client for the MetadataCache from the given config.
+func NewMetadataCacheClient(c config) *MetadataCacheClient {
+	return &MetadataCacheClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `metadatacache.Hooks(f(g(h())))`.
+func (c *MetadataCacheClient) Use(hooks ...Hook) {
+	c.hooks.MetadataCache = append(c.hooks.MetadataCache, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `metadatacache.Intercept(f(g(h())))`.
+func (c *MetadataCacheClient) Intercept(interceptors ...Interceptor) {
+	c.inters.MetadataCache = append(c.inters.MetadataCache, interceptors...)
+}
+
+// Create returns a builder for creating a MetadataCache entity.
+func (c *MetadataCacheClient) Create() *MetadataCacheCreate {
+	mutation := newMetadataCacheMutation(c.config, OpCreate)
+	return &MetadataCacheCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of MetadataCache entities.
+func (c *MetadataCacheClient) CreateBulk(builders ...*MetadataCacheCreate) *MetadataCacheCreateBulk {
+	return &MetadataCacheCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *MetadataCacheClient) MapCreateBulk(slice any, setFunc func(*MetadataCacheCreate, int)) *MetadataCacheCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &MetadataCacheCreateBulk{err: fmt.Errorf("calling to MetadataCacheClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*MetadataCacheCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &MetadataCacheCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for MetadataCache.
+func (c *MetadataCacheClient) Update() *MetadataCacheUpdate {
+	mutation := newMetadataCacheMutation(c.config, OpUpdate)
+	return &MetadataCacheUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *MetadataCacheClient) UpdateOne(_m *MetadataCache) *MetadataCacheUpdateOne {
+	mutation := newMetadataCacheMutation(c.config, OpUpdateOne, withMetadataCache(_m))
+	return &MetadataCacheUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *MetadataCacheClient) UpdateOneID(id int) *MetadataCacheUpdateOne {
+	mutation := newMetadataCacheMutation(c.config, OpUpdateOne, withMetadataCacheID(id))
+	return &MetadataCacheUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for MetadataCache.
+func (c *MetadataCacheClient) Delete() *MetadataCacheDelete {
+	mutation := newMetadataCacheMutation(c.config, OpDelete)
+	return &MetadataCacheDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *MetadataCacheClient) DeleteOne(_m *MetadataCache) *MetadataCacheDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *MetadataCacheClient) DeleteOneID(id int) *MetadataCacheDeleteOne {
+	builder := c.Delete().Where(metadatacache.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &MetadataCacheDeleteOne{builder}
+}
+
+// Query returns a query builder for MetadataCache.
+func (c *MetadataCacheClient) Query() *MetadataCacheQuery {
+	return &MetadataCacheQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeMetadataCache},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a MetadataCache entity by its id.
+func (c *MetadataCacheClient) Get(ctx context.Context, id int) (*MetadataCache, error) {
+	return c.Query().Where(metadatacache.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *MetadataCacheClient) GetX(ctx context.Context, id int) *MetadataCache {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *MetadataCacheClient) Hooks() []Hook {
+	return c.hooks.MetadataCache
+}
+
+// Interceptors returns the client interceptors.
+func (c *MetadataCacheClient) Interceptors() []Interceptor {
+	return c.inters.MetadataCache
+}
+
+func (c *MetadataCacheClient) mutate(ctx context.Context, m *MetadataCacheMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&MetadataCacheCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&MetadataCacheUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&MetadataCacheUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&MetadataCacheDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown MetadataCache mutation op: %q", m.Op())
 	}
 }
 
@@ -1882,11 +2025,11 @@ func (c *ViewedMovieClient) mutate(ctx context.Context, m *ViewedMovieMutation) 
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Actor, EmbyNotification, File, Movie, OfflineDownload, Setting, Subscription,
-		Subtitle, Tag, Task, ViewedMovie []ent.Hook
+		Actor, EmbyNotification, File, MetadataCache, Movie, OfflineDownload, Setting,
+		Subscription, Subtitle, Tag, Task, ViewedMovie []ent.Hook
 	}
 	inters struct {
-		Actor, EmbyNotification, File, Movie, OfflineDownload, Setting, Subscription,
-		Subtitle, Tag, Task, ViewedMovie []ent.Interceptor
+		Actor, EmbyNotification, File, MetadataCache, Movie, OfflineDownload, Setting,
+		Subscription, Subtitle, Tag, Task, ViewedMovie []ent.Interceptor
 	}
 )

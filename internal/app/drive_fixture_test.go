@@ -287,7 +287,6 @@ func libraryFixture(t testing.TB) testLibraryFixture {
 	t.Cleanup(scrapeSvc.Close)
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScan, lib.Scan, lib.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScrape, scrapeSvc.Scrape, scrapeSvc.Finished))
-	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindCover, scrapeSvc.Cover, scrapeSvc.Finished))
 	return testLibraryFixture{
 		Service: lib,
 		Drive:   driveSvc,

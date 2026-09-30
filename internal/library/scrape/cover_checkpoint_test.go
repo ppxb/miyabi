@@ -32,7 +32,7 @@ func TestArtworkCheckpointFailureReleasesLockAndCanRetry(t *testing.T) {
 				t.Fatal(err)
 			}
 			service := &Service{db: store.Client, images: images}
-			job := store.Client.Task.Create().SetType("cover").SaveX(ctx)
+			job := store.Client.Task.Create().SetType("scrape").SaveX(ctx)
 			failWrite := failure == "checkpoint"
 			writeError := errors.New("fixture checkpoint failure")
 			store.Client.Task.Use(func(next ent.Mutator) ent.Mutator {
@@ -55,7 +55,7 @@ func TestArtworkCheckpointFailureReleasesLockAndCanRetry(t *testing.T) {
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
 			}
-			input := CoverPayload{}
+			input := Payload{}
 			err = service.checkpointArtwork(ctx, job.ID, &input, body)
 			if failure == "cancelled lock wait" {
 				images.UnlockArtwork()
@@ -75,12 +75,12 @@ func TestArtworkCheckpointFailureReleasesLockAndCanRetry(t *testing.T) {
 				t.Fatal("failed checkpoint published partial artwork references")
 			}
 			failWrite = false
-			input = CoverPayload{}
+			input = Payload{}
 			if err := service.checkpointArtwork(t.Context(), job.ID, &input, encoded.Bytes()); err != nil {
 				t.Fatalf("checkpoint retry: %v", err)
 			}
 			saved = store.Client.Task.GetX(t.Context(), job.ID)
-			checkpoint, err := tasks.DecodePayload[CoverPayload](saved.Payload)
+			checkpoint, err := tasks.DecodePayload[Payload](saved.Payload)
 			if err != nil || checkpoint.Artwork == nil || *checkpoint.Artwork != *input.Artwork || checkpoint.Completed {
 				t.Fatalf("retry checkpoint = %+v, %v", checkpoint, err)
 			}

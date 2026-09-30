@@ -22,6 +22,7 @@ type Dependencies struct {
 	Health         HealthChecker
 	Access         AccessGate
 	Catalogue      CatalogueManager
+	Metadata       MetadataManager
 	Drive          DriveManager
 	Offline        OfflineManager
 	Monitor        SubscriptionManager
@@ -74,6 +75,8 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected := api.Group("", authMiddleware(deps.Access))
 
 	settingsAPI := protected.Group("/settings", noStore())
+	settingsAPI.GET("/scraping", metadataSettingsHandler(deps.Metadata))
+	settingsAPI.PUT("/scraping", metadataUpdateHandler(deps.Metadata))
 	settingsAPI.GET("/system", dataInfoHandler(deps.Maintenance))
 	settingsAPI.DELETE("/cache", dataClearCacheHandler(deps.Maintenance))
 	settingsAPI.GET("/network", networkHandler(deps.Network))

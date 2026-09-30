@@ -11,7 +11,6 @@ import (
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/javbus"
 	"github.com/ppxb/miyabi/internal/javdb"
 	"github.com/ppxb/miyabi/internal/magnet"
 	"github.com/ppxb/miyabi/internal/netx"
@@ -48,11 +47,13 @@ type Service struct {
 }
 
 // New creates the lazy JavDB client and restores/persists device UUID and route settings.
+// On success, Close also releases the supplied magnet source.
 func New(
 	ctx context.Context,
 	db *ent.Client,
 	proxy *netx.ProxyManager,
 	local LocalState,
+	supplement JavBusSource,
 ) (*Service, error) {
 	deviceUUID, found, err := database.LoadSetting[string](ctx, db, javdbDeviceSetting)
 	if err != nil {
@@ -83,13 +84,7 @@ func New(
 		return nil, err
 	}
 
-	javbusClient, err := javbus.New(javbus.Options{Proxy: proxy})
-	if err != nil {
-		client.Close()
-		return nil, fmt.Errorf("initialize JavBus client: %w", err)
-	}
-
-	service := newService(db, client, javbusClient, local, route)
+	service := newService(db, client, supplement, local, route)
 	service.proxy = proxy
 	return service, nil
 }

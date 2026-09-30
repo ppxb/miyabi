@@ -17,9 +17,9 @@ import (
 	"github.com/ppxb/miyabi/internal/gfriends"
 )
 
-// MediaFetcher downloads catalogue images such as JavDB actor avatars.
+// MediaFetcher downloads actor images through their metadata source.
 type MediaFetcher interface {
-	Media(context.Context, string) (domain.Media, error)
+	Image(context.Context, domain.ImageCandidate) (domain.Media, error)
 }
 
 type actorSync struct {
@@ -138,7 +138,7 @@ func (s *actorSync) syncAvatars(ctx context.Context, cfg Config) (int, error) {
 	if g != nil {
 		if err := g.EnsureIndex(ctx); err != nil {
 			// Skip GFriends for this run instead of re-downloading its index per actor.
-			slog.WarnContext(ctx, "gfriends index unavailable; using JavDB avatars only", "error", err)
+			slog.WarnContext(ctx, "gfriends index unavailable; using source avatars only", "error", err)
 			g = nil
 			canCacheMiss = false
 		}
@@ -237,7 +237,7 @@ func (s *actorSync) clearCache() {
 	clear(s.avatarNotFound)
 }
 
-// findAvatar prefers GFriends and falls back to the JavDB avatar of a scraped actor.
+// findAvatar prefers GFriends and falls back to the source avatar of a scraped actor.
 func (s *actorSync) findAvatar(ctx context.Context, g *gfriends.Client, media MediaFetcher, name string) (domain.Media, bool, error) {
 	if s.isAvatarNotFound(name) {
 		return domain.Media{}, false, nil
@@ -265,7 +265,7 @@ func (s *actorSync) findAvatar(ctx context.Context, g *gfriends.Client, media Me
 	if *act.Avatar == "" {
 		return domain.Media{}, false, upstreamErr
 	}
-	image, err := media.Media(ctx, *act.Avatar)
+	image, err := media.Image(ctx, domain.ImageCandidate{Provider: act.Provider, URL: *act.Avatar, Role: "avatar"})
 	if err != nil {
 		return domain.Media{}, false, errors.Join(upstreamErr, err)
 	}

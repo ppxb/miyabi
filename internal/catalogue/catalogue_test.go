@@ -63,7 +63,7 @@ func TestNewPersistsDeviceWithoutSelectingRoute(t *testing.T) {
 	}
 	defer store.Close()
 
-	first, err := New(t.Context(), store.Client, nil, nil)
+	first, err := New(t.Context(), store.Client, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestNewPersistsDeviceWithoutSelectingRoute(t *testing.T) {
 		t.Fatalf("device UUID = %q: %v", firstDevice, err)
 	}
 
-	second, err := New(t.Context(), store.Client, nil, nil)
+	second, err := New(t.Context(), store.Client, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestNewRestoresPersistedRoute(t *testing.T) {
 	if err := database.SaveSetting(t.Context(), store.Client, javdbRouteSetting, saved); err != nil {
 		t.Fatal(err)
 	}
-	service, err := New(t.Context(), store.Client, nil, nil)
+	service, err := New(t.Context(), store.Client, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

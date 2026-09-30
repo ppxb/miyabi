@@ -58,7 +58,7 @@ func newCompletedScanFixture(t *testing.T) *completedScanFixture {
 		Videos: scrape.VideoFingerprint([]pan.File{videos[0].File}), PosterVersion: mediaimage.PosterVersion,
 	}
 	record = record.Update().SetMetadataSnapshot(snapshot).SaveX(ctx)
-	input := scrape.CoverPayload{
+	input := scrape.Payload{
 		MetadataPayload: scrape.MetadataPayload{Source: payload.Source, ScanTaskID: queued.ID, MovieID: record.ID, Code: record.Code},
 		Artwork:         &artwork, Completed: true,
 	}
@@ -66,7 +66,7 @@ func newCompletedScanFixture(t *testing.T) *completedScanFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	covered, err := lib.database.Task.Create().SetType("cover").SetStatus(task.StatusDone).SetPayload(encoded).Save(ctx)
+	covered, err := lib.database.Task.Create().SetType("scrape").SetStatus(task.StatusDone).SetPayload(encoded).Save(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestRescanSchedulesOnlyChangedOrIncompleteMetadata(t *testing.T) {
 			if err := reconcileScan(t.Context(), f.lib, f.queued.ID, "rescan", &f.payload); err != nil {
 				t.Fatal(err)
 			}
-			count, err := f.lib.database.Task.Query().Where(task.TypeEQ("scrape")).Count(t.Context())
+			count, err := f.lib.database.Task.Query().Where(task.TypeEQ("scrape"), task.StatusEQ(task.StatusQueued)).Count(t.Context())
 			if err != nil || count != scenario.jobs {
 				t.Fatalf("metadata jobs=%d want=%d err=%v", count, scenario.jobs, err)
 			}

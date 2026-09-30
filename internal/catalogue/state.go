@@ -66,7 +66,7 @@ func (service *Service) MovieStates(ctx context.Context, identities []MovieIdent
 		JavDBID string `json:"javdb_id"`
 	}
 	err = service.database.Task.Query().Where(
-		task.TypeIn(tasks.KindScan.String(), tasks.KindScrape.String(), tasks.KindCover.String()), task.StatusIn(task.StatusQueued, task.StatusRunning), func(s *sql.Selector) {
+		task.TypeIn(tasks.KindScan.String(), tasks.KindScrape.String()), task.StatusIn(task.StatusQueued, task.StatusRunning), func(s *sql.Selector) {
 			s.Where(sql.And(
 				sqljson.ValueIn(task.FieldPayload, taskIDs, sqljson.Path("javdb_id")),
 				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("source", "account_id")),

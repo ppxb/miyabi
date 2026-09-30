@@ -23,14 +23,16 @@ import (
 )
 
 type Entity struct {
-	ID   string `json:"id,omitempty"`
-	Name string `json:"name"`
+	Provider string `json:"provider,omitempty"`
+	ID       string `json:"id,omitempty"`
+	Name     string `json:"name"`
 }
 
 type Tag struct {
-	ID      int    `json:"id"`
-	JavDBID string `json:"javdb_id"`
-	Name    string `json:"name"`
+	ID       int    `json:"id"`
+	Provider string `json:"provider"`
+	SourceID string `json:"source_id"`
+	Name     string `json:"name"`
 }
 
 type Movie struct {
@@ -233,10 +235,10 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 		Order(ent.Desc(movie.FieldCreatedAt), ent.Desc(movie.FieldID)).
 		Offset((page - 1) * limit).Limit(limit).
 		WithActors(func(query *ent.ActorQuery) {
-			query.Select(actor.FieldID, actor.FieldJavdbID, actor.FieldName).Order(ent.Asc(actor.FieldName), ent.Asc(actor.FieldID))
+			query.Select(actor.FieldID, actor.FieldProvider, actor.FieldSourceID, actor.FieldName).Order(ent.Asc(actor.FieldName), ent.Asc(actor.FieldID))
 		}).
 		WithTags(func(query *ent.TagQuery) {
-			query.Select(tag.FieldID, tag.FieldJavdbID, tag.FieldName).Order(ent.Asc(tag.FieldName), ent.Asc(tag.FieldID))
+			query.Select(tag.FieldID, tag.FieldProvider, tag.FieldSourceID, tag.FieldName).Order(ent.Asc(tag.FieldName), ent.Asc(tag.FieldID))
 		}).All(ctx)
 	if err != nil {
 		return result, fmt.Errorf("list library movies: %w", err)
@@ -258,10 +260,10 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 			item.Fanart = record.Fanarts[0]
 		}
 		for _, person := range record.Edges.Actors {
-			item.Actors = append(item.Actors, Entity{ID: person.JavdbID, Name: person.Name})
+			item.Actors = append(item.Actors, Entity{Provider: person.Provider, ID: person.SourceID, Name: person.Name})
 		}
 		for _, label := range record.Edges.Tags {
-			item.Tags = append(item.Tags, Tag{ID: label.ID, JavDBID: label.JavdbID, Name: label.Name})
+			item.Tags = append(item.Tags, Tag{ID: label.ID, Provider: label.Provider, SourceID: label.SourceID, Name: label.Name})
 		}
 		result.Movies = append(result.Movies, item)
 	}

@@ -35,16 +35,30 @@ func (_u *ActorUpdate) SetUpdatedAt(v time.Time) *ActorUpdate {
 	return _u
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (_u *ActorUpdate) SetJavdbID(v string) *ActorUpdate {
-	_u.mutation.SetJavdbID(v)
+// SetProvider sets the "provider" field.
+func (_u *ActorUpdate) SetProvider(v string) *ActorUpdate {
+	_u.mutation.SetProvider(v)
 	return _u
 }
 
-// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
-func (_u *ActorUpdate) SetNillableJavdbID(v *string) *ActorUpdate {
+// SetNillableProvider sets the "provider" field if the given value is not nil.
+func (_u *ActorUpdate) SetNillableProvider(v *string) *ActorUpdate {
 	if v != nil {
-		_u.SetJavdbID(*v)
+		_u.SetProvider(*v)
+	}
+	return _u
+}
+
+// SetSourceID sets the "source_id" field.
+func (_u *ActorUpdate) SetSourceID(v string) *ActorUpdate {
+	_u.mutation.SetSourceID(v)
+	return _u
+}
+
+// SetNillableSourceID sets the "source_id" field if the given value is not nil.
+func (_u *ActorUpdate) SetNillableSourceID(v *string) *ActorUpdate {
+	if v != nil {
+		_u.SetSourceID(*v)
 	}
 	return _u
 }
@@ -196,9 +210,14 @@ func (_u *ActorUpdate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *ActorUpdate) check() error {
-	if v, ok := _u.mutation.JavdbID(); ok {
-		if err := actor.JavdbIDValidator(v); err != nil {
-			return &ValidationError{Name: "javdb_id", err: fmt.Errorf(`ent: validator failed for field "Actor.javdb_id": %w`, err)}
+	if v, ok := _u.mutation.Provider(); ok {
+		if err := actor.ProviderValidator(v); err != nil {
+			return &ValidationError{Name: "provider", err: fmt.Errorf(`ent: validator failed for field "Actor.provider": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SourceID(); ok {
+		if err := actor.SourceIDValidator(v); err != nil {
+			return &ValidationError{Name: "source_id", err: fmt.Errorf(`ent: validator failed for field "Actor.source_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Name(); ok {
@@ -229,8 +248,11 @@ func (_u *ActorUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(actor.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if value, ok := _u.mutation.JavdbID(); ok {
-		_spec.SetField(actor.FieldJavdbID, field.TypeString, value)
+	if value, ok := _u.mutation.Provider(); ok {
+		_spec.SetField(actor.FieldProvider, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SourceID(); ok {
+		_spec.SetField(actor.FieldSourceID, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(actor.FieldName, field.TypeString, value)
@@ -321,16 +343,30 @@ func (_u *ActorUpdateOne) SetUpdatedAt(v time.Time) *ActorUpdateOne {
 	return _u
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (_u *ActorUpdateOne) SetJavdbID(v string) *ActorUpdateOne {
-	_u.mutation.SetJavdbID(v)
+// SetProvider sets the "provider" field.
+func (_u *ActorUpdateOne) SetProvider(v string) *ActorUpdateOne {
+	_u.mutation.SetProvider(v)
 	return _u
 }
 
-// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
-func (_u *ActorUpdateOne) SetNillableJavdbID(v *string) *ActorUpdateOne {
+// SetNillableProvider sets the "provider" field if the given value is not nil.
+func (_u *ActorUpdateOne) SetNillableProvider(v *string) *ActorUpdateOne {
 	if v != nil {
-		_u.SetJavdbID(*v)
+		_u.SetProvider(*v)
+	}
+	return _u
+}
+
+// SetSourceID sets the "source_id" field.
+func (_u *ActorUpdateOne) SetSourceID(v string) *ActorUpdateOne {
+	_u.mutation.SetSourceID(v)
+	return _u
+}
+
+// SetNillableSourceID sets the "source_id" field if the given value is not nil.
+func (_u *ActorUpdateOne) SetNillableSourceID(v *string) *ActorUpdateOne {
+	if v != nil {
+		_u.SetSourceID(*v)
 	}
 	return _u
 }
@@ -495,9 +531,14 @@ func (_u *ActorUpdateOne) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *ActorUpdateOne) check() error {
-	if v, ok := _u.mutation.JavdbID(); ok {
-		if err := actor.JavdbIDValidator(v); err != nil {
-			return &ValidationError{Name: "javdb_id", err: fmt.Errorf(`ent: validator failed for field "Actor.javdb_id": %w`, err)}
+	if v, ok := _u.mutation.Provider(); ok {
+		if err := actor.ProviderValidator(v); err != nil {
+			return &ValidationError{Name: "provider", err: fmt.Errorf(`ent: validator failed for field "Actor.provider": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SourceID(); ok {
+		if err := actor.SourceIDValidator(v); err != nil {
+			return &ValidationError{Name: "source_id", err: fmt.Errorf(`ent: validator failed for field "Actor.source_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Name(); ok {
@@ -545,8 +586,11 @@ func (_u *ActorUpdateOne) sqlSave(ctx context.Context) (_node *Actor, err error)
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(actor.FieldUpdatedAt, field.TypeTime, value)
 	}
-	if value, ok := _u.mutation.JavdbID(); ok {
-		_spec.SetField(actor.FieldJavdbID, field.TypeString, value)
+	if value, ok := _u.mutation.Provider(); ok {
+		_spec.SetField(actor.FieldProvider, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.SourceID(); ok {
+		_spec.SetField(actor.FieldSourceID, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(actor.FieldName, field.TypeString, value)

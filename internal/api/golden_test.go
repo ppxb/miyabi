@@ -130,7 +130,7 @@ func (goldenLibrary) Movies(context.Context, int, int) (library.Page, error) {
 			ReleaseDate: "2026-08-01", Duration: 120, Rating: 4.5,
 			Director: &library.Entity{ID: "director-1", Name: "Director"}, Maker: &library.Entity{ID: "maker-1", Name: "Maker"},
 			Series: &library.Entity{ID: "series-1", Name: "Series"},
-			Actors: []library.Entity{{ID: "actor-1", Name: "Actor"}}, Tags: []library.Tag{{ID: 3, JavDBID: "tag-1", Name: "Tag"}},
+			Actors: []library.Entity{{ID: "actor-1", Name: "Actor"}}, Tags: []library.Tag{{ID: 3, Provider: "javdb", SourceID: "tag-1", Name: "Tag"}},
 			ScrapeStatus: movie.ScrapeStatusDone},
 		{ID: 8, Code: "ZZZ-999", Actors: []library.Entity{}, Tags: []library.Tag{}, ScrapeStatus: movie.ScrapeStatusFailed},
 	}}, nil

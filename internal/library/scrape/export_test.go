@@ -57,7 +57,7 @@ func TestExportLocalMovie_ScrapedRecordExportsMissingSidecars(t *testing.T) {
 
 	actorRecord, err := store.Client.Actor.Create().
 		SetName("水野優香").
-		SetJavdbID("8VXx").
+		SetProvider("javdb").SetSourceID("8VXx").
 		SetGender(actor.GenderFemale).
 		Save(t.Context())
 	if err != nil {

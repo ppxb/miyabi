@@ -15,6 +15,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/embynotification"
 	"github.com/ppxb/miyabi/internal/ent/file"
+	"github.com/ppxb/miyabi/internal/ent/metadatacache"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/setting"
@@ -86,6 +87,7 @@ func checkColumn(t, c string) error {
 			actor.Table:            actor.ValidColumn,
 			embynotification.Table: embynotification.ValidColumn,
 			file.Table:             file.ValidColumn,
+			metadatacache.Table:    metadatacache.ValidColumn,
 			movie.Table:            movie.ValidColumn,
 			offlinedownload.Table:  offlinedownload.ValidColumn,
 			setting.Table:          setting.ValidColumn,

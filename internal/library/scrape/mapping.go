@@ -3,6 +3,8 @@ package scrape
 import (
 	"context"
 	"fmt"
+	"github.com/ppxb/miyabi/internal/ent/predicate"
+	"strconv"
 	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
@@ -21,28 +23,34 @@ func DetailNFO(detail domain.MovieDetail) nfo.Movie {
 		Premiered: detail.ReleaseDate,
 		Runtime:   detail.Duration,
 		Rating:    detail.Rating,
-		IDs:       []nfo.UniqueID{{Type: "javdb", Default: true, Value: detail.ID}},
+		Summary:   detail.Summary, RatingSource: detail.RatingSource, RatingMax: detail.RatingMax,
+		FieldSources: detail.FieldSources, Previews: detail.PreviewImages, PreviewVideo: detail.PreviewVideo,
+	}
+	for i, source := range detail.Sources {
+		doc.IDs = append(doc.IDs, nfo.UniqueID{Type: source.Provider, Value: source.ID, Default: i == 0})
 	}
 	if detail.Director != nil {
-		doc.Director = nfo.Entity{ID: detail.Director.ID, Name: detail.Director.Name}
+		doc.Director = nfo.Entity{Provider: detail.Director.Provider, ID: detail.Director.ID, Name: detail.Director.Name}
 	}
 	if detail.Maker != nil {
-		doc.Studio = nfo.Entity{ID: detail.Maker.ID, Name: detail.Maker.Name}
+		doc.Studio = nfo.Entity{Provider: detail.Maker.Provider, ID: detail.Maker.ID, Name: detail.Maker.Name}
 	}
 	if detail.Series != nil {
-		doc.Set = nfo.Series{ID: detail.Series.ID, Name: detail.Series.Name}
+		doc.Set = nfo.Series{Provider: detail.Series.Provider, ID: detail.Series.ID, Name: detail.Series.Name}
 	}
 	for _, person := range detail.Actors {
 		doc.Actors = append(doc.Actors, nfo.Actor{
-			ID:      person.ID,
-			Name:    person.Name,
-			NameZHT: person.NameZHT,
-			Gender:  person.Gender,
-			Thumb:   person.Avatar,
+			Provider: person.Provider,
+			ID:       person.ID,
+			Name:     person.Name,
+			NameZHT:  person.NameZHT,
+			Gender:   person.Gender,
+			Thumb:    person.Avatar,
 		})
 	}
 	for _, item := range detail.Tags {
 		doc.Tags = append(doc.Tags, nfo.Tag{
+			Provider:   item.Provider,
 			ID:         item.ID,
 			Name:       item.Name,
 			NameZHT:    item.NameZHT,
@@ -55,6 +63,9 @@ func DetailNFO(detail domain.MovieDetail) nfo.Movie {
 
 // MovieNFO builds an NFO Document from an existing indexed ent.Movie record.
 func MovieNFO(record *ent.Movie) nfo.Movie {
+	if record.Metadata != nil {
+		return *record.Metadata
+	}
 	doc := nfo.Movie{
 		Title:    record.Title,
 		Code:     record.Code,
@@ -72,16 +83,18 @@ func MovieNFO(record *ent.Movie) nfo.Movie {
 	}
 	for _, person := range record.Edges.Actors {
 		doc.Actors = append(doc.Actors, nfo.Actor{
-			ID:      person.JavdbID,
-			Name:    person.Name,
-			NameZHT: domain.ValueOrZero(person.NameZht),
-			Gender:  string(person.Gender),
-			Thumb:   domain.ValueOrZero(person.Avatar),
+			Provider: person.Provider,
+			ID:       person.SourceID,
+			Name:     person.Name,
+			NameZHT:  domain.ValueOrZero(person.NameZht),
+			Gender:   string(person.Gender),
+			Thumb:    domain.ValueOrZero(person.Avatar),
 		})
 	}
 	for _, item := range record.Edges.Tags {
 		doc.Tags = append(doc.Tags, nfo.Tag{
-			ID:         item.JavdbID,
+			Provider:   item.Provider,
+			ID:         item.SourceID,
 			Name:       item.Name,
 			NameZHT:    domain.ValueOrZero(item.NameZht),
 			CategoryID: item.CategoryID,
@@ -93,7 +106,7 @@ func MovieNFO(record *ent.Movie) nfo.Movie {
 
 // SaveMovieMetadata updates an ent.Movie record and associates actors and tags from an NFO document.
 func SaveMovieMetadata(ctx context.Context, tx *ent.Tx, id int, doc nfo.Movie) error {
-	update := tx.Movie.UpdateOneID(id).SetTitle(doc.Title).SetScrapeStatus(movie.ScrapeStatusPending).
+	update := tx.Movie.UpdateOneID(id).SetMetadata(&doc).SetTitle(doc.Title).SetScrapeStatus(movie.ScrapeStatusPending).
 		ClearActors().ClearTags().ClearJavdbID().ClearReleaseDate().ClearDuration().ClearRating().
 		ClearDirectorID().ClearDirectorName().ClearMakerID().ClearMakerName().ClearSeriesID().ClearSeriesName()
 	if doc.Code != "" {
@@ -134,43 +147,51 @@ func SaveMovieMetadata(ctx context.Context, tx *ent.Tx, id int, doc nfo.Movie) e
 		update.SetSeriesName(doc.Set.Name)
 	}
 	actors := make([]*ent.ActorCreate, 0, len(doc.Actors))
-	actorIDs := make([]string, 0, len(doc.Actors))
-	for _, person := range doc.Actors {
-		if person.ID == "" {
+	actorPredicates := make([]predicate.Actor, 0, len(doc.Actors))
+	for index, person := range doc.Actors {
+		if person.Name == "" {
 			continue
+		}
+		if person.Provider == "" || person.ID == "" {
+			person.Provider = "nfo"
+			person.ID = doc.Code + ":" + strconv.Itoa(index)
 		}
 		gender := actor.Gender(person.Gender)
 		if gender == "" {
 			gender = actor.GenderUnknown
 		}
-		actors = append(actors, tx.Actor.Create().SetJavdbID(person.ID).SetName(person.Name).
+		actors = append(actors, tx.Actor.Create().SetProvider(person.Provider).SetSourceID(person.ID).SetName(person.Name).
 			SetNameZht(person.NameZHT).SetGender(gender).SetAvatar(person.Thumb))
-		actorIDs = append(actorIDs, person.ID)
+		actorPredicates = append(actorPredicates, actor.And(actor.ProviderEQ(person.Provider), actor.SourceIDEQ(person.ID)))
 	}
 	if len(actors) > 0 {
-		if err := tx.Actor.CreateBulk(actors...).OnConflictColumns(actor.FieldJavdbID).UpdateNewValues().Exec(ctx); err != nil {
+		if err := tx.Actor.CreateBulk(actors...).OnConflictColumns(actor.FieldProvider, actor.FieldSourceID).UpdateNewValues().Exec(ctx); err != nil {
 			return err
 		}
-		ids, err := tx.Actor.Query().Where(actor.JavdbIDIn(actorIDs...)).IDs(ctx)
+		ids, err := tx.Actor.Query().Where(actor.Or(actorPredicates...)).IDs(ctx)
 		if err != nil {
 			return err
 		}
 		update.AddActorIDs(ids...)
 	}
 	tags := make([]*ent.TagCreate, 0, len(doc.Tags))
-	tagIDs := make([]string, 0, len(doc.Tags))
+	tagPredicates := make([]predicate.Tag, 0, len(doc.Tags))
 	for _, item := range doc.Tags {
-		if item.ID == "" || item.CategoryID == "" {
+		if item.Name == "" {
 			continue
 		}
-		tags = append(tags, tx.Tag.Create().SetJavdbID(item.ID).SetName(item.Name).SetNameZht(item.NameZHT).SetCategoryID(item.CategoryID))
-		tagIDs = append(tagIDs, item.ID)
+		if item.Provider == "" || item.ID == "" {
+			item.Provider = "nfo"
+			item.ID = item.Name
+		}
+		tags = append(tags, tx.Tag.Create().SetProvider(item.Provider).SetSourceID(item.ID).SetName(item.Name).SetNameZht(item.NameZHT).SetCategoryID(item.CategoryID))
+		tagPredicates = append(tagPredicates, tag.And(tag.ProviderEQ(item.Provider), tag.SourceIDEQ(item.ID)))
 	}
 	if len(tags) > 0 {
-		if err := tx.Tag.CreateBulk(tags...).OnConflictColumns(tag.FieldJavdbID).UpdateNewValues().Exec(ctx); err != nil {
+		if err := tx.Tag.CreateBulk(tags...).OnConflictColumns(tag.FieldProvider, tag.FieldSourceID).UpdateNewValues().Exec(ctx); err != nil {
 			return err
 		}
-		ids, err := tx.Tag.Query().Where(tag.JavdbIDIn(tagIDs...)).IDs(ctx)
+		ids, err := tx.Tag.Query().Where(tag.Or(tagPredicates...)).IDs(ctx)
 		if err != nil {
 			return err
 		}

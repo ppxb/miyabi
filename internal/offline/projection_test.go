@@ -282,10 +282,7 @@ func TestOfflineActivitySeparatesLibraryEntryFromArtworkAndRechecksFiles(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := service.database.Task.Create().SetType("scrape").SetStatus(task.StatusDone).SetPayload(metadata).Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
-	cover, err := service.database.Task.Create().SetType("cover").SetStatus(task.StatusRunning).SetPayload(metadata).Save(ctx)
+	scrapeTask, err := service.database.Task.Create().SetType("scrape").SetStatus(task.StatusRunning).SetPayload(metadata).Save(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +298,7 @@ func TestOfflineActivitySeparatesLibraryEntryFromArtworkAndRechecksFiles(t *test
 		}
 	}
 	assertPhase("in_library", true)
-	if err := service.tasks.Queue().Finish(ctx, cover.ID, nil); err != nil {
+	if err := service.tasks.Queue().Finish(ctx, scrapeTask.ID, nil); err != nil {
 		t.Fatal(err)
 	}
 	assertPhase("in_library", false)

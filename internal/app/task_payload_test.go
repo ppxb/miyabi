@@ -26,23 +26,23 @@ func taskPayloadJSON(t testing.TB, value any) json.RawMessage {
 
 func TestTaskPayloadRoundTripKeepsMetadataAndIntegerPrecision(t *testing.T) {
 	fix := libraryFixture(t)
-	input := scrape.CoverPayload{
+	input := scrape.Payload{
 		MetadataPayload: scrape.MetadataPayload{Source: fix.Payload.Source, ScanTaskID: 9007199254740993, MovieID: 2, Code: "ABP-001"},
 		Document: nfo.Movie{Code: "ABP-001", Title: "Fixture title", Rating: 4.5,
 			Tags: []nfo.Tag{{ID: "tag", Name: "标签", CategoryID: "category"}}},
 		Completed: true,
 	}
 	encoded := taskPayloadJSON(t, input)
-	record := fix.DB.Task.Create().SetType("cover").SetPayload(encoded).SaveX(t.Context())
+	record := fix.DB.Task.Create().SetType("scrape").SetPayload(encoded).SaveX(t.Context())
 	loaded := fix.DB.Task.GetX(t.Context(), record.ID)
-	restored, err := tasks.DecodePayload[scrape.CoverPayload](loaded.Payload)
+	restored, err := tasks.DecodePayload[scrape.Payload](loaded.Payload)
 	if err != nil || !reflect.DeepEqual(restored, input) {
 		t.Fatalf("task round trip changed metadata or IDs: %#v, %v", restored, err)
 	}
 	if len(loaded.Payload) == 0 || loaded.Payload[0] != '{' {
 		t.Fatalf("task stored a JSON string instead of an object: %s", loaded.Payload)
 	}
-	if count := fix.DB.Task.Query().Where(task.TypeEQ("cover")).CountX(t.Context()); count != 1 {
+	if count := fix.DB.Task.Query().Where(task.TypeEQ("scrape")).CountX(t.Context()); count != 1 {
 		t.Fatalf("round trip changed task type: %d", count)
 	}
 }
@@ -90,7 +90,7 @@ func TestTaskPayloadRejectsMalformedValues(t *testing.T) {
 var taskBenchmarkResult any
 
 func BenchmarkTaskPayload(b *testing.B) {
-	input := scrape.CoverPayload{
+	input := scrape.Payload{
 		MetadataPayload: scrape.MetadataPayload{Source: domain.LibrarySource{AccountID: "100", Directory: domain.LibraryDirectory{ID: "10", Path: "/Movies"}},
 			ScanTaskID: 1, MovieID: 2, Code: "ABP-001", JavDBID: "movie"},
 		Document:  nfo.Movie{Code: "ABP-001", Title: "Fixture title", Rating: 4.5},
@@ -124,7 +124,7 @@ func BenchmarkTaskPayload(b *testing.B) {
 			if err := json.Unmarshal(body, &record.Payload); err != nil {
 				b.Fatal(err)
 			}
-			decoded, err := tasks.DecodePayload[scrape.CoverPayload](record.Payload)
+			decoded, err := tasks.DecodePayload[scrape.Payload](record.Payload)
 			if err != nil {
 				b.Fatal(err)
 			}

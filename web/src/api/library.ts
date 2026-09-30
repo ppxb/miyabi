@@ -6,7 +6,7 @@ import { taskKeys, type LibrarySource, type ScanTask, type Task } from '@/api/ta
 
 export const LIBRARY_PAGE_SIZE = 20
 
-export type LibraryEntity = { id?: string; name: string }
+export type LibraryEntity = { provider?: string; id?: string; name: string }
 
 export type LibraryMovie = {
   id: number
@@ -23,7 +23,7 @@ export type LibraryMovie = {
   series?: LibraryEntity
   director?: LibraryEntity
   actors: LibraryEntity[]
-  tags: Array<{ id: number; javdb_id: string; name: string }>
+  tags: Array<{ id: number; provider: string; source_id: string; name: string }>
   scrape_status: 'pending' | 'done' | 'failed'
 }
 

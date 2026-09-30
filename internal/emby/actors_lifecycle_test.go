@@ -76,7 +76,7 @@ func TestConfigChangeCancelsOldAvatarUploadAndNextRunUsesNewServer(t *testing.T)
 		t.Fatal(err)
 	}
 	defer store.Close()
-	store.Client.Actor.Create().SetJavdbID("actor").SetName("Actor").SetAvatar("https://image.example/actor").ExecX(t.Context())
+	store.Client.Actor.Create().SetProvider("javdb").SetSourceID("actor").SetName("Actor").SetAvatar("https://image.example/actor").ExecX(t.Context())
 	entered := make(chan struct{})
 	var calls atomic.Int32
 	media := mediaFetcherFunc(func(ctx context.Context, _ string) (domain.Media, error) {

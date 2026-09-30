@@ -49,7 +49,7 @@ func (s *Service) RetryTask(ctx context.Context, id int) (domain.TaskInfo, error
 		if current.Status == task.StatusQueued || current.Status == task.StatusRunning {
 			return domain.E(domain.KindConflict, "任务正在处理中，无需重复重试", nil)
 		}
-		count, err := tx.Task.Update().Where(task.TypeIn(string(tasks.KindScrape), string(tasks.KindCover)),
+		count, err := tx.Task.Update().Where(task.TypeEQ(string(tasks.KindScrape)),
 			task.StatusEQ(task.StatusFailed), func(selector *sql.Selector) {
 				selector.Where(sqljson.ValueEQ(task.FieldPayload, id, sqljson.Path("scan_task_id")))
 			}).SetStatus(task.StatusQueued).SetProgress(0).ClearError().Save(ctx)

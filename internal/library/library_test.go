@@ -68,10 +68,10 @@ func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 	lib, _, payload := libraryFixture(t)
 	ctx := t.Context()
 	database := lib.database
-	tagB := database.Tag.Create().SetJavdbID("tag-b").SetName("B tag").SetCategoryID("category").SaveX(ctx)
-	tagA := database.Tag.Create().SetJavdbID("tag-a").SetName("A tag").SetCategoryID("category").SaveX(ctx)
-	actorB := database.Actor.Create().SetJavdbID("actor-b").SetName("B actor").SaveX(ctx)
-	actorA := database.Actor.Create().SetJavdbID("actor-a").SetName("A actor").SaveX(ctx)
+	tagB := database.Tag.Create().SetProvider("javdb").SetSourceID("tag-b").SetName("B tag").SetCategoryID("category").SaveX(ctx)
+	tagA := database.Tag.Create().SetProvider("javdb").SetSourceID("tag-a").SetName("A tag").SetCategoryID("category").SaveX(ctx)
+	actorB := database.Actor.Create().SetProvider("javdb").SetSourceID("actor-b").SetName("B actor").SaveX(ctx)
+	actorA := database.Actor.Create().SetProvider("javdb").SetSourceID("actor-a").SetName("A actor").SaveX(ctx)
 	releaseDate := time.Date(2026, time.September, 12, 0, 0, 0, 0, time.UTC)
 	film := database.Movie.Create().SetCode("ABP-001").SetTitle("Fixture title").SetCover("/cover").
 		SetFanarts([]string{"/api/library/artwork/fanart"}).SetReleaseDate(releaseDate).SetDuration(125).SetRating(4.5).
@@ -118,14 +118,14 @@ func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 		if item.ID == film.ID {
 			if item.Title != film.Title || item.Cover == nil || *item.Cover != "/cover" ||
 				item.ScrapeStatus != movie.ScrapeStatusDone ||
-				!reflect.DeepEqual(item.Tags, []Tag{{ID: tagA.ID, JavDBID: tagA.JavdbID, Name: tagA.Name}, {ID: tagB.ID, JavDBID: tagB.JavdbID, Name: tagB.Name}}) {
+				!reflect.DeepEqual(item.Tags, []Tag{{ID: tagA.ID, Provider: "javdb", SourceID: tagA.SourceID, Name: tagA.Name}, {ID: tagB.ID, Provider: "javdb", SourceID: tagB.SourceID, Name: tagB.Name}}) {
 				t.Fatalf("card lost or reordered catalogue data: %#v", item)
 			}
 			if item.ReleaseDate != "2026-09-12" || item.Duration != 125 || item.Rating != 4.5 || item.Fanart != "/api/library/artwork/fanart" ||
 				!reflect.DeepEqual(item.Maker, &Entity{ID: "maker-id", Name: "Studio"}) ||
 				!reflect.DeepEqual(item.Series, &Entity{ID: "series-id", Name: "Series"}) ||
 				!reflect.DeepEqual(item.Director, &Entity{ID: "director-id", Name: "Director"}) ||
-				!reflect.DeepEqual(item.Actors, []Entity{{ID: actorA.JavdbID, Name: actorA.Name}, {ID: actorB.JavdbID, Name: actorB.Name}}) {
+				!reflect.DeepEqual(item.Actors, []Entity{{Provider: "javdb", ID: actorA.SourceID, Name: actorA.Name}, {Provider: "javdb", ID: actorB.SourceID, Name: actorB.Name}}) {
 				t.Fatalf("local hover details were omitted or lost their search IDs: %#v", item)
 			}
 		} else if item.ID != empty.ID || item.Title != "" || item.Code != empty.Code || item.Tags == nil || len(item.Tags) != 0 ||

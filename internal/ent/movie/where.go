@@ -1240,6 +1240,16 @@ func PosterContainsFold(v string) predicate.Movie {
 	return predicate.Movie(sql.FieldContainsFold(FieldPoster, v))
 }
 
+// MetadataIsNil applies the IsNil predicate on the "metadata" field.
+func MetadataIsNil() predicate.Movie {
+	return predicate.Movie(sql.FieldIsNull(FieldMetadata))
+}
+
+// MetadataNotNil applies the NotNil predicate on the "metadata" field.
+func MetadataNotNil() predicate.Movie {
+	return predicate.Movie(sql.FieldNotNull(FieldMetadata))
+}
+
 // MetadataSnapshotIsNil applies the IsNil predicate on the "metadata_snapshot" field.
 func MetadataSnapshotIsNil() predicate.Movie {
 	return predicate.Movie(sql.FieldIsNull(FieldMetadataSnapshot))

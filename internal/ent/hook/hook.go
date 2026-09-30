@@ -45,6 +45,18 @@ func (f FileFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error)
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.FileMutation", m)
 }
 
+// The MetadataCacheFunc type is an adapter to allow the use of ordinary
+// function as MetadataCache mutator.
+type MetadataCacheFunc func(context.Context, *ent.MetadataCacheMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f MetadataCacheFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.MetadataCacheMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.MetadataCacheMutation", m)
+}
+
 // The MovieFunc type is an adapter to allow the use of ordinary
 // function as Movie mutator.
 type MovieFunc func(context.Context, *ent.MovieMutation) (ent.Value, error)

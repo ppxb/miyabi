@@ -26,7 +26,7 @@ func TestOfflineHistoryIndexesSurviveReopenAndSupportGrouping(t *testing.T) {
 	job := store.Client.OfflineDownload.Create().SetHash("fixture").SetAccountID("100").SetDirectoryID("10").SetJavdbID("movie").SaveX(t.Context())
 	// Recreate missing schema-managed indexes without changing downloads.
 	for _, name := range []string{"offlinedownload_account_id_directory_id_hash_id", "offlinedownload_account_id_javdb_id_hash_id"} {
-		if _, err := store.db.ExecContext(t.Context(), "DROP INDEX "+name); err != nil {
+		if _, err := store.db.ExecContext(t.Context(), "DROP INDEX IF EXISTS "+name); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -171,7 +171,7 @@ func TestMigrateOfflineDownloadsRollsBackInvalidHistory(t *testing.T) {
 			setMigrationVersion(t, store, 2)
 			// This legacy database predates both task JSON expression indexes.
 			for _, name := range []string{"task_scan_workflow", "task_cover_parent"} {
-				if _, err := store.db.ExecContext(ctx, "DROP INDEX "+name); err != nil {
+				if _, err := store.db.ExecContext(ctx, "DROP INDEX IF EXISTS "+name); err != nil {
 					t.Fatal(err)
 				}
 			}

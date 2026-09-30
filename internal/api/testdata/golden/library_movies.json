@@ -40,7 +40,8 @@
       "tags": [
         {
           "id": 3,
-          "javdb_id": "tag-1",
+          "provider": "javdb",
+          "source_id": "tag-1",
           "name": "Tag"
         }
       ],

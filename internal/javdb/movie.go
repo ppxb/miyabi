@@ -194,6 +194,8 @@ func movieFromWire(ctx context.Context, source wireMovie) (domain.Movie, error) 
 	}
 
 	movie := domain.Movie{
+		Sources:      []domain.SourceID{{Provider: "javdb", ID: source.ID}},
+		RatingSource: "javdb", RatingMax: 5,
 		ID:            source.ID,
 		Code:          code,
 		Title:         source.Title,
@@ -234,7 +236,7 @@ func movieFromWire(ctx context.Context, source wireMovie) (domain.Movie, error) 
 					"actor_id", actor.ID, "value", *actor.Gender)
 			}
 		}
-		movie.Actors[index] = domain.Actor{
+		movie.Actors[index] = domain.Actor{Provider: "javdb",
 			ID:      actor.ID,
 			Name:    actor.Name,
 			NameZHT: actor.NameZHT,
@@ -243,7 +245,7 @@ func movieFromWire(ctx context.Context, source wireMovie) (domain.Movie, error) 
 		}
 	}
 	for index, tag := range source.Tags {
-		movie.Tags[index] = domain.Tag{
+		movie.Tags[index] = domain.Tag{Provider: "javdb",
 			ID:         tag.ID,
 			Name:       tag.Name,
 			NameZHT:    tag.NameZHT,
@@ -251,13 +253,13 @@ func movieFromWire(ctx context.Context, source wireMovie) (domain.Movie, error) 
 		}
 	}
 	if source.SeriesID != "" || source.SeriesName != "" {
-		movie.Series = &domain.Series{ID: source.SeriesID, Name: source.SeriesName}
+		movie.Series = &domain.Series{Provider: "javdb", ID: source.SeriesID, Name: source.SeriesName}
 	}
 	if source.MakerID != "" || source.MakerName != "" {
-		movie.Maker = &domain.Maker{ID: source.MakerID, Name: source.MakerName}
+		movie.Maker = &domain.Maker{Provider: "javdb", ID: source.MakerID, Name: source.MakerName}
 	}
 	if source.DirectorID != "" || source.DirectorName != "" {
-		movie.Director = &domain.Director{ID: source.DirectorID, Name: source.DirectorName}
+		movie.Director = &domain.Director{Provider: "javdb", ID: source.DirectorID, Name: source.DirectorName}
 	}
 	return movie, nil
 }

@@ -19,7 +19,7 @@ func TestExportLocalMediaSingleVideo(t *testing.T) {
 		Code:  "IPX-123",
 		Title: "Test Movie",
 	}
-	input := CoverPayload{
+	input := Payload{
 		MetadataPayload: MetadataPayload{
 			Code:    "IPX-123",
 			MovieID: 1,
@@ -33,7 +33,7 @@ func TestExportLocalMediaSingleVideo(t *testing.T) {
 	poster := []byte("fake poster data")
 	fanart := []byte("fake fanart data")
 
-	err := service.exportLocalMedia(t.Context(), input, videos, poster, fanart)
+	err := ExportEmbyMedia(service.exportConfig().EmbyDir, service.exportConfig().PublicURL, service.exportConfig().STRMToken, input.Code, input.Document, videos, poster, fanart)
 	if err != nil {
 		t.Fatalf("exportLocalMedia failed: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestExportLocalMediaMultiVideo(t *testing.T) {
 		Code:  "SSIS-456",
 		Title: "Two Disc Movie",
 	}
-	input := CoverPayload{
+	input := Payload{
 		MetadataPayload: MetadataPayload{
 			Code:    "SSIS-456",
 			MovieID: 2,
@@ -98,7 +98,7 @@ func TestExportLocalMediaMultiVideo(t *testing.T) {
 		{ID: "video-cd2", Name: "SSIS-456-CD2.mp4"},
 	}
 
-	err := service.exportLocalMedia(t.Context(), input, videos, nil, nil)
+	err := ExportEmbyMedia(service.exportConfig().EmbyDir, service.exportConfig().PublicURL, service.exportConfig().STRMToken, input.Code, input.Document, videos, nil, nil)
 	if err != nil {
 		t.Fatalf("exportLocalMedia failed: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestExportLocalMediaMultiVideoUnsorted(t *testing.T) {
 		Code:  "SSIS-456",
 		Title: "Two Disc Movie",
 	}
-	input := CoverPayload{
+	input := Payload{
 		MetadataPayload: MetadataPayload{
 			Code:    "SSIS-456",
 			MovieID: 2,
@@ -145,7 +145,7 @@ func TestExportLocalMediaMultiVideoUnsorted(t *testing.T) {
 		{ID: "video-cd1", Name: "SSIS-456-CD1.mp4"},
 	}
 
-	err := service.exportLocalMedia(t.Context(), input, videos, nil, nil)
+	err := ExportEmbyMedia(service.exportConfig().EmbyDir, service.exportConfig().PublicURL, service.exportConfig().STRMToken, input.Code, input.Document, videos, nil, nil)
 	if err != nil {
 		t.Fatalf("exportLocalMedia failed: %v", err)
 	}

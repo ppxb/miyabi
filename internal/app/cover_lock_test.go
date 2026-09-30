@@ -17,13 +17,13 @@ import (
 )
 
 type coverMediaProbe struct {
-	scrapePkg.Discoverer
+	scrapePkg.MetadataSource
 	beforeMedia func()
 }
 
-func (probe coverMediaProbe) Media(ctx context.Context, url string) (domain.Media, error) {
+func (probe coverMediaProbe) Image(ctx context.Context, image domain.ImageCandidate) (domain.Media, error) {
 	probe.beforeMedia()
-	return probe.Discoverer.Media(ctx, url)
+	return probe.MetadataSource.Image(ctx, image)
 }
 
 type coverExportProbe struct {
@@ -31,7 +31,7 @@ type coverExportProbe struct {
 	onUpdated func(context.Context, string) error
 }
 
-func (probe coverExportProbe) NotifyUpdated(ctx context.Context, path string) error {
+func (probe coverExportProbe) NotifyUpdatedTx(ctx context.Context, _ *ent.Tx, path string) error {
 	return probe.onUpdated(ctx, path)
 }
 
@@ -43,19 +43,19 @@ func TestCoverCleanupOnlyBlocksUntilArtworkCheckpoint(t *testing.T) {
 	if _, err := fixture.library.StartScan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	for _, handle := range []func(context.Context, tasks.Job) error{fixture.library.Scan, fixture.scrape.Scrape} {
+	{
 		job, err := fixture.tasks.Queue().Claim(ctx, []tasks.Kind{tasks.KindScan, tasks.KindScrape})
 		if err != nil || job == nil {
 			t.Fatalf("claim metadata: %+v, %v", job, err)
 		}
-		if err := handle(ctx, *job); err != nil {
+		if err := fixture.library.Scan(ctx, *job); err != nil {
 			t.Fatal(err)
 		}
 		if err := fixture.tasks.Queue().Finish(ctx, job.ID, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	job, err := fixture.tasks.Queue().Claim(ctx, []tasks.Kind{tasks.KindCover})
+	job, err := fixture.tasks.Queue().Claim(ctx, []tasks.Kind{tasks.KindScrape})
 	if err != nil || job == nil {
 		t.Fatalf("claim cover: %+v, %v", job, err)
 	}
@@ -84,7 +84,7 @@ func TestCoverCleanupOnlyBlocksUntilArtworkCheckpoint(t *testing.T) {
 			t.Fatalf("%s: cleanup blocked outside image publication: %v", phase, err)
 		}
 		saved := fixture.store.Client.Task.GetX(ctx, job.ID)
-		input, err := tasks.DecodePayload[scrapePkg.CoverPayload](saved.Payload)
+		input, err := tasks.DecodePayload[scrapePkg.Payload](saved.Payload)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -103,7 +103,7 @@ func TestCoverCleanupOnlyBlocksUntilArtworkCheckpoint(t *testing.T) {
 	fixture.store.Client.Task.Use(func(next ent.Mutator) ent.Mutator {
 		return ent.MutateFunc(func(ctx context.Context, mutation ent.Mutation) (ent.Value, error) {
 			if body, ok := mutation.(*ent.TaskMutation).Payload(); ok {
-				input, err := tasks.DecodePayload[scrapePkg.CoverPayload](body)
+				input, err := tasks.DecodePayload[scrapePkg.Payload](body)
 				if err != nil {
 					return nil, err
 				}
@@ -128,7 +128,7 @@ func TestCoverCleanupOnlyBlocksUntilArtworkCheckpoint(t *testing.T) {
 		return info(ctx, token, id)
 	}
 	service := scrapePkg.New(fixture.store.Client, fixture.driveService,
-		coverMediaProbe{Discoverer: fixture.discover, beforeMedia: func() { checkCleanup("download", false) }},
+		coverMediaProbe{MetadataSource: fixtureMetadata{fixture.discover}, beforeMedia: func() { checkCleanup("download", false) }},
 		fixture.images, fixture.tasks, scrapePkg.Dependencies{
 			ExportManager: export.NewManager(export.Config{EmbyDir: fixture.embyDir, PublicURL: "http://127.0.0.1:8080"}),
 			MediaNotifier: coverExportProbe{onUpdated: func(_ context.Context, path string) error {
@@ -142,7 +142,7 @@ func TestCoverCleanupOnlyBlocksUntilArtworkCheckpoint(t *testing.T) {
 			}},
 		})
 	t.Cleanup(service.Close)
-	if err := service.Cover(ctx, *job); err != nil {
+	if err := service.Scrape(ctx, *job); err != nil {
 		t.Fatal(err)
 	}
 	if err := fixture.tasks.Queue().Finish(ctx, job.ID, nil); err != nil {

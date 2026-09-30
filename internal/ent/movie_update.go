@@ -19,6 +19,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/ent/tag"
+	"github.com/ppxb/miyabi/internal/nfo"
 )
 
 // MovieUpdate is the builder for updating Movie entities.
@@ -345,6 +346,18 @@ func (_u *MovieUpdate) SetFanarts(v []string) *MovieUpdate {
 // AppendFanarts appends value to the "fanarts" field.
 func (_u *MovieUpdate) AppendFanarts(v []string) *MovieUpdate {
 	_u.mutation.AppendFanarts(v)
+	return _u
+}
+
+// SetMetadata sets the "metadata" field.
+func (_u *MovieUpdate) SetMetadata(v *nfo.Movie) *MovieUpdate {
+	_u.mutation.SetMetadata(v)
+	return _u
+}
+
+// ClearMetadata clears the value of the "metadata" field.
+func (_u *MovieUpdate) ClearMetadata() *MovieUpdate {
+	_u.mutation.ClearMetadata()
 	return _u
 }
 
@@ -689,6 +702,12 @@ func (_u *MovieUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, movie.FieldFanarts, value)
 		})
+	}
+	if value, ok := _u.mutation.Metadata(); ok {
+		_spec.SetField(movie.FieldMetadata, field.TypeJSON, value)
+	}
+	if _u.mutation.MetadataCleared() {
+		_spec.ClearField(movie.FieldMetadata, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.MetadataSnapshot(); ok {
 		_spec.SetField(movie.FieldMetadataSnapshot, field.TypeJSON, value)
@@ -1213,6 +1232,18 @@ func (_u *MovieUpdateOne) AppendFanarts(v []string) *MovieUpdateOne {
 	return _u
 }
 
+// SetMetadata sets the "metadata" field.
+func (_u *MovieUpdateOne) SetMetadata(v *nfo.Movie) *MovieUpdateOne {
+	_u.mutation.SetMetadata(v)
+	return _u
+}
+
+// ClearMetadata clears the value of the "metadata" field.
+func (_u *MovieUpdateOne) ClearMetadata() *MovieUpdateOne {
+	_u.mutation.ClearMetadata()
+	return _u
+}
+
 // SetMetadataSnapshot sets the "metadata_snapshot" field.
 func (_u *MovieUpdateOne) SetMetadataSnapshot(v *domain.MetadataSnapshot) *MovieUpdateOne {
 	_u.mutation.SetMetadataSnapshot(v)
@@ -1584,6 +1615,12 @@ func (_u *MovieUpdateOne) sqlSave(ctx context.Context) (_node *Movie, err error)
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, movie.FieldFanarts, value)
 		})
+	}
+	if value, ok := _u.mutation.Metadata(); ok {
+		_spec.SetField(movie.FieldMetadata, field.TypeJSON, value)
+	}
+	if _u.mutation.MetadataCleared() {
+		_spec.ClearField(movie.FieldMetadata, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.MetadataSnapshot(); ok {
 		_spec.SetField(movie.FieldMetadataSnapshot, field.TypeJSON, value)

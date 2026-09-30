@@ -13,7 +13,8 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "javdb_id", Type: field.TypeString, Unique: true},
+		{Name: "provider", Type: field.TypeString},
+		{Name: "source_id", Type: field.TypeString},
 		{Name: "name", Type: field.TypeString},
 		{Name: "name_zht", Type: field.TypeString, Nullable: true},
 		{Name: "gender", Type: field.TypeEnum, Enums: []string{"female", "male", "unknown"}, Default: "unknown"},
@@ -24,6 +25,13 @@ var (
 		Name:       "actors",
 		Columns:    ActorsColumns,
 		PrimaryKey: []*schema.Column{ActorsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "actor_provider_source_id",
+				Unique:  true,
+				Columns: []*schema.Column{ActorsColumns[3], ActorsColumns[4]},
+			},
+		},
 	}
 	// EmbyNotificationsColumns holds the columns for the "emby_notifications" table.
 	EmbyNotificationsColumns = []*schema.Column{
@@ -92,6 +100,27 @@ var (
 			},
 		},
 	}
+	// MetadataCachesColumns holds the columns for the "metadata_caches" table.
+	MetadataCachesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "provider", Type: field.TypeString},
+		{Name: "code", Type: field.TypeString},
+		{Name: "result", Type: field.TypeJSON, Nullable: true},
+		{Name: "expires_at", Type: field.TypeTime},
+	}
+	// MetadataCachesTable holds the schema information for the "metadata_caches" table.
+	MetadataCachesTable = &schema.Table{
+		Name:       "metadata_caches",
+		Columns:    MetadataCachesColumns,
+		PrimaryKey: []*schema.Column{MetadataCachesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "metadatacache_provider_code",
+				Unique:  true,
+				Columns: []*schema.Column{MetadataCachesColumns[1], MetadataCachesColumns[2]},
+			},
+		},
+	}
 	// MoviesColumns holds the columns for the "movies" table.
 	MoviesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -113,6 +142,7 @@ var (
 		{Name: "cover", Type: field.TypeString, Nullable: true},
 		{Name: "poster", Type: field.TypeString, Nullable: true},
 		{Name: "fanarts", Type: field.TypeJSON},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
 		{Name: "metadata_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "scrape_status", Type: field.TypeEnum, Enums: []string{"pending", "done", "failed"}, Default: "pending"},
 	}
@@ -265,16 +295,24 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "javdb_id", Type: field.TypeString, Unique: true},
+		{Name: "provider", Type: field.TypeString},
+		{Name: "source_id", Type: field.TypeString},
 		{Name: "name", Type: field.TypeString},
 		{Name: "name_zht", Type: field.TypeString, Nullable: true},
-		{Name: "category_id", Type: field.TypeString},
+		{Name: "category_id", Type: field.TypeString, Default: ""},
 	}
 	// TagsTable holds the schema information for the "tags" table.
 	TagsTable = &schema.Table{
 		Name:       "tags",
 		Columns:    TagsColumns,
 		PrimaryKey: []*schema.Column{TagsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "tag_provider_source_id",
+				Unique:  true,
+				Columns: []*schema.Column{TagsColumns[3], TagsColumns[4]},
+			},
+		},
 	}
 	// TasksColumns holds the columns for the "tasks" table.
 	TasksColumns = []*schema.Column{
@@ -379,6 +417,7 @@ var (
 		ActorsTable,
 		EmbyNotificationsTable,
 		FilesTable,
+		MetadataCachesTable,
 		MoviesTable,
 		OfflineDownloadsTable,
 		SettingsTable,

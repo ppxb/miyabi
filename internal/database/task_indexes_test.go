@@ -22,7 +22,7 @@ func TestTaskWorkflowIndexUpgradesAndSurvivesReopen(t *testing.T) {
 		}
 	})
 	payload := json.RawMessage(`{"scan_task_id":12,"scrape_task_id":34,"future":{"keep":true}}`)
-	job := store.Client.Task.Create().SetType("cover").SetPayload(payload).SetProgress(40).SetError("preserved").SaveX(ctx)
+	job := store.Client.Task.Create().SetType("scrape").SetPayload(payload).SetProgress(40).SetError("preserved").SaveX(ctx)
 	if _, err := store.db.ExecContext(ctx, "DROP INDEX task_scan_workflow"); err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestTaskWorkflowIndexUpgradesAndSurvivesReopen(t *testing.T) {
 		rows, err := store.db.QueryContext(ctx, `EXPLAIN QUERY PLAN SELECT id,
 			COUNT(*) OVER (PARTITION BY json_extract(payload, '$.scan_task_id'), type, status),
 			ROW_NUMBER() OVER (PARTITION BY json_extract(payload, '$.scan_task_id'), type, status ORDER BY updated_at DESC, id DESC)
-			FROM tasks WHERE type IN (?, ?) AND json_extract(payload, '$.scan_task_id') IN (?, ?)`, "scrape", "cover", 12, 13)
+			FROM tasks WHERE type = ? AND json_extract(payload, '$.scan_task_id') IN (?, ?)`, "scrape", 12, 13)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -92,14 +92,14 @@ func TestTaskQueueIndexUpgradePreservesHistoryAndRecords(t *testing.T) {
 		kind   string
 		status task.Status
 	}{
-		{"cover", task.StatusQueued},
+		{"scrape", task.StatusQueued},
 		{"scan", task.StatusRunning},
 		{"scan", task.StatusDone},
 		{"scrape", task.StatusQueued},
 		{"subscription_batch", task.StatusFailed},
 		{"scan", task.StatusQueued},
 		{"subscription_batch", task.StatusQueued},
-		{"cover", task.StatusRunning},
+		{"scrape", task.StatusRunning},
 	} {
 		job := store.Client.Task.Create().SetType(entry.kind).SetStatus(entry.status).
 			SetPayload(json.RawMessage(`{"scan_task_id":12,"future":{"keep":true}}`)).
@@ -114,7 +114,7 @@ func TestTaskQueueIndexUpgradePreservesHistoryAndRecords(t *testing.T) {
 		needsSort        bool
 	}{
 		{"batch claim", "SELECT id, payload FROM tasks WHERE type IN (?) AND status=? ORDER BY id LIMIT 1", "task_type_status", []any{"subscription_batch", "queued"}, []int{ids[6]}, false},
-		{"library claim", "SELECT id, payload FROM tasks WHERE type IN (?, ?, ?) AND status=? ORDER BY id LIMIT 1", "task_type_status", []any{"scan", "scrape", "cover", "queued"}, []int{ids[0]}, true},
+		{"library claim", "SELECT id, payload FROM tasks WHERE type IN (?, ?) AND status=? ORDER BY id LIMIT 1", "task_type_status", []any{"scan", "scrape", "queued"}, []int{ids[0]}, true},
 		{"scan history", "SELECT id, payload FROM tasks WHERE type=? ORDER BY id DESC LIMIT 20", "task_type", []any{"scan"}, []int{ids[5], ids[2], ids[1]}, false},
 		{"batch history", "SELECT id, payload FROM tasks WHERE type=? ORDER BY id DESC LIMIT 5", "task_type", []any{"subscription_batch"}, []int{ids[6], ids[4]}, false},
 	}
@@ -149,7 +149,7 @@ func TestTaskQueueIndexUpgradePreservesHistoryAndRecords(t *testing.T) {
 			}
 			t.Logf("%s: %s", query.name, plan)
 		}
-		recovery := queryPlan(t, store, "UPDATE tasks SET status='queued', progress=0, error=NULL WHERE type IN (?, ?, ?) AND status=?", "scan", "scrape", "cover", "running")
+		recovery := queryPlan(t, store, "UPDATE tasks SET status='queued', progress=0, error=NULL WHERE type IN (?, ?) AND status=?", "scan", "scrape", "running")
 		if !strings.Contains(recovery, "INDEX task_type_status (type=? AND status=?)") {
 			t.Fatalf("recovery plan: %s", recovery)
 		}

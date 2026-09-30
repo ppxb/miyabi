@@ -30,9 +30,9 @@ func TestTaskGroupsFoldChildCountsAndLatestState(t *testing.T) {
 		status task.Status
 	}{
 		{"scrape", task.StatusDone}, {"scrape", task.StatusDone}, {"scrape", task.StatusFailed},
-		{"cover", task.StatusDone}, {"cover", task.StatusRunning},
+		{"scrape", task.StatusDone}, {"scrape", task.StatusRunning},
 	} {
-		input, err := tasks.EncodePayload(scrape.MetadataPayload{Source: payload.Source, ScanTaskID: parent.ID})
+		input, err := tasks.EncodePayload(scrape.Payload{MetadataPayload: scrape.MetadataPayload{Source: payload.Source, ScanTaskID: parent.ID}, MetadataReady: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -56,7 +56,7 @@ func TestTaskGroupsFoldChildCountsAndLatestState(t *testing.T) {
 		t.Fatal(err)
 	}
 	info := infos[0]
-	if info.Status != string(task.StatusRunning) || info.Scan.Stage != "artwork" || info.Scan.MetadataTotal != 3 || info.Scan.MetadataCompleted != 2 || info.Progress != 66 || info.Error == nil {
+	if info.Status != string(task.StatusRunning) || info.Scan.Stage != "artwork" || info.Scan.MetadataTotal != 5 || info.Scan.MetadataCompleted != 4 || info.Progress != 80 || info.Error == nil {
 		t.Fatalf("workflow: %+v", info)
 	}
 	if !info.UpdatedAt.Equal(latest.Add(4 * time.Second)) {
@@ -70,7 +70,7 @@ func TestTaskGroupsFoldChildCountsAndLatestState(t *testing.T) {
 		t.Fatal(err)
 	}
 	info = infos[0]
-	if err != nil || info.Status != string(task.StatusFailed) || info.Scan.MetadataCompleted != 3 || info.Progress != 100 {
+	if err != nil || info.Status != string(task.StatusFailed) || info.Scan.MetadataCompleted != 5 || info.Progress != 100 {
 		t.Fatalf("finished workflow: %+v err=%v", info, err)
 	}
 }

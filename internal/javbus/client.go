@@ -194,14 +194,24 @@ func (c *Client) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Magnet
 }
 
 func (c *Client) ensureDetailParams(ctx context.Context, code string) (gid, uc, img string, err error) {
-	if err := c.limiter.Wait(ctx); err != nil {
+	body, err := c.MoviePage(ctx, code)
+	if err != nil || body == "" {
 		return "", "", "", err
+	}
+	params, err := extractDetailParams(body)
+	return params.GID, params.UC, params.Img, err
+}
+
+// MoviePage retrieves the verified page shared by metadata and magnet parsing.
+func (c *Client) MoviePage(ctx context.Context, code string) (string, error) {
+	if err := c.limiter.Wait(ctx); err != nil {
+		return "", err
 	}
 
 	detailURL := fmt.Sprintf("%s/%s?existmag=all", baseURL, url.PathEscape(code))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, detailURL, nil)
 	if err != nil {
-		return "", "", "", err
+		return "", err
 	}
 	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Cookie", "dv=1; existmag=all")
@@ -211,52 +221,47 @@ func (c *Client) ensureDetailParams(ctx context.Context, code string) (gid, uc, 
 	resp, err := client.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
-			return "", "", "", ctx.Err()
+			return "", ctx.Err()
 		}
 		if !c.isTest {
 			c.setAvailable(false)
 		}
-		return "", "", "", domain.E(domain.KindUpstream, "JavBus detail request failed", err)
+		return "", domain.E(domain.KindUpstream, "JavBus detail request failed", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 301 || resp.StatusCode == 302 {
 		location := resp.Header.Get("Location")
 		if strings.Contains(location, "driver-verify") {
-			return "", "", "", domain.E(domain.KindUpstream, "JavBus driver verify required", nil)
+			return "", domain.E(domain.KindUpstream, "JavBus driver verify required", nil)
 		}
-		return "", "", "", domain.E(domain.KindUpstream, fmt.Sprintf("JavBus unexpected redirect to %s", location), nil)
+		return "", domain.E(domain.KindUpstream, fmt.Sprintf("JavBus unexpected redirect to %s", location), nil)
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if err != nil {
-		return "", "", "", domain.E(domain.KindUpstream, "read JavBus detail response", err)
+		return "", domain.E(domain.KindUpstream, "read JavBus detail response", err)
 	}
 	bodyStr := string(body)
 
 	if resp.StatusCode == 404 || isNotFoundPage(bodyStr) {
-		return "", "", "", nil
+		return "", nil
 	}
 
 	if isCloudflareChallenge(bodyStr) || resp.StatusCode == 403 || resp.StatusCode == 503 {
 		if !c.isTest {
 			c.setAvailable(false)
 		}
-		return "", "", "", domain.E(domain.KindUpstream, "JavBus Cloudflare challenge encountered", nil)
+		return "", domain.E(domain.KindUpstream, "JavBus Cloudflare challenge encountered", nil)
 	}
 	if isDriverVerify(bodyStr) {
-		return "", "", "", domain.E(domain.KindUpstream, "JavBus driver verify required", nil)
+		return "", domain.E(domain.KindUpstream, "JavBus driver verify required", nil)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", "", "", domain.E(domain.KindUpstream, fmt.Sprintf("JavBus returned unexpected status %d", resp.StatusCode), nil)
+		return "", domain.E(domain.KindUpstream, fmt.Sprintf("JavBus returned unexpected status %d", resp.StatusCode), nil)
 	}
 
-	params, err := extractDetailParams(bodyStr)
-	if err != nil {
-		return "", "", "", err
-	}
-
-	return params.GID, params.UC, params.Img, nil
+	return bodyStr, nil
 }
 
 func (c *Client) fetchMagnets(ctx context.Context, code, gid, uc, img string) ([]domain.Magnet, error) {

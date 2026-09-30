@@ -21,8 +21,10 @@ type Actor struct {
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
-	// JavdbID holds the value of the "javdb_id" field.
-	JavdbID string `json:"javdb_id,omitempty"`
+	// Provider holds the value of the "provider" field.
+	Provider string `json:"provider,omitempty"`
+	// SourceID holds the value of the "source_id" field.
+	SourceID string `json:"source_id,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
 	// NameZht holds the value of the "name_zht" field.
@@ -62,7 +64,7 @@ func (*Actor) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case actor.FieldID:
 			values[i] = new(sql.NullInt64)
-		case actor.FieldJavdbID, actor.FieldName, actor.FieldNameZht, actor.FieldGender, actor.FieldAvatar:
+		case actor.FieldProvider, actor.FieldSourceID, actor.FieldName, actor.FieldNameZht, actor.FieldGender, actor.FieldAvatar:
 			values[i] = new(sql.NullString)
 		case actor.FieldCreatedAt, actor.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -99,11 +101,17 @@ func (_m *Actor) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.UpdatedAt = value.Time
 			}
-		case actor.FieldJavdbID:
+		case actor.FieldProvider:
 			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field javdb_id", values[i])
+				return fmt.Errorf("unexpected type %T for field provider", values[i])
 			} else if value.Valid {
-				_m.JavdbID = value.String
+				_m.Provider = value.String
+			}
+		case actor.FieldSourceID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field source_id", values[i])
+			} else if value.Valid {
+				_m.SourceID = value.String
 			}
 		case actor.FieldName:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -178,8 +186,11 @@ func (_m *Actor) String() string {
 	builder.WriteString("updated_at=")
 	builder.WriteString(_m.UpdatedAt.Format(time.ANSIC))
 	builder.WriteString(", ")
-	builder.WriteString("javdb_id=")
-	builder.WriteString(_m.JavdbID)
+	builder.WriteString("provider=")
+	builder.WriteString(_m.Provider)
+	builder.WriteString(", ")
+	builder.WriteString("source_id=")
+	builder.WriteString(_m.SourceID)
 	builder.WriteString(", ")
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)
