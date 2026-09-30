@@ -84,10 +84,6 @@ func (c *embyClient) notify(ctx context.Context, cfg Config, updates []mediaUpda
 	return c.request(ctx, cfg, http.MethodPost, "/Library/Media/Updated", bytes.NewReader(body), "application/json", nil)
 }
 
-func (c *embyClient) refresh(ctx context.Context, cfg Config) error {
-	return c.request(ctx, cfg, http.MethodPost, "/Library/Refresh", nil, "", nil)
-}
-
 type personItem struct {
 	Name            string            `json:"Name"`
 	ID              string            `json:"Id"`

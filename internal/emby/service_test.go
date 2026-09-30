@@ -240,10 +240,7 @@ func TestEmbyService_NotifyUpdatedBatch(t *testing.T) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		if r.URL.Path == "/Library/Refresh" && r.Method == http.MethodPost {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
+		t.Errorf("unexpected request during notification: %s %s", r.Method, r.URL.Path)
 		http.NotFound(w, r)
 	}))
 	defer server.Close()
@@ -292,10 +289,7 @@ func TestEmbyService_NotifyUpdatedDeleted(t *testing.T) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		if r.URL.Path == "/Library/Refresh" && r.Method == http.MethodPost {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
+		t.Errorf("unexpected request during notification: %s %s", r.Method, r.URL.Path)
 		http.NotFound(w, r)
 	}))
 	defer server.Close()

@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-30；本轮移除复查通过的第 112–125 项，共 14 条。当前保留 111 条：108 条待处理，3 条已完成、待复查。
+> 清单整理：2026-09-30；本轮移除复查通过的第 112–125 项，共 14 条。当前保留 111 条：107 条待处理，4 条已完成、待复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；完成项经复查确认后可移除，已提交的历史记录可通过 Git 追溯。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮复查范围为第 112–125 项的实现、生产调用链与回归覆盖；其余待办和历史已移除条目不在本轮复查范围内。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -48,7 +48,9 @@
   - 已完成：Ent schema 改为 `(type, status)` 联合索引并重新生成代码；追加第 8 版迁移，在 Ent 建立新索引后显式删除旧 `task_status_created_at` 索引。保留第 126 项的 `task_scan_workflow` 表达式索引。
   - 修正原建议：保留单列 `task_type` 索引。扫描与订阅批次历史跨状态按 ID 倒序读取，单列索引可利用 SQLite 隐含 rowid 提供顺序；只保留联合索引会引入临时排序。多类型领取仍需合并排序，保持按全局最小 ID 领取的语义，本项未改动 Claim 算法。
   - 验证：使用项目 SQLite 驱动覆盖新库、第 7 版旧库升级及重复打开，确认旧索引移除、任务所有字段不变，领取/恢复/活动任务查询命中新联合索引，历史查询无临时排序，原工作流索引回归通过。Go 全量测试、go vet、git diff --check 通过。未进行生产性能基准、浏览器或真实上游联调；CGO_ENABLED=0，未运行 race 检测，依赖和锁文件未改动。
-- [ ] **129.** ✔ `internal/emby/service.go` 的 `sendBatch` 每批 `/Library/Media/Updated` 增量通知后仍调用 `client.refresh`（`/Library/Refresh` 全库扫描），扫描期间约每 3 秒一次 → 删除。
+- [x] **129.** `internal/emby/service.go` 的 `sendBatch` 每批增量通知后额外请求 `/Library/Refresh` 全库扫描；通知工作线程每 3 秒处理一批，持续扫描时会重复触发。
+  - 已完成：`sendBatch` 直接返回 `/Library/Media/Updated` 的调用结果，删除全库扫描请求及无人使用的 `embyClient.refresh` 方法和对应测试分支。路径映射、Created/Deleted 通知、持久化去重、失败退避与手动重试、并发修订保护、退出补发及通知成功后的头像同步调度保持原逻辑。
+  - 验证：现有批量通知和新增/删除路径测试改为拒绝额外请求，修复前均捕获到 `POST /Library/Refresh`，修复后通过；通知失败恢复、重启恢复、事务与并发更新、退出补发等回归通过。Go 全量测试、go vet、git diff --check 通过。未进行浏览器或真实 Emby 联调；CGO_ENABLED=0，未运行 race 检测，依赖和锁文件未改动。
 - [ ] **130.** `internal/library/scan/movies.go:29` `MatchMovies` 每页 100 个 `LIKE '%code'` 以 OR 连接 → 全表扫描；:38-45 codes × records 双重循环；:56 `slices.Contains` 去重 O(n²) → 增加 `canonical_code` 索引列 + 等值 IN，去重用 map。
 - [ ] **131.** `internal/library/scan/local.go` 已通过后台任务执行，但仍逐文件开事务并调用 MatchMovies；图片解码/重编码在 SQLite 写事务内；Emby 通知现已同事务持久化并在提交后发送。评估批量匹配、缩短事务；通知事务语义已修复。
 - [ ] **132.** `internal/library/scan/reconcile.go:94-142` 全量扫描加载所有已刮削影片的 files / actors / tags；每部影片 `images.Exists` 3 次 stat + `ExportLocalMovie` stat / 写文件均在 SQLite 写事务内，长时间占写锁；:139 刮削任务逐条 `Create().Exec` → 事务外导出 + `CreateBulk`。

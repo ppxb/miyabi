@@ -200,7 +200,6 @@ func (s *Service) Test(ctx context.Context, cfg Config) (ServerInfo, error) {
 }
 
 func (s *Service) sendBatch(ctx context.Context, cfg Config, localPaths []string) error {
-
 	if !cfg.ready() || len(localPaths) == 0 {
 		return nil
 	}
@@ -224,15 +223,7 @@ func (s *Service) sendBatch(ctx context.Context, cfg Config, localPaths []string
 		return nil
 	}
 
-	if err := s.client.notify(ctx, cfg, updates); err != nil {
-		return err
-	}
-
-	if err := s.client.refresh(ctx, cfg); err != nil {
-		slog.WarnContext(ctx, "failed to trigger emby library refresh", "error", err)
-	}
-
-	return nil
+	return s.client.notify(ctx, cfg, updates)
 }
 
 func translatePath(localPath, localDir, mediaPath string) string {

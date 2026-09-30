@@ -13,7 +13,7 @@ import (
 )
 
 func TestClientUsesHeaderAuthAndPreservesRequestFormats(t *testing.T) {
-	paths := make(chan string, 5)
+	paths := make(chan string, 4)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Emby-Token") != "secret +&" || r.URL.RawQuery != "" {
 			t.Errorf("incorrect auth: header=%q query=%q", r.Header.Get("X-Emby-Token"), r.URL.RawQuery)
@@ -42,11 +42,6 @@ func TestClientUsesHeaderAuthAndPreservesRequestFormats(t *testing.T) {
 				t.Errorf("avatar format changed")
 			}
 			w.WriteHeader(http.StatusNoContent)
-		case "/emby/Library/Refresh":
-			if r.Method != http.MethodPost {
-				t.Errorf("method=%s", r.Method)
-			}
-			w.WriteHeader(http.StatusNoContent)
 		default:
 			http.NotFound(w, r)
 		}
@@ -68,10 +63,7 @@ func TestClientUsesHeaderAuthAndPreservesRequestFormats(t *testing.T) {
 	if err := client.uploadAvatar(t.Context(), cfg, "one", domain.Media{Body: []byte("image"), ContentType: "image/jpeg"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := client.refresh(t.Context(), cfg); err != nil {
-		t.Fatal(err)
-	}
-	if len(paths) != 5 {
+	if len(paths) != 4 {
 		t.Fatalf("requests=%d", len(paths))
 	}
 }
