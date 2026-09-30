@@ -172,7 +172,7 @@ func TestDataCleanupPreservesAllLibraryAndUnfinishedTaskReferences(t *testing.T)
 	}
 }
 
-func TestDataCleanupAndCoverWorkShareAnExclusiveGate(t *testing.T) {
+func TestDataCleanupAndArtworkWritesShareAnExclusiveGate(t *testing.T) {
 	service := dataFixture(t)
 	unused := dataArtwork(t, service, 70)
 	if !service.scrape.TryLockArtwork() {
@@ -183,14 +183,8 @@ func TestDataCleanupAndCoverWorkShareAnExclusiveGate(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	payload, err := tasks.EncodePayload(scrape.CoverPayload{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	// No drive is installed in the fixture. Cover must honor cancellation while
-	// waiting for the gate, before attempting upstream access or creating files.
-	if err := service.scrape.(*scrape.Service).Cover(ctx, tasks.Job{Payload: payload}); !errors.Is(err, context.Canceled) {
-		t.Fatalf("cover did not wait on the cleanup gate: %v", err)
+	if err := service.images.LockArtwork(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("artwork write did not honor cancellation at the cleanup gate: %v", err)
 	}
 	service.scrape.UnlockArtwork()
 	if _, err := service.ClearCache(ctx); !errors.Is(err, context.Canceled) {
@@ -219,5 +213,57 @@ func TestDataCleanupDoesNotDeleteWhenReferenceLookupFails(t *testing.T) {
 		if _, err := service.images.ReadURL(url); err != nil {
 			t.Fatal("failed reference lookup deleted images")
 		}
+	}
+}
+
+func TestDataCleanupRetainsArtworkWhenCoverFinishesBetweenReferenceQueries(t *testing.T) {
+	for _, firstQuery := range []string{"task", "movie"} {
+		t.Run("complete after "+firstQuery+" query", func(t *testing.T) {
+			service := dataFixture(t)
+			ctx := t.Context()
+			artwork := dataArtwork(t, service, 90)
+			film := service.db.Movie.Create().SetCode("ABP-123").SaveX(ctx)
+			payload, err := tasks.EncodePayload(scrape.CoverPayload{Artwork: &artwork})
+			if err != nil {
+				t.Fatal(err)
+			}
+			job := service.db.Task.Create().SetType("cover").SetStatus(task.StatusRunning).SetPayload(payload).SaveX(ctx)
+			completed := false
+			intercept := ent.InterceptFunc(func(next ent.Querier) ent.Querier {
+				return ent.QuerierFunc(func(ctx context.Context, query ent.Query) (ent.Value, error) {
+					result, err := next.Query(ctx, query)
+					if err != nil || completed {
+						return result, err
+					}
+					completed = true
+					// Commit after cleanup has read one reference source, before it
+					// reads the other. This used to miss both with movie-first reads.
+					err = ent.WithTx(ctx, service.db, func(tx *ent.Tx) error {
+						if err := tx.Movie.UpdateOneID(film.ID).SetPoster(artwork.Poster).
+							SetCover(artwork.Thumbnail).SetFanarts([]string{artwork.Fanart}).Exec(ctx); err != nil {
+							return err
+						}
+						return tx.Task.UpdateOneID(job.ID).SetStatus(task.StatusDone).Exec(ctx)
+					})
+					return result, err
+				})
+			})
+			if firstQuery == "task" {
+				service.db.Task.Intercept(intercept)
+			} else {
+				service.db.Movie.Intercept(intercept)
+			}
+			if _, err := service.ClearCache(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if !completed {
+				t.Fatal("cover completion was not interleaved with cleanup")
+			}
+			for _, url := range artworkURLs(artwork) {
+				if _, err := service.images.ReadURL(url); err != nil {
+					t.Fatalf("cleanup removed artwork during task-to-movie handoff: %v", err)
+				}
+			}
+		})
 	}
 }

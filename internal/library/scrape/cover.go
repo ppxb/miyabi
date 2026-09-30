@@ -37,23 +37,12 @@ func (service *Service) Cover(ctx context.Context, job tasks.Job) error {
 		return nil
 	}
 
-	var subTask *SubtitleTask
-	err = func() error {
-		if err := service.images.LockArtwork(ctx); err != nil {
-			return err
-		}
-		defer service.images.UnlockArtwork()
-
-		var err error
-		subTask, err = service.processCover(ctx, job, input)
-		return err
-	}()
+	subTask, err := service.processCover(ctx, job, input)
 	if err != nil {
 		return err
 	}
 
-	// Dispatch subtitle fetching asynchronously via bounded queue after releasing the artwork lock
-	// to avoid blocking other movies' scrape and artwork pipelines and prevent unbounded goroutines.
+	// Subtitle fetching keeps its bounded asynchronous queue.
 	if subTask != nil {
 		service.subtitleQueue.Enqueue(*subTask)
 	}
@@ -68,11 +57,7 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 	if err != nil {
 		return nil, err
 	}
-	var artwork mediaimage.Artwork
-	switch {
-	case input.Artwork != nil:
-		artwork = *input.Artwork
-	default:
+	if input.Artwork == nil {
 		if input.CoverURL == "" {
 			// Older queued jobs may contain only remote NFO artwork.
 			if err := service.loadCatalogueCover(ctx, &input); err != nil {
@@ -88,11 +73,13 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 		if err != nil {
 			return nil, err
 		}
-		artwork, err = service.images.FromCover(media.Body)
-		if err != nil {
+		if err := service.checkpointArtwork(ctx, job.ID, &input, media.Body); err != nil {
 			return nil, err
 		}
 	}
+	// The unfinished task now retains these cache files during remote queries
+	// and local export, until the final transaction publishes movie references.
+	artwork := *input.Artwork
 	poster, err := service.images.ReadURL(artwork.Poster)
 	if err != nil {
 		return nil, fmt.Errorf("read cached poster: %w", err)
@@ -100,14 +87,6 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 	fanart, err := service.images.ReadURL(artwork.Fanart)
 	if err != nil {
 		return nil, fmt.Errorf("read cached fanart: %w", err)
-	}
-	input.Artwork = &artwork
-	encoded, err := tasks.EncodePayload(input)
-	if err != nil {
-		return nil, err
-	}
-	if err := service.db.Task.UpdateOneID(job.ID).SetPayload(encoded).Exec(ctx); err != nil {
-		return nil, err
 	}
 	// Verify current video locations before exporting local files.
 	directories, err := service.Directories(ctx, sess, input.MetadataPayload)
@@ -148,7 +127,7 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 		return nil, err
 	}
 	input.Completed = true
-	encoded, err = tasks.EncodePayload(input)
+	encoded, err := tasks.EncodePayload(input)
 	if err != nil {
 		return nil, err
 	}
@@ -169,6 +148,25 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 		service.notifier.NotifyLibraryChanged()
 	}
 	return subTask, nil
+}
+
+// Protect newly written images until their recovery checkpoint is durable.
+// Cache maintenance retains artwork referenced by every unfinished cover task.
+func (service *Service) checkpointArtwork(ctx context.Context, taskID int, input *CoverPayload, body []byte) error {
+	if err := service.images.LockArtwork(ctx); err != nil {
+		return err
+	}
+	defer service.images.UnlockArtwork()
+	artwork, err := service.images.FromCover(body)
+	if err != nil {
+		return err
+	}
+	input.Artwork = &artwork
+	encoded, err := tasks.EncodePayload(input)
+	if err != nil {
+		return err
+	}
+	return service.db.Task.UpdateOneID(taskID).SetPayload(encoded).Exec(ctx)
 }
 
 // subtitleTask targets the .strm exported for a movie's video. Multi-part

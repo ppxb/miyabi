@@ -255,13 +255,15 @@ type pipelineFixture struct {
 	discover     *catalogue.Service
 	images       *mediaimage.Cache
 	source       domain.LibrarySource
+	dataDir      string
 	embyDir      string
 }
 
 func newPipelineFixture(t *testing.T) *pipelineFixture {
 	t.Helper()
 	ctx := t.Context()
-	store, err := database.Open(ctx, t.TempDir())
+	dataDir := t.TempDir()
+	store, err := database.Open(ctx, dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,7 +299,7 @@ func newPipelineFixture(t *testing.T) *pipelineFixture {
 	return &pipelineFixture{
 		store: store, drive: drive, driveService: d, catalogue: catalogueClient, tasks: taskSvc,
 		library: library, discover: discover, scrape: scrape, images: images, source: source,
-		embyDir: embyDir,
+		dataDir: dataDir, embyDir: embyDir,
 	}
 }
 

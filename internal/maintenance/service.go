@@ -24,7 +24,7 @@ type Info struct {
 	Cache             mediaimage.CacheStats `json:"cache"`
 }
 
-// ArtworkLocker serializes cache pruning against cover downloads.
+// ArtworkLocker excludes pruning while new images gain durable references.
 type ArtworkLocker interface {
 	TryLockArtwork() bool
 	UnlockArtwork()
@@ -99,26 +99,11 @@ func (service *Service) info(ctx context.Context, retained map[string]bool) (Inf
 }
 
 func (service *Service) retainedArtwork(ctx context.Context) (map[string]bool, error) {
-	// Include every account and directory, including films temporarily without
-	// indexed files. Switching the active library must not make their covers disposable.
-	records, err := service.db.Movie.Query().
-		Select(movie.FieldID, movie.FieldCover, movie.FieldPoster, movie.FieldFanarts).All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("read artwork references: %w", err)
-	}
-	retained := make(map[string]bool)
-	for _, record := range records {
-		retained[domain.ValueOrZero(record.Cover)] = true
-		retained[domain.ValueOrZero(record.Poster)] = true
-		for _, fanart := range record.Fanarts {
-			retained[fanart] = true
-		}
-	}
-
-	// Failed and queued cover jobs can resume from locally saved artwork before
-	// the movie references it. Extract only those URLs, not the full NFO payloads.
+	// Read unfinished tasks before movies: cover completion publishes movie
+	// references before marking its task done. This order cannot miss both sides
+	// of that handoff, even when completion happens between the two queries.
 	var pending []mediaimage.Artwork
-	err = service.db.Task.Query().Where(
+	err := service.db.Task.Query().Where(
 		task.TypeEQ(tasks.KindCover.String()), task.StatusNEQ(task.StatusDone),
 		func(selector *sql.Selector) {
 			selector.Select(
@@ -131,10 +116,25 @@ func (service *Service) retainedArtwork(ctx context.Context) (map[string]bool, e
 	if err != nil {
 		return nil, fmt.Errorf("read pending artwork references: %w", err)
 	}
+	retained := make(map[string]bool)
 	for _, artwork := range pending {
 		retained[artwork.Poster] = true
 		retained[artwork.Fanart] = true
 		retained[artwork.Thumbnail] = true
+	}
+	// Include every account and directory, including films temporarily without
+	// indexed files. Switching the active library must not make their covers disposable.
+	records, err := service.db.Movie.Query().
+		Select(movie.FieldID, movie.FieldCover, movie.FieldPoster, movie.FieldFanarts).All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read artwork references: %w", err)
+	}
+	for _, record := range records {
+		retained[domain.ValueOrZero(record.Cover)] = true
+		retained[domain.ValueOrZero(record.Poster)] = true
+		for _, fanart := range record.Fanarts {
+			retained[fanart] = true
+		}
 	}
 	return retained, nil
 }
