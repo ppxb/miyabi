@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：119 条待处理，6 条已完成、待复查。
+> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：118 条待处理，7 条已完成、待复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；完成项经复查确认后可移除，已提交的历史记录可通过 Git 追溯。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮核对现存已完成项的实现、调用链和回归覆盖，并非重新验证全部待办，也未重审此前移除的 62 条记录。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -57,7 +57,10 @@
   - 已完成：详情与磁力请求改用 ctx.Err() != nil 判断并返回原始上下文错误；限速直接使用 rate.Limit(defaultRate)，保持每秒 1 次、突发 2 次。验证页检测仅保留 driver-verify 子串，删除磁力结构体中 FilesCount/Inferred 的显式零值。
   - 现状修正：Close 已无空客户端分支；确认构造时始终设置客户端后，删除健康探测中的同类空值检查。保留指纹客户端与测试客户端各自的关闭路径，健康探测周期及代理变更逻辑不变。
   - 验证：新增详情/磁力请求各自取消、超时的四个场景，确认原始错误返回且不禁用来源；javbus、magnet、catalogue、network、api、app 包测试及 javbus 的 go vet、git diff --check 通过，保留验证页、磁力解析、来源跳过和代理变更覆盖。未进行浏览器或真实 JavBus 联调。
-- [ ] **118.** `internal/javdb/route.go:277` `utf8.Valid`；`route.go:217-256`、`client.go:369-389` 解析到 `map[string]any` 再逐层断言 → typed struct；`route.go:49` 类型 `probe` 与方法 `c.probe` 同名。
+- [x] **118.** `internal/javdb/route.go:277` `utf8.Valid`；`route.go:217-256`、`client.go:369-389` 解析到 `map[string]any` 再逐层断言 → typed struct；`route.go:49` 类型 `probe` 与方法 `c.probe` 同名。
+  - 已完成：startup 响应与解密后的备用域名改用专用结构体，apiDomains 直接解码为字符串切片，移除 map 与逐层类型断言；函数类型改名 probeFunc。可选 backup_domains_data 用 RawMessage 延后解码，字段类型错误或解密失败仍不影响已探测成功的基础线路参与选线。
+  - 保留：utf8.Valid 用于拒绝非法 UTF-8，encoding/json 会替换字符串中的非法字节，不能代替此检查。保留字段缺失与显式 null 的区分、Base64/AES/填充检查、域名规范化与去重；选线时序和优先规则不变。
+  - 验证：新增字段缺失/null/类型错误、异常密文、非法 UTF-8/JSON、域名规范化/去重测试，以及本地 HTTP 探测下备用数据损坏仍选中基础线路的回归测试；javdb、catalogue、network、api、app 包测试及 javdb 的 go vet、git diff --check 通过。未进行浏览器或真实 JavDB 联调。
 - [ ] **119.** `internal/catalogue/state.go:60` `source == nil` 在 :32 已判断；`service.go:163-168` nil 检查；`service.go:379` `time.Now().In(time.Local)`；`magnets.go:80-90` 先投影 URI 再剥离。
 - [ ] **120.** `internal/magnet/aggregator.go:75,84-86` Hash 小写化、`Sources` 为空兜底（各来源已保证）；`picker.go:108`、`quality.go:158` `m.HD || hasTag(m, MagnetTagHD)`（根源：`domain.Magnet` 同时用 bool 与 Tags 表达 HD/字幕）；`picker.go:105` 对已聚合结果再次 `ApplyInference`。
 - [ ] **121.** `internal/library/scrape`：`Close` 的 `service == nil`、`subtitleQueue != nil`；`newSubtitleQueue` 的 concurrency / capacity / logger 兜底（唯一调用传默认值）；`Enqueue` 的 `q.ctx != nil`、`q.logger != nil`；`worker` 的 `!ok`（channel 从不关闭）；`processCover` 与 `process` 两次判断 `subtitles != nil`；`ExportLocalMovie` 的 `record == nil` + `notifiers ...MediaNotifier` 表示可选；`scrape.go:339` `dirCache == nil`、:343 `ttl <= 0`；`findAvatar` 的 `s.db == nil`；`reconcile.go:112` `if images != nil`；`reconcile.go:58` 多余 `var err error`。

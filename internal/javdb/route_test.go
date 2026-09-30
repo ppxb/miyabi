@@ -5,8 +5,10 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
-	"reflect"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -23,22 +25,22 @@ const encryptedBackupDomains = "JCxJQTR1DerICeuy4lmmWJuj2sRqgbDdvL2Nru5I6BmGb+Gm
 	"UaFDDnzr0S2Vwbp0uu68GAov458mHuuIUleBSI4TGqA="
 
 func TestAPIHostsFromStartup(t *testing.T) {
-	hosts, err := apiHostsFromStartup(map[string]any{"backup_domains_data": encryptedBackupDomains})
+	hosts, err := apiHostsFromStartup(startupData{BackupDomainsData: json.RawMessage(`"` + encryptedBackupDomains + `"`)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []string{"https://apidd.spthgb.com", "https://apidd.czssdgz.com"}
-	if !reflect.DeepEqual(hosts, want) {
+	if !slices.Equal(hosts, want) {
 		t.Fatalf("hosts = %v, want %v", hosts, want)
 	}
 }
 
 func TestSelectRouteFullMeasuresCachedHostWithoutPreferringIt(t *testing.T) {
-	check := func(_ context.Context, host string, _ func(time.Time)) (time.Duration, map[string]any, error) {
+	check := func(_ context.Context, host string, _ func(time.Time)) (time.Duration, startupData, error) {
 		if host == "https://cached.example" {
-			return 12 * time.Millisecond, nil, nil
+			return 12 * time.Millisecond, startupData{}, nil
 		}
-		return time.Millisecond, nil, nil
+		return time.Millisecond, startupData{}, nil
 	}
 	result, err := selectRoute(t.Context(), routeSelection{full: true, hosts: []string{"https://cached.example"}}, check)
 	if err != nil {
@@ -55,18 +57,18 @@ func TestSelectRouteFullMeasuresCachedHostWithoutPreferringIt(t *testing.T) {
 }
 
 func TestSelectRouteChoosesFastestDynamicHost(t *testing.T) {
-	check := func(_ context.Context, host string, _ func(time.Time)) (time.Duration, map[string]any, error) {
+	check := func(_ context.Context, host string, _ func(time.Time)) (time.Duration, startupData, error) {
 		switch host {
 		case bootstrapHosts[0]:
-			return 20 * time.Millisecond, map[string]any{"backup_domains_data": encryptedBackupDomains}, nil
+			return 20 * time.Millisecond, startupData{BackupDomainsData: json.RawMessage(`"` + encryptedBackupDomains + `"`)}, nil
 		case bootstrapHosts[1]:
-			return 30 * time.Millisecond, nil, nil
+			return 30 * time.Millisecond, startupData{}, nil
 		case bootstrapHosts[2]:
-			return 5 * time.Millisecond, nil, nil
+			return 5 * time.Millisecond, startupData{}, nil
 		case bootstrapHosts[3]:
-			return 0, nil, errors.New("offline")
+			return 0, startupData{}, errors.New("offline")
 		default:
-			return 0, nil, errors.New("unexpected host")
+			return 0, startupData{}, errors.New("unexpected host")
 		}
 	}
 
@@ -80,14 +82,14 @@ func TestSelectRouteChoosesFastestDynamicHost(t *testing.T) {
 }
 
 func TestSelectRouteFallsBackToFastestBootstrap(t *testing.T) {
-	check := func(_ context.Context, host string, _ func(time.Time)) (time.Duration, map[string]any, error) {
+	check := func(_ context.Context, host string, _ func(time.Time)) (time.Duration, startupData, error) {
 		switch host {
 		case bootstrapHosts[0]:
-			return 30 * time.Millisecond, nil, nil
+			return 30 * time.Millisecond, startupData{}, nil
 		case bootstrapHosts[1]:
-			return 10 * time.Millisecond, nil, nil
+			return 10 * time.Millisecond, startupData{}, nil
 		default:
-			return 0, nil, errors.New("offline")
+			return 0, startupData{}, errors.New("offline")
 		}
 	}
 
@@ -101,9 +103,58 @@ func TestSelectRouteFallsBackToFastestBootstrap(t *testing.T) {
 }
 
 func TestAPIHostsFromStartupAllowsMissingDynamicData(t *testing.T) {
-	hosts, err := apiHostsFromStartup(map[string]any{})
+	hosts, err := apiHostsFromStartup(startupData{})
 	if err != nil || len(hosts) != 0 {
 		t.Fatalf("hosts = %v, error = %v", hosts, err)
+	}
+}
+
+func TestAPIHostsFromStartupValidatesBackupDomains(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		plain   string
+		want    []string
+		wantErr string
+	}{
+		{name: "missing domains", plain: `{}`},
+		{name: "null payload", plain: `null`},
+		{name: "empty domains", plain: `{"apiDomains":[]}`},
+		{
+			name:  "normalized and deduplicated in order",
+			plain: `{"apiDomains":[" https://first.example/ ","https://second.example","https://first.example"]}`,
+			want:  []string{"https://first.example", "https://second.example"},
+		},
+		{name: "null domains", plain: `{"apiDomains":null}`, wantErr: "has no apiDomains"},
+		{name: "wrong domains type", plain: `{"apiDomains":"https://example.com"}`, wantErr: "decode backup domains JSON"},
+		{name: "non-string domain", plain: `{"apiDomains":["https://example.com",42]}`, wantErr: "decode backup domains JSON"},
+		{name: "null domain", plain: `{"apiDomains":["https://example.com",null]}`, wantErr: "invalid JavDB host"},
+		{name: "invalid host", plain: `{"apiDomains":["https://example.com","relative/path"]}`, wantErr: "invalid JavDB host"},
+		{name: "malformed JSON", plain: `{"apiDomains":`, wantErr: "decode backup domains JSON"},
+		{name: "invalid UTF-8", plain: "{\"apiDomains\":[\"https://example.com/\xff\"]}", wantErr: "invalid UTF-8"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			hosts, err := apiHostsFromStartup(startupWithBackupDomains(t, []byte(test.plain)))
+			if test.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErr) || len(hosts) != 0 {
+					t.Fatalf("hosts = %v, error = %v, want error containing %q and no hosts", hosts, err, test.wantErr)
+				}
+				return
+			}
+			if err != nil || !slices.Equal(hosts, test.want) {
+				t.Fatalf("hosts = %v, error = %v, want %v", hosts, err, test.want)
+			}
+		})
+	}
+}
+
+func TestAPIHostsFromStartupRejectsMalformedBackupData(t *testing.T) {
+	for _, raw := range []string{`null`, `42`, `[]`, `{}`, `true`, `""`, `"!"`, `"AA=="`} {
+		t.Run(raw, func(t *testing.T) {
+			hosts, err := apiHostsFromStartup(startupData{BackupDomainsData: json.RawMessage(raw)})
+			if err == nil || len(hosts) != 0 {
+				t.Fatalf("hosts = %v, error = %v", hosts, err)
+			}
+		})
 	}
 }
 
@@ -111,7 +162,7 @@ func TestSelectRouteStartsDynamicProbesBeforeSlowBootstrapsFinish(t *testing.T) 
 	synctest.Test(t, func(t *testing.T) {
 		const dynamicHost = "https://dynamic.example"
 		startup := startupWithDynamicHost(t, dynamicHost)
-		check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, map[string]any, error) {
+		check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, startupData, error) {
 			onStart(time.Now())
 			switch host {
 			case bootstrapHosts[0]:
@@ -119,10 +170,10 @@ func TestSelectRouteStartsDynamicProbesBeforeSlowBootstrapsFinish(t *testing.T) 
 				return 10 * time.Millisecond, startup, nil
 			case dynamicHost:
 				time.Sleep(2 * time.Millisecond)
-				return 2 * time.Millisecond, nil, nil
+				return 2 * time.Millisecond, startupData{}, nil
 			default:
 				<-ctx.Done()
-				return 0, nil, ctx.Err()
+				return 0, startupData{}, ctx.Err()
 			}
 		}
 		started := time.Now()
@@ -135,7 +186,7 @@ func TestSelectRouteStartsDynamicProbesBeforeSlowBootstrapsFinish(t *testing.T) 
 
 func TestSelectRouteDoesNotCountTransportConstructionAsLatency(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, map[string]any, error) {
+		check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, startupData, error) {
 			if host == bootstrapHosts[2] {
 				time.Sleep(60 * time.Millisecond)
 			}
@@ -143,13 +194,13 @@ func TestSelectRouteDoesNotCountTransportConstructionAsLatency(t *testing.T) {
 			switch host {
 			case bootstrapHosts[0]:
 				time.Sleep(20 * time.Millisecond)
-				return 20 * time.Millisecond, map[string]any{"backup_domains_data": encryptedBackupDomains}, nil
+				return 20 * time.Millisecond, startupData{BackupDomainsData: json.RawMessage(`"` + encryptedBackupDomains + `"`)}, nil
 			case bootstrapHosts[2]:
 				time.Sleep(5 * time.Millisecond)
-				return 5 * time.Millisecond, nil, nil
+				return 5 * time.Millisecond, startupData{}, nil
 			default:
 				<-ctx.Done()
-				return 0, nil, ctx.Err()
+				return 0, startupData{}, ctx.Err()
 			}
 		}
 		result, err := selectRoute(t.Context(), routeSelection{}, check)
@@ -163,24 +214,24 @@ func TestSelectRouteWaitsForDynamicSourceEvenWhenBootstrapIsSlow(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		const dynamicHost = "https://dynamic.example"
 		startup := startupWithDynamicHost(t, dynamicHost)
-		check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, map[string]any, error) {
+		check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, startupData, error) {
 			onStart(time.Now())
 			switch host {
 			case bootstrapHosts[0]:
 				time.Sleep(5 * time.Millisecond)
-				return 5 * time.Millisecond, nil, nil
+				return 5 * time.Millisecond, startupData{}, nil
 			case bootstrapHosts[1]:
 				select {
 				case <-time.After(50 * time.Millisecond):
 					return 50 * time.Millisecond, startup, nil
 				case <-ctx.Done():
-					return 0, nil, ctx.Err()
+					return 0, startupData{}, ctx.Err()
 				}
 			case dynamicHost:
 				time.Sleep(time.Millisecond)
-				return time.Millisecond, nil, nil
+				return time.Millisecond, startupData{}, nil
 			default:
-				return 0, nil, errors.New("offline")
+				return 0, startupData{}, errors.New("offline")
 			}
 		}
 		result, err := selectRoute(t.Context(), routeSelection{}, check)
@@ -199,13 +250,13 @@ func TestSelectRouteFullMeasuresSlowKnownAndNewDynamicCandidates(t *testing.T) {
 		secondStartup := startupWithDynamicHost(t, secondDynamic)
 		var mu sync.Mutex
 		calls := make(map[string]int)
-		check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, map[string]any, error) {
+		check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, startupData, error) {
 			mu.Lock()
 			calls[host]++
 			mu.Unlock()
 			onStart(time.Now())
 			delay := 80 * time.Millisecond
-			var startup map[string]any
+			var startup startupData
 			switch host {
 			case bootstrapHosts[0]:
 				delay, startup = 10*time.Millisecond, firstStartup
@@ -219,11 +270,11 @@ func TestSelectRouteFullMeasuresSlowKnownAndNewDynamicCandidates(t *testing.T) {
 			select {
 			case <-time.After(delay):
 				if host == bootstrapHosts[3] {
-					return 0, nil, context.DeadlineExceeded
+					return 0, startupData{}, context.DeadlineExceeded
 				}
 				return delay, startup, nil
 			case <-ctx.Done():
-				return 0, nil, ctx.Err()
+				return 0, startupData{}, ctx.Err()
 			}
 		}
 		started := time.Now()
@@ -249,8 +300,8 @@ func TestSelectRouteFullMeasuresSlowKnownAndNewDynamicCandidates(t *testing.T) {
 }
 
 func TestSelectRouteFullReturnsResultsWhenAllCandidatesFail(t *testing.T) {
-	check := func(context.Context, string, func(time.Time)) (time.Duration, map[string]any, error) {
-		return 0, nil, context.DeadlineExceeded
+	check := func(context.Context, string, func(time.Time)) (time.Duration, startupData, error) {
+		return 0, startupData{}, context.DeadlineExceeded
 	}
 	result, err := selectRoute(t.Context(), routeSelection{full: true}, check)
 	if err == nil || len(result.Candidates) != len(bootstrapHosts) {
@@ -263,9 +314,13 @@ func TestSelectRouteFullReturnsResultsWhenAllCandidatesFail(t *testing.T) {
 	}
 }
 
-func startupWithDynamicHost(t *testing.T, host string) map[string]any {
+func startupWithDynamicHost(t *testing.T, host string) startupData {
 	t.Helper()
-	plain := []byte(`{"apiDomains":["` + host + `"]}`)
+	return startupWithBackupDomains(t, []byte(`{"apiDomains":["`+host+`"]}`))
+}
+
+func startupWithBackupDomains(t *testing.T, plain []byte) startupData {
+	t.Helper()
 	padding := aes.BlockSize - len(plain)%aes.BlockSize
 	for range padding {
 		plain = append(plain, byte(padding))
@@ -276,5 +331,5 @@ func startupWithDynamicHost(t *testing.T, host string) map[string]any {
 	}
 	encrypted := make([]byte, len(plain))
 	cipher.NewCBCEncrypter(block, backupIV).CryptBlocks(encrypted, plain)
-	return map[string]any{"backup_domains_data": base64.StdEncoding.EncodeToString(encrypted)}
+	return startupData{BackupDomainsData: json.RawMessage(`"` + base64.StdEncoding.EncodeToString(encrypted) + `"`)}
 }

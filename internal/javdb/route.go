@@ -37,13 +37,22 @@ type routeSelection struct {
 	hosts []string
 }
 
+type startupData struct {
+	// Decode optional backup data after probing so it cannot invalidate a healthy route.
+	BackupDomainsData json.RawMessage `json:"backup_domains_data"`
+}
+
+type backupDomains struct {
+	APIDomains []string `json:"apiDomains"`
+}
+
 // onStart records the request start after transport construction.
-type probe func(context.Context, string, func(time.Time)) (time.Duration, map[string]any, error)
+type probeFunc func(context.Context, string, func(time.Time)) (time.Duration, startupData, error)
 
 type probeResult struct {
 	host    string
 	latency time.Duration
-	startup map[string]any
+	startup startupData
 	err     error
 }
 
@@ -57,7 +66,7 @@ type runningProbe struct {
 	cancel  context.CancelFunc
 }
 
-func selectRoute(ctx context.Context, options routeSelection, check probe) (RouteStatus, error) {
+func selectRoute(ctx context.Context, options routeSelection, check probeFunc) (RouteStatus, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	events := make(chan probeEvent)
@@ -196,35 +205,25 @@ func routeCandidates(hosts []string, known map[string]probeResult) []RouteCandid
 	return candidates
 }
 
-func apiHostsFromStartup(startup map[string]any) ([]string, error) {
-	raw, exists := startup["backup_domains_data"]
-	if !exists {
+func apiHostsFromStartup(startup startupData) ([]string, error) {
+	if len(startup.BackupDomainsData) == 0 {
 		return nil, nil
 	}
-	encoded, ok := raw.(string)
-	if !ok {
+	var encoded *string
+	if err := json.Unmarshal(startup.BackupDomainsData, &encoded); err != nil {
+		return nil, fmt.Errorf("decode startup backup_domains_data: %w", err)
+	}
+	if encoded == nil {
 		return nil, errors.New("startup backup_domains_data is not a string")
 	}
-	payload, err := decryptBackupDomains(encoded)
+	payload, err := decryptBackupDomains(*encoded)
 	if err != nil {
 		return nil, err
 	}
-	rawDomains, exists := payload["apiDomains"]
-	if !exists {
-		return nil, nil
-	}
-	domains, ok := rawDomains.([]any)
-	if !ok {
-		return nil, errors.New("backup domains has no apiDomains")
-	}
 
-	hosts := make([]string, 0, len(domains))
-	seen := make(map[string]bool, len(domains))
-	for _, item := range domains {
-		value, ok := item.(string)
-		if !ok {
-			return nil, errors.New("apiDomains contains a non-string value")
-		}
+	hosts := make([]string, 0, len(payload.APIDomains))
+	seen := make(map[string]bool, len(payload.APIDomains))
+	for _, value := range payload.APIDomains {
 		host, err := normalizeHost(value)
 		if err != nil {
 			return nil, err
@@ -237,32 +236,36 @@ func apiHostsFromStartup(startup map[string]any) ([]string, error) {
 	return hosts, nil
 }
 
-func decryptBackupDomains(encoded string) (map[string]any, error) {
+func decryptBackupDomains(encoded string) (backupDomains, error) {
 	encrypted, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
-		return nil, fmt.Errorf("decode backup domains: %w", err)
+		return backupDomains{}, fmt.Errorf("decode backup domains: %w", err)
 	}
 	if len(encrypted) == 0 || len(encrypted)%aes.BlockSize != 0 {
-		return nil, fmt.Errorf("decode backup domains: invalid cipher length %d", len(encrypted))
+		return backupDomains{}, fmt.Errorf("decode backup domains: invalid cipher length %d", len(encrypted))
 	}
 
 	block, err := aes.NewCipher(backupKey)
 	if err != nil {
-		return nil, fmt.Errorf("create backup domains cipher: %w", err)
+		return backupDomains{}, fmt.Errorf("create backup domains cipher: %w", err)
 	}
 	plain := make([]byte, len(encrypted))
 	cipher.NewCBCDecrypter(block, backupIV).CryptBlocks(plain, encrypted)
 	plain, err = unpadPKCS7(plain)
 	if err != nil {
-		return nil, fmt.Errorf("decode backup domains: %w", err)
+		return backupDomains{}, fmt.Errorf("decode backup domains: %w", err)
 	}
 	if !utf8.Valid(plain) {
-		return nil, errors.New("decode backup domains: invalid UTF-8")
+		return backupDomains{}, errors.New("decode backup domains: invalid UTF-8")
 	}
 
-	var payload map[string]any
+	// An omitted list is optional; an explicit null list is malformed.
+	payload := backupDomains{APIDomains: []string{}}
 	if err := json.Unmarshal(plain, &payload); err != nil {
-		return nil, fmt.Errorf("decode backup domains JSON: %w", err)
+		return backupDomains{}, fmt.Errorf("decode backup domains JSON: %w", err)
+	}
+	if payload.APIDomains == nil {
+		return backupDomains{}, errors.New("backup domains has no apiDomains")
 	}
 	return payload, nil
 }

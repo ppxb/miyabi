@@ -107,6 +107,41 @@ func TestRouteProbeResultsRemainIndependentOfActiveSelection(t *testing.T) {
 	}
 }
 
+func TestClientReselectKeepsBootstrapWithMalformedBackupData(t *testing.T) {
+	invalidDomains := startupWithBackupDomains(t, []byte(`{"apiDomains":[42]}`))
+	for _, test := range []struct {
+		name string
+		data string
+	}{
+		{name: "wrong field type", data: `42`},
+		{name: "null field", data: `null`},
+		{name: "invalid ciphertext", data: `"AA=="`},
+		{name: "invalid domains", data: string(invalidDomains.BackupDomainsData)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/api/v1/startup" {
+					t.Errorf("unexpected probe path %s", r.URL.Path)
+				}
+				_, _ = w.Write([]byte(`{"success":true,"data":{"backup_domains_data":` + test.data + `}}`))
+			}))
+			defer server.Close()
+			originalHosts := bootstrapHosts
+			bootstrapHosts = []string{server.URL}
+			defer func() { bootstrapHosts = originalHosts }()
+			client, err := New(Options{DeviceUUID: "00000000-0000-4000-8000-000000000000"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer client.Close()
+			result, err := client.Reselect(t.Context())
+			if err != nil || result.Host != server.URL || len(result.Candidates) != 1 || result.Candidates[0].Status != RouteAvailable {
+				t.Fatalf("healthy bootstrap rejected: result = %+v, error = %v", result, err)
+			}
+		})
+	}
+}
+
 func TestClientReusesCachedRouteWithoutSelecting(t *testing.T) {
 	for _, test := range []struct {
 		name   string

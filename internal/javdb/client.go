@@ -380,14 +380,14 @@ func (c *Client) installRoute(ctx context.Context, status RouteStatus) (*routeSt
 	return state, nil
 }
 
-func (c *Client) probe(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, map[string]any, error) {
+func (c *Client) probe(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, startupData, error) {
 	return probeHost(ctx, host, c.proxyURL(), c.options, onStart)
 }
 
-func probeHost(ctx context.Context, host string, proxy *url.URL, options Options, onStart func(time.Time)) (time.Duration, map[string]any, error) {
+func probeHost(ctx context.Context, host string, proxy *url.URL, options Options, onStart func(time.Time)) (time.Duration, startupData, error) {
 	transport, err := newTransport(host, proxy, options)
 	if err != nil {
-		return 0, nil, err
+		return 0, startupData{}, err
 	}
 	defer transport.closeIdleConnections()
 
@@ -395,9 +395,9 @@ func probeHost(ctx context.Context, host string, proxy *url.URL, options Options
 	if onStart != nil {
 		onStart(started)
 	}
-	var startup map[string]any
+	var startup startupData
 	if err := transport.getJSON(ctx, "/api/v1/startup", nil, &startup); err != nil {
-		return 0, nil, err
+		return 0, startupData{}, err
 	}
 	return time.Since(started), startup, nil
 }
