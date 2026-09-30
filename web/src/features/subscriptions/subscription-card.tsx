@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router'
 import { CloudDownloadIcon, LoaderCircleIcon, Trash2Icon } from 'lucide-react'
 
 import { useMovieState } from '@/api/movie-states'
@@ -12,6 +11,7 @@ import { MovieStateBadge } from '@/components/movie/movie-badges'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { MovieDetailLink } from '@/features/movie-detail/detail-link'
 import { cn } from 'cn'
 
 const dateTimeFormat = new Intl.DateTimeFormat('zh-CN', {
@@ -135,14 +135,9 @@ export function SubscriptionCard({
           {card}
         </Button>
       ) : (
-        <Link
-          to="/discover/$movieId"
-          search={previous => ({ main: previous.main || undefined })}
-          params={{ movieId: item.target_id }}
-          className="block h-full rounded-2xl outline-ring"
-        >
+        <MovieDetailLink movieId={item.target_id} className="block h-full rounded-2xl outline-ring">
           {card}
-        </Link>
+        </MovieDetailLink>
       )}
       {selecting ? (
         <Checkbox

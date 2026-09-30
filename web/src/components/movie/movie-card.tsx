@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
 import type { DiscoverMovie } from '@/api/discover'
@@ -8,16 +7,12 @@ import { MovieSubscribeButton } from '@/components/movie/movie-subscribe-button'
 import { OverflowTooltip } from '@/components/overflow-tooltip'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { MovieDetailLink } from '@/features/movie-detail/detail-link'
 
 export function DiscoverMovieCard({ movie }: { movie: DiscoverMovie }) {
   const subscribable = movie.release_status === 'upcoming' && movie.magnets_count === 0
   return (
-    <Link
-      to="/discover/$movieId"
-      search={previous => ({ main: previous.main || undefined })}
-      params={{ movieId: movie.id }}
-      className="block rounded-2xl outline-ring"
-    >
+    <MovieDetailLink movieId={movie.id} className="block rounded-2xl outline-ring">
       <MovieCard
         movie={movie}
         description={movie.release_date}
@@ -32,7 +27,7 @@ export function DiscoverMovieCard({ movie }: { movie: DiscoverMovie }) {
       >
         <MovieResourceBadges movie={movie} />
       </MovieCard>
-    </Link>
+    </MovieDetailLink>
   )
 }
 

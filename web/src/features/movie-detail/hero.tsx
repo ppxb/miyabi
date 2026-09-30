@@ -21,7 +21,7 @@ export function MovieHero({ movie }: { movie: DiscoverMovieDetail }) {
             </Badge>
             <MovieStateBadge movie={movie} hideViewed />
           </div>
-          <h1 className="text-2xl leading-tight font-bold tracking-normal sm:text-3xl">
+          <h1 className="text-xl leading-snug font-bold tracking-normal sm:text-2xl">
             {movie.title}
           </h1>
           {movie.origin_title && movie.origin_title !== movie.title ? (

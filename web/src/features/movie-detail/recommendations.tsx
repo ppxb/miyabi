@@ -1,4 +1,3 @@
-import { Link } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { type MovieReference, useRecommendationMovie } from '@/api/discover'
@@ -7,6 +6,7 @@ import { MovieResourceBadges, MovieStateBadge } from '@/components/movie/movie-b
 import { Button } from '@/components/ui/button'
 import { cn } from 'cn'
 import { useSettingsStore } from '@/stores/settings'
+import { MovieDetailLink } from './detail-link'
 import { observeRecommendation } from './recommendation-visibility'
 
 export function MovieRecommendations({
@@ -53,10 +53,8 @@ function RecommendationCard({ movie }: { movie: MovieReference }) {
 
   return (
     <div ref={cardRef} className="relative h-full min-w-0">
-      <Link
-        to="/discover/$movieId"
-        search={previous => ({ main: previous.main || undefined })}
-        params={{ movieId: movie.id }}
+      <MovieDetailLink
+        movieId={movie.id}
         className="relative block h-full rounded-2xl outline-ring"
         onFocus={() => {
           if (!data && !failed) prioritize()
@@ -87,7 +85,7 @@ function RecommendationCard({ movie }: { movie: MovieReference }) {
             <MovieCardSkeleton />
           </div>
         ) : null}
-      </Link>
+      </MovieDetailLink>
       {!data && failed ? (
         <Button
           type="button"

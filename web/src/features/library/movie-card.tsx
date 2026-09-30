@@ -1,9 +1,9 @@
-import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import type { LibraryMovie } from '@/api/library'
 import { MovieCard } from '@/components/movie'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
+import { MovieDetailLink } from '@/features/movie-detail/detail-link'
 import { LibraryMovieHoverDetails } from './movie-hover-details'
 import { LibraryMovieStatus } from './movie-status'
 import { useDesktopHover } from './use-desktop-hover'
@@ -30,15 +30,13 @@ export function LibraryMovieCard({ movie }: { movie: LibraryMovie }) {
     >
       <HoverCardTrigger asChild>
         {movie.javdb_id ? (
-          <Link
-            to="/discover/$movieId"
-            search={previous => ({ main: previous.main || undefined })}
-            params={{ movieId: movie.javdb_id }}
+          <MovieDetailLink
+            movieId={movie.javdb_id}
             className="block min-w-0 rounded-2xl outline-ring"
             onClick={() => setOpen(false)}
           >
             {card}
-          </Link>
+          </MovieDetailLink>
         ) : (
           <div className="min-w-0">{card}</div>
         )}
