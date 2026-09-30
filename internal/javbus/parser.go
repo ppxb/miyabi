@@ -54,7 +54,7 @@ func isNotFoundPage(content string) bool {
 }
 
 func isDriverVerify(content string) bool {
-	return strings.Contains(content, "/doc/driver-verify") || strings.Contains(content, "driver-verify")
+	return strings.Contains(content, "driver-verify")
 }
 
 func isCloudflareChallenge(content string) bool {
@@ -125,11 +125,9 @@ func parseMagnetsHTML(body string) ([]domain.Magnet, error) {
 			Size:        size,
 			HasSubtitle: hasSub,
 			HD:          hd,
-			FilesCount:  0,
 			CreatedAt:   createdAt,
 			Sources:     []string{domain.MagnetSourceJavBus},
 			Tags:        tags,
-			Inferred:    false,
 		})
 	}
 

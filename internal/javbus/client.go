@@ -2,7 +2,6 @@ package javbus
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -74,7 +73,7 @@ func New(options Options) (*Client, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	client := &Client{
-		limiter: rate.NewLimiter(rate.Every(time.Second/time.Duration(defaultRate)), defaultBurst),
+		limiter: rate.NewLimiter(rate.Limit(defaultRate), defaultBurst),
 		ctx:     ctx,
 		cancel:  cancel,
 	}
@@ -154,11 +153,7 @@ func (c *Client) probe() bool {
 	req.Header.Set("User-Agent", userAgent)
 	req.Header.Set("Cookie", "dv=1")
 
-	client := c.client
-	if client == nil {
-		return false
-	}
-	resp, err := client.Do(req)
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return false
 	}
@@ -215,7 +210,7 @@ func (c *Client) ensureDetailParams(ctx context.Context, code string) (gid, uc, 
 	client := c.client
 	resp, err := client.Do(req)
 	if err != nil {
-		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if ctx.Err() != nil {
 			return "", "", "", ctx.Err()
 		}
 		if !c.isTest {
@@ -285,7 +280,7 @@ func (c *Client) fetchMagnets(ctx context.Context, code, gid, uc, img string) ([
 	client := c.client
 	resp, err := client.Do(req)
 	if err != nil {
-		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
 		if !c.isTest {

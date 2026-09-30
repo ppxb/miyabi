@@ -2,12 +2,14 @@ package javbus
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/url"
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	http "github.com/bogdanfinn/fhttp"
@@ -132,6 +134,53 @@ func TestClient_FindUsesFreshDetailParameters(t *testing.T) {
 	}
 	if mock.getCallCount("/ajax/uncledatoolsbyajax.php") != 2 {
 		t.Fatalf("expected 2 ajax calls, got %d", mock.getCallCount("/ajax/uncledatoolsbyajax.php"))
+	}
+}
+
+func TestClientContextErrorsDoNotDisableSource(t *testing.T) {
+	for _, stage := range []string{"detail", "magnets"} {
+		for _, canceled := range []bool{true, false} {
+			name := "timeout"
+			if canceled {
+				name = "canceled"
+			}
+			t.Run(stage+"/"+name, func(t *testing.T) {
+				synctest.Test(t, func(t *testing.T) {
+					ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+					defer cancel()
+					mock := newMockHTTPClient()
+					mock.handlers["/SSIS-001"] = func(*http.Request) (*http.Response, error) {
+						return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewReader(fixtureFile(t, "detail_ssis-001.html")))}, nil
+					}
+					requestPath := "/SSIS-001"
+					if stage == "magnets" {
+						requestPath = "/ajax/uncledatoolsbyajax.php"
+					}
+					mock.handlers[requestPath] = func(req *http.Request) (*http.Response, error) {
+						if canceled {
+							cancel()
+						}
+						<-req.Context().Done()
+						return nil, errors.New("transport interrupted")
+					}
+					client, err := New(Options{testClient: mock})
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer client.Close()
+					// Exercise production availability handling without background probes.
+					client.isTest = false
+					_, err = client.Find(ctx, domain.MovieRef{Code: "SSIS-001"})
+					want := context.DeadlineExceeded
+					if canceled {
+						want = context.Canceled
+					}
+					if err != want || !client.Available() || mock.getCallCount(requestPath) != 1 {
+						t.Fatalf("err=%v available=%t calls=%d", err, client.Available(), mock.getCallCount(requestPath))
+					}
+				})
+			})
+		}
 	}
 }
 
