@@ -139,9 +139,7 @@ func newService(database *ent.Client, primary JavDBClient, supplement JavBusSour
 }
 
 func (service *Service) Close() {
-	if service.javdb != nil {
-		service.javdb.Close()
-	}
+	service.javdb.Close()
 	if service.javbus != nil {
 		service.javbus.Close()
 	}
@@ -318,7 +316,7 @@ func projectMovies(
 		return []Movie{}
 	}
 
-	now := time.Now().In(time.Local)
+	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 	result := make([]Movie, len(source))
 	for index, item := range source {

@@ -8,10 +8,43 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 )
 
-// Magnets returns the aggregated, cached magnet list of a movie. The detail
+// Magnets returns the aggregated magnet list with URIs for the API.
+func (service *Service) Magnets(ctx context.Context, movieID string) ([]Magnet, error) {
+	magnets, err := service.cachedMagnets(ctx, movieID)
+	if err != nil {
+		return nil, err
+	}
+	return projectMagnets(magnets), nil
+}
+
+// CatalogueMagnets returns domain magnets in a separate slice for internal callers.
+func (service *Service) CatalogueMagnets(ctx context.Context, movieID string) ([]domain.Magnet, error) {
+	magnets, err := service.cachedMagnets(ctx, movieID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]domain.Magnet, len(magnets))
+	copy(result, magnets)
+	return result, nil
+}
+
+func (service *Service) HasMagnet(ctx context.Context, movieID, hash string) (bool, error) {
+	magnets, err := service.cachedMagnets(ctx, movieID)
+	if err != nil {
+		return false, err
+	}
+	for _, item := range magnets {
+		if strings.EqualFold(item.Hash, hash) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// cachedMagnets shares immutable domain data across all magnet lookups. The detail
 // lookup supplies the code and zone JavBus needs; when it fails the
 // aggregator still runs with the JavDB ID alone.
-func (service *Service) Magnets(ctx context.Context, movieID string) ([]Magnet, error) {
+func (service *Service) cachedMagnets(ctx context.Context, movieID string) ([]domain.Magnet, error) {
 	magnets, err := cachedJavDB(ctx, service, service.magnets, movieID, func(ctx context.Context) ([]domain.Magnet, error) {
 		ref := domain.MovieRef{JavDBID: movieID}
 		detailFailed := false
@@ -35,34 +68,7 @@ func (service *Service) Magnets(ctx context.Context, movieID string) ([]Magnet, 
 	if err != nil {
 		return nil, fmt.Errorf("get magnets: %w", err)
 	}
-	return projectMagnets(magnets), nil
-}
-
-// CatalogueMagnets is Magnets without the URI projection, for packages that
-// only speak domain types.
-func (service *Service) CatalogueMagnets(ctx context.Context, movieID string) ([]domain.Magnet, error) {
-	magnets, err := service.Magnets(ctx, movieID)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]domain.Magnet, len(magnets))
-	for index, item := range magnets {
-		result[index] = item.Magnet
-	}
-	return result, nil
-}
-
-func (service *Service) HasMagnet(ctx context.Context, movieID, hash string) (bool, error) {
-	magnets, err := service.Magnets(ctx, movieID)
-	if err != nil {
-		return false, err
-	}
-	for _, item := range magnets {
-		if strings.EqualFold(item.Hash, hash) {
-			return true, nil
-		}
-	}
-	return false, nil
+	return magnets, nil
 }
 
 func projectMagnets(source []domain.Magnet) []Magnet {

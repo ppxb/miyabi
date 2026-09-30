@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -129,7 +131,7 @@ func TestNewRestoresPersistedRoute(t *testing.T) {
 }
 
 func TestProjectMoviesOmitsInvalidDatesWithoutMutatingCatalogue(t *testing.T) {
-	now := time.Now().In(time.Local)
+	now := time.Now()
 	today := now.Format("2006-01-02")
 	past := now.AddDate(0, 0, -1).Format("2006-01-02")
 	future := now.AddDate(0, 0, 1).Format("2006-01-02")
@@ -276,17 +278,18 @@ func TestServiceMagnetsWithAggregator(t *testing.T) {
 	}
 	defer store.Close()
 
+	const hash = "abcdef0123456789abcdef0123456789abcdef0123"
 	provider := &stubProviderWithMagnets{
 		magnets: []domain.Magnet{
 			{
-				Hash:        "1111111111111111111111111111111111111111",
+				Hash:        hash,
 				Name:        "SSIS-001 Subtitle",
 				Size:        2000,
 				HasSubtitle: true,
 				Sources:     []string{"javdb"},
 			},
 			{
-				Hash: "1111111111111111111111111111111111111111",
+				Hash: hash,
 				Name: "duplicate from primary source",
 			},
 		},
@@ -296,6 +299,7 @@ func TestServiceMagnetsWithAggregator(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error creating service: %v", err)
 	}
+	defer service.Close()
 
 	magnets, err := service.Magnets(t.Context(), "movie-1")
 	if err != nil {
@@ -304,13 +308,34 @@ func TestServiceMagnetsWithAggregator(t *testing.T) {
 	if len(magnets) != 1 {
 		t.Fatalf("expected 1 magnet, got %d", len(magnets))
 	}
-	if magnets[0].URI != "magnet:?xt=urn:btih:1111111111111111111111111111111111111111" {
+	if magnets[0].URI != "magnet:?xt=urn:btih:"+hash {
 		t.Errorf("unexpected magnet URI: %s", magnets[0].URI)
 	}
 
-	has, err := service.HasMagnet(t.Context(), "movie-1", "1111111111111111111111111111111111111111")
-	if err != nil || !has {
-		t.Errorf("expected HasMagnet to return true, got %v, err=%v", has, err)
+	want := magnets[0].Magnet
+	// All entry points must share the populated cache, even when the source changes.
+	provider.magnets = nil
+	magnets[0] = Magnet{}
+	domainMagnets, err := service.CatalogueMagnets(t.Context(), "movie-1")
+	if err != nil || len(domainMagnets) != 1 || !reflect.DeepEqual(domainMagnets[0], want) {
+		t.Fatalf("domain magnets = %+v, error = %v, want cached %+v", domainMagnets, err, want)
+	}
+	domainMagnets[0] = domain.Magnet{}
+	for _, lookup := range []struct {
+		hash string
+		want bool
+	}{
+		{hash: strings.ToUpper(hash), want: true},
+		{hash: "0000000000000000000000000000000000000000", want: false},
+	} {
+		has, err := service.HasMagnet(t.Context(), "movie-1", lookup.hash)
+		if err != nil || has != lookup.want {
+			t.Errorf("HasMagnet(%q) = %v, error = %v, want %v", lookup.hash, has, err, lookup.want)
+		}
+	}
+	cached, err := service.Magnets(t.Context(), "movie-1")
+	if err != nil || len(cached) != 1 || !reflect.DeepEqual(cached[0].Magnet, want) || cached[0].URI != "magnet:?xt=urn:btih:"+hash {
+		t.Fatalf("returned slices changed cached magnets: %+v, error = %v", cached, err)
 	}
 }
 

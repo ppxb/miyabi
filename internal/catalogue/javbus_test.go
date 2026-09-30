@@ -48,11 +48,17 @@ func TestMagnetsOptionalSourceFailureDoesNotCachePartialResults(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer service.Close()
-	for _, want := range []int{1, 2, 2} {
-		magnets, err := service.Magnets(t.Context(), "movie-1")
-		if err != nil || len(magnets) != want {
-			t.Fatalf("magnets=%+v error=%v want=%d", magnets, err, want)
-		}
+	has, err := service.HasMagnet(t.Context(), "movie-1", primary.magnets[0].Hash)
+	if err != nil || !has {
+		t.Fatalf("primary magnet unavailable during partial failure: has=%v error=%v", has, err)
+	}
+	domainMagnets, err := service.CatalogueMagnets(t.Context(), "movie-1")
+	if err != nil || len(domainMagnets) != 2 {
+		t.Fatalf("domain lookup did not retry partial results: magnets=%+v error=%v", domainMagnets, err)
+	}
+	magnets, err := service.Magnets(t.Context(), "movie-1")
+	if err != nil || len(magnets) != 2 {
+		t.Fatalf("API lookup lost supplemented result: magnets=%+v error=%v", magnets, err)
 	}
 	if supplement.calls != 2 {
 		t.Fatalf("expected retry then cache hit, got %d upstream calls", supplement.calls)
