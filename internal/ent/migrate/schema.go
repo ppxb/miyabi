@@ -286,9 +286,9 @@ var (
 		PrimaryKey: []*schema.Column{TasksColumns[0]},
 		Indexes: []*schema.Index{
 			{
-				Name:    "task_status_created_at",
+				Name:    "task_type_status",
 				Unique:  false,
-				Columns: []*schema.Column{TasksColumns[4], TasksColumns[1]},
+				Columns: []*schema.Column{TasksColumns[3], TasksColumns[4]},
 			},
 			{
 				Name:    "task_type",

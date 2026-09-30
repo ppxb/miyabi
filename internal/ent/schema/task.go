@@ -36,7 +36,8 @@ func (Task) Fields() []ent.Field {
 
 func (Task) Indexes() []ent.Index {
 	return []ent.Index{
-		index.Fields("status", "created_at"),
+		index.Fields("type", "status"),
+		// Keep history across statuses ordered by SQLite's implicit row ID.
 		index.Fields("type"),
 	}
 }
