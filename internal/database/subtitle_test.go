@@ -40,7 +40,7 @@ func TestOpenRemovesPanSubtitleStorageAndPreservesOnlineExports(t *testing.T) {
 	if _, err := store.db.ExecContext(ctx, "UPDATE subtitles SET file_id = 'file', pick_code = 'pick' WHERE id = ?", legacy.ID); err != nil {
 		t.Fatal(err)
 	}
-	setMigrationVersion(t, store, len(migrations)-1)
+	setMigrationVersion(t, store, 5) // Before the subtitle-storage migration.
 	if err := store.Close(); err != nil {
 		t.Fatal(err)
 	}

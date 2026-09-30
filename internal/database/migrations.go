@@ -10,7 +10,8 @@ import (
 const preSchemaVersion = 1
 
 // Versions are one-based positions. Append new data migrations; never reorder
-// existing entries. Ent remains responsible for creating current tables/indexes.
+// existing entries. Ent manages tables and field indexes; SQLite expression
+// indexes are created here because they cannot be represented by Ent fields.
 var migrations = []struct {
 	name string
 	run  func(context.Context, *sql.Tx) error
@@ -21,6 +22,7 @@ var migrations = []struct {
 	{"migrate metadata snapshots", migrateMetadataSnapshots},
 	{"migrate viewed movies", migrateViewedMovies},
 	{"remove 115 subtitle storage", dropPanSubtitleStorage},
+	{"index metadata workflow tasks", indexMetadataWorkflowTasks},
 }
 
 func runMigrations(ctx context.Context, db *sql.DB, through int) error {

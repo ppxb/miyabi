@@ -19,6 +19,7 @@ func (s *Service) Registry() *Registry { return s.registry }
 
 func (s *Service) Subscribe() (<-chan struct{}, func()) { return s.bus.Subscribe() }
 func (s *Service) Revisions() TaskRevisions             { return s.bus.Revisions() }
+func (s *Service) Version() uint64                      { return s.bus.Version() }
 func (s *Service) Notify()                              { s.bus.Notify() }
 func (s *Service) NotifyLibraryChanged()                { s.bus.NotifyLibraryChanged() }
 func (s *Service) NotifyOfflineChanged()                { s.bus.NotifyOfflineChanged() }

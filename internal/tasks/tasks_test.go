@@ -149,6 +149,25 @@ func TestBusSubscriptionsAndRevisions(t *testing.T) {
 	}
 }
 
+func TestBusVersionIncludesCoalescedProgressNotifications(t *testing.T) {
+	bus := tasks.NewBus()
+	updates, unsubscribe := bus.Subscribe()
+	defer unsubscribe()
+	for _, notify := range []func(){bus.Notify, bus.Notify, bus.NotifyLibraryChanged, bus.NotifyOfflineChanged, bus.NotifyMonitorChanged} {
+		before := bus.Version()
+		notify()
+		if bus.Version() != before+1 {
+			t.Fatal("notification did not advance snapshot version")
+		}
+	}
+	if got := bus.Revisions(); got != (tasks.TaskRevisions{Library: 1, Offline: 1, Monitor: 1}) {
+		t.Fatalf("progress notifications changed business revisions: %+v", got)
+	}
+	if len(updates) != 1 {
+		t.Fatal("notifications no longer coalesce")
+	}
+}
+
 func TestQueueLifecycleAndHook(t *testing.T) {
 	ctx := t.Context()
 	store, err := database.Open(ctx, t.TempDir())

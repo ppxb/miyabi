@@ -22,6 +22,7 @@ const (
 // Bus fans task notifications out to the worker pools and SSE subscribers.
 type Bus struct {
 	mu          sync.Mutex
+	version     uint64
 	revisions   TaskRevisions
 	subscribers map[chan struct{}]struct{}
 }
@@ -43,7 +44,7 @@ func (b *Bus) Subscribe() (<-chan struct{}, func()) {
 	}
 }
 
-// Notify wakes all subscribers without bumping any revision.
+// Notify wakes all subscribers without bumping business revisions.
 func (b *Bus) Notify() { b.publish(0) }
 
 func (b *Bus) NotifyLibraryChanged() { b.publish(ChangeLibrary) }
@@ -56,9 +57,17 @@ func (b *Bus) Revisions() TaskRevisions {
 	return b.revisions
 }
 
+// Version changes on every notification, including task progress updates.
+func (b *Bus) Version() uint64 {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.version
+}
+
 func (b *Bus) publish(change Change) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	b.version++
 	if change&ChangeLibrary != 0 {
 		b.revisions.Library++
 	}

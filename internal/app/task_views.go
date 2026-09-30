@@ -8,6 +8,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/library"
 	"github.com/ppxb/miyabi/internal/monitor"
+	"github.com/ppxb/miyabi/internal/syncx"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -17,9 +18,38 @@ type taskViews struct {
 	database *ent.Client
 	library  *library.Service
 	monitor  *monitor.Service
+
+	snapshotLock syncx.ContextLock
+	snapshot     *taskSnapshot
 }
 
+type taskSnapshot struct {
+	version uint64
+	items   []domain.TaskInfo
+}
+
+// List shares a read-only snapshot until the next notification. Canceled or
+// failed reads release the lock so another caller can load its own snapshot.
 func (v *taskViews) List(ctx context.Context) ([]domain.TaskInfo, error) {
+	if err := v.snapshotLock.Lock(ctx); err != nil {
+		return nil, err
+	}
+	defer v.snapshotLock.Unlock()
+	version := v.Version()
+	if v.snapshot != nil && v.snapshot.version == version {
+		return v.snapshot.items, nil
+	}
+	items, err := v.list(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// Keep the version from before the read: an update arriving during the
+	// queries must force the next caller (or queued SSE event) to reload.
+	v.snapshot = &taskSnapshot{version: version, items: items}
+	return items, nil
+}
+
+func (v *taskViews) list(ctx context.Context) ([]domain.TaskInfo, error) {
 	scans, err := v.library.ListTasks(ctx)
 	if err != nil {
 		return nil, err
