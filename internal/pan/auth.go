@@ -83,7 +83,7 @@ func (client *Client) BeginLogin(ctx context.Context) (*Login, error) {
 
 func (client *Client) LoginStatus(ctx context.Context, login *Login) (LoginState, error) {
 	data, err := authRequest[struct {
-		Status *int `json:"status"`
+		Status int `json:"status"`
 	}](client, client.http.R().SetContext(ctx).SetQueryParams(map[string]string{
 		"uid":  login.uid,
 		"time": strconv.FormatInt(login.time, 10),
@@ -96,12 +96,7 @@ func (client *Client) LoginStatus(ctx context.Context, login *Login) (LoginState
 	// an empty payload, or a value we do not recognize — is a successful answer
 	// that carries no news, so it must not abort a login the user is still
 	// completing. The caller bounds how long it keeps waiting.
-	if data.Status == nil {
-		return LoginWaiting, nil
-	}
-	switch *data.Status {
-	case 0:
-		return LoginWaiting, nil
+	switch data.Status {
 	case 1:
 		return LoginScanned, nil
 	case 2:

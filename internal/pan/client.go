@@ -47,9 +47,6 @@ type panTransport struct {
 }
 
 func newPanTransport(base http.RoundTripper, limiter *rate.Limiter, maxConcurrent int) *panTransport {
-	if maxConcurrent <= 0 {
-		maxConcurrent = maxInFlight
-	}
 	return &panTransport{
 		base:     base,
 		limiter:  limiter,
@@ -160,12 +157,7 @@ func New() *Client {
 	httpClient := netx.NewDirectRestyClient(netx.RestyOptions{}).SetTimeout(0).SetPreRequestHook(preserveEmptyUserAgent)
 	limiter := rate.NewLimiter(rate.Every(requestGap), 1)
 
-	baseTransport := httpClient.GetClient().Transport
-	if baseTransport == nil {
-		baseTransport = http.DefaultTransport
-	}
-	transport := newPanTransport(baseTransport, limiter, maxInFlight)
-	httpClient.SetTransport(transport)
+	httpClient.SetTransport(newPanTransport(httpClient.GetClient().Transport, limiter, maxInFlight))
 
 	httpClient.SetRetryCount(3)
 	httpClient.SetRetryWaitTime(1 * time.Second)
@@ -277,10 +269,7 @@ func apiRequest[T apiPayload](client *Client, request *resty.Request, method, en
 	if err := json.Unmarshal(response.Body(), &result); err != nil {
 		return result, fmt.Errorf("decode 115 %s: %w", action, err)
 	}
-	if err := result.err(); err != nil {
-		return result, err
-	}
-	return result, nil
+	return result, result.err()
 }
 
 // Resty fills empty UA headers; this private marker preserves an explicit empty UA.

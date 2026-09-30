@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：122 条待处理，3 条已完成、待复查。
+> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：121 条待处理，4 条已完成、待复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；完成项经复查确认后可移除，已提交的历史记录可通过 Git 追溯。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮核对现存已完成项的实现、调用链和回归覆盖，并非重新验证全部待办，也未重审此前移除的 62 条记录。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -45,7 +45,10 @@
   - 已完成：withPanToken 将当轮已校验的凭据快照传给请求回调，withPanSourceToken 直接在同一快照上检查数据源，删除每次请求/重试前额外的 sourceState 加锁读取；账号查询、目录导航、账号级离线查询及测试回调同步使用快照中的 AccessToken，不新增包装层或配置开关。
   - 范围修正：入口 sourceState 用于在令牌刷新前拒绝失效会话，成功响应后的 checkSource 用于拒绝等待期间已失效的结果，两者保留；事务提交仍在锁内校验。AddOffline 继续返回已被 115 接受的结果供业务持久化，OfflineTasks 仍按账号而非挂载目录校验。正常读取路径的 sourceState 调用从三处减少到入口和响应后两处，不把跨异步阶段的检查视作冗余。
   - 验证：新增目录清除/退出账号后拒绝旧读取结果、失效会话不启动提前刷新的测试；drive、library（含 scan/scrape）、offline、app、api、strm 包测试及 drive 的 go vet、git diff --check 通过，保留刷新期间目录切换、凭据防覆盖和离线提交成功后原始来源记录测试。未进行真实 115 联调或 race 检测。
-- [ ] **115.** `internal/pan/client.go:48-50` `maxInFlight <= 0`、:127-129 `baseTransport == nil`、`SetRetryAfter` 中 `resp == nil` / `wait > 0`、:241-244 可直接 `return result, result.err()`；`auth.go:99-115` `Status == nil`、`case 0`、`default` 三处返回同值；`upload.go:44` 局部变量名 `init`。
+- [x] **115.** `internal/pan/client.go:48-50` `maxInFlight <= 0`、:127-129 `baseTransport == nil`、`SetRetryAfter` 中 `resp == nil` / `wait > 0`、:241-244 可直接 `return result, result.err()`；`auth.go:99-115` `Status == nil`、`case 0`、`default` 三处返回同值；`upload.go:44` 局部变量名 `init`。
+  - 已完成：确认 newPanTransport 调用方均传正并发数、NewDirectRestyClient 必定设置 Transport 后，删除两处无效兜底；apiRequest 直接返回 result 与 result.err()。扫码状态改为 int，缺失、null、零及未知值统一由 default 返回等待，已扫码/授权/过期/取消映射不变。
+  - 现状修正：SetRetryAfter 回调及 upload.go 已不存在，无需重复清理；当前传输层响应与有效等待时间判断保留，限流、共享退避、I/O 超时与取消语义不变。
+  - 验证：扫码状态表补充显式 null 用例；pan、drive、library（含 scan/scrape）、offline、strm、app、api 包测试及 pan 的 go vet、git diff --check 通过，覆盖扫码状态、请求错误、并发限制、长 Retry-After、取消及响应头/体超时。未进行真实 115 或浏览器联调。
 - [ ] **116.** `internal/strm/relay.go:35-37,78-80` `relay.drive == nil`、:65 `source.URL != ""`、`downloadURL != ""`（pan 层已保证）。
 - [ ] **117.** `internal/javbus/client.go:149,214` `errors.Is(ctx.Err(), Canceled) || errors.Is(ctx.Err(), DeadlineExceeded)` 等价 `ctx.Err() != nil`；:70 `rate.Every(time.Second/time.Duration(defaultRate))` 即 `rate.Limit(1)`；:297 `c.client != nil`；`parser.go:57` `Contains("/doc/driver-verify") || Contains("driver-verify")`；`parser.go:128,132` 显式零值。
 - [ ] **118.** `internal/javdb/route.go:277` `utf8.Valid`；`route.go:217-256`、`client.go:369-389` 解析到 `map[string]any` 再逐层断言 → typed struct；`route.go:49` 类型 `probe` 与方法 `c.probe` 同名。

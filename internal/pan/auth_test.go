@@ -15,6 +15,7 @@ func TestLoginStatusWaitsForAnExplicitAuthorization(t *testing.T) {
 	}{
 		{`{"state":1,"code":0,"data":{}}`, LoginWaiting, false},
 		{`{"state":1,"code":0}`, LoginWaiting, false},
+		{`{"state":1,"code":0,"data":{"status":null}}`, LoginWaiting, false},
 		{`{"state":1,"code":0,"data":{"status":0}}`, LoginWaiting, false},
 		{`{"state":1,"code":0,"data":{"status":1}}`, LoginScanned, false},
 		{`{"state":1,"code":0,"data":{"status":2}}`, LoginAuthorized, false},
