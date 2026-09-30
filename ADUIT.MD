@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：121 条待处理，4 条已完成、待复查。
+> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：120 条待处理，5 条已完成、待复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；完成项经复查确认后可移除，已提交的历史记录可通过 Git 追溯。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮核对现存已完成项的实现、调用链和回归覆盖，并非重新验证全部待办，也未重审此前移除的 62 条记录。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -49,7 +49,10 @@
   - 已完成：确认 newPanTransport 调用方均传正并发数、NewDirectRestyClient 必定设置 Transport 后，删除两处无效兜底；apiRequest 直接返回 result 与 result.err()。扫码状态改为 int，缺失、null、零及未知值统一由 default 返回等待，已扫码/授权/过期/取消映射不变。
   - 现状修正：SetRetryAfter 回调及 upload.go 已不存在，无需重复清理；当前传输层响应与有效等待时间判断保留，限流、共享退避、I/O 超时与取消语义不变。
   - 验证：扫码状态表补充显式 null 用例；pan、drive、library（含 scan/scrape）、offline、strm、app、api 包测试及 pan 的 go vet、git diff --check 通过，覆盖扫码状态、请求错误、并发限制、长 Retry-After、取消及响应头/体超时。未进行真实 115 或浏览器联调。
-- [ ] **116.** `internal/strm/relay.go:35-37,78-80` `relay.drive == nil`、:65 `source.URL != ""`、`downloadURL != ""`（pan 层已保证）。
+- [x] **116.** `internal/strm/relay.go:35-37,78-80` `relay.drive == nil`、:65 `source.URL != ""`、`downloadURL != ""`（pan 层已保证）。
+  - 已完成：确认生产构造始终传入 Drive 后，删除 StreamURL/Probe 的空依赖分支；下载成功直接返回，只有 ErrDownloadUnavailable 才回退。播放列表非空、URL 非空和正分辨率由 pan 校验，移除 STRM 重复过滤和无有效流兜底；保留缺少提取码的实际错误路径、原画/最高分辨率选择及错误映射。
+  - 测试归属：STRM 测试桩不再返回空播放列表却无错误；原无效 URL 假成功用例改为校验上游错误传递。pan 保留空播放列表/URL 测试并补充分辨率缺失用例，STRM 新增无原画时选择最高分辨率测试。
+  - 验证：strm、pan、drive、api、app 包测试及 strm/pan 的 go vet、git diff --check 通过，保留直链优先、致命错误不回退、UA 一致性、HEAD 探测和 API 授权测试。未进行浏览器或真实 Emby/115 播放联调。
 - [ ] **117.** `internal/javbus/client.go:149,214` `errors.Is(ctx.Err(), Canceled) || errors.Is(ctx.Err(), DeadlineExceeded)` 等价 `ctx.Err() != nil`；:70 `rate.Every(time.Second/time.Duration(defaultRate))` 即 `rate.Limit(1)`；:297 `c.client != nil`；`parser.go:57` `Contains("/doc/driver-verify") || Contains("driver-verify")`；`parser.go:128,132` 显式零值。
 - [ ] **118.** `internal/javdb/route.go:277` `utf8.Valid`；`route.go:217-256`、`client.go:369-389` 解析到 `map[string]any` 再逐层断言 → typed struct；`route.go:49` 类型 `probe` 与方法 `c.probe` 同名。
 - [ ] **119.** `internal/catalogue/state.go:60` `source == nil` 在 :32 已判断；`service.go:163-168` nil 检查；`service.go:379` `time.Now().In(time.Local)`；`magnets.go:80-90` 先投影 URI 再剥离。

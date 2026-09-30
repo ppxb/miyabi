@@ -19,6 +19,7 @@ func TestPlayURLDecodesOfficialResponses(t *testing.T) {
 		{name: "hls without extension", body: `{"state":true,"code":0,"data":{"video_url":[{"url":"http://cdn.example/m3u8/fixture?definition=4","height":1080,"width":1920,"definition":4,"title":1080}]}}`},
 		{name: "transcode pending", body: `{"state":true,"code":0,"data":{"video_url":[]}}`, wantErr: true},
 		{name: "missing hls URL", body: `{"state":true,"code":0,"data":{"video_url":[{"height":1080}]}}`, wantErr: true},
+		{name: "missing height", body: `{"state":true,"code":0,"data":{"video_url":[{"url":"https://cdn.example/video"}]}}`, wantErr: true},
 		{name: "wrong wire type", body: `{"state":true,"code":0,"data":{"video_url":{"url":"https://cdn.example/video"}}}`, wantErr: true},
 		{name: "api rejection", body: `{"state":false,"code":500001,"message":"fixture failure"}`, wantErr: true},
 	} {

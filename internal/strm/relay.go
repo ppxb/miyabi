@@ -25,17 +25,15 @@ type Relay struct {
 	drive    *drive.Drive
 }
 
+// New requires an initialized database and drive.
 func New(database *ent.Client, d *drive.Drive) *Relay {
 	return &Relay{database: database, drive: d}
 }
 
-// StreamURL returns the best 115 stream for a video: the original quality,
-// otherwise the highest transcoded resolution. 115 signs these URLs for a
-// short time, so every request resolves a fresh one.
+// StreamURL prefers a direct download URL, falling back to the original stream
+// or highest transcoded resolution. 115 signs these URLs for a short time,
+// so every request resolves a fresh one.
 func (relay *Relay) StreamURL(ctx context.Context, fileID, userAgent string) (string, error) {
-	if relay.drive == nil {
-		return "", drive.ErrMediaDirectoryRequired
-	}
 	ua := strings.TrimSpace(userAgent)
 	sess, err := relay.drive.Open(ctx)
 	if err != nil {
@@ -47,10 +45,10 @@ func (relay *Relay) StreamURL(ctx context.Context, fileID, userAgent string) (st
 	}
 	// Prefer the direct download URL for full CDN throughput and instant seeking.
 	downloadURL, err := sess.DownloadURL(ctx, pickCode, ua)
-	if err == nil && downloadURL != "" {
+	if err == nil {
 		return downloadURL, nil
 	}
-	if err != nil && !errors.Is(err, pan.ErrDownloadUnavailable) {
+	if !errors.Is(err, pan.ErrDownloadUnavailable) {
 		return "", err
 	}
 	sources, err := sess.PlayURL(ctx, pickCode, ua)
@@ -61,6 +59,7 @@ func (relay *Relay) StreamURL(ctx context.Context, fileID, userAgent string) (st
 		}
 		return "", fmt.Errorf("get 115 playback URL: %w", err)
 	}
+	// pan has validated a nonempty list of URLs with positive heights.
 	var best string
 	bestScore := -1
 	for _, source := range sources {
@@ -68,12 +67,9 @@ func (relay *Relay) StreamURL(ctx context.Context, fileID, userAgent string) (st
 		if source.Definition == originalDefinition {
 			score += 1 << 20
 		}
-		if source.URL != "" && score > bestScore {
+		if score > bestScore {
 			best, bestScore = source.URL, score
 		}
-	}
-	if best == "" {
-		return "", domain.E(domain.KindNotFound, "115 未返回有效视频播放流", nil)
 	}
 	return best, nil
 }
@@ -81,9 +77,6 @@ func (relay *Relay) StreamURL(ctx context.Context, fileID, userAgent string) (st
 // Probe forwards a HEAD request to the 115 CDN so media servers can read
 // stream metadata without following the redirect.
 func (relay *Relay) Probe(ctx context.Context, address string, headers http.Header) (*http.Response, error) {
-	if relay.drive == nil {
-		return nil, drive.ErrMediaDirectoryRequired
-	}
 	return relay.drive.OpenMedia(ctx, http.MethodHead, address, headers)
 }
 

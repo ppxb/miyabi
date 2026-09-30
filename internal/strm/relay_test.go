@@ -50,19 +50,35 @@ func TestStreamURLAsks115WhenThePickCodeWasNotIndexed(t *testing.T) {
 	}
 }
 
-func TestStreamURLReportsMissingStreams(t *testing.T) {
+func TestStreamURLReportsPlaybackErrors(t *testing.T) {
 	relay, client := relayFixture(t, "pick-101")
+	upstreamErr := errors.New("115 returned incomplete playback source")
 	client.playURL = func(context.Context, string, string, string) ([]pan.PlaySource, error) {
-		return []pan.PlaySource{{Height: 1080}}, nil
+		return nil, upstreamErr
 	}
-	if _, err := relay.StreamURL(t.Context(), "101", ""); err == nil {
-		t.Fatal("a source list without URLs resolved to a stream")
+	if _, err := relay.StreamURL(t.Context(), "101", ""); !errors.Is(err, upstreamErr) {
+		t.Fatalf("playback error = %v, want %v", err, upstreamErr)
 	}
 	client.playURL = func(context.Context, string, string, string) ([]pan.PlaySource, error) {
 		return nil, pan.ErrTranscodeUnavailable
 	}
 	if _, err := relay.StreamURL(t.Context(), "101", ""); !errors.Is(err, drive.ErrTranscodeUnavailable) {
 		t.Fatalf("missing transcodes = %v, want drive.ErrTranscodeUnavailable", err)
+	}
+}
+
+func TestStreamURLPrefersHighestResolutionWithoutOriginal(t *testing.T) {
+	relay, client := relayFixture(t, "pick-101")
+	client.playURL = func(context.Context, string, string, string) ([]pan.PlaySource, error) {
+		return []pan.PlaySource{
+			{URL: "https://cdn.example/480p.m3u8", Height: 480, Definition: 2},
+			{URL: "https://cdn.example/1080p.m3u8", Height: 1080, Definition: 4},
+			{URL: "https://cdn.example/720p.m3u8", Height: 720, Definition: 3},
+		}, nil
+	}
+	got, err := relay.StreamURL(t.Context(), "101", "")
+	if err != nil || got != "https://cdn.example/1080p.m3u8" {
+		t.Fatalf("StreamURL = %q, %v; want the highest resolution", got, err)
 	}
 }
 

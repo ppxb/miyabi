@@ -59,7 +59,7 @@ func (client *panStub) PlayURL(ctx context.Context, token, pickCode, userAgent s
 	if client.playURL != nil {
 		return client.playURL(ctx, token, pickCode, userAgent)
 	}
-	return nil, nil
+	return nil, pan.ErrTranscodeUnavailable
 }
 
 func (client *panStub) DownloadURL(ctx context.Context, token, pickCode, userAgent string) (string, error) {
