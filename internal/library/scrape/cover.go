@@ -54,7 +54,7 @@ func (service *Service) Cover(ctx context.Context, job tasks.Job) error {
 
 	// Dispatch subtitle fetching asynchronously via bounded queue after releasing the artwork lock
 	// to avoid blocking other movies' scrape and artwork pipelines and prevent unbounded goroutines.
-	if subTask != nil && service.subtitleQueue != nil {
+	if subTask != nil {
 		service.subtitleQueue.Enqueue(*subTask)
 	}
 
@@ -163,10 +163,7 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 		return nil, fmt.Errorf("save movie artwork: %w", err)
 	}
 
-	var subTask *SubtitleTask
-	if service.subtitles != nil {
-		subTask = service.subtitleTask(input.MetadataPayload, videos)
-	}
+	subTask := service.subtitleTask(input.MetadataPayload, videos)
 
 	if service.notifier != nil {
 		service.notifier.NotifyLibraryChanged()
@@ -177,7 +174,7 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 // subtitleTask targets the .strm exported for a movie's video. Multi-part
 // movies export one .strm per part, and whole-movie subtitles fit none of them.
 func (service *Service) subtitleTask(input MetadataPayload, videos []pan.File) *SubtitleTask {
-	if len(videos) != 1 {
+	if service.subtitles == nil || len(videos) != 1 {
 		return nil
 	}
 	return &SubtitleTask{

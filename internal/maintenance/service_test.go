@@ -36,6 +36,7 @@ func dataFixture(t *testing.T) *Service {
 		t.Fatal(err)
 	}
 	scrapeSvc := scrape.New(store.Client, nil, nil, images, nil, scrape.Dependencies{})
+	t.Cleanup(scrapeSvc.Close)
 	service, err := New(directory, store.Client, images, scrapeSvc)
 	if err != nil {
 		t.Fatal(err)

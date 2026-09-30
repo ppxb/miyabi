@@ -397,7 +397,7 @@ func TestReconcileRollbackKeepsExport(t *testing.T) {
 	}
 	// A missing task causes SaveScanProgress to fail after reconciliation work.
 	payload.ScanID = "new"
-	err := scan.ReconcileScan(ctx, lib.database, -1, &payload, nil, nil, export.Config{EmbyDir: root}, nil)
+	err := scan.ReconcileScan(ctx, lib.database, -1, &payload, lib.images, lib.tasks, export.Config{EmbyDir: root}, nil)
 	if err == nil {
 		t.Fatal("expected rollback")
 	}

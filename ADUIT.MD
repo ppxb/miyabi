@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：116 条待处理，9 条已完成、待复查。
+> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：115 条待处理，10 条已完成、待复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；完成项经复查确认后可移除，已提交的历史记录可通过 Git 追溯。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮核对现存已完成项的实现、调用链和回归覆盖，并非重新验证全部待办，也未重审此前移除的 62 条记录。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -69,7 +69,11 @@
   - 已完成：确认 JavDB/JavBus 已返回有效小写哈希和来源信息后，删除聚合层重复的哈希转换、空哈希过滤与 Sources 兜底，并明确 Source 输入约定。名称推断仅在聚合完成后执行，Picker 删除二次 ApplyInference；站方高清直接读取 HD，推断高清仍读取 4K 标签。
   - 范围修正：HasSubtitle/HD 用于区分站方标注与名称推断，Tags 同时承担页面展示和推断标签，保留两者及现有评分权重；不合并为单一字段。去重、来源合并、排序、超时、部分失败处理及订阅筛选规则不变。
   - 验证：来源测试覆盖大写哈希规范化、无效哈希拒绝/跳过、来源信息和站方标签一致性；筛选测试改用已推断的数据，补充 4K 满足高清条件及站方高清优先于推断，并新增聚合到筛选的权重、必需条件和无码筛选测试。magnet、javdb、javbus、catalogue、monitor、offline、api、app 包测试及 magnet/javdb/javbus/catalogue 的 go vet、git diff --check 通过。未进行浏览器或真实上游联调。
-- [ ] **121.** `internal/library/scrape`：`Close` 的 `service == nil`、`subtitleQueue != nil`；`newSubtitleQueue` 的 concurrency / capacity / logger 兜底（唯一调用传默认值）；`Enqueue` 的 `q.ctx != nil`、`q.logger != nil`；`worker` 的 `!ok`（channel 从不关闭）；`processCover` 与 `process` 两次判断 `subtitles != nil`；`ExportLocalMovie` 的 `record == nil` + `notifiers ...MediaNotifier` 表示可选；`scrape.go:339` `dirCache == nil`、:343 `ttl <= 0`；`findAvatar` 的 `s.db == nil`；`reconcile.go:112` `if images != nil`；`reconcile.go:58` 多余 `var err error`。
+- [x] **121.** `internal/library/scrape`：`Close` 的 `service == nil`、`subtitleQueue != nil`；`newSubtitleQueue` 的 concurrency / capacity / logger 兜底（唯一调用传默认值）；`Enqueue` 的 `q.ctx != nil`、`q.logger != nil`；`worker` 的 `!ok`（channel 从不关闭）；`processCover` 与 `process` 两次判断 `subtitles != nil`；`ExportLocalMovie` 的 `record == nil` + `notifiers ...MediaNotifier` 表示可选；`scrape.go:339` `dirCache == nil`、:343 `ttl <= 0`；`findAvatar` 的 `s.db == nil`；`reconcile.go:112` `if images != nil`；`reconcile.go:58` 多余 `var err error`。
+  - 已完成：字幕队列构造直接使用 2 个 worker、256 个缓冲位及 slog.Default()，删除无实际配置需求的参数和兜底；移除 Service/队列、context/logger 的空值分支及从不关闭的 channel 接收检查。字幕服务的可选检查集中在 subtitleTask 创建入口，worker 不再重复检查。
+  - 依赖清理：删除目录缓存的重复初始化、ExportLocalMovie 的记录/图片缓存判空，以及现 scan/reconcile.go 的图片缓存判空和多余 err 声明；现 emby/actors.go 的 findAvatar 移除数据库判空，保留可选媒体获取器检查。字幕去重、满队列清理、取消、两分钟超时、关闭等待、45 秒目录缓存和导出/事务通知顺序不变。
+  - 现状修正：原可变通知参数和 ttl <= 0 已不存在；原 logger 调用实际传 nil，本次直接在构造时初始化默认 logger。保留空番号、缺失图片、可选通知器等实际业务分支。
+  - 验证：关闭测试改为真实执行并阻塞字幕导出，验证取消传递、等待退出、清除运行中 pending 和关闭后拒绝入队；补充无字幕服务不创建任务，相关测试提供图片缓存并补齐队列清理。library（含 scan/scrape）、emby、maintenance、subtitle、api、app 包测试及 library/emby/maintenance 的 go vet、git diff --check 通过，覆盖目录缓存、导出、头像回退和扫描回滚。未进行浏览器或真实 Emby/115/字幕来源联调。
 - [ ] **122.** `internal/image` singleflight + Stat 检查 + `publishImage` 读回比较三层叠加 → 保留原子 rename + Stat；`internal/maintenance` 每次循环检查 `ctx.Err()`、检查 DB 文件 `IsRegular`。
 - [ ] **123.** `internal/monitor/service.go:108` `checking`、`internal/offline/service.go:52` `syncing` 互斥锁：生产中仅由一个 `RunPeriodic` 串行调用；`offline/add.go:20,30` `catalogue != nil` 两次；`sync.go:254` `library != nil` 只为测试；`sync.go:76` 重复过滤 `DirectoryID`、:94-96 每条检查 `ctx.Err()`、:154-159 身份校验冗余；`monitor/service.go:160,176` `limit > 0` / `max(page, 1)`（API 绑定已保证）；`tasks/pool.go:34` `logger == nil`。
 - [ ] **124.** `internal/offline/projection.go` 已使用独立 OfflineDownload 表，不再有旧 JSON hash 分组。当前空 hash 会使整次 Activity 投影报错，而 schema 已要求 hash 非空；核实遗留坏数据的实际入口，再决定移除冗余检查或采用记录日志并跳过的策略。

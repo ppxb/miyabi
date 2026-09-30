@@ -240,7 +240,7 @@ func (s *actorSync) findAvatar(ctx context.Context, g *gfriends.Client, media Me
 			upstreamErr = err
 		}
 	}
-	if media == nil || s.db == nil {
+	if media == nil {
 		return domain.Media{}, false, upstreamErr
 	}
 	act, err := s.db.Actor.Query().Where(actor.Or(actor.NameEQ(name), actor.NameZhtEQ(name)), actor.AvatarNotNil()).First(ctx)

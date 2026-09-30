@@ -33,28 +33,18 @@ const (
 )
 
 // newSubtitleQueue initializes a bounded queue and starts dedicated worker goroutines.
-func newSubtitleQueue(service *Service, concurrency, capacity int, logger *slog.Logger) *SubtitleQueue {
-	if concurrency <= 0 {
-		concurrency = defaultSubtitleConcurrency
-	}
-	if capacity <= 0 {
-		capacity = defaultSubtitleQueueCapacity
-	}
-	if logger == nil {
-		logger = slog.Default()
-	}
-
+func newSubtitleQueue(service *Service) *SubtitleQueue {
 	ctx, cancel := context.WithCancel(context.Background())
 	q := &SubtitleQueue{
-		tasks:   make(chan SubtitleTask, capacity),
+		tasks:   make(chan SubtitleTask, defaultSubtitleQueueCapacity),
 		pending: make(map[int]bool),
 		service: service,
-		logger:  logger,
+		logger:  slog.Default(),
 		ctx:     ctx,
 		cancel:  cancel,
 	}
 
-	for range concurrency {
+	for range defaultSubtitleConcurrency {
 		q.wg.Add(1)
 		go q.worker()
 	}
@@ -65,7 +55,7 @@ func newSubtitleQueue(service *Service, concurrency, capacity int, logger *slog.
 // Enqueue adds a subtitle task to the queue if not already pending and queue has capacity.
 func (q *SubtitleQueue) Enqueue(task SubtitleTask) {
 	q.mu.Lock()
-	if q.ctx != nil && q.ctx.Err() != nil {
+	if q.ctx.Err() != nil {
 		q.mu.Unlock()
 		return
 	}
@@ -83,12 +73,10 @@ func (q *SubtitleQueue) Enqueue(task SubtitleTask) {
 		q.mu.Lock()
 		delete(q.pending, task.MovieID)
 		q.mu.Unlock()
-		if q.logger != nil {
-			q.logger.WarnContext(q.ctx, "subtitle task queue is full; dropping task",
-				"code", task.Target.Code,
-				"movie_id", task.MovieID,
-			)
-		}
+		q.logger.WarnContext(q.ctx, "subtitle task queue is full; dropping task",
+			"code", task.Target.Code,
+			"movie_id", task.MovieID,
+		)
 	}
 }
 
@@ -104,10 +92,7 @@ func (q *SubtitleQueue) worker() {
 		select {
 		case <-q.ctx.Done():
 			return
-		case task, ok := <-q.tasks:
-			if !ok {
-				return
-			}
+		case task := <-q.tasks:
 			q.process(task)
 			q.mu.Lock()
 			delete(q.pending, task.MovieID)
@@ -117,9 +102,6 @@ func (q *SubtitleQueue) worker() {
 }
 
 func (q *SubtitleQueue) process(task SubtitleTask) {
-	if q.service.subtitles == nil {
-		return
-	}
 	// Online providers are slow; one movie must not hold a worker indefinitely.
 	ctx, cancel := context.WithTimeout(q.ctx, 2*time.Minute)
 	defer cancel()

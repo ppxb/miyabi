@@ -39,7 +39,6 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 			})
 		}
 	}
-	var err error
 	movies, err := tx.File.Query().Where(stale).QueryMovie().IDs(ctx)
 	if err != nil {
 		return fmt.Errorf("find removed movie files: %w", err)
@@ -97,25 +96,23 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 	}
 	for _, record := range moviesToScrape {
 		if record.ScrapeStatus == movie.ScrapeStatusDone && scrape.SnapshotMatches(record, r.payload.Source) {
-			if r.scanner.images != nil {
-				cached, err := r.scanner.images.Exists(scrape.MovieArtwork(record))
-				if err != nil {
-					return fmt.Errorf("check cached artwork: %w", err)
-				}
-				if cached {
-					if cfg.EmbyDir != "" {
-						written, err := scrape.ExportLocalMovie(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken, record, r.scanner.images)
-						if err != nil {
-							return fmt.Errorf("export local movie %s: %w", record.Code, err)
-						}
-						if written && r.scanner.notifier != nil {
-							if err := r.scanner.notifier.NotifyUpdatedTx(ctx, tx, scrape.EmbyMovieDir(cfg.EmbyDir, record.Code)); err != nil {
-								return err
-							}
+			cached, err := r.scanner.images.Exists(scrape.MovieArtwork(record))
+			if err != nil {
+				return fmt.Errorf("check cached artwork: %w", err)
+			}
+			if cached {
+				if cfg.EmbyDir != "" {
+					written, err := scrape.ExportLocalMovie(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken, record, r.scanner.images)
+					if err != nil {
+						return fmt.Errorf("export local movie %s: %w", record.Code, err)
+					}
+					if written && r.scanner.notifier != nil {
+						if err := r.scanner.notifier.NotifyUpdatedTx(ctx, tx, scrape.EmbyMovieDir(cfg.EmbyDir, record.Code)); err != nil {
+							return err
 						}
 					}
-					continue
 				}
+				continue
 			}
 		}
 

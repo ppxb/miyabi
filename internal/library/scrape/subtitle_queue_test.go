@@ -1,19 +1,28 @@
 package scrape
 
 import (
+	"context"
+	"log/slog"
 	"path/filepath"
 	"testing"
+	"testing/synctest"
 
+	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
+type subtitleExporterFunc func(context.Context, int, subtitlemeta.Target) (int, error)
+
+func (f subtitleExporterFunc) Export(ctx context.Context, movieID int, target subtitlemeta.Target) (int, error) {
+	return f(ctx, movieID, target)
+}
+
 func TestSubtitleQueue_DeduplicationAndCapacity(t *testing.T) {
-	// Create a queue with concurrency 0 (workers don't consume, so tasks stay buffered)
-	// We instantiate SubtitleQueue directly for exact queue channel testing.
+	// Leave workers out so queue capacity and deduplication are deterministic.
 	q := &SubtitleQueue{
 		tasks:   make(chan SubtitleTask, 2),
 		pending: make(map[int]bool),
-		service: &Service{},
+		logger:  slog.Default(),
 		ctx:     t.Context(),
 	}
 
@@ -60,26 +69,55 @@ func TestSubtitleQueue_DeduplicationAndCapacity(t *testing.T) {
 }
 
 func TestSubtitleQueue_GracefulShutdown(t *testing.T) {
-	service := &Service{}
-	q := newSubtitleQueue(service, 2, 8, nil)
+	synctest.Test(t, func(t *testing.T) {
+		started := make(chan struct{})
+		cancelled := make(chan struct{})
+		release := make(chan struct{})
+		defer close(release)
+		exporter := subtitleExporterFunc(func(ctx context.Context, _ int, _ subtitlemeta.Target) (int, error) {
+			close(started)
+			<-ctx.Done()
+			close(cancelled)
+			<-release
+			return 0, ctx.Err()
+		})
+		service := New(nil, nil, nil, nil, nil, Dependencies{Subtitles: exporter})
+		t.Cleanup(service.Close)
+		q := service.subtitleQueue
+		q.Enqueue(SubtitleTask{MovieID: 201})
+		<-started
 
-	task := SubtitleTask{MovieID: 201}
-	q.Enqueue(task)
+		closed := make(chan struct{})
+		go func() {
+			service.Close()
+			close(closed)
+		}()
+		<-cancelled
+		synctest.Wait()
+		select {
+		case <-closed:
+			t.Fatal("close returned before the active exporter finished")
+		default:
+		}
+		release <- struct{}{}
+		<-closed
+		if q.pending[201] {
+			t.Fatal("finished task remains pending after close")
+		}
 
-	// Close waits for active workers to exit.
-	q.Close()
-
-	// After close, new tasks must not enter the queue or pending map.
-	queued := len(q.tasks)
-	taskAfterClose := SubtitleTask{MovieID: 202}
-	q.Enqueue(taskAfterClose)
-	if len(q.tasks) != queued || q.pending[202] {
-		t.Fatal("enqueue after close accepted a task")
-	}
+		// After close, new tasks must not enter the queue or pending map.
+		queued := len(q.tasks)
+		q.Enqueue(SubtitleTask{MovieID: 202})
+		if len(q.tasks) != queued || q.pending[202] {
+			t.Fatal("enqueue after close accepted a task")
+		}
+	})
 }
 
 func TestSubtitleTaskTargetsTheExportedSTRM(t *testing.T) {
-	service := &Service{}
+	service := &Service{subtitles: subtitleExporterFunc(func(context.Context, int, subtitlemeta.Target) (int, error) {
+		return 0, nil
+	})}
 	service.SetEmbyExport("emby", "", "")
 	input := MetadataPayload{MovieID: 7, Code: "SSIS-589"}
 
@@ -95,5 +133,9 @@ func TestSubtitleTaskTargetsTheExportedSTRM(t *testing.T) {
 	parts := []pan.File{{Name: "SSIS-589-CD1.mp4"}, {Name: "SSIS-589-CD2.mp4"}}
 	if task := service.subtitleTask(input, parts); task != nil {
 		t.Fatalf("multi-part movie received a single subtitle target: %+v", task)
+	}
+	service.subtitles = nil
+	if task := service.subtitleTask(input, []pan.File{{Name: "SSIS-589.mp4"}}); task != nil {
+		t.Fatalf("subtitle task created without an exporter: %+v", task)
 	}
 }

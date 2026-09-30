@@ -102,7 +102,7 @@ func New(db *ent.Client, d *drive.Drive, discover Discoverer, images *mediaimage
 		mediaNotifier: deps.MediaNotifier,
 		subtitles:     deps.Subtitles,
 	}
-	service.subtitleQueue = newSubtitleQueue(service, defaultSubtitleConcurrency, defaultSubtitleQueueCapacity, nil)
+	service.subtitleQueue = newSubtitleQueue(service)
 	return service
 }
 
@@ -120,12 +120,7 @@ func (service *Service) SetEmbyExport(embyDir, publicURL, strmToken string) {
 
 // Close releases resources and terminates background workers.
 func (service *Service) Close() {
-	if service == nil {
-		return
-	}
-	if service.subtitleQueue != nil {
-		service.subtitleQueue.Close()
-	}
+	service.subtitleQueue.Close()
 }
 
 // TryLockArtwork attempts to acquire the artwork lock for cache maintenance.
@@ -299,9 +294,6 @@ func (service *Service) directoryEntries(ctx context.Context, sess drive.Session
 	}
 
 	service.dirMu.Lock()
-	if service.dirCache == nil {
-		service.dirCache = make(map[string]dirCacheEntry)
-	}
 	service.dirCache[key] = dirCacheEntry{
 		files:     files,
 		expiresAt: time.Now().Add(defaultDirCacheTTL),

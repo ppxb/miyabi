@@ -160,7 +160,7 @@ func ExportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, 
 
 // ExportLocalMovie exports an already-scraped ent.Movie record and cached artwork to the Emby directory if missing.
 func ExportLocalMovie(embyDir, publicURL, strmToken string, record *ent.Movie, images *mediaimage.Cache) (bool, error) {
-	if record == nil || record.Code == "" {
+	if record.Code == "" {
 		return false, nil
 	}
 
@@ -190,16 +190,14 @@ func ExportLocalMovie(embyDir, publicURL, strmToken string, record *ent.Movie, i
 		videos = append(videos, pan.File{ID: f.FileID, Name: f.Name, Size: f.Size, PickCode: f.PickCode})
 	}
 	var posterBytes, fanartBytes []byte
-	if images != nil {
-		artwork := MovieArtwork(record)
-		if artwork.Poster != "" {
-			posterBytes, _ = images.ReadURL(artwork.Poster)
-		}
-		if artwork.Fanart != "" {
-			fanartBytes, _ = images.ReadURL(artwork.Fanart)
-		} else if artwork.Thumbnail != "" {
-			fanartBytes, _ = images.ReadURL(artwork.Thumbnail)
-		}
+	artwork := MovieArtwork(record)
+	if artwork.Poster != "" {
+		posterBytes, _ = images.ReadURL(artwork.Poster)
+	}
+	if artwork.Fanart != "" {
+		fanartBytes, _ = images.ReadURL(artwork.Fanart)
+	} else if artwork.Thumbnail != "" {
+		fanartBytes, _ = images.ReadURL(artwork.Thumbnail)
 	}
 
 	if err := ExportEmbyMedia(embyDir, publicURL, strmToken, record.Code, doc, videos, posterBytes, fanartBytes); err != nil {
