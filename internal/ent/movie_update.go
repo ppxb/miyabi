@@ -54,6 +54,20 @@ func (_u *MovieUpdate) SetNillableCode(v *string) *MovieUpdate {
 	return _u
 }
 
+// SetCanonicalCode sets the "canonical_code" field.
+func (_u *MovieUpdate) SetCanonicalCode(v string) *MovieUpdate {
+	_u.mutation.SetCanonicalCode(v)
+	return _u
+}
+
+// SetNillableCanonicalCode sets the "canonical_code" field if the given value is not nil.
+func (_u *MovieUpdate) SetNillableCanonicalCode(v *string) *MovieUpdate {
+	if v != nil {
+		_u.SetCanonicalCode(*v)
+	}
+	return _u
+}
+
 // SetJavdbID sets the "javdb_id" field.
 func (_u *MovieUpdate) SetJavdbID(v string) *MovieUpdate {
 	_u.mutation.SetJavdbID(v)
@@ -511,7 +525,9 @@ func (_u *MovieUpdate) RemoveSubtitles(v ...*Subtitle) *MovieUpdate {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (_u *MovieUpdate) Save(ctx context.Context) (int, error) {
-	_u.defaults()
+	if err := _u.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, _u.sqlSave, _u.mutation, _u.hooks)
 }
 
@@ -538,11 +554,15 @@ func (_u *MovieUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (_u *MovieUpdate) defaults() {
+func (_u *MovieUpdate) defaults() error {
 	if _, ok := _u.mutation.UpdatedAt(); !ok {
+		if movie.UpdateDefaultUpdatedAt == nil {
+			return fmt.Errorf("ent: uninitialized movie.UpdateDefaultUpdatedAt (forgotten import ent/runtime?)")
+		}
 		v := movie.UpdateDefaultUpdatedAt()
 		_u.mutation.SetUpdatedAt(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -577,6 +597,9 @@ func (_u *MovieUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Code(); ok {
 		_spec.SetField(movie.FieldCode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CanonicalCode(); ok {
+		_spec.SetField(movie.FieldCanonicalCode, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.JavdbID(); ok {
 		_spec.SetField(movie.FieldJavdbID, field.TypeString, value)
@@ -892,6 +915,20 @@ func (_u *MovieUpdateOne) SetCode(v string) *MovieUpdateOne {
 func (_u *MovieUpdateOne) SetNillableCode(v *string) *MovieUpdateOne {
 	if v != nil {
 		_u.SetCode(*v)
+	}
+	return _u
+}
+
+// SetCanonicalCode sets the "canonical_code" field.
+func (_u *MovieUpdateOne) SetCanonicalCode(v string) *MovieUpdateOne {
+	_u.mutation.SetCanonicalCode(v)
+	return _u
+}
+
+// SetNillableCanonicalCode sets the "canonical_code" field if the given value is not nil.
+func (_u *MovieUpdateOne) SetNillableCanonicalCode(v *string) *MovieUpdateOne {
+	if v != nil {
+		_u.SetCanonicalCode(*v)
 	}
 	return _u
 }
@@ -1366,7 +1403,9 @@ func (_u *MovieUpdateOne) Select(field string, fields ...string) *MovieUpdateOne
 
 // Save executes the query and returns the updated Movie entity.
 func (_u *MovieUpdateOne) Save(ctx context.Context) (*Movie, error) {
-	_u.defaults()
+	if err := _u.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, _u.sqlSave, _u.mutation, _u.hooks)
 }
 
@@ -1393,11 +1432,15 @@ func (_u *MovieUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (_u *MovieUpdateOne) defaults() {
+func (_u *MovieUpdateOne) defaults() error {
 	if _, ok := _u.mutation.UpdatedAt(); !ok {
+		if movie.UpdateDefaultUpdatedAt == nil {
+			return fmt.Errorf("ent: uninitialized movie.UpdateDefaultUpdatedAt (forgotten import ent/runtime?)")
+		}
 		v := movie.UpdateDefaultUpdatedAt()
 		_u.mutation.SetUpdatedAt(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -1449,6 +1492,9 @@ func (_u *MovieUpdateOne) sqlSave(ctx context.Context) (_node *Movie, err error)
 	}
 	if value, ok := _u.mutation.Code(); ok {
 		_spec.SetField(movie.FieldCode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CanonicalCode(); ok {
+		_spec.SetField(movie.FieldCanonicalCode, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.JavdbID(); ok {
 		_spec.SetField(movie.FieldJavdbID, field.TypeString, value)

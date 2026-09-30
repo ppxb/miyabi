@@ -61,6 +61,20 @@ func (_c *MovieCreate) SetCode(v string) *MovieCreate {
 	return _c
 }
 
+// SetCanonicalCode sets the "canonical_code" field.
+func (_c *MovieCreate) SetCanonicalCode(v string) *MovieCreate {
+	_c.mutation.SetCanonicalCode(v)
+	return _c
+}
+
+// SetNillableCanonicalCode sets the "canonical_code" field if the given value is not nil.
+func (_c *MovieCreate) SetNillableCanonicalCode(v *string) *MovieCreate {
+	if v != nil {
+		_c.SetCanonicalCode(*v)
+	}
+	return _c
+}
+
 // SetJavdbID sets the "javdb_id" field.
 func (_c *MovieCreate) SetJavdbID(v string) *MovieCreate {
 	_c.mutation.SetJavdbID(v)
@@ -336,7 +350,9 @@ func (_c *MovieCreate) Mutation() *MovieMutation {
 
 // Save creates the Movie in the database.
 func (_c *MovieCreate) Save(ctx context.Context) (*Movie, error) {
-	_c.defaults()
+	if err := _c.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -363,20 +379,33 @@ func (_c *MovieCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (_c *MovieCreate) defaults() {
+func (_c *MovieCreate) defaults() error {
 	if _, ok := _c.mutation.CreatedAt(); !ok {
+		if movie.DefaultCreatedAt == nil {
+			return fmt.Errorf("ent: uninitialized movie.DefaultCreatedAt (forgotten import ent/runtime?)")
+		}
 		v := movie.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
 	}
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
+		if movie.DefaultUpdatedAt == nil {
+			return fmt.Errorf("ent: uninitialized movie.DefaultUpdatedAt (forgotten import ent/runtime?)")
+		}
 		v := movie.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
+	}
+	if _, ok := _c.mutation.CanonicalCode(); !ok {
+		v := movie.DefaultCanonicalCode
+		_c.mutation.SetCanonicalCode(v)
 	}
 	if _, ok := _c.mutation.Title(); !ok {
 		v := movie.DefaultTitle
 		_c.mutation.SetTitle(v)
 	}
 	if _, ok := _c.mutation.Fanarts(); !ok {
+		if movie.DefaultFanarts == nil {
+			return fmt.Errorf("ent: uninitialized movie.DefaultFanarts (forgotten import ent/runtime?)")
+		}
 		v := movie.DefaultFanarts()
 		_c.mutation.SetFanarts(v)
 	}
@@ -384,6 +413,7 @@ func (_c *MovieCreate) defaults() {
 		v := movie.DefaultScrapeStatus
 		_c.mutation.SetScrapeStatus(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -401,6 +431,9 @@ func (_c *MovieCreate) check() error {
 		if err := movie.CodeValidator(v); err != nil {
 			return &ValidationError{Name: "code", err: fmt.Errorf(`ent: validator failed for field "Movie.code": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.CanonicalCode(); !ok {
+		return &ValidationError{Name: "canonical_code", err: errors.New(`ent: missing required field "Movie.canonical_code"`)}
 	}
 	if _, ok := _c.mutation.Title(); !ok {
 		return &ValidationError{Name: "title", err: errors.New(`ent: missing required field "Movie.title"`)}
@@ -454,6 +487,10 @@ func (_c *MovieCreate) createSpec() (*Movie, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Code(); ok {
 		_spec.SetField(movie.FieldCode, field.TypeString, value)
 		_node.Code = value
+	}
+	if value, ok := _c.mutation.CanonicalCode(); ok {
+		_spec.SetField(movie.FieldCanonicalCode, field.TypeString, value)
+		_node.CanonicalCode = value
 	}
 	if value, ok := _c.mutation.JavdbID(); ok {
 		_spec.SetField(movie.FieldJavdbID, field.TypeString, value)
@@ -656,6 +693,18 @@ func (u *MovieUpsert) SetCode(v string) *MovieUpsert {
 // UpdateCode sets the "code" field to the value that was provided on create.
 func (u *MovieUpsert) UpdateCode() *MovieUpsert {
 	u.SetExcluded(movie.FieldCode)
+	return u
+}
+
+// SetCanonicalCode sets the "canonical_code" field.
+func (u *MovieUpsert) SetCanonicalCode(v string) *MovieUpsert {
+	u.Set(movie.FieldCanonicalCode, v)
+	return u
+}
+
+// UpdateCanonicalCode sets the "canonical_code" field to the value that was provided on create.
+func (u *MovieUpsert) UpdateCanonicalCode() *MovieUpsert {
+	u.SetExcluded(movie.FieldCanonicalCode)
 	return u
 }
 
@@ -1011,6 +1060,20 @@ func (u *MovieUpsertOne) SetCode(v string) *MovieUpsertOne {
 func (u *MovieUpsertOne) UpdateCode() *MovieUpsertOne {
 	return u.Update(func(s *MovieUpsert) {
 		s.UpdateCode()
+	})
+}
+
+// SetCanonicalCode sets the "canonical_code" field.
+func (u *MovieUpsertOne) SetCanonicalCode(v string) *MovieUpsertOne {
+	return u.Update(func(s *MovieUpsert) {
+		s.SetCanonicalCode(v)
+	})
+}
+
+// UpdateCanonicalCode sets the "canonical_code" field to the value that was provided on create.
+func (u *MovieUpsertOne) UpdateCanonicalCode() *MovieUpsertOne {
+	return u.Update(func(s *MovieUpsert) {
+		s.UpdateCanonicalCode()
 	})
 }
 
@@ -1579,6 +1642,20 @@ func (u *MovieUpsertBulk) SetCode(v string) *MovieUpsertBulk {
 func (u *MovieUpsertBulk) UpdateCode() *MovieUpsertBulk {
 	return u.Update(func(s *MovieUpsert) {
 		s.UpdateCode()
+	})
+}
+
+// SetCanonicalCode sets the "canonical_code" field.
+func (u *MovieUpsertBulk) SetCanonicalCode(v string) *MovieUpsertBulk {
+	return u.Update(func(s *MovieUpsert) {
+		s.SetCanonicalCode(v)
+	})
+}
+
+// UpdateCanonicalCode sets the "canonical_code" field to the value that was provided on create.
+func (u *MovieUpsertBulk) UpdateCanonicalCode() *MovieUpsertBulk {
+	return u.Update(func(s *MovieUpsert) {
+		s.UpdateCanonicalCode()
 	})
 }
 

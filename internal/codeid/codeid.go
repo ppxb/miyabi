@@ -240,6 +240,21 @@ func Candidates(code string) []string {
 	return candidates
 }
 
+// MatchKey groups possible equivalents for indexed lookups. Sharing a key is
+// not proof of identity: different distributors or studios can share a fallback.
+// Callers must still check IsEquivalent before associating movies.
+func MatchKey(code string) string {
+	candidates := Candidates(code)
+	if len(candidates) == 0 {
+		return ""
+	}
+	key := candidates[len(candidates)-1]
+	if unpadded, ok := unpaddedNumericCandidate(key); ok {
+		return unpadded
+	}
+	return key
+}
+
 // stripPrefix only relaxes distributor labels and complete six-digit date codes.
 func stripPrefix(norm string) []string {
 	prefix, seq := splitCode(norm)

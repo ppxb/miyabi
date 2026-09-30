@@ -121,7 +121,7 @@ func TestTaskQueueIndexUpgradePreservesHistoryAndRecords(t *testing.T) {
 	checkQueries := func() {
 		t.Helper()
 		for _, query := range queries {
-			plan := taskQueryPlan(t, store, query.sql, query.args...)
+			plan := queryPlan(t, store, query.sql, query.args...)
 			if !strings.Contains(plan, "INDEX "+query.index+" (") || strings.Contains(plan, "TEMP B-TREE") != query.needsSort {
 				t.Fatalf("%s query plan: %s", query.name, plan)
 			}
@@ -149,11 +149,11 @@ func TestTaskQueueIndexUpgradePreservesHistoryAndRecords(t *testing.T) {
 			}
 			t.Logf("%s: %s", query.name, plan)
 		}
-		recovery := taskQueryPlan(t, store, "UPDATE tasks SET status='queued', progress=0, error=NULL WHERE type IN (?, ?, ?) AND status=?", "scan", "scrape", "cover", "running")
+		recovery := queryPlan(t, store, "UPDATE tasks SET status='queued', progress=0, error=NULL WHERE type IN (?, ?, ?) AND status=?", "scan", "scrape", "cover", "running")
 		if !strings.Contains(recovery, "INDEX task_type_status (type=? AND status=?)") {
 			t.Fatalf("recovery plan: %s", recovery)
 		}
-		active := taskQueryPlan(t, store, "SELECT id, payload FROM tasks WHERE type=? AND status IN (?, ?)", "subscription_batch", "queued", "running")
+		active := queryPlan(t, store, "SELECT id, payload FROM tasks WHERE type=? AND status IN (?, ?)", "subscription_batch", "queued", "running")
 		if !strings.Contains(active, "INDEX task_type_status (type=? AND status=?)") {
 			t.Fatalf("active batch plan: %s", active)
 		}
@@ -199,7 +199,7 @@ func TestTaskQueueIndexUpgradePreservesHistoryAndRecords(t *testing.T) {
 	}
 }
 
-func taskQueryPlan(t *testing.T, store *Store, query string, args ...any) string {
+func queryPlan(t *testing.T, store *Store, query string, args ...any) string {
 	t.Helper()
 	rows, err := store.db.QueryContext(t.Context(), "EXPLAIN QUERY PLAN "+query, args...)
 	if err != nil {

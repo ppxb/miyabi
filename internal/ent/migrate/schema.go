@@ -98,6 +98,7 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "code", Type: field.TypeString, Unique: true},
+		{Name: "canonical_code", Type: field.TypeString, Default: ""},
 		{Name: "javdb_id", Type: field.TypeString, Unique: true, Nullable: true},
 		{Name: "title", Type: field.TypeString, Default: ""},
 		{Name: "release_date", Type: field.TypeTime, Nullable: true},
@@ -120,6 +121,13 @@ var (
 		Name:       "movies",
 		Columns:    MoviesColumns,
 		PrimaryKey: []*schema.Column{MoviesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "movie_canonical_code",
+				Unique:  false,
+				Columns: []*schema.Column{MoviesColumns[4]},
+			},
+		},
 	}
 	// OfflineDownloadsColumns holds the columns for the "offline_downloads" table.
 	OfflineDownloadsColumns = []*schema.Column{

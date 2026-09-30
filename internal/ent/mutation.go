@@ -2647,6 +2647,7 @@ type MovieMutation struct {
 	created_at        *time.Time
 	updated_at        *time.Time
 	code              *string
+	canonical_code    *string
 	javdb_id          *string
 	title             *string
 	release_date      *time.Time
@@ -2888,6 +2889,42 @@ func (m *MovieMutation) OldCode(ctx context.Context) (v string, err error) {
 // ResetCode resets all changes to the "code" field.
 func (m *MovieMutation) ResetCode() {
 	m.code = nil
+}
+
+// SetCanonicalCode sets the "canonical_code" field.
+func (m *MovieMutation) SetCanonicalCode(s string) {
+	m.canonical_code = &s
+}
+
+// CanonicalCode returns the value of the "canonical_code" field in the mutation.
+func (m *MovieMutation) CanonicalCode() (r string, exists bool) {
+	v := m.canonical_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCanonicalCode returns the old "canonical_code" field's value of the Movie entity.
+// If the Movie object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MovieMutation) OldCanonicalCode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCanonicalCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCanonicalCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCanonicalCode: %w", err)
+	}
+	return oldValue.CanonicalCode, nil
+}
+
+// ResetCanonicalCode resets all changes to the "canonical_code" field.
+func (m *MovieMutation) ResetCanonicalCode() {
+	m.canonical_code = nil
 }
 
 // SetJavdbID sets the "javdb_id" field.
@@ -3942,7 +3979,7 @@ func (m *MovieMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MovieMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 20)
 	if m.created_at != nil {
 		fields = append(fields, movie.FieldCreatedAt)
 	}
@@ -3951,6 +3988,9 @@ func (m *MovieMutation) Fields() []string {
 	}
 	if m.code != nil {
 		fields = append(fields, movie.FieldCode)
+	}
+	if m.canonical_code != nil {
+		fields = append(fields, movie.FieldCanonicalCode)
 	}
 	if m.javdb_id != nil {
 		fields = append(fields, movie.FieldJavdbID)
@@ -4014,6 +4054,8 @@ func (m *MovieMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdatedAt()
 	case movie.FieldCode:
 		return m.Code()
+	case movie.FieldCanonicalCode:
+		return m.CanonicalCode()
 	case movie.FieldJavdbID:
 		return m.JavdbID()
 	case movie.FieldTitle:
@@ -4061,6 +4103,8 @@ func (m *MovieMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldUpdatedAt(ctx)
 	case movie.FieldCode:
 		return m.OldCode(ctx)
+	case movie.FieldCanonicalCode:
+		return m.OldCanonicalCode(ctx)
 	case movie.FieldJavdbID:
 		return m.OldJavdbID(ctx)
 	case movie.FieldTitle:
@@ -4122,6 +4166,13 @@ func (m *MovieMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCode(v)
+		return nil
+	case movie.FieldCanonicalCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCanonicalCode(v)
 		return nil
 	case movie.FieldJavdbID:
 		v, ok := value.(string)
@@ -4400,6 +4451,9 @@ func (m *MovieMutation) ResetField(name string) error {
 		return nil
 	case movie.FieldCode:
 		m.ResetCode()
+		return nil
+	case movie.FieldCanonicalCode:
+		m.ResetCanonicalCode()
 		return nil
 	case movie.FieldJavdbID:
 		m.ResetJavdbID()

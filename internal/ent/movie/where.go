@@ -70,6 +70,11 @@ func Code(v string) predicate.Movie {
 	return predicate.Movie(sql.FieldEQ(FieldCode, v))
 }
 
+// CanonicalCode applies equality check predicate on the "canonical_code" field. It's identical to CanonicalCodeEQ.
+func CanonicalCode(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldEQ(FieldCanonicalCode, v))
+}
+
 // JavdbID applies equality check predicate on the "javdb_id" field. It's identical to JavdbIDEQ.
 func JavdbID(v string) predicate.Movie {
 	return predicate.Movie(sql.FieldEQ(FieldJavdbID, v))
@@ -278,6 +283,71 @@ func CodeEqualFold(v string) predicate.Movie {
 // CodeContainsFold applies the ContainsFold predicate on the "code" field.
 func CodeContainsFold(v string) predicate.Movie {
 	return predicate.Movie(sql.FieldContainsFold(FieldCode, v))
+}
+
+// CanonicalCodeEQ applies the EQ predicate on the "canonical_code" field.
+func CanonicalCodeEQ(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldEQ(FieldCanonicalCode, v))
+}
+
+// CanonicalCodeNEQ applies the NEQ predicate on the "canonical_code" field.
+func CanonicalCodeNEQ(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldNEQ(FieldCanonicalCode, v))
+}
+
+// CanonicalCodeIn applies the In predicate on the "canonical_code" field.
+func CanonicalCodeIn(vs ...string) predicate.Movie {
+	return predicate.Movie(sql.FieldIn(FieldCanonicalCode, vs...))
+}
+
+// CanonicalCodeNotIn applies the NotIn predicate on the "canonical_code" field.
+func CanonicalCodeNotIn(vs ...string) predicate.Movie {
+	return predicate.Movie(sql.FieldNotIn(FieldCanonicalCode, vs...))
+}
+
+// CanonicalCodeGT applies the GT predicate on the "canonical_code" field.
+func CanonicalCodeGT(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldGT(FieldCanonicalCode, v))
+}
+
+// CanonicalCodeGTE applies the GTE predicate on the "canonical_code" field.
+func CanonicalCodeGTE(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldGTE(FieldCanonicalCode, v))
+}
+
+// CanonicalCodeLT applies the LT predicate on the "canonical_code" field.
+func CanonicalCodeLT(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldLT(FieldCanonicalCode, v))
+}
+
+// CanonicalCodeLTE applies the LTE predicate on the "canonical_code" field.
+func CanonicalCodeLTE(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldLTE(FieldCanonicalCode, v))
+}
+
+// CanonicalCodeContains applies the Contains predicate on the "canonical_code" field.
+func CanonicalCodeContains(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldContains(FieldCanonicalCode, v))
+}
+
+// CanonicalCodeHasPrefix applies the HasPrefix predicate on the "canonical_code" field.
+func CanonicalCodeHasPrefix(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldHasPrefix(FieldCanonicalCode, v))
+}
+
+// CanonicalCodeHasSuffix applies the HasSuffix predicate on the "canonical_code" field.
+func CanonicalCodeHasSuffix(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldHasSuffix(FieldCanonicalCode, v))
+}
+
+// CanonicalCodeEqualFold applies the EqualFold predicate on the "canonical_code" field.
+func CanonicalCodeEqualFold(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldEqualFold(FieldCanonicalCode, v))
+}
+
+// CanonicalCodeContainsFold applies the ContainsFold predicate on the "canonical_code" field.
+func CanonicalCodeContainsFold(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldContainsFold(FieldCanonicalCode, v))
 }
 
 // JavdbIDEQ applies the EQ predicate on the "javdb_id" field.

@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/ppxb/miyabi/internal/ent"
+	_ "github.com/ppxb/miyabi/internal/ent/runtime" // Initialize schema hooks and defaults.
 	_ "modernc.org/sqlite"
 )
 

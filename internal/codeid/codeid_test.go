@@ -262,6 +262,9 @@ func TestIsEquivalent(t *testing.T) {
 			if got := IsEquivalent(tt.a, tt.b); got != tt.want {
 				t.Errorf("IsEquivalent(%q, %q) = %v; want %v", tt.a, tt.b, got, tt.want)
 			}
+			if tt.want && MatchKey(tt.a) != MatchKey(tt.b) {
+				t.Errorf("equivalent codes have different lookup keys: %q and %q", MatchKey(tt.a), MatchKey(tt.b))
+			}
 		})
 	}
 }

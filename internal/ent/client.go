@@ -892,7 +892,8 @@ func (c *MovieClient) QuerySubtitles(_m *Movie) *SubtitleQuery {
 
 // Hooks returns the client hooks.
 func (c *MovieClient) Hooks() []Hook {
-	return c.hooks.Movie
+	hooks := c.hooks.Movie
+	return append(hooks[:len(hooks):len(hooks)], movie.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
