@@ -6,8 +6,7 @@ import { useAddSubscription, useSubscription } from '@/api/subscriptions'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
-// Shown on unreleased cards without a magnet. Sits inside a Link, so clicks
-// must not navigate.
+// Shown on unreleased cards without a magnet; clicks must not open the detail dialog.
 export function MovieSubscribeButton({ movie }: { movie: DiscoverMovie }) {
   const { subscription, isPending } = useSubscription('movie', movie.id)
   const add = useAddSubscription()

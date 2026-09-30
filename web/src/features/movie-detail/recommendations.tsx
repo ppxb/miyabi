@@ -6,7 +6,7 @@ import { MovieResourceBadges, MovieStateBadge } from '@/components/movie/movie-b
 import { Button } from '@/components/ui/button'
 import { cn } from 'cn'
 import { useSettingsStore } from '@/stores/settings'
-import { MovieDetailLink } from './detail-link'
+import { MovieDetailTrigger } from './detail-trigger'
 import { observeRecommendation } from './recommendation-visibility'
 
 export function MovieRecommendations({
@@ -53,7 +53,7 @@ function RecommendationCard({ movie }: { movie: MovieReference }) {
 
   return (
     <div ref={cardRef} className="relative h-full min-w-0">
-      <MovieDetailLink
+      <MovieDetailTrigger
         movieId={movie.id}
         className="relative block h-full rounded-2xl outline-ring"
         onFocus={() => {
@@ -85,7 +85,7 @@ function RecommendationCard({ movie }: { movie: MovieReference }) {
             <MovieCardSkeleton />
           </div>
         ) : null}
-      </MovieDetailLink>
+      </MovieDetailTrigger>
       {!data && failed ? (
         <Button
           type="button"

@@ -2,7 +2,6 @@ import {
   Children,
   isValidElement,
   type ComponentProps,
-  type KeyboardEvent,
   type MouseEvent,
   type ReactElement,
   type ReactNode
@@ -12,7 +11,7 @@ import { expect, test, vi } from 'vitest'
 import { type SubscriptionItem, useRemoveSubscription } from '@/api/subscriptions'
 import { MovieCard } from '@/components/movie'
 import { Button } from '@/components/ui/button'
-import { MovieDetailLink } from '@/features/movie-detail/detail-link'
+import { MovieDetailTrigger } from '@/features/movie-detail/detail-trigger'
 import { SubscriptionCard } from '@/features/subscriptions/subscription-card'
 
 vi.mock('@/api/subscriptions', async importOriginal => ({
@@ -48,12 +47,12 @@ function cardState(selecting: boolean, disabled = false) {
   } as unknown as ReturnType<typeof useRemoveSubscription>)
   const onSelect = vi.fn()
   const tree = SubscriptionCard({ item, selecting, disabled, selected: false, onSelect })
-  const link = Children.toArray(tree.props.children)[0] as ReactElement<
-    ComponentProps<typeof MovieDetailLink>
+  const trigger = Children.toArray(tree.props.children)[0] as ReactElement<
+    ComponentProps<typeof MovieDetailTrigger>
   >
-  const card = link.props.children as ReactElement<ComponentProps<typeof MovieCard>>
+  const card = trigger.props.children as ReactElement<ComponentProps<typeof MovieCard>>
   const action = findAction(card.props.coverOverlay)
-  return { tree, link, card, action, onSelect, remove }
+  return { tree, trigger, card, action, onSelect, remove }
 }
 
 test('entering and leaving selection preserves card ancestors without a changing footer', () => {
@@ -61,7 +60,7 @@ test('entering and leaving selection preserves card ancestors without a changing
   for (const selecting of [true, false]) {
     const current = cardState(selecting)
     // Changing an ancestor's type or key remounts the cover and resets its loaded state.
-    for (const node of ['tree', 'link', 'card'] as const) {
+    for (const node of ['tree', 'trigger', 'card'] as const) {
       expect(current[node].type).toBe(browsing[node].type)
       expect(current[node].key).toBe(browsing[node].key)
     }
@@ -71,47 +70,25 @@ test('entering and leaving selection preserves card ancestors without a changing
   }
 })
 
-test('selection intercepts card clicks and Space, while browsing leaves detail navigation available', () => {
+test('selection consumes card clicks while browsing allows the detail dialog', () => {
   const selecting = cardState(true)
   const preventDefault = vi.fn()
-  selecting.link.props.onClick?.({ preventDefault } as unknown as MouseEvent<HTMLAnchorElement>)
+  selecting.trigger.props.onClick?.({ preventDefault } as unknown as MouseEvent<HTMLDivElement>)
   expect(preventDefault).toHaveBeenCalledOnce()
   expect(selecting.onSelect).toHaveBeenCalledOnce()
 
-  selecting.link.props.onKeyDown?.({
-    key: ' ',
-    repeat: false,
-    preventDefault
-  } as unknown as KeyboardEvent<HTMLAnchorElement>)
-  expect(selecting.onSelect).toHaveBeenCalledTimes(2)
-  selecting.link.props.onKeyDown?.({
-    key: ' ',
-    repeat: true,
-    preventDefault
-  } as unknown as KeyboardEvent<HTMLAnchorElement>)
-  expect(selecting.onSelect).toHaveBeenCalledTimes(2)
-  expect(selecting.link.props['aria-haspopup']).toBe(false)
+  expect(selecting.trigger.props['aria-haspopup']).toBe(false)
 
   const browsing = cardState(false)
   preventDefault.mockClear()
-  browsing.link.props.onClick?.({ preventDefault } as unknown as MouseEvent<HTMLAnchorElement>)
+  browsing.trigger.props.onClick?.({ preventDefault } as unknown as MouseEvent<HTMLDivElement>)
   expect(preventDefault).not.toHaveBeenCalled()
   expect(browsing.onSelect).not.toHaveBeenCalled()
 })
 
-test('disabled selection cannot toggle or navigate, including middle clicks', () => {
-  const { link, onSelect } = cardState(true, true)
-  const preventDefault = vi.fn()
-  link.props.onClick?.({ preventDefault } as unknown as MouseEvent<HTMLAnchorElement>)
-  link.props.onKeyDown?.({
-    key: ' ',
-    preventDefault
-  } as unknown as KeyboardEvent<HTMLAnchorElement>)
-  link.props.onAuxClick?.({ button: 1, preventDefault } as unknown as MouseEvent<HTMLAnchorElement>)
-  expect(onSelect).not.toHaveBeenCalled()
-  expect(preventDefault).toHaveBeenCalledTimes(3)
-  expect(link.props['aria-disabled']).toBe(true)
-  expect(link.props.tabIndex).toBe(-1)
+test('selection disables unavailable cards without disabling normal detail browsing', () => {
+  expect(cardState(true, true).trigger.props.disabled).toBe(true)
+  expect(cardState(false, true).trigger.props.disabled).toBe(false)
 })
 
 test('canceling a subscription stays independent of the card click', () => {

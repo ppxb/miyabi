@@ -7,11 +7,7 @@ import {
   createRouter
 } from '@tanstack/react-router'
 
-import {
-  validateDiscoverSearch,
-  validateMainSearch,
-  categoryFromSearch
-} from '@/features/discover/search'
+import { validateDiscoverSearch, categoryFromSearch } from '@/features/discover/search'
 import { validateMetadataSearch } from '@/features/discover/metadata-search'
 import { validateSubscriptionsSearch } from '@/features/subscriptions/search'
 
@@ -21,11 +17,6 @@ function routerAt(href: string) {
     getParentRoute: () => root,
     path: '/discover',
     validateSearch: validateDiscoverSearch
-  })
-  const detail = createRoute({
-    getParentRoute: () => root,
-    path: '/discover/$movieId',
-    validateSearch: validateMainSearch
   })
   const metadata = createRoute({
     getParentRoute: () => root,
@@ -40,12 +31,12 @@ function routerAt(href: string) {
   return createRouter({
     isServer: false,
     origin: 'http://localhost',
-    routeTree: root.addChildren([discover, detail, metadata, subscriptions]),
+    routeTree: root.addChildren([discover, metadata, subscriptions]),
     history: createMemoryHistory({ initialEntries: [href] })
   })
 }
 
-test('discover filters and all tab pages survive detail navigation, back and reload', async () => {
+test('discover filters and all tab pages survive metadata navigation, back and reload', async () => {
   const href =
     '/discover?view=category&zone=uncensored&categoryID=year&tagID=2026&main=m&categoryPage=3&releasedPage=4&upcomingPage=2'
   const router = routerAt(href)
@@ -53,9 +44,14 @@ test('discover filters and all tab pages survive detail navigation, back and rel
   assert.equal(router.state.matches.at(-1)!.status, 'success')
   const original = router.state.matches.at(-1)!.search
   await router.navigate({
-    to: '/discover/$movieId',
-    params: { movieId: 'one' },
-    search: previous => ({ main: previous.main })
+    to: '/discover/search',
+    search: previous => ({
+      kind: 'actor',
+      id: 'one',
+      name: 'Actor',
+      page: 1,
+      main: previous.main ?? ''
+    })
   })
   await router.load()
   assert.equal(router.state.location.search.main, 'm')
@@ -79,7 +75,7 @@ test('subscription actor selection and both pages survive back and reload', asyn
   await router.load()
   assert.equal(router.state.matches.at(-1)!.status, 'success')
   const original = router.state.matches.at(-1)!.search
-  await router.navigate({ to: '/discover/$movieId', params: { movieId: 'one' } })
+  await router.navigate({ to: '/discover' })
   await router.load()
   router.history.back()
   await router.load()
@@ -94,14 +90,8 @@ test('subscription actor selection and both pages survive back and reload', asyn
   })
 })
 
-test('metadata filters travel through detail links without shared mutable state', async () => {
+test('metadata navigation preserves common filters without shared mutable state', async () => {
   const router = routerAt('/discover/search?kind=actor&id=actor-1&name=Actor&main=c&page=2')
-  await router.load()
-  await router.navigate({
-    to: '/discover/$movieId',
-    params: { movieId: 'one' },
-    search: previous => ({ main: previous.main })
-  })
   await router.load()
   await router.navigate({
     to: '/discover/search',

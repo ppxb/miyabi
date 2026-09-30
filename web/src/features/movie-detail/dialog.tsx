@@ -21,10 +21,10 @@ export function MovieDetailDialogProvider({ children }: PropsWithChildren) {
   const router = useRouter()
   const [movieId, setMovieId] = useState<string>()
   const [open, setOpen] = useState(false)
-  const triggerRef = useRef<HTMLAnchorElement | null>(null)
+  const triggerRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const openMovie = useCallback(
-    (id: string, trigger: HTMLAnchorElement) => {
+    (id: string, trigger: HTMLDivElement) => {
       // Recommendations replace the detail while retaining the original list's focus target.
       if (!open) triggerRef.current = trigger
       setMovieId(id)

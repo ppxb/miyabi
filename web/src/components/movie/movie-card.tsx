@@ -7,12 +7,12 @@ import { MovieSubscribeButton } from '@/components/movie/movie-subscribe-button'
 import { OverflowTooltip } from '@/components/overflow-tooltip'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { MovieDetailLink } from '@/features/movie-detail/detail-link'
+import { MovieDetailTrigger } from '@/features/movie-detail/detail-trigger'
 
 export function DiscoverMovieCard({ movie }: { movie: DiscoverMovie }) {
   const subscribable = movie.release_status === 'upcoming' && movie.magnets_count === 0
   return (
-    <MovieDetailLink movieId={movie.id} className="block rounded-2xl outline-ring">
+    <MovieDetailTrigger movieId={movie.id} className="block rounded-2xl outline-ring">
       <MovieCard
         movie={movie}
         description={movie.release_date}
@@ -27,7 +27,7 @@ export function DiscoverMovieCard({ movie }: { movie: DiscoverMovie }) {
       >
         <MovieResourceBadges movie={movie} />
       </MovieCard>
-    </MovieDetailLink>
+    </MovieDetailTrigger>
   )
 }
 

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { MovieDetailLink } from '@/features/movie-detail/detail-link'
+import { MovieDetailTrigger } from '@/features/movie-detail/detail-trigger'
 import { cn } from 'cn'
 
 const dateTimeFormat = new Intl.DateTimeFormat('zh-CN', {
@@ -74,8 +74,10 @@ export function SubscriptionCard({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
+                  type="button"
                   variant="secondary"
                   size="icon-sm"
+                  aria-label={`取消订阅 ${item.code}`}
                   disabled={busy}
                   onClick={event => {
                     event.preventDefault()
@@ -100,7 +102,7 @@ export function SubscriptionCard({
 
   return (
     <div className="relative h-full min-w-0">
-      <MovieDetailLink
+      <MovieDetailTrigger
         movieId={item.target_id}
         className={cn(
           'block h-full rounded-2xl outline-ring',
@@ -108,26 +110,17 @@ export function SubscriptionCard({
           selecting && disabled && 'cursor-not-allowed opacity-50'
         )}
         role={selecting ? 'checkbox' : undefined}
+        disabled={selecting && disabled}
         aria-checked={selecting ? selected : undefined}
-        aria-disabled={selecting ? disabled : undefined}
         aria-haspopup={selecting ? false : 'dialog'}
-        tabIndex={selecting && disabled ? -1 : undefined}
         onClick={event => {
           if (!selecting) return
           event.preventDefault()
-          if (!disabled) onSelect()
-        }}
-        onAuxClick={event => {
-          if (selecting) event.preventDefault()
-        }}
-        onKeyDown={event => {
-          if (!selecting || event.key !== ' ') return
-          event.preventDefault()
-          if (!disabled && !event.repeat) onSelect()
+          onSelect()
         }}
       >
         {card}
-      </MovieDetailLink>
+      </MovieDetailTrigger>
       {selecting ? (
         <Checkbox
           checked={selected}
