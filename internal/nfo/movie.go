@@ -47,7 +47,25 @@ type Actor struct {
 	Name    string `xml:"name" json:"name"`
 	NameZHT string `xml:"name_zht,omitempty" json:"name_zht"`
 	Gender  string `xml:"gender,omitempty" json:"gender"`
-	Thumb   string `xml:"thumb,omitempty" json:"thumb"`
+	// Actor images are uploaded by Miyabi after decoding, not fetched by Emby.
+	Thumb string `xml:"miyabi_avatar,omitempty" json:"thumb"`
+}
+
+// Read ordinary NFO thumbnails as well as Miyabi's preserved source URL.
+func (actor *Actor) UnmarshalXML(decoder *xml.Decoder, start xml.StartElement) error {
+	type actorXML Actor
+	var value struct {
+		actorXML
+		LegacyThumb string `xml:"thumb"`
+	}
+	if err := decoder.DecodeElement(&value, &start); err != nil {
+		return err
+	}
+	*actor = Actor(value.actorXML)
+	if actor.Thumb == "" {
+		actor.Thumb = value.LegacyThumb
+	}
+	return nil
 }
 
 type Tag struct {

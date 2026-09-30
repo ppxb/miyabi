@@ -125,12 +125,12 @@ func (s *actorSync) close() {
 
 func (s *actorSync) syncAvatars(ctx context.Context, cfg Config) (int, error) {
 	g, media := s.gfriends, s.media
-	missing, err := s.client.personsWithoutAvatar(ctx, cfg)
+	people, err := s.client.persons(ctx, cfg)
 	if err != nil {
-		return 0, fmt.Errorf("list persons without avatar: %w", err)
+		return 0, fmt.Errorf("list persons for avatar sync: %w", err)
 	}
 
-	if len(missing) == 0 {
+	if len(people) == 0 {
 		return 0, nil
 	}
 
@@ -144,15 +144,27 @@ func (s *actorSync) syncAvatars(ctx context.Context, cfg Config) (int, error) {
 		}
 	}
 
-	slog.InfoContext(ctx, "emby actor avatar sync started", "missing_count", len(missing))
+	slog.InfoContext(ctx, "emby actor avatar sync started", "person_count", len(people))
 	uploaded := 0
 
-	for _, person := range missing {
+	for _, person := range people {
 		if err := ctx.Err(); err != nil {
 			return uploaded, err
 		}
 
 		if s.isAvatarNotFound(person.Name) {
+			continue
+		}
+		valid, err := s.client.hasValidAvatar(ctx, cfg, person)
+		if err != nil {
+			if ctx.Err() != nil {
+				return uploaded, ctx.Err()
+			}
+			// An unavailable image-details endpoint does not prove the image is broken.
+			slog.WarnContext(ctx, "failed to inspect actor avatar", "name", person.Name, "error", err)
+			continue
+		}
+		if valid {
 			continue
 		}
 
@@ -178,7 +190,7 @@ func (s *actorSync) syncAvatars(ctx context.Context, cfg Config) (int, error) {
 		}
 	}
 
-	slog.InfoContext(ctx, "emby actor avatar sync completed", "uploaded", uploaded, "total_missing", len(missing))
+	slog.InfoContext(ctx, "emby actor avatar sync completed", "uploaded", uploaded, "total_persons", len(people))
 	return uploaded, nil
 }
 

@@ -1,10 +1,45 @@
 package nfo
 
 import (
+	"encoding/xml"
 	"net/url"
 	"strings"
 	"testing"
 )
+
+func TestActorAvatarSourceRoundTripsWithoutAnEmbyDownloadURL(t *testing.T) {
+	for _, input := range []string{
+		`<movie><num>ABP-001</num><actor><javdbid>actor-1</javdbid><name>Actor</name><thumb>https://cdn.example/encoded.jpg</thumb></actor></movie>`,
+		`<movie><num>ABP-001</num><actor><javdbid>actor-1</javdbid><name>Actor</name><miyabi_avatar>https://cdn.example/encoded.jpg</miyabi_avatar></actor></movie>`,
+	} {
+		doc, err := Decode([]byte(input))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(doc.Actors) != 1 || doc.Actors[0].Thumb != "https://cdn.example/encoded.jpg" {
+			t.Fatalf("avatar source lost: %+v", doc.Actors)
+		}
+		body, err := Encode(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var exported struct {
+			Actors []struct {
+				Thumb string `xml:"thumb"`
+			} `xml:"actor"`
+		}
+		if err := xml.Unmarshal(body, &exported); err != nil {
+			t.Fatal(err)
+		}
+		if exported.Actors[0].Thumb != "" || !strings.Contains(string(body), "<miyabi_avatar>") {
+			t.Fatalf("export exposes encoded image to Emby: %s", body)
+		}
+		restored, err := Decode(body)
+		if err != nil || restored.Actors[0].Thumb != doc.Actors[0].Thumb || restored.Actors[0].ID != "actor-1" {
+			t.Fatalf("rescan lost avatar metadata: %+v, %v", restored.Actors, err)
+		}
+	}
+}
 
 func TestUnfamiliarNumbersRoundTripWithSafeFilenames(t *testing.T) {
 	seen := make(map[string]bool)
