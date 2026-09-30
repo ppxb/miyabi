@@ -32,6 +32,19 @@ func asyncOfflineAdd(ctx context.Context, service *Service, hash string) <-chan 
 	return result
 }
 
+func TestOfflineAddRejectsUnknownMagnetBeforeSubmission(t *testing.T) {
+	service, client := offlineAddFixture(t)
+	adds := 0
+	client.addOffline = func(context.Context, string, string, string) (string, error) {
+		adds++
+		return "", nil
+	}
+	_, err := service.Add(t.Context(), "fixture-movie", strings.Repeat("c", 40))
+	if !errors.Is(err, ErrMagnetNotFound) || adds != 0 || service.database.OfflineDownload.Query().CountX(t.Context()) != 0 {
+		t.Fatalf("unknown magnet was submitted or recorded: adds=%d error=%v", adds, err)
+	}
+}
+
 func TestOfflineConcurrentAddsDeduplicateWithoutBlockingOtherHashes(t *testing.T) {
 	service, client := offlineAddFixture(t)
 	started := make(chan struct{}, 1)

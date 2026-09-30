@@ -22,12 +22,11 @@ const (
 )
 
 // Check polls due movie and actor subscriptions in small batches with a pause
-// between JavDB requests. Overlapping runs are serialized.
+// between JavDB requests. The scheduler runs checks serially.
 func (service *Service) Check(ctx context.Context) error {
-	if err := service.checking.Lock(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
-	defer service.checking.Unlock()
 
 	cfg := service.config(ctx)
 	picker := magnet.NewPicker(cfg.Preferences)

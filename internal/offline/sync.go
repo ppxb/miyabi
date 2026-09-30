@@ -13,11 +13,11 @@ import (
 )
 
 // Sync polls active and pending 115 offline tasks and updates their state in the database.
+// The scheduler runs syncs serially; per-magnet locks coordinate with submissions.
 func (service *Service) Sync(ctx context.Context) error {
-	if err := service.syncing.Lock(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
-	defer service.syncing.Unlock()
 
 	source := service.drive.Source()
 	if source == nil {
@@ -102,6 +102,7 @@ func (service *Service) Sync(ctx context.Context) error {
 }
 
 // UpdateTask applies a 115 offline remote task state to a local offline task.
+// The caller has already matched the remote task to the record by info hash.
 func (service *Service) UpdateTask(ctx context.Context, sess drive.Session, record *ent.OfflineDownload, remote pan.OfflineTask) error {
 	unlock, err := service.operations.Lock(ctx, record.AccountID, strings.ToLower(record.Hash))
 	if err != nil {
@@ -119,12 +120,6 @@ func (service *Service) UpdateTask(ctx context.Context, sess drive.Session, reco
 		// committed. Never regress terminal state or overwrite indexed files.
 		if current.Status == offlinedownload.StatusFailed || current.Status == offlinedownload.StatusDone && remote.Status != 2 {
 			return nil
-		}
-		if current.AccountID != record.AccountID || current.InfoHash != record.InfoHash {
-			return fmt.Errorf("offline task identity changed while syncing")
-		}
-		if remote.Hash != "" && !strings.EqualFold(remote.Hash, current.InfoHash) {
-			return fmt.Errorf("115 returned a different offline task than requested")
 		}
 		status := offlinedownload.StatusRunning
 		switch remote.Status {
@@ -202,7 +197,7 @@ func (service *Service) completeTask(ctx context.Context, tx *ent.Tx, record *en
 	}
 	scanID := record.ScanTaskID
 	source := service.drive.Source()
-	if fileID != "" && scanID == 0 && source != nil && service.library != nil &&
+	if fileID != "" && scanID == 0 && source != nil &&
 		source.Directory.ID == record.DirectoryID && source.AccountID == record.AccountID {
 		var err error
 		scanID, err = service.library.EnqueueTargetedScan(ctx, tx, *source, fileID, record.ID, record.Code, record.JavdbID)

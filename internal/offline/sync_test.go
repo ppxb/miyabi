@@ -65,6 +65,31 @@ func TestOfflineSyncContinuesPastIndividualFailures(t *testing.T) {
 	}
 }
 
+func TestOfflineSyncMatchesRemoteInfoHash(t *testing.T) {
+	service, client := offlineAddFixture(t)
+	client.addOffline = func(context.Context, string, string, string) (string, error) {
+		return offlineHashB, nil
+	}
+	added, err := service.Add(t.Context(), "fixture-movie", offlineHashA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.offlineTasks = func(context.Context, string, int) (pan.OfflinePage, error) {
+		return pan.OfflinePage{PageCount: 1, Tasks: []pan.OfflineTask{
+			{Hash: offlineHashA, Status: 2, FileID: "unrelated-folder"},
+			{Hash: strings.ToUpper(offlineHashB), Status: 1, Progress: 45},
+		}}, nil
+	}
+	if err := service.Sync(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	saved := service.database.OfflineDownload.GetX(t.Context(), added.TaskID)
+	if saved.Hash != offlineHashA || saved.InfoHash != offlineHashB || saved.Status != offlinedownload.StatusRunning ||
+		saved.Progress != 45 || saved.FileID != "" || saved.ScanTaskID != 0 {
+		t.Fatalf("sync applied the wrong remote task: %+v", saved)
+	}
+}
+
 func TestOfflineSyncKeepsUnseenTasksWhenLaterPageFails(t *testing.T) {
 	service, record, _, _ := offlineFixture(t)
 	pageError := errors.New("fixture page unavailable")
@@ -122,7 +147,7 @@ func TestOfflineCompletionWaitsForLocationAcrossRestart(t *testing.T) {
 	if after := service.tasks.Revisions().Offline; after != before {
 		t.Fatalf("unchanged pending completion was announced again: %+v", after)
 	}
-	service = New(service.database, nil, service.drive, tasks.NewService(service.database, tasks.NewRegistry()), service.library, service.submitTimeout)
+	service = New(service.database, service.catalogue, service.drive, tasks.NewService(service.database, tasks.NewRegistry()), service.library, service.submitTimeout)
 	activity, err = service.Activity(ctx)
 	if err != nil || len(activity.Tasks) != 1 || activity.Tasks[0].Phase != "processing" ||
 		!activity.Tasks[0].Processing || activity.Tasks[0].ScanTaskID != 0 {
@@ -191,7 +216,7 @@ func TestOfflineMissingLocationStopsPendingWorkflow(t *testing.T) {
 	if state.Status != string(offlinedownload.StatusDone) || state.Processing || state.Error == nil {
 		t.Fatalf("removed remote history kept an endless pending workflow: %+v", state)
 	}
-	service = New(service.database, nil, service.drive, tasks.NewService(service.database, tasks.NewRegistry()), service.library, service.submitTimeout)
+	service = New(service.database, service.catalogue, service.drive, tasks.NewService(service.database, tasks.NewRegistry()), service.library, service.submitTimeout)
 	if err := service.Sync(ctx); err != nil {
 		t.Fatal(err)
 	}

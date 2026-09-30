@@ -14,22 +14,16 @@ import (
 // Add validates and records a new offline download for the given movie ID and magnet hash.
 func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.OfflineSubmission, error) {
 	hash = strings.ToLower(hash)
-	if service.catalogue != nil {
-		has, err := service.catalogue.HasMagnet(ctx, movieID, hash)
-		if err != nil {
-			return domain.OfflineSubmission{}, err
-		}
-		if !has {
-			return domain.OfflineSubmission{}, ErrMagnetNotFound
-		}
+	has, err := service.catalogue.HasMagnet(ctx, movieID, hash)
+	if err != nil {
+		return domain.OfflineSubmission{}, err
 	}
-	var rawCode string
-	if service.catalogue != nil {
-		var err error
-		rawCode, err = service.catalogue.MovieCode(ctx, movieID)
-		if err != nil {
-			return domain.OfflineSubmission{}, err
-		}
+	if !has {
+		return domain.OfflineSubmission{}, ErrMagnetNotFound
+	}
+	rawCode, err := service.catalogue.MovieCode(ctx, movieID)
+	if err != nil {
+		return domain.OfflineSubmission{}, err
 	}
 	code := codeid.Normalize(rawCode)
 

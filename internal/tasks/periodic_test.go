@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -70,4 +71,41 @@ func TestRunPeriodic_WakeChannel(t *testing.T) {
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("timed out waiting for wake executions")
 	}
+}
+
+func TestRunPeriodicSerializesTicksAndWakeups(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		started := make(chan struct{})
+		release := make(chan struct{})
+		defer close(release)
+		wake := make(chan struct{}, 1)
+		var calls atomic.Int32
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			RunPeriodic(ctx, slog.Default(), "serial-job", time.Second, wake, func(context.Context) error {
+				if calls.Add(1) == 1 {
+					close(started)
+					<-release
+				} else {
+					cancel()
+				}
+				return nil
+			})
+		}()
+		<-started
+		wake <- struct{}{}
+		time.Sleep(3 * time.Second)
+		synctest.Wait()
+		if calls.Load() != 1 {
+			t.Fatal("ticks or wakeups started another run while the first was active")
+		}
+		release <- struct{}{}
+		<-done
+		if calls.Load() < 2 {
+			t.Fatal("pending signals did not trigger a run after the first finished")
+		}
+	})
 }

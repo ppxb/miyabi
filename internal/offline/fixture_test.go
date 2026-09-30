@@ -243,11 +243,20 @@ func libraryBaseFixture(t testing.TB) (*Service, *drive.Drive, *ent.Client, doma
 	}
 
 	scrapeSvc := scrapePkg.New(store.Client, driveSvc, nil, images, taskSvc, scrapePkg.Dependencies{})
+	t.Cleanup(scrapeSvc.Close)
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScan, lib.Scan, lib.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScrape, scrapeSvc.Scrape, scrapeSvc.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindCover, scrapeSvc.Cover, scrapeSvc.Finished))
 
-	service := New(store.Client, nil, driveSvc, taskSvc, lib, 2*time.Minute)
+	cat := &stubCatalogue{
+		movies: map[string]domain.MovieDetail{
+			"fixture-movie": {Movie: domain.Movie{ID: "fixture-movie", Code: "ABP-001"}},
+		},
+		magnets: map[string][]domain.Magnet{
+			"fixture-movie": {{Hash: offlineHashA}, {Hash: offlineHashB}},
+		},
+	}
+	service := New(store.Client, cat, driveSvc, taskSvc, lib, 2*time.Minute)
 	return service, driveSvc, store.Client, source
 }
 
@@ -300,15 +309,6 @@ const (
 func offlineAddFixture(t *testing.T) (*Service, *panStub) {
 	t.Helper()
 	service, driveSvc, _, _ := libraryBaseFixture(t)
-	cat := &stubCatalogue{
-		movies: map[string]domain.MovieDetail{
-			"fixture-movie": {Movie: domain.Movie{ID: "fixture-movie", Code: "ABP-001"}},
-		},
-		magnets: map[string][]domain.Magnet{
-			"fixture-movie": {{Hash: offlineHashA}, {Hash: offlineHashB}},
-		},
-	}
-	service.catalogue = cat
 	return service, stubOf(t, driveSvc)
 }
 

@@ -130,7 +130,7 @@ func TestPoolSubscribesBeforeRecoveryAndUnsubscribesOnExit(t *testing.T) {
 				}
 				return failure
 			}}
-			err := NewPool(queue, bus, NewRegistry(), []Kind{KindScan}, 1, nil).Run(ctx)
+			err := NewPool(queue, bus, NewRegistry(), []Kind{KindScan}, 1, slog.Default()).Run(ctx)
 			if canceled && err != nil || !canceled && !errors.Is(err, failure) {
 				t.Fatalf("pool exit = %v", err)
 			}

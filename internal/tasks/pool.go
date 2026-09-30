@@ -36,9 +36,6 @@ type Pool struct {
 
 // NewPool initializes a worker pool that only recovers and claims the given kinds.
 func NewPool(queue PoolQueue, bus PoolBus, registry *Registry, kinds []Kind, size int, logger *slog.Logger) *Pool {
-	if logger == nil {
-		logger = slog.Default()
-	}
 	return &Pool{
 		queue:    queue,
 		bus:      bus,

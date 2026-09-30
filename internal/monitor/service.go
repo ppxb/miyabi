@@ -12,7 +12,6 @@ import (
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/subscription"
 	"github.com/ppxb/miyabi/internal/magnet"
-	"github.com/ppxb/miyabi/internal/syncx"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -93,7 +92,6 @@ type Service struct {
 	discover Discoverer
 	offline  OfflineAdder
 	tasks    *tasks.Service
-	checking syncx.ContextLock
 	wake     chan struct{}
 }
 
@@ -184,10 +182,7 @@ func (service *Service) List(ctx context.Context, kind string, page, limit int) 
 	if kind != "" {
 		query = query.Where(subscription.KindEQ(subscription.Kind(kind)))
 	}
-	query = query.Order(ent.Desc(subscription.FieldID))
-	if limit > 0 {
-		query = query.Offset((max(page, 1) - 1) * limit).Limit(limit)
-	}
+	query = query.Order(ent.Desc(subscription.FieldID)).Offset((page - 1) * limit).Limit(limit)
 	records, err := query.All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list subscriptions: %w", err)
@@ -205,10 +200,7 @@ func (service *Service) ActorFeed(ctx context.Context, actorSubscriptionID, page
 	} else {
 		query = query.Where(subscription.OriginIDNotNil())
 	}
-	if limit > 0 {
-		query = query.Offset((max(page, 1) - 1) * limit).Limit(limit)
-	}
-	records, err := query.All(ctx)
+	records, err := query.Offset((page - 1) * limit).Limit(limit).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list actor feed: %w", err)
 	}

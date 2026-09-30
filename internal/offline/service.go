@@ -7,7 +7,6 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/syncx"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -37,7 +36,6 @@ type Service struct {
 	// caller may have gone away but the mutation must be recorded.
 	submitTimeout time.Duration
 	operations    offlineOperations
-	syncing       syncx.ContextLock
 }
 
 // New creates a new offline download management service.
