@@ -24,10 +24,10 @@ func VideoFingerprint(files []pan.File) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// SnapshotMatches compares the movie's saved export with this source's current files.
+// SnapshotMatches checks the exported videos and generated poster revision.
 func SnapshotMatches(record *ent.Movie, source domain.LibrarySource) bool {
 	snapshot := record.MetadataSnapshot
-	if snapshot == nil || snapshot.AccountID != source.AccountID || snapshot.DirectoryID != source.Directory.ID {
+	if snapshot == nil || snapshot.AccountID != source.AccountID || snapshot.DirectoryID != source.Directory.ID || snapshot.PosterVersion != mediaimage.PosterVersion {
 		return false
 	}
 	files := make([]pan.File, 0, len(record.Edges.Files))

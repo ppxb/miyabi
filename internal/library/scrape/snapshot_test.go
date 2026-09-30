@@ -5,6 +5,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
+	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
@@ -34,6 +35,7 @@ func TestSnapshotMatches(t *testing.T) {
 	}{
 		{name: "unchanged", want: true},
 		{name: "missing snapshot", change: func(m *ent.Movie) { m.MetadataSnapshot = nil }},
+		{name: "outdated poster", change: func(m *ent.Movie) { m.MetadataSnapshot.PosterVersion = 0 }},
 		{name: "other account", change: func(m *ent.Movie) { m.MetadataSnapshot.AccountID = "other" }},
 		{name: "other root", change: func(m *ent.Movie) { m.MetadataSnapshot.DirectoryID = "other" }},
 		{name: "moved video", change: func(m *ent.Movie) { m.Edges.Files[0].ParentID = "other" }},
@@ -44,7 +46,7 @@ func TestSnapshotMatches(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			record := &ent.Movie{
-				MetadataSnapshot: &domain.MetadataSnapshot{AccountID: source.AccountID, DirectoryID: source.Directory.ID, Videos: VideoFingerprint([]pan.File{video})},
+				MetadataSnapshot: &domain.MetadataSnapshot{AccountID: source.AccountID, DirectoryID: source.Directory.ID, Videos: VideoFingerprint([]pan.File{video}), PosterVersion: mediaimage.PosterVersion},
 				Edges:            ent.MovieEdges{Files: []*ent.File{{FileID: video.ID, ParentID: video.ParentID, Name: video.Name, Sha1: video.SHA1, Size: video.Size}}},
 			}
 			if tc.change != nil {

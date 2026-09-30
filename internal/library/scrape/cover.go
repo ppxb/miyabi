@@ -20,11 +20,12 @@ import (
 // CoverPayload describes the input and intermediate state of a cover creation job.
 type CoverPayload struct {
 	MetadataPayload
-	ScrapeTaskID int                 `json:"scrape_task_id"`
-	Document     nfo.Movie           `json:"document"`
-	CoverURL     string              `json:"cover_url,omitempty"`
-	Artwork      *mediaimage.Artwork `json:"artwork,omitempty"`
-	Completed    bool                `json:"completed,omitempty"`
+	ScrapeTaskID  int                 `json:"scrape_task_id"`
+	Document      nfo.Movie           `json:"document"`
+	CoverURL      string              `json:"cover_url,omitempty"`
+	Artwork       *mediaimage.Artwork `json:"artwork,omitempty"`
+	PosterVersion int                 `json:"poster_version,omitempty"`
+	Completed     bool                `json:"completed,omitempty"`
 }
 
 // Cover processes the cover download, generation, and export of artwork and NFO sidecars.
@@ -76,6 +77,10 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 		if err := service.checkpointArtwork(ctx, job.ID, &input, media.Body); err != nil {
 			return nil, err
 		}
+	} else if input.PosterVersion != mediaimage.PosterVersion {
+		if err := service.checkpointArtwork(ctx, job.ID, &input, nil); err != nil {
+			return nil, err
+		}
 	}
 	// The unfinished task now retains these cache files during remote queries
 	// and local export, until the final transaction publishes movie references.
@@ -94,8 +99,9 @@ func (service *Service) processCover(ctx context.Context, job tasks.Job, input C
 		return nil, err
 	}
 	snapshot := &domain.MetadataSnapshot{
-		AccountID:   input.Source.AccountID,
-		DirectoryID: input.Source.Directory.ID,
+		AccountID:     input.Source.AccountID,
+		DirectoryID:   input.Source.Directory.ID,
+		PosterVersion: input.PosterVersion,
 	}
 	var videos []pan.File
 	for i, directory := range directories {
@@ -157,11 +163,18 @@ func (service *Service) checkpointArtwork(ctx context.Context, taskID int, input
 		return err
 	}
 	defer service.images.UnlockArtwork()
-	artwork, err := service.images.FromCover(body)
+	var artwork mediaimage.Artwork
+	var err error
+	if input.Artwork == nil {
+		artwork, err = service.images.FromCover(body)
+	} else {
+		artwork, err = service.images.RecropPoster(*input.Artwork)
+	}
 	if err != nil {
 		return err
 	}
 	input.Artwork = &artwork
+	input.PosterVersion = mediaimage.PosterVersion
 	encoded, err := tasks.EncodePayload(input)
 	if err != nil {
 		return err

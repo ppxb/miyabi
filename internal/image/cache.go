@@ -52,9 +52,30 @@ func (cache *Cache) FromCover(body []byte) (Artwork, error) {
 	if err != nil {
 		return Artwork{}, fmt.Errorf("decode cover image: %w", err)
 	}
-	size := cover.Bounds().Size()
-	poster := imaging.CropAnchor(cover, min(size.X, size.Y*2/3), size.Y, imaging.Right)
+	poster, err := cropPoster(cover)
+	if err != nil {
+		return Artwork{}, err
+	}
 	return cache.saveArtwork(poster, cover)
+}
+
+// RecropPoster upgrades a generated poster from the cached full cover, keeping
+// the original fanart and thumbnail bytes and URLs intact.
+func (cache *Cache) RecropPoster(artwork Artwork) (Artwork, error) {
+	body, err := cache.ReadURL(artwork.Fanart)
+	if err != nil {
+		return Artwork{}, fmt.Errorf("read cover for poster: %w", err)
+	}
+	cover, err := imaging.Decode(bytes.NewReader(body), imaging.AutoOrientation(true))
+	if err != nil {
+		return Artwork{}, fmt.Errorf("decode cover for poster: %w", err)
+	}
+	poster, err := cropPoster(cover)
+	if err != nil {
+		return Artwork{}, err
+	}
+	artwork.Poster, err = cache.save(poster)
+	return artwork, err
 }
 
 func (cache *Cache) Restore(poster, fanart []byte) (Artwork, error) {
@@ -72,7 +93,7 @@ func (cache *Cache) Restore(poster, fanart []byte) (Artwork, error) {
 func (cache *Cache) saveArtwork(poster, fanart stdimage.Image) (Artwork, error) {
 	var artwork Artwork
 	var err error
-	artwork.Poster, err = cache.save(imaging.Fit(poster, 800, 1200, imaging.Lanczos))
+	artwork.Poster, err = cache.save(poster)
 	if err != nil {
 		return Artwork{}, err
 	}

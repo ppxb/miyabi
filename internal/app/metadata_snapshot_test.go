@@ -8,6 +8,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	mediaimage "github.com/ppxb/miyabi/internal/image"
 	scrapePkg "github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -80,7 +81,7 @@ func TestCoverSnapshotAndRecoveryCheckpointCommitTogether(t *testing.T) {
 				t.Fatal(err)
 			}
 			record := fixture.store.Client.Movie.Query().OnlyX(ctx)
-			if record.MetadataSnapshot == nil || record.ScrapeStatus != movie.ScrapeStatusDone {
+			if record.MetadataSnapshot == nil || record.MetadataSnapshot.PosterVersion != mediaimage.PosterVersion || record.ScrapeStatus != movie.ScrapeStatusDone {
 				t.Fatalf("export was not committed: %+v", record)
 			}
 			saved := fixture.store.Client.Task.GetX(ctx, job.ID)

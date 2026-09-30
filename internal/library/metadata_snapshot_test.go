@@ -55,7 +55,7 @@ func newCompletedScanFixture(t *testing.T) *completedScanFixture {
 	}
 	snapshot := &domain.MetadataSnapshot{
 		AccountID: payload.Source.AccountID, DirectoryID: payload.Source.Directory.ID,
-		Videos: scrape.VideoFingerprint([]pan.File{videos[0].File}),
+		Videos: scrape.VideoFingerprint([]pan.File{videos[0].File}), PosterVersion: mediaimage.PosterVersion,
 	}
 	record = record.Update().SetMetadataSnapshot(snapshot).SaveX(ctx)
 	input := scrape.CoverPayload{
@@ -90,6 +90,10 @@ func TestRescanSchedulesOnlyChangedOrIncompleteMetadata(t *testing.T) {
 		jobs   int
 	}{
 		{name: "unchanged"},
+		{name: "outdated poster", jobs: 1, change: func(t *testing.T, f *completedScanFixture) {
+			f.snapshot.PosterVersion = 0
+			f.movie.Update().SetMetadataSnapshot(f.snapshot).ExecX(t.Context())
+		}},
 		{name: "movie without snapshot", jobs: 1, change: func(t *testing.T, f *completedScanFixture) {
 			f.movie.Update().ClearMetadataSnapshot().ExecX(t.Context())
 		}},

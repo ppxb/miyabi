@@ -54,7 +54,7 @@ func reconcileFixture(t *testing.T, completed, pending int) *scanRun {
 				builder.SetScrapeStatus(movie.ScrapeStatusDone).SetPoster(artwork.Poster).SetCover(artwork.Thumbnail).
 					SetFanarts([]string{artwork.Fanart}).SetMetadataSnapshot(&domain.MetadataSnapshot{
 					AccountID: payload.Source.AccountID, DirectoryID: payload.Source.Directory.ID,
-					Videos: scrape.VideoFingerprint([]pan.File{video}),
+					Videos: scrape.VideoFingerprint([]pan.File{video}), PosterVersion: mediaimage.PosterVersion,
 				})
 			}
 			film := builder.SaveX(t.Context())
@@ -255,7 +255,7 @@ func TestReconcileSnapshotUsesFilesRemainingAfterScopedCleanup(t *testing.T) {
 					retained = append(retained, video)
 				}
 			}
-			film.Update().SetMetadataSnapshot(&domain.MetadataSnapshot{AccountID: "account", DirectoryID: "root", Videos: scrape.VideoFingerprint(retained)}).ExecX(ctx)
+			film.Update().SetMetadataSnapshot(&domain.MetadataSnapshot{AccountID: "account", DirectoryID: "root", Videos: scrape.VideoFingerprint(retained), PosterVersion: mediaimage.PosterVersion}).ExecX(ctx)
 			if err := run.reconcile(ctx); err != nil {
 				t.Fatal(err)
 			}

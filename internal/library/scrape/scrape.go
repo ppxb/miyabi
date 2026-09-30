@@ -175,6 +175,9 @@ func (service *Service) Scrape(ctx context.Context, job tasks.Job) error {
 		cover.Document = MovieNFO(record)
 		artwork := MovieArtwork(record)
 		cover.Artwork = &artwork
+		if record.MetadataSnapshot != nil {
+			cover.PosterVersion = record.MetadataSnapshot.PosterVersion
+		}
 	} else {
 		if id := domain.ValueOrZero(record.JavdbID); id != "" {
 			cover.JavDBID = id
