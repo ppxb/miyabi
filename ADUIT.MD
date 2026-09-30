@@ -1,7 +1,7 @@
 # Miyabi 审计与复查清单
 
 > 初始审计：2026-09-27，基于提交 `f79e501`。
-> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：124 条待处理，1 条已完成、待复查。
+> 清单整理：2026-09-30；此前删除 52 条复查通过的完成项，并移除已失效的重复待办 144、185。当前保留 125 条：123 条待处理，2 条已完成、待复查。
 > 范围：后端 Go（不含 ent 生成代码）与前端；测试仅评估覆盖收益、重复和职责归属。
 > 原编号保留，不重新编号；完成项经复查确认后可移除，已提交的历史记录可通过 Git 追溯。第 37 项未完成的导出默认值清理保留在第 184 项。
 > 本轮核对现存已完成项的实现、调用链和回归覆盖，并非重新验证全部待办，也未重审此前移除的 62 条记录。保留的旧行号仅作定位线索；✔ 表示初审时复核过，不代表当前仍成立。
@@ -37,7 +37,10 @@
 - [x] **112.** `internal/api/auth.go:35/58/70/76/83/117`、`strm.go:64` 的 `gate == nil` 生产不可能成立；`rate_limiter.go:37/74/98` `limiter != nil` 与方法内 `l == nil` 双重防御；`accessLoginHandler` gate 为 nil 返回 `Success: true` 死路径 → 测试统一传 `NewAccessGateService("")`。
   - 已完成：确认 app 始终注入门禁对象、NewRouter 始终创建登录限流器，删除 handler/中间件/STRM 中的门禁空值分支及限流器调用方、方法内的重复空值检查。测试显式传入当前双参数构造函数 NewAccessGateService("", "")，不增加兜底对象或包装层；密码开关、限流阈值、Cookie/JWT 与 STRM 令牌规则不变。
   - 验证：api、app、strm、cmd/miyabi 包测试通过；扩展禁用门禁测试验证登录成功且不签发 Cookie，保留失败封禁、成功清零、代理 IP 防伪造、过期/篡改 JWT、SSE 和 STRM 授权覆盖。未进行浏览器或真实播放器联调。
-- [ ] **113.** `internal/drive/token.go:59-105` `withPanToken` 中 `current.closed` 检查 3 次、`ctx.Err()` 3 次 + `refreshTokens` 入口再一次 → 合并为最多 2 次的循环。
+- [x] **113.** `internal/drive/token.go:59-105` `withPanToken` 中 `current.closed` 检查 3 次、`ctx.Err()` 3 次 + `refreshTokens` 入口再一次 → 合并为最多 2 次的循环。
+  - 已完成：提前刷新和未授权后刷新共用一个循环、一个请求入口和一个刷新入口；最多执行两轮、刷新一次，每轮重新读取凭据并检查取消和关闭状态。提前刷新后仍未授权直接返回，网络错误不触发凭据刷新。
+  - 保留：refreshTokens 入口的取消检查用于阻止已取消请求启动独立共享刷新；singleflight、刷新前后凭据版本校验、持久化提交锁及关闭等待语义不变，不将独立刷新生命周期的检查当作冗余删除。
+  - 验证：新增提前刷新后再次未授权、请求取消后返回未授权的调用次数测试；drive、library（含 scan/scrape）、offline、app、api 包测试及 drive 的 go vet、git diff --check 通过，保留并发合并、旧令牌延迟拒绝、取消等待、账号/目录切换和关闭回归测试。未进行真实 115 联调或 race 检测。
 - [ ] **114.** `internal/drive/session.go` 每次调用执行 `sourceState` 3~4 次（显式一次、`withPanSourceToken` 内一次、重试一次、`checkSource` 一次）。
 - [ ] **115.** `internal/pan/client.go:48-50` `maxInFlight <= 0`、:127-129 `baseTransport == nil`、`SetRetryAfter` 中 `resp == nil` / `wait > 0`、:241-244 可直接 `return result, result.err()`；`auth.go:99-115` `Status == nil`、`case 0`、`default` 三处返回同值；`upload.go:44` 局部变量名 `init`。
 - [ ] **116.** `internal/strm/relay.go:35-37,78-80` `relay.drive == nil`、:65 `source.URL != ""`、`downloadURL != ""`（pan 层已保证）。

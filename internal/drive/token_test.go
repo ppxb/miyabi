@@ -205,6 +205,48 @@ func TestOnlyRetriesExplicitAuthorizationRejection(t *testing.T) {
 	}
 }
 
+func TestProactiveRefreshDoesNotRetryRejectedRequest(t *testing.T) {
+	d, client := mountedTestDrive(t)
+	expireTokens(d)
+	refreshed := testTokens("refreshed")
+	requests, refreshes := 0, 0
+	client.refreshToken = func(context.Context, string) (pan.Tokens, error) {
+		refreshes++
+		return refreshed, nil
+	}
+	_, err := withPanToken(t.Context(), d, d.snapshot(), func(token string) (struct{}, error) {
+		requests++
+		if token != refreshed.AccessToken {
+			t.Errorf("request used token before proactive refresh")
+		}
+		return struct{}{}, pan.ErrUnauthorized
+	})
+	if !errors.Is(err, pan.ErrUnauthorized) || requests != 1 || refreshes != 1 {
+		t.Fatalf("requests=%d refreshes=%d err=%v", requests, refreshes, err)
+	}
+}
+
+func TestCanceledAuthorizationRejectionDoesNotStartRefresh(t *testing.T) {
+	d, client := mountedTestDrive(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	var refreshes atomic.Int32
+	client.refreshToken = func(context.Context, string) (pan.Tokens, error) {
+		refreshes.Add(1)
+		return testTokens("unexpected"), nil
+	}
+	requests := 0
+	_, err := withPanToken(ctx, d, d.snapshot(), func(string) (struct{}, error) {
+		requests++
+		cancel()
+		return struct{}{}, pan.ErrUnauthorized
+	})
+	d.Close()
+	if !errors.Is(err, context.Canceled) || requests != 1 || refreshes.Load() != 0 {
+		t.Fatalf("requests=%d refreshes=%d err=%v", requests, refreshes.Load(), err)
+	}
+}
+
 func TestCloseFinishesRefreshBeforeStoppingQueuedRequests(t *testing.T) {
 	d, client := mountedTestDrive(t)
 	tokens := testTokens("refreshed")

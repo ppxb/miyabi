@@ -58,50 +58,32 @@ func (d *Drive) refreshTokens(ctx context.Context, expected snapshot) error {
 
 func withPanToken[T any](ctx context.Context, d *Drive, expected snapshot, request func(string) (T, error)) (T, error) {
 	var zero T
-	if err := ctx.Err(); err != nil {
-		return zero, err
-	}
-	current, err := d.credentials(expected)
-	if err != nil {
-		return zero, err
-	}
-	if current.closed {
-		return zero, context.Canceled
-	}
-	refreshed := !current.tokens.ExpiresAt.IsZero() && time.Until(current.tokens.ExpiresAt) <= 30*time.Second
-	if refreshed {
-		if err := d.refreshTokens(ctx, current); err != nil {
+	refreshed := false
+	for {
+		if err := ctx.Err(); err != nil {
 			return zero, err
 		}
-		current, err = d.credentials(expected)
-		if err != nil {
-			return zero, err
-		}
-	}
-	if current.closed {
-		return zero, context.Canceled
-	}
-	if err := ctx.Err(); err != nil {
-		return zero, err
-	}
-	value, err := request(current.tokens.AccessToken)
-	if errors.Is(err, pan.ErrUnauthorized) && !refreshed {
-		if err := d.refreshTokens(ctx, current); err != nil {
-			return zero, err
-		}
-		current, err = d.credentials(expected)
+		current, err := d.credentials(expected)
 		if err != nil {
 			return zero, err
 		}
 		if current.closed {
 			return zero, context.Canceled
 		}
-		if err := ctx.Err(); err != nil {
+		expiresSoon := !current.tokens.ExpiresAt.IsZero() && time.Until(current.tokens.ExpiresAt) <= 30*time.Second
+		if refreshed || !expiresSoon {
+			value, err := request(current.tokens.AccessToken)
+			if refreshed || !errors.Is(err, pan.ErrUnauthorized) {
+				return value, err
+			}
+		}
+		if err := d.refreshTokens(ctx, current); err != nil {
 			return zero, err
 		}
-		return request(current.tokens.AccessToken)
+		// The next iteration rechecks cancellation and credentials, then returns
+		// the request result even if the refreshed token is rejected.
+		refreshed = true
 	}
-	return value, err
 }
 
 func withPanSourceToken[T any](ctx context.Context, d *Drive, expected snapshot, request func(string) (T, error)) (T, error) {
