@@ -1,11 +1,6 @@
-import { CloudDownloadIcon, LoaderCircleIcon, Trash2Icon } from 'lucide-react'
+import { LoaderCircleIcon, Trash2Icon } from 'lucide-react'
 
-import { useMovieState } from '@/api/movie-states'
-import {
-  type SubscriptionItem,
-  useEnqueueSubscription,
-  useRemoveSubscription
-} from '@/api/subscriptions'
+import { type SubscriptionItem, useRemoveSubscription } from '@/api/subscriptions'
 import { MovieCard } from '@/components/movie'
 import { MovieStateBadge } from '@/components/movie/movie-badges'
 import { Badge } from '@/components/ui/badge'
@@ -48,12 +43,8 @@ export function SubscriptionCard({
   disabled: boolean
   onSelect: () => void
 }) {
-  const enqueue = useEnqueueSubscription()
   const remove = useRemoveSubscription()
-  const state = useMovieState({ id: item.target_id, code: item.code })
-  const busy = disabled || enqueue.isPending || remove.isPending
-  const canEnqueue =
-    isPendingSubscription(item) && !state.isPlaceholderData && state.state === 'not_in_library'
+  const busy = disabled || remove.isPending
 
   const card = (
     <MovieCard
@@ -78,43 +69,22 @@ export function SubscriptionCard({
         </>
       }
     >
-      {item.auto_download ? <Badge variant="outline">自动入库</Badge> : null}
-      {item.origin_id ? <Badge variant="outline">演员新作</Badge> : null}
       {!selecting ? (
-        <div className="flex w-full items-center justify-end gap-2">
-          {canEnqueue ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              disabled={busy}
-              onClick={event => {
-                event.preventDefault()
-                enqueue.mutate(item.id)
-              }}
-            >
-              {enqueue.isPending ? (
-                <LoaderCircleIcon className="animate-spin" />
-              ) : (
-                <CloudDownloadIcon />
-              )}
-              入库
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            disabled={busy}
-            onClick={event => {
-              event.preventDefault()
-              remove.mutate(item)
-            }}
-          >
-            {remove.isPending ? <LoaderCircleIcon className="animate-spin" /> : <Trash2Icon />}
-            取消订阅
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className="w-full"
+          disabled={busy}
+          onClick={event => {
+            event.preventDefault()
+            event.stopPropagation()
+            remove.mutate(item)
+          }}
+        >
+          {remove.isPending ? <LoaderCircleIcon className="animate-spin" /> : <Trash2Icon />}
+          取消订阅
+        </Button>
       ) : null}
     </MovieCard>
   )

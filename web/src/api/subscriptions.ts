@@ -162,22 +162,6 @@ export function useRemoveSubscription() {
   })
 }
 
-export function useEnqueueSubscription() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (id: number) => apiPost<SubscriptionItem>(`/api/subscriptions/${id}/enqueue`),
-    onSuccess: item => {
-      void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
-      if (item.status === 'added') {
-        toast.success(item.code, { description: '已加入 115 离线下载。' })
-      } else {
-        toast.info(item.code, { description: '暂无符合偏好的磁力，出现后会自动加入 115。' })
-      }
-    },
-    meta: { errorTitle: '入库失败' }
-  })
-}
-
 export function useBatchEnqueueSubscriptions() {
   const queryClient = useQueryClient()
   return useMutation({
