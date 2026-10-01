@@ -10,6 +10,8 @@ type TaskInfo struct {
 	Progress      int           `json:"progress"`
 	Error         *string       `json:"error,omitempty"`
 	CanRetry      bool          `json:"can_retry,omitempty"`
+	RetryAt       *time.Time    `json:"retry_at,omitempty"`
+	RetryCount    int           `json:"retry_count,omitempty"`
 	CreatedAt     time.Time     `json:"created_at"`
 	UpdatedAt     time.Time     `json:"updated_at"`
 	Source        LibrarySource `json:"source"`

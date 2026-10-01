@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
@@ -19,12 +20,13 @@ import (
 )
 
 type workflowSource struct {
-	id        string
-	complete  bool
-	body      []byte
-	failImage bool
-	queries   int
-	images    int
+	id         string
+	complete   bool
+	body       []byte
+	failImage  bool
+	imageError error
+	queries    int
+	images     int
 }
 
 func (s *workflowSource) ID() string {
@@ -51,10 +53,100 @@ func (s *workflowSource) Fetch(_ context.Context, ref domain.MovieRef) (domain.M
 }
 func (s *workflowSource) Media(context.Context, string) (domain.Media, error) {
 	s.images++
+	if s.imageError != nil {
+		return domain.Media{}, s.imageError
+	}
 	if s.failImage {
 		return domain.Media{}, errors.New("image unavailable")
 	}
 	return domain.Media{Body: s.body, ContentType: "image/jpeg"}, nil
+}
+
+func TestTransientImageFailureAutomaticallyResumesSavedMetadata(t *testing.T) {
+	f := newPipelineFixture(t)
+	source := &workflowSource{body: f.catalogue.cover, imageError: context.DeadlineExceeded}
+	meta, err := metadata.New(t.Context(), f.store.Client, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(meta.Close)
+	f.scrape = scrape.New(f.store.Client, f.driveService, meta, f.images, f.tasks, scrape.Dependencies{ExportManager: export.NewManager(export.Config{EmbyDir: f.embyDir, PublicURL: "http://127.0.0.1:8080"})})
+	t.Cleanup(f.scrape.Close)
+	f.tasks.Registry().Register(tasks.NewHandler(tasks.KindScrape, f.scrape.Scrape, f.scrape.Finished).WithRetry(domain.RetryDelay))
+	f.drive.addFile("101", "10", "ABP-123.mp4", 2<<30, []byte("video"))
+	if _, err := f.library.StartScan(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	jobs := f.runQueue(t)
+	job := f.store.Client.Task.GetX(t.Context(), jobs[1].ID)
+	payload, err := tasks.DecodePayload[scrape.Payload](job.Payload)
+	film := f.store.Client.Movie.Query().OnlyX(t.Context())
+	if err != nil || job.Status != task.StatusQueued || job.RetryAt == nil || job.RetryCount != 1 || !payload.MetadataReady || film.ScrapeStatus == movie.ScrapeStatusFailed {
+		t.Fatalf("transient failure became terminal: %+v %+v %v", job, film, err)
+	}
+	info, err := f.library.ListTasks(t.Context())
+	if err != nil || len(info) != 1 || info[0].Scan.MetadataRetrying != 1 || info[0].Scan.MetadataCompleted != 0 || info[0].CanRetry {
+		t.Fatalf("incorrect retry progress: %+v %v", info, err)
+	}
+	source.imageError = nil
+	job.Update().SetRetryAt(time.Now().Add(-time.Second)).ExecX(t.Context())
+	f.runQueue(t)
+	job = f.store.Client.Task.GetX(t.Context(), job.ID)
+	film = f.store.Client.Movie.GetX(t.Context(), film.ID)
+	if job.Status != task.StatusDone || job.RetryAt != nil || film.ScrapeStatus != movie.ScrapeStatusDone || source.queries != 1 {
+		t.Fatalf("automatic retry did not reuse metadata: %+v queries=%d", job, source.queries)
+	}
+	if _, err := os.Stat(filepath.Join(f.embyDir, "ABP", "ABP-123", "ABP-123.nfo")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestScrapeDoesNotExportFilesRemovedByConcurrentScan(t *testing.T) {
+	f := newPipelineFixture(t)
+	ctx := t.Context()
+	f.drive.addFile("101", "10", "ABP-123.mp4", 2<<30, []byte("video"))
+	f.addCatalogueMovie(fixtureDetail())
+	if _, err := f.library.StartScan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	scan, err := f.tasks.Queue().Claim(ctx, []tasks.Kind{tasks.KindScan})
+	if err != nil || scan == nil {
+		t.Fatalf("claim scan: %+v %v", scan, err)
+	}
+	if err := f.library.Scan(ctx, *scan); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.tasks.Queue().Finish(ctx, scan.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	job, err := f.tasks.Queue().Claim(ctx, []tasks.Kind{tasks.KindScrape})
+	if err != nil || job == nil {
+		t.Fatalf("claim scrape: %+v %v", job, err)
+	}
+	removed := false
+	f.store.Client.Task.Use(func(next ent.Mutator) ent.Mutator {
+		return ent.MutateFunc(func(ctx context.Context, mutation ent.Mutation) (ent.Value, error) {
+			m := mutation.(*ent.TaskMutation)
+			id, _ := m.ID()
+			progress, hasProgress := m.Progress()
+			if id == job.ID && hasProgress && progress == 100 && !removed {
+				// Reconcile can remove the file after remote position checks but
+				// before this worker acquires the export/source locks.
+				removed = true
+				if _, err := f.store.Client.File.Delete().Exec(ctx); err != nil {
+					return nil, err
+				}
+			}
+			return next.Mutate(ctx, mutation)
+		})
+	})
+	err = f.scrape.Scrape(ctx, *job)
+	if !removed || !domain.IsKind(err, domain.KindConflict) {
+		t.Fatalf("stale export was accepted: %v removed=%v", err, removed)
+	}
+	if _, err := os.Stat(filepath.Join(f.embyDir, "ABP", "ABP-123")); !os.IsNotExist(err) {
+		t.Fatalf("stale sidecars created: %v", err)
+	}
 }
 
 func TestJavDBMetadataAndArtworkCheckpointSurvivePublishFailure(t *testing.T) {

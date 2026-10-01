@@ -88,6 +88,11 @@ func (e *HTTPError) Error() string {
 
 func (e *HTTPError) DomainKind() domain.Kind { return domain.KindUpstream }
 
+func (e *HTTPError) Retryable() bool {
+	return (&domain.HTTPError{StatusCode: e.StatusCode}).Retryable()
+}
+func (e *HTTPError) RetryWait() time.Duration { return e.RetryAfter }
+
 func (e *HTTPError) PublicMessage() string {
 	if e.StatusCode == 429 {
 		return "JavDB 请求过于频繁，请稍后重试"

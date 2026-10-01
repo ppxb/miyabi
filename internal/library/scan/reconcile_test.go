@@ -113,7 +113,7 @@ func TestReconcilePagesPreparationWithoutHoldingDatabaseWriter(t *testing.T) {
 	seen := make(map[int]bool)
 	for _, job := range jobs {
 		input, err := tasks.DecodePayload[scrape.MetadataPayload](job.Payload)
-		if err != nil || input.ScanTaskID != run.taskID || seen[input.MovieID] || input.Source != run.payload.Source {
+		if err != nil || input.ScanTaskID != run.taskID || seen[input.MovieID] || input.Source != run.payload.Source || job.ResourceKey != fmt.Sprintf("movie:%d", input.MovieID) {
 			t.Fatalf("invalid or duplicate child: %+v %v", input, err)
 		}
 		seen[input.MovieID] = true

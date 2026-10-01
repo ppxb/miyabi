@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
-	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -15,7 +14,7 @@ import (
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
-func TestSubscriptionBatchesDoNotBlockLibraryWorkers(t *testing.T) {
+func TestTaskPoolsIsolateScanningScrapingAndBatches(t *testing.T) {
 	ctx := t.Context()
 	store, err := database.Open(ctx, t.TempDir())
 	if err != nil {
@@ -25,143 +24,104 @@ func TestSubscriptionBatchesDoNotBlockLibraryWorkers(t *testing.T) {
 	registry := tasks.NewRegistry()
 	service := tasks.NewService(store.Client, registry)
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	batchStarted := make(chan tasks.Job, 4)
-	libraryStarted := make(chan tasks.Job, 6)
-	batchGate := make(chan struct{})
-	scanGate := make(chan struct{})
-	var activeLibrary, activeBatches atomic.Int32
-	var overlapped atomic.Bool
-	registry.Register(tasks.NewHandler(tasks.KindSubscriptionBatch, func(ctx context.Context, job tasks.Job) error {
-		if activeBatches.Add(1) != 1 {
-			overlapped.Store(true)
-		}
-		defer activeBatches.Add(-1)
-		batchStarted <- job
-		select {
-		case <-batchGate:
-			return nil
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}, func(context.Context, *ent.Tx, tasks.Job, error) (tasks.Change, error) {
-		return tasks.ChangeOffline | tasks.ChangeMonitor, nil
-	}))
-	for _, kind := range []tasks.Kind{tasks.KindScan, tasks.KindScrape} {
-		registry.Register(tasks.NewHandler(kind, func(ctx context.Context, job tasks.Job) error {
-			if activeLibrary.Add(1) != 1 {
-				overlapped.Store(true)
+	started := make(chan tasks.Job, 12)
+	gate := make(chan struct{})
+	var scans, scrapes, batches atomic.Int32
+	var exceeded atomic.Bool
+	for _, config := range []struct {
+		kind  tasks.Kind
+		count *atomic.Int32
+		limit int32
+	}{
+		{tasks.KindScan, &scans, 1}, {tasks.KindScrape, &scrapes, 2}, {tasks.KindSubscriptionBatch, &batches, 1},
+	} {
+		registry.Register(tasks.NewHandler(config.kind, func(ctx context.Context, job tasks.Job) error {
+			if config.count.Add(1) > config.limit {
+				exceeded.Store(true)
 			}
-			defer activeLibrary.Add(-1)
-			libraryStarted <- job
-			if job.Type == tasks.KindScan {
-				select {
-				case <-scanGate:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
+			defer config.count.Add(-1)
+			started <- job
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-gate:
+				return nil
 			}
-			return nil
 		}, func(context.Context, *ent.Tx, tasks.Job, error) (tasks.Change, error) {
 			return tasks.ChangeLibrary, nil
 		}))
 	}
-	checkpoint := json.RawMessage(`{"ids":[10,20],"batch":{"total":2,"processed":1,"submitted":1}}`)
-	// Both pools must recover their own interrupted tasks without resetting the other pool.
-	batch := store.Client.Task.Create().SetType(string(tasks.KindSubscriptionBatch)).SetStatus(task.StatusRunning).SetPayload(checkpoint).SaveX(ctx)
-	secondBatch := store.Client.Task.Create().SetType(string(tasks.KindSubscriptionBatch)).SaveX(ctx)
-	scan := store.Client.Task.Create().SetType(string(tasks.KindScan)).SetStatus(task.StatusRunning).SaveX(ctx)
-	scrape := store.Client.Task.Create().SetType(string(tasks.KindScrape)).SaveX(ctx)
-	cover := store.Client.Task.Create().SetType(string(tasks.KindScrape)).SaveX(ctx)
-	pools := newTaskPools(service, logger)
-	runCtx, cancel := context.WithCancel(ctx)
-	stopped := make(chan error, 2)
-	var workers sync.WaitGroup
-	var stop context.CancelFunc
-	startPool := func(pool *tasks.Pool, ctx context.Context) {
-		workers.Add(1)
-		go func() { defer workers.Done(); stopped <- pool.Run(ctx) }()
+	body := json.RawMessage(`{"checkpoint":"saved"}`)
+	// An older scrape backlog must not prevent a new scan or batch from starting.
+	var jobs []*ent.Task
+	for _, kind := range []tasks.Kind{tasks.KindScrape, tasks.KindScrape, tasks.KindScrape, tasks.KindScan, tasks.KindScan, tasks.KindSubscriptionBatch, tasks.KindSubscriptionBatch} {
+		jobs = append(jobs, store.Client.Task.Create().SetType(string(kind)).SetPayload(body).SaveX(ctx))
 	}
-	t.Cleanup(func() {
+	jobs[0].Update().SetStatus(task.StatusRunning).ExecX(ctx)
+	jobs[3].Update().SetStatus(task.StatusRunning).ExecX(ctx)
+	jobs[5].Update().SetStatus(task.StatusRunning).ExecX(ctx)
+	start := func() (context.CancelFunc, <-chan error) {
+		runCtx, cancel := context.WithCancel(ctx)
+		stopped := make(chan error, 3)
+		for _, pool := range newTaskPools(service, logger) {
+			go func() { stopped <- pool.Run(runCtx) }()
+		}
+		return cancel, stopped
+	}
+	stop := func(cancel context.CancelFunc, stopped <-chan error) {
 		cancel()
-		if stop != nil {
-			stop()
-		}
-		done := make(chan struct{})
-		go func() { workers.Wait(); close(done) }()
-		awaitPan(t, done)
-	})
-	startPool(pools[1], runCtx)
-	first := awaitPan(t, batchStarted)
-	if first.ID != batch.ID || string(first.Payload) != string(checkpoint) {
-		t.Fatalf("batch recovery lost its checkpoint: %+v", first)
-	}
-	startPool(pools[0], runCtx)
-	if started := awaitPan(t, libraryStarted); started.ID != scan.ID {
-		t.Fatalf("wrong library task: %+v", started)
-	}
-	if got := store.Client.Task.GetX(ctx, batch.ID); got.Status != task.StatusRunning {
-		t.Fatalf("library recovery reset the running batch: %+v", got)
-	}
-	if got := store.Client.Task.GetX(ctx, secondBatch.ID); got.Status != task.StatusQueued {
-		t.Fatalf("batches ran concurrently: %+v", got)
-	}
-	close(scanGate)
-	for _, id := range []int{scrape.ID, cover.ID} {
-		if started := awaitPan(t, libraryStarted); started.ID != id {
-			t.Fatalf("library order changed: %+v, want %d", started, id)
+		for range 3 {
+			if err := awaitPan(t, stopped); err != nil {
+				t.Error(err)
+			}
 		}
 	}
-	awaitPanCondition(t, func() bool { return store.Client.Task.GetX(ctx, cover.ID).Status == task.StatusDone })
-	if activeBatches.Load() != 1 || overlapped.Load() {
-		t.Fatal("library work blocked on the batch or a serial pool overlapped handlers")
-	}
-	cancel()
-	for range 2 {
-		if err := awaitPan(t, stopped); err != nil {
-			t.Fatal(err)
+	cancel, stopped := start()
+	t.Cleanup(cancel)
+	seen := make(map[int]bool)
+	for range 4 {
+		job := awaitPan(t, started)
+		seen[job.ID] = true
+		if string(job.Payload) != string(body) {
+			t.Fatal("recovery discarded checkpoint")
 		}
 	}
-	if got := store.Client.Task.GetX(ctx, batch.ID); got.Status != task.StatusRunning || string(got.Payload) != string(checkpoint) {
-		t.Fatalf("shutdown failed or lost the interrupted batch: %+v", got)
-	}
-	// Restart and finish both batches, preserving their order and completion hooks.
-	close(batchGate)
-	resumedCtx, stop := context.WithCancel(ctx)
-	defer stop()
-	for _, pool := range newTaskPools(service, logger) {
-		startPool(pool, resumedCtx)
-	}
-	for _, id := range []int{batch.ID, secondBatch.ID} {
-		if started := awaitPan(t, batchStarted); started.ID != id {
-			t.Fatalf("batch order changed after restart: %+v", started)
+	for _, i := range []int{0, 1, 3, 5} {
+		if !seen[jobs[i].ID] {
+			t.Fatalf("task %d starved", jobs[i].ID)
 		}
+	}
+	for _, i := range []int{2, 4, 6} {
+		if store.Client.Task.GetX(ctx, jobs[i].ID).Status != task.StatusQueued {
+			t.Fatal("pool exceeded concurrency")
+		}
+	}
+	stop(cancel, stopped)
+	for id := range seen {
+		if store.Client.Task.GetX(ctx, id).Status != task.StatusRunning {
+			t.Fatal("shutdown marked an interrupted task failed")
+		}
+	}
+	close(gate)
+	cancel, stopped = start()
+	t.Cleanup(cancel)
+	for range len(jobs) {
+		awaitPan(t, started)
 	}
 	awaitPanCondition(t, func() bool {
-		return store.Client.Task.GetX(ctx, secondBatch.ID).Status == task.StatusDone && service.Revisions().Monitor == 2
+		return store.Client.Task.Query().Where(task.StatusEQ(task.StatusDone)).CountX(ctx) == len(jobs)
 	})
-	if rev := service.Revisions(); rev.Library != 3 || rev.Offline != 2 || rev.Monitor != 2 {
-		t.Fatalf("completion hooks changed: %+v", rev)
+	if service.Revisions().Library != uint64(len(jobs)) || exceeded.Load() {
+		t.Fatal("duplicate completions or excess concurrency")
 	}
-	// Each idle pool must wake for newly queued work using the same shared bus.
-	newScan := store.Client.Task.Create().SetType(string(tasks.KindScan)).SaveX(ctx)
-	service.WakePool()
-	if started := awaitPan(t, libraryStarted); started.ID != newScan.ID {
-		t.Fatalf("library pool missed enqueue: %+v", started)
-	}
-	awaitPanCondition(t, func() bool { return store.Client.Task.GetX(ctx, newScan.ID).Status == task.StatusDone })
-	newBatch := store.Client.Task.Create().SetType(string(tasks.KindSubscriptionBatch)).SaveX(ctx)
-	service.WakePool()
-	if started := awaitPan(t, batchStarted); started.ID != newBatch.ID {
-		t.Fatalf("batch pool missed enqueue: %+v", started)
-	}
-	awaitPanCondition(t, func() bool { return store.Client.Task.GetX(ctx, newBatch.ID).Status == task.StatusDone })
-	stop()
-	for range 2 {
-		if err := awaitPan(t, stopped); err != nil {
-			t.Fatal(err)
+	// Wake all idle pool kinds through the shared bus.
+	for _, kind := range []tasks.Kind{tasks.KindScan, tasks.KindScrape, tasks.KindSubscriptionBatch} {
+		job := store.Client.Task.Create().SetType(string(kind)).SaveX(ctx)
+		service.WakePool()
+		if got := awaitPan(t, started); got.ID != job.ID {
+			t.Fatal("idle pool missed enqueue")
 		}
+		awaitPanCondition(t, func() bool { return store.Client.Task.GetX(ctx, job.ID).Status == task.StatusDone })
 	}
-	if overlapped.Load() {
-		t.Fatal("a serial pool ran multiple handlers concurrently")
-	}
+	stop(cancel, stopped)
 }

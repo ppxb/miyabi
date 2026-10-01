@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
@@ -16,21 +17,59 @@ import (
 )
 
 type client struct {
-	http    *http.Client
-	limiter *rate.Limiter
-	base    string
-	cookie  string
-	hosts   []string
+	http          *http.Client
+	limiter       *rate.Limiter
+	base          string
+	cookie        string
+	hosts         []string
+	cooldownMu    sync.Mutex
+	cooldownUntil time.Time
+	cooldownError error
 }
 
 func (c *client) Close() { c.http.CloseIdleConnections() }
+
+func (c *client) cooldown() error {
+	c.cooldownMu.Lock()
+	defer c.cooldownMu.Unlock()
+	if wait := time.Until(c.cooldownUntil); wait > 0 {
+		return &domain.RetryError{Cause: c.cooldownError, After: wait}
+	}
+	return nil
+}
+
+func (c *client) admit(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := c.cooldown(); err != nil {
+		return err
+	}
+	if err := c.limiter.Wait(ctx); err != nil {
+		return err
+	}
+	return c.cooldown()
+}
+
+func (c *client) failed(err error) error {
+	if wait, retry := domain.RetryDelay(err); retry {
+		c.cooldownMu.Lock()
+		until := time.Now().Add(max(wait, 15*time.Second))
+		if until.After(c.cooldownUntil) {
+			c.cooldownUntil, c.cooldownError = until, err
+		}
+		defer c.cooldownMu.Unlock()
+		return &domain.RetryError{Cause: err, After: time.Until(c.cooldownUntil)}
+	}
+	return err
+}
 
 func newClient(proxy *netx.ProxyManager, base, cookie string, hosts ...string) client {
 	return client{http: netx.NewSafeDownloadClient(proxy, 20*time.Second), limiter: rate.NewLimiter(2, 2), base: base, cookie: cookie, hosts: hosts}
 }
 
 func (c *client) get(ctx context.Context, target string) ([]byte, error) {
-	if err := c.limiter.Wait(ctx); err != nil {
+	if err := c.admit(ctx); err != nil {
 		return nil, err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
@@ -44,18 +83,18 @@ func (c *client) get(ctx context.Context, target string) ([]byte, error) {
 	}
 	response, err := c.http.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, c.failed(err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusNotFound {
 		return nil, metadata.ErrNotFound
 	}
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d", response.StatusCode)
+		return nil, c.failed(&domain.HTTPError{Source: "metadata", StatusCode: response.StatusCode, RetryAfter: domain.ParseRetryAfter(response.Header.Get("Retry-After"), time.Now())})
 	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, 16<<20+1))
 	if err != nil {
-		return nil, err
+		return nil, c.failed(err)
 	}
 	if len(body) > 16<<20 {
 		return nil, fmt.Errorf("response exceeds 16 MiB")

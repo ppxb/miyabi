@@ -27,6 +27,12 @@ const (
 	FieldPayload = "payload"
 	// FieldProgress holds the string denoting the progress field in the database.
 	FieldProgress = "progress"
+	// FieldRetryCount holds the string denoting the retry_count field in the database.
+	FieldRetryCount = "retry_count"
+	// FieldRetryAt holds the string denoting the retry_at field in the database.
+	FieldRetryAt = "retry_at"
+	// FieldResourceKey holds the string denoting the resource_key field in the database.
+	FieldResourceKey = "resource_key"
 	// FieldError holds the string denoting the error field in the database.
 	FieldError = "error"
 	// Table holds the table name of the task in the database.
@@ -42,6 +48,9 @@ var Columns = []string{
 	FieldStatus,
 	FieldPayload,
 	FieldProgress,
+	FieldRetryCount,
+	FieldRetryAt,
+	FieldResourceKey,
 	FieldError,
 }
 
@@ -70,6 +79,12 @@ var (
 	DefaultProgress int
 	// ProgressValidator is a validator for the "progress" field. It is called by the builders before save.
 	ProgressValidator func(int) error
+	// DefaultRetryCount holds the default value on creation for the "retry_count" field.
+	DefaultRetryCount int
+	// RetryCountValidator is a validator for the "retry_count" field. It is called by the builders before save.
+	RetryCountValidator func(int) error
+	// DefaultResourceKey holds the default value on creation for the "resource_key" field.
+	DefaultResourceKey string
 )
 
 // Status defines the type for the "status" enum field.
@@ -131,6 +146,21 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByProgress orders the results by the progress field.
 func ByProgress(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProgress, opts...).ToFunc()
+}
+
+// ByRetryCount orders the results by the retry_count field.
+func ByRetryCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRetryCount, opts...).ToFunc()
+}
+
+// ByRetryAt orders the results by the retry_at field.
+func ByRetryAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRetryAt, opts...).ToFunc()
+}
+
+// ByResourceKey orders the results by the resource_key field.
+func ByResourceKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldResourceKey, opts...).ToFunc()
 }
 
 // ByError orders the results by the error field.

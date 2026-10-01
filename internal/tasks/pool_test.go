@@ -23,6 +23,10 @@ type mockPoolQueue struct {
 	recover        func(context.Context) error
 }
 
+func (m *mockPoolQueue) NextRetry(context.Context, []Kind) (time.Time, error) {
+	return time.Time{}, nil
+}
+
 func (m *mockPoolQueue) Recover(ctx context.Context, kinds []Kind) error {
 	if m.recover != nil {
 		return m.recover(ctx)

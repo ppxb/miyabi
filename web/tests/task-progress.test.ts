@@ -6,6 +6,7 @@ import { test, vi } from 'vitest'
 
 import type { ScanTask } from '@/api/tasks'
 import { taskProgressState, type TaskStage } from '@/features/tasks/task-progress-state'
+import { scanStatus } from '@/features/tasks/scan-status'
 import { notifyOfflineTask, notifyScanTask } from '@/features/tasks/task-toast'
 import { offlineSubmission } from './fixtures'
 
@@ -95,5 +96,18 @@ test('metadata and artwork share batch progress in scan and offline notification
       assert.ok(html.includes(`${completed} / 4 部`))
       previous = value
     }
+    scan.status = 'queued'
+    scan.scan.metadata_retrying = 1
+    assert.equal(scanStatus(scan), '等待自动重试')
+    if (isOffline) notifyOfflineTask(offline, { scan })
+    else notifyScanTask(scan)
+    const options = vi.mocked(toast.info).mock.lastCall?.[1]
+    assert.ok(isValidElement(options?.description))
+    const html = renderToStaticMarkup(options.description)
+    assert.ok(html.includes('等待自动重试'))
+    assert.ok(html.includes('1 部等待重试'))
+    assert.equal(Number(html.match(/aria-valuenow="([^"]+)"/)?.[1]), previous)
+    scan.status = 'running'
+    scan.scan.metadata_retrying = 0
   }
 })

@@ -74,6 +74,21 @@ func Progress(v int) predicate.Task {
 	return predicate.Task(sql.FieldEQ(FieldProgress, v))
 }
 
+// RetryCount applies equality check predicate on the "retry_count" field. It's identical to RetryCountEQ.
+func RetryCount(v int) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldRetryCount, v))
+}
+
+// RetryAt applies equality check predicate on the "retry_at" field. It's identical to RetryAtEQ.
+func RetryAt(v time.Time) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldRetryAt, v))
+}
+
+// ResourceKey applies equality check predicate on the "resource_key" field. It's identical to ResourceKeyEQ.
+func ResourceKey(v string) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldResourceKey, v))
+}
+
 // Error applies equality check predicate on the "error" field. It's identical to ErrorEQ.
 func Error(v string) predicate.Task {
 	return predicate.Task(sql.FieldEQ(FieldError, v))
@@ -282,6 +297,161 @@ func ProgressLT(v int) predicate.Task {
 // ProgressLTE applies the LTE predicate on the "progress" field.
 func ProgressLTE(v int) predicate.Task {
 	return predicate.Task(sql.FieldLTE(FieldProgress, v))
+}
+
+// RetryCountEQ applies the EQ predicate on the "retry_count" field.
+func RetryCountEQ(v int) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldRetryCount, v))
+}
+
+// RetryCountNEQ applies the NEQ predicate on the "retry_count" field.
+func RetryCountNEQ(v int) predicate.Task {
+	return predicate.Task(sql.FieldNEQ(FieldRetryCount, v))
+}
+
+// RetryCountIn applies the In predicate on the "retry_count" field.
+func RetryCountIn(vs ...int) predicate.Task {
+	return predicate.Task(sql.FieldIn(FieldRetryCount, vs...))
+}
+
+// RetryCountNotIn applies the NotIn predicate on the "retry_count" field.
+func RetryCountNotIn(vs ...int) predicate.Task {
+	return predicate.Task(sql.FieldNotIn(FieldRetryCount, vs...))
+}
+
+// RetryCountGT applies the GT predicate on the "retry_count" field.
+func RetryCountGT(v int) predicate.Task {
+	return predicate.Task(sql.FieldGT(FieldRetryCount, v))
+}
+
+// RetryCountGTE applies the GTE predicate on the "retry_count" field.
+func RetryCountGTE(v int) predicate.Task {
+	return predicate.Task(sql.FieldGTE(FieldRetryCount, v))
+}
+
+// RetryCountLT applies the LT predicate on the "retry_count" field.
+func RetryCountLT(v int) predicate.Task {
+	return predicate.Task(sql.FieldLT(FieldRetryCount, v))
+}
+
+// RetryCountLTE applies the LTE predicate on the "retry_count" field.
+func RetryCountLTE(v int) predicate.Task {
+	return predicate.Task(sql.FieldLTE(FieldRetryCount, v))
+}
+
+// RetryAtEQ applies the EQ predicate on the "retry_at" field.
+func RetryAtEQ(v time.Time) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldRetryAt, v))
+}
+
+// RetryAtNEQ applies the NEQ predicate on the "retry_at" field.
+func RetryAtNEQ(v time.Time) predicate.Task {
+	return predicate.Task(sql.FieldNEQ(FieldRetryAt, v))
+}
+
+// RetryAtIn applies the In predicate on the "retry_at" field.
+func RetryAtIn(vs ...time.Time) predicate.Task {
+	return predicate.Task(sql.FieldIn(FieldRetryAt, vs...))
+}
+
+// RetryAtNotIn applies the NotIn predicate on the "retry_at" field.
+func RetryAtNotIn(vs ...time.Time) predicate.Task {
+	return predicate.Task(sql.FieldNotIn(FieldRetryAt, vs...))
+}
+
+// RetryAtGT applies the GT predicate on the "retry_at" field.
+func RetryAtGT(v time.Time) predicate.Task {
+	return predicate.Task(sql.FieldGT(FieldRetryAt, v))
+}
+
+// RetryAtGTE applies the GTE predicate on the "retry_at" field.
+func RetryAtGTE(v time.Time) predicate.Task {
+	return predicate.Task(sql.FieldGTE(FieldRetryAt, v))
+}
+
+// RetryAtLT applies the LT predicate on the "retry_at" field.
+func RetryAtLT(v time.Time) predicate.Task {
+	return predicate.Task(sql.FieldLT(FieldRetryAt, v))
+}
+
+// RetryAtLTE applies the LTE predicate on the "retry_at" field.
+func RetryAtLTE(v time.Time) predicate.Task {
+	return predicate.Task(sql.FieldLTE(FieldRetryAt, v))
+}
+
+// RetryAtIsNil applies the IsNil predicate on the "retry_at" field.
+func RetryAtIsNil() predicate.Task {
+	return predicate.Task(sql.FieldIsNull(FieldRetryAt))
+}
+
+// RetryAtNotNil applies the NotNil predicate on the "retry_at" field.
+func RetryAtNotNil() predicate.Task {
+	return predicate.Task(sql.FieldNotNull(FieldRetryAt))
+}
+
+// ResourceKeyEQ applies the EQ predicate on the "resource_key" field.
+func ResourceKeyEQ(v string) predicate.Task {
+	return predicate.Task(sql.FieldEQ(FieldResourceKey, v))
+}
+
+// ResourceKeyNEQ applies the NEQ predicate on the "resource_key" field.
+func ResourceKeyNEQ(v string) predicate.Task {
+	return predicate.Task(sql.FieldNEQ(FieldResourceKey, v))
+}
+
+// ResourceKeyIn applies the In predicate on the "resource_key" field.
+func ResourceKeyIn(vs ...string) predicate.Task {
+	return predicate.Task(sql.FieldIn(FieldResourceKey, vs...))
+}
+
+// ResourceKeyNotIn applies the NotIn predicate on the "resource_key" field.
+func ResourceKeyNotIn(vs ...string) predicate.Task {
+	return predicate.Task(sql.FieldNotIn(FieldResourceKey, vs...))
+}
+
+// ResourceKeyGT applies the GT predicate on the "resource_key" field.
+func ResourceKeyGT(v string) predicate.Task {
+	return predicate.Task(sql.FieldGT(FieldResourceKey, v))
+}
+
+// ResourceKeyGTE applies the GTE predicate on the "resource_key" field.
+func ResourceKeyGTE(v string) predicate.Task {
+	return predicate.Task(sql.FieldGTE(FieldResourceKey, v))
+}
+
+// ResourceKeyLT applies the LT predicate on the "resource_key" field.
+func ResourceKeyLT(v string) predicate.Task {
+	return predicate.Task(sql.FieldLT(FieldResourceKey, v))
+}
+
+// ResourceKeyLTE applies the LTE predicate on the "resource_key" field.
+func ResourceKeyLTE(v string) predicate.Task {
+	return predicate.Task(sql.FieldLTE(FieldResourceKey, v))
+}
+
+// ResourceKeyContains applies the Contains predicate on the "resource_key" field.
+func ResourceKeyContains(v string) predicate.Task {
+	return predicate.Task(sql.FieldContains(FieldResourceKey, v))
+}
+
+// ResourceKeyHasPrefix applies the HasPrefix predicate on the "resource_key" field.
+func ResourceKeyHasPrefix(v string) predicate.Task {
+	return predicate.Task(sql.FieldHasPrefix(FieldResourceKey, v))
+}
+
+// ResourceKeyHasSuffix applies the HasSuffix predicate on the "resource_key" field.
+func ResourceKeyHasSuffix(v string) predicate.Task {
+	return predicate.Task(sql.FieldHasSuffix(FieldResourceKey, v))
+}
+
+// ResourceKeyEqualFold applies the EqualFold predicate on the "resource_key" field.
+func ResourceKeyEqualFold(v string) predicate.Task {
+	return predicate.Task(sql.FieldEqualFold(FieldResourceKey, v))
+}
+
+// ResourceKeyContainsFold applies the ContainsFold predicate on the "resource_key" field.
+func ResourceKeyContainsFold(v string) predicate.Task {
+	return predicate.Task(sql.FieldContainsFold(FieldResourceKey, v))
 }
 
 // ErrorEQ applies the EQ predicate on the "error" field.

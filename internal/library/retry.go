@@ -52,12 +52,12 @@ func (s *Service) RetryTask(ctx context.Context, id int) (domain.TaskInfo, error
 		count, err := tx.Task.Update().Where(task.TypeEQ(string(tasks.KindScrape)),
 			task.StatusEQ(task.StatusFailed), func(selector *sql.Selector) {
 				selector.Where(sqljson.ValueEQ(task.FieldPayload, id, sqljson.Path("scan_task_id")))
-			}).SetStatus(task.StatusQueued).SetProgress(0).ClearError().Save(ctx)
+			}).SetStatus(task.StatusQueued).SetProgress(0).SetRetryCount(0).ClearRetryAt().ClearError().Save(ctx)
 		if err != nil {
 			return err
 		}
 		if current.Status == task.StatusFailed {
-			return tx.Task.UpdateOneID(id).SetStatus(task.StatusQueued).SetProgress(0).ClearError().Exec(ctx)
+			return tx.Task.UpdateOneID(id).SetStatus(task.StatusQueued).SetProgress(0).SetRetryCount(0).ClearRetryAt().ClearError().Exec(ctx)
 		}
 		if count == 0 {
 			return domain.E(domain.KindConflict, "没有可重试的失败项", nil)

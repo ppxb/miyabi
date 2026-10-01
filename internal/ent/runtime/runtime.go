@@ -425,6 +425,16 @@ func init() {
 	task.DefaultProgress = taskDescProgress.Default.(int)
 	// task.ProgressValidator is a validator for the "progress" field. It is called by the builders before save.
 	task.ProgressValidator = taskDescProgress.Validators[0].(func(int) error)
+	// taskDescRetryCount is the schema descriptor for retry_count field.
+	taskDescRetryCount := taskFields[4].Descriptor()
+	// task.DefaultRetryCount holds the default value on creation for the retry_count field.
+	task.DefaultRetryCount = taskDescRetryCount.Default.(int)
+	// task.RetryCountValidator is a validator for the "retry_count" field. It is called by the builders before save.
+	task.RetryCountValidator = taskDescRetryCount.Validators[0].(func(int) error)
+	// taskDescResourceKey is the schema descriptor for resource_key field.
+	taskDescResourceKey := taskFields[6].Descriptor()
+	// task.DefaultResourceKey holds the default value on creation for the resource_key field.
+	task.DefaultResourceKey = taskDescResourceKey.Default.(string)
 	viewedmovieFields := schema.ViewedMovie{}.Fields()
 	_ = viewedmovieFields
 	// viewedmovieDescJavdbID is the schema descriptor for javdb_id field.

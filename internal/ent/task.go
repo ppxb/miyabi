@@ -31,6 +31,12 @@ type Task struct {
 	Payload jsontext.Value `json:"payload,omitempty"`
 	// Progress holds the value of the "progress" field.
 	Progress int `json:"progress,omitempty"`
+	// RetryCount holds the value of the "retry_count" field.
+	RetryCount int `json:"retry_count,omitempty"`
+	// RetryAt holds the value of the "retry_at" field.
+	RetryAt *time.Time `json:"retry_at,omitempty"`
+	// ResourceKey holds the value of the "resource_key" field.
+	ResourceKey string `json:"resource_key,omitempty"`
 	// Error holds the value of the "error" field.
 	Error        *string `json:"error,omitempty"`
 	selectValues sql.SelectValues
@@ -43,11 +49,11 @@ func (*Task) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case task.FieldPayload:
 			values[i] = new([]byte)
-		case task.FieldID, task.FieldProgress:
+		case task.FieldID, task.FieldProgress, task.FieldRetryCount:
 			values[i] = new(sql.NullInt64)
-		case task.FieldType, task.FieldStatus, task.FieldError:
+		case task.FieldType, task.FieldStatus, task.FieldResourceKey, task.FieldError:
 			values[i] = new(sql.NullString)
-		case task.FieldCreatedAt, task.FieldUpdatedAt:
+		case task.FieldCreatedAt, task.FieldUpdatedAt, task.FieldRetryAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -107,6 +113,25 @@ func (_m *Task) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field progress", values[i])
 			} else if value.Valid {
 				_m.Progress = int(value.Int64)
+			}
+		case task.FieldRetryCount:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field retry_count", values[i])
+			} else if value.Valid {
+				_m.RetryCount = int(value.Int64)
+			}
+		case task.FieldRetryAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field retry_at", values[i])
+			} else if value.Valid {
+				_m.RetryAt = new(time.Time)
+				*_m.RetryAt = value.Time
+			}
+		case task.FieldResourceKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field resource_key", values[i])
+			} else if value.Valid {
+				_m.ResourceKey = value.String
 			}
 		case task.FieldError:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -168,6 +193,17 @@ func (_m *Task) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("progress=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Progress))
+	builder.WriteString(", ")
+	builder.WriteString("retry_count=")
+	builder.WriteString(fmt.Sprintf("%v", _m.RetryCount))
+	builder.WriteString(", ")
+	if v := _m.RetryAt; v != nil {
+		builder.WriteString("retry_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("resource_key=")
+	builder.WriteString(_m.ResourceKey)
 	builder.WriteString(", ")
 	if v := _m.Error; v != nil {
 		builder.WriteString("error=")

@@ -18,6 +18,8 @@ type TaskBase = {
   progress: number
   error?: string
   can_retry?: boolean
+  retry_at?: string
+  retry_count?: number
   created_at: string
   updated_at: string
 }
@@ -40,6 +42,8 @@ export type ScanTask = TaskBase & {
     removed_movies: number
     metadata_total: number
     metadata_completed: number
+    metadata_retrying?: number
+    metadata_failed?: number
   }
 }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/ppxb/miyabi/internal/catalogue"
 	"github.com/ppxb/miyabi/internal/config"
 	"github.com/ppxb/miyabi/internal/database"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/emby"
 	"github.com/ppxb/miyabi/internal/export"
@@ -170,8 +171,8 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		embySvc.StartStartupSTRMRewrite()
 	}
 
-	taskRegistry.Register(tasks.NewHandler(tasks.KindScan, libSvc.Scan, libSvc.Finished))
-	taskRegistry.Register(tasks.NewHandler(tasks.KindScrape, scrapeSvc.Scrape, scrapeSvc.Finished))
+	taskRegistry.Register(tasks.NewHandler(tasks.KindScan, libSvc.Scan, libSvc.Finished).WithRetry(domain.RetryDelay))
+	taskRegistry.Register(tasks.NewHandler(tasks.KindScrape, scrapeSvc.Scrape, scrapeSvc.Finished).WithRetry(domain.RetryDelay))
 	taskRegistry.Register(tasks.NewHandler(tasks.KindSubscriptionBatch, monitorSvc.BatchHandler, monitorSvc.BatchFinished))
 
 	pools := newTaskPools(taskSvc, logger)

@@ -28,6 +28,10 @@ func (Task) Fields() []ent.Field {
 		field.Int("progress").
 			Range(0, 100).
 			Default(0),
+		field.Int("retry_count").NonNegative().Default(0),
+		field.Time("retry_at").Optional().Nillable(),
+		// Jobs sharing a resource run in order, including delayed retries.
+		field.String("resource_key").Default(""),
 		field.String("error").
 			Optional().
 			Nillable(),
@@ -37,6 +41,8 @@ func (Task) Fields() []ent.Field {
 func (Task) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("type", "status"),
+		index.Fields("type", "status", "retry_at"),
+		index.Fields("resource_key", "status"),
 		// Keep history across statuses ordered by SQLite's implicit row ID.
 		index.Fields("type"),
 	}

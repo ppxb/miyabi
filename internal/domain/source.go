@@ -31,4 +31,6 @@ type ScanProgress struct {
 	RemovedMovies         int    `json:"removed_movies"`
 	MetadataTotal         int    `json:"metadata_total"`
 	MetadataCompleted     int    `json:"metadata_completed"`
+	MetadataRetrying      int    `json:"metadata_retrying,omitempty"`
+	MetadataFailed        int    `json:"metadata_failed,omitempty"`
 }

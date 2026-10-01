@@ -174,7 +174,8 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 			if err != nil {
 				return err
 			}
-			builders = append(builders, tx.Task.Create().SetType(tasks.KindScrape.String()).SetPayload(encoded))
+			builders = append(builders, tx.Task.Create().SetType(tasks.KindScrape.String()).SetPayload(encoded).
+				SetResourceKey(fmt.Sprintf("movie:%d", record.ID)))
 		}
 		if len(builders) > 0 {
 			if err := tx.Task.CreateBulk(builders...).Exec(ctx); err != nil {

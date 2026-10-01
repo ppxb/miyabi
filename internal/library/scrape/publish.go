@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/export"
 	"github.com/ppxb/miyabi/internal/nfo"
@@ -69,26 +71,41 @@ func (service *Service) publishMovie(ctx context.Context, sess drive.Session, jo
 		return nil, err
 	}
 	if err := service.exportMgr.WithConfig(func(cfg export.Config) error {
-		if err := ExportEmbyMedia(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken, input.Code, input.Document, videos, poster, fanart); err != nil {
-			return err
-		}
-		return sess.Commit(ctx, func(tx *ent.Tx) error {
-			update := tx.Movie.UpdateOneID(input.MovieID).SetCode(input.Code).SetMetadata(&input.Document).
-				SetCover(artwork.Thumbnail).SetPoster(artwork.Poster).SetFanarts([]string{artwork.Fanart}).
-				SetScrapeStatus(movie.ScrapeStatusDone).SetMetadataSnapshot(snapshot)
-			if id := input.Document.JavDBID(); id != "" {
-				update.SetJavdbID(id)
-			}
-			if err := update.Exec(ctx); err != nil {
+		return sess.WithSource(ctx, func() error {
+			// A scan may have reconciled the index while artwork was downloading.
+			// Check again under the source/export locks before creating any sidecars.
+			files, err := service.db.File.Query().Where(database.LibraryFiles(input.Source), file.MovieIDEQ(input.MovieID)).All(ctx)
+			if err != nil {
 				return err
 			}
-			if err := tx.Task.UpdateOneID(job.ID).SetPayload(encoded).Exec(ctx); err != nil {
+			current := make([]pan.File, 0, len(files))
+			for _, entry := range files {
+				current = append(current, pan.File{ID: entry.FileID, ParentID: entry.ParentID, Name: entry.Name, Size: entry.Size, SHA1: entry.Sha1})
+			}
+			if len(current) == 0 || VideoFingerprint(current) != snapshot.Videos {
+				return domain.E(domain.KindConflict, "媒体文件索引已变化，请重新扫描", nil)
+			}
+			if err := ExportEmbyMedia(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken, input.Code, input.Document, videos, poster, fanart); err != nil {
 				return err
 			}
-			if service.mediaNotifier != nil && cfg.EmbyDir != "" {
-				return service.mediaNotifier.NotifyUpdatedTx(ctx, tx, EmbyMovieDir(cfg.EmbyDir, input.Code))
-			}
-			return nil
+			return ent.WithTx(ctx, service.db, func(tx *ent.Tx) error {
+				update := tx.Movie.UpdateOneID(input.MovieID).SetCode(input.Code).SetMetadata(&input.Document).
+					SetCover(artwork.Thumbnail).SetPoster(artwork.Poster).SetFanarts([]string{artwork.Fanart}).
+					SetScrapeStatus(movie.ScrapeStatusDone).SetMetadataSnapshot(snapshot)
+				if id := input.Document.JavDBID(); id != "" {
+					update.SetJavdbID(id)
+				}
+				if err := update.Exec(ctx); err != nil {
+					return err
+				}
+				if err := tx.Task.UpdateOneID(job.ID).SetPayload(encoded).Exec(ctx); err != nil {
+					return err
+				}
+				if service.mediaNotifier != nil && cfg.EmbyDir != "" {
+					return service.mediaNotifier.NotifyUpdatedTx(ctx, tx, EmbyMovieDir(cfg.EmbyDir, input.Code))
+				}
+				return nil
+			})
 		})
 	}); err != nil {
 		return nil, fmt.Errorf("publish movie: %w", err)
@@ -124,7 +141,7 @@ func (service *Service) verifyVideoPositions(ctx context.Context, sess drive.Ses
 	for videoID := range directory.VideoIDs {
 		info, err := sess.Info(ctx, videoID)
 		if err != nil {
-			return domain.E(domain.KindNotFound, "视频文件已删除或无法访问，请重新扫描", err)
+			return fmt.Errorf("确认视频文件位置: %w", err)
 		}
 		if info.ParentID != directory.ID || !drive.WithinSource(info, sess.Source()) {
 			return domain.E(domain.KindConflict, "视频已移动，请重新扫描", nil)

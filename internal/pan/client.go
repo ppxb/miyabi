@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/netx"
 	"golang.org/x/time/rate"
 )
@@ -210,7 +211,7 @@ func (client *Client) request(request *resty.Request, method, endpoint string) (
 		return nil, ErrUnauthorized
 	}
 	if !response.IsSuccess() {
-		return nil, fmt.Errorf("115 returned HTTP %d", response.StatusCode())
+		return nil, &domain.HTTPError{Source: "115", StatusCode: response.StatusCode(), RetryAfter: parseRetryAfter(response.Header().Get("Retry-After"))}
 	}
 	return response, nil
 }

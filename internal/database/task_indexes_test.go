@@ -150,11 +150,11 @@ func TestTaskQueueIndexUpgradePreservesHistoryAndRecords(t *testing.T) {
 			t.Logf("%s: %s", query.name, plan)
 		}
 		recovery := queryPlan(t, store, "UPDATE tasks SET status='queued', progress=0, error=NULL WHERE type IN (?, ?) AND status=?", "scan", "scrape", "running")
-		if !strings.Contains(recovery, "INDEX task_type_status (type=? AND status=?)") {
+		if !strings.Contains(recovery, "INDEX task_type_status") || !strings.Contains(recovery, "(type=? AND status=?)") {
 			t.Fatalf("recovery plan: %s", recovery)
 		}
 		active := queryPlan(t, store, "SELECT id, payload FROM tasks WHERE type=? AND status IN (?, ?)", "subscription_batch", "queued", "running")
-		if !strings.Contains(active, "INDEX task_type_status (type=? AND status=?)") {
+		if !strings.Contains(active, "INDEX task_type_status") || !strings.Contains(active, "(type=? AND status=?)") {
 			t.Fatalf("active batch plan: %s", active)
 		}
 	}

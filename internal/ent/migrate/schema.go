@@ -323,6 +323,9 @@ var (
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"queued", "running", "done", "failed"}, Default: "queued"},
 		{Name: "payload", Type: field.TypeJSON},
 		{Name: "progress", Type: field.TypeInt, Default: 0},
+		{Name: "retry_count", Type: field.TypeInt, Default: 0},
+		{Name: "retry_at", Type: field.TypeTime, Nullable: true},
+		{Name: "resource_key", Type: field.TypeString, Default: ""},
 		{Name: "error", Type: field.TypeString, Nullable: true},
 	}
 	// TasksTable holds the schema information for the "tasks" table.
@@ -335,6 +338,16 @@ var (
 				Name:    "task_type_status",
 				Unique:  false,
 				Columns: []*schema.Column{TasksColumns[3], TasksColumns[4]},
+			},
+			{
+				Name:    "task_type_status_retry_at",
+				Unique:  false,
+				Columns: []*schema.Column{TasksColumns[3], TasksColumns[4], TasksColumns[8]},
+			},
+			{
+				Name:    "task_resource_key_status",
+				Unique:  false,
+				Columns: []*schema.Column{TasksColumns[9], TasksColumns[4]},
 			},
 			{
 				Name:    "task_type",

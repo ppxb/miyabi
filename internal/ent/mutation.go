@@ -10085,22 +10085,26 @@ func (m *TagMutation) ResetEdge(name string) error {
 // TaskMutation represents an operation that mutates the Task nodes in the graph.
 type TaskMutation struct {
 	config
-	op            Op
-	typ           string
-	id            *int
-	created_at    *time.Time
-	updated_at    *time.Time
-	_type         *string
-	status        *task.Status
-	payload       *jsontext.Value
-	appendpayload jsontext.Value
-	progress      *int
-	addprogress   *int
-	error         *string
-	clearedFields map[string]struct{}
-	done          bool
-	oldValue      func(context.Context) (*Task, error)
-	predicates    []predicate.Task
+	op             Op
+	typ            string
+	id             *int
+	created_at     *time.Time
+	updated_at     *time.Time
+	_type          *string
+	status         *task.Status
+	payload        *jsontext.Value
+	appendpayload  jsontext.Value
+	progress       *int
+	addprogress    *int
+	retry_count    *int
+	addretry_count *int
+	retry_at       *time.Time
+	resource_key   *string
+	error          *string
+	clearedFields  map[string]struct{}
+	done           bool
+	oldValue       func(context.Context) (*Task, error)
+	predicates     []predicate.Task
 }
 
 var _ ent.Mutation = (*TaskMutation)(nil)
@@ -10452,6 +10456,147 @@ func (m *TaskMutation) ResetProgress() {
 	m.addprogress = nil
 }
 
+// SetRetryCount sets the "retry_count" field.
+func (m *TaskMutation) SetRetryCount(i int) {
+	m.retry_count = &i
+	m.addretry_count = nil
+}
+
+// RetryCount returns the value of the "retry_count" field in the mutation.
+func (m *TaskMutation) RetryCount() (r int, exists bool) {
+	v := m.retry_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRetryCount returns the old "retry_count" field's value of the Task entity.
+// If the Task object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskMutation) OldRetryCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRetryCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRetryCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRetryCount: %w", err)
+	}
+	return oldValue.RetryCount, nil
+}
+
+// AddRetryCount adds i to the "retry_count" field.
+func (m *TaskMutation) AddRetryCount(i int) {
+	if m.addretry_count != nil {
+		*m.addretry_count += i
+	} else {
+		m.addretry_count = &i
+	}
+}
+
+// AddedRetryCount returns the value that was added to the "retry_count" field in this mutation.
+func (m *TaskMutation) AddedRetryCount() (r int, exists bool) {
+	v := m.addretry_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRetryCount resets all changes to the "retry_count" field.
+func (m *TaskMutation) ResetRetryCount() {
+	m.retry_count = nil
+	m.addretry_count = nil
+}
+
+// SetRetryAt sets the "retry_at" field.
+func (m *TaskMutation) SetRetryAt(t time.Time) {
+	m.retry_at = &t
+}
+
+// RetryAt returns the value of the "retry_at" field in the mutation.
+func (m *TaskMutation) RetryAt() (r time.Time, exists bool) {
+	v := m.retry_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRetryAt returns the old "retry_at" field's value of the Task entity.
+// If the Task object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskMutation) OldRetryAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRetryAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRetryAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRetryAt: %w", err)
+	}
+	return oldValue.RetryAt, nil
+}
+
+// ClearRetryAt clears the value of the "retry_at" field.
+func (m *TaskMutation) ClearRetryAt() {
+	m.retry_at = nil
+	m.clearedFields[task.FieldRetryAt] = struct{}{}
+}
+
+// RetryAtCleared returns if the "retry_at" field was cleared in this mutation.
+func (m *TaskMutation) RetryAtCleared() bool {
+	_, ok := m.clearedFields[task.FieldRetryAt]
+	return ok
+}
+
+// ResetRetryAt resets all changes to the "retry_at" field.
+func (m *TaskMutation) ResetRetryAt() {
+	m.retry_at = nil
+	delete(m.clearedFields, task.FieldRetryAt)
+}
+
+// SetResourceKey sets the "resource_key" field.
+func (m *TaskMutation) SetResourceKey(s string) {
+	m.resource_key = &s
+}
+
+// ResourceKey returns the value of the "resource_key" field in the mutation.
+func (m *TaskMutation) ResourceKey() (r string, exists bool) {
+	v := m.resource_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResourceKey returns the old "resource_key" field's value of the Task entity.
+// If the Task object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TaskMutation) OldResourceKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResourceKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResourceKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResourceKey: %w", err)
+	}
+	return oldValue.ResourceKey, nil
+}
+
+// ResetResourceKey resets all changes to the "resource_key" field.
+func (m *TaskMutation) ResetResourceKey() {
+	m.resource_key = nil
+}
+
 // SetError sets the "error" field.
 func (m *TaskMutation) SetError(s string) {
 	m.error = &s
@@ -10535,7 +10680,7 @@ func (m *TaskMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TaskMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 10)
 	if m.created_at != nil {
 		fields = append(fields, task.FieldCreatedAt)
 	}
@@ -10553,6 +10698,15 @@ func (m *TaskMutation) Fields() []string {
 	}
 	if m.progress != nil {
 		fields = append(fields, task.FieldProgress)
+	}
+	if m.retry_count != nil {
+		fields = append(fields, task.FieldRetryCount)
+	}
+	if m.retry_at != nil {
+		fields = append(fields, task.FieldRetryAt)
+	}
+	if m.resource_key != nil {
+		fields = append(fields, task.FieldResourceKey)
 	}
 	if m.error != nil {
 		fields = append(fields, task.FieldError)
@@ -10577,6 +10731,12 @@ func (m *TaskMutation) Field(name string) (ent.Value, bool) {
 		return m.Payload()
 	case task.FieldProgress:
 		return m.Progress()
+	case task.FieldRetryCount:
+		return m.RetryCount()
+	case task.FieldRetryAt:
+		return m.RetryAt()
+	case task.FieldResourceKey:
+		return m.ResourceKey()
 	case task.FieldError:
 		return m.Error()
 	}
@@ -10600,6 +10760,12 @@ func (m *TaskMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldPayload(ctx)
 	case task.FieldProgress:
 		return m.OldProgress(ctx)
+	case task.FieldRetryCount:
+		return m.OldRetryCount(ctx)
+	case task.FieldRetryAt:
+		return m.OldRetryAt(ctx)
+	case task.FieldResourceKey:
+		return m.OldResourceKey(ctx)
 	case task.FieldError:
 		return m.OldError(ctx)
 	}
@@ -10653,6 +10819,27 @@ func (m *TaskMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetProgress(v)
 		return nil
+	case task.FieldRetryCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRetryCount(v)
+		return nil
+	case task.FieldRetryAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRetryAt(v)
+		return nil
+	case task.FieldResourceKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResourceKey(v)
+		return nil
 	case task.FieldError:
 		v, ok := value.(string)
 		if !ok {
@@ -10671,6 +10858,9 @@ func (m *TaskMutation) AddedFields() []string {
 	if m.addprogress != nil {
 		fields = append(fields, task.FieldProgress)
 	}
+	if m.addretry_count != nil {
+		fields = append(fields, task.FieldRetryCount)
+	}
 	return fields
 }
 
@@ -10681,6 +10871,8 @@ func (m *TaskMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case task.FieldProgress:
 		return m.AddedProgress()
+	case task.FieldRetryCount:
+		return m.AddedRetryCount()
 	}
 	return nil, false
 }
@@ -10697,6 +10889,13 @@ func (m *TaskMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddProgress(v)
 		return nil
+	case task.FieldRetryCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRetryCount(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Task numeric field %s", name)
 }
@@ -10705,6 +10904,9 @@ func (m *TaskMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *TaskMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(task.FieldRetryAt) {
+		fields = append(fields, task.FieldRetryAt)
+	}
 	if m.FieldCleared(task.FieldError) {
 		fields = append(fields, task.FieldError)
 	}
@@ -10722,6 +10924,9 @@ func (m *TaskMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *TaskMutation) ClearField(name string) error {
 	switch name {
+	case task.FieldRetryAt:
+		m.ClearRetryAt()
+		return nil
 	case task.FieldError:
 		m.ClearError()
 		return nil
@@ -10750,6 +10955,15 @@ func (m *TaskMutation) ResetField(name string) error {
 		return nil
 	case task.FieldProgress:
 		m.ResetProgress()
+		return nil
+	case task.FieldRetryCount:
+		m.ResetRetryCount()
+		return nil
+	case task.FieldRetryAt:
+		m.ResetRetryAt()
+		return nil
+	case task.FieldResourceKey:
+		m.ResetResourceKey()
 		return nil
 	case task.FieldError:
 		m.ResetError()

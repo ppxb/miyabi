@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/ppxb/miyabi/internal/domain"
 )
 
 type FileInfo struct {
@@ -88,7 +90,7 @@ func (client *Client) ReadMetadata(ctx context.Context, accessToken, pickCode st
 	}
 	defer download.RawBody().Close()
 	if !download.IsSuccess() {
-		return nil, fmt.Errorf("115 metadata download returned HTTP %d", download.StatusCode())
+		return nil, &domain.HTTPError{Source: "115 metadata", StatusCode: download.StatusCode(), RetryAfter: parseRetryAfter(download.Header().Get("Retry-After"))}
 	}
 	body, err := io.ReadAll(io.LimitReader(download.RawBody(), limit+1))
 	if err != nil {

@@ -15,6 +15,7 @@ import (
 
 type metadataTaskGroup struct {
 	MetadataReady bool        `json:"metadata_ready"`
+	Retrying      int         `json:"retrying"`
 	ParentID      int         `json:"parent_id"`
 	Count         int         `json:"count"`
 	Type          string      `json:"type"`
@@ -81,6 +82,7 @@ func (s *Service) Workflows(ctx context.Context, records []*ent.Task) ([]domain.
 		}
 		active, running, failed, artwork := false, false, false, false
 		for _, child := range byParent[record.ID] {
+			info.Scan.MetadataRetrying += child.Retrying
 			if child.Type == string(tasks.KindScrape) {
 				info.Scan.MetadataTotal += child.Count
 			}
@@ -91,6 +93,7 @@ func (s *Service) Workflows(ctx context.Context, records []*ent.Task) ([]domain.
 			running = running || child.Status == task.StatusRunning
 			artwork = artwork || (child.MetadataReady && child.Status == task.StatusRunning)
 			if child.Status == task.StatusFailed {
+				info.Scan.MetadataFailed += child.Count
 				failed = true
 				if info.Error == nil {
 					info.Error = child.Error
@@ -133,6 +136,7 @@ func metadataGroups(ctx context.Context, database *ent.Client, records []*ent.Ta
 	groups := sql.Select(
 		children.C(task.FieldID), sql.As(parent, "parent_id"),
 		sql.As("COUNT(*) OVER ("+partition+")", "count"),
+		sql.As("SUM(CASE WHEN "+children.C(task.FieldStatus)+" = 'queued' AND "+children.C(task.FieldRetryAt)+" IS NOT NULL THEN 1 ELSE 0 END) OVER ("+partition+")", "retrying"),
 		sql.As("MAX(coalesce("+tasks.JSONExtract(children.C(task.FieldPayload), "metadata_ready")+", 0)) OVER ("+partition+")", "metadata_ready"),
 		sql.As("ROW_NUMBER() OVER ("+partition+" ORDER BY "+children.C(task.FieldUpdatedAt)+" DESC, "+children.C(task.FieldID)+" DESC)", "position"),
 	).From(children).Where(sql.And(sql.EQ(children.C(task.FieldType), string(tasks.KindScrape)),
@@ -141,7 +145,7 @@ func metadataGroups(ctx context.Context, database *ent.Client, records []*ent.Ta
 	err := database.Task.Query().Where(func(s *sql.Selector) {
 		s.Join(groups).On(s.C(task.FieldID), groups.C(task.FieldID))
 		s.Where(sql.EQ(groups.C("position"), 1))
-		s.Select(s.C(task.FieldType), s.C(task.FieldStatus), s.C(task.FieldError), s.C(task.FieldUpdatedAt), groups.C("parent_id"), groups.C("count"), groups.C("metadata_ready"))
+		s.Select(s.C(task.FieldType), s.C(task.FieldStatus), s.C(task.FieldError), s.C(task.FieldUpdatedAt), groups.C("parent_id"), groups.C("count"), groups.C("metadata_ready"), groups.C("retrying"))
 	}).Select(task.FieldID).Scan(ctx, &result)
 	return result, err
 }
@@ -155,6 +159,7 @@ func scanTaskInfo(record *ent.Task) (domain.TaskInfo, error) {
 	return domain.TaskInfo{
 		ID: record.ID, Type: record.Type, Status: string(record.Status), Progress: record.Progress,
 		Error: record.Error, CanRetry: record.Status == task.StatusFailed, CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
+		RetryAt: record.RetryAt, RetryCount: record.RetryCount,
 		Source: payload.Source, Scan: payload.Scan, OfflineTaskID: payload.OfflineTaskID,
 	}, nil
 }

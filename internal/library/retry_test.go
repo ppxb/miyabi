@@ -3,6 +3,7 @@ package library
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
@@ -14,13 +15,13 @@ func TestRetryScanPreservesCheckpointAndSource(t *testing.T) {
 	ctx := t.Context()
 	record := lib.database.Task.GetX(ctx, parent.ID)
 	checkpoint := json.RawMessage(`{"scan_id":"resume-marker","checkpoint":"[{\"id\":\"20\"}]","scan":{"stage":"scanning","files_scanned":7},"source":{"account_id":"100","directory":{"id":"10","path":"/Movies"}}}`)
-	record.Update().SetPayload(checkpoint).SetStatus(task.StatusFailed).SetError("fixture failure").ExecX(ctx)
+	record.Update().SetPayload(checkpoint).SetStatus(task.StatusFailed).SetRetryCount(3).SetError("fixture failure").ExecX(ctx)
 	info, err := lib.RetryTask(ctx, record.ID)
 	if err != nil || info.ID != record.ID || info.Status != "queued" {
 		t.Fatalf("retry = %+v, %v", info, err)
 	}
 	saved := lib.database.Task.GetX(ctx, record.ID)
-	if string(saved.Payload) != string(checkpoint) || saved.Error != nil || saved.Progress != 0 {
+	if string(saved.Payload) != string(checkpoint) || saved.Error != nil || saved.Progress != 0 || saved.RetryCount != 0 || saved.RetryAt != nil {
 		t.Fatalf("checkpoint changed: %+v", saved)
 	}
 	if _, err := lib.RetryTask(ctx, record.ID); !domain.IsKind(err, domain.KindConflict) {
@@ -35,6 +36,24 @@ func TestRetryScanPreservesCheckpointAndSource(t *testing.T) {
 	}
 	if lib.database.Task.GetX(ctx, record.ID).Status != task.StatusFailed {
 		t.Fatal("source rejection changed task state")
+	}
+}
+
+func TestWaitingRetriesRemainActiveWithoutCountingAsCompleted(t *testing.T) {
+	lib, parent, _ := libraryFixture(t)
+	ctx := t.Context()
+	lib.database.Task.UpdateOneID(parent.ID).SetStatus(task.StatusDone).ExecX(ctx)
+	body, _ := json.Marshal(map[string]any{"scan_task_id": parent.ID, "metadata_ready": true})
+	lib.database.Task.Create().SetType("scrape").SetPayload(body).SetStatus(task.StatusDone).ExecX(ctx)
+	lib.database.Task.Create().SetType("scrape").SetPayload(body).SetStatus(task.StatusFailed).SetError("invalid identity").ExecX(ctx)
+	lib.database.Task.Create().SetType("scrape").SetPayload(body).SetStatus(task.StatusQueued).SetRetryCount(1).SetRetryAt(time.Now().Add(time.Minute)).ExecX(ctx)
+	info, err := lib.ListTasks(ctx)
+	if err != nil || len(info) != 1 {
+		t.Fatalf("tasks=%+v %v", info, err)
+	}
+	got := info[0]
+	if got.Status != "queued" || got.CanRetry || got.Scan.MetadataTotal != 3 || got.Scan.MetadataCompleted != 2 || got.Scan.MetadataRetrying != 1 || got.Scan.MetadataFailed != 1 {
+		t.Fatalf("retry was counted as a terminal failure: %+v", got)
 	}
 }
 

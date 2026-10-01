@@ -17,6 +17,7 @@ type PoolQueue interface {
 	Recover(context.Context, []Kind) error
 	Claim(context.Context, []Kind) (*Job, error)
 	Finish(context.Context, int, error) error
+	NextRetry(context.Context, []Kind) (time.Time, error)
 }
 
 // PoolBus defines the notification wake operations required by the worker Pool.
@@ -86,12 +87,25 @@ func (pool *Pool) runWorker(ctx context.Context, pending <-chan struct{}) error 
 			continue
 		}
 		if job == nil {
+			next, err := pool.queue.NextRetry(ctx, pool.kinds)
+			if err != nil {
+				next = time.Now().Add(poolRetryDelay)
+			}
+			var timer *time.Timer
+			var due <-chan time.Time
+			if !next.IsZero() {
+				timer = time.NewTimer(time.Until(next))
+				due = timer.C
+			}
 			select {
 			case <-ctx.Done():
-				return nil
 			case <-pending:
-				continue
+			case <-due:
 			}
+			if timer != nil {
+				timer.Stop()
+			}
+			continue
 		}
 		handler, ok := pool.registry.Get(job.Type)
 		if !ok {
@@ -123,7 +137,7 @@ func (pool *Pool) runWorker(ctx context.Context, pending <-chan struct{}) error 
 			return nil
 		}
 		if runError != nil {
-			pool.logger.ErrorContext(ctx, "task failed", "task_id", job.ID, "type", string(job.Type), "error", runError)
+			pool.logger.WarnContext(ctx, "task attempt failed", "task_id", job.ID, "type", string(job.Type), "error", runError)
 		} else {
 			pool.logger.InfoContext(ctx, "task completed", "task_id", job.ID, "type", string(job.Type))
 		}

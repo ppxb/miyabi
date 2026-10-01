@@ -91,6 +91,48 @@ func (_c *TaskCreate) SetNillableProgress(v *int) *TaskCreate {
 	return _c
 }
 
+// SetRetryCount sets the "retry_count" field.
+func (_c *TaskCreate) SetRetryCount(v int) *TaskCreate {
+	_c.mutation.SetRetryCount(v)
+	return _c
+}
+
+// SetNillableRetryCount sets the "retry_count" field if the given value is not nil.
+func (_c *TaskCreate) SetNillableRetryCount(v *int) *TaskCreate {
+	if v != nil {
+		_c.SetRetryCount(*v)
+	}
+	return _c
+}
+
+// SetRetryAt sets the "retry_at" field.
+func (_c *TaskCreate) SetRetryAt(v time.Time) *TaskCreate {
+	_c.mutation.SetRetryAt(v)
+	return _c
+}
+
+// SetNillableRetryAt sets the "retry_at" field if the given value is not nil.
+func (_c *TaskCreate) SetNillableRetryAt(v *time.Time) *TaskCreate {
+	if v != nil {
+		_c.SetRetryAt(*v)
+	}
+	return _c
+}
+
+// SetResourceKey sets the "resource_key" field.
+func (_c *TaskCreate) SetResourceKey(v string) *TaskCreate {
+	_c.mutation.SetResourceKey(v)
+	return _c
+}
+
+// SetNillableResourceKey sets the "resource_key" field if the given value is not nil.
+func (_c *TaskCreate) SetNillableResourceKey(v *string) *TaskCreate {
+	if v != nil {
+		_c.SetResourceKey(*v)
+	}
+	return _c
+}
+
 // SetError sets the "error" field.
 func (_c *TaskCreate) SetError(v string) *TaskCreate {
 	_c.mutation.SetError(v)
@@ -160,6 +202,14 @@ func (_c *TaskCreate) defaults() {
 		v := task.DefaultProgress
 		_c.mutation.SetProgress(v)
 	}
+	if _, ok := _c.mutation.RetryCount(); !ok {
+		v := task.DefaultRetryCount
+		_c.mutation.SetRetryCount(v)
+	}
+	if _, ok := _c.mutation.ResourceKey(); !ok {
+		v := task.DefaultResourceKey
+		_c.mutation.SetResourceKey(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -196,6 +246,17 @@ func (_c *TaskCreate) check() error {
 		if err := task.ProgressValidator(v); err != nil {
 			return &ValidationError{Name: "progress", err: fmt.Errorf(`ent: validator failed for field "Task.progress": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.RetryCount(); !ok {
+		return &ValidationError{Name: "retry_count", err: errors.New(`ent: missing required field "Task.retry_count"`)}
+	}
+	if v, ok := _c.mutation.RetryCount(); ok {
+		if err := task.RetryCountValidator(v); err != nil {
+			return &ValidationError{Name: "retry_count", err: fmt.Errorf(`ent: validator failed for field "Task.retry_count": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.ResourceKey(); !ok {
+		return &ValidationError{Name: "resource_key", err: errors.New(`ent: missing required field "Task.resource_key"`)}
 	}
 	return nil
 }
@@ -247,6 +308,18 @@ func (_c *TaskCreate) createSpec() (*Task, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Progress(); ok {
 		_spec.SetField(task.FieldProgress, field.TypeInt, value)
 		_node.Progress = value
+	}
+	if value, ok := _c.mutation.RetryCount(); ok {
+		_spec.SetField(task.FieldRetryCount, field.TypeInt, value)
+		_node.RetryCount = value
+	}
+	if value, ok := _c.mutation.RetryAt(); ok {
+		_spec.SetField(task.FieldRetryAt, field.TypeTime, value)
+		_node.RetryAt = &value
+	}
+	if value, ok := _c.mutation.ResourceKey(); ok {
+		_spec.SetField(task.FieldResourceKey, field.TypeString, value)
+		_node.ResourceKey = value
 	}
 	if value, ok := _c.mutation.Error(); ok {
 		_spec.SetField(task.FieldError, field.TypeString, value)
@@ -367,6 +440,54 @@ func (u *TaskUpsert) UpdateProgress() *TaskUpsert {
 // AddProgress adds v to the "progress" field.
 func (u *TaskUpsert) AddProgress(v int) *TaskUpsert {
 	u.Add(task.FieldProgress, v)
+	return u
+}
+
+// SetRetryCount sets the "retry_count" field.
+func (u *TaskUpsert) SetRetryCount(v int) *TaskUpsert {
+	u.Set(task.FieldRetryCount, v)
+	return u
+}
+
+// UpdateRetryCount sets the "retry_count" field to the value that was provided on create.
+func (u *TaskUpsert) UpdateRetryCount() *TaskUpsert {
+	u.SetExcluded(task.FieldRetryCount)
+	return u
+}
+
+// AddRetryCount adds v to the "retry_count" field.
+func (u *TaskUpsert) AddRetryCount(v int) *TaskUpsert {
+	u.Add(task.FieldRetryCount, v)
+	return u
+}
+
+// SetRetryAt sets the "retry_at" field.
+func (u *TaskUpsert) SetRetryAt(v time.Time) *TaskUpsert {
+	u.Set(task.FieldRetryAt, v)
+	return u
+}
+
+// UpdateRetryAt sets the "retry_at" field to the value that was provided on create.
+func (u *TaskUpsert) UpdateRetryAt() *TaskUpsert {
+	u.SetExcluded(task.FieldRetryAt)
+	return u
+}
+
+// ClearRetryAt clears the value of the "retry_at" field.
+func (u *TaskUpsert) ClearRetryAt() *TaskUpsert {
+	u.SetNull(task.FieldRetryAt)
+	return u
+}
+
+// SetResourceKey sets the "resource_key" field.
+func (u *TaskUpsert) SetResourceKey(v string) *TaskUpsert {
+	u.Set(task.FieldResourceKey, v)
+	return u
+}
+
+// UpdateResourceKey sets the "resource_key" field to the value that was provided on create.
+func (u *TaskUpsert) UpdateResourceKey() *TaskUpsert {
+	u.SetExcluded(task.FieldResourceKey)
 	return u
 }
 
@@ -507,6 +628,62 @@ func (u *TaskUpsertOne) AddProgress(v int) *TaskUpsertOne {
 func (u *TaskUpsertOne) UpdateProgress() *TaskUpsertOne {
 	return u.Update(func(s *TaskUpsert) {
 		s.UpdateProgress()
+	})
+}
+
+// SetRetryCount sets the "retry_count" field.
+func (u *TaskUpsertOne) SetRetryCount(v int) *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.SetRetryCount(v)
+	})
+}
+
+// AddRetryCount adds v to the "retry_count" field.
+func (u *TaskUpsertOne) AddRetryCount(v int) *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.AddRetryCount(v)
+	})
+}
+
+// UpdateRetryCount sets the "retry_count" field to the value that was provided on create.
+func (u *TaskUpsertOne) UpdateRetryCount() *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.UpdateRetryCount()
+	})
+}
+
+// SetRetryAt sets the "retry_at" field.
+func (u *TaskUpsertOne) SetRetryAt(v time.Time) *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.SetRetryAt(v)
+	})
+}
+
+// UpdateRetryAt sets the "retry_at" field to the value that was provided on create.
+func (u *TaskUpsertOne) UpdateRetryAt() *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.UpdateRetryAt()
+	})
+}
+
+// ClearRetryAt clears the value of the "retry_at" field.
+func (u *TaskUpsertOne) ClearRetryAt() *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.ClearRetryAt()
+	})
+}
+
+// SetResourceKey sets the "resource_key" field.
+func (u *TaskUpsertOne) SetResourceKey(v string) *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.SetResourceKey(v)
+	})
+}
+
+// UpdateResourceKey sets the "resource_key" field to the value that was provided on create.
+func (u *TaskUpsertOne) UpdateResourceKey() *TaskUpsertOne {
+	return u.Update(func(s *TaskUpsert) {
+		s.UpdateResourceKey()
 	})
 }
 
@@ -816,6 +993,62 @@ func (u *TaskUpsertBulk) AddProgress(v int) *TaskUpsertBulk {
 func (u *TaskUpsertBulk) UpdateProgress() *TaskUpsertBulk {
 	return u.Update(func(s *TaskUpsert) {
 		s.UpdateProgress()
+	})
+}
+
+// SetRetryCount sets the "retry_count" field.
+func (u *TaskUpsertBulk) SetRetryCount(v int) *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.SetRetryCount(v)
+	})
+}
+
+// AddRetryCount adds v to the "retry_count" field.
+func (u *TaskUpsertBulk) AddRetryCount(v int) *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.AddRetryCount(v)
+	})
+}
+
+// UpdateRetryCount sets the "retry_count" field to the value that was provided on create.
+func (u *TaskUpsertBulk) UpdateRetryCount() *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.UpdateRetryCount()
+	})
+}
+
+// SetRetryAt sets the "retry_at" field.
+func (u *TaskUpsertBulk) SetRetryAt(v time.Time) *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.SetRetryAt(v)
+	})
+}
+
+// UpdateRetryAt sets the "retry_at" field to the value that was provided on create.
+func (u *TaskUpsertBulk) UpdateRetryAt() *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.UpdateRetryAt()
+	})
+}
+
+// ClearRetryAt clears the value of the "retry_at" field.
+func (u *TaskUpsertBulk) ClearRetryAt() *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.ClearRetryAt()
+	})
+}
+
+// SetResourceKey sets the "resource_key" field.
+func (u *TaskUpsertBulk) SetResourceKey(v string) *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.SetResourceKey(v)
+	})
+}
+
+// UpdateResourceKey sets the "resource_key" field to the value that was provided on create.
+func (u *TaskUpsertBulk) UpdateResourceKey() *TaskUpsertBulk {
+	return u.Update(func(s *TaskUpsert) {
+		s.UpdateResourceKey()
 	})
 }
 

@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import type { OfflineSubmission } from '@/api/offline'
 import { isTaskActive, type BatchTask, type ScanTask } from '@/api/tasks'
 import { isOfflineTaskActive } from '@/api/offline'
-import { scanCount, scanStage } from './scan-status'
+import { scanCount, scanStage, scanStatus } from './scan-status'
 import { TaskProgress } from './task-progress'
 import { TaskToastActions } from './task-toast-actions'
 import { batchToastID, offlineToastID, scanToastID } from './task-notification-diff'
@@ -51,13 +51,19 @@ export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
       description: (
         <TaskProgress
           current={scanStage(task)}
+          label={scanStatus(task)}
           progress={task.scan.metadata_total > 0 ? task.progress : undefined}
           count={task.scan.metadata_total > 0 ? scanCount(task) : undefined}
         />
       )
     })
   } else if (task.status === 'failed') {
-    toast.error('媒体库处理失败', { ...props, description: task.error })
+    toast.error(task.scan.metadata_failed ? '媒体库处理结束，部分影片失败' : '媒体库处理失败', {
+      ...props,
+      description: task.scan.metadata_failed
+        ? `${scanCount(task)}。${task.error ?? ''}`
+        : task.error
+    })
   } else {
     toast.success('媒体库处理完成', {
       ...props,
@@ -88,6 +94,7 @@ export function notifyOfflineTask(
       ) : (
         <TaskProgress
           offline
+          label={task.phase !== 'downloading' && scan ? scanStatus(scan) : undefined}
           current={
             task.phase === 'downloading'
               ? 'downloading'

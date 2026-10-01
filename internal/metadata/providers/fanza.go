@@ -211,7 +211,7 @@ func matchFANZA(identities []fanzaIdentity, code string) (string, error) {
 }
 
 func (s *FANZA) graphQL(ctx context.Context, query string, variables map[string]any, result any) error {
-	if err := s.limiter.Wait(ctx); err != nil {
+	if err := s.admit(ctx); err != nil {
 		return err
 	}
 	body, err := json.Marshal(map[string]any{"query": query, "variables": variables})
@@ -228,15 +228,15 @@ func (s *FANZA) graphQL(ctx context.Context, query string, variables map[string]
 	req.Header.Set("User-Agent", "")
 	response, err := s.http.Do(req)
 	if err != nil {
-		return err
+		return s.failed(err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("FANZA HTTP %d", response.StatusCode)
+		return s.failed(&domain.HTTPError{Source: "FANZA", StatusCode: response.StatusCode, RetryAfter: domain.ParseRetryAfter(response.Header.Get("Retry-After"), time.Now())})
 	}
 	body, err = io.ReadAll(io.LimitReader(response.Body, 4<<20+1))
 	if err != nil {
-		return err
+		return s.failed(err)
 	}
 	if len(body) > 4<<20 {
 		return fmt.Errorf("FANZA response exceeds 4 MiB")

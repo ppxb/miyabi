@@ -2,7 +2,6 @@ package scrape
 
 import (
 	"context"
-	"errors"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -148,11 +147,15 @@ func TestVerifyVideoPositions(t *testing.T) {
 	sessDeleted := &mockSession{
 		source: source,
 		infoFunc: func(ctx context.Context, fileID string) (pan.FileInfo, error) {
-			return pan.FileInfo{}, errors.New("file not found on 115")
+			return pan.FileInfo{}, pan.ErrNotFound
 		},
 	}
 	errDeleted := service.verifyVideoPositions(t.Context(), sessDeleted, dir)
 	if !domain.IsKind(errDeleted, domain.KindNotFound) {
 		t.Fatalf("expected KindNotFound for deleted video, got %v", errDeleted)
+	}
+	sessDeleted.infoFunc = func(context.Context, string) (pan.FileInfo, error) { return pan.FileInfo{}, context.DeadlineExceeded }
+	if _, retry := domain.RetryDelay(service.verifyVideoPositions(t.Context(), sessDeleted, dir)); !retry {
+		t.Fatal("network timeout was classified as a deleted video")
 	}
 }

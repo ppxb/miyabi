@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/ent"
 )
@@ -24,6 +25,13 @@ type Handler struct {
 	Kind     Kind
 	Handle   HandleFunc
 	Finished FinishedFunc
+	Retry    func(error) (time.Duration, bool)
+}
+
+// WithRetry opts a handler into bounded retries using its own error policy.
+func (h Handler) WithRetry(policy func(error) (time.Duration, bool)) Handler {
+	h.Retry = policy
+	return h
 }
 
 // NewHandler pairs an execution function with an optional completion callback.

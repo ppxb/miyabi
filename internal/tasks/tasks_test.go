@@ -239,6 +239,10 @@ func TestQueueLifecycleAndHook(t *testing.T) {
 	if err := svc.Queue().Finish(ctx, job.ID, expectedErr); err != nil {
 		t.Fatalf("finish: %v", err)
 	}
+	if len(work) != 1 {
+		t.Fatal("completion did not wake resource waiters")
+	}
+	<-work
 	assertUIOnly()
 
 	if !hookCalled.Load() {

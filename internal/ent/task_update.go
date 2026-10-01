@@ -97,6 +97,61 @@ func (_u *TaskUpdate) AddProgress(v int) *TaskUpdate {
 	return _u
 }
 
+// SetRetryCount sets the "retry_count" field.
+func (_u *TaskUpdate) SetRetryCount(v int) *TaskUpdate {
+	_u.mutation.ResetRetryCount()
+	_u.mutation.SetRetryCount(v)
+	return _u
+}
+
+// SetNillableRetryCount sets the "retry_count" field if the given value is not nil.
+func (_u *TaskUpdate) SetNillableRetryCount(v *int) *TaskUpdate {
+	if v != nil {
+		_u.SetRetryCount(*v)
+	}
+	return _u
+}
+
+// AddRetryCount adds value to the "retry_count" field.
+func (_u *TaskUpdate) AddRetryCount(v int) *TaskUpdate {
+	_u.mutation.AddRetryCount(v)
+	return _u
+}
+
+// SetRetryAt sets the "retry_at" field.
+func (_u *TaskUpdate) SetRetryAt(v time.Time) *TaskUpdate {
+	_u.mutation.SetRetryAt(v)
+	return _u
+}
+
+// SetNillableRetryAt sets the "retry_at" field if the given value is not nil.
+func (_u *TaskUpdate) SetNillableRetryAt(v *time.Time) *TaskUpdate {
+	if v != nil {
+		_u.SetRetryAt(*v)
+	}
+	return _u
+}
+
+// ClearRetryAt clears the value of the "retry_at" field.
+func (_u *TaskUpdate) ClearRetryAt() *TaskUpdate {
+	_u.mutation.ClearRetryAt()
+	return _u
+}
+
+// SetResourceKey sets the "resource_key" field.
+func (_u *TaskUpdate) SetResourceKey(v string) *TaskUpdate {
+	_u.mutation.SetResourceKey(v)
+	return _u
+}
+
+// SetNillableResourceKey sets the "resource_key" field if the given value is not nil.
+func (_u *TaskUpdate) SetNillableResourceKey(v *string) *TaskUpdate {
+	if v != nil {
+		_u.SetResourceKey(*v)
+	}
+	return _u
+}
+
 // SetError sets the "error" field.
 func (_u *TaskUpdate) SetError(v string) *TaskUpdate {
 	_u.mutation.SetError(v)
@@ -175,6 +230,11 @@ func (_u *TaskUpdate) check() error {
 			return &ValidationError{Name: "progress", err: fmt.Errorf(`ent: validator failed for field "Task.progress": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.RetryCount(); ok {
+		if err := task.RetryCountValidator(v); err != nil {
+			return &ValidationError{Name: "retry_count", err: fmt.Errorf(`ent: validator failed for field "Task.retry_count": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -212,6 +272,21 @@ func (_u *TaskUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedProgress(); ok {
 		_spec.AddField(task.FieldProgress, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.RetryCount(); ok {
+		_spec.SetField(task.FieldRetryCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRetryCount(); ok {
+		_spec.AddField(task.FieldRetryCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.RetryAt(); ok {
+		_spec.SetField(task.FieldRetryAt, field.TypeTime, value)
+	}
+	if _u.mutation.RetryAtCleared() {
+		_spec.ClearField(task.FieldRetryAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ResourceKey(); ok {
+		_spec.SetField(task.FieldResourceKey, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Error(); ok {
 		_spec.SetField(task.FieldError, field.TypeString, value)
@@ -306,6 +381,61 @@ func (_u *TaskUpdateOne) AddProgress(v int) *TaskUpdateOne {
 	return _u
 }
 
+// SetRetryCount sets the "retry_count" field.
+func (_u *TaskUpdateOne) SetRetryCount(v int) *TaskUpdateOne {
+	_u.mutation.ResetRetryCount()
+	_u.mutation.SetRetryCount(v)
+	return _u
+}
+
+// SetNillableRetryCount sets the "retry_count" field if the given value is not nil.
+func (_u *TaskUpdateOne) SetNillableRetryCount(v *int) *TaskUpdateOne {
+	if v != nil {
+		_u.SetRetryCount(*v)
+	}
+	return _u
+}
+
+// AddRetryCount adds value to the "retry_count" field.
+func (_u *TaskUpdateOne) AddRetryCount(v int) *TaskUpdateOne {
+	_u.mutation.AddRetryCount(v)
+	return _u
+}
+
+// SetRetryAt sets the "retry_at" field.
+func (_u *TaskUpdateOne) SetRetryAt(v time.Time) *TaskUpdateOne {
+	_u.mutation.SetRetryAt(v)
+	return _u
+}
+
+// SetNillableRetryAt sets the "retry_at" field if the given value is not nil.
+func (_u *TaskUpdateOne) SetNillableRetryAt(v *time.Time) *TaskUpdateOne {
+	if v != nil {
+		_u.SetRetryAt(*v)
+	}
+	return _u
+}
+
+// ClearRetryAt clears the value of the "retry_at" field.
+func (_u *TaskUpdateOne) ClearRetryAt() *TaskUpdateOne {
+	_u.mutation.ClearRetryAt()
+	return _u
+}
+
+// SetResourceKey sets the "resource_key" field.
+func (_u *TaskUpdateOne) SetResourceKey(v string) *TaskUpdateOne {
+	_u.mutation.SetResourceKey(v)
+	return _u
+}
+
+// SetNillableResourceKey sets the "resource_key" field if the given value is not nil.
+func (_u *TaskUpdateOne) SetNillableResourceKey(v *string) *TaskUpdateOne {
+	if v != nil {
+		_u.SetResourceKey(*v)
+	}
+	return _u
+}
+
 // SetError sets the "error" field.
 func (_u *TaskUpdateOne) SetError(v string) *TaskUpdateOne {
 	_u.mutation.SetError(v)
@@ -397,6 +527,11 @@ func (_u *TaskUpdateOne) check() error {
 			return &ValidationError{Name: "progress", err: fmt.Errorf(`ent: validator failed for field "Task.progress": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.RetryCount(); ok {
+		if err := task.RetryCountValidator(v); err != nil {
+			return &ValidationError{Name: "retry_count", err: fmt.Errorf(`ent: validator failed for field "Task.retry_count": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -451,6 +586,21 @@ func (_u *TaskUpdateOne) sqlSave(ctx context.Context) (_node *Task, err error) {
 	}
 	if value, ok := _u.mutation.AddedProgress(); ok {
 		_spec.AddField(task.FieldProgress, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.RetryCount(); ok {
+		_spec.SetField(task.FieldRetryCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRetryCount(); ok {
+		_spec.AddField(task.FieldRetryCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.RetryAt(); ok {
+		_spec.SetField(task.FieldRetryAt, field.TypeTime, value)
+	}
+	if _u.mutation.RetryAtCleared() {
+		_spec.ClearField(task.FieldRetryAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ResourceKey(); ok {
+		_spec.SetField(task.FieldResourceKey, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Error(); ok {
 		_spec.SetField(task.FieldError, field.TypeString, value)
