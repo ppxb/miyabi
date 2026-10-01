@@ -68,6 +68,7 @@ func TestMatchMoviesPreservesRankingAndRejectsSharedFallbacks(t *testing.T) {
 		{"1PONDO-060326-001", ""}, {"ABC-00123", ""}, {"FJIN-106A", ""},
 		{"SCUTE-1575-ITSUKI", ""}, {"SSIS-589-02", ""},
 		{"fc2_1234567", ""}, {"OLD-001", ""},
+		{"042126_100", "date-film"}, {"TUSHYRAW.2026.09.27", "western-film"},
 	} {
 		builder := store.Client.Movie.Create().SetCode(entry.code)
 		if entry.javdbID != "" {
@@ -89,6 +90,8 @@ func TestMatchMoviesPreservesRankingAndRejectsSharedFallbacks(t *testing.T) {
 		{"SSIS-589", ""}, {"SSIS-589-02", "SSIS-589-02"},
 		{"FC2-PPV-1234567", "fc2_1234567"}, {"CURRENT-1", "OLD-001"},
 		{"OLD-001", ""}, {"MISSING-001", ""}, {"", ""},
+		{"PACOPACOMAMA-042126-100", "042126_100"}, {"042126-100", "042126_100"},
+		{"TUSHYRAW.26.09.27", "TUSHYRAW.2026.09.27"}, {"TUSHYRAW.23.09.27", ""},
 	}
 	var codes []string
 	for _, tt := range cases {
@@ -106,6 +109,33 @@ func TestMatchMoviesPreservesRankingAndRejectsSharedFallbacks(t *testing.T) {
 	for _, tt := range cases {
 		if got := matched[tt.code]; got != ids[tt.owner] {
 			t.Errorf("MatchMovies(%q)=%d, want %q (%d)", tt.code, got, tt.owner, ids[tt.owner])
+		}
+	}
+}
+
+func TestIndexMoviesReusesDateSpellingsAcrossScans(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	tx, err := store.Client.Tx(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	codes := []string{"042126_100", "PACOPACOMAMA-042126-100", "TUSHYRAW.26.09.27", "TUSHYRAW.2026.09.27"}
+	for range 2 {
+		matched, err := indexMovies(t.Context(), tx, codes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if matched[codes[0]] == 0 || matched[codes[0]] != matched[codes[1]] ||
+			matched[codes[2]] == 0 || matched[codes[2]] != matched[codes[3]] {
+			t.Fatalf("date spellings created duplicate movies: %v", matched)
+		}
+		if count := tx.Movie.Query().CountX(t.Context()); count != 2 {
+			t.Fatalf("scan created %d movies, want 2", count)
 		}
 	}
 }

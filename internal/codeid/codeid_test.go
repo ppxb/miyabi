@@ -243,6 +243,8 @@ func TestIsEquivalent(t *testing.T) {
 		{name: "studio prefix with date code", a: "CARIB-060326-001", b: "060326-001", want: true},
 		{name: "studio prefix with date code reverse", a: "060326-001", b: "CARIB-060326-001", want: true},
 		{name: "1pondo prefix with date code", a: "1PONDO-060326-001", b: "060326-001", want: true},
+		{name: "studio prefix and date separator", a: "PACOPACOMAMA-042126-100", b: "042126_100", want: true},
+		{name: "Western year spelling", a: "TUSHYRAW.26.09.27", b: "Tushyraw.2026.09.27", want: true},
 		{name: "padding zeros", a: "ABC-00123", b: "abc123", want: true},
 		{name: "distributor prefix with padding", a: "326IHD-005", b: "IHD-5", want: true},
 		{name: "reject different distributor digits", a: "259LUXU-1899", b: "999LUXU-1899", want: false},
@@ -262,7 +264,7 @@ func TestIsEquivalent(t *testing.T) {
 			if got := IsEquivalent(tt.a, tt.b); got != tt.want {
 				t.Errorf("IsEquivalent(%q, %q) = %v; want %v", tt.a, tt.b, got, tt.want)
 			}
-			if tt.want && MatchKey(tt.a) != MatchKey(tt.b) {
+			if tt.want && !slices.Contains(Queries(MatchKey(tt.a)), MatchKey(tt.b)) {
 				t.Errorf("equivalent codes have different lookup keys: %q and %q", MatchKey(tt.a), MatchKey(tt.b))
 			}
 		})
@@ -282,6 +284,14 @@ func TestIsFormatEquivalent(t *testing.T) {
 		{name: "three digit padding vs two digit", a: "IPX-052", b: "IPX-52", want: true},
 		{name: "delimiter underscore", a: "IPX_052", b: "ipx-52", want: true},
 		{name: "zero value sequence", a: "ABC-000", b: "ABC-0", want: true},
+		{name: "date separators", a: "042126-100", b: "042126_100", want: true},
+		{name: "Western short year", a: "TUSHYRAW.26.09.27", b: "Tushyraw.2026.09.27", want: true},
+		{name: "Western full year", a: "ExampleStudio.2026.09.27-SCENE2", b: "EXAMPLESTUDIO.26.09.27-SCENE2", want: true},
+		{name: "reject Western different year", a: "TUSHYRAW.26.09.27", b: "Tushyraw.2023.09.27", want: false},
+		{name: "reject Western different century", a: "STUDIO.26.09.27", b: "STUDIO.1926.09.27", want: false},
+		{name: "reject Western different scene", a: "STUDIO.26.09.27-SCENE2", b: "STUDIO.2026.09.27-SCENE3", want: false},
+		{name: "reject Western different studio", a: "STUDIO.26.09.27", b: "OTHER.2026.09.27", want: false},
+		{name: "reject date different sequence", a: "042126-100", b: "042126_101", want: false},
 		{name: "reject different numbers", a: "ABC-123", b: "ABC-124", want: false},
 		{name: "reject substring number truncated", a: "ABC-12", b: "ABC-123", want: false},
 		{name: "reject letter suffix variant", a: "FJIN-106", b: "FJIN-106A", want: false},
@@ -401,6 +411,11 @@ func TestQueries(t *testing.T) {
 	}{
 		{candidate: "SSIS-589", want: []string{"SSIS-589"}},
 		{candidate: "ABC-00123", want: []string{"ABC-00123", "ABC-123"}},
+		{candidate: "042126-100", want: []string{"042126-100", "042126_100"}},
+		{candidate: "042126_100", want: []string{"042126_100", "042126-100"}},
+		{candidate: "TUSHYRAW.26.09.27", want: []string{"TUSHYRAW.26.09.27", "TUSHYRAW.2026.09.27"}},
+		{candidate: "EXAMPLESTUDIO.2026.09.27-SCENE2", want: []string{"EXAMPLESTUDIO.2026.09.27-SCENE2", "EXAMPLESTUDIO.26.09.27-SCENE2"}},
+		{candidate: "STUDIO.1926.09.27", want: []string{"STUDIO.1926.09.27"}},
 		{candidate: "FC2-PPV-1234567", want: []string{"FC2-1234567", "FC2-PPV-1234567"}},
 		{candidate: "FC2-PPV-4778943", want: []string{"FC2-4778943", "FC2-PPV-4778943"}},
 	}

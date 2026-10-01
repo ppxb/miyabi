@@ -7,8 +7,7 @@ const sourcesKey = ['settings', 'scraping'] as const
 
 export const sourceNames: Record<string, string> = {
   fanza: 'FANZA',
-  fc2: 'FC2 官方',
-  javdb: 'JavDB'
+  fc2: 'FC2 官方'
 }
 
 export function useScrapingSources() {

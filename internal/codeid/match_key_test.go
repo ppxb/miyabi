@@ -1,6 +1,9 @@
 package codeid
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestMatchKeyPreservesCatalogueVariants(t *testing.T) {
 	for _, tt := range []struct{ code, want string }{
@@ -22,16 +25,17 @@ func TestMatchKeyPreservesCatalogueVariants(t *testing.T) {
 	}
 }
 
-func FuzzEquivalentCodesShareMatchKey(f *testing.F) {
+func FuzzEquivalentCodesShareLookupQuery(f *testing.F) {
 	for _, pair := range [][2]string{
 		{"ABC00123", "ABC-123"}, {"326IHD-005", "IHD-5"},
 		{"1PONDO-060326-001", "060326-001"}, {"FC2-123", "FC2-PPV-123"},
+		{"PACOPACOMAMA-042126-100", "042126_100"}, {"TUSHYRAW.26.09.27", "TUSHYRAW.2026.09.27"},
 		{"259LUXU-1899", "999LUXU-1899"}, {"", ""},
 	} {
 		f.Add(pair[0], pair[1])
 	}
 	f.Fuzz(func(t *testing.T, a, b string) {
-		if IsEquivalent(a, b) && MatchKey(a) != MatchKey(b) {
+		if IsEquivalent(a, b) && !slices.Contains(Queries(MatchKey(a)), MatchKey(b)) {
 			t.Fatalf("equivalent codes would be excluded by the index: %q, %q", a, b)
 		}
 	})

@@ -54,7 +54,9 @@ func New(ctx context.Context, db *ent.Client, sources ...Source) (*Service, erro
 			return nil, fmt.Errorf("duplicate metadata source %s", source.ID())
 		}
 		s.sources[source.ID()] = source
-		s.settings = append(s.settings, SourceSetting{ID: source.ID(), Enabled: true})
+		if source.ID() != "javdb" {
+			s.settings = append(s.settings, SourceSetting{ID: source.ID(), Enabled: true})
+		}
 	}
 	settings, found, err := database.LoadSetting[[]SourceSetting](ctx, db, "metadata.sources")
 	if err != nil {
@@ -66,7 +68,7 @@ func New(ctx context.Context, db *ent.Client, sources ...Source) (*Service, erro
 		registered := make(map[string]bool, len(s.sources))
 		var current []SourceSetting
 		for _, setting := range settings {
-			if s.sources[setting.ID] != nil {
+			if setting.ID != "javdb" && s.sources[setting.ID] != nil {
 				current = append(current, setting)
 				registered[setting.ID] = true
 			}
@@ -76,13 +78,13 @@ func New(ctx context.Context, db *ent.Client, sources ...Source) (*Service, erro
 				current = append(current, setting)
 			}
 		}
-		slices.SortStableFunc(current, func(a, b SourceSetting) int {
-			return cmp.Compare(sourceOrder(a.ID), sourceOrder(b.ID))
-		})
-		if err := s.validate(current); err != nil {
-			return nil, err
-		}
 		s.settings = current
+	}
+	slices.SortStableFunc(s.settings, func(a, b SourceSetting) int {
+		return cmp.Compare(sourceOrder(a.ID), sourceOrder(b.ID))
+	})
+	if err := s.validate(s.settings); err != nil {
+		return nil, err
 	}
 	return s, nil
 }
@@ -91,8 +93,6 @@ func sourceOrder(id string) int {
 	switch id {
 	case "fanza":
 		return -1
-	case "javdb":
-		return 1
 	default:
 		return 0
 	}
@@ -105,17 +105,21 @@ func (s *Service) Settings() []SourceSetting {
 }
 
 func (s *Service) validate(settings []SourceSetting) error {
-	if len(settings) != len(s.sources) {
+	count := len(s.sources)
+	if s.sources["javdb"] != nil {
+		count--
+	}
+	if len(settings) != count {
 		return domain.E(domain.KindInvalid, "请提供完整的刮削来源列表", nil)
 	}
 	seen := make(map[string]bool)
 	for i, item := range settings {
-		if s.sources[item.ID] == nil || seen[item.ID] {
+		if item.ID == "javdb" || s.sources[item.ID] == nil || seen[item.ID] {
 			return domain.E(domain.KindInvalid, "未知或重复的刮削来源", nil)
 		}
 		seen[item.ID] = true
 		if i > 0 && sourceOrder(settings[i-1].ID) > sourceOrder(item.ID) {
-			return domain.E(domain.KindInvalid, "FANZA 必须为首选来源，JavDB 必须为最终兜底", nil)
+			return domain.E(domain.KindInvalid, "FANZA 必须为首选来源", nil)
 		}
 	}
 	return nil
@@ -138,6 +142,9 @@ func (s *Service) UpdateSettings(ctx context.Context, settings []SourceSetting) 
 // triggers another source; a network failure never permits a weaker identity.
 func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
 	settings := s.Settings()
+	if s.sources["javdb"] != nil {
+		settings = append(settings, SourceSetting{ID: "javdb", Enabled: true})
+	}
 	var failures []error
 	for _, layer := range codeid.Layers(ref.Code) {
 		var results []domain.MovieMetadata
@@ -234,7 +241,7 @@ func attachJavDBIdentity(result domain.MovieMetadata, knownID string) (domain.Mo
 // the confirmed code, never downgrading to another film to obtain an image.
 func (s *Service) Fallback(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
 	source := s.sources["javdb"]
-	if source == nil || !s.enabled("javdb") {
+	if source == nil {
 		return domain.MovieMetadata{}, ErrNotFound
 	}
 	ref.Code = codeid.Normalize(ref.Code)
@@ -323,6 +330,9 @@ func (s *Service) fetch(ctx context.Context, source Source, ref domain.MovieRef)
 }
 
 func (s *Service) enabled(id string) bool {
+	if id == "javdb" {
+		return s.sources[id] != nil
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, setting := range s.settings {

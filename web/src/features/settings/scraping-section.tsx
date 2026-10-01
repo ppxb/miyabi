@@ -7,8 +7,7 @@ import { SettingRow, SettingsSection } from './shared'
 
 const descriptions: Record<string, string> = {
   fanza: '首选来源：官方影片资料、封面和预览图',
-  fc2: 'FC2 商品资料、封面和预览图',
-  javdb: '最终兜底：补充缺失资料，或在其他来源封面不可用时获取图片'
+  fc2: 'FC2 商品资料、封面和预览图'
 }
 
 export function ScrapingSection() {
@@ -18,8 +17,7 @@ export function ScrapingSection() {
   return (
     <SettingsSection icon={<ScanSearchIcon className="size-4" />} title="影片刮削">
       <p className="text-xs text-muted-foreground">
-        FANZA 优先，FC2 使用对应商品资料，JavDB
-        最后兜底。主要资料齐全时不继续查询。保存后对新刮削生效。
+        FANZA 优先，FC2 使用对应商品资料。主要资料齐全时不继续查询。保存后对新刮削生效。
       </p>
       {query.isPending ? <p className="text-sm text-muted-foreground">正在读取来源…</p> : null}
       {sources.map(source => (

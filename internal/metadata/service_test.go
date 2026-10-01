@@ -64,11 +64,8 @@ func TestCompletePrimaryDoesNotQueryJavDBUntilArtworkFallback(t *testing.T) {
 	if fallback.calls.Load() != 1 {
 		t.Fatal("image fallback did not reuse source cache")
 	}
-	if err := s.UpdateSettings(t.Context(), []SourceSetting{{ID: "fanza", Enabled: true}, {ID: "javdb", Enabled: false}}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.Fallback(t.Context(), domain.MovieRef{Code: "ABP-123"}); !errors.Is(err, ErrNotFound) {
-		t.Fatal("disabled fallback was used")
+	if err := s.UpdateSettings(t.Context(), []SourceSetting{{ID: "fanza", Enabled: true}, {ID: "javdb", Enabled: false}}); err == nil {
+		t.Fatal("fallback accepted a user-controlled switch")
 	}
 }
 
@@ -140,12 +137,50 @@ func TestFANZAFirstAndJavDBLastSurviveSavedSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	want := []SourceSetting{{ID: "fanza", Enabled: true}, {ID: "fc2", Enabled: false}, {ID: "javdb", Enabled: true}}
+	want := []SourceSetting{{ID: "fanza", Enabled: true}, {ID: "fc2", Enabled: false}}
 	if !reflect.DeepEqual(s.Settings(), want) {
 		t.Fatalf("order=%v", s.Settings())
 	}
-	if err := s.UpdateSettings(t.Context(), []SourceSetting{want[2], want[0], want[1]}); err == nil {
-		t.Fatal("fallback can become primary")
+	if err := s.UpdateSettings(t.Context(), []SourceSetting{want[1], want[0]}); err == nil {
+		t.Fatal("FANZA can lose its priority")
+	}
+}
+
+func TestJavDBIsHiddenAndAlwaysEnabled(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := database.SaveSetting(t.Context(), store.Client, "metadata.sources", []SourceSetting{
+		{ID: "javdb", Enabled: false}, {ID: "fanza", Enabled: false},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	primary := &sourceStub{id: "fanza", fetch: func(context.Context, string) (domain.MovieMetadata, error) {
+		t.Error("disabled source queried")
+		return domain.MovieMetadata{}, ErrNotFound
+	}}
+	fallback := &sourceStub{id: "javdb", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
+		return completeFixture("javdb", code), nil
+	}}
+	s, err := New(t.Context(), store.Client, fallback, primary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	want := []SourceSetting{{ID: "fanza", Enabled: false}}
+	if !reflect.DeepEqual(s.Settings(), want) {
+		t.Fatalf("public settings include fallback: %v", s.Settings())
+	}
+	if err := s.UpdateSettings(t.Context(), want); err != nil {
+		t.Fatal(err)
+	}
+	for _, resolve := range []func(context.Context, domain.MovieRef) (domain.MovieMetadata, error){s.Resolve, s.Fallback} {
+		m, err := resolve(t.Context(), domain.MovieRef{Code: "ABP-123"})
+		if err != nil || m.Detail.Sources[0].Provider != "javdb" {
+			t.Fatalf("fallback disabled by settings: %+v %v", m, err)
+		}
 	}
 }
 

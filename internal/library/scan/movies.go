@@ -42,10 +42,11 @@ func loadMovieMatcher(ctx context.Context, tx *ent.Tx, codes []string) (movieMat
 	var keys []string
 	groups := make(movieMatcher, len(codes))
 	for _, code := range codes {
-		key := codeid.MatchKey(code)
-		if _, found := groups[key]; !found {
-			keys = append(keys, key)
-			groups[key] = nil
+		for _, key := range codeid.Queries(codeid.MatchKey(code)) {
+			if _, found := groups[key]; !found {
+				keys = append(keys, key)
+				groups[key] = nil
+			}
 		}
 	}
 	records, err := tx.Movie.Query().Where(movie.CanonicalCodeIn(keys...)).
@@ -62,13 +63,15 @@ func loadMovieMatcher(ctx context.Context, tx *ent.Tx, codes []string) (movieMat
 
 func (matcher movieMatcher) find(code string) *ent.Movie {
 	var best *ent.Movie
-	for _, record := range matcher[codeid.MatchKey(code)] {
-		if !codeid.IsEquivalent(record.Code, code) {
-			continue
-		}
-		if best == nil || movieRank(record, code) > movieRank(best, code) ||
-			(movieRank(record, code) == movieRank(best, code) && record.ID < best.ID) {
-			best = record
+	for _, key := range codeid.Queries(codeid.MatchKey(code)) {
+		for _, record := range matcher[key] {
+			if !codeid.IsEquivalent(record.Code, code) {
+				continue
+			}
+			if best == nil || movieRank(record, code) > movieRank(best, code) ||
+				(movieRank(record, code) == movieRank(best, code) && record.ID < best.ID) {
+				best = record
+			}
 		}
 	}
 	return best
@@ -120,12 +123,15 @@ func indexMovies(ctx context.Context, tx *ent.Tx, codes []string) (map[string]in
 	builders := make([]*ent.MovieCreate, 0, len(pending))
 	for _, code := range pending {
 		key := codeid.MatchKey(code)
-		group := owners[key]
+		var group []string
+		for _, variant := range codeid.Queries(key) {
+			group = append(group, owners[variant]...)
+		}
 		if index := slices.IndexFunc(group, func(owner string) bool { return codeid.IsEquivalent(owner, code) }); index >= 0 {
 			aliases[code] = group[index]
 			continue
 		}
-		owners[key] = append(group, code)
+		owners[key] = append(owners[key], code)
 		builders = append(builders, tx.Movie.Create().SetCode(code))
 	}
 	if len(builders) > 0 {
