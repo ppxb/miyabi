@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -136,7 +137,9 @@ func (pool *Pool) runWorker(ctx context.Context, pending <-chan struct{}) error 
 		if ctx.Err() != nil {
 			return nil
 		}
-		if runError != nil {
+		if errors.Is(runError, ErrPaused) {
+			pool.logger.InfoContext(ctx, "task paused", "task_id", job.ID, "type", string(job.Type))
+		} else if runError != nil {
 			pool.logger.WarnContext(ctx, "task attempt failed", "task_id", job.ID, "type", string(job.Type), "error", runError)
 		} else {
 			pool.logger.InfoContext(ctx, "task completed", "task_id", job.ID, "type", string(job.Type))

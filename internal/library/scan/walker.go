@@ -225,6 +225,9 @@ func (r *scanRun) walk(ctx context.Context, start Directory, isResume bool) erro
 		if err := ReportScan(ctx, r.scanner.db.Task, r.taskID, *r.payload, r.scanner.tasksSvc); err != nil {
 			return err
 		}
+		if err := tasks.Checkpoint(ctx, r.scanner.db); err != nil {
+			return err
+		}
 		progress := r.payload.Scan
 		r.checkpointProgress = &progress
 		if err := r.indexDirectory(ctx, directory); err != nil {
@@ -237,6 +240,9 @@ func (r *scanRun) walk(ctx context.Context, start Directory, isResume bool) erro
 	r.payload.Scan.Stage = "reconciling"
 	r.payload.Scan.CurrentPath = r.payload.Source.Directory.Path
 	if err := ReportScan(ctx, r.scanner.db.Task, r.taskID, *r.payload, r.scanner.tasksSvc); err != nil {
+		return err
+	}
+	if err := tasks.Checkpoint(ctx, r.scanner.db); err != nil {
 		return err
 	}
 	return r.reconcile(ctx)

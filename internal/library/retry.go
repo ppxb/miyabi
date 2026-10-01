@@ -51,7 +51,8 @@ func (s *Service) RetryTask(ctx context.Context, id int) (domain.TaskInfo, error
 		}
 		count, err := tx.Task.Update().Where(task.TypeEQ(string(tasks.KindScrape)),
 			task.StatusEQ(task.StatusFailed), func(selector *sql.Selector) {
-				selector.Where(sqljson.ValueEQ(task.FieldPayload, id, sqljson.Path("scan_task_id")))
+				selector.Where(sql.Or(sqljson.ValueEQ(task.FieldPayload, id, sqljson.Path("scan_task_id")),
+					sql.ExprP(selector.C(task.FieldID)+" IN (SELECT value FROM json_each(?, '$.reused_tasks'))", string(parent.Payload))))
 			}).SetStatus(task.StatusQueued).SetProgress(0).SetRetryCount(0).ClearRetryAt().ClearError().Save(ctx)
 		if err != nil {
 			return err

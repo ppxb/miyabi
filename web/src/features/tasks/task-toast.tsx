@@ -18,7 +18,8 @@ function taskToastOptions(
   id: string,
   active: boolean,
   options: TaskToastOptions = {},
-  retryTaskID?: number
+  retryTaskID?: number,
+  libraryPaused?: boolean
 ) {
   return {
     id,
@@ -27,7 +28,7 @@ function taskToastOptions(
     closeButton: false,
     icon: undefined,
     onDismiss: options.onDismiss,
-    action: <TaskToastActions id={id} retryTaskID={retryTaskID} />
+    action: <TaskToastActions id={id} retryTaskID={retryTaskID} libraryPaused={libraryPaused} />
   }
 }
 
@@ -41,13 +42,17 @@ export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
     scanToastID(task.id),
     active,
     options,
-    task.can_retry ? task.id : undefined
+    task.can_retry ? task.id : undefined,
+    active ? !!task.paused : undefined
   )
   if (active) {
     // Sonner's loading type hides the close button; long tasks remain dismissible.
     toast.info(options.waiting ? '扫描进度等待同步' : '正在处理媒体库', {
       ...props,
-      icon: options.waiting ? undefined : <LoaderCircleIcon className="size-4 animate-spin" />,
+      icon:
+        options.waiting || task.paused ? undefined : (
+          <LoaderCircleIcon className="size-4 animate-spin" />
+        ),
       description: (
         <TaskProgress
           current={scanStage(task)}
@@ -82,13 +87,17 @@ export function notifyOfflineTask(
     id,
     active,
     options,
-    options.scan?.can_retry ? options.scan.id : undefined
+    options.scan?.can_retry ? options.scan.id : undefined,
+    options.scan && isTaskActive(options.scan) ? !!options.scan.paused : undefined
   )
   if (active) {
     const scan = options.scan
     toast.info(task.code, {
       ...props,
-      icon: options.waiting ? undefined : <LoaderCircleIcon className="size-4 animate-spin" />,
+      icon:
+        options.waiting || (task.phase !== 'downloading' && scan?.paused) ? undefined : (
+          <LoaderCircleIcon className="size-4 animate-spin" />
+        ),
       description: options.waiting ? (
         '等待进度同步'
       ) : (

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/catalogue"
 	"github.com/ppxb/miyabi/internal/database"
@@ -32,6 +33,69 @@ import (
 	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
+
+func TestRepeatedScanReusesActiveWorkAndPreservesCompleteExports(t *testing.T) {
+	f := newPipelineFixture(t)
+	ctx := t.Context()
+	f.library = library.New(f.store.Client, f.driveService, f.tasks, f.images, library.Options{
+		Pacing:        func(context.Context) error { return nil },
+		ExportManager: export.NewManager(export.Config{EmbyDir: f.embyDir, PublicURL: "http://127.0.0.1:8080"}),
+	})
+	f.drive.addFile("101", "10", "ABP-123.mp4", 2<<30, []byte("video"))
+	f.addCatalogueMovie(fixtureDetail())
+	for range 2 {
+		if _, err := f.library.StartScan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		job, err := f.tasks.Queue().Claim(ctx, []tasks.Kind{tasks.KindScan})
+		if err != nil || job == nil {
+			t.Fatalf("scan claim: %+v %v", job, err)
+		}
+		if err := f.library.Scan(ctx, *job); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.tasks.Queue().Finish(ctx, job.ID, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(f.tasksOfType(t, "scrape")) != 1 {
+		t.Fatal("overlapping scans duplicated scraping")
+	}
+	infos, err := f.library.ListTasks(ctx)
+	if err != nil || len(infos) != 2 {
+		t.Fatalf("workflows: %+v %v", infos, err)
+	}
+	for _, info := range infos {
+		if info.Status != "queued" || info.Scan.MetadataTotal != 1 {
+			t.Fatalf("shared work not tracked: %+v", info)
+		}
+	}
+	f.runQueue(t)
+	before := maps.Clone(f.catalogue.calls)
+	stamp := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	dir := filepath.Join(f.embyDir, "ABP", "ABP-123")
+	files := []string{"ABP-123.nfo", "ABP-123.strm", "poster.jpg", "fanart.jpg"}
+	for _, name := range files {
+		if err := os.Chtimes(filepath.Join(dir, name), stamp, stamp); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := f.library.StartScan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if executed := f.runQueue(t); len(executed) != 1 || executed[0].Type != tasks.KindScan {
+		t.Fatalf("unchanged scan started work: %+v", executed)
+	}
+	if !maps.Equal(before, f.catalogue.calls) {
+		t.Fatal("unchanged scan requested metadata or images")
+	}
+	for _, name := range files {
+		info, err := os.Stat(filepath.Join(dir, name))
+		if err != nil || !info.ModTime().Equal(stamp) {
+			t.Fatalf("unchanged file rewritten: %s %v", name, err)
+		}
+	}
+}
 
 // fakeDrive is an in-memory 115 account: a directory tree, file contents keyed
 // by pick code, and a record of metadata reads in call order.

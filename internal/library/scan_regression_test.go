@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/domain"
@@ -20,6 +21,43 @@ import (
 	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
+
+func TestScanPausesAtDirectoryCheckpointAndResumesRemainingWork(t *testing.T) {
+	lib, client := panConcurrencyFixture(t)
+	ctx := t.Context()
+	source := *lib.Source()
+	rootCalls, childCalls := 0, 0
+	client.list = func(ctx context.Context, _, directoryID string, offset, limit int) (pan.FilePage, error) {
+		if directoryID == source.Directory.ID {
+			rootCalls++
+			if err := lib.tasks.SetLibraryPaused(ctx, true); err != nil {
+				return pan.FilePage{}, err
+			}
+			return pan.FilePage{Files: []pan.File{{ID: "child", Name: "Child", IsDirectory: true}}, Total: 1, Path: []pan.Directory{{ID: source.Directory.ID}}}, nil
+		}
+		childCalls++
+		return pan.FilePage{Path: []pan.Directory{{ID: source.Directory.ID}, {ID: "child"}}}, nil
+	}
+	job := lib.database.Task.Query().Where(task.TypeEQ("scan")).OnlyX(ctx)
+	err := lib.Scan(ctx, tasks.Job{ID: job.ID, Payload: job.Payload})
+	if !errors.Is(err, tasks.ErrPaused) || rootCalls != 1 || childCalls != 0 {
+		t.Fatalf("pause ignored: %v calls=%d/%d", err, rootCalls, childCalls)
+	}
+	saved := lib.database.Task.GetX(ctx, job.ID)
+	checkpoint, err := tasks.DecodePayload[domain.ScanPayload](saved.Payload)
+	if err != nil || checkpoint.Scan.DirectoriesScanned != 1 || checkpoint.Checkpoint == "" {
+		t.Fatalf("lost scan checkpoint: %+v %v", checkpoint, err)
+	}
+	if err := lib.tasks.SetLibraryPaused(ctx, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := lib.Scan(ctx, tasks.Job{ID: job.ID, Payload: saved.Payload}); err != nil {
+		t.Fatal(err)
+	}
+	if rootCalls != 1 || childCalls != 1 {
+		t.Fatalf("resumed already completed directories: %d/%d", rootCalls, childCalls)
+	}
+}
 
 func TestScanResumesCanceledDirectoryAndPersistsAllChunks(t *testing.T) {
 	lib, client := panConcurrencyFixture(t)
@@ -180,7 +218,7 @@ func TestScanResumesReconciliationWithoutWalkingAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	payload.Scan.Stage = "done"
-	if after != payload || lib.database.File.Query().CountX(ctx) != 1 {
+	if !reflect.DeepEqual(after, payload) || lib.database.File.Query().CountX(ctx) != 1 {
 		t.Fatalf("reconciliation changed traversal results: %+v", after)
 	}
 }
@@ -199,7 +237,7 @@ func TestScanProgressKeepsRestartContextAndScanKind(t *testing.T) {
 			}
 			record := lib.database.Task.GetX(t.Context(), queued.ID)
 			restored, err := tasks.DecodePayload[domain.ScanPayload](record.Payload)
-			if err != nil || restored != payload {
+			if err != nil || !reflect.DeepEqual(restored, payload) {
 				t.Fatalf("restart context changed: %+v err=%v", restored, err)
 			}
 			next, err := lib.EnqueueScan(t.Context(), payload.Source)

@@ -13,7 +13,24 @@ type TaskManager interface {
 	Revisions() tasks.TaskRevisions
 	List(context.Context) ([]domain.TaskInfo, error)
 	Retry(context.Context, int) (domain.TaskInfo, error)
+	SetLibraryPaused(context.Context, bool) error
 	Subscribe() (<-chan struct{}, func())
+}
+
+func taskLibraryControlHandler(manager TaskManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		input, ok := bindJSON[struct {
+			Paused *bool `json:"paused" binding:"required"`
+		}](c)
+		if !ok {
+			return
+		}
+		if err := manager.SetLibraryPaused(c.Request.Context(), *input.Paused); err != nil {
+			respond(c, nil, err)
+			return
+		}
+		c.JSON(http.StatusAccepted, gin.H{"paused": *input.Paused})
+	}
 }
 
 func tasksHandler(tasks TaskManager) gin.HandlerFunc {

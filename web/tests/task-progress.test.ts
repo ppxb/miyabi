@@ -107,6 +107,16 @@ test('metadata and artwork share batch progress in scan and offline notification
     assert.ok(html.includes('等待自动重试'))
     assert.ok(html.includes('1 部等待重试'))
     assert.equal(Number(html.match(/aria-valuenow="([^"]+)"/)?.[1]), previous)
+    scan.paused = true
+    assert.equal(scanStatus(scan), '已暂停')
+    if (isOffline) notifyOfflineTask(offline, { scan })
+    else notifyScanTask(scan)
+    const pausedOptions = vi.mocked(toast.info).mock.lastCall?.[1]
+    assert.ok(isValidElement(pausedOptions?.description))
+    const pausedHTML = renderToStaticMarkup(pausedOptions.description)
+    assert.ok(pausedHTML.includes('已暂停'))
+    assert.equal(Number(pausedHTML.match(/aria-valuenow="([^"]+)"/)?.[1]), previous)
+    scan.paused = false
     scan.status = 'running'
     scan.scan.metadata_retrying = 0
   }

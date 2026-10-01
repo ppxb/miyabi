@@ -9,6 +9,7 @@ const statusLabels = {
 
 export function scanStatus(task: ScanTask) {
   if (!isTaskActive(task)) return statusLabels[task.status]
+  if (task.paused) return task.status === 'running' ? '正在保存进度并暂停' : '已暂停'
   if (task.retry_at || (task.status === 'queued' && task.scan.metadata_retrying)) {
     return '等待自动重试'
   }

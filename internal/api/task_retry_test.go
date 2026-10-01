@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/domain"
@@ -15,6 +16,35 @@ type retryTaskStub struct {
 	TaskManager
 	err error
 	ids []int
+}
+
+type libraryControlStub struct {
+	TaskManager
+	paused []bool
+}
+
+func (s *libraryControlStub) SetLibraryPaused(_ context.Context, paused bool) error {
+	s.paused = append(s.paused, paused)
+	return nil
+}
+
+func TestLibraryPauseEndpoint(t *testing.T) {
+	for _, tc := range []struct {
+		body, password string
+		status, calls  int
+	}{
+		{`{"paused":true}`, "", 202, 1}, {`{"paused":false}`, "", 202, 1}, {`{}`, "", 400, 0}, {`{"paused":null}`, "", 400, 0}, {`{"paused":true}`, "secret", 401, 0},
+	} {
+		stub := &libraryControlStub{}
+		router := NewRouter(Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Tasks: stub, Access: NewAccessGateService(tc.password, "fixture-signing-key")})
+		request := httptest.NewRequest(http.MethodPut, "/api/tasks/library-control", strings.NewReader(tc.body))
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		if response.Code != tc.status || len(stub.paused) != tc.calls {
+			t.Fatalf("pause endpoint: %d %s calls=%v", response.Code, response.Body, stub.paused)
+		}
+	}
 }
 
 func (s *retryTaskStub) Retry(_ context.Context, id int) (domain.TaskInfo, error) {

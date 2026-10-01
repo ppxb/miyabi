@@ -58,7 +58,7 @@ export const isOfflineTaskActive = (task: { phase: string; processing: boolean }
   task.phase === 'downloading' || task.processing
 
 export function scanFingerprint(task: ScanTask): string {
-  return `${task.status}|${task.progress}|${task.error ?? ''}|${task.scan.stage}|${task.scan.movies}|${task.scan.metadata_total}|${task.scan.metadata_completed}|${task.scan.metadata_retrying ?? 0}|${task.scan.metadata_failed ?? 0}|${task.retry_at ?? ''}|${task.updated_at}|${!!task.can_retry}`
+  return `${task.status}|${task.progress}|${task.error ?? ''}|${task.scan.stage}|${task.scan.movies}|${task.scan.metadata_total}|${task.scan.metadata_completed}|${task.scan.metadata_retrying ?? 0}|${task.scan.metadata_failed ?? 0}|${task.retry_at ?? ''}|${task.updated_at}|${!!task.can_retry}|${!!task.paused}`
 }
 
 export function batchFingerprint(task: BatchTask): string {

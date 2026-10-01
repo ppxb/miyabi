@@ -171,7 +171,13 @@ func (service *Service) Scrape(ctx context.Context, job tasks.Job) error {
 			return err
 		}
 	}
+	if err := tasks.Checkpoint(ctx, service.db); err != nil {
+		return err
+	}
 	if err := service.prepareArtwork(ctx, job.ID, &input); err != nil {
+		return err
+	}
+	if err := tasks.Checkpoint(ctx, service.db); err != nil {
 		return err
 	}
 	subTask, err := service.publishMovie(ctx, sess, job, input)
@@ -193,7 +199,13 @@ func (service *Service) prepareMetadata(ctx context.Context, sess drive.Session,
 	if record.ScrapeStatus == movie.ScrapeStatusDone {
 		input.Document = MovieNFO(record)
 		artwork := MovieArtwork(record)
-		input.Artwork = &artwork
+		cached, err := service.images.Exists(artwork)
+		if err != nil {
+			return err
+		}
+		if cached {
+			input.Artwork = &artwork
+		}
 		if record.MetadataSnapshot != nil {
 			input.PosterVersion = record.MetadataSnapshot.PosterVersion
 		}

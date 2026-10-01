@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +23,54 @@ import (
 	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
+
+func TestRescanReusesActiveScrapeWithoutChangingItsCheckpoint(t *testing.T) {
+	for _, scenario := range []string{"queued", "running", "retrying", "other source", "failed", "published"} {
+		t.Run(scenario, func(t *testing.T) {
+			run := reconcileFixture(t, 0, 1)
+			ctx := t.Context()
+			film := run.scanner.db.Movie.Query().OnlyX(ctx)
+			source := run.payload.Source
+			if scenario == "other source" {
+				source.AccountID = "another-account"
+			}
+			body, err := tasks.EncodePayload(scrape.Payload{MetadataPayload: scrape.MetadataPayload{Source: source, MovieID: film.ID, Code: film.Code, ScanTaskID: 900}, MetadataReady: true, Completed: scenario == "published"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			builder := run.scanner.db.Task.Create().SetType("scrape").SetResourceKey(fmt.Sprintf("movie:%d", film.ID)).SetPayload(body).SetProgress(45)
+			if scenario == "running" {
+				builder.SetStatus(task.StatusRunning)
+			}
+			if scenario == "retrying" {
+				builder.SetRetryCount(2).SetRetryAt(time.Now().Add(time.Hour))
+			}
+			if scenario == "failed" {
+				builder.SetStatus(task.StatusFailed)
+			}
+			original := builder.SaveX(ctx)
+			if err := run.reconcile(ctx); err != nil {
+				t.Fatal(err)
+			}
+			reused := scenario != "other source" && scenario != "failed" && scenario != "published"
+			want := 2
+			if reused {
+				want = 1
+			}
+			if got := run.scanner.db.Task.Query().Where(task.TypeEQ("scrape")).CountX(ctx); got != want {
+				t.Fatalf("scrape jobs=%d want=%d", got, want)
+			}
+			payload, err := tasks.DecodePayload[domain.ScanPayload](run.scanner.db.Task.GetX(ctx, run.taskID).Payload)
+			if err != nil || reused && !slices.Equal(payload.ReusedTasks, []int{original.ID}) || !reused && len(payload.ReusedTasks) != 0 {
+				t.Fatalf("wrong shared work: %+v %v", payload, err)
+			}
+			got := run.scanner.db.Task.GetX(ctx, original.ID)
+			if string(got.Payload) != string(body) || got.Status != original.Status || got.Progress != 45 || got.RetryCount != original.RetryCount {
+				t.Fatalf("rescan reset active work: %+v", got)
+			}
+		})
+	}
+}
 
 func reconcileFixture(t *testing.T, completed, pending int) *scanRun {
 	t.Helper()

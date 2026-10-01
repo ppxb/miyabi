@@ -12,4 +12,6 @@ type ScanPayload struct {
 	Code          string        `json:"code,omitempty"`
 	JavDBID       string        `json:"javdb_id,omitempty"`
 	Checkpoint    string        `json:"checkpoint,omitempty"`
+	// ReusedTasks links this scan to work already owned by another scan.
+	ReusedTasks []int `json:"reused_tasks,omitempty"`
 }

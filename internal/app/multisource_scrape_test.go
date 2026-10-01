@@ -149,6 +149,72 @@ func TestScrapeDoesNotExportFilesRemovedByConcurrentScan(t *testing.T) {
 	}
 }
 
+func TestSharedRunningScrapeRecoversWhenRescanAddsAPart(t *testing.T) {
+	f := newPipelineFixture(t)
+	ctx := t.Context()
+	f.tasks.Registry().Register(tasks.NewHandler(tasks.KindScrape, f.scrape.Scrape, f.scrape.Finished).WithRetry(domain.RetryDelay))
+	f.drive.addFile("101", "10", "ABP-123-CD1.mp4", 2<<30, []byte("one"))
+	f.addCatalogueMovie(fixtureDetail())
+	runScan := func() {
+		t.Helper()
+		if _, err := f.library.StartScan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		job, err := f.tasks.Queue().Claim(ctx, []tasks.Kind{tasks.KindScan})
+		if err != nil || job == nil {
+			t.Fatalf("claim scan: %+v %v", job, err)
+		}
+		if err := f.library.Scan(ctx, *job); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.tasks.Queue().Finish(ctx, job.ID, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runScan()
+	job, err := f.tasks.Queue().Claim(ctx, []tasks.Kind{tasks.KindScrape})
+	if err != nil || job == nil {
+		t.Fatalf("claim scrape: %+v %v", job, err)
+	}
+	added := false
+	f.store.Client.Task.Use(func(next ent.Mutator) ent.Mutator {
+		return ent.MutateFunc(func(ctx context.Context, mutation ent.Mutation) (ent.Value, error) {
+			m := mutation.(*ent.TaskMutation)
+			id, _ := m.ID()
+			progress, ok := m.Progress()
+			if id == job.ID && ok && progress == 100 && !added {
+				added = true
+				f.drive.addFile("102", "10", "ABP-123-CD2.mp4", 2<<30, []byte("two"))
+				runScan()
+			}
+			return next.Mutate(ctx, mutation)
+		})
+	})
+	err = f.scrape.Scrape(ctx, *job)
+	if _, retry := domain.RetryDelay(err); !retry || !added {
+		t.Fatalf("changed index cannot recover: %v", err)
+	}
+	if err := f.tasks.Queue().Finish(ctx, job.ID, err); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.tasksOfType(t, "scrape")) != 1 {
+		t.Fatal("rescan duplicated running task")
+	}
+	f.store.Client.Task.UpdateOneID(job.ID).SetRetryAt(time.Now().Add(-time.Second)).ExecX(ctx)
+	f.runQueue(t)
+	if got := f.store.Client.Task.GetX(ctx, job.ID); got.Status != task.StatusDone {
+		t.Fatalf("shared task did not recover: %+v", got)
+	}
+	for _, name := range []string{"ABP-123-cd1.strm", "ABP-123-cd2.strm"} {
+		if _, err := os.Stat(filepath.Join(f.embyDir, "ABP", "ABP-123", name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if f.catalogue.calls["detail"] != 1 || f.catalogue.calls["media"] != 1 {
+		t.Fatalf("retry repeated metadata/artwork: %v", f.catalogue.calls)
+	}
+}
+
 func TestJavDBMetadataAndArtworkCheckpointSurvivePublishFailure(t *testing.T) {
 	f := newPipelineFixture(t)
 	primary := &workflowSource{id: "fanza", complete: true, failImage: true}

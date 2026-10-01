@@ -82,8 +82,16 @@ func (service *Service) publishMovie(ctx context.Context, sess drive.Session, jo
 			for _, entry := range files {
 				current = append(current, pan.File{ID: entry.FileID, ParentID: entry.ParentID, Name: entry.Name, Size: entry.Size, SHA1: entry.Sha1})
 			}
-			if len(current) == 0 || VideoFingerprint(current) != snapshot.Videos {
+			if len(current) == 0 {
 				return domain.E(domain.KindConflict, "媒体文件索引已变化，请重新扫描", nil)
+			}
+			if VideoFingerprint(current) != snapshot.Videos {
+				// A shared task may overlap a rescan that adds or moves a part.
+				// Retry publication from saved artwork using fresh directory listings.
+				service.dirMu.Lock()
+				clear(service.dirCache)
+				service.dirMu.Unlock()
+				return &domain.RetryError{Cause: domain.E(domain.KindConflict, "媒体文件索引已更新，等待重新导出", nil)}
 			}
 			if err := ExportEmbyMedia(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken, input.Code, input.Document, videos, poster, fanart); err != nil {
 				return err

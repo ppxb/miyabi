@@ -3,6 +3,7 @@ package library
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -39,6 +40,15 @@ func (s *Service) ListTasks(ctx context.Context) ([]domain.TaskInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list active library tasks: %w", err)
 	}
+	// A recent scan may share work with a much older owner. Keep every active
+	// dependent scan visible, even after it falls outside the history page.
+	shared, err := database.Task.Query().Where(task.TypeEQ(string(tasks.KindScan)), func(s *sql.Selector) {
+		s.Where(sql.ExprP("EXISTS (SELECT 1 FROM json_each(" + s.C(task.FieldPayload) + ", '$.reused_tasks') refs JOIN tasks child ON child.id = refs.value WHERE child.status IN ('queued','running'))"))
+	}).IDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	active = append(active, shared...)
 	ids := make(map[int]bool)
 	for _, record := range records {
 		ids[record.ID] = true
@@ -66,6 +76,10 @@ func (s *Service) Workflows(ctx context.Context, records []*ent.Task) ([]domain.
 	result := make([]domain.TaskInfo, 0, len(records))
 	if len(records) == 0 {
 		return result, nil
+	}
+	paused, err := tasks.LibraryPaused(ctx, database)
+	if err != nil {
+		return nil, err
 	}
 	children, err := metadataGroups(ctx, database, records)
 	if err != nil {
@@ -118,6 +132,7 @@ func (s *Service) Workflows(ctx context.Context, records []*ent.Task) ([]domain.
 			}
 		}
 		info.CanRetry = info.Status == string(task.StatusFailed)
+		info.Paused = paused && (info.Status == string(task.StatusQueued) || info.Status == string(task.StatusRunning))
 		result = append(result, info)
 	}
 	return result, nil
@@ -132,6 +147,32 @@ func metadataGroups(ctx context.Context, database *ent.Client, records []*ent.Ta
 		parents = append(parents, record.ID)
 	}
 	parent := tasks.JSONExtract(children.C(task.FieldPayload), "scan_task_id")
+	result, err := queryMetadataGroups(ctx, database, parent, sqljson.ValueIn(children.C(task.FieldPayload), parents, sqljson.Path("scan_task_id")))
+	if err != nil {
+		return nil, err
+	}
+	for _, record := range records {
+		input, err := tasks.DecodePayload[domain.ScanPayload](record.Payload)
+		if err != nil {
+			return nil, err
+		}
+		if len(input.ReusedTasks) == 0 {
+			continue
+		}
+		// Expand the saved reference array in SQLite instead of binding one
+		// parameter per movie, which exceeds SQLite's limit for large libraries.
+		filter := sql.ExprP(children.C(task.FieldID)+" IN (SELECT value FROM json_each(?, '$.reused_tasks'))", string(record.Payload))
+		groups, err := queryMetadataGroups(ctx, database, "CAST("+strconv.Itoa(record.ID)+" AS INTEGER)", filter)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, groups...)
+	}
+	return result, nil
+}
+
+func queryMetadataGroups(ctx context.Context, database *ent.Client, parent string, filter *sql.Predicate) ([]metadataTaskGroup, error) {
+	children := sql.Table(task.Table)
 	partition := "PARTITION BY " + parent + ", " + children.C(task.FieldType) + ", " + children.C(task.FieldStatus)
 	groups := sql.Select(
 		children.C(task.FieldID), sql.As(parent, "parent_id"),
@@ -139,8 +180,7 @@ func metadataGroups(ctx context.Context, database *ent.Client, records []*ent.Ta
 		sql.As("SUM(CASE WHEN "+children.C(task.FieldStatus)+" = 'queued' AND "+children.C(task.FieldRetryAt)+" IS NOT NULL THEN 1 ELSE 0 END) OVER ("+partition+")", "retrying"),
 		sql.As("MAX(coalesce("+tasks.JSONExtract(children.C(task.FieldPayload), "metadata_ready")+", 0)) OVER ("+partition+")", "metadata_ready"),
 		sql.As("ROW_NUMBER() OVER ("+partition+" ORDER BY "+children.C(task.FieldUpdatedAt)+" DESC, "+children.C(task.FieldID)+" DESC)", "position"),
-	).From(children).Where(sql.And(sql.EQ(children.C(task.FieldType), string(tasks.KindScrape)),
-		sqljson.ValueIn(children.C(task.FieldPayload), parents, sqljson.Path("scan_task_id")))).As("metadata_groups")
+	).From(children).Where(sql.And(sql.EQ(children.C(task.FieldType), string(tasks.KindScrape)), filter)).As("metadata_groups")
 	var result []metadataTaskGroup
 	err := database.Task.Query().Where(func(s *sql.Selector) {
 		s.Join(groups).On(s.C(task.FieldID), groups.C(task.FieldID))

@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"time"
@@ -36,6 +37,10 @@ func resourceAvailable(s *sql.Selector) {
 }
 
 func (q *Queue) NextRetry(ctx context.Context, kinds []Kind) (time.Time, error) {
+	kinds, err := q.runnableKinds(ctx, kinds)
+	if err != nil || len(kinds) == 0 {
+		return time.Time{}, err
+	}
 	record, err := q.database.Task.Query().Where(task.TypeIn(kindStrings(kinds)...), task.StatusEQ(task.StatusQueued),
 		task.RetryAtNotNil(), predicate.Task(resourceAvailable)).Select(task.FieldRetryAt).
 		Order(ent.Asc(task.FieldRetryAt)).First(ctx)
@@ -56,7 +61,7 @@ func (q *Queue) Unlock()                        { q.lock.Unlock() }
 func (q *Queue) Recover(ctx context.Context, kinds []Kind) error {
 	if _, err := q.database.Task.Update().Where(
 		task.TypeIn(kindStrings(kinds)...), task.StatusEQ(task.StatusRunning),
-	).SetStatus(task.StatusQueued).SetProgress(0).ClearError().Save(ctx); err != nil {
+	).SetStatus(task.StatusQueued).ClearError().Save(ctx); err != nil {
 		return fmt.Errorf("recover interrupted tasks: %w", err)
 	}
 	q.bus.NotifyUI()
@@ -70,6 +75,10 @@ func (q *Queue) Claim(ctx context.Context, kinds []Kind) (*Job, error) {
 		return nil, err
 	}
 	defer q.lock.Unlock()
+	kinds, err := q.runnableKinds(ctx, kinds)
+	if err != nil || len(kinds) == 0 {
+		return nil, err
+	}
 	for {
 		record, err := q.database.Task.Query().Where(
 			task.TypeIn(kindStrings(kinds)...), task.StatusEQ(task.StatusQueued),
@@ -105,6 +114,9 @@ func (q *Queue) Finish(ctx context.Context, id int, runError error) error {
 			return err
 		}
 		update := tx.Task.UpdateOneID(id)
+		if errors.Is(runError, ErrPaused) {
+			return update.SetStatus(task.StatusQueued).ClearError().Exec(ctx)
+		}
 		handler, registered := q.registry.Get(Kind(record.Type))
 		if registered && handler.Retry != nil {
 			if wait, retry := handler.Retry(runError); retry && record.RetryCount < MaxRetries {

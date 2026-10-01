@@ -10,12 +10,14 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
+	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scrape"
@@ -53,6 +55,9 @@ func (r *scanRun) prepareReconcile(ctx context.Context, cfg export.Config) (map[
 	retained := file.And(database.LibraryFiles(r.payload.Source), file.Not(r.staleFiles()))
 	reusable := make(map[int]time.Time)
 	for after := 0; ; {
+		if err := tasks.Checkpoint(ctx, r.scanner.db); err != nil {
+			return nil, err
+		}
 		query := r.scanner.db.Movie.Query().Where(movie.IDGT(after), movie.ScrapeStatusEQ(movie.ScrapeStatusDone), movie.HasFilesWith(indexed)).
 			Order(movie.ByID()).Limit(reconcileBatchSize).
 			WithFiles(func(q *ent.FileQuery) { q.Where(retained) })
@@ -144,6 +149,7 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 		}
 	}
 	queued := false
+	r.payload.ReusedTasks = nil
 	for after := 0; ; {
 		records, err := tx.Movie.Query().Where(movie.IDGT(after), movie.HasFilesWith(indexed)).
 			Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID, movie.FieldUpdatedAt).
@@ -155,7 +161,40 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 			break
 		}
 		builders := make([]*ent.TaskCreate, 0, len(records))
+		keys := make([]string, len(records))
+		for i, record := range records {
+			keys[i] = fmt.Sprintf("movie:%d", record.ID)
+		}
+		var active []struct {
+			ID          int    `json:"id"`
+			ResourceKey string `json:"resource_key"`
+			ParentID    int    `json:"parent_id"`
+		}
+		if err := tx.Task.Query().Where(task.TypeEQ(string(tasks.KindScrape)), task.ResourceKeyIn(keys...),
+			task.StatusIn(task.StatusQueued, task.StatusRunning), func(s *sql.Selector) {
+				// Publication checkpoints can precede the queue's final status update.
+				// Such a task can no longer pick up files found by this scan.
+				s.Where(sql.ExprP("coalesce(" + tasks.JSONExtract(s.C(task.FieldPayload), "completed") + ", 0) = 0"))
+				s.Where(sql.And(sqljson.ValueEQ(task.FieldPayload, r.payload.Source.AccountID, sqljson.Path("source", "account_id")),
+					sqljson.ValueEQ(task.FieldPayload, r.payload.Source.Directory.ID, sqljson.Path("source", "directory", "id"))))
+				s.Select(s.C(task.FieldID), s.C(task.FieldResourceKey), sql.As(tasks.JSONExtract(s.C(task.FieldPayload), "scan_task_id"), "parent_id"))
+			}).Order(task.ByID()).Select(task.FieldID).Scan(ctx, &active); err != nil {
+			return err
+		}
+		byKey := make(map[string]int, len(active))
+		for i, item := range active {
+			if _, found := byKey[item.ResourceKey]; !found {
+				byKey[item.ResourceKey] = i
+			}
+		}
 		for _, record := range records {
+			if index, found := byKey[fmt.Sprintf("movie:%d", record.ID)]; found {
+				item := active[index]
+				if item.ParentID != r.taskID {
+					r.payload.ReusedTasks = append(r.payload.ReusedTasks, item.ID)
+				}
+				continue
+			}
 			if checked, ok := reusable[record.ID]; ok && checked.Equal(record.UpdatedAt) {
 				if cfg.EmbyDir != "" && r.scanner.notifier != nil {
 					// Also notify on a retry that finds complete exports: a previous

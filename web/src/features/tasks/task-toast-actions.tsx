@@ -5,13 +5,23 @@ import { toast } from 'sonner'
 import { useRetryTask } from '@/api/tasks'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { LibraryPauseButton } from './library-pause-button'
 
-export function TaskToastActions({ id, retryTaskID }: { id: string; retryTaskID?: number }) {
+export function TaskToastActions({
+  id,
+  retryTaskID,
+  libraryPaused
+}: {
+  id: string
+  retryTaskID?: number
+  libraryPaused?: boolean
+}) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const retry = useRetryTask()
 
   return (
     <div ref={setContainer} className="ml-auto flex shrink-0 items-center gap-1">
+      {libraryPaused !== undefined ? <LibraryPauseButton paused={libraryPaused} /> : null}
       {retryTaskID !== undefined && (
         <Button
           type="button"

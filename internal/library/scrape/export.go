@@ -1,6 +1,7 @@
 package scrape
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"fmt"
@@ -85,10 +86,33 @@ func SortFiles(videos []pan.File) {
 
 // ExportEmbyMedia writes .strm, .nfo, poster.jpg, and fanart.jpg files to the Emby directory structure.
 func ExportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, videos []pan.File, poster, fanart []byte) error {
+	_, err := exportEmbyMedia(embyDir, publicURL, strmToken, code, doc, videos, poster, fanart)
+	return err
+}
+
+// Compare each output independently so repairing one missing sidecar does not
+// touch complete files or trigger unnecessary media-server file events.
+func exportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, videos []pan.File, poster, fanart []byte) (bool, error) {
 	stem := nfo.FileStem(code)
 	destDir := export.EmbyMovieDir(embyDir, code)
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		return fmt.Errorf("create emby directory %s: %w", destDir, err)
+		return false, fmt.Errorf("create emby directory %s: %w", destDir, err)
+	}
+	changed := false
+	write := func(name string, body []byte) error {
+		path := filepath.Join(destDir, name)
+		before, err := os.ReadFile(path)
+		if err == nil && bytes.Equal(before, body) {
+			return nil
+		}
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		if err := os.WriteFile(path, body, 0o644); err != nil {
+			return err
+		}
+		changed = true
+		return nil
 	}
 
 	// Ensure videos are sorted deterministically
@@ -97,15 +121,13 @@ func ExportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, 
 	// 1. Write poster and fanart FIRST
 	posterName, fanartName := "poster.jpg", "fanart.jpg"
 	if len(poster) > 0 {
-		posterPath := filepath.Join(destDir, posterName)
-		if err := os.WriteFile(posterPath, poster, 0o644); err != nil {
-			return fmt.Errorf("write poster: %w", err)
+		if err := write(posterName, poster); err != nil {
+			return changed, fmt.Errorf("write poster: %w", err)
 		}
 	}
 	if len(fanart) > 0 {
-		fanartPath := filepath.Join(destDir, fanartName)
-		if err := os.WriteFile(fanartPath, fanart, 0o644); err != nil {
-			return fmt.Errorf("write fanart: %w", err)
+		if err := write(fanartName, fanart); err != nil {
+			return changed, fmt.Errorf("write fanart: %w", err)
 		}
 	}
 
@@ -115,11 +137,10 @@ func ExportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, 
 	doc.Fanart = fanartName
 	nfoBody, err := nfo.Encode(doc)
 	if err != nil {
-		return fmt.Errorf("encode nfo: %w", err)
+		return changed, fmt.Errorf("encode nfo: %w", err)
 	}
-	nfoPath := filepath.Join(destDir, nfoName)
-	if err := os.WriteFile(nfoPath, nfoBody, 0o644); err != nil {
-		return fmt.Errorf("write nfo file: %w", err)
+	if err := write(nfoName, nfoBody); err != nil {
+		return changed, fmt.Errorf("write nfo file: %w", err)
 	}
 
 	// 3. Write STRM files LAST so media servers (Emby) watching via inotify detect complete assets
@@ -127,60 +148,43 @@ func ExportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, 
 	if len(videos) == 1 {
 		strmName := stem + ".strm"
 		expectedSTRMs[strmName] = true
-		strmPath := filepath.Join(destDir, strmName)
-		if err := os.WriteFile(strmPath, export.STRMContent(publicURL, videos[0].ID, strmToken), 0o644); err != nil {
-			return fmt.Errorf("write strm file: %w", err)
+		if err := write(strmName, export.STRMContent(publicURL, videos[0].ID, strmToken)); err != nil {
+			return changed, fmt.Errorf("write strm file: %w", err)
 		}
 	} else if len(videos) > 1 {
 		for i, v := range videos {
 			strmName := fmt.Sprintf("%s-cd%d.strm", stem, i+1)
 			expectedSTRMs[strmName] = true
-			strmPath := filepath.Join(destDir, strmName)
-			if err := os.WriteFile(strmPath, export.STRMContent(publicURL, v.ID, strmToken), 0o644); err != nil {
-				return fmt.Errorf("write strm file: %w", err)
+			if err := write(strmName, export.STRMContent(publicURL, v.ID, strmToken)); err != nil {
+				return changed, fmt.Errorf("write strm file: %w", err)
 			}
 		}
 	}
 
 	// Clean up obsolete .strm files belonging to this movie
-	if entries, err := os.ReadDir(destDir); err == nil {
-		for _, entry := range entries {
-			if entry.IsDir() {
-				continue
+	entries, err := os.ReadDir(destDir)
+	if err != nil {
+		return changed, err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if strings.HasSuffix(name, ".strm") && strings.HasPrefix(name, stem) && !expectedSTRMs[name] {
+			if err := os.Remove(filepath.Join(destDir, name)); err != nil {
+				return changed, err
 			}
-			name := entry.Name()
-			if strings.HasSuffix(name, ".strm") && strings.HasPrefix(name, stem) && !expectedSTRMs[name] {
-				_ = os.Remove(filepath.Join(destDir, name))
-			}
+			changed = true
 		}
 	}
 
-	return nil
+	return changed, nil
 }
 
-// ExportLocalMovie exports an already-scraped ent.Movie record and cached artwork to the Emby directory if missing.
+// ExportLocalMovie repairs missing or changed outputs using saved metadata and artwork.
 func ExportLocalMovie(embyDir, publicURL, strmToken string, record *ent.Movie, images *mediaimage.Cache) (bool, error) {
 	if record.Code == "" {
-		return false, nil
-	}
-
-	destDir := export.EmbyMovieDir(embyDir, record.Code)
-	stem := nfo.FileStem(record.Code)
-	nfoPath := filepath.Join(destDir, stem+".nfo")
-	posterPath := filepath.Join(destDir, "poster.jpg")
-
-	hasSTRM := false
-	if len(record.Edges.Files) == 1 {
-		_, err := os.Stat(filepath.Join(destDir, stem+".strm"))
-		hasSTRM = err == nil
-	} else if len(record.Edges.Files) > 1 {
-		_, err := os.Stat(filepath.Join(destDir, fmt.Sprintf("%s-cd1.strm", stem)))
-		hasSTRM = err == nil
-	}
-
-	_, nfoErr := os.Stat(nfoPath)
-	_, posterErr := os.Stat(posterPath)
-	if nfoErr == nil && posterErr == nil && hasSTRM {
 		return false, nil
 	}
 
@@ -190,18 +194,21 @@ func ExportLocalMovie(embyDir, publicURL, strmToken string, record *ent.Movie, i
 		videos = append(videos, pan.File{ID: f.FileID, Name: f.Name, Size: f.Size, PickCode: f.PickCode})
 	}
 	var posterBytes, fanartBytes []byte
+	var err error
 	artwork := MovieArtwork(record)
 	if artwork.Poster != "" {
-		posterBytes, _ = images.ReadURL(artwork.Poster)
+		posterBytes, err = images.ReadURL(artwork.Poster)
+		if err != nil {
+			return false, err
+		}
 	}
 	if artwork.Fanart != "" {
-		fanartBytes, _ = images.ReadURL(artwork.Fanart)
+		fanartBytes, err = images.ReadURL(artwork.Fanart)
 	} else if artwork.Thumbnail != "" {
-		fanartBytes, _ = images.ReadURL(artwork.Thumbnail)
+		fanartBytes, err = images.ReadURL(artwork.Thumbnail)
 	}
-
-	if err := ExportEmbyMedia(embyDir, publicURL, strmToken, record.Code, doc, videos, posterBytes, fanartBytes); err != nil {
+	if err != nil {
 		return false, err
 	}
-	return true, nil
+	return exportEmbyMedia(embyDir, publicURL, strmToken, record.Code, doc, videos, posterBytes, fanartBytes)
 }
