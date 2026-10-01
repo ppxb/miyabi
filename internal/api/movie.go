@@ -15,6 +15,14 @@ type LibraryManager interface {
 	Movie(context.Context, int) (lib.MovieDetail, error)
 	Preview(context.Context, int, int) (domain.ImageCandidate, error)
 	StartScan(context.Context) (domain.TaskInfo, error)
+	StartRebuild(context.Context) (domain.TaskInfo, error)
+}
+
+func libraryRebuildHandler(library LibraryManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		job, err := library.StartRebuild(c.Request.Context())
+		accepted(c, job, err)
+	}
 }
 
 func libraryMovieHandler(library LibraryManager) gin.HandlerFunc {

@@ -15,6 +15,7 @@ import (
 type JavDBCatalogue interface {
 	Search(context.Context, string, domain.SearchOptions) ([]catalogue.Movie, error)
 	CatalogueDetail(context.Context, string) (domain.MovieDetail, error)
+	RefreshCatalogueDetail(context.Context, string) (domain.MovieDetail, error)
 	Media(context.Context, string) (domain.Media, error)
 }
 
@@ -68,7 +69,11 @@ func (s *JavDB) Fetch(ctx context.Context, ref domain.MovieRef) (domain.MovieMet
 			return domain.MovieMetadata{}, metadata.ErrNotFound
 		}
 	}
-	m, err := s.catalogue.CatalogueDetail(ctx, id)
+	detail := s.catalogue.CatalogueDetail
+	if ref.Refresh {
+		detail = s.catalogue.RefreshCatalogueDetail
+	}
+	m, err := detail(ctx, id)
 	if err != nil {
 		return domain.MovieMetadata{}, err
 	}

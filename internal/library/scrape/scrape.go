@@ -24,6 +24,7 @@ import (
 
 // MetadataPayload describes the input for a movie scrape job.
 type MetadataPayload struct {
+	Rebuild    bool                 `json:"rebuild,omitempty"`
 	Source     domain.LibrarySource `json:"source"`
 	ScanTaskID int                  `json:"scan_task_id"`
 	MovieID    int                  `json:"movie_id"`
@@ -196,7 +197,7 @@ func (service *Service) prepareMetadata(ctx context.Context, sess drive.Session,
 	if err != nil {
 		return fmt.Errorf("load indexed movie for metadata: %w", err)
 	}
-	if record.ScrapeStatus == movie.ScrapeStatusDone {
+	if record.ScrapeStatus == movie.ScrapeStatusDone && !input.Rebuild {
 		input.Document = MovieNFO(record)
 		artwork := MovieArtwork(record)
 		cached, err := service.images.Exists(artwork)
@@ -338,7 +339,7 @@ func (service *Service) directoryEntries(ctx context.Context, sess drive.Session
 }
 
 func (service *Service) resolveMetadata(ctx context.Context, input *Payload) error {
-	result, err := service.metadata.Resolve(ctx, domain.MovieRef{Code: input.Code, JavDBID: input.JavDBID})
+	result, err := service.metadata.Resolve(ctx, domain.MovieRef{Code: input.Code, JavDBID: input.JavDBID, Refresh: input.Rebuild})
 	if err != nil {
 		return err
 	}

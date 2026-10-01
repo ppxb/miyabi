@@ -1,4 +1,4 @@
-import { LoaderCircleIcon, RefreshCwIcon, ScanLineIcon } from 'lucide-react'
+import { LoaderCircleIcon, RefreshCwIcon, RotateCcwIcon, ScanLineIcon } from 'lucide-react'
 
 import { describeApiError } from '@/api/client'
 import { useStartLibraryScan } from '@/api/library'
@@ -11,6 +11,7 @@ export function LibraryScanButton({
   loading,
   available,
   scanning,
+  rebuilding,
   connected,
   failed,
   onStarted
@@ -18,13 +19,14 @@ export function LibraryScanButton({
   loading: boolean
   available: boolean
   scanning: boolean
+  rebuilding: boolean
   connected: boolean
   failed: boolean
   onStarted: () => void
 }) {
   const startScan = useStartLibraryScan()
   // Keep the mutation observer mounted while pagination replaces the visible control.
-  if (loading) return <Skeleton className="h-9 w-9 rounded-4xl sm:w-30" />
+  if (loading) return <Skeleton className="h-9 w-20 rounded-4xl sm:w-60" />
   if (!available) return null
 
   const processing = scanning && connected
@@ -37,34 +39,54 @@ export function LibraryScanButton({
       : '扫描媒体库'
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          className="w-9 px-0 sm:w-auto sm:px-3"
-          disabled={scanning || startScan.isPending}
-          onClick={() =>
-            startScan.mutate(undefined, {
-              onSuccess: task => {
-                notifyScanTask(task)
-                onStarted()
-              },
-              onError: error => {
-                notifyTaskError('scan:submit-error', '无法创建扫描任务', describeApiError(error))
-              }
-            })
-          }
-        >
-          {processing || startScan.isPending ? (
-            <LoaderCircleIcon className="size-4 animate-spin" />
-          ) : scanning ? (
-            <RefreshCwIcon className="size-4" />
-          ) : (
-            <ScanLineIcon className="size-4" />
-          )}
-          <span className="hidden sm:inline">{scanLabel}</span>
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent className="sm:hidden">{scanLabel}</TooltipContent>
-    </Tooltip>
+    <div className="flex items-center gap-2">
+      {[false, true].map(rebuild => {
+        const label = rebuild ? (scanning && rebuilding ? '正在重建' : '重建媒体库') : scanLabel
+        const busy =
+          (processing && rebuilding === rebuild) ||
+          (startScan.isPending && startScan.variables === rebuild)
+        return (
+          <Tooltip key={String(rebuild)}>
+            <TooltipTrigger asChild>
+              <Button
+                variant={rebuild ? 'outline' : 'default'}
+                className="w-9 px-0 sm:w-auto sm:px-3"
+                aria-label={label}
+                disabled={scanning || startScan.isPending}
+                onClick={() =>
+                  startScan.mutate(rebuild, {
+                    onSuccess: task => {
+                      notifyScanTask(task)
+                      onStarted()
+                    },
+                    onError: error => {
+                      notifyTaskError(
+                        'scan:submit-error',
+                        rebuild ? '无法创建重建任务' : '无法创建扫描任务',
+                        describeApiError(error)
+                      )
+                    }
+                  })
+                }
+              >
+                {busy ? (
+                  <LoaderCircleIcon className="size-4 animate-spin" />
+                ) : rebuild ? (
+                  <RotateCcwIcon className="size-4" />
+                ) : scanning ? (
+                  <RefreshCwIcon className="size-4" />
+                ) : (
+                  <ScanLineIcon className="size-4" />
+                )}
+                <span className="hidden sm:inline">{label}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {rebuild ? '重新刮削全部影片的资料和图片' : '扫描文件变化并处理新增影片'}
+            </TooltipContent>
+          </Tooltip>
+        )
+      })}
+    </div>
   )
 }

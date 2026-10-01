@@ -17,6 +17,30 @@ type libraryPageStub struct {
 	page, limit int
 }
 
+type libraryRebuildStub struct {
+	LibraryManager
+	err error
+}
+
+func (stub *libraryRebuildStub) StartRebuild(context.Context) (domain.TaskInfo, error) {
+	return domain.TaskInfo{ID: 42, Type: "scan", Status: "queued", Rebuild: true}, stub.err
+}
+
+func TestLibraryRebuildReturnsTaskAndPropagatesSourceErrors(t *testing.T) {
+	for _, failure := range []error{nil, domain.E(domain.KindConflict, "媒体目录未挂载", nil)} {
+		router := NewRouter(Dependencies{Access: NewAccessGateService("", ""), Library: &libraryRebuildStub{err: failure}, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/library/rebuild", nil))
+		want := http.StatusAccepted
+		if failure != nil {
+			want = http.StatusConflict
+		}
+		if response.Code != want {
+			t.Fatalf("rebuild status=%d body=%s", response.Code, response.Body)
+		}
+	}
+}
+
 type libraryPreviewStub struct {
 	LibraryManager
 	candidate domain.ImageCandidate

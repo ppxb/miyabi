@@ -47,21 +47,24 @@ export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
   )
   if (active) {
     // Sonner's loading type hides the close button; long tasks remain dismissible.
-    toast.info(options.waiting ? '扫描进度等待同步' : '正在处理媒体库', {
-      ...props,
-      icon:
-        options.waiting || task.paused ? undefined : (
-          <LoaderCircleIcon className="size-4 animate-spin" />
-        ),
-      description: (
-        <TaskProgress
-          current={scanStage(task)}
-          label={scanStatus(task)}
-          progress={task.scan.metadata_total > 0 ? task.progress : undefined}
-          count={task.scan.metadata_total > 0 ? scanCount(task) : undefined}
-        />
-      )
-    })
+    toast.info(
+      options.waiting ? '扫描进度等待同步' : task.rebuild ? '正在重建媒体库' : '正在处理媒体库',
+      {
+        ...props,
+        icon:
+          options.waiting || task.paused ? undefined : (
+            <LoaderCircleIcon className="size-4 animate-spin" />
+          ),
+        description: (
+          <TaskProgress
+            current={scanStage(task)}
+            label={scanStatus(task)}
+            progress={task.scan.metadata_total > 0 ? task.progress : undefined}
+            count={task.scan.metadata_total > 0 ? scanCount(task) : undefined}
+          />
+        )
+      }
+    )
   } else if (task.status === 'failed') {
     toast.error(task.scan.metadata_failed ? '媒体库处理结束，部分影片失败' : '媒体库处理失败', {
       ...props,
@@ -70,7 +73,7 @@ export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
         : task.error
     })
   } else {
-    toast.success('媒体库处理完成', {
+    toast.success(task.rebuild ? '媒体库重建完成' : '媒体库处理完成', {
       ...props,
       description: `识别到 ${task.scan.movies} 部影片${task.scan.metadata_total > 0 ? ` · 元数据 ${task.scan.metadata_completed} 部` : ''}`
     })

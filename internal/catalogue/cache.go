@@ -131,6 +131,16 @@ func cachedJavDB[T any](ctx context.Context, service *Service, cache *responseCa
 	})
 }
 
+// invalidate lets a refresh replace one entry without an older load overwriting it.
+func (cache *responseCache[T]) invalidate(key string) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	if element := cache.entries[key]; element != nil {
+		cache.remove(element)
+	}
+	delete(cache.pending, key)
+}
+
 // reset drops every cached entry; in-flight loads finish but are not stored.
 func (cache *responseCache[T]) reset() {
 	cache.mu.Lock()

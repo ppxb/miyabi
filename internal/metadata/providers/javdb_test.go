@@ -13,6 +13,7 @@ import (
 )
 
 type javdbStub struct {
+	refreshes        int
 	search           []catalogue.Movie
 	detail           domain.MovieDetail
 	queries, details int
@@ -35,6 +36,11 @@ func (s *javdbStub) CatalogueDetail(_ context.Context, id string) (domain.MovieD
 	s.requestedID = id
 	return s.detail, s.err
 }
+
+func (s *javdbStub) RefreshCatalogueDetail(ctx context.Context, id string) (domain.MovieDetail, error) {
+	s.refreshes++
+	return s.CatalogueDetail(ctx, id)
+}
 func (*javdbStub) Media(context.Context, string) (domain.Media, error) { return domain.Media{}, nil }
 
 func TestJavDBKnownIDSkipsSearchAndDoesNotMutateCatalogueCache(t *testing.T) {
@@ -46,6 +52,14 @@ func TestJavDBKnownIDSkipsSearchAndDoesNotMutateCatalogueCache(t *testing.T) {
 	}
 	if s.detail.Actors[0].Provider != "" || s.detail.Tags[0].Provider != "" || s.detail.Maker.Provider != "" {
 		t.Fatal("catalogue cache mutated")
+	}
+}
+
+func TestJavDBRefreshRequestsFreshCatalogueDetail(t *testing.T) {
+	s := &javdbStub{detail: domain.MovieDetail{Movie: domain.Movie{ID: "known", Code: "IPZZ-960", Title: "JavDB title"}}}
+	m, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "IPZZ-960", JavDBID: "known", Refresh: true})
+	if err != nil || s.refreshes != 1 || s.queries != 0 || m.Detail.Title != "JavDB title" {
+		t.Fatalf("JavDB refresh skipped: %+v %v", m, err)
 	}
 }
 

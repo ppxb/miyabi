@@ -181,6 +181,11 @@ func (service *Service) CatalogueDetail(ctx context.Context, movieID string) (do
 	})
 }
 
+func (service *Service) RefreshCatalogueDetail(ctx context.Context, movieID string) (domain.MovieDetail, error) {
+	service.details.invalidate(movieID)
+	return service.CatalogueDetail(ctx, movieID)
+}
+
 func (service *Service) MovieDetail(ctx context.Context, movieID string) (MovieDetail, error) {
 	movie, err := service.CatalogueDetail(ctx, movieID)
 	if err != nil {

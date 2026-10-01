@@ -36,6 +36,7 @@ export function LibraryPage({
           loading={library.isPending}
           available={!!source}
           scanning={scanning}
+          rebuilding={!!latest?.rebuild}
           connected={connection.status === 'connected'}
           failed={latest?.status === 'failed'}
           onStarted={() => onPageChange(1)}

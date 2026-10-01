@@ -104,6 +104,36 @@ func TestResponseCacheEvictsLeastRecentlyUsedAtCapacity(t *testing.T) {
 	}
 }
 
+func TestResponseCacheRefreshDetachesOlderLoad(t *testing.T) {
+	cache := newResponseCache[string](2, time.Hour)
+	started, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = cache.get(t.Context(), "movie", func(context.Context) (string, error) {
+			close(started)
+			<-release
+			return "old", nil
+		})
+	}()
+	<-started
+	cache.invalidate("movie")
+	_, err := cache.get(t.Context(), "movie", func(context.Context) (string, error) { return "fresh", nil })
+	close(release)
+	<-done
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := cache.get(t.Context(), "movie", func(context.Context) (string, error) { t.Error("fresh cache lost"); return "", nil })
+	if err != nil || got != "fresh" {
+		t.Fatalf("older load overwrote refresh: %s %v", got, err)
+	}
+	cache.invalidate("movie")
+	got, err = cache.get(t.Context(), "movie", func(context.Context) (string, error) { return "newer", nil })
+	if err != nil || got != "newer" {
+		t.Fatalf("completed cache not invalidated: %s %v", got, err)
+	}
+}
+
 func TestResponseCacheDoNotCacheBypassesStorage(t *testing.T) {
 	cache := newResponseCache[string](2, time.Hour)
 	ctx := t.Context()

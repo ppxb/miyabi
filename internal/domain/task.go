@@ -4,6 +4,7 @@ import "time"
 
 // TaskInfo is the API presentation of a scan workflow and folded background tasks.
 type TaskInfo struct {
+	Rebuild       bool          `json:"rebuild,omitempty"`
 	ID            int           `json:"id"`
 	Type          string        `json:"type"`
 	Status        string        `json:"status"`

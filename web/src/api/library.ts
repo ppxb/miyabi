@@ -66,7 +66,8 @@ export function useLibraryMovies(page: number) {
 export function useStartLibraryScan() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: () => apiPost<ScanTask>('/api/library/scan'),
+    mutationFn: (rebuild: boolean) =>
+      apiPost<ScanTask>(rebuild ? '/api/library/rebuild' : '/api/library/scan'),
     onSuccess: task => {
       const account = queryClient.getQueryData<PanAccountStatus>(panKeys.account)
       if (

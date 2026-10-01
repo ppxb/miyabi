@@ -2,6 +2,7 @@ package domain
 
 // MovieRef uniquely identifies a movie reference across different metadata sources.
 type MovieRef struct {
+	Refresh bool   `json:"refresh,omitempty"`
 	Code    string `json:"code"`
 	JavDBID string `json:"javdb_id"`
 	Zone    Zone   `json:"zone,omitempty"`

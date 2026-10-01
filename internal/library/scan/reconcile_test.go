@@ -72,6 +72,35 @@ func TestRescanReusesActiveScrapeWithoutChangingItsCheckpoint(t *testing.T) {
 	}
 }
 
+func TestRebuildRefreshesCompletedMoviesAndNeverReusesOrdinaryScrapes(t *testing.T) {
+	run := reconcileFixture(t, 2, 0)
+	ctx := t.Context()
+	run.payload.Rebuild = true
+	film := run.scanner.db.Movie.Query().Order(movie.ByID()).FirstX(ctx)
+	body, _ := tasks.EncodePayload(scrape.Payload{MetadataPayload: scrape.MetadataPayload{
+		Source: run.payload.Source, MovieID: film.ID, Code: film.Code, ScanTaskID: 900,
+	}, MetadataReady: true})
+	old := run.scanner.db.Task.Create().SetType("scrape").SetResourceKey(fmt.Sprintf("movie:%d", film.ID)).SetPayload(body).SaveX(ctx)
+	for range 2 {
+		if err := run.reconcile(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	jobs := run.scanner.db.Task.Query().Where(task.TypeEQ("scrape"), task.IDNEQ(old.ID)).AllX(ctx)
+	if len(jobs) != 2 {
+		t.Fatalf("rebuild jobs = %d, want 2", len(jobs))
+	}
+	for _, job := range jobs {
+		input, err := tasks.DecodePayload[scrape.Payload](job.Payload)
+		if err != nil || !input.Rebuild || input.MetadataReady || input.Artwork != nil {
+			t.Fatalf("rebuild retained an old checkpoint: %+v %v", input, err)
+		}
+	}
+	if got := run.scanner.db.Task.GetX(ctx, old.ID); string(got.Payload) != string(body) {
+		t.Fatal("rebuild changed another task's checkpoint")
+	}
+}
+
 func reconcileFixture(t *testing.T, completed, pending int) *scanRun {
 	t.Helper()
 	store, err := database.Open(t.Context(), t.TempDir())

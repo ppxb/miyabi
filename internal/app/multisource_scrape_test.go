@@ -24,6 +24,7 @@ type workflowSource struct {
 	complete   bool
 	body       []byte
 	failImage  bool
+	fetchError error
 	imageError error
 	queries    int
 	images     int
@@ -39,6 +40,9 @@ func (*workflowSource) Supports(string) bool { return true }
 func (s *workflowSource) Fetch(_ context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
 	code := ref.Code
 	s.queries++
+	if s.fetchError != nil {
+		return domain.MovieMetadata{}, s.fetchError
+	}
 	provider := s.ID()
 	m := domain.MovieMetadata{Detail: domain.MovieDetail{Movie: domain.Movie{
 		Code: code, Title: "Independent metadata", Sources: []domain.SourceID{{Provider: provider, ID: code}},

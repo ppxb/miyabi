@@ -51,6 +51,9 @@ func (r *scanRun) staleFiles() predicate.File {
 // Prepare only bounded pages of completed movies. Files that reconciliation
 // will delete must not participate in snapshot comparison or regenerated STRMs.
 func (r *scanRun) prepareReconcile(ctx context.Context, cfg export.Config) (map[int]time.Time, error) {
+	if r.payload.Rebuild {
+		return nil, nil
+	}
 	indexed := file.And(database.LibraryFiles(r.payload.Source), file.ScanIDEQ(r.payload.ScanID))
 	retained := file.And(database.LibraryFiles(r.payload.Source), file.Not(r.staleFiles()))
 	reusable := make(map[int]time.Time)
@@ -172,6 +175,9 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 		}
 		if err := tx.Task.Query().Where(task.TypeEQ(string(tasks.KindScrape)), task.ResourceKeyIn(keys...),
 			task.StatusIn(task.StatusQueued, task.StatusRunning), func(s *sql.Selector) {
+				if r.payload.Rebuild {
+					s.Where(sqljson.ValueEQ(task.FieldPayload, true, sqljson.Path("rebuild")))
+				}
 				// Publication checkpoints can precede the queue's final status update.
 				// Such a task can no longer pick up files found by this scan.
 				s.Where(sql.ExprP("coalesce(" + tasks.JSONExtract(s.C(task.FieldPayload), "completed") + ", 0) = 0"))
@@ -206,7 +212,8 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 				continue
 			}
 			input := scrape.MetadataPayload{
-				Source: r.payload.Source, ScanTaskID: r.taskID, MovieID: record.ID,
+				Rebuild: r.payload.Rebuild,
+				Source:  r.payload.Source, ScanTaskID: r.taskID, MovieID: record.ID,
 				Code: record.Code, JavDBID: domain.ValueOrZero(record.JavdbID),
 			}
 			encoded, err := tasks.EncodePayload(input)

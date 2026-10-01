@@ -197,7 +197,8 @@ func scanTaskInfo(record *ent.Task) (domain.TaskInfo, error) {
 		return domain.TaskInfo{}, fmt.Errorf("read scan task %d: %w", record.ID, err)
 	}
 	return domain.TaskInfo{
-		ID: record.ID, Type: record.Type, Status: string(record.Status), Progress: record.Progress,
+		Rebuild: payload.Rebuild,
+		ID:      record.ID, Type: record.Type, Status: string(record.Status), Progress: record.Progress,
 		Error: record.Error, CanRetry: record.Status == task.StatusFailed, CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
 		RetryAt: record.RetryAt, RetryCount: record.RetryCount,
 		Source: payload.Source, Scan: payload.Scan, OfflineTaskID: payload.OfflineTaskID,
@@ -205,10 +206,13 @@ func scanTaskInfo(record *ent.Task) (domain.TaskInfo, error) {
 }
 
 // ensureScanTask finds an existing reusable scan task for the source or creates a new queued scan.
-func ensureScanTask(ctx context.Context, taskClient *ent.TaskClient, source domain.LibrarySource, reusable ...task.Status) (*ent.Task, error) {
+func ensureScanTask(ctx context.Context, taskClient *ent.TaskClient, source domain.LibrarySource, rebuild bool, reusable ...task.Status) (*ent.Task, error) {
 	record, err := taskClient.Query().Where(
 		task.TypeEQ(string(tasks.KindScan)), task.StatusIn(reusable...),
 		func(selector *sql.Selector) {
+			if rebuild {
+				selector.Where(sqljson.ValueEQ(task.FieldPayload, true, sqljson.Path("rebuild")))
+			}
 			selector.Where(sql.And(
 				sql.Not(sqljson.HasKey(task.FieldPayload, sqljson.Path("target_id"))),
 				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("source", "account_id")),
@@ -223,7 +227,7 @@ func ensureScanTask(ctx context.Context, taskClient *ent.TaskClient, source doma
 		return nil, fmt.Errorf("find active scan: %w", err)
 	}
 	payload, err := tasks.EncodePayload(domain.ScanPayload{
-		Source: source, Scan: domain.ScanProgress{Stage: "queued", CurrentPath: source.Directory.Path},
+		Source: source, Rebuild: rebuild, Scan: domain.ScanProgress{Stage: "queued", CurrentPath: source.Directory.Path},
 	})
 	if err != nil {
 		return nil, err
@@ -238,7 +242,7 @@ func ensureScanTask(ctx context.Context, taskClient *ent.TaskClient, source doma
 // EnqueueScan reuses a queued or running full scan of the source or creates
 // one. It serves manual retries, where any active scan is good enough.
 func (s *Service) EnqueueScan(ctx context.Context, source domain.LibrarySource) (domain.TaskInfo, error) {
-	return s.enqueueScan(ctx, source, task.StatusQueued, task.StatusRunning)
+	return s.enqueueScan(ctx, source, false, task.StatusQueued, task.StatusRunning)
 }
 
 // EnqueueFreshScan queues a full scan that observes the current mount. Only a
@@ -246,15 +250,15 @@ func (s *Service) EnqueueScan(ctx context.Context, source domain.LibrarySource) 
 // against an earlier mount of the same directory and is about to fail its
 // source check.
 func (s *Service) EnqueueFreshScan(ctx context.Context, source domain.LibrarySource) (domain.TaskInfo, error) {
-	return s.enqueueScan(ctx, source, task.StatusQueued)
+	return s.enqueueScan(ctx, source, false, task.StatusQueued)
 }
 
-func (s *Service) enqueueScan(ctx context.Context, source domain.LibrarySource, reusable ...task.Status) (domain.TaskInfo, error) {
+func (s *Service) enqueueScan(ctx context.Context, source domain.LibrarySource, rebuild bool, reusable ...task.Status) (domain.TaskInfo, error) {
 	if err := s.tasks.Queue().Lock(ctx); err != nil {
 		return domain.TaskInfo{}, err
 	}
 	defer s.tasks.Queue().Unlock()
-	record, err := ensureScanTask(ctx, s.database.Task, source, reusable...)
+	record, err := ensureScanTask(ctx, s.database.Task, source, rebuild, reusable...)
 	if err != nil {
 		return domain.TaskInfo{}, err
 	}

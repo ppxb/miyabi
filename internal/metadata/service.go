@@ -170,6 +170,11 @@ func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.Movi
 		if err := ctx.Err(); err != nil {
 			return domain.MovieMetadata{}, err
 		}
+		// A rebuild must not replace saved catalogue data with a partial result
+		// merely because a source is temporarily unavailable.
+		if ref.Refresh && len(failures) > 0 {
+			break
+		}
 		if merged.Detail.Code != "" {
 			return attachJavDBIdentity(merged, ref.JavDBID)
 		}
@@ -261,6 +266,9 @@ func (s *Service) fetch(ctx context.Context, source Source, ref domain.MovieRef)
 	if knownJavDB {
 		key += ":" + ref.JavDBID
 	}
+	if ref.Refresh {
+		key += ":refresh"
+	}
 	ch := s.requests.DoChan(key, func() (any, error) {
 		s.mu.Lock()
 		if s.closed {
@@ -277,7 +285,7 @@ func (s *Service) fetch(ctx context.Context, source Source, ref domain.MovieRef)
 		if err != nil && !ent.IsNotFound(err) {
 			return nil, err
 		}
-		cacheMatches := entry != nil && time.Now().Before(entry.ExpiresAt)
+		cacheMatches := !ref.Refresh && entry != nil && time.Now().Before(entry.ExpiresAt)
 		// A known ID can retrieve a film absent from search. A cached miss or a
 		// different catalogue ID must not suppress that more precise lookup.
 		if cacheMatches && knownJavDB {

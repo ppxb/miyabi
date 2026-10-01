@@ -29,6 +29,52 @@ func fixture(provider, code, title string) domain.MovieMetadata {
 	return domain.MovieMetadata{Detail: domain.MovieDetail{Movie: domain.Movie{Code: code, Title: title, Sources: []domain.SourceID{{Provider: provider, ID: code}}}}}
 }
 
+func TestRefreshBypassesSuccessfulAndMissingSourceCaches(t *testing.T) {
+	for _, missing := range []bool{false, true} {
+		t.Run(map[bool]string{false: "success", true: "miss"}[missing], func(t *testing.T) {
+			fresh := false
+			source := &sourceStub{id: "official", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
+				if missing && !fresh {
+					return domain.MovieMetadata{}, ErrNotFound
+				}
+				title := "Old title"
+				if fresh {
+					title = "New title"
+				}
+				return fixture("official", code, title), nil
+			}}
+			s := newTestService(t, source)
+			_, _ = s.Resolve(t.Context(), domain.MovieRef{Code: "EBWH-367"})
+			fresh = true
+			m, err := s.Resolve(t.Context(), domain.MovieRef{Code: "EBWH-367", Refresh: true})
+			if err != nil || m.Detail.Title != "New title" || source.calls.Load() != 2 {
+				t.Fatalf("refresh used cached metadata: %+v %v", m, err)
+			}
+			m, err = s.Resolve(t.Context(), domain.MovieRef{Code: "EBWH-367"})
+			if err != nil || m.Detail.Title != "New title" || source.calls.Load() != 2 {
+				t.Fatal("fresh result not saved for ordinary requests")
+			}
+		})
+	}
+}
+
+func TestRefreshDoesNotPublishOfficialOnlyDataWhenJavDBFails(t *testing.T) {
+	official := &sourceStub{id: "fanza", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
+		return completeFixture("fanza", code), nil
+	}}
+	catalogue := &sourceStub{id: "javdb", fetch: func(context.Context, string) (domain.MovieMetadata, error) {
+		return domain.MovieMetadata{}, context.DeadlineExceeded
+	}}
+	s := newTestService(t, official, catalogue)
+	m, err := s.Resolve(t.Context(), domain.MovieRef{Code: "IPZZ-960", Refresh: true})
+	if err == nil || m.Detail.Code != "" {
+		t.Fatalf("partial rebuild accepted: %+v %v", m, err)
+	}
+	if _, retry := domain.RetryDelay(err); !retry {
+		t.Fatalf("source failure cannot retry: %v", err)
+	}
+}
+
 func completeFixture(provider, code string) domain.MovieMetadata {
 	m := fixture(provider, code, provider+" title")
 	m.Detail.ReleaseDate, m.Detail.Duration = "2026-01-01", 120

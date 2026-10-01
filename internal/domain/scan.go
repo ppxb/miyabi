@@ -2,6 +2,7 @@ package domain
 
 // ScanPayload describes the stored JSON payload of a library scan task.
 type ScanPayload struct {
+	Rebuild       bool          `json:"rebuild,omitempty"`
 	ScanID        string        `json:"scan_id,omitempty"`
 	Source        LibrarySource `json:"source"`
 	Scan          ScanProgress  `json:"scan"`

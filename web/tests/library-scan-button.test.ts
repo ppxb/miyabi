@@ -59,7 +59,13 @@ test('loading and hidden controls still retain the scan mutation hook', () => {
   vi.mocked(useStartLibraryScan).mockReturnValue({ isPending: true } as ReturnType<
     typeof useStartLibraryScan
   >)
-  const props = { scanning: false, connected: true, failed: false, onStarted: vi.fn() }
+  const props = {
+    scanning: false,
+    rebuilding: false,
+    connected: true,
+    failed: false,
+    onStarted: vi.fn()
+  }
   LibraryScanButton({ ...props, loading: true, available: false })
   expect(useStartLibraryScan).toHaveBeenCalledTimes(1)
   expect(LibraryScanButton({ ...props, loading: false, available: false })).toBeNull()
@@ -77,13 +83,16 @@ test('scan submission keeps success navigation and failure notification', () => 
     loading: false,
     available: true,
     scanning: false,
+    rebuilding: false,
     connected: true,
     failed: false,
     onStarted
   })!
-  const trigger = elements(tree.props.children)[0]!
+  const tooltip = elements(tree.props.children)[0]!
+  const trigger = elements(tooltip.props.children as ReactNode)[0]!
   const button = elements(trigger.props.children as ReactNode)[0]!
   ;(button.props.onClick as () => void)()
+  expect(mutate.mock.calls[0]![0]).toBe(false)
   const callbacks = mutate.mock.calls[0]![1]
   const task = { id: 123 }
   callbacks.onSuccess(task)
@@ -95,4 +104,33 @@ test('scan submission keeps success navigation and failure notification', () => 
     '无法创建扫描任务',
     '请检查后端服务和网络后重试。'
   )
+})
+
+test('rebuild control submits a full rebuild and both controls disable during processing', () => {
+  const mutate = vi.fn()
+  vi.mocked(useStartLibraryScan).mockReturnValue({
+    isPending: false,
+    mutate
+  } as unknown as ReturnType<typeof useStartLibraryScan>)
+  const props = {
+    loading: false,
+    available: true,
+    scanning: false,
+    rebuilding: false,
+    connected: true,
+    failed: false,
+    onStarted: vi.fn()
+  }
+  const buttons = (tree: ReturnType<typeof LibraryScanButton>) =>
+    elements(tree!.props.children).map(tooltip => {
+      const trigger = elements(tooltip.props.children as ReactNode)[0]!
+      return elements(trigger.props.children as ReactNode)[0]!
+    })
+  const controls = buttons(LibraryScanButton(props))
+  expect(controls.map(button => button.props['aria-label'])).toEqual(['扫描媒体库', '重建媒体库'])
+  ;(controls[1]!.props.onClick as () => void)()
+  expect(mutate.mock.calls[0]![0]).toBe(true)
+  for (const button of buttons(LibraryScanButton({ ...props, scanning: true, rebuilding: true }))) {
+    expect(button.props.disabled).toBe(true)
+  }
 })

@@ -15,6 +15,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 	"github.com/ppxb/miyabi/internal/ent/tag"
+	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scan"
@@ -107,6 +108,15 @@ func (s *Service) StartScan(ctx context.Context) (domain.TaskInfo, error) {
 		return domain.TaskInfo{}, err
 	}
 	return s.EnqueueScan(ctx, sess.Source())
+}
+
+// StartRebuild scans the current source and refreshes every matched movie.
+func (s *Service) StartRebuild(ctx context.Context) (domain.TaskInfo, error) {
+	sess, err := s.drive.Open(ctx)
+	if err != nil {
+		return domain.TaskInfo{}, err
+	}
+	return s.enqueueScan(ctx, sess.Source(), true, task.StatusQueued, task.StatusRunning)
 }
 
 // Source returns the currently mounted library source, or nil if unmounted.
