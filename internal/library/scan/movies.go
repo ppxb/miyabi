@@ -50,7 +50,7 @@ func loadMovieMatcher(ctx context.Context, tx *ent.Tx, codes []string) (movieMat
 		}
 	}
 	records, err := tx.Movie.Query().Where(movie.CanonicalCodeIn(keys...)).
-		Select(movie.FieldID, movie.FieldCode, movie.FieldCanonicalCode, movie.FieldJavdbID).All(ctx)
+		Select(movie.FieldID, movie.FieldCode, movie.FieldCanonicalCode, movie.FieldJavdbID, movie.FieldScrapeStatus).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load equivalent movies: %w", err)
 	}

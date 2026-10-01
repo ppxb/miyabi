@@ -250,11 +250,14 @@ func (service *Service) Finished(ctx context.Context, tx *ent.Tx, job tasks.Job,
 	if err != nil {
 		return 0, err
 	}
-	if err := tx.Movie.Update().Where(
+	update := tx.Movie.Update().Where(
 		movie.IDEQ(input.MovieID),
-		movie.ScrapeStatusNEQ(movie.ScrapeStatusDone),
 		movie.HasFilesWith(database.LibraryFiles(input.Source)),
-	).SetScrapeStatus(movie.ScrapeStatusFailed).Exec(ctx); err != nil {
+	)
+	if !input.Rebuild {
+		update.Where(movie.ScrapeStatusNEQ(movie.ScrapeStatusDone))
+	}
+	if err := update.SetScrapeStatus(movie.ScrapeStatusFailed).Exec(ctx); err != nil {
 		return 0, err
 	}
 	return tasks.ChangeLibrary, nil

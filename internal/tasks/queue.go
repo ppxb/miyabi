@@ -118,18 +118,27 @@ func (q *Queue) Finish(ctx context.Context, id int, runError error) error {
 			return update.SetStatus(task.StatusQueued).ClearError().Exec(ctx)
 		}
 		handler, registered := q.registry.Get(Kind(record.Type))
+		message := ""
+		if runError != nil {
+			message = runError.Error()
+			var public interface{ PublicMessage() string }
+			if errors.As(runError, &public) {
+				// The worker logs the full cause; task views only need the public message.
+				message = public.PublicMessage()
+			}
+		}
 		if registered && handler.Retry != nil {
 			if wait, retry := handler.Retry(runError); retry && record.RetryCount < MaxRetries {
 				// Backoff starts at 15s; jitter avoids a simultaneous retry burst.
 				delay := (15 * time.Second) << record.RetryCount
 				delay += time.Duration(rand.Int64N(int64(delay / 4)))
 				return update.SetStatus(task.StatusQueued).AddRetryCount(1).
-					SetRetryAt(time.Now().Add(max(wait, delay))).SetError(runError.Error()).Exec(ctx)
+					SetRetryAt(time.Now().Add(max(wait, delay))).SetError(message).Exec(ctx)
 			}
 		}
 		update.ClearRetryAt()
 		if runError != nil {
-			update.SetStatus(task.StatusFailed).SetError(runError.Error())
+			update.SetStatus(task.StatusFailed).SetError(message)
 		} else {
 			update.SetStatus(task.StatusDone).SetProgress(100).ClearError()
 		}

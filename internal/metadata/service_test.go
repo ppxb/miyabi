@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -72,6 +73,32 @@ func TestRefreshDoesNotPublishOfficialOnlyDataWhenJavDBFails(t *testing.T) {
 	}
 	if _, retry := domain.RetryDelay(err); !retry {
 		t.Fatalf("source failure cannot retry: %v", err)
+	}
+}
+
+func TestSourceFailuresExposeOnlySourceNamesAndKeepDiagnosticCauses(t *testing.T) {
+	cause := &domain.RetryError{Cause: errors.New("Get https://source.example/private/path: proxyconnect tcp: connection refused")}
+	for _, names := range [][]string{{"pacopacomama"}, {"pacopacomama", "heyzo"}} {
+		t.Run(strings.Join(names, "+"), func(t *testing.T) {
+			var sources []Source
+			for _, name := range names {
+				sources = append(sources, &sourceStub{id: name, fetch: func(context.Context, string) (domain.MovieMetadata, error) {
+					return domain.MovieMetadata{}, cause
+				}})
+			}
+			sources = append(sources, &sourceStub{id: "javdb", fetch: func(context.Context, string) (domain.MovieMetadata, error) {
+				return domain.MovieMetadata{}, ErrNotFound
+			}})
+			s := newTestService(t, sources...)
+			_, err := s.Resolve(t.Context(), domain.MovieRef{Code: "042126_100", Refresh: true})
+			want := "刮削来源查询失败: " + strings.Join(names, "、") + "，请检查网络和代理设置"
+			if domain.PublicMessage(err) != want || !errors.Is(err, cause) || !strings.Contains(err.Error(), "proxyconnect tcp") {
+				t.Fatalf("incorrect public message or lost diagnostics: %v", err)
+			}
+			if _, retry := domain.RetryDelay(err); !retry {
+				t.Fatal("simplified message changed retry classification")
+			}
+		})
 	}
 }
 

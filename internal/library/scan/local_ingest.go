@@ -133,7 +133,8 @@ func (s *LocalScanner) ingestBatch(ctx context.Context, rootDir string, batch []
 				matcher.add(record)
 				added++
 			}
-			if media.document != nil {
+			// An old exported NFO does not mean a failed refresh has recovered.
+			if media.document != nil && record.ScrapeStatus != movie.ScrapeStatusFailed {
 				nfoRead++
 				var current *ent.Movie
 				if err := scrape.SaveMovieMetadata(ctx, tx, record.ID, *media.document); err != nil {

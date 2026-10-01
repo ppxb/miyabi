@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -147,6 +148,7 @@ func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.Movi
 		settings = append(settings, SourceSetting{ID: "javdb", Enabled: true})
 	}
 	var failures []error
+	var failedSources []string
 	for _, layer := range codeid.Layers(ref.Code) {
 		var results []domain.MovieMetadata
 		var merged domain.MovieMetadata
@@ -158,6 +160,9 @@ func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.Movi
 			if err != nil {
 				if !errors.Is(err, ErrNotFound) {
 					failures = append(failures, fmt.Errorf("%s: %w", setting.ID, err))
+					if !slices.Contains(failedSources, setting.ID) {
+						failedSources = append(failedSources, setting.ID)
+					}
 				}
 				continue
 			}
@@ -183,7 +188,8 @@ func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.Movi
 		}
 	}
 	if len(failures) > 0 {
-		return domain.MovieMetadata{}, domain.E(domain.KindUpstream, "刮削来源查询失败", errors.Join(failures...))
+		message := "刮削来源查询失败: " + strings.Join(failedSources, "、") + "，请检查网络和代理设置"
+		return domain.MovieMetadata{}, domain.E(domain.KindUpstream, message, errors.Join(failures...))
 	}
 	return domain.MovieMetadata{}, domain.E(domain.KindNotFound, "已启用的来源未找到可确认的影片资料", ErrNotFound)
 }

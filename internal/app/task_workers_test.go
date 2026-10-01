@@ -109,7 +109,9 @@ func TestTaskPoolsIsolateScanningScrapingAndBatches(t *testing.T) {
 		awaitPan(t, started)
 	}
 	awaitPanCondition(t, func() bool {
-		return store.Client.Task.Query().Where(task.StatusEQ(task.StatusDone)).CountX(ctx) == len(jobs)
+		// Notifications are published after the completion transaction commits.
+		return store.Client.Task.Query().Where(task.StatusEQ(task.StatusDone)).CountX(ctx) == len(jobs) &&
+			service.Revisions().Library >= uint64(len(jobs))
 	})
 	if service.Revisions().Library != uint64(len(jobs)) || exceeded.Load() {
 		t.Fatal("duplicate completions or excess concurrency")

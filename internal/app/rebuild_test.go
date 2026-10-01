@@ -1,18 +1,76 @@
 package app
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/export"
+	"github.com/ppxb/miyabi/internal/library/scan"
 	"github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/metadata"
 	"github.com/ppxb/miyabi/internal/nfo"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
+
+func TestFailedRebuildMarksMovieFailedUntilSuccessfulRetry(t *testing.T) {
+	f := newPipelineFixture(t)
+	ctx := t.Context()
+	source := &workflowSource{id: "pacopacomama", complete: true, body: f.catalogue.cover}
+	meta, err := metadata.New(ctx, f.store.Client, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(meta.Close)
+	f.scrape = scrape.New(f.store.Client, f.driveService, meta, f.images, f.tasks, scrape.Dependencies{
+		ExportManager: export.NewManager(export.Config{EmbyDir: f.embyDir, PublicURL: "http://127.0.0.1:8080"}),
+	})
+	t.Cleanup(f.scrape.Close)
+	f.tasks.Registry().Register(tasks.NewHandler(tasks.KindScrape, f.scrape.Scrape, f.scrape.Finished).WithRetry(domain.RetryDelay))
+	f.drive.addFile("101", "10", "042126_100.mp4", 2<<30, []byte("video"))
+	if _, err := f.library.StartScan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	f.runQueue(t)
+	before := f.store.Client.Movie.Query().OnlyX(ctx)
+	source.fetchError = context.DeadlineExceeded
+	parent, err := f.library.StartRebuild(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.runQueue(t)
+	job := f.store.Client.Task.Query().Where(task.TypeEQ("scrape"), task.StatusEQ(task.StatusQueued)).OnlyX(ctx)
+	job.Update().SetRetryCount(tasks.MaxRetries).SetRetryAt(time.Now().Add(-time.Second)).ExecX(ctx)
+	f.runQueue(t)
+	failed := f.store.Client.Movie.GetX(ctx, before.ID)
+	if failed.ScrapeStatus != movie.ScrapeStatusFailed || failed.Title != before.Title || domain.ValueOrZero(failed.Poster) != domain.ValueOrZero(before.Poster) {
+		t.Fatalf("failed rebuild did not retain data and expose failure: %+v", failed)
+	}
+	infos, err := f.library.ListTasks(ctx)
+	want := "刮削来源查询失败: pacopacomama，请检查网络和代理设置"
+	if err != nil || infos[0].Error == nil || *infos[0].Error != want || !infos[0].CanRetry {
+		t.Fatalf("wrong public failure: %+v %v", infos, err)
+	}
+	if _, err := scan.NewLocalScanner(f.store.Client, f.images).Scan(ctx, f.embyDir); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.store.Client.Movie.GetX(ctx, before.ID); got.ScrapeStatus != movie.ScrapeStatusFailed {
+		t.Fatal("old local NFO cleared rebuild failure")
+	}
+	source.fetchError = nil
+	if _, err := f.library.RetryTask(ctx, parent.ID); err != nil {
+		t.Fatal(err)
+	}
+	f.runQueue(t)
+	if got := f.store.Client.Movie.GetX(ctx, before.ID); got.ScrapeStatus != movie.ScrapeStatusDone {
+		t.Fatal("successful retry did not restore completed status")
+	}
+}
 
 func TestRebuildReplacesSavedMetadataAndPublishesNewPreviews(t *testing.T) {
 	for _, tc := range []struct{ code, provider string }{

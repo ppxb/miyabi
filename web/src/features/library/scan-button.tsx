@@ -34,7 +34,7 @@ export function LibraryScanButton({
       ? '正在处理'
       : '等待同步'
     : failed
-      ? '重新扫描'
+      ? '同步媒体库'
       : '扫描媒体库'
 
   return (

@@ -31,7 +31,7 @@ export function LibraryPage({
 
   return (
     <AppPage>
-      <PageHeader title="媒体库" description="来自 115 网盘的影片索引" inlineActions>
+      <PageHeader title="媒体库" description="来自 115 网盘的影片" inlineActions>
         <LibraryScanButton
           loading={library.isPending}
           available={!!source}
