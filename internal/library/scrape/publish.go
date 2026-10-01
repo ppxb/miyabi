@@ -73,9 +73,13 @@ func (service *Service) publishMovie(ctx context.Context, sess drive.Session, jo
 			return err
 		}
 		return sess.Commit(ctx, func(tx *ent.Tx) error {
-			if err := tx.Movie.UpdateOneID(input.MovieID).SetCode(input.Code).SetMetadata(&input.Document).
+			update := tx.Movie.UpdateOneID(input.MovieID).SetCode(input.Code).SetMetadata(&input.Document).
 				SetCover(artwork.Thumbnail).SetPoster(artwork.Poster).SetFanarts([]string{artwork.Fanart}).
-				SetScrapeStatus(movie.ScrapeStatusDone).SetMetadataSnapshot(snapshot).Exec(ctx); err != nil {
+				SetScrapeStatus(movie.ScrapeStatusDone).SetMetadataSnapshot(snapshot)
+			if id := input.Document.JavDBID(); id != "" {
+				update.SetJavdbID(id)
+			}
+			if err := update.Exec(ctx); err != nil {
 				return err
 			}
 			if err := tx.Task.UpdateOneID(job.ID).SetPayload(encoded).Exec(ctx); err != nil {

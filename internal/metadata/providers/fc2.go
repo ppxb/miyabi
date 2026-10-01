@@ -22,8 +22,8 @@ func (*FC2) ID() string { return "fc2" }
 var fc2Code = regexp.MustCompile(`^FC2-(?:PPV-)?(\d+)$`)
 
 func (*FC2) Supports(code string) bool { return fc2Code.MatchString(code) }
-func (s *FC2) Fetch(ctx context.Context, code string) (domain.MovieMetadata, error) {
-	id := fc2Code.FindStringSubmatch(code)[1]
+func (s *FC2) Fetch(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
+	id := fc2Code.FindStringSubmatch(ref.Code)[1]
 	body, err := s.get(ctx, s.base+"article/"+id+"/")
 	if err != nil {
 		return domain.MovieMetadata{}, err

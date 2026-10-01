@@ -106,8 +106,10 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		return nil, fmt.Errorf("initialize catalogue service: %w", err)
 	}
 	fc2Source := providers.NewFC2(networkSvc.ProxyManager())
-	metadataSvc, err := metadata.New(ctx, store.Client, fc2Source)
+	fanzaSource := providers.NewFANZA(networkSvc.ProxyManager())
+	metadataSvc, err := metadata.New(ctx, store.Client, fanzaSource, fc2Source, providers.NewJavDB(catalogueSvc))
 	if err != nil {
+		fanzaSource.Close()
 		fc2Source.Close()
 		catalogueSvc.Close()
 		driveSvc.Close()

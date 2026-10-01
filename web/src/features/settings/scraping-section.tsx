@@ -1,31 +1,28 @@
-import { ArrowDownIcon, ArrowUpIcon, ScanSearchIcon } from 'lucide-react'
+import { ScanSearchIcon } from 'lucide-react'
 
 import { sourceNames, useScrapingSources, useUpdateScrapingSources } from '@/api/metadata'
 import { InlineError } from '@/components/error-state'
-import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { SettingRow, SettingsSection } from './shared'
 
 const descriptions: Record<string, string> = {
-  fc2: 'FC2 商品资料、封面和预览图'
+  fanza: '首选来源：官方影片资料、封面和预览图',
+  fc2: 'FC2 商品资料、封面和预览图',
+  javdb: '最终兜底：补充缺失资料，或在其他来源封面不可用时获取图片'
 }
 
 export function ScrapingSection() {
   const query = useScrapingSources()
   const update = useUpdateScrapingSources()
   const sources = query.data ?? []
-  function move(index: number, offset: number) {
-    const next = [...sources]
-    ;[next[index], next[index + offset]] = [next[index + offset]!, next[index]!]
-    update.mutate(next)
-  }
   return (
     <SettingsSection icon={<ScanSearchIcon className="size-4" />} title="影片刮削">
       <p className="text-xs text-muted-foreground">
-        按顺序选取资料，其他来源补充缺失信息；封面按实际清晰度自动选择。保存后对新刮削生效。
+        FANZA 优先，FC2 使用对应商品资料，JavDB
+        最后兜底。主要资料齐全时不继续查询。保存后对新刮削生效。
       </p>
       {query.isPending ? <p className="text-sm text-muted-foreground">正在读取来源…</p> : null}
-      {sources.map((source, index) => (
+      {sources.map(source => (
         <SettingRow
           key={source.id}
           title={sourceNames[source.id] ?? source.id}
@@ -33,24 +30,6 @@ export function ScrapingSection() {
           inline
         >
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`上移 ${sourceNames[source.id]}`}
-              disabled={index === 0 || update.isPending}
-              onClick={() => move(index, -1)}
-            >
-              <ArrowUpIcon className="size-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`下移 ${sourceNames[source.id]}`}
-              disabled={index === sources.length - 1 || update.isPending}
-              onClick={() => move(index, 1)}
-            >
-              <ArrowDownIcon className="size-4" />
-            </Button>
             <Switch
               aria-label={`启用 ${sourceNames[source.id]}`}
               checked={source.enabled}

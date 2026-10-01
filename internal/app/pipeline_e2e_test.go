@@ -672,3 +672,7 @@ func (f fixtureMetadata) Resolve(ctx context.Context, ref domain.MovieRef) (doma
 func (f fixtureMetadata) Image(ctx context.Context, image domain.ImageCandidate) (domain.Media, error) {
 	return f.catalogue.Media(ctx, image.URL)
 }
+
+func (f fixtureMetadata) Fallback(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
+	return f.Resolve(ctx, ref)
+}

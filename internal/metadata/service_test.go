@@ -20,13 +20,159 @@ type sourceStub struct {
 
 func (s *sourceStub) ID() string         { return s.id }
 func (*sourceStub) Supports(string) bool { return true }
-func (s *sourceStub) Fetch(ctx context.Context, code string) (domain.MovieMetadata, error) {
+func (s *sourceStub) Fetch(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
 	s.calls.Add(1)
-	return s.fetch(ctx, code)
+	return s.fetch(ctx, ref.Code)
 }
 func (*sourceStub) Media(context.Context, string) (domain.Media, error) { return domain.Media{}, nil }
 func fixture(provider, code, title string) domain.MovieMetadata {
 	return domain.MovieMetadata{Detail: domain.MovieDetail{Movie: domain.Movie{Code: code, Title: title, Sources: []domain.SourceID{{Provider: provider, ID: code}}}}}
+}
+
+func completeFixture(provider, code string) domain.MovieMetadata {
+	m := fixture(provider, code, provider+" title")
+	m.Detail.ReleaseDate, m.Detail.Duration = "2026-01-01", 120
+	m.Detail.Actors = []domain.Actor{{Provider: provider, ID: "actor", Name: "Actor"}}
+	m.Detail.Maker = &domain.Maker{Provider: provider, ID: "maker", Name: "Studio"}
+	m.Detail.Tags = []domain.Tag{{Provider: provider, ID: "tag", Name: "Genre"}}
+	m.Images = []domain.ImageCandidate{{Provider: provider, URL: "cover", Role: "cover"}, {Provider: provider, URL: "preview", Role: "preview"}}
+	return m
+}
+
+func TestCompletePrimaryDoesNotQueryJavDBUntilArtworkFallback(t *testing.T) {
+	primary := &sourceStub{id: "fanza", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
+		return completeFixture("fanza", code), nil
+	}}
+	fallback := &sourceStub{id: "javdb", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
+		return completeFixture("javdb", code), nil
+	}}
+	s := newTestService(t, primary, fallback)
+	for range 2 {
+		m, err := s.Resolve(t.Context(), domain.MovieRef{Code: "ABP-123"})
+		if err != nil || m.Detail.Title != "fanza title" || m.Detail.ID != "" {
+			t.Fatalf("result=%+v err=%v", m, err)
+		}
+	}
+	if primary.calls.Load() != 1 || fallback.calls.Load() != 0 {
+		t.Fatal("complete metadata queried fallback")
+	}
+	for range 2 {
+		if _, err := s.Fallback(t.Context(), domain.MovieRef{Code: "ABP-123"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if fallback.calls.Load() != 1 {
+		t.Fatal("image fallback did not reuse source cache")
+	}
+	if err := s.UpdateSettings(t.Context(), []SourceSetting{{ID: "fanza", Enabled: true}, {ID: "javdb", Enabled: false}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Fallback(t.Context(), domain.MovieRef{Code: "ABP-123"}); !errors.Is(err, ErrNotFound) {
+		t.Fatal("disabled fallback was used")
+	}
+}
+
+func TestJavDBOnlyFillsMissingFieldsAndReturnsItsConfirmedIdentity(t *testing.T) {
+	var order []string
+	primary := &sourceStub{id: "fanza", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
+		order = append(order, "fanza")
+		return fixture("fanza", code, "Official title"), nil
+	}}
+	fallback := &sourceStub{id: "javdb", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
+		order = append(order, "javdb")
+		m := completeFixture("javdb", code)
+		m.Detail.Sources[0].ID = "catalogue-id"
+		return m, nil
+	}}
+	s := newTestService(t, primary, fallback)
+	m, err := s.Resolve(t.Context(), domain.MovieRef{Code: "ABP-123"})
+	if err != nil || !reflect.DeepEqual(order, []string{"fanza", "javdb"}) || m.Detail.Title != "Official title" || m.Detail.ID != "catalogue-id" || m.Detail.FieldSources["title"] != "fanza" || m.Detail.FieldSources["actors"] != "javdb" {
+		t.Fatalf("merge=%+v order=%v err=%v", m, order, err)
+	}
+}
+
+func TestStrongerJavDBIdentityWinsBeforeAnySourceDowngrade(t *testing.T) {
+	primary := &sourceStub{id: "fanza", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
+		if code == "118ABP-123" {
+			return domain.MovieMetadata{}, ErrNotFound
+		}
+		return completeFixture("fanza", code), nil
+	}}
+	fallback := &sourceStub{id: "javdb", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
+		return completeFixture("javdb", code), nil
+	}}
+	s := newTestService(t, primary, fallback)
+	m, err := s.Resolve(t.Context(), domain.MovieRef{Code: "118ABP-123"})
+	if err != nil || m.Detail.Code != "118ABP-123" || m.Detail.Sources[0].Provider != "javdb" || primary.calls.Load() != 1 {
+		t.Fatalf("strong identity lost: %+v %v", m, err)
+	}
+}
+
+func TestPrimaryFailureCanUseSameIdentityFallbackButNeverWeakerIdentity(t *testing.T) {
+	primary := &sourceStub{id: "fanza", fetch: func(context.Context, string) (domain.MovieMetadata, error) {
+		return domain.MovieMetadata{}, errors.New("network unavailable")
+	}}
+	fallback := &sourceStub{id: "javdb", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
+		return completeFixture("javdb", code), nil
+	}}
+	s := newTestService(t, primary, fallback)
+	if _, err := s.Resolve(t.Context(), domain.MovieRef{Code: "118ABP-123"}); err != nil {
+		t.Fatal(err)
+	}
+	fallback.fetch = func(context.Context, string) (domain.MovieMetadata, error) {
+		return domain.MovieMetadata{}, ErrNotFound
+	}
+	if _, err := s.Resolve(t.Context(), domain.MovieRef{Code: "118ABP-124"}); err == nil {
+		t.Fatal("network failure became a weaker match")
+	}
+	if primary.calls.Load() != 2 || fallback.calls.Load() != 2 {
+		t.Fatal("weaker layers were queried after network failure")
+	}
+}
+
+func TestFANZAFirstAndJavDBLastSurviveSavedSettings(t *testing.T) {
+	old := newTestService(t, &sourceStub{id: "fc2"})
+	if err := old.UpdateSettings(t.Context(), []SourceSetting{{ID: "fc2", Enabled: false}}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(t.Context(), old.db, &sourceStub{id: "fanza"}, &sourceStub{id: "fc2"}, &sourceStub{id: "javdb"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	want := []SourceSetting{{ID: "fanza", Enabled: true}, {ID: "fc2", Enabled: false}, {ID: "javdb", Enabled: true}}
+	if !reflect.DeepEqual(s.Settings(), want) {
+		t.Fatalf("order=%v", s.Settings())
+	}
+	if err := s.UpdateSettings(t.Context(), []SourceSetting{want[2], want[0], want[1]}); err == nil {
+		t.Fatal("fallback can become primary")
+	}
+}
+
+func TestKnownJavDBIDCanRecoverFromCachedSearchMiss(t *testing.T) {
+	source := &sourceStub{id: "javdb"}
+	source.fetch = func(_ context.Context, code string) (domain.MovieMetadata, error) {
+		if source.calls.Load() == 1 {
+			return domain.MovieMetadata{}, ErrNotFound
+		}
+		m := completeFixture("javdb", code)
+		m.Detail.ID = "known"
+		m.Detail.Sources[0].ID = "known"
+		return m, nil
+	}
+	s := newTestService(t, source)
+	if _, err := s.Resolve(t.Context(), domain.MovieRef{Code: "ABP-123"}); !errors.Is(err, ErrNotFound) {
+		t.Fatal(err)
+	}
+	for range 2 {
+		m, err := s.Fallback(t.Context(), domain.MovieRef{Code: "ABP-123", JavDBID: "known"})
+		if err != nil || m.Detail.ID != "known" {
+			t.Fatalf("cached search miss blocked ID lookup: %+v %v", m, err)
+		}
+	}
+	if source.calls.Load() != 2 {
+		t.Fatal("known identity was not cached")
+	}
 }
 func newTestService(t *testing.T, sources ...Source) *Service {
 	t.Helper()

@@ -17,6 +17,9 @@ type artworkSource map[string][]byte
 func (artworkSource) Resolve(context.Context, domain.MovieRef) (domain.MovieMetadata, error) {
 	panic("metadata should not be queried")
 }
+func (artworkSource) Fallback(context.Context, domain.MovieRef) (domain.MovieMetadata, error) {
+	panic("fallback should not be queried")
+}
 func (s artworkSource) Image(_ context.Context, candidate domain.ImageCandidate) (domain.Media, error) {
 	return domain.Media{Body: s[candidate.URL]}, nil
 }
@@ -40,6 +43,17 @@ func TestArtworkSelectionRejectsCorruptLargerImageAndUsesEffectivePixels(t *test
 	body, selected, err := service.selectCover(t.Context(), candidates)
 	if err != nil || selected.URL != "good" || !bytes.Equal(body, good) {
 		t.Fatalf("selection: %+v %v", selected, err)
+	}
+	// A fallback cannot replace an available primary image, even if listed first.
+	candidates = []domain.ImageCandidate{{Provider: "javdb", URL: "good", Role: "cover"}, {Provider: "fanza", URL: "small", Role: "cover"}}
+	_, selected, err = service.selectCover(t.Context(), candidates)
+	if err != nil || selected.Provider != "fanza" {
+		t.Fatalf("fallback overrode primary: %+v %v", selected, err)
+	}
+	candidates[1].URL = "bad"
+	_, selected, err = service.selectCover(t.Context(), candidates)
+	if err != nil || selected.Provider != "javdb" {
+		t.Fatalf("broken primary prevented fallback: %+v %v", selected, err)
 	}
 }
 

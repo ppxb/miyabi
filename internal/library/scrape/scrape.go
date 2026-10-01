@@ -44,6 +44,7 @@ type Payload struct {
 // MetadataSource resolves independent sources and downloads their image candidates.
 type MetadataSource interface {
 	Resolve(context.Context, domain.MovieRef) (domain.MovieMetadata, error)
+	Fallback(context.Context, domain.MovieRef) (domain.MovieMetadata, error)
 	Image(context.Context, domain.ImageCandidate) (domain.Media, error)
 }
 

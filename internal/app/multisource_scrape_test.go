@@ -19,25 +19,90 @@ import (
 )
 
 type workflowSource struct {
+	id        string
+	complete  bool
 	body      []byte
 	failImage bool
 	queries   int
+	images    int
 }
 
-func (*workflowSource) ID() string           { return "fixture" }
+func (s *workflowSource) ID() string {
+	if s.id != "" {
+		return s.id
+	}
+	return "fixture"
+}
 func (*workflowSource) Supports(string) bool { return true }
-func (s *workflowSource) Fetch(_ context.Context, code string) (domain.MovieMetadata, error) {
+func (s *workflowSource) Fetch(_ context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
+	code := ref.Code
 	s.queries++
-	return domain.MovieMetadata{Detail: domain.MovieDetail{Movie: domain.Movie{
-		Code: code, Title: "Independent metadata", Sources: []domain.SourceID{{Provider: "fixture", ID: code}},
-		Actors: []domain.Actor{{Provider: "fixture", ID: "42", Name: "Actor"}}, Tags: []domain.Tag{{Provider: "fixture", ID: "7", Name: "Tag"}},
-	}}, Images: []domain.ImageCandidate{{Provider: "fixture", URL: "https://fixture.example/cover.jpg", Role: "cover"}}}, nil
+	provider := s.ID()
+	m := domain.MovieMetadata{Detail: domain.MovieDetail{Movie: domain.Movie{
+		Code: code, Title: "Independent metadata", Sources: []domain.SourceID{{Provider: provider, ID: code}},
+		Actors: []domain.Actor{{Provider: provider, ID: "42", Name: "Actor"}}, Tags: []domain.Tag{{Provider: provider, ID: "7", Name: "Tag"}},
+	}}, Images: []domain.ImageCandidate{{Provider: provider, URL: "https://fixture.example/cover.jpg", Role: "cover"}}}
+	if s.complete {
+		m.Detail.ReleaseDate, m.Detail.Duration = "2026-01-01", 120
+		m.Detail.Maker = &domain.Maker{Provider: provider, ID: "maker", Name: "Studio"}
+		m.Images = append(m.Images, domain.ImageCandidate{Provider: provider, URL: "https://fixture.example/preview.jpg", Role: "preview"})
+	}
+	return m, nil
 }
 func (s *workflowSource) Media(context.Context, string) (domain.Media, error) {
+	s.images++
 	if s.failImage {
 		return domain.Media{}, errors.New("image unavailable")
 	}
 	return domain.Media{Body: s.body, ContentType: "image/jpeg"}, nil
+}
+
+func TestArtworkFallbackCheckpointSurvivesPublishFailureWithoutReplacingPrimaryMetadata(t *testing.T) {
+	f := newPipelineFixture(t)
+	primary := &workflowSource{id: "fanza", complete: true, failImage: true}
+	fallback := &workflowSource{id: "javdb", complete: true, body: f.catalogue.cover}
+	meta, err := metadata.New(t.Context(), f.store.Client, primary, fallback)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(meta.Close)
+	f.scrape = scrape.New(f.store.Client, f.driveService, meta, f.images, f.tasks, scrape.Dependencies{ExportManager: export.NewManager(export.Config{EmbyDir: f.embyDir, PublicURL: "http://127.0.0.1:8080"})})
+	t.Cleanup(f.scrape.Close)
+	failPublish := true
+	f.store.Client.Task.Use(func(next ent.Mutator) ent.Mutator {
+		return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+			if raw, ok := m.(*ent.TaskMutation).Payload(); ok && failPublish {
+				p, err := tasks.DecodePayload[scrape.Payload](raw)
+				if err == nil && p.Completed {
+					return nil, errors.New("publish failed")
+				}
+			}
+			return next.Mutate(ctx, m)
+		})
+	})
+	f.drive.addFile("101", "10", "ABP-123.mp4", 2<<30, []byte("video"))
+	if _, err := f.library.StartScan(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	jobs := f.runQueue(t)
+	job := f.store.Client.Task.GetX(t.Context(), jobs[1].ID)
+	p, err := tasks.DecodePayload[scrape.Payload](job.Payload)
+	if err != nil || job.Status != task.StatusFailed || p.Artwork == nil || p.Completed || p.Document.SelectedImage.Provider != "javdb" || p.Document.JavDBID() != "ABP-123" {
+		t.Fatalf("fallback checkpoint=%+v err=%v", p, err)
+	}
+	if f.store.Client.Movie.Query().OnlyX(t.Context()).JavdbID != nil {
+		t.Fatal("identity escaped failed publish transaction")
+	}
+	failPublish = false
+	job.Update().SetStatus(task.StatusQueued).ExecX(t.Context())
+	f.runQueue(t)
+	record := f.store.Client.Movie.Query().WithActors().OnlyX(t.Context())
+	if record.ScrapeStatus != movie.ScrapeStatusDone || record.JavdbID == nil || *record.JavdbID != "ABP-123" || record.Metadata.IDs[0].Type != "fanza" || record.Edges.Actors[0].Provider != "fanza" || record.Metadata.SelectedImage.Provider != "javdb" {
+		t.Fatalf("fallback replaced primary metadata: %+v", record)
+	}
+	if primary.queries != 1 || fallback.queries != 1 || primary.images != 1 || fallback.images != 1 || len(f.catalogue.calls) != 0 {
+		t.Fatalf("retry repeated work: primary=%+v fallback=%+v", primary, fallback)
+	}
 }
 
 func TestMultiSourceScrapeWithoutJavDBResumesAfterImageFailure(t *testing.T) {

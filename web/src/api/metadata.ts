@@ -6,7 +6,9 @@ export type ScrapingSource = { id: string; enabled: boolean }
 const sourcesKey = ['settings', 'scraping'] as const
 
 export const sourceNames: Record<string, string> = {
-  fc2: 'FC2 官方'
+  fanza: 'FANZA',
+  fc2: 'FC2 官方',
+  javdb: 'JavDB'
 }
 
 export function useScrapingSources() {
