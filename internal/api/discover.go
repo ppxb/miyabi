@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/catalogue"
+	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
 )
 
@@ -13,6 +14,7 @@ type CatalogueManager interface {
 	Search(context.Context, string, domain.SearchOptions) ([]catalogue.Movie, error)
 	Browse(context.Context, domain.BrowseOptions) ([]catalogue.Movie, error)
 	MovieDetail(context.Context, string) (catalogue.MovieDetail, error)
+	ResolveMovieID(context.Context, string) (string, error)
 	MovieStates(context.Context, []catalogue.MovieIdentity) ([]catalogue.MovieStateItem, error)
 	Magnets(context.Context, string) ([]catalogue.Magnet, error)
 	Tags(context.Context, domain.Zone) ([]domain.TagCategory, error)
@@ -123,6 +125,26 @@ func discoverMovieHandler(discover CatalogueManager) gin.HandlerFunc {
 		}
 		movie, err := discover.MovieDetail(c.Request.Context(), uri.ID)
 		respond(c, movie, err)
+	}
+}
+
+func discoverResolveMovieHandler(discover CatalogueManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		query, ok := bindQuery[struct {
+			Code string `form:"code" binding:"required,max=200"`
+		}](c)
+		if !ok {
+			return
+		}
+		code := codeid.Normalize(query.Code)
+		if code == "" {
+			respond(c, nil, domain.E(domain.KindInvalid, "影片番号不能为空", nil))
+			return
+		}
+		id, err := discover.ResolveMovieID(c.Request.Context(), code)
+		respond(c, struct {
+			ID string `json:"id"`
+		}{ID: id}, err)
 	}
 }
 

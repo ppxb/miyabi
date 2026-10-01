@@ -12,7 +12,7 @@ import { MovieDetailTrigger } from '@/features/movie-detail/detail-trigger'
 export function DiscoverMovieCard({ movie }: { movie: DiscoverMovie }) {
   const subscribable = movie.release_status === 'upcoming' && movie.magnets_count === 0
   return (
-    <MovieDetailTrigger movieId={movie.id} className="block rounded-2xl outline-ring">
+    <MovieDetailTrigger movie={{ id: movie.id }} className="block rounded-2xl outline-ring">
       <MovieCard
         movie={movie}
         description={movie.release_date}

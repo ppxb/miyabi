@@ -1,10 +1,10 @@
 import { cn } from 'cn'
 import { useContext, type ComponentProps } from 'react'
 
-import { MovieDetailDialogContext } from './dialog-context'
+import { MovieDetailDialogContext, type MovieDetailTarget } from './dialog-context'
 
 export function MovieDetailTrigger({
-  movieId,
+  movie,
   disabled = false,
   role = 'button',
   tabIndex = 0,
@@ -13,7 +13,7 @@ export function MovieDetailTrigger({
   onKeyDown,
   'aria-haspopup': hasPopup = 'dialog',
   ...props
-}: ComponentProps<'div'> & { movieId: string; disabled?: boolean }) {
+}: ComponentProps<'div'> & { movie: MovieDetailTarget; disabled?: boolean }) {
   const openMovie = useContext(MovieDetailDialogContext)
   if (!openMovie) throw new Error('MovieDetailDialogProvider is missing')
 
@@ -31,7 +31,7 @@ export function MovieDetailTrigger({
         onClick?.(event)
         if (event.defaultPrevented) return
         event.preventDefault()
-        openMovie(movieId, event.currentTarget)
+        openMovie(movie, event.currentTarget)
       }}
       onKeyDown={event => {
         onKeyDown?.(event)

@@ -103,7 +103,7 @@ export function SubscriptionCard({
   return (
     <div className="relative h-full min-w-0">
       <MovieDetailTrigger
-        movieId={item.target_id}
+        movie={{ id: item.target_id }}
         className={cn(
           'block h-full rounded-2xl outline-ring',
           selected && 'ring-2 ring-success',

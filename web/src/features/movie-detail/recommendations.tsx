@@ -54,7 +54,7 @@ function RecommendationCard({ movie }: { movie: MovieReference }) {
   return (
     <div ref={cardRef} className="relative h-full min-w-0">
       <MovieDetailTrigger
-        movieId={movie.id}
+        movie={{ id: movie.id }}
         className="relative block h-full rounded-2xl outline-ring"
         onFocus={() => {
           if (!data && !failed) prioritize()

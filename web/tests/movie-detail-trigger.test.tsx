@@ -5,12 +5,17 @@ import { test, vi } from 'vitest'
 
 import { MovieDetailTrigger } from '@/features/movie-detail/detail-trigger'
 import { MovieDetailDialogContext } from '@/features/movie-detail/dialog-context'
+import { LibraryMovieCard } from '@/features/library/movie-card'
 
 function renderTrigger(overrides: Partial<ComponentProps<typeof MovieDetailTrigger>> = {}) {
   const openMovie = vi.fn()
   let props!: ComponentProps<'div'>
   function CaptureTrigger() {
-    const element = MovieDetailTrigger({ movieId: 'movie-1', children: 'Movie', ...overrides })
+    const element = MovieDetailTrigger({
+      movie: { id: 'movie-1' },
+      children: 'Movie',
+      ...overrides
+    })
     props = element.props
     return element
   }
@@ -43,7 +48,7 @@ test('movie cards open the dialog without rendering a navigation link', () => {
   const event = click()
   props.onClick?.(event)
   assert.equal(event.defaultPrevented, true)
-  assert.deepEqual(openMovie.mock.calls, [['movie-1', event.currentTarget]])
+  assert.deepEqual(openMovie.mock.calls, [[{ id: 'movie-1' }, event.currentTarget]])
 })
 
 test('card actions and selection can consume a click without opening details', () => {
@@ -105,9 +110,37 @@ test('disabled cards cannot open details or invoke selection actions', () => {
 
 test('recommendations prioritize their request before opening in the dialog', () => {
   const prioritize = vi.fn()
-  const { openMovie, props } = renderTrigger({ movieId: 'recommended', onClick: prioritize })
+  const { openMovie, props } = renderTrigger({ movie: { id: 'recommended' }, onClick: prioritize })
   const event = click()
   props.onClick?.(event)
-  assert.deepEqual(openMovie.mock.calls, [['recommended', event.currentTarget]])
+  assert.deepEqual(openMovie.mock.calls, [[{ id: 'recommended' }, event.currentTarget]])
   assert.ok(prioritize.mock.invocationCallOrder[0]! < openMovie.mock.invocationCallOrder[0]!)
+})
+
+test('library cards without a JavDB ID open by code, never by the local database ID', () => {
+  for (const javdb_id of [undefined, '', 'javdb-movie']) {
+    const card = LibraryMovieCard({
+      movie: {
+        id: 42,
+        code: 'ABP-123',
+        title: 'Library movie',
+        javdb_id,
+        duration: 0,
+        rating: 0,
+        actors: [],
+        tags: [],
+        scrape_status: 'done'
+      }
+    })
+    assert.equal(card.type, MovieDetailTrigger)
+    const { openMovie, props, html } = renderTrigger(card.props)
+    assert.match(html, /role="button"/)
+    assert.match(html, /tabindex="0"/)
+    assert.doesNotMatch(html, /href=|<a\b/)
+    const event = click()
+    props.onClick?.(event)
+    assert.deepEqual(openMovie.mock.calls, [
+      [javdb_id ? { id: javdb_id } : { code: 'ABP-123' }, event.currentTarget]
+    ])
+  }
 })

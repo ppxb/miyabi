@@ -4,17 +4,14 @@ import { MovieDetailTrigger } from '@/features/movie-detail/detail-trigger'
 import { LibraryMovieStatus } from './movie-status'
 
 export function LibraryMovieCard({ movie }: { movie: LibraryMovie }) {
-  const card = (
-    <MovieCard movie={movie} titleTooltip={false}>
-      <LibraryMovieStatus movie={movie} />
-    </MovieCard>
-  )
-
-  return movie.javdb_id ? (
-    <MovieDetailTrigger movieId={movie.javdb_id} className="block min-w-0 rounded-2xl outline-ring">
-      {card}
+  return (
+    <MovieDetailTrigger
+      movie={movie.javdb_id ? { id: movie.javdb_id } : { code: movie.code }}
+      className="block min-w-0 rounded-2xl outline-ring"
+    >
+      <MovieCard movie={movie} titleTooltip={false}>
+        <LibraryMovieStatus movie={movie} />
+      </MovieCard>
     </MovieDetailTrigger>
-  ) : (
-    <div className="min-w-0">{card}</div>
   )
 }

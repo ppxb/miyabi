@@ -10,7 +10,7 @@ import {
 } from 'react'
 
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { MovieDetailDialogContext } from './dialog-context'
+import { MovieDetailDialogContext, type MovieDetailTarget } from './dialog-context'
 import { MovieDetailSkeleton } from './skeleton'
 
 const MovieDetailContent = lazy(() =>
@@ -19,15 +19,15 @@ const MovieDetailContent = lazy(() =>
 
 export function MovieDetailDialogProvider({ children }: PropsWithChildren) {
   const router = useRouter()
-  const [movieId, setMovieId] = useState<string>()
+  const [movie, setMovie] = useState<MovieDetailTarget>()
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const openMovie = useCallback(
-    (id: string, trigger: HTMLDivElement) => {
+    (target: MovieDetailTarget, trigger: HTMLDivElement) => {
       // Recommendations replace the detail while retaining the original list's focus target.
       if (!open) triggerRef.current = trigger
-      setMovieId(id)
+      setMovie(target)
       setOpen(true)
     },
     [open]
@@ -55,11 +55,11 @@ export function MovieDetailDialogProvider({ children }: PropsWithChildren) {
         >
           <DialogTitle className="sr-only">影片详情</DialogTitle>
           <div
-            key={movieId}
+            key={movie && ('id' in movie ? `id:${movie.id}` : `code:${movie.code}`)}
             className="min-h-0 flex-1 scroll-fade scrollbar-none overflow-y-auto overscroll-contain p-4 sm:p-6 [&::-webkit-scrollbar]:hidden"
           >
             <Suspense fallback={<MovieDetailSkeleton />}>
-              {movieId ? <MovieDetailContent movieId={movieId} /> : null}
+              {movie ? <MovieDetailContent movie={movie} /> : null}
             </Suspense>
           </div>
         </DialogContent>

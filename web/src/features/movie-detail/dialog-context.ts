@@ -1,5 +1,7 @@
 import { createContext } from 'react'
 
+export type MovieDetailTarget = { id: string } | { code: string }
+
 export const MovieDetailDialogContext = createContext<
-  ((movieId: string, trigger: HTMLDivElement) => void) | null
+  ((movie: MovieDetailTarget, trigger: HTMLDivElement) => void) | null
 >(null)
