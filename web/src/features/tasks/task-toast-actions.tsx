@@ -1,10 +1,8 @@
 import { XIcon } from 'lucide-react'
-import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { useRetryTask } from '@/api/tasks'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { LibraryPauseButton } from './library-pause-button'
 
 export function TaskToastActions({
@@ -16,11 +14,10 @@ export function TaskToastActions({
   retryTaskID?: number
   libraryPaused?: boolean
 }) {
-  const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const retry = useRetryTask()
 
   return (
-    <div ref={setContainer} className="ml-auto flex shrink-0 items-center gap-1">
+    <div className="ml-auto flex shrink-0 items-center gap-1">
       {libraryPaused !== undefined ? <LibraryPauseButton paused={libraryPaused} /> : null}
       {retryTaskID !== undefined && (
         <Button
@@ -33,19 +30,9 @@ export function TaskToastActions({
           {retry.isPending ? '提交中…' : '重试'}
         </Button>
       )}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button type="button" variant="ghost" size="icon-sm" onClick={() => toast.dismiss(id)}>
-            <XIcon />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent
-          container={container?.closest<HTMLElement>('[data-sonner-toaster]')}
-          side="top"
-        >
-          关闭通知
-        </TooltipContent>
-      </Tooltip>
+      <Button type="button" variant="ghost" size="icon-sm" onClick={() => toast.dismiss(id)}>
+        <XIcon />
+      </Button>
     </div>
   )
 }
