@@ -105,19 +105,10 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		_ = store.Close()
 		return nil, fmt.Errorf("initialize catalogue service: %w", err)
 	}
-	busSource := providers.NewJavBus(javbusClient, networkSvc.ProxyManager())
-	avbaseSource, err := providers.NewAVBase(networkSvc.ProxyManager())
+	fc2Source := providers.NewFC2(networkSvc.ProxyManager())
+	metadataSvc, err := metadata.New(ctx, store.Client, fc2Source)
 	if err != nil {
-		busSource.Close()
-		catalogueSvc.Close()
-		driveSvc.Close()
-		_ = store.Close()
-		return nil, err
-	}
-	metadataSvc, err := metadata.New(ctx, store.Client, avbaseSource, providers.NewMGStage(networkSvc.ProxyManager()), providers.NewFC2(networkSvc.ProxyManager()), busSource)
-	if err != nil {
-		avbaseSource.Close()
-		busSource.Close()
+		fc2Source.Close()
 		catalogueSvc.Close()
 		driveSvc.Close()
 		_ = store.Close()

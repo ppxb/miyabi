@@ -53,9 +53,6 @@ func tag(n *html.Node, name string) *html.Node {
 func class(n *html.Node, name string) *html.Node {
 	return first(n, func(n *html.Node) bool { return hasClass(n, name) })
 }
-func id(n *html.Node, name string) *html.Node {
-	return first(n, func(n *html.Node) bool { return attr(n, "id") == name })
-}
 func text(n *html.Node) string {
 	var b strings.Builder
 	var walk func(*html.Node)
@@ -76,11 +73,6 @@ func text(n *html.Node) string {
 	}
 	walk(n)
 	return strings.Join(strings.Fields(b.String()), " ")
-}
-func meta(n *html.Node, key string) string {
-	return attr(first(n, func(n *html.Node) bool {
-		return n.Data == "meta" && (attr(n, "property") == key || attr(n, "name") == key)
-	}), "content")
 }
 func absolute(base, ref string) string {
 	if ref == "" {

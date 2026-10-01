@@ -7,10 +7,7 @@ import { Switch } from '@/components/ui/switch'
 import { SettingRow, SettingsSection } from './shared'
 
 const descriptions: Record<string, string> = {
-  avbase: '影片资料、演员信息和多站点原图汇总',
-  mgstage: '影片资料、完整封面和预览原图',
-  fc2: 'FC2 商品资料、封面和预览图',
-  javbus: '影片资料、演员和图片补充'
+  fc2: 'FC2 商品资料、封面和预览图'
 }
 
 export function ScrapingSection() {

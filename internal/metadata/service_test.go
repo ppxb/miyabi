@@ -3,6 +3,7 @@ package metadata
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -40,6 +41,33 @@ func newTestService(t *testing.T, sources ...Source) *Service {
 	}
 	t.Cleanup(s.Close)
 	return s
+}
+
+func TestSourceSettingsFollowRegisteredSources(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	saved := []SourceSetting{{ID: "removed", Enabled: true}, {ID: "retained", Enabled: false}}
+	if err := database.SaveSetting(t.Context(), store.Client, "metadata.sources", saved); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(t.Context(), store.Client, &sourceStub{id: "added"}, &sourceStub{id: "retained"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	want := []SourceSetting{{ID: "retained", Enabled: false}, {ID: "added", Enabled: true}}
+	if got := s.Settings(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("settings = %+v, want %+v", got, want)
+	}
+	if err := s.UpdateSettings(t.Context(), saved); err == nil {
+		t.Fatal("removed source can still be enabled")
+	}
+	if err := s.UpdateSettings(t.Context(), want); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestResolveWithoutJavDBMergesInPriorityOrderAndPersistsCache(t *testing.T) {

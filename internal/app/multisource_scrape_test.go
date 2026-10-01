@@ -24,14 +24,14 @@ type workflowSource struct {
 	queries   int
 }
 
-func (*workflowSource) ID() string           { return "avbase" }
+func (*workflowSource) ID() string           { return "fixture" }
 func (*workflowSource) Supports(string) bool { return true }
 func (s *workflowSource) Fetch(_ context.Context, code string) (domain.MovieMetadata, error) {
 	s.queries++
 	return domain.MovieMetadata{Detail: domain.MovieDetail{Movie: domain.Movie{
-		Code: code, Title: "Independent metadata", Sources: []domain.SourceID{{Provider: "avbase", ID: code}},
-		Actors: []domain.Actor{{Provider: "avbase", ID: "42", Name: "Actor"}}, Tags: []domain.Tag{{Provider: "avbase", ID: "7", Name: "Tag"}},
-	}}, Images: []domain.ImageCandidate{{Provider: "avbase", URL: "https://fixture.example/cover.jpg", Role: "cover"}}}, nil
+		Code: code, Title: "Independent metadata", Sources: []domain.SourceID{{Provider: "fixture", ID: code}},
+		Actors: []domain.Actor{{Provider: "fixture", ID: "42", Name: "Actor"}}, Tags: []domain.Tag{{Provider: "fixture", ID: "7", Name: "Tag"}},
+	}}, Images: []domain.ImageCandidate{{Provider: "fixture", URL: "https://fixture.example/cover.jpg", Role: "cover"}}}, nil
 }
 func (s *workflowSource) Media(context.Context, string) (domain.Media, error) {
 	if s.failImage {
@@ -69,7 +69,7 @@ func TestMultiSourceScrapeWithoutJavDBResumesAfterImageFailure(t *testing.T) {
 	job.Update().SetStatus(task.StatusQueued).ExecX(t.Context())
 	f.runQueue(t)
 	record = f.store.Client.Movie.Query().WithActors().WithTags().OnlyX(t.Context())
-	if record.ScrapeStatus != movie.ScrapeStatusDone || record.JavdbID != nil || record.Title != "Independent metadata" || record.Edges.Actors[0].Provider != "avbase" || record.Edges.Tags[0].Provider != "avbase" {
+	if record.ScrapeStatus != movie.ScrapeStatusDone || record.JavdbID != nil || record.Title != "Independent metadata" || record.Edges.Actors[0].Provider != "fixture" || record.Edges.Tags[0].Provider != "fixture" {
 		t.Fatalf("source identity lost: %+v", record)
 	}
 	if source.queries != 1 || len(f.catalogue.calls) != 0 {
@@ -80,7 +80,7 @@ func TestMultiSourceScrapeWithoutJavDBResumesAfterImageFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	doc, err := nfo.Decode(body)
-	if err != nil || doc.JavDBID() != "" || doc.IDs[0].Type != "avbase" || doc.Actors[0].Provider != "avbase" {
+	if err != nil || doc.JavDBID() != "" || doc.IDs[0].Type != "fixture" || doc.Actors[0].Provider != "fixture" {
 		t.Fatalf("invalid NFO identities: %+v %v", doc, err)
 	}
 }

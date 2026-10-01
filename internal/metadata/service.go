@@ -60,10 +60,25 @@ func New(ctx context.Context, db *ent.Client, sources ...Source) (*Service, erro
 		return nil, err
 	}
 	if found {
-		if err := s.validate(settings); err != nil {
+		// The registry defines available sources. Preserve their saved order and
+		// switches, discard removed sources, then append newly registered ones.
+		registered := make(map[string]bool, len(s.sources))
+		var current []SourceSetting
+		for _, setting := range settings {
+			if s.sources[setting.ID] != nil {
+				current = append(current, setting)
+				registered[setting.ID] = true
+			}
+		}
+		for _, setting := range s.settings {
+			if !registered[setting.ID] {
+				current = append(current, setting)
+			}
+		}
+		if err := s.validate(current); err != nil {
 			return nil, err
 		}
-		s.settings = settings
+		s.settings = current
 	}
 	return s, nil
 }
