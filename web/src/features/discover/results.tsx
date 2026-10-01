@@ -35,7 +35,7 @@ export function DiscoverResults({
   }
   if (loading || !movies) return <MovieGridSkeleton count={DISCOVER_PAGE_SIZE} />
   return (
-    <div className="flex flex-col gap-6" aria-busy={fetching}>
+    <div className="flex flex-col gap-6">
       {movies.length === 0 && page === 1 ? (
         <EmptyState title={searching ? '没有搜索结果' : '暂无内容'} />
       ) : (

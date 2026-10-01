@@ -77,8 +77,6 @@ test('selection consumes card clicks while browsing allows the detail dialog', (
   expect(preventDefault).toHaveBeenCalledOnce()
   expect(selecting.onSelect).toHaveBeenCalledOnce()
 
-  expect(selecting.trigger.props['aria-haspopup']).toBe(false)
-
   const browsing = cardState(false)
   preventDefault.mockClear()
   browsing.trigger.props.onClick?.({ preventDefault } as unknown as MouseEvent<HTMLDivElement>)
@@ -95,7 +93,6 @@ test('canceling a subscription stays independent of the card click', () => {
   const { action, remove, onSelect } = cardState(false)
   expect(action).toBeDefined()
   expect(action!.props.size).toBe('icon-sm')
-  expect(action!.props['aria-label']).toBe(`取消订阅 ${item.code}`)
   const preventDefault = vi.fn()
   const stopPropagation = vi.fn()
   action!.props.onClick?.({

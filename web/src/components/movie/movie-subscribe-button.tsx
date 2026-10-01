@@ -26,8 +26,6 @@ export function MovieSubscribeButton({ movie }: { movie: DiscoverMovie }) {
           type="button"
           variant={subscribed ? 'default' : 'outline'}
           size="icon-sm"
-          aria-label={subscribed ? '已订阅' : '订阅影片'}
-          aria-pressed={subscribed}
           disabled={isPending || add.isPending}
           className={subscribed ? undefined : 'bg-background/85 backdrop-blur'}
           onClick={handleClick}

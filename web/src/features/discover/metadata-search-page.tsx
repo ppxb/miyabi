@@ -58,7 +58,7 @@ export function MetadataSearchPage({
               onZoneChange(value === 'all' ? undefined : (value as JavDBZone))
             }
           >
-            <SelectTrigger className="w-32" aria-label="影片分区">
+            <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent position="popper" align="end">

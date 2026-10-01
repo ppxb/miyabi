@@ -11,7 +11,6 @@ export function MovieDetailTrigger({
   className,
   onClick,
   onKeyDown,
-  'aria-haspopup': hasPopup = 'dialog',
   ...props
 }: ComponentProps<'div'> & { movie: MovieDetailTarget; disabled?: boolean }) {
   const openMovie = useContext(MovieDetailDialogContext)
@@ -23,8 +22,6 @@ export function MovieDetailTrigger({
       {...props}
       role={role}
       tabIndex={disabled ? -1 : tabIndex}
-      aria-disabled={disabled || undefined}
-      aria-haspopup={hasPopup}
       className={cn('cursor-pointer', className)}
       onClick={event => {
         if (disabled) return

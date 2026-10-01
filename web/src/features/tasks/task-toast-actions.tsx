@@ -35,13 +35,7 @@ export function TaskToastActions({
       )}
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="关闭通知"
-            onClick={() => toast.dismiss(id)}
-          >
+          <Button type="button" variant="ghost" size="icon-sm" onClick={() => toast.dismiss(id)}>
             <XIcon />
           </Button>
         </TooltipTrigger>

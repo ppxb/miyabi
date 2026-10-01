@@ -9,7 +9,6 @@ export function LibraryPauseButton({ paused }: { paused: boolean }) {
       type="button"
       variant="ghost"
       size="sm"
-      aria-label={label}
       title={label}
       disabled={control.isPending}
       onClick={() => control.mutate(!paused)}

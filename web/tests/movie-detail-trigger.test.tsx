@@ -56,11 +56,10 @@ test('card actions and selection can consume a click without opening details', (
   props.onClick?.(click({ defaultPrevented: true }))
   assert.equal(openMovie.mock.calls.length, 0)
   const select = vi.fn((event: MouseEvent<HTMLDivElement>) => event.preventDefault())
-  const selection = renderTrigger({ onClick: select, role: 'checkbox', 'aria-haspopup': false })
+  const selection = renderTrigger({ onClick: select, role: 'checkbox' })
   selection.props.onClick?.(click())
   assert.equal(select.mock.calls.length, 1)
   assert.equal(selection.openMovie.mock.calls.length, 0)
-  assert.equal(selection.props['aria-haspopup'], false)
 })
 
 test('Enter and Space activate the card once and ignore keyboard events from child controls', () => {
@@ -105,7 +104,6 @@ test('disabled cards cannot open details or invoke selection actions', () => {
   assert.equal(openMovie.mock.calls.length, 0)
   assert.equal(activate.mock.calls.length, 0)
   assert.equal(props.tabIndex, -1)
-  assert.equal(props['aria-disabled'], true)
 })
 
 test('recommendations prioritize their request before opening in the dialog', () => {

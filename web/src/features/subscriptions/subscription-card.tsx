@@ -77,7 +77,6 @@ export function SubscriptionCard({
                   type="button"
                   variant="secondary"
                   size="icon-sm"
-                  aria-label={`取消订阅 ${item.code}`}
                   disabled={busy}
                   onClick={event => {
                     event.preventDefault()
@@ -111,8 +110,6 @@ export function SubscriptionCard({
         )}
         role={selecting ? 'checkbox' : undefined}
         disabled={selecting && disabled}
-        aria-checked={selecting ? selected : undefined}
-        aria-haspopup={selecting ? false : 'dialog'}
         onClick={event => {
           if (!selecting) return
           event.preventDefault()
@@ -126,7 +123,6 @@ export function SubscriptionCard({
           checked={selected}
           disabled={disabled}
           onCheckedChange={onSelect}
-          aria-label={`选择 ${item.code}`}
           className="absolute top-3 right-3 size-5 data-checked:border-success data-checked:bg-success data-checked:text-white"
         />
       ) : null}

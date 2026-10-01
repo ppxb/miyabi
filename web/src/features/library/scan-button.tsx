@@ -49,7 +49,6 @@ export function LibraryScanButton({
             key={String(rebuild)}
             variant={rebuild ? 'outline' : 'default'}
             className="w-9 px-0 sm:w-auto sm:px-3"
-            aria-label={label}
             disabled={scanning || startScan.isPending}
             onClick={() =>
               startScan.mutate(rebuild, {

@@ -43,7 +43,6 @@ export function ListPagination({
       <PaginationItem key={item}>
         <PaginationLink
           href="#"
-          aria-disabled={disabled || undefined}
           tabIndex={disabled ? -1 : undefined}
           className={cn(disabled && 'pointer-events-none opacity-50')}
           onClick={e => {

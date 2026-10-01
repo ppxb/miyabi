@@ -22,7 +22,7 @@ export function CommonFilterSelect({
       value={value || 'all'}
       onValueChange={next => onValueChange(next === 'all' ? '' : next)}
     >
-      <SelectTrigger className="w-full sm:w-48" aria-label="通用筛选">
+      <SelectTrigger className="w-full sm:w-48">
         <SelectValue placeholder="全部条件" />
       </SelectTrigger>
       <SelectContent position="popper" align="start">

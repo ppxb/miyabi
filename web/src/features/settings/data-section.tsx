@@ -57,7 +57,6 @@ export function DataSection() {
           type="button"
           variant="outline"
           size="icon"
-          aria-label="刷新数据与缓存统计"
           title="刷新统计"
           disabled={busy}
           onClick={() => void info.refetch()}
