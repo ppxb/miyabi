@@ -88,9 +88,7 @@ test('scan submission keeps success navigation and failure notification', () => 
     failed: false,
     onStarted
   })!
-  const tooltip = elements(tree.props.children)[0]!
-  const trigger = elements(tooltip.props.children as ReactNode)[0]!
-  const button = elements(trigger.props.children as ReactNode)[0]!
+  const button = elements(tree.props.children)[0]!
   ;(button.props.onClick as () => void)()
   expect(mutate.mock.calls[0]![0]).toBe(false)
   const callbacks = mutate.mock.calls[0]![1]
@@ -121,11 +119,7 @@ test('rebuild control submits a full rebuild and both controls disable during pr
     failed: false,
     onStarted: vi.fn()
   }
-  const buttons = (tree: ReturnType<typeof LibraryScanButton>) =>
-    elements(tree!.props.children).map(tooltip => {
-      const trigger = elements(tooltip.props.children as ReactNode)[0]!
-      return elements(trigger.props.children as ReactNode)[0]!
-    })
+  const buttons = (tree: ReturnType<typeof LibraryScanButton>) => elements(tree!.props.children)
   const controls = buttons(LibraryScanButton(props))
   expect(controls.map(button => button.props['aria-label'])).toEqual(['扫描媒体库', '重建媒体库'])
   ;(controls[1]!.props.onClick as () => void)()
