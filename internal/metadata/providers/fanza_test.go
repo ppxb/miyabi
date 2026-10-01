@@ -77,7 +77,7 @@ func TestFANZAResolvesOfficialIdentityAcrossPagesAndMapsMetadata(t *testing.T) {
 				t.Error("guessed content ID")
 			}
 			return json.RawMessage(`{"data":{"ppvContent":{
-			"id":"unpredictable-content-id","makerContentId":"SSIS-001","floor":"AV","title":"Official title","description":"Synopsis",
+			"id":"unpredictable-content-id","makerContentId":"SSIS-001","floor":"AV","title":"Official title",
 			"duration":8826,"deliveryStartDate":"2021-02-18T01:00:00Z","makerReleasedAt":"2021-02-18T15:00:00Z",
 			"packageImage":{"largeUrl":"https://pics.dmm.co.jp/cover.jpg","mediumUrl":"https://pics.dmm.co.jp/thumb.jpg"},
 			"sampleImages":[{"imageUrl":"small.jpg","largeImageUrl":"original.jpg"}],
@@ -92,7 +92,7 @@ func TestFANZAResolvesOfficialIdentityAcrossPagesAndMapsMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := got.Detail
-	if !reflect.DeepEqual(offsets, []float64{0, 40}) || m.ID != "" || m.Sources[0].ID != "unpredictable-content-id" || m.ReleaseDate != "2021-02-19" || m.Duration != 147 || m.RatingMax != 5 || m.RatingSource != "fanza" || m.Summary != "Synopsis" {
+	if !reflect.DeepEqual(offsets, []float64{0, 40}) || m.ID != "" || m.Sources[0].ID != "unpredictable-content-id" || m.ReleaseDate != "2021-02-19" || m.Duration != 147 || m.RatingMax != 5 || m.RatingSource != "fanza" {
 		t.Fatalf("identity or metadata: %+v offsets=%v", m, offsets)
 	}
 	if len(m.Actors) != 2 || m.Actors[1].Gender != "male" || m.Maker.Provider != "fanza" || m.Tags[0].Provider != "fanza" || len(got.Images) != 3 || m.PreviewImages[0].Original != "original.jpg" {

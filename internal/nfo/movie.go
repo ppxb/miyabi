@@ -11,9 +11,8 @@ import (
 // keep a Miyabi rescan lossless without requesting metadata sources again.
 type Movie struct {
 	Zone          domain.Zone             `xml:"miyabi_zone,omitempty" json:"zone,omitempty"`
-	SelectedImage domain.ImageCandidate   `xml:"-" json:"selected_image,omitempty"`
-	Images        []domain.ImageCandidate `xml:"-" json:"images,omitempty"`
-	Summary       string                  `xml:"plot,omitempty" json:"summary,omitempty"`
+	SelectedImage domain.ImageCandidate   `xml:"miyabi_selected_image,omitempty" json:"selected_image,omitempty"`
+	Images        []domain.ImageCandidate `xml:"miyabi_images>image,omitempty" json:"images,omitempty"`
 	RatingSource  string                  `xml:"rating_source,omitempty" json:"rating_source,omitempty"`
 	RatingMax     float64                 `xml:"rating_max,omitempty" json:"rating_max,omitempty"`
 	FieldSources  map[string]string       `xml:"-" json:"field_sources,omitempty"`

@@ -1,15 +1,42 @@
 package metadata
 
-import "github.com/ppxb/miyabi/internal/domain"
+import (
+	"cmp"
+	"slices"
 
-// merge only combines results confirmed at the same matching layer, in the
-// configured priority order. Actor lists are selected as a whole: names alone
-// cannot prove cross-provider identity.
+	"github.com/ppxb/miyabi/internal/domain"
+)
+
+// merge only combines confirmed results for the same film. JavDB owns catalogue
+// metadata when available, while artwork keeps the configured source order.
+// Entity lists stay intact so names cannot replace another provider's IDs.
 func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 	var result domain.MovieMetadata
 	result.Detail.FieldSources = make(map[string]string)
 	images := make(map[string]bool)
-	tags := make(map[string]bool)
+	for _, item := range results {
+		for _, image := range item.Images {
+			key := image.Role + ":" + image.URL
+			if image.URL == "" || images[key] {
+				continue
+			}
+			images[key] = true
+			result.Images = append(result.Images, image)
+			if image.Role == "preview" {
+				result.Detail.PreviewImages = append(result.Detail.PreviewImages, domain.PreviewImage{Original: image.URL, Thumbnail: image.URL})
+			}
+		}
+	}
+	results = slices.Clone(results)
+	slices.SortStableFunc(results, func(a, b domain.MovieMetadata) int {
+		priority := func(m domain.MovieMetadata) int {
+			if slices.ContainsFunc(m.Detail.Sources, func(id domain.SourceID) bool { return id.Provider == "javdb" }) {
+				return 0
+			}
+			return 1
+		}
+		return cmp.Compare(priority(a), priority(b))
+	})
 	for _, item := range results {
 		m := item.Detail
 		if m.Code == "" {
@@ -26,12 +53,12 @@ func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 		}
 		text("code", &out.Code, m.Code)
 		text("title", &out.Title, m.Title)
-		text("summary", &out.Summary, m.Summary)
+		text("origin_title", &out.OriginTitle, m.OriginTitle)
 		text("release_date", &out.ReleaseDate, m.ReleaseDate)
 		text("cover", &out.Cover, m.Cover)
 		text("thumbnail", &out.Thumbnail, m.Thumbnail)
 		text("preview_video", &out.PreviewVideo, m.PreviewVideo)
-		if out.Zone == "" {
+		if out.Zone == "" || out.Zone == domain.ZoneUnknown {
 			out.Zone = m.Zone
 		}
 		if out.Duration == 0 && m.Duration > 0 {
@@ -59,22 +86,9 @@ func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 			out.Series = m.Series
 			out.FieldSources["series"] = provider
 		}
-		for _, tag := range m.Tags {
-			if tag.Name != "" && !tags[tag.Name] {
-				out.Tags = append(out.Tags, tag)
-				tags[tag.Name] = true
-			}
-		}
-		for _, image := range item.Images {
-			key := image.Role + ":" + image.URL
-			if image.URL == "" || images[key] {
-				continue
-			}
-			images[key] = true
-			result.Images = append(result.Images, image)
-			if image.Role == "preview" {
-				out.PreviewImages = append(out.PreviewImages, domain.PreviewImage{Original: image.URL, Thumbnail: image.URL})
-			}
+		if len(out.Tags) == 0 && len(m.Tags) > 0 {
+			out.Tags = m.Tags
+			out.FieldSources["tags"] = provider
 		}
 	}
 	result.Detail.HasPreview = len(result.Detail.PreviewImages) > 0 || result.Detail.PreviewVideo != ""

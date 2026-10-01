@@ -18,13 +18,13 @@ import (
 // DetailNFO converts a catalogue MovieDetail into an NFO Document.
 func DetailNFO(detail domain.MovieDetail) nfo.Movie {
 	doc := nfo.Movie{
-		Zone:      detail.Zone,
-		Title:     detail.Title,
-		Code:      detail.Code,
-		Premiered: detail.ReleaseDate,
-		Runtime:   detail.Duration,
-		Rating:    detail.Rating,
-		Summary:   detail.Summary, RatingSource: detail.RatingSource, RatingMax: detail.RatingMax,
+		Zone:         detail.Zone,
+		Title:        detail.Title,
+		Code:         detail.Code,
+		Premiered:    detail.ReleaseDate,
+		Runtime:      detail.Duration,
+		Rating:       detail.Rating,
+		RatingSource: detail.RatingSource, RatingMax: detail.RatingMax,
 		FieldSources: detail.FieldSources, Previews: detail.PreviewImages, PreviewVideo: detail.PreviewVideo,
 	}
 	for i, source := range detail.Sources {

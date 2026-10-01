@@ -6,15 +6,60 @@ import (
 	"image/jpeg"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/database"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
+	"github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/nfo"
+	"github.com/ppxb/miyabi/internal/pan"
 )
+
+func TestExportedPreviewsAndCatalogueEntitiesSurviveLocalRescan(t *testing.T) {
+	ctx := t.Context()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	doc := nfo.Movie{
+		Code: "ABP-123", Title: "Catalogue title", Zone: domain.ZoneCensored,
+		IDs:    []nfo.UniqueID{{Type: "javdb", Value: "catalogue-id", Default: true}, {Type: "fanza", Value: "abp00123"}},
+		Actors: []nfo.Actor{{Provider: "javdb", ID: "actor-id", Name: "Actor"}},
+		Tags:   []nfo.Tag{{Provider: "javdb", ID: "tag-id", CategoryID: "category-id", Name: "Tag"}},
+		Images: []domain.ImageCandidate{
+			{Provider: "fanza", Role: "cover", URL: "https://official.example/cover.jpg", Layout: domain.CoverJacket},
+			{Provider: "fanza", Role: "preview", URL: "https://official.example/sample.jpg?a=1&b=2"},
+			{Provider: "javdb", Role: "preview", URL: "https://catalogue.example/sample.jpg"},
+		},
+		SelectedImage: domain.ImageCandidate{Provider: "fanza", Role: "cover", URL: "https://official.example/cover.jpg", Layout: domain.CoverJacket, Width: 2184, Height: 1468},
+	}
+	root := t.TempDir()
+	if err := scrape.ExportEmbyMedia(root, "http://localhost:8080", "", doc.Code, doc,
+		[]pan.File{{ID: "preview-video", Name: doc.Code + ".mp4"}}, testJPEG(t), testJPEG(t)); err != nil {
+		t.Fatal(err)
+	}
+	store.Client.Movie.Create().SetCode(doc.Code).SetMetadata(&doc).SetScrapeStatus(movie.ScrapeStatusDone).SaveX(ctx)
+	scanner := NewLocalScanner(store.Client, nil)
+	for range 2 {
+		if _, err := scanner.Scan(ctx, root); err != nil {
+			t.Fatal(err)
+		}
+		film := store.Client.Movie.Query().Where(movie.CodeEQ(doc.Code)).WithActors().WithTags().OnlyX(ctx)
+		if film.Metadata == nil || !reflect.DeepEqual(film.Metadata.Images, doc.Images) || film.Metadata.SelectedImage != doc.SelectedImage {
+			t.Fatalf("local scan discarded image sources: %+v", film.Metadata)
+		}
+		if len(film.Edges.Actors) != 1 || film.Edges.Actors[0].Provider != "javdb" || film.Edges.Actors[0].SourceID != "actor-id" ||
+			len(film.Edges.Tags) != 1 || film.Edges.Tags[0].Provider != "javdb" || film.Edges.Tags[0].SourceID != "tag-id" || film.Edges.Tags[0].CategoryID != "category-id" {
+			t.Fatalf("local scan discarded catalogue search identities: %+v", film.Edges)
+		}
+	}
+}
 
 func testJPEG(t *testing.T) []byte {
 	t.Helper()

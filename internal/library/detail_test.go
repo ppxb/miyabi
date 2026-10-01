@@ -12,7 +12,7 @@ import (
 func TestSavedDetailNeedsNoJavDBAndKeepsSourceIdentities(t *testing.T) {
 	lib, _, payload := libraryFixture(t)
 	ctx := t.Context()
-	doc := nfo.Movie{Code: "ABP-123", Title: "Official title", Summary: "Summary", Zone: domain.ZoneCensored,
+	doc := nfo.Movie{Code: "ABP-123", Title: "Official title", Zone: domain.ZoneCensored,
 		IDs:    []nfo.UniqueID{{Type: "fanza", Value: "abp00123"}},
 		Rating: 4.2, RatingSource: "fanza", RatingMax: 5,
 		Actors: []nfo.Actor{{Provider: "fanza", ID: "actor", Name: "Actor"}},
@@ -35,12 +35,20 @@ func TestSavedDetailNeedsNoJavDBAndKeepsSourceIdentities(t *testing.T) {
 	if _, err := lib.Preview(ctx, film.ID, 0); !domain.IsKind(err, domain.KindNotFound) {
 		t.Fatalf("pending preview: %v", err)
 	}
-	film.Update().SetMetadata(&doc).SetScrapeStatus(movie.ScrapeStatusDone).ExecX(ctx)
+	encoded, err := nfo.Encode(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restored, err := nfo.Decode(encoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	film.Update().SetMetadata(&restored).SetScrapeStatus(movie.ScrapeStatusDone).ExecX(ctx)
 	detail, err := lib.Movie(ctx, film.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if detail.LibraryID != film.ID || detail.ID != "" || detail.Title != doc.Title || detail.Summary != doc.Summary || detail.Zone != doc.Zone {
+	if detail.LibraryID != film.ID || detail.ID != "" || detail.Title != doc.Title || detail.Zone != doc.Zone {
 		t.Fatalf("wrong saved detail: %+v", detail)
 	}
 	if detail.RatingSource != "fanza" || detail.RatingMax != 5 || detail.Actors[0].Provider != "fanza" || detail.Maker.Provider != "fanza" {

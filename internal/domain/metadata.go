@@ -16,12 +16,12 @@ const (
 
 // ImageCandidate describes a source image's intended use before downloading it.
 type ImageCandidate struct {
-	Provider string      `json:"provider"`
-	URL      string      `json:"url"`
-	Role     string      `json:"role"` // cover, poster, preview or avatar
-	Layout   CoverLayout `json:"layout,omitempty"`
-	Width    int         `json:"width,omitempty"`
-	Height   int         `json:"height,omitempty"`
+	Provider string      `json:"provider" xml:"provider,attr"`
+	URL      string      `json:"url" xml:",chardata"`
+	Role     string      `json:"role" xml:"role,attr"` // cover, poster, preview or avatar
+	Layout   CoverLayout `json:"layout,omitempty" xml:"layout,attr,omitempty"`
+	Width    int         `json:"width,omitempty" xml:"width,attr,omitempty"`
+	Height   int         `json:"height,omitempty" xml:"height,attr,omitempty"`
 }
 
 // MovieMetadata is independent of ownership and media-file indexing.

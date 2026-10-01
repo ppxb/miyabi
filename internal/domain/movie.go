@@ -139,7 +139,6 @@ type Director struct {
 type Movie struct {
 	Sources       []SourceID        `json:"sources,omitempty"`
 	FieldSources  map[string]string `json:"field_sources,omitempty"`
-	Summary       string            `json:"summary,omitempty"`
 	RatingSource  string            `json:"rating_source,omitempty"`
 	RatingMax     float64           `json:"rating_max,omitempty"`
 	ID            string            `json:"id"`

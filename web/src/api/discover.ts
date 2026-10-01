@@ -48,7 +48,6 @@ export type NamedEntity = {
 }
 
 export type DiscoverMovie = {
-  readonly summary?: string
   readonly rating_source?: string
   readonly rating_max?: number
   id: string

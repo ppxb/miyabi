@@ -67,7 +67,7 @@ func TestUnfamiliarNumbersRoundTripWithSafeFilenames(t *testing.T) {
 	}
 }
 
-func TestRoundTripPreservesSourceIDsAndPlot(t *testing.T) {
+func TestRoundTripPreservesSourceIDs(t *testing.T) {
 	input := []byte(`<movie>
   <title>Fixture &amp; title</title><num>ABP-001</num>
   <uniqueid type="javdb" default="true">fixture-movie</uniqueid>
@@ -87,8 +87,8 @@ func TestRoundTripPreservesSourceIDsAndPlot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(body), "<plot>Source synopsis</plot>") {
-		t.Fatal("NFO lost source synopsis")
+	if strings.Contains(string(body), "<plot>") {
+		t.Fatal("NFO retained an unused plot")
 	}
 	got, err := Decode(body)
 	if err != nil {

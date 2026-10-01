@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch'
 import { SettingRow, SettingsSection } from './shared'
 
 const descriptions: Record<string, string> = {
-  fanza: '首选来源：官方影片资料、封面和预览图',
+  fanza: '优先提供官方高清封面、预览图，并补充影片资料',
   fc2: 'FC2 商品资料、封面和预览图'
 }
 
@@ -17,7 +17,7 @@ export function ScrapingSection() {
   return (
     <SettingsSection icon={<ScanSearchIcon className="size-4" />} title="影片刮削">
       <p className="text-xs text-muted-foreground">
-        FANZA 优先，FC2 使用对应商品资料。主要资料齐全时不继续查询。保存后对新刮削生效。
+        JavDB 已收录的影片优先使用其资料和标签，以下来源补充图片及缺失资料。未收录的影片使用可用的来源资料。保存后对新刮削生效。
       </p>
       {query.isPending ? <p className="text-sm text-muted-foreground">正在读取来源…</p> : null}
       {sources.map(source => (

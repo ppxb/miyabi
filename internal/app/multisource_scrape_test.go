@@ -41,11 +41,11 @@ func (s *workflowSource) Fetch(_ context.Context, ref domain.MovieRef) (domain.M
 	m := domain.MovieMetadata{Detail: domain.MovieDetail{Movie: domain.Movie{
 		Code: code, Title: "Independent metadata", Sources: []domain.SourceID{{Provider: provider, ID: code}},
 		Actors: []domain.Actor{{Provider: provider, ID: "42", Name: "Actor"}}, Tags: []domain.Tag{{Provider: provider, ID: "7", Name: "Tag"}},
-	}}, Images: []domain.ImageCandidate{{Provider: provider, URL: "https://fixture.example/cover.jpg", Role: "cover"}}}
+	}}, Images: []domain.ImageCandidate{{Provider: provider, URL: "https://" + provider + ".example/cover.jpg", Role: "cover"}}}
 	if s.complete {
 		m.Detail.ReleaseDate, m.Detail.Duration = "2026-01-01", 120
 		m.Detail.Maker = &domain.Maker{Provider: provider, ID: "maker", Name: "Studio"}
-		m.Images = append(m.Images, domain.ImageCandidate{Provider: provider, URL: "https://fixture.example/preview.jpg", Role: "preview"})
+		m.Images = append(m.Images, domain.ImageCandidate{Provider: provider, URL: "https://" + provider + ".example/preview.jpg", Role: "preview"})
 	}
 	return m, nil
 }
@@ -57,7 +57,7 @@ func (s *workflowSource) Media(context.Context, string) (domain.Media, error) {
 	return domain.Media{Body: s.body, ContentType: "image/jpeg"}, nil
 }
 
-func TestArtworkFallbackCheckpointSurvivesPublishFailureWithoutReplacingPrimaryMetadata(t *testing.T) {
+func TestJavDBMetadataAndArtworkCheckpointSurvivePublishFailure(t *testing.T) {
 	f := newPipelineFixture(t)
 	primary := &workflowSource{id: "fanza", complete: true, failImage: true}
 	fallback := &workflowSource{id: "javdb", complete: true, body: f.catalogue.cover}
@@ -90,15 +90,23 @@ func TestArtworkFallbackCheckpointSurvivesPublishFailureWithoutReplacingPrimaryM
 	if err != nil || job.Status != task.StatusFailed || p.Artwork == nil || p.Completed || p.Document.SelectedImage.Provider != "javdb" || p.Document.JavDBID() != "ABP-123" {
 		t.Fatalf("fallback checkpoint=%+v err=%v", p, err)
 	}
-	if f.store.Client.Movie.Query().OnlyX(t.Context()).JavdbID != nil {
-		t.Fatal("identity escaped failed publish transaction")
+	failed := f.store.Client.Movie.Query().OnlyX(t.Context())
+	if failed.JavdbID == nil || *failed.JavdbID != "ABP-123" || failed.Metadata.Actors[0].Provider != "javdb" {
+		t.Fatal("catalogue metadata was not checkpointed before artwork")
+	}
+	if failed.Poster != nil || failed.MetadataSnapshot != nil || failed.ScrapeStatus != movie.ScrapeStatusFailed {
+		t.Fatal("artwork escaped failed publish transaction")
 	}
 	failPublish = false
 	job.Update().SetStatus(task.StatusQueued).ExecX(t.Context())
 	f.runQueue(t)
-	record := f.store.Client.Movie.Query().WithActors().OnlyX(t.Context())
-	if record.ScrapeStatus != movie.ScrapeStatusDone || record.JavdbID == nil || *record.JavdbID != "ABP-123" || record.Metadata.IDs[0].Type != "fanza" || record.Edges.Actors[0].Provider != "fanza" || record.Metadata.SelectedImage.Provider != "javdb" {
-		t.Fatalf("fallback replaced primary metadata: %+v", record)
+	record := f.store.Client.Movie.Query().WithActors().WithTags().OnlyX(t.Context())
+	if record.ScrapeStatus != movie.ScrapeStatusDone || record.JavdbID == nil || *record.JavdbID != "ABP-123" || record.Metadata.IDs[0].Type != "javdb" || record.Edges.Actors[0].Provider != "javdb" || record.Edges.Tags[0].Provider != "javdb" || record.Metadata.SelectedImage.Provider != "javdb" {
+		t.Fatalf("catalogue metadata lost during publish: %+v", record)
+	}
+	detail, err := f.library.Movie(t.Context(), record.ID)
+	if err != nil || len(detail.PreviewImages) != 2 || detail.Tags[0].Provider != "javdb" {
+		t.Fatalf("saved detail lost previews or searchable tags: %+v %v", detail, err)
 	}
 	if primary.queries != 1 || fallback.queries != 1 || primary.images != 1 || fallback.images != 1 || len(f.catalogue.calls) != 0 {
 		t.Fatalf("retry repeated work: primary=%+v fallback=%+v", primary, fallback)

@@ -39,7 +39,7 @@ func completeFixture(provider, code string) domain.MovieMetadata {
 	return m
 }
 
-func TestCompletePrimaryDoesNotQueryJavDBUntilArtworkFallback(t *testing.T) {
+func TestCompleteOfficialMetadataStillQueriesJavDBAndReusesCache(t *testing.T) {
 	primary := &sourceStub{id: "fanza", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
 		return completeFixture("fanza", code), nil
 	}}
@@ -49,12 +49,12 @@ func TestCompletePrimaryDoesNotQueryJavDBUntilArtworkFallback(t *testing.T) {
 	s := newTestService(t, primary, fallback)
 	for range 2 {
 		m, err := s.Resolve(t.Context(), domain.MovieRef{Code: "ABP-123"})
-		if err != nil || m.Detail.Title != "fanza title" || m.Detail.ID != "" {
+		if err != nil || m.Detail.Title != "javdb title" || m.Detail.ID != "ABP-123" || m.Detail.Actors[0].Provider != "javdb" || m.Detail.Tags[0].Provider != "javdb" {
 			t.Fatalf("result=%+v err=%v", m, err)
 		}
 	}
-	if primary.calls.Load() != 1 || fallback.calls.Load() != 0 {
-		t.Fatal("complete metadata queried fallback")
+	if primary.calls.Load() != 1 || fallback.calls.Load() != 1 {
+		t.Fatal("catalogue identity was skipped or source cache was not reused")
 	}
 	for range 2 {
 		if _, err := s.Fallback(t.Context(), domain.MovieRef{Code: "ABP-123"}); err != nil {
@@ -69,7 +69,7 @@ func TestCompletePrimaryDoesNotQueryJavDBUntilArtworkFallback(t *testing.T) {
 	}
 }
 
-func TestJavDBOnlyFillsMissingFieldsAndReturnsItsConfirmedIdentity(t *testing.T) {
+func TestJavDBMetadataTakesPriorityAndReturnsItsConfirmedIdentity(t *testing.T) {
 	var order []string
 	primary := &sourceStub{id: "fanza", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
 		order = append(order, "fanza")
@@ -83,8 +83,26 @@ func TestJavDBOnlyFillsMissingFieldsAndReturnsItsConfirmedIdentity(t *testing.T)
 	}}
 	s := newTestService(t, primary, fallback)
 	m, err := s.Resolve(t.Context(), domain.MovieRef{Code: "ABP-123"})
-	if err != nil || !reflect.DeepEqual(order, []string{"fanza", "javdb"}) || m.Detail.Title != "Official title" || m.Detail.ID != "catalogue-id" || m.Detail.FieldSources["title"] != "fanza" || m.Detail.FieldSources["actors"] != "javdb" {
+	if err != nil || !reflect.DeepEqual(order, []string{"fanza", "javdb"}) || m.Detail.Title != "javdb title" || m.Detail.ID != "catalogue-id" || m.Detail.FieldSources["title"] != "javdb" || m.Detail.FieldSources["actors"] != "javdb" {
 		t.Fatalf("merge=%+v order=%v err=%v", m, order, err)
+	}
+}
+
+func TestOfficialMetadataRemainsUsableWithoutJavDB(t *testing.T) {
+	for _, failure := range []error{ErrNotFound, errors.New("network unavailable")} {
+		t.Run(failure.Error(), func(t *testing.T) {
+			primary := &sourceStub{id: "fanza", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
+				return completeFixture("fanza", code), nil
+			}}
+			catalogue := &sourceStub{id: "javdb", fetch: func(context.Context, string) (domain.MovieMetadata, error) {
+				return domain.MovieMetadata{}, failure
+			}}
+			s := newTestService(t, primary, catalogue)
+			m, err := s.Resolve(t.Context(), domain.MovieRef{Code: "ABP-123"})
+			if err != nil || m.Detail.ID != "" || m.Detail.Title != "fanza title" || len(m.Detail.PreviewImages) != 1 || m.Detail.Tags[0].Provider != "fanza" {
+				t.Fatalf("official metadata lost: %+v %v", m, err)
+			}
+		})
 	}
 }
 
@@ -259,7 +277,6 @@ func TestResolveWithoutJavDBMergesInPriorityOrderAndPersistsCache(t *testing.T) 
 	}}
 	secondary := &sourceStub{id: "secondary", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
 		m := fixture("secondary", code, "Secondary title")
-		m.Detail.Summary = "Synopsis"
 		m.Detail.Rating = 8
 		m.Detail.RatingMax = 10
 		m.Detail.Actors = []domain.Actor{{Provider: "secondary", ID: "a", Name: "Same name"}}
@@ -272,7 +289,7 @@ func TestResolveWithoutJavDBMergesInPriorityOrderAndPersistsCache(t *testing.T) 
 		if err != nil {
 			t.Fatal(err)
 		}
-		if m.Detail.ID != "" || m.Detail.Title != "Primary title" || m.Detail.Summary != "Synopsis" || len(m.Detail.Actors) != 1 || m.Detail.Actors[0].Provider != "primary" || m.Detail.RatingSource != "secondary" || m.Detail.RatingMax != 10 || len(m.Images) != 1 {
+		if m.Detail.ID != "" || m.Detail.Title != "Primary title" || len(m.Detail.Actors) != 1 || m.Detail.Actors[0].Provider != "primary" || m.Detail.RatingSource != "secondary" || m.Detail.RatingMax != 10 || len(m.Images) != 1 {
 			t.Fatalf("unexpected merge: %+v", m)
 		}
 	}

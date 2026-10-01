@@ -51,11 +51,6 @@ export function MovieHero({
         ) : null}
 
         <MovieMetadata movie={movie} />
-        {movie.summary ? (
-          <p className="text-sm leading-6 whitespace-pre-line text-muted-foreground">
-            {movie.summary}
-          </p>
-        ) : null}
       </div>
     </section>
   )

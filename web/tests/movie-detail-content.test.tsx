@@ -30,7 +30,6 @@ test('saved library metadata renders without a JavDB identity or lookup', () => 
       code: 'ABP-123',
       title: 'Saved title',
       origin_title: '',
-      summary: 'Saved summary',
       cover: '',
       thumbnail: '',
       release_date: '2026-01-01',
@@ -69,7 +68,6 @@ test('saved library metadata renders without a JavDB identity or lookup', () => 
   expect(useRecordMovieView).not.toHaveBeenCalled()
   expect(html).toContain('Saved title')
   expect(html).toContain('Saved actor')
-  expect(html).toContain('Saved summary')
   expect(html).toContain('FANZA 评分')
   expect(html).not.toContain('JavDB 评分')
   expect(html).not.toContain('href=')

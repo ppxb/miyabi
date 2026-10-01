@@ -138,8 +138,9 @@ func (s *Service) UpdateSettings(ctx context.Context, settings []SourceSetting) 
 	return nil
 }
 
-// Resolve checks each identity layer in source order. Only missing metadata
-// triggers another source; a network failure never permits a weaker identity.
+// Resolve checks each identity layer across sources. JavDB is always queried
+// for catalogue identities; official sources supply artwork and missing fields.
+// A network failure never permits a weaker identity.
 func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
 	settings := s.Settings()
 	if s.sources["javdb"] != nil {
@@ -150,7 +151,7 @@ func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.Movi
 		var results []domain.MovieMetadata
 		var merged domain.MovieMetadata
 		for _, setting := range settings {
-			if !setting.Enabled || (merged.Detail.Code != "" && !needsSupplement(merged)) {
+			if !setting.Enabled || (setting.ID != "javdb" && merged.Detail.Code != "" && !needsSupplement(merged)) {
 				continue
 			}
 			result, err := s.resolveLayer(ctx, s.sources[setting.ID], ref, layer)
@@ -207,8 +208,8 @@ func (s *Service) resolveLayer(ctx context.Context, source Source, ref domain.Mo
 	return matched, nil
 }
 
-// Optional series, director and rating may legitimately be absent. They do not
-// force a catalogue request when the main metadata and artwork are complete.
+// Optional series, director and rating may legitimately be absent.
+// They do not force another supplementary source request.
 func needsSupplement(result domain.MovieMetadata) bool {
 	m := result.Detail
 	cover, preview := false, false
