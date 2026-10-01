@@ -50,7 +50,7 @@ func TestFromCoverConcurrentSavesAreIdempotent(t *testing.T) {
 			for i := range writers {
 				workers.Go(func() {
 					<-start
-					artwork, err := caches[i%len(caches)].FromCover(body.Bytes())
+					artwork, err := caches[i%len(caches)].FromCover(body.Bytes(), "single")
 					results <- result{artwork: artwork, err: err}
 				})
 			}

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiGet, apiPost } from '@/api/client'
+import type { DiscoverMovieDetail } from '@/api/discover'
 import { panKeys, type PanAccountStatus } from '@/api/pan'
 import { taskKeys, type LibrarySource, type ScanTask, type Task } from '@/api/tasks'
 
@@ -37,7 +38,21 @@ type LibraryPage = {
 
 export const libraryKeys = {
   all: ['library'] as const,
+  detail: (id: number) => ['library', 'detail', id] as const,
   movies: (page: number) => ['library', 'movies', page] as const
+}
+
+export type LibraryMovieDetail = Omit<DiscoverMovieDetail, 'release_status'> & {
+  library_id: number
+  scrape_status: LibraryMovie['scrape_status']
+}
+
+export function useLibraryMovie(id: number) {
+  return useQuery({
+    queryKey: libraryKeys.detail(id),
+    queryFn: ({ signal }) =>
+      apiGet<LibraryMovieDetail>(`/api/library/movies/${id}`, undefined, signal)
+  })
 }
 
 export function useLibraryMovies(page: number) {

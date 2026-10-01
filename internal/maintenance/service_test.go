@@ -56,7 +56,7 @@ func dataArtwork(t *testing.T, service *Service, seed uint8) mediaimage.Artwork 
 	if err := png.Encode(&encoded, cover); err != nil {
 		t.Fatal(err)
 	}
-	artwork, err := service.images.FromCover(encoded.Bytes())
+	artwork, err := service.images.FromCover(encoded.Bytes(), "single")
 	if err != nil {
 		t.Fatal(err)
 	}

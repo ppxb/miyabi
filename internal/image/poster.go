@@ -9,10 +9,11 @@ import (
 
 	"github.com/disintegration/imaging"
 	pigo "github.com/esimov/pigo/core"
+	"github.com/ppxb/miyabi/internal/domain"
 )
 
 // PosterVersion invalidates generated posters when their composition changes.
-const PosterVersion = 1
+const PosterVersion = 2
 
 // Pigo's MIT-licensed model is embedded so cropping needs no runtime downloads.
 // Source: esimov/pigo, commit 7465ed14de4797ad2e7db017b46c794153e9e7ab.
@@ -29,7 +30,13 @@ type posterFace struct {
 	weight float64
 }
 
-func cropPoster(source stdimage.Image) (stdimage.Image, error) {
+func cropPoster(source stdimage.Image, layout domain.CoverLayout) (stdimage.Image, error) {
+	region := posterRegion(source.Bounds(), layout)
+	if region != source.Bounds() {
+		// Exclude the back cover before detection so its stills cannot affect
+		// face size, clustering or the final composition.
+		source = imaging.Crop(source, region)
+	}
 	bounds := source.Bounds()
 	if bounds.Dx()*3 == bounds.Dy()*2 {
 		return source, nil
@@ -38,7 +45,21 @@ func cropPoster(source stdimage.Image) (stdimage.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	return imaging.Crop(source, posterWindow(bounds, faces)), nil
+	return imaging.Crop(source, posterWindow(bounds, faces, layout)), nil
+}
+
+func posterRegion(bounds stdimage.Rectangle, layout domain.CoverLayout) stdimage.Rectangle {
+	if layout == domain.CoverJacket && bounds.Dx() > bounds.Dy() {
+		bounds.Min.X += bounds.Dx() * 45 / 100
+	}
+	return bounds
+}
+
+// PosterSize measures the usable original pixels under the same layout policy
+// used for cropping. It never treats upscaling as additional detail.
+func PosterSize(width, height int, layout domain.CoverLayout) (int, int) {
+	region := posterRegion(stdimage.Rect(0, 0, width, height), layout)
+	return min(region.Dx(), region.Dy()*2/3), min(region.Dy(), region.Dx()*3/2)
 }
 
 func detectPosterFaces(source stdimage.Image) ([]posterFace, error) {
@@ -122,7 +143,7 @@ func posterPixels(img *stdimage.NRGBA) []byte {
 
 // Score complete faces more highly than fragments. Unlike averaging every
 // detected face, this cannot choose empty space between two distant subjects.
-func posterWindow(bounds stdimage.Rectangle, faces []posterFace) stdimage.Rectangle {
+func posterWindow(bounds stdimage.Rectangle, faces []posterFace, layout domain.CoverLayout) stdimage.Rectangle {
 	w, h := bounds.Dx(), bounds.Dy()
 	horizontal := w*3 > h*2
 	length, start, end := max(1, h*2/3), bounds.Min.X, bounds.Max.X
@@ -142,11 +163,14 @@ func posterWindow(bounds stdimage.Rectangle, faces []posterFace) stdimage.Rectan
 		}
 		return rect.Min.Y, rect.Max.Y
 	}
-	// Retain the conventional right-hand jacket front when no reliable face
-	// is found. Tall portraits use the top edge instead of cutting off heads.
+	// Jackets keep the right-hand front; single images default to the center.
+	// Tall portraits use the top edge instead of cutting off heads.
 	position := start
 	if horizontal {
-		position = end - length
+		position = (start + end - length) / 2
+		if layout == domain.CoverJacket {
+			position = end - length
+		}
 	}
 	best, bestScore := window(position), 0.0
 	score := func(rect stdimage.Rectangle) float64 {

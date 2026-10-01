@@ -8,12 +8,73 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/library"
 )
 
 type libraryPageStub struct {
 	LibraryManager
 	page, limit int
+}
+
+type libraryPreviewStub struct {
+	LibraryManager
+	candidate domain.ImageCandidate
+}
+
+func (stub *libraryPreviewStub) Preview(_ context.Context, id, index int) (domain.ImageCandidate, error) {
+	if id != 42 || index != 0 {
+		return domain.ImageCandidate{}, domain.E(domain.KindNotFound, "预览图不存在", nil)
+	}
+	return stub.candidate, nil
+}
+
+type metadataImageStub struct {
+	MetadataManager
+	received domain.ImageCandidate
+}
+
+func (stub *metadataImageStub) Image(_ context.Context, candidate domain.ImageCandidate) (domain.Media, error) {
+	stub.received = candidate
+	return domain.Media{ContentType: "image/jpeg", Body: []byte("preview bytes")}, nil
+}
+
+func TestLibraryPreviewRoutesSavedSourceAndRejectsInvalidTargets(t *testing.T) {
+	for _, tc := range []struct {
+		path, provider string
+		status         int
+	}{
+		{"/42/previews/0?v=123", "fanza", http.StatusOK},
+		{"/42/previews/0", "fc2", http.StatusOK},
+		{"/42/previews/0", "javdb", http.StatusOK},
+		{"/42/previews/1", "fanza", http.StatusNotFound},
+		{"/43/previews/0", "fanza", http.StatusNotFound},
+		{"/0/previews/0", "fanza", http.StatusBadRequest},
+		{"/42/previews/-1", "fanza", http.StatusBadRequest},
+		{"/42/previews/invalid", "fanza", http.StatusBadRequest},
+	} {
+		t.Run(tc.provider+tc.path, func(t *testing.T) {
+			candidate := domain.ImageCandidate{Provider: tc.provider, URL: "https://image.example/preview.jpg", Role: "preview"}
+			metadata := &metadataImageStub{}
+			router := NewRouter(Dependencies{
+				Access: NewAccessGateService("", ""), Library: &libraryPreviewStub{candidate: candidate}, Metadata: metadata,
+				Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+			})
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/library/movies"+tc.path, nil))
+			if response.Code != tc.status {
+				t.Fatalf("status = %d, want %d: %s", response.Code, tc.status, response.Body)
+			}
+			if tc.status == http.StatusOK {
+				if metadata.received != candidate || response.Body.String() != "preview bytes" ||
+					response.Header().Get("Content-Type") != "image/jpeg" || response.Header().Get("Cache-Control") != "private, max-age=3600" {
+					t.Fatalf("preview changed source or response: %+v, %s", metadata.received, response.Body)
+				}
+			} else if metadata.received != (domain.ImageCandidate{}) {
+				t.Fatalf("invalid target fetched an image: %+v", metadata.received)
+			}
+		})
+	}
 }
 
 func (stub *libraryPageStub) Movies(_ context.Context, page, limit int) (library.Page, error) {

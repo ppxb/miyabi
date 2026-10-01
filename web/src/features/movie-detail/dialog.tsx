@@ -10,7 +10,7 @@ import {
 } from 'react'
 
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { MovieDetailDialogContext, type MovieDetailTarget } from './dialog-context'
+import { MovieDetailDialogContext, movieDetailKey, type MovieDetailTarget } from './dialog-context'
 import { MovieDetailSkeleton } from './skeleton'
 
 const MovieDetailContent = lazy(() =>
@@ -55,7 +55,7 @@ export function MovieDetailDialogProvider({ children }: PropsWithChildren) {
         >
           <DialogTitle className="sr-only">影片详情</DialogTitle>
           <div
-            key={movie && ('id' in movie ? `id:${movie.id}` : `code:${movie.code}`)}
+            key={movie && movieDetailKey(movie)}
             className="min-h-0 flex-1 scroll-fade scrollbar-none overflow-y-auto overscroll-contain p-4 sm:p-6 [&::-webkit-scrollbar]:hidden"
           >
             <Suspense fallback={<MovieDetailSkeleton />}>

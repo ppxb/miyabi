@@ -12,7 +12,46 @@ import (
 type LibraryManager interface {
 	ViewedManager
 	Movies(context.Context, int, int) (lib.Page, error)
+	Movie(context.Context, int) (lib.MovieDetail, error)
+	Preview(context.Context, int, int) (domain.ImageCandidate, error)
 	StartScan(context.Context) (domain.TaskInfo, error)
+}
+
+func libraryMovieHandler(library LibraryManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[struct {
+			ID int `uri:"id" binding:"min=1"`
+		}](c)
+		if !ok {
+			return
+		}
+		detail, err := library.Movie(c.Request.Context(), uri.ID)
+		respond(c, detail, err)
+	}
+}
+
+func libraryPreviewHandler(library LibraryManager, metadata MetadataManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[struct {
+			ID    int `uri:"id" binding:"min=1"`
+			Index int `uri:"index" binding:"min=0"`
+		}](c)
+		if !ok {
+			return
+		}
+		candidate, err := library.Preview(c.Request.Context(), uri.ID, uri.Index)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		media, err := metadata.Image(c.Request.Context(), candidate)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		c.Header("Cache-Control", "private, max-age=3600")
+		c.Data(http.StatusOK, media.ContentType, media.Body)
+	}
 }
 
 type ArtworkReader interface {

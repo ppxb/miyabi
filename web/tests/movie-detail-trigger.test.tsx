@@ -117,7 +117,7 @@ test('recommendations prioritize their request before opening in the dialog', ()
   assert.ok(prioritize.mock.invocationCallOrder[0]! < openMovie.mock.invocationCallOrder[0]!)
 })
 
-test('library cards without a JavDB ID open by code, never by the local database ID', () => {
+test('library cards always use an explicit local detail target', () => {
   for (const javdb_id of [undefined, '', 'javdb-movie']) {
     const card = LibraryMovieCard({
       movie: {
@@ -139,8 +139,6 @@ test('library cards without a JavDB ID open by code, never by the local database
     assert.doesNotMatch(html, /href=|<a\b/)
     const event = click()
     props.onClick?.(event)
-    assert.deepEqual(openMovie.mock.calls, [
-      [javdb_id ? { id: javdb_id } : { code: 'ABP-123' }, event.currentTarget]
-    ])
+    assert.deepEqual(openMovie.mock.calls, [[{ libraryId: 42 }, event.currentTarget]])
   }
 })

@@ -44,7 +44,7 @@ func newCompletedScanFixture(t *testing.T) *completedScanFixture {
 	if err := jpeg.Encode(&body, image.NewRGBA(image.Rect(0, 0, 6, 4)), nil); err != nil {
 		t.Fatal(err)
 	}
-	artwork, err := lib.images.FromCover(body.Bytes())
+	artwork, err := lib.images.FromCover(body.Bytes(), "single")
 	if err != nil {
 		t.Fatal(err)
 	}

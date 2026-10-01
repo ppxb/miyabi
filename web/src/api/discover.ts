@@ -25,6 +25,7 @@ export type PreviewImage = {
 }
 
 export type Actor = {
+  provider?: string
   id: string
   name: string
   name_zht: string
@@ -33,6 +34,7 @@ export type Actor = {
 }
 
 export type Tag = {
+  provider?: string
   id: string
   name: string
   name_zht: string
@@ -40,11 +42,15 @@ export type Tag = {
 }
 
 export type NamedEntity = {
+  provider?: string
   id: string
   name: string
 }
 
 export type DiscoverMovie = {
+  readonly summary?: string
+  readonly rating_source?: string
+  readonly rating_max?: number
   id: string
   code: string
   title: string

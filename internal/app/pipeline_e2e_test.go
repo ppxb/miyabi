@@ -432,7 +432,7 @@ func TestPipelineScansScrapesAndWritesSidecarsEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if doc.Code != "ABP-123" || doc.JavDBID() != "movie-exact" || doc.Title != "Localized title" || doc.Premiered != "2026-08-01" {
+	if doc.Code != "ABP-123" || doc.JavDBID() != "movie-exact" || doc.Title != "Localized title" || doc.Premiered != "2026-08-01" || doc.Zone != domain.ZoneCensored {
 		t.Fatalf("nfo = %+v", doc)
 	}
 	if doc.Poster() != "poster.jpg" || doc.Fanart != "fanart.jpg" || len(doc.Actors) != 2 || len(doc.Tags) != 1 || doc.Studio.Name != "Maker" {
@@ -460,6 +460,15 @@ func TestPipelineScansScrapesAndWritesSidecarsEndToEnd(t *testing.T) {
 	page, err := fixture.library.Movies(ctx, 1, 20)
 	if err != nil || page.Total != 1 || len(page.Movies) != 1 || page.Movies[0].Fanart != artwork.Fanart || page.Movies[0].ScrapeStatus != movie.ScrapeStatusDone {
 		t.Fatalf("library page = %+v, %v", page, err)
+	}
+	beforeDetail := maps.Clone(fixture.catalogue.calls)
+	detail, err := fixture.library.Movie(ctx, record.ID)
+	if err != nil || detail.Title != doc.Title || detail.ID != doc.JavDBID() || detail.Zone != doc.Zone ||
+		detail.Cover != artwork.Fanart || detail.ScrapeStatus != movie.ScrapeStatusDone || len(detail.Actors) != len(doc.Actors) {
+		t.Fatalf("saved library detail = %+v, %v", detail, err)
+	}
+	if !maps.Equal(fixture.catalogue.calls, beforeDetail) {
+		t.Fatalf("saved detail contacted the catalogue: %v", fixture.catalogue.calls)
 	}
 
 	if snapshot := record.MetadataSnapshot; snapshot == nil || snapshot.Videos != scrapePkg.VideoFingerprint([]pan.File{video}) ||
@@ -667,7 +676,7 @@ func (f fixtureMetadata) Resolve(ctx context.Context, ref domain.MovieRef) (doma
 	for i := range detail.Tags {
 		detail.Tags[i].Provider = "javdb"
 	}
-	return domain.MovieMetadata{Detail: detail, Images: []domain.ImageCandidate{{Provider: "fixture", URL: detail.Cover, Role: "cover"}}}, nil
+	return domain.MovieMetadata{Detail: detail, Images: []domain.ImageCandidate{{Provider: "javdb", URL: detail.Cover, Role: "cover"}}}, nil
 }
 func (f fixtureMetadata) Image(ctx context.Context, image domain.ImageCandidate) (domain.Media, error) {
 	return f.catalogue.Media(ctx, image.URL)

@@ -63,7 +63,7 @@ func parseFC2(body, base, productID string) (domain.MovieMetadata, error) {
 	m.Duration = integer(text(class(thumb, "items_article_info")))
 	result := domain.MovieMetadata{Detail: m}
 	if m.Cover != "" {
-		result.Images = append(result.Images, domain.ImageCandidate{Provider: "fc2", URL: m.Cover, Role: "cover"})
+		result.Images = append(result.Images, domain.ImageCandidate{Provider: "fc2", URL: m.Cover, Role: "cover", Layout: domain.CoverSingle})
 	}
 	for _, a := range nodes(class(doc, "items_article_SampleImages"), func(n *html.Node) bool { return n.Data == "a" }) {
 		if href := absolute(base, attr(a, "href")); href != "" {

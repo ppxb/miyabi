@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/disintegration/imaging"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/syncx"
 	_ "golang.org/x/image/webp" // Register WebP decoding for covers and NFO artwork.
 	"golang.org/x/sync/singleflight"
@@ -47,12 +48,12 @@ func NewCache(dataDir string) (*Cache, error) {
 	return &Cache{directory: directory}, nil
 }
 
-func (cache *Cache) FromCover(body []byte) (Artwork, error) {
+func (cache *Cache) FromCover(body []byte, layout domain.CoverLayout) (Artwork, error) {
 	cover, err := imaging.Decode(bytes.NewReader(body), imaging.AutoOrientation(true))
 	if err != nil {
 		return Artwork{}, fmt.Errorf("decode cover image: %w", err)
 	}
-	poster, err := cropPoster(cover)
+	poster, err := cropPoster(cover, layout)
 	if err != nil {
 		return Artwork{}, err
 	}
@@ -61,7 +62,7 @@ func (cache *Cache) FromCover(body []byte) (Artwork, error) {
 
 // RecropPoster upgrades a generated poster from the cached full cover, keeping
 // the original fanart and thumbnail bytes and URLs intact.
-func (cache *Cache) RecropPoster(artwork Artwork) (Artwork, error) {
+func (cache *Cache) RecropPoster(artwork Artwork, layout domain.CoverLayout) (Artwork, error) {
 	body, err := cache.ReadURL(artwork.Fanart)
 	if err != nil {
 		return Artwork{}, fmt.Errorf("read cover for poster: %w", err)
@@ -70,7 +71,7 @@ func (cache *Cache) RecropPoster(artwork Artwork) (Artwork, error) {
 	if err != nil {
 		return Artwork{}, fmt.Errorf("decode cover for poster: %w", err)
 	}
-	poster, err := cropPoster(cover)
+	poster, err := cropPoster(cover, layout)
 	if err != nil {
 		return Artwork{}, err
 	}
@@ -83,9 +84,12 @@ func (cache *Cache) Restore(poster, fanart []byte) (Artwork, error) {
 	if err != nil {
 		return Artwork{}, fmt.Errorf("decode NFO poster: %w", err)
 	}
-	fanartImage, err := imaging.Decode(bytes.NewReader(fanart), imaging.AutoOrientation(true))
-	if err != nil {
-		return Artwork{}, fmt.Errorf("decode NFO fanart: %w", err)
+	fanartImage := posterImage
+	if !bytes.Equal(poster, fanart) {
+		fanartImage, err = imaging.Decode(bytes.NewReader(fanart), imaging.AutoOrientation(true))
+		if err != nil {
+			return Artwork{}, fmt.Errorf("decode NFO fanart: %w", err)
+		}
 	}
 	return cache.saveArtwork(posterImage, fanartImage)
 }

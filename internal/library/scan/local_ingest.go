@@ -63,7 +63,7 @@ func (s *LocalScanner) prepareMedia(ctx context.Context, rootDir string, media *
 			if len(fanart) > 0 {
 				artwork, err = s.images.Restore(poster, fanart)
 			} else {
-				artwork, err = s.images.FromCover(poster)
+				artwork, err = s.images.Restore(poster, poster)
 			}
 			if err == nil {
 				media.artwork = artwork

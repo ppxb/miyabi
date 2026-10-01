@@ -63,7 +63,7 @@ func TestCoverCleanupOnlyBlocksUntilArtworkCheckpoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	unused, err := fixture.images.FromCover(fixtureJPEG(t, 60, 40))
+	unused, err := fixture.images.FromCover(fixtureJPEG(t, 60, 40), "single")
 	if err != nil {
 		t.Fatal(err)
 	}

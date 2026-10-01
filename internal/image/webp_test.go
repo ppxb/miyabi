@@ -30,7 +30,7 @@ func TestWebPArtwork(t *testing.T) {
 					var artwork Artwork
 					posterSize := stdimage.Pt(6, 4)
 					if source == "cover" {
-						artwork, err = cache.FromCover(body)
+						artwork, err = cache.FromCover(body, "single")
 						posterSize = stdimage.Pt(2, 4)
 					} else {
 						artwork, err = cache.Restore(body, body)

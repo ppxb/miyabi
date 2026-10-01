@@ -6,11 +6,22 @@ type SourceID struct {
 	ID       string `json:"id"`
 }
 
+// CoverLayout distinguishes a single composition from a front/back jacket.
+type CoverLayout string
+
+const (
+	CoverSingle CoverLayout = "single"
+	CoverJacket CoverLayout = "jacket"
+)
+
 // ImageCandidate describes a source image's intended use before downloading it.
 type ImageCandidate struct {
-	Provider string `json:"provider"`
-	URL      string `json:"url"`
-	Role     string `json:"role"` // cover, poster, preview or avatar
+	Provider string      `json:"provider"`
+	URL      string      `json:"url"`
+	Role     string      `json:"role"` // cover, poster, preview or avatar
+	Layout   CoverLayout `json:"layout,omitempty"`
+	Width    int         `json:"width,omitempty"`
+	Height   int         `json:"height,omitempty"`
 }
 
 // MovieMetadata is independent of ownership and media-file indexing.

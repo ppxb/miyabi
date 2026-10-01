@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/disintegration/imaging"
+	"github.com/ppxb/miyabi/internal/domain"
 )
 
 func TestPosterWindowKeepsFacesAndBounds(t *testing.T) {
@@ -30,7 +31,7 @@ func TestPosterWindowKeepsFacesAndBounds(t *testing.T) {
 		{name: "one pixel", bounds: stdimage.Rect(0, 0, 1, 1), want: stdimage.Rect(0, 0, 1, 1)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := posterWindow(tc.bounds, tc.faces)
+			got := posterWindow(tc.bounds, tc.faces, "jacket")
 			if got.Empty() || !got.In(tc.bounds) {
 				t.Fatalf("crop %v escaped source %v", got, tc.bounds)
 			}
@@ -43,6 +44,54 @@ func TestPosterWindowKeepsFacesAndBounds(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestPosterLayoutBoundsAndDefaults(t *testing.T) {
+	for _, tc := range []struct {
+		name                 string
+		bounds, region, crop stdimage.Rectangle
+		layout               domain.CoverLayout
+	}{
+		{"jacket", stdimage.Rect(0, 0, 900, 600), stdimage.Rect(405, 0, 900, 600), stdimage.Rect(500, 0, 900, 600), domain.CoverJacket},
+		{"single", stdimage.Rect(0, 0, 900, 600), stdimage.Rect(0, 0, 900, 600), stdimage.Rect(250, 0, 650, 600), domain.CoverSingle},
+		{"portrait", stdimage.Rect(0, 0, 600, 900), stdimage.Rect(0, 0, 600, 900), stdimage.Rect(0, 0, 600, 900), domain.CoverJacket},
+		{"translated jacket", stdimage.Rect(100, 200, 1000, 800), stdimage.Rect(505, 200, 1000, 800), stdimage.Rect(600, 200, 1000, 800), domain.CoverJacket},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			region := posterRegion(tc.bounds, tc.layout)
+			if region != tc.region {
+				t.Fatalf("detection region=%v want=%v", region, tc.region)
+			}
+			if crop := posterWindow(region, nil, tc.layout); crop != tc.crop {
+				t.Fatalf("default crop=%v want=%v", crop, tc.crop)
+			}
+		})
+	}
+}
+
+func TestJacketCropExcludesLargerBackCoverFace(t *testing.T) {
+	face := posterFixture(t)
+	cover := imaging.New(1200, 800, color.NRGBA{B: 200, A: 255})
+	cover = imaging.Paste(cover, imaging.Resize(face, 440, 0, imaging.Lanczos), stdimage.Pt(15, 30))
+	cover = imaging.Paste(cover, face, stdimage.Pt(900, 120))
+	poster, err := cropPoster(cover, domain.CoverJacket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if poster.Bounds().Dx() != 533 || poster.Bounds().Dy() != 800 {
+		t.Fatalf("lost original pixels: %v", poster.Bounds())
+	}
+	// The crop can start anywhere in [540,667]; this whole rectangle is
+	// inside the front face for every legal window, never the back face.
+	faces, err := detectPosterFaces(poster)
+	if err != nil || len(faces) == 0 {
+		t.Fatalf("front face lost: %v %v", faces, err)
+	}
+	for _, detected := range faces {
+		if detected.bounds.Dx() > 350 {
+			t.Fatalf("back cover face influenced output: %+v", faces)
+		}
 	}
 }
 
@@ -79,7 +128,7 @@ func TestPosterDetectsFacesAcrossCoverLayouts(t *testing.T) {
 			if err != nil || len(faces) == 0 {
 				t.Fatalf("detect faces: %+v, %v", faces, err)
 			}
-			crop := posterWindow(cover.Bounds(), faces)
+			crop := posterWindow(cover.Bounds(), faces, "single")
 			center := stdimage.Pt(tc.x+tc.image.Bounds().Dx()/2, tc.y+tc.image.Bounds().Dy()/2)
 			// A central region around the known face must survive the crop;
 			// checking only the detector's own rectangles would hide mapping errors.
@@ -102,7 +151,7 @@ func TestPosterPreservesResolutionAndExistingArtwork(t *testing.T) {
 	if err := png.Encode(&body, cover); err != nil {
 		t.Fatal(err)
 	}
-	artwork, err := cache.FromCover(body.Bytes())
+	artwork, err := cache.FromCover(body.Bytes(), "single")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +163,7 @@ func TestPosterPreservesResolutionAndExistingArtwork(t *testing.T) {
 	if err != nil || config.Width != 1200 || config.Height != 1800 {
 		t.Fatalf("poster was downscaled: %+v, %v", config, err)
 	}
-	recropped, err := cache.RecropPoster(artwork)
+	recropped, err := cache.RecropPoster(artwork, "single")
 	if err != nil || recropped.Fanart != artwork.Fanart || recropped.Thumbnail != artwork.Thumbnail || recropped.Poster != artwork.Poster {
 		t.Fatalf("recrop changed unmodified artwork: %+v, %v", recropped, err)
 	}
@@ -130,7 +179,7 @@ func BenchmarkPosterFaceDetection(b *testing.B) {
 	cover := imaging.Paste(imaging.New(1800, 1200, color.White), imaging.Resize(face, 480, 0, imaging.Lanczos), stdimage.Pt(150, 180))
 	b.ResetTimer()
 	for b.Loop() {
-		if _, err := cropPoster(cover); err != nil {
+		if _, err := cropPoster(cover, "single"); err != nil {
 			b.Fatal(err)
 		}
 	}

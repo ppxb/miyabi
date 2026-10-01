@@ -10,6 +10,7 @@ import (
 // Kodi reads the standard fields. Source IDs and category/gender attributes
 // keep a Miyabi rescan lossless without requesting metadata sources again.
 type Movie struct {
+	Zone          domain.Zone             `xml:"miyabi_zone,omitempty" json:"zone,omitempty"`
 	SelectedImage domain.ImageCandidate   `xml:"-" json:"selected_image,omitempty"`
 	Images        []domain.ImageCandidate `xml:"-" json:"images,omitempty"`
 	Summary       string                  `xml:"plot,omitempty" json:"summary,omitempty"`

@@ -1,12 +1,19 @@
 import { CalendarIcon, ClockIcon, StarIcon, type LucideIcon } from 'lucide-react'
 
 import type { DiscoverMovie, DiscoverMovieDetail } from '@/api/discover'
+import type { LibraryMovieDetail } from '@/api/library'
 import { MovieResourceBadges, MovieStateBadge } from '@/components/movie/movie-badges'
 import { MovieCover } from '@/components/movie/movie-cover'
 import { Badge } from '@/components/ui/badge'
 import { MovieMetadata } from './metadata'
 
-export function MovieHero({ movie }: { movie: DiscoverMovieDetail }) {
+export function MovieHero({
+  movie,
+  libraryStatus
+}: {
+  movie: DiscoverMovieDetail | LibraryMovieDetail
+  libraryStatus?: LibraryMovieDetail['scrape_status']
+}) {
   return (
     <section className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-8">
       <div className="aspect-3/2 overflow-hidden rounded-2xl bg-muted ring-1 ring-foreground/10">
@@ -19,10 +26,16 @@ export function MovieHero({ movie }: { movie: DiscoverMovieDetail }) {
             <Badge variant="outline" className="tabular-nums">
               {movie.code}
             </Badge>
-            <MovieStateBadge movie={movie} hideViewed />
+            {libraryStatus ? (
+              <Badge variant="secondary">
+                {{ done: '已入库', pending: '待刮削', failed: '刮削失败' }[libraryStatus]}
+              </Badge>
+            ) : (
+              <MovieStateBadge movie={movie} hideViewed />
+            )}
           </div>
           <h1 className="text-xl leading-snug font-bold tracking-normal sm:text-2xl">
-            {movie.title}
+            {movie.title || movie.code}
           </h1>
           {movie.origin_title && movie.origin_title !== movie.title ? (
             <p className="text-sm leading-6 text-muted-foreground">{movie.origin_title}</p>
@@ -31,17 +44,31 @@ export function MovieHero({ movie }: { movie: DiscoverMovieDetail }) {
 
         <MovieStats movie={movie} />
 
-        <div className="flex flex-wrap gap-2">
-          <MovieResourceBadges movie={movie} />
-        </div>
+        {!libraryStatus && 'release_status' in movie ? (
+          <div className="flex flex-wrap gap-2">
+            <MovieResourceBadges movie={movie} />
+          </div>
+        ) : null}
 
         <MovieMetadata movie={movie} />
+        {movie.summary ? (
+          <p className="text-sm leading-6 whitespace-pre-line text-muted-foreground">
+            {movie.summary}
+          </p>
+        ) : null}
       </div>
     </section>
   )
 }
 
-function MovieStats({ movie }: { movie: DiscoverMovie }) {
+function MovieStats({
+  movie
+}: {
+  movie: Pick<
+    DiscoverMovie,
+    'release_date' | 'duration' | 'rating' | 'rating_source' | 'rating_max'
+  >
+}) {
   const stats: Array<{ label: string; value: string; icon: LucideIcon }> = []
   if (movie.release_date) {
     stats.push({ label: '发行日期', value: movie.release_date, icon: CalendarIcon })
@@ -50,7 +77,14 @@ function MovieStats({ movie }: { movie: DiscoverMovie }) {
     stats.push({ label: '片长', value: `${movie.duration} 分钟`, icon: ClockIcon })
   }
   if (movie.rating > 0) {
-    stats.push({ label: 'JavDB 评分', value: movie.rating.toFixed(1), icon: StarIcon })
+    const source = movie.rating_source === 'javdb' ? 'JavDB' : movie.rating_source?.toUpperCase()
+    stats.push({
+      label: source ? `${source} 评分` : '评分',
+      value: movie.rating_max
+        ? `${movie.rating.toFixed(1)} / ${movie.rating_max}`
+        : movie.rating.toFixed(1),
+      icon: StarIcon
+    })
   }
   if (stats.length === 0) return null
 

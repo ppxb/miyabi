@@ -6,7 +6,7 @@ import { LibraryMovieStatus } from './movie-status'
 export function LibraryMovieCard({ movie }: { movie: LibraryMovie }) {
   return (
     <MovieDetailTrigger
-      movie={movie.javdb_id ? { id: movie.javdb_id } : { code: movie.code }}
+      movie={{ libraryId: movie.id }}
       className="block min-w-0 rounded-2xl outline-ring"
     >
       <MovieCard movie={movie} titleTooltip={false}>

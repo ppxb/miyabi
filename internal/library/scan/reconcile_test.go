@@ -34,7 +34,7 @@ func reconcileFixture(t *testing.T, completed, pending int) *scanRun {
 	if err != nil {
 		t.Fatal(err)
 	}
-	artwork, err := images.FromCover(testJPEG(t))
+	artwork, err := images.FromCover(testJPEG(t), "single")
 	if err != nil {
 		t.Fatal(err)
 	}
