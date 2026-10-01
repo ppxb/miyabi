@@ -34,7 +34,7 @@ func (*FANZA) ID() string { return "fanza" }
 var fanzaNumber = regexp.MustCompile(`^([0-9]*[A-Z][A-Z0-9]*)-([0-9]+)([A-Z]?)$`)
 
 func (*FANZA) Supports(code string) bool {
-	return fanzaNumber.MatchString(code) && !strings.HasPrefix(code, "FC2-")
+	return fanzaNumber.MatchString(code) && !strings.HasPrefix(code, "FC2-") && !strings.HasPrefix(code, "HEYZO-")
 }
 
 const fanzaSearchQuery = `query MovieSearch($keyword: String!, $offset: Int!) {

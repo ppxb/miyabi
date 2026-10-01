@@ -108,10 +108,12 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	}
 	fc2Source := providers.NewFC2(networkSvc.ProxyManager())
 	fanzaSource := providers.NewFANZA(networkSvc.ProxyManager())
-	metadataSvc, err := metadata.New(ctx, store.Client, fanzaSource, fc2Source, providers.NewJavDB(catalogueSvc))
+	heyzoSource := providers.NewHEYZO(networkSvc.ProxyManager())
+	metadataSvc, err := metadata.New(ctx, store.Client, fanzaSource, fc2Source, heyzoSource, providers.NewJavDB(catalogueSvc))
 	if err != nil {
 		fanzaSource.Close()
 		fc2Source.Close()
+		heyzoSource.Close()
 		catalogueSvc.Close()
 		driveSvc.Close()
 		_ = store.Close()
