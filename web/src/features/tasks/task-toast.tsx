@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import type { OfflineSubmission } from '@/api/offline'
 import { isTaskActive, type BatchTask, type ScanTask } from '@/api/tasks'
 import { isOfflineTaskActive } from '@/api/offline'
-import { scanStage } from './scan-status'
+import { scanCount, scanStage } from './scan-status'
 import { TaskProgress } from './task-progress'
 import { TaskToastActions } from './task-toast-actions'
 import { batchToastID, offlineToastID, scanToastID } from './task-notification-diff'
@@ -51,7 +51,8 @@ export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
       description: (
         <TaskProgress
           current={scanStage(task)}
-          progress={task.scan.stage === 'artwork' ? task.progress : undefined}
+          progress={task.scan.metadata_total > 0 ? task.progress : undefined}
+          count={task.scan.metadata_total > 0 ? scanCount(task) : undefined}
         />
       )
     })
@@ -99,9 +100,14 @@ export function notifyOfflineTask(
           progress={
             task.phase === 'downloading'
               ? task.progress
-              : scan?.scan.stage === 'artwork'
+              : scan && scan.scan.metadata_total > 0
                 ? scan.progress
                 : undefined
+          }
+          count={
+            task.phase !== 'downloading' && scan && scan.scan.metadata_total > 0
+              ? scanCount(scan)
+              : undefined
           }
         />
       )

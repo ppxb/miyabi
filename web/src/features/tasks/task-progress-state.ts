@@ -20,8 +20,14 @@ export function taskProgressState(current: TaskStage, offline = false, progress 
   if (!active) return { label: '等待进度同步', value: null }
 
   const percent = Number.isFinite(progress) ? clamp(progress, 0, 100) : 0
-  // Completion is the final marker; each preceding stage occupies one interval.
-  const value = stage === 'done' ? 100 : ((index + percent / 100) / (visible.length - 1)) * 100
+  // Metadata and artwork interleave for each movie. Their shared interval uses
+  // the completed-movie count, so starting the next movie cannot move it back.
+  const metadata = stage === 'scraping' || stage === 'artwork'
+  const start = stage === 'artwork' ? index - 1 : index
+  const value =
+    stage === 'done'
+      ? 100
+      : ((start + (percent / 100) * (metadata ? 2 : 1)) / (visible.length - 1)) * 100
   const label =
     current === 'locating'
       ? '已下载，等待 115 返回文件信息'
