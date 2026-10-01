@@ -121,9 +121,6 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.GET("/discover/movies/:id/magnets", discoverMagnetsHandler(deps.Catalogue))
 	protected.POST("/discover/movies/:id/offline", offlineAddHandler(deps.Offline))
 	protected.GET("/image", imageHandler(deps.Catalogue))
-	protected.GET("/javdb/route", javdbRouteHandler(deps.Catalogue))
-	protected.PUT("/javdb/route", javdbSelectRouteHandler(deps.Catalogue))
-	protected.POST("/javdb/reselect", javdbReselectHandler(deps.Catalogue))
 
 	panAPI := protected.Group("/pan", noStore())
 	panAPI.GET("/account", panAccountHandler(deps.Drive))

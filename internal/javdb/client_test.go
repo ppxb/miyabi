@@ -34,76 +34,62 @@ func (transport *stubTransport) getJSON(
 func (*stubTransport) closeIdleConnections() {}
 
 func TestRouteProbeResultsRemainIndependentOfActiveSelection(t *testing.T) {
-	for _, manual := range []bool{false, true} {
-		name := "automatic reselect"
-		if manual {
-			name = "manual selection"
+	var responseCode atomic.Int32
+	responseCode.Store(http.StatusServiceUnavailable)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/startup" {
+			t.Errorf("unexpected probe path %s", r.URL.Path)
 		}
-		t.Run(name, func(t *testing.T) {
-			var responseCode atomic.Int32
-			responseCode.Store(http.StatusServiceUnavailable)
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path != "/api/v1/startup" {
-					t.Errorf("unexpected probe path %s", r.URL.Path)
-				}
-				w.WriteHeader(int(responseCode.Load()))
-				_, _ = w.Write([]byte(`{"success":true,"data":{}}`))
-			}))
-			defer server.Close()
-			originalHosts := bootstrapHosts
-			bootstrapHosts = []string{server.URL}
-			defer func() { bootstrapHosts = originalHosts }()
-			client, err := New(Options{
-				DeviceUUID: "00000000-0000-4000-8000-000000000000",
-				CachedHost: server.URL, CachedLatency: 125 * time.Millisecond, ManualRoute: true,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer client.Close()
-			selectRoute := func(ctx context.Context) (RouteStatus, error) {
-				if manual {
-					return client.SelectRoute(ctx, server.URL)
-				}
-				return client.Reselect(ctx)
-			}
-			before := client.current.Load()
-			initial, _ := client.Route()
-			if _, err := selectRoute(t.Context()); err == nil {
-				t.Fatal("failed probe was accepted")
-			}
-			status, active := client.Route()
-			if !active || client.current.Load() != before || status.Host != server.URL || !status.Manual || status.Latency != 125*time.Millisecond {
-				t.Fatalf("failed probe replaced active selection: %+v", status)
-			}
-			if len(status.Candidates) != 1 || status.Candidates[0].Status != RouteUnavailable {
-				t.Fatalf("failed measurements not exposed: %+v", status.Candidates)
-			}
-			if initial.Candidates[0].Status != RouteAvailable {
-				t.Fatal("new probe mutated previously returned measurements")
-			}
-			measurements := client.lastProbe.Load()
-			ctx, cancel := context.WithCancel(t.Context())
-			cancel()
-			if _, err := selectRoute(ctx); !errors.Is(err, context.Canceled) {
-				t.Fatalf("cancelled selection = %v", err)
-			}
-			if client.lastProbe.Load() != measurements || client.current.Load() != before {
-				t.Fatal("cancelled selection changed route state")
-			}
-			responseCode.Store(http.StatusOK)
-			selected, err := selectRoute(t.Context())
-			if err != nil {
-				t.Fatal(err)
-			}
-			if selected.Host != server.URL || selected.Manual != manual || len(selected.Candidates) != 1 || selected.Candidates[0].Status != RouteAvailable {
-				t.Fatalf("selection response lost route or candidates: %+v", selected)
-			}
-			status, active = client.Route()
-			if !active || client.current.Load() == before || status.Host != selected.Host || status.Manual != selected.Manual || !slices.Equal(status.Candidates, selected.Candidates) {
-				t.Fatalf("installed route disagrees with response: %+v", status)
-			}
-		})
+		w.WriteHeader(int(responseCode.Load()))
+		_, _ = w.Write([]byte(`{"success":true,"data":{}}`))
+	}))
+	defer server.Close()
+	originalHosts := bootstrapHosts
+	bootstrapHosts = []string{server.URL}
+	defer func() { bootstrapHosts = originalHosts }()
+	client, err := New(Options{
+		DeviceUUID: "00000000-0000-4000-8000-000000000000",
+		CachedHost: server.URL, CachedLatency: 125 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	before := client.current.Load()
+	initial, _ := client.Route()
+	if _, err := client.reselect(t.Context()); err == nil {
+		t.Fatal("failed probe was accepted")
+	}
+	status, active := client.Route()
+	if !active || client.current.Load() != before || status.Host != server.URL || status.Latency != 125*time.Millisecond {
+		t.Fatalf("failed probe replaced active selection: %+v", status)
+	}
+	if len(status.Candidates) != 1 || status.Candidates[0].Status != RouteUnavailable {
+		t.Fatalf("failed measurements not exposed: %+v", status.Candidates)
+	}
+	if initial.Candidates[0].Status != RouteAvailable {
+		t.Fatal("new probe mutated previously returned measurements")
+	}
+	measurements := client.lastProbe.Load()
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if _, err := client.reselect(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled selection = %v", err)
+	}
+	if client.lastProbe.Load() != measurements || client.current.Load() != before {
+		t.Fatal("cancelled selection changed route state")
+	}
+	responseCode.Store(http.StatusOK)
+	selected, err := client.reselect(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if selected.Host != server.URL || len(selected.Candidates) != 1 || selected.Candidates[0].Status != RouteAvailable {
+		t.Fatalf("selection response lost route or candidates: %+v", selected)
+	}
+	status, active = client.Route()
+	if !active || client.current.Load() == before || status.Host != selected.Host || !slices.Equal(status.Candidates, selected.Candidates) {
+		t.Fatalf("installed route disagrees with response: %+v", status)
 	}
 }
 
@@ -134,7 +120,7 @@ func TestClientReselectKeepsBootstrapWithMalformedBackupData(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer client.Close()
-			result, err := client.Reselect(t.Context())
+			result, err := client.reselect(t.Context())
 			if err != nil || result.Host != server.URL || len(result.Candidates) != 1 || result.Candidates[0].Status != RouteAvailable {
 				t.Fatalf("healthy bootstrap rejected: result = %+v, error = %v", result, err)
 			}
@@ -143,54 +129,43 @@ func TestClientReselectKeepsBootstrapWithMalformedBackupData(t *testing.T) {
 }
 
 func TestClientReusesCachedRouteWithoutSelecting(t *testing.T) {
-	for _, test := range []struct {
-		name   string
-		manual bool
-	}{
-		{name: "automatic"},
-		{name: "manual", manual: true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			client, err := New(Options{
-				DeviceUUID: "00000000-0000-4000-8000-000000000000",
-				CachedHost: "https://cached.example", CachedLatency: 125 * time.Millisecond,
-				ManualRoute: test.manual,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer client.Close()
-			status, active := client.Route()
-			if !active || status.Host != "https://cached.example" || status.Manual != test.manual || status.Latency != 125*time.Millisecond {
-				t.Fatalf("restored route = %#v, active = %t", status, active)
-			}
+	client, err := New(Options{
+		DeviceUUID: "00000000-0000-4000-8000-000000000000",
+		CachedHost: "https://cached.example", CachedLatency: 125 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	status, active := client.Route()
+	if !active || status.Host != "https://cached.example" || status.Latency != 125*time.Millisecond {
+		t.Fatalf("restored route = %#v, active = %t", status, active)
+	}
 
-			cached := client.current.Load()
-			cached.transport.closeIdleConnections()
-			transport := &stubTransport{}
-			client.current.Store(&routeState{transport: transport, host: cached.host, latency: cached.latency, manual: cached.manual})
-			selections := 0
-			client.selector = func(context.Context, routeSelection) (*routeState, error) {
-				selections++
-				return nil, errors.New("cached route must be reused without probing")
-			}
-			if err := client.Initialize(t.Context()); err != nil {
-				t.Fatal(err)
-			}
-			if err := client.getJSON(t.Context(), "/test", nil, nil); err != nil {
-				t.Fatal(err)
-			}
-			if selections != 0 || transport.calls != 1 {
-				t.Fatalf("selections = %d, business requests = %d", selections, transport.calls)
-			}
-		})
+	cached := client.current.Load()
+	cached.transport.closeIdleConnections()
+	transport := &stubTransport{}
+	client.current.Store(&routeState{transport: transport, host: cached.host, latency: cached.latency})
+	selections := 0
+	client.selector = func(context.Context, routeSelection) (*routeState, error) {
+		selections++
+		return nil, errors.New("cached route must be reused without probing")
+	}
+	if err := client.Initialize(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.getJSON(t.Context(), "/test", nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if selections != 0 || transport.calls != 1 {
+		t.Fatalf("selections = %d, business requests = %d", selections, transport.calls)
 	}
 }
 
 func TestClientReselectStillMeasuresAllRoutesWithCache(t *testing.T) {
 	client, err := New(Options{
 		DeviceUUID: "00000000-0000-4000-8000-000000000000",
-		CachedHost: "https://cached.example", ManualRoute: true,
+		CachedHost: "https://cached.example",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -200,15 +175,15 @@ func TestClientReselectStillMeasuresAllRoutesWithCache(t *testing.T) {
 	client.selector = func(_ context.Context, options routeSelection) (*routeState, error) {
 		selections++
 		if !options.full || !slices.Contains(options.hosts, "https://cached.example") {
-			return nil, errors.New("manual reselect must measure all routes, including the cached host")
+			return nil, errors.New("reselection must measure all routes, including the cached host")
 		}
 		return &routeState{host: "https://selected.example"}, nil
 	}
-	status, err := client.Reselect(t.Context())
+	status, err := client.reselect(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if selections != 1 || status.Host != "https://selected.example" || status.Manual {
+	if selections != 1 || status.Host != "https://selected.example" {
 		t.Fatalf("selections = %d, selected route = %#v", selections, status)
 	}
 }
@@ -367,32 +342,42 @@ func TestClientRouteSelectionStopsOnTimeoutAndClose(t *testing.T) {
 	}
 }
 
-func TestClientRebuildsTransportWhenProxyChanges(t *testing.T) {
+func TestClientRebuildsAndReselectsWhenProxyChanges(t *testing.T) {
 	proxy, err := netx.NewProxyManager(netx.ProxyConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	client, err := New(Options{
 		DeviceUUID: "00000000-0000-4000-8000-000000000000",
-		CachedHost: "https://cached.example", ManualRoute: true, Proxy: proxy,
+		CachedHost: "https://cached.example", Proxy: proxy,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
 	before := client.current.Load()
+	selections := make(chan routeSelection, 1)
+	client.selector = func(_ context.Context, options routeSelection) (*routeState, error) {
+		current := client.current.Load()
+		if current == before {
+			return nil, errors.New("selection started before rebuilding the transport")
+		}
+		next := *current
+		next.host = "https://selected.example"
+		client.current.Store(&next)
+		selections <- options
+		return &next, nil
+	}
 
 	if err := proxy.Update(netx.ProxyConfig{Enabled: true, URL: "http://127.0.0.1:7890"}); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(5 * time.Second)
-	for client.current.Load() == before {
-		if time.Now().After(deadline) {
-			t.Fatal("transport was not rebuilt after proxy change")
+	select {
+	case selection := <-selections:
+		if !selection.full || !slices.Contains(selection.hosts, before.host) || client.current.Load().host != "https://selected.example" {
+			t.Fatalf("proxy change did not reselect routes: %+v", selection)
 		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if after := client.current.Load(); after.host != before.host || !after.manual {
-		t.Fatalf("route status changed during reinstall: %+v", after)
+	case <-time.After(5 * time.Second):
+		t.Fatal("routes were not reselected after proxy change")
 	}
 }

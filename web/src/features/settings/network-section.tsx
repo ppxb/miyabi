@@ -103,7 +103,7 @@ export function NetworkSection() {
 
   return (
     <SettingsSection icon={<GlobeIcon className="size-4" />} title="网络代理">
-      <SettingRow title="代理服务" description="仅为 JavDB 与 JavBus 提供网络代理" inline>
+      <SettingRow title="启用代理服务" description="将对除 115 以外的所有流量进行网络代理" inline>
         <Switch checked={isEnabled} disabled={disabled} onCheckedChange={handleToggle} />
       </SettingRow>
 

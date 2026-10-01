@@ -12,6 +12,9 @@ func TestRemovedRoutesLeaveActiveWorkflowsRegistered(t *testing.T) {
 		"POST /api/auth/logout",
 		"POST /api/library/scan/local",
 		"GET /api/discover/movies/:id/offline",
+		"GET /api/javdb/route",
+		"PUT /api/javdb/route",
+		"POST /api/javdb/reselect",
 	} {
 		if routes[route] {
 			t.Errorf("unused route still registered: %s", route)

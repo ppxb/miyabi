@@ -24,7 +24,6 @@ const (
 type persistedRoute struct {
 	Host      string `json:"host"`
 	LatencyMS int64  `json:"latency_ms"`
-	Manual    bool   `json:"manual"`
 }
 
 // Service combines JavDB catalogue data with Miyabi's local library and workflow state.
@@ -78,7 +77,6 @@ func New(
 		Proxy:         proxy,
 		CachedHost:    route.Host,
 		CachedLatency: time.Duration(route.LatencyMS) * time.Millisecond,
-		ManualRoute:   route.Manual,
 	})
 	if err != nil {
 		return nil, err
@@ -261,48 +259,6 @@ func (service *Service) ResolveMovieID(ctx context.Context, code string) (string
 	return id, nil
 }
 
-func (service *Service) Route() RouteStatus {
-	status, active := service.javdb.Route()
-	result := RouteStatus{
-		Host:       status.Host,
-		LatencyMS:  status.Latency.Milliseconds(),
-		Active:     active,
-		Manual:     status.Manual,
-		Candidates: make([]RouteCandidate, len(status.Candidates)),
-	}
-	for index, candidate := range status.Candidates {
-		result.Candidates[index] = RouteCandidate{
-			Host:      candidate.Host,
-			LatencyMS: candidate.Latency.Milliseconds(),
-			Status:    candidate.Status,
-		}
-	}
-	return result
-}
-
-func (service *Service) SelectRoute(ctx context.Context, host string) (RouteStatus, error) {
-	if host == "" {
-		return service.Reselect(ctx)
-	}
-	if _, err := service.javdb.SelectRoute(ctx, host); err != nil {
-		return RouteStatus{}, fmt.Errorf("select JavDB route: %w", err)
-	}
-	if err := service.persistActiveRoute(ctx); err != nil {
-		return RouteStatus{}, err
-	}
-	return service.Route(), nil
-}
-
-func (service *Service) Reselect(ctx context.Context) (RouteStatus, error) {
-	if _, err := service.javdb.Reselect(ctx); err != nil {
-		return RouteStatus{}, fmt.Errorf("reselect JavDB route: %w", err)
-	}
-	if err := service.persistActiveRoute(ctx); err != nil {
-		return RouteStatus{}, err
-	}
-	return service.Route(), nil
-}
-
 func projectMovies(
 	ctx context.Context,
 	source []domain.Movie,
@@ -344,7 +300,7 @@ func (service *Service) persistActiveRoute(ctx context.Context) error {
 	if !ok {
 		return nil
 	}
-	route := persistedRoute{Host: active.Host, LatencyMS: active.Latency.Milliseconds(), Manual: active.Manual}
+	route := persistedRoute{Host: active.Host, LatencyMS: active.Latency.Milliseconds()}
 	if route == service.lastSavedRoute {
 		return nil
 	}

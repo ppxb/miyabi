@@ -225,14 +225,6 @@ func (catalogue *fakeCatalogue) ResolveMovieID(_ context.Context, code string) (
 
 func (catalogue *fakeCatalogue) Route() (javdb.RouteStatus, bool) { return javdb.RouteStatus{}, false }
 
-func (catalogue *fakeCatalogue) SelectRoute(context.Context, string) (javdb.RouteStatus, error) {
-	return javdb.RouteStatus{}, fmt.Errorf("route selection is not part of this fixture")
-}
-
-func (catalogue *fakeCatalogue) Reselect(context.Context) (javdb.RouteStatus, error) {
-	return javdb.RouteStatus{}, fmt.Errorf("route selection is not part of this fixture")
-}
-
 func fixtureJPEG(t testing.TB, width, height int) []byte {
 	t.Helper()
 	var body bytes.Buffer

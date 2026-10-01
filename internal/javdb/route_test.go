@@ -46,7 +46,7 @@ func TestSelectRouteFullMeasuresCachedHostWithoutPreferringIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Host != bootstrapHosts[0] || result.Manual || len(result.Candidates) != len(bootstrapHosts)+1 {
+	if result.Host != bootstrapHosts[0] || len(result.Candidates) != len(bootstrapHosts)+1 {
 		t.Fatalf("result = %#v", result)
 	}
 	for _, candidate := range result.Candidates {

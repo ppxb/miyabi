@@ -26,7 +26,7 @@ func TestRouteStateIsIndependentOfPersistence(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	saved := persistedRoute{Host: "https://old.example", LatencyMS: 125, Manual: true}
+	saved := persistedRoute{Host: "https://old.example", LatencyMS: 125}
 	if err := database.SaveSetting(ctx, store.Client, javdbRouteSetting, saved); err != nil {
 		t.Fatal(err)
 	}
@@ -44,8 +44,8 @@ func TestRouteStateIsIndependentOfPersistence(t *testing.T) {
 	defer service.Close()
 	assertCurrent := func() {
 		t.Helper()
-		status := service.Route()
-		if !status.Active || status.Host != client.status.Host || status.LatencyMS != 42 || status.Manual || len(status.Candidates) != 1 || status.Candidates[0].LatencyMS != 42 {
+		status, active := service.javdb.Route()
+		if !active || status.Host != client.status.Host || status.Latency != 42*time.Millisecond || len(status.Candidates) != 1 || status.Candidates[0].Latency != 42*time.Millisecond {
 			t.Fatalf("current route came from saved state or lost its projection: %+v", status)
 		}
 	}
@@ -83,11 +83,11 @@ func TestRouteStateIsIndependentOfPersistence(t *testing.T) {
 	}
 
 	// An inactive client may still report probe candidates, but must not borrow
-	// the last saved host and manual-selection flag for its current state.
+	// the last saved host for its current state.
 	client.active = false
 	client.status = javdb.RouteStatus{Candidates: client.status.Candidates}
-	status := service.Route()
-	if status.Active || status.Host != "" || status.LatencyMS != 0 || status.Manual || len(status.Candidates) != 1 {
+	status, active := service.javdb.Route()
+	if active || status.Host != "" || status.Latency != 0 || len(status.Candidates) != 1 {
 		t.Fatalf("inactive route used stale saved state: %+v", status)
 	}
 	if err := service.persistActiveRoute(ctx); err != nil {

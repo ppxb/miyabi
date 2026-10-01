@@ -44,7 +44,7 @@ func (e *networkError) Unwrap() error {
 func (e *networkError) DomainKind() domain.Kind { return domain.KindUpstream }
 
 func (e *networkError) PublicMessage() string {
-	return "无法连接 JavDB，请检查网络代理或线路设置"
+	return "暂时无法连接 JavDB，请稍后重试或检查网络代理"
 }
 
 // newTransport builds an independent client for a route probe. Its proxy stays

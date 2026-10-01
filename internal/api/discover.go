@@ -19,9 +19,6 @@ type CatalogueManager interface {
 	Magnets(context.Context, string) ([]catalogue.Magnet, error)
 	Tags(context.Context, domain.Zone) ([]domain.TagCategory, error)
 	Media(context.Context, string) (domain.Media, error)
-	Route() catalogue.RouteStatus
-	Reselect(context.Context) (catalogue.RouteStatus, error)
-	SelectRoute(context.Context, string) (catalogue.RouteStatus, error)
 }
 
 type ViewedManager interface {
@@ -74,10 +71,6 @@ func discoverMovieStatesHandler(discover CatalogueManager) gin.HandlerFunc {
 
 type imageQuery struct {
 	URL string `form:"url" binding:"required,url"`
-}
-
-type javdbRouteInput struct {
-	Host string `json:"host" binding:"omitempty,url"`
 }
 
 func discoverSearchHandler(discover CatalogueManager) gin.HandlerFunc {
@@ -183,30 +176,6 @@ func imageHandler(discover CatalogueManager) gin.HandlerFunc {
 		}
 		c.Header("Cache-Control", "public, max-age=86400")
 		c.Data(http.StatusOK, media.ContentType, media.Body)
-	}
-}
-
-func javdbRouteHandler(discover CatalogueManager) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		respond(c, discover.Route(), nil)
-	}
-}
-
-func javdbReselectHandler(discover CatalogueManager) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		status, err := discover.Reselect(c.Request.Context())
-		respond(c, status, err)
-	}
-}
-
-func javdbSelectRouteHandler(discover CatalogueManager) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		input, ok := bindJSON[javdbRouteInput](c)
-		if !ok {
-			return
-		}
-		status, err := discover.SelectRoute(c.Request.Context(), input.Host)
-		respond(c, status, err)
 	}
 }
 

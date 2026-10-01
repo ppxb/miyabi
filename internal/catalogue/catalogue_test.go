@@ -67,7 +67,7 @@ func TestNewPersistsDeviceWithoutSelectingRoute(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status := first.Route(); status.Active || status.Host != "" {
+	if status, active := first.javdb.Route(); active || status.Host != "" {
 		t.Fatalf("new service selected a route: %#v", status)
 	}
 	first.Close()
@@ -108,7 +108,7 @@ func TestNewRestoresPersistedRoute(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	saved := persistedRoute{Host: "https://cached.example", LatencyMS: 125, Manual: true}
+	saved := persistedRoute{Host: "https://cached.example", LatencyMS: 125}
 	if err := database.SaveSetting(t.Context(), store.Client, javdbRouteSetting, saved); err != nil {
 		t.Fatal(err)
 	}
@@ -117,8 +117,8 @@ func TestNewRestoresPersistedRoute(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer service.Close()
-	status := service.Route()
-	if !status.Active || status.Host != saved.Host || status.LatencyMS != saved.LatencyMS || status.Manual != saved.Manual {
+	status, active := service.javdb.Route()
+	if !active || status.Host != saved.Host || status.Latency.Milliseconds() != saved.LatencyMS {
 		t.Fatalf("restored route = %#v", status)
 	}
 	if err := service.persistActiveRoute(t.Context()); err != nil {
@@ -259,12 +259,6 @@ func (s *stubProviderWithMagnets) ResolveMovieID(context.Context, string) (strin
 }
 func (s *stubProviderWithMagnets) Route() (javdb.RouteStatus, bool) {
 	return javdb.RouteStatus{}, false
-}
-func (s *stubProviderWithMagnets) SelectRoute(context.Context, string) (javdb.RouteStatus, error) {
-	return javdb.RouteStatus{}, nil
-}
-func (s *stubProviderWithMagnets) Reselect(context.Context) (javdb.RouteStatus, error) {
-	return javdb.RouteStatus{}, nil
 }
 func (s *stubProviderWithMagnets) Name() string { return "javdb" }
 func (s *stubProviderWithMagnets) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Magnet, error) {

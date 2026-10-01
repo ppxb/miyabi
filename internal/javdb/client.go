@@ -23,7 +23,6 @@ type routeState struct {
 	transport jsonTransport
 	host      string
 	latency   time.Duration
-	manual    bool
 }
 
 type jsonTransport interface {
@@ -87,7 +86,7 @@ func New(options Options) (*Client, error) {
 			options.CachedHost: {latency: options.CachedLatency},
 		}
 		if _, err := client.installRoute(routeContext, RouteStatus{
-			Host: options.CachedHost, Latency: options.CachedLatency, Manual: options.ManualRoute,
+			Host: options.CachedHost, Latency: options.CachedLatency,
 			Candidates: routeCandidates(hosts, known),
 		}); err != nil {
 			client.Close()
@@ -112,46 +111,10 @@ func (c *Client) Initialize(ctx context.Context) error {
 	return err
 }
 
-// Reselect measures every candidate and replaces the active route on success.
-func (c *Client) Reselect(ctx context.Context) (RouteStatus, error) {
+// reselect measures every candidate and replaces the active route on success.
+func (c *Client) reselect(ctx context.Context) (RouteStatus, error) {
 	state, err := c.waitRoute(ctx, "probe-all", func(ctx context.Context) (*routeState, error) {
 		return c.selector(ctx, routeSelection{full: true, hosts: c.routeHosts()})
-	})
-	if err != nil {
-		return RouteStatus{}, err
-	}
-	return c.routeStatus(state), nil
-}
-
-// SelectRoute verifies a known candidate before changing the active route.
-// Connection failures still trigger automatic selection on subsequent requests.
-func (c *Client) SelectRoute(ctx context.Context, rawHost string) (RouteStatus, error) {
-	c.selectionMu.Lock()
-	defer c.selectionMu.Unlock()
-	if err := ctx.Err(); err != nil {
-		return RouteStatus{}, err
-	}
-	host, err := normalizeHost(rawHost)
-	if err != nil {
-		return RouteStatus{}, err
-	}
-	current, _ := c.Route()
-	index := slices.IndexFunc(current.Candidates, func(candidate RouteCandidate) bool { return candidate.Host == host })
-	if index < 0 {
-		return RouteStatus{}, fmt.Errorf("unknown JavDB route %q", host)
-	}
-	latency, _, err := c.probe(ctx, host, nil)
-	candidates := slices.Clone(current.Candidates)
-	candidates[index] = RouteCandidate{Host: host, Latency: latency, Status: RouteAvailable}
-	if err != nil {
-		if ctx.Err() == nil {
-			candidates[index].Status = RouteUnavailable
-			c.lastProbe.Store(&candidates)
-		}
-		return RouteStatus{}, err
-	}
-	state, err := c.installRoute(ctx, RouteStatus{
-		Host: host, Latency: latency, Manual: true, Candidates: candidates,
 	})
 	if err != nil {
 		return RouteStatus{}, err
@@ -170,7 +133,7 @@ func (c *Client) Route() (RouteStatus, bool) {
 func (c *Client) routeStatus(state *routeState) RouteStatus {
 	var status RouteStatus
 	if state != nil {
-		status.Host, status.Latency, status.Manual = state.host, state.latency, state.manual
+		status.Host, status.Latency = state.host, state.latency
 	}
 	if candidates := c.lastProbe.Load(); candidates != nil {
 		status.Candidates = *candidates
@@ -212,8 +175,8 @@ func (c *Client) proxyURL() *url.URL {
 	return c.options.Proxy.Resolve()
 }
 
-// watchProxy rebuilds the active transport whenever the proxy changes and,
-// for automatically selected routes, re-measures candidates through it.
+// watchProxy rebuilds the active transport whenever the proxy changes and
+// re-measures candidates through the new proxy.
 func (c *Client) watchProxy() {
 	for {
 		select {
@@ -228,8 +191,8 @@ func (c *Client) watchProxy() {
 				slog.WarnContext(c.routeContext, "JavDB transport keeps previous proxy after change", "error", err)
 				continue
 			}
-			if state != nil && !state.manual {
-				go func() { _, _ = c.Reselect(c.routeContext) }()
+			if state != nil {
+				go func() { _, _ = c.reselect(c.routeContext) }()
 			}
 		}
 	}
@@ -370,7 +333,6 @@ func (c *Client) installRoute(ctx context.Context, status RouteStatus) (*routeSt
 		transport: transport,
 		host:      status.Host,
 		latency:   status.Latency,
-		manual:    status.Manual,
 	}
 	previous := c.current.Swap(state)
 	c.lastProbe.Store(&status.Candidates)

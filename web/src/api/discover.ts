@@ -1,7 +1,7 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useSyncExternalStore } from 'react'
 
-import { apiGet, apiPost, apiPut } from './client'
+import { apiGet } from './client'
 import {
   createMovieDetailLoader,
   discoverKeys,
@@ -97,20 +97,6 @@ export type TagCategory = {
   id: string
   name: string
   tags: NamedEntity[]
-}
-
-export type JavDBRouteStatus = {
-  host: string
-  latency_ms: number
-  active: boolean
-  manual: boolean
-  candidates: JavDBRouteCandidate[]
-}
-
-export type JavDBRouteCandidate = {
-  host: string
-  latency_ms: number
-  status: 'untested' | 'available' | 'unavailable'
 }
 
 export type BrowseMoviesParams = {
@@ -236,30 +222,5 @@ export function useDiscoverTags(zone: JavDBZone) {
     queryKey: discoverKeys.tags(zone),
     queryFn: ({ signal }) => apiGet<TagCategory[]>('/api/discover/tags', { zone }, signal),
     staleTime: 24 * 60 * 60_000
-  })
-}
-
-export function useJavDBRoute() {
-  return useQuery({
-    queryKey: discoverKeys.route,
-    queryFn: ({ signal }) => apiGet<JavDBRouteStatus>('/api/javdb/route', undefined, signal)
-  })
-}
-
-export function useReselectJavDBRoute() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: () => apiPost<JavDBRouteStatus>('/api/javdb/reselect'),
-    onSuccess: status => queryClient.setQueryData(discoverKeys.route, status),
-    onError: () => queryClient.invalidateQueries({ queryKey: discoverKeys.route })
-  })
-}
-
-export function useSelectJavDBRoute() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (host: string) => apiPut<JavDBRouteStatus>('/api/javdb/route', { host }),
-    onSuccess: status => queryClient.setQueryData(discoverKeys.route, status),
-    onError: () => queryClient.invalidateQueries({ queryKey: discoverKeys.route })
   })
 }

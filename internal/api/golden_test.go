@@ -21,7 +21,6 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/subscription"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
-	"github.com/ppxb/miyabi/internal/javdb"
 	"github.com/ppxb/miyabi/internal/library"
 	"github.com/ppxb/miyabi/internal/maintenance"
 	"github.com/ppxb/miyabi/internal/monitor"
@@ -101,15 +100,6 @@ func (goldenDiscover) Magnets(context.Context, string) ([]catalogue.Magnet, erro
 
 func (goldenDiscover) Tags(context.Context, domain.Zone) ([]domain.TagCategory, error) {
 	return []domain.TagCategory{{ID: "category-1", Name: "主題", Tags: []domain.TagOption{{ID: "tag-1", Name: "Tag"}, {ID: "tag-2", Name: "Other"}}}}, nil
-}
-
-func (goldenDiscover) Route() catalogue.RouteStatus {
-	return catalogue.RouteStatus{Host: "https://api.example", LatencyMS: 125, Active: true, Manual: false,
-		Candidates: []catalogue.RouteCandidate{
-			{Host: "https://api.example", LatencyMS: 125, Status: javdb.RouteAvailable},
-			{Host: "https://backup.example", LatencyMS: 0, Status: javdb.RouteUnavailable},
-			{Host: "https://untested.example", Status: javdb.RouteUntested},
-		}}
 }
 
 type goldenLibrary struct {
@@ -244,7 +234,6 @@ func TestResponseContractsMatchGoldenFiles(t *testing.T) {
 		{name: "discover_movie_states", method: http.MethodPost, path: "/api/discover/movie-states",
 			body: `{"movies":[{"id":"movie-exact","code":"ABP-123"},{"id":"movie-near","code":"ABP-124"},{"id":"movie-saving","code":"SONE-001"}]}`},
 		{name: "discover_tags", method: http.MethodGet, path: "/api/discover/tags?zone=censored"},
-		{name: "javdb_route", method: http.MethodGet, path: "/api/javdb/route"},
 		{name: "library_movies", method: http.MethodGet, path: "/api/library/movies"},
 		{name: "tasks", method: http.MethodGet, path: "/api/tasks"},
 		{name: "offline_tasks", method: http.MethodGet, path: "/api/offline/tasks"},

@@ -22,7 +22,6 @@ const (
 type Options struct {
 	CachedHost    string
 	CachedLatency time.Duration
-	ManualRoute   bool
 	DeviceUUID    string
 	Proxy         *netx.ProxyManager
 	Timeout       time.Duration
@@ -32,7 +31,6 @@ type Options struct {
 type RouteStatus struct {
 	Host       string
 	Latency    time.Duration
-	Manual     bool
 	Candidates []RouteCandidate
 }
 

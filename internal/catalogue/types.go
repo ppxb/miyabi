@@ -44,22 +44,6 @@ type Magnet struct {
 	URI string `json:"uri"`
 }
 
-// RouteStatus exposes JavDB routing status and candidates.
-type RouteStatus struct {
-	Host       string           `json:"host"`
-	LatencyMS  int64            `json:"latency_ms"`
-	Active     bool             `json:"active"`
-	Manual     bool             `json:"manual"`
-	Candidates []RouteCandidate `json:"candidates"`
-}
-
-// RouteCandidate represents a probed JavDB mirror candidate.
-type RouteCandidate struct {
-	Host      string                  `json:"host"`
-	LatencyMS int64                   `json:"latency_ms"`
-	Status    javdb.RouteAvailability `json:"status"`
-}
-
 // MovieIdentity specifies a movie by its catalogue ID and release code.
 type MovieIdentity struct {
 	ID   string `json:"id" binding:"required,max=200"`
@@ -84,8 +68,6 @@ type JavDBClient interface {
 	Tags(context.Context, domain.Zone) ([]domain.TagCategory, error)
 	ResolveMovieID(context.Context, string) (string, error)
 	Route() (javdb.RouteStatus, bool)
-	SelectRoute(context.Context, string) (javdb.RouteStatus, error)
-	Reselect(context.Context) (javdb.RouteStatus, error)
 }
 
 // JavBusSource supplements magnets without providing catalogue metadata.
