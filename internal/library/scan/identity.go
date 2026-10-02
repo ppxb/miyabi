@@ -10,6 +10,8 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/ent/file"
+	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
@@ -40,6 +42,8 @@ func IdentifyScanVideos(payload domain.ScanPayload, videos []Video, previous map
 		case !canIdentifyVideo(video.File):
 			// Auxiliary files cannot inherit an old or downloaded identity.
 			video.Code = ""
+		case old != nil && old.AccountID == payload.Source.AccountID && old.Edges.Movie != nil && old.Edges.Movie.ManualCode != "":
+			video.Code, video.Manual = old.Edges.Movie.Code, true
 		case payload.OfflineTaskID != 0 && payload.TargetID != "":
 			video.Code = codeid.Normalize(payload.Code)
 		case old != nil && old.AccountID == payload.Source.AccountID &&
@@ -52,6 +56,33 @@ func IdentifyScanVideos(payload domain.ScanPayload, videos []Video, previous map
 			}
 		}
 	}
+}
+
+// Manual identities take precedence over optional sidecars before their validation.
+func applyManualCodes(ctx context.Context, db *ent.Client, accountID string, videos []Video) error {
+	for start := 0; start < len(videos); start += 100 {
+		chunk := videos[start:min(start+100, len(videos))]
+		ids := make([]string, len(chunk))
+		for i, video := range chunk {
+			ids[i] = video.ID
+		}
+		records, err := db.File.Query().Where(file.AccountIDEQ(accountID), file.FileIDIn(ids...),
+			file.HasMovieWith(movie.ManualCodeNEQ(""))).Select(file.FieldID, file.FieldFileID, file.FieldMovieID).
+			WithMovie(func(q *ent.MovieQuery) { q.Select(movie.FieldCode) }).All(ctx)
+		if err != nil {
+			return err
+		}
+		codes := make(map[string]string, len(records))
+		for _, record := range records {
+			codes[record.FileID] = record.Edges.Movie.Code
+		}
+		for i := range chunk {
+			if code := codes[chunk[i].ID]; code != "" && canIdentifyVideo(chunk[i].File) {
+				chunk[i].Code, chunk[i].Manual = code, true
+			}
+		}
+	}
+	return nil
 }
 
 // ResolveNFOCodes uses matching NFOs only to identify and validate catalogue codes.
@@ -75,7 +106,7 @@ func ResolveNFOCodes(ctx context.Context, sess drive.Session, sidecars []pan.Fil
 	codes := make(map[string]string)
 	for i := range videos {
 		video := &videos[i]
-		if !canIdentifyVideo(video.File) || (video.Code == "" && (shared || len(sidecars) != 1)) {
+		if video.Manual || !canIdentifyVideo(video.File) || (video.Code == "" && (shared || len(sidecars) != 1)) {
 			continue
 		}
 		entry, found := findNFO(video.Code, shared, sidecars)
@@ -114,7 +145,7 @@ func ResolveNFOCodes(ctx context.Context, sess drive.Session, sidecars []pan.Fil
 // A targeted download checks only its matching NFO, not other movies' metadata.
 func resolveTargetNFO(ctx context.Context, sess drive.Session, videos []Video) error {
 	video := videos[0]
-	if !canIdentifyVideo(video.File) {
+	if video.Manual || !canIdentifyVideo(video.File) {
 		return nil
 	}
 	entries, err := drive.DirectoryEntries(ctx, sess, video.ParentID)

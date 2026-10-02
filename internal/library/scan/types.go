@@ -11,5 +11,6 @@ type Directory struct {
 // Video wraps a 115 file with an assigned catalogue code.
 type Video struct {
 	pan.File
-	Code string
+	Code   string
+	Manual bool
 }

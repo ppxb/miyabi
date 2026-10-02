@@ -70,6 +70,11 @@ func Code(v string) predicate.Movie {
 	return predicate.Movie(sql.FieldEQ(FieldCode, v))
 }
 
+// ManualCode applies equality check predicate on the "manual_code" field. It's identical to ManualCodeEQ.
+func ManualCode(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldEQ(FieldManualCode, v))
+}
+
 // CanonicalCode applies equality check predicate on the "canonical_code" field. It's identical to CanonicalCodeEQ.
 func CanonicalCode(v string) predicate.Movie {
 	return predicate.Movie(sql.FieldEQ(FieldCanonicalCode, v))
@@ -283,6 +288,71 @@ func CodeEqualFold(v string) predicate.Movie {
 // CodeContainsFold applies the ContainsFold predicate on the "code" field.
 func CodeContainsFold(v string) predicate.Movie {
 	return predicate.Movie(sql.FieldContainsFold(FieldCode, v))
+}
+
+// ManualCodeEQ applies the EQ predicate on the "manual_code" field.
+func ManualCodeEQ(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldEQ(FieldManualCode, v))
+}
+
+// ManualCodeNEQ applies the NEQ predicate on the "manual_code" field.
+func ManualCodeNEQ(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldNEQ(FieldManualCode, v))
+}
+
+// ManualCodeIn applies the In predicate on the "manual_code" field.
+func ManualCodeIn(vs ...string) predicate.Movie {
+	return predicate.Movie(sql.FieldIn(FieldManualCode, vs...))
+}
+
+// ManualCodeNotIn applies the NotIn predicate on the "manual_code" field.
+func ManualCodeNotIn(vs ...string) predicate.Movie {
+	return predicate.Movie(sql.FieldNotIn(FieldManualCode, vs...))
+}
+
+// ManualCodeGT applies the GT predicate on the "manual_code" field.
+func ManualCodeGT(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldGT(FieldManualCode, v))
+}
+
+// ManualCodeGTE applies the GTE predicate on the "manual_code" field.
+func ManualCodeGTE(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldGTE(FieldManualCode, v))
+}
+
+// ManualCodeLT applies the LT predicate on the "manual_code" field.
+func ManualCodeLT(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldLT(FieldManualCode, v))
+}
+
+// ManualCodeLTE applies the LTE predicate on the "manual_code" field.
+func ManualCodeLTE(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldLTE(FieldManualCode, v))
+}
+
+// ManualCodeContains applies the Contains predicate on the "manual_code" field.
+func ManualCodeContains(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldContains(FieldManualCode, v))
+}
+
+// ManualCodeHasPrefix applies the HasPrefix predicate on the "manual_code" field.
+func ManualCodeHasPrefix(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldHasPrefix(FieldManualCode, v))
+}
+
+// ManualCodeHasSuffix applies the HasSuffix predicate on the "manual_code" field.
+func ManualCodeHasSuffix(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldHasSuffix(FieldManualCode, v))
+}
+
+// ManualCodeEqualFold applies the EqualFold predicate on the "manual_code" field.
+func ManualCodeEqualFold(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldEqualFold(FieldManualCode, v))
+}
+
+// ManualCodeContainsFold applies the ContainsFold predicate on the "manual_code" field.
+func ManualCodeContainsFold(v string) predicate.Movie {
+	return predicate.Movie(sql.FieldContainsFold(FieldManualCode, v))
 }
 
 // CanonicalCodeEQ applies the EQ predicate on the "canonical_code" field.

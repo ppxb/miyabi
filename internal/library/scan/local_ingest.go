@@ -107,22 +107,36 @@ func (s *LocalScanner) ingestBatch(ctx context.Context, rootDir string, batch []
 	}
 	var added, nfoRead int
 	err := ent.WithTx(ctx, s.db, func(tx *ent.Tx) error {
-		matcher, err := loadMovieMatcher(ctx, tx, codes)
-		if err != nil {
-			return err
-		}
 		records, err := tx.File.Query().Where(file.FileIDIn(fileIDs...)).All(ctx)
 		if err != nil {
 			return err
 		}
 		files := make(map[string]*ent.File, len(records))
+		var associatedIDs []int
 		for _, record := range records {
 			files[record.FileID] = record
+			if record.MovieID != nil {
+				associatedIDs = append(associatedIDs, *record.MovieID)
+			}
+		}
+		matcher, err := loadMovieMatcher(ctx, tx, codes, associatedIDs...)
+		if err != nil {
+			return err
+		}
+		manualMovies := make(map[int]bool)
+		for _, group := range matcher {
+			for _, record := range group {
+				manualMovies[record.ID] = record.ManualCode != ""
+			}
 		}
 		directories := make(map[string]bool)
 		for _, media := range batch {
 			if err := ctx.Err(); err != nil {
 				return err
+			}
+			// A stale exported NFO must not undo a manual correction or reassign its files.
+			if existing := files[media.fileID]; existing != nil && existing.MovieID != nil && manualMovies[*existing.MovieID] {
+				continue
 			}
 			record := matcher.find(media.code)
 			if record == nil {

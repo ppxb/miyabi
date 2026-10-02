@@ -127,6 +127,7 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "code", Type: field.TypeString, Unique: true},
+		{Name: "manual_code", Type: field.TypeString, Default: ""},
 		{Name: "canonical_code", Type: field.TypeString, Default: ""},
 		{Name: "javdb_id", Type: field.TypeString, Unique: true, Nullable: true},
 		{Name: "title", Type: field.TypeString, Default: ""},
@@ -155,7 +156,7 @@ var (
 			{
 				Name:    "movie_canonical_code",
 				Unique:  false,
-				Columns: []*schema.Column{MoviesColumns[4]},
+				Columns: []*schema.Column{MoviesColumns[5]},
 			},
 		},
 	}

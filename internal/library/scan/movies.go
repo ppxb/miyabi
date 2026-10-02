@@ -38,7 +38,7 @@ func MatchMovies(ctx context.Context, tx *ent.Tx, codes []string) (map[string]in
 // earlier NFOs in the batch without querying the same candidate groups again.
 type movieMatcher map[string][]*ent.Movie
 
-func loadMovieMatcher(ctx context.Context, tx *ent.Tx, codes []string) (movieMatcher, error) {
+func loadMovieMatcher(ctx context.Context, tx *ent.Tx, codes []string, associatedIDs ...int) (movieMatcher, error) {
 	var keys []string
 	groups := make(movieMatcher, len(codes))
 	for _, code := range codes {
@@ -49,8 +49,8 @@ func loadMovieMatcher(ctx context.Context, tx *ent.Tx, codes []string) (movieMat
 			}
 		}
 	}
-	records, err := tx.Movie.Query().Where(movie.CanonicalCodeIn(keys...)).
-		Select(movie.FieldID, movie.FieldCode, movie.FieldCanonicalCode, movie.FieldJavdbID, movie.FieldScrapeStatus).All(ctx)
+	records, err := tx.Movie.Query().Where(movie.Or(movie.CanonicalCodeIn(keys...), movie.IDIn(associatedIDs...))).
+		Select(movie.FieldID, movie.FieldCode, movie.FieldCanonicalCode, movie.FieldJavdbID, movie.FieldManualCode, movie.FieldScrapeStatus).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load equivalent movies: %w", err)
 	}

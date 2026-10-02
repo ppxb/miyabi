@@ -26,6 +26,8 @@ type TaskBase = {
 
 export type ScanTask = TaskBase & {
   type: 'scan'
+  movie_id?: number
+  code?: string
   rebuild?: boolean
   source: LibrarySource
   offline_task_id?: number

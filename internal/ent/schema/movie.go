@@ -26,6 +26,7 @@ func (Movie) Fields() []ent.Field {
 		field.String("code").
 			NotEmpty().
 			Unique(),
+		field.String("manual_code").Default(""),
 		field.String("canonical_code").
 			Default("").
 			Comment("Candidate grouping key; equivalence must still be checked against code."),

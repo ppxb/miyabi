@@ -16,6 +16,26 @@ type LibraryManager interface {
 	Preview(context.Context, int, int) (domain.ImageCandidate, error)
 	StartScan(context.Context) (domain.TaskInfo, error)
 	StartRebuild(context.Context) (domain.TaskInfo, error)
+	RescrapeMovie(context.Context, int, string) (domain.TaskInfo, error)
+}
+
+func libraryMovieScrapeHandler(library LibraryManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[struct {
+			ID int `uri:"id" binding:"min=1"`
+		}](c)
+		if !ok {
+			return
+		}
+		input, ok := bindJSON[struct {
+			Code string `json:"code" binding:"max=120"`
+		}](c)
+		if !ok {
+			return
+		}
+		job, err := library.RescrapeMovie(c.Request.Context(), uri.ID, input.Code)
+		accepted(c, job, err)
+	}
 }
 
 func libraryRebuildHandler(library LibraryManager) gin.HandlerFunc {

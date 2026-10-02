@@ -55,6 +55,20 @@ func (_u *MovieUpdate) SetNillableCode(v *string) *MovieUpdate {
 	return _u
 }
 
+// SetManualCode sets the "manual_code" field.
+func (_u *MovieUpdate) SetManualCode(v string) *MovieUpdate {
+	_u.mutation.SetManualCode(v)
+	return _u
+}
+
+// SetNillableManualCode sets the "manual_code" field if the given value is not nil.
+func (_u *MovieUpdate) SetNillableManualCode(v *string) *MovieUpdate {
+	if v != nil {
+		_u.SetManualCode(*v)
+	}
+	return _u
+}
+
 // SetCanonicalCode sets the "canonical_code" field.
 func (_u *MovieUpdate) SetCanonicalCode(v string) *MovieUpdate {
 	_u.mutation.SetCanonicalCode(v)
@@ -611,6 +625,9 @@ func (_u *MovieUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Code(); ok {
 		_spec.SetField(movie.FieldCode, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.ManualCode(); ok {
+		_spec.SetField(movie.FieldManualCode, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.CanonicalCode(); ok {
 		_spec.SetField(movie.FieldCanonicalCode, field.TypeString, value)
 	}
@@ -934,6 +951,20 @@ func (_u *MovieUpdateOne) SetCode(v string) *MovieUpdateOne {
 func (_u *MovieUpdateOne) SetNillableCode(v *string) *MovieUpdateOne {
 	if v != nil {
 		_u.SetCode(*v)
+	}
+	return _u
+}
+
+// SetManualCode sets the "manual_code" field.
+func (_u *MovieUpdateOne) SetManualCode(v string) *MovieUpdateOne {
+	_u.mutation.SetManualCode(v)
+	return _u
+}
+
+// SetNillableManualCode sets the "manual_code" field if the given value is not nil.
+func (_u *MovieUpdateOne) SetNillableManualCode(v *string) *MovieUpdateOne {
+	if v != nil {
+		_u.SetManualCode(*v)
 	}
 	return _u
 }
@@ -1523,6 +1554,9 @@ func (_u *MovieUpdateOne) sqlSave(ctx context.Context) (_node *Movie, err error)
 	}
 	if value, ok := _u.mutation.Code(); ok {
 		_spec.SetField(movie.FieldCode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ManualCode(); ok {
+		_spec.SetField(movie.FieldManualCode, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.CanonicalCode(); ok {
 		_spec.SetField(movie.FieldCanonicalCode, field.TypeString, value)

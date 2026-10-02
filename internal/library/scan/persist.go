@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"path"
+	"slices"
 
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -36,7 +37,9 @@ func (r *scanRun) processPageTx(ctx context.Context, tx *ent.Tx, directoryPath s
 		previous, err := tx.File.Query().Where(file.FileIDIn(ids...)).
 			Select(file.FieldID, file.FieldFileID, file.FieldName, file.FieldParentID, file.FieldSize,
 				file.FieldSha1, file.FieldPickCode, file.FieldAccountID, file.FieldRootID, file.FieldPath, file.FieldMovieID).
-			WithMovie(func(q *ent.MovieQuery) { q.Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID) }).All(ctx)
+			WithMovie(func(q *ent.MovieQuery) {
+				q.Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID, movie.FieldManualCode)
+			}).All(ctx)
 		if err != nil {
 			return fmt.Errorf("load previous file associations: %w", err)
 		}
@@ -64,7 +67,7 @@ func (r *scanRun) processPageTx(ctx context.Context, tx *ent.Tx, directoryPath s
 				}
 			}
 		}
-		if len(codes) > 0 && r.payload.OfflineTaskID != 0 && r.payload.TargetID != "" {
+		if len(codes) > 0 && r.payload.OfflineTaskID != 0 && r.payload.TargetID != "" && !slices.ContainsFunc(videos, func(v Video) bool { return v.Manual }) {
 			id, err := IndexDownloadedMovie(ctx, tx, *r.payload)
 			if err != nil {
 				return err

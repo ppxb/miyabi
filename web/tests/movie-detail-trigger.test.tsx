@@ -130,8 +130,9 @@ test('library cards always use an explicit local detail target', () => {
         scrape_status: 'done'
       }
     })
-    assert.equal(card.type, MovieDetailTrigger)
-    const { openMovie, props, html } = renderTrigger(card.props)
+    const trigger = card.props.children[0]
+    assert.equal(trigger.type, MovieDetailTrigger)
+    const { openMovie, props, html } = renderTrigger(trigger.props)
     assert.match(html, /role="button"/)
     assert.match(html, /tabindex="0"/)
     assert.doesNotMatch(html, /href=|<a\b/)

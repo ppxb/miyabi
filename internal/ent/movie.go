@@ -26,6 +26,8 @@ type Movie struct {
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 	// Code holds the value of the "code" field.
 	Code string `json:"code,omitempty"`
+	// ManualCode holds the value of the "manual_code" field.
+	ManualCode string `json:"manual_code,omitempty"`
 	// Candidate grouping key; equivalence must still be checked against code.
 	CanonicalCode string `json:"canonical_code,omitempty"`
 	// JavdbID holds the value of the "javdb_id" field.
@@ -130,7 +132,7 @@ func (*Movie) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case movie.FieldID, movie.FieldDuration:
 			values[i] = new(sql.NullInt64)
-		case movie.FieldCode, movie.FieldCanonicalCode, movie.FieldJavdbID, movie.FieldTitle, movie.FieldDirectorID, movie.FieldDirectorName, movie.FieldMakerID, movie.FieldMakerName, movie.FieldSeriesID, movie.FieldSeriesName, movie.FieldCover, movie.FieldPoster, movie.FieldScrapeStatus:
+		case movie.FieldCode, movie.FieldManualCode, movie.FieldCanonicalCode, movie.FieldJavdbID, movie.FieldTitle, movie.FieldDirectorID, movie.FieldDirectorName, movie.FieldMakerID, movie.FieldMakerName, movie.FieldSeriesID, movie.FieldSeriesName, movie.FieldCover, movie.FieldPoster, movie.FieldScrapeStatus:
 			values[i] = new(sql.NullString)
 		case movie.FieldCreatedAt, movie.FieldUpdatedAt, movie.FieldReleaseDate:
 			values[i] = new(sql.NullTime)
@@ -172,6 +174,12 @@ func (_m *Movie) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field code", values[i])
 			} else if value.Valid {
 				_m.Code = value.String
+			}
+		case movie.FieldManualCode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field manual_code", values[i])
+			} else if value.Valid {
+				_m.ManualCode = value.String
 			}
 		case movie.FieldCanonicalCode:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -363,6 +371,9 @@ func (_m *Movie) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("code=")
 	builder.WriteString(_m.Code)
+	builder.WriteString(", ")
+	builder.WriteString("manual_code=")
+	builder.WriteString(_m.ManualCode)
 	builder.WriteString(", ")
 	builder.WriteString("canonical_code=")
 	builder.WriteString(_m.CanonicalCode)

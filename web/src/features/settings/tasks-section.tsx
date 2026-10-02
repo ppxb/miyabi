@@ -1,9 +1,7 @@
-import { Link } from '@tanstack/react-router'
 import { ListChecksIcon } from 'lucide-react'
 
 import { isScanTask, isTaskActive, useTasks } from '@/api/tasks'
 import { InlineError } from '@/components/error-state'
-import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsSection } from '@/features/settings/shared'
 import { LibraryPauseButton } from '@/features/tasks/library-pause-button'
 import { ScanProgressView } from '@/features/tasks/scan-progress'
@@ -21,12 +19,7 @@ export function TasksSection() {
         title="媒体库进度"
         description="查看同步与重建进度，暂停会作用于所有扫描与刮削任务并保留进度"
       >
-        <div className="flex items-center gap-2">
-          {activeScan ? <LibraryPauseButton paused={!!activeScan.paused} /> : null}
-          <Button asChild variant="outline" size="sm">
-            <Link to="/">进入媒体库</Link>
-          </Button>
-        </div>
+        {activeScan ? <LibraryPauseButton paused={!!activeScan.paused} /> : null}
       </SettingRow>
       {tasks.isPending ? <p className="text-xs text-muted-foreground">正在读取任务…</p> : null}
       {tasks.isError ? (
@@ -40,6 +33,7 @@ export function TasksSection() {
       <div className="divide-y divide-border">
         {scans?.slice(0, 3).map(task => (
           <div key={task.id} className="space-y-2 py-3 first:pt-0 last:pb-0">
+            {task.movie_id ? <p className="text-sm">{task.code} · 重新刮削</p> : null}
             <ScanProgressView task={task} />
             <p className="text-xs text-muted-foreground">
               {new Date(task.created_at).toLocaleString('zh-CN')}

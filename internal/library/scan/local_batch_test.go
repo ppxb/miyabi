@@ -102,6 +102,31 @@ func TestLocalScannerBatchesQueriesAndPreservesRemoteFileIdentity(t *testing.T) 
 	}
 }
 
+func TestLocalImportKeepsManualIdentityWhenOldExportStillExists(t *testing.T) {
+	scanner := localScannerFixture(t)
+	ctx, root := t.Context(), t.TempDir()
+	record := scanner.db.Movie.Create().SetCode("IPX-123").SetManualCode("IPX-123").
+		SetTitle("corrected").SetScrapeStatus(movie.ScrapeStatusFailed).SetCover("correct-cover").SaveX(ctx)
+	remote := scanner.db.File.Create().SetFileID("remote-1").SetName("ABP-001.mp4").SetSize(1 << 30).
+		SetAccountID("account").SetRootID("root").SetMovieID(record.ID).SaveX(ctx)
+	writeLocalFile(t, root, "ABP-001.strm", []byte("http://localhost/api/strm/play/remote-1"))
+	body, err := nfo.Encode(nfo.Movie{Code: "ABP-001", Title: "stale"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeLocalFile(t, root, "ABP-001.nfo", body)
+	if _, err := scanner.Scan(ctx, root); err != nil {
+		t.Fatal(err)
+	}
+	got := scanner.db.Movie.GetX(ctx, record.ID)
+	if got.Code != "IPX-123" || got.Title != "corrected" || got.ScrapeStatus != movie.ScrapeStatusFailed || got.Cover == nil || *got.Cover != "correct-cover" || scanner.db.Movie.Query().CountX(ctx) != 1 {
+		t.Fatalf("stale NFO replaced corrected metadata: %+v", got)
+	}
+	if got := scanner.db.File.GetX(ctx, remote.ID); got.MovieID == nil || *got.MovieID != record.ID || got.Name != remote.Name {
+		t.Fatal("stale export reassigned the corrected movie's video")
+	}
+}
+
 func TestLocalBatchObservesNFOIdentityAndRankingChanges(t *testing.T) {
 	scanner := localScannerFixture(t)
 	ctx, root := t.Context(), t.TempDir()

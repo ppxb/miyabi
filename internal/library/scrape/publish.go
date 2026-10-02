@@ -35,6 +35,7 @@ func (service *Service) publishMovie(ctx context.Context, sess drive.Session, jo
 		return nil, err
 	}
 	snapshot := &domain.MetadataSnapshot{
+		Code:          input.Code,
 		AccountID:     input.Source.AccountID,
 		DirectoryID:   input.Source.Directory.ID,
 		PosterVersion: input.PosterVersion,
@@ -72,6 +73,14 @@ func (service *Service) publishMovie(ctx context.Context, sess drive.Session, jo
 	}
 	if err := service.exportMgr.WithConfig(func(cfg export.Config) error {
 		return sess.WithSource(ctx, func() error {
+			record, err := service.db.Movie.Query().Where(movie.IDEQ(input.MovieID)).
+				Select(movie.FieldID, movie.FieldManualCode, movie.FieldMetadataSnapshot).Only(ctx)
+			if err != nil {
+				return err
+			}
+			if record.ManualCode != input.ManualCode {
+				return domain.E(domain.KindConflict, "影片番号已纠正，请使用新的刮削任务", nil)
+			}
 			// A scan may have reconciled the index while artwork was downloading.
 			// Check again under the source/export locks before creating any sidecars.
 			files, err := service.db.File.Query().Where(database.LibraryFiles(input.Source), file.MovieIDEQ(input.MovieID)).All(ctx)
@@ -96,6 +105,10 @@ func (service *Service) publishMovie(ctx context.Context, sess drive.Session, jo
 			if err := ExportEmbyMedia(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken, input.Code, input.Document, videos, poster, fanart); err != nil {
 				return err
 			}
+			oldDir, err := service.removePreviousExport(ctx, cfg.EmbyDir, record, input.Code)
+			if err != nil {
+				return err
+			}
 			return ent.WithTx(ctx, service.db, func(tx *ent.Tx) error {
 				update := tx.Movie.UpdateOneID(input.MovieID).SetCode(input.Code).SetMetadata(&input.Document).
 					SetCover(artwork.Thumbnail).SetPoster(artwork.Poster).SetFanarts([]string{artwork.Fanart}).
@@ -110,6 +123,11 @@ func (service *Service) publishMovie(ctx context.Context, sess drive.Session, jo
 					return err
 				}
 				if service.mediaNotifier != nil && cfg.EmbyDir != "" {
+					if oldDir != "" {
+						if err := service.mediaNotifier.NotifyUpdatedTx(ctx, tx, oldDir); err != nil {
+							return err
+						}
+					}
 					return service.mediaNotifier.NotifyUpdatedTx(ctx, tx, EmbyMovieDir(cfg.EmbyDir, input.Code))
 				}
 				return nil

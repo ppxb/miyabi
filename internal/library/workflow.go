@@ -197,8 +197,8 @@ func scanTaskInfo(record *ent.Task) (domain.TaskInfo, error) {
 		return domain.TaskInfo{}, fmt.Errorf("read scan task %d: %w", record.ID, err)
 	}
 	return domain.TaskInfo{
-		Rebuild: payload.Rebuild,
-		ID:      record.ID, Type: record.Type, Status: string(record.Status), Progress: record.Progress,
+		Rebuild: payload.Rebuild, MovieID: payload.MovieID, Code: payload.Code,
+		ID: record.ID, Type: record.Type, Status: string(record.Status), Progress: record.Progress,
 		Error: record.Error, CanRetry: record.Status == task.StatusFailed, CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
 		RetryAt: record.RetryAt, RetryCount: record.RetryCount,
 		Source: payload.Source, Scan: payload.Scan, OfflineTaskID: payload.OfflineTaskID,
@@ -214,6 +214,7 @@ func ensureScanTask(ctx context.Context, taskClient *ent.TaskClient, source doma
 				selector.Where(sqljson.ValueEQ(task.FieldPayload, true, sqljson.Path("rebuild")))
 			}
 			selector.Where(sql.And(
+				sql.Not(sqljson.HasKey(task.FieldPayload, sqljson.Path("movie_id"))),
 				sql.Not(sqljson.HasKey(task.FieldPayload, sqljson.Path("target_id"))),
 				sqljson.ValueEQ(task.FieldPayload, source.AccountID, sqljson.Path("source", "account_id")),
 				sqljson.ValueEQ(task.FieldPayload, source.Directory.ID, sqljson.Path("source", "directory", "id")),

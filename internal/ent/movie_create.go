@@ -62,6 +62,20 @@ func (_c *MovieCreate) SetCode(v string) *MovieCreate {
 	return _c
 }
 
+// SetManualCode sets the "manual_code" field.
+func (_c *MovieCreate) SetManualCode(v string) *MovieCreate {
+	_c.mutation.SetManualCode(v)
+	return _c
+}
+
+// SetNillableManualCode sets the "manual_code" field if the given value is not nil.
+func (_c *MovieCreate) SetNillableManualCode(v *string) *MovieCreate {
+	if v != nil {
+		_c.SetManualCode(*v)
+	}
+	return _c
+}
+
 // SetCanonicalCode sets the "canonical_code" field.
 func (_c *MovieCreate) SetCanonicalCode(v string) *MovieCreate {
 	_c.mutation.SetCanonicalCode(v)
@@ -401,6 +415,10 @@ func (_c *MovieCreate) defaults() error {
 		v := movie.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.ManualCode(); !ok {
+		v := movie.DefaultManualCode
+		_c.mutation.SetManualCode(v)
+	}
 	if _, ok := _c.mutation.CanonicalCode(); !ok {
 		v := movie.DefaultCanonicalCode
 		_c.mutation.SetCanonicalCode(v)
@@ -438,6 +456,9 @@ func (_c *MovieCreate) check() error {
 		if err := movie.CodeValidator(v); err != nil {
 			return &ValidationError{Name: "code", err: fmt.Errorf(`ent: validator failed for field "Movie.code": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.ManualCode(); !ok {
+		return &ValidationError{Name: "manual_code", err: errors.New(`ent: missing required field "Movie.manual_code"`)}
 	}
 	if _, ok := _c.mutation.CanonicalCode(); !ok {
 		return &ValidationError{Name: "canonical_code", err: errors.New(`ent: missing required field "Movie.canonical_code"`)}
@@ -494,6 +515,10 @@ func (_c *MovieCreate) createSpec() (*Movie, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Code(); ok {
 		_spec.SetField(movie.FieldCode, field.TypeString, value)
 		_node.Code = value
+	}
+	if value, ok := _c.mutation.ManualCode(); ok {
+		_spec.SetField(movie.FieldManualCode, field.TypeString, value)
+		_node.ManualCode = value
 	}
 	if value, ok := _c.mutation.CanonicalCode(); ok {
 		_spec.SetField(movie.FieldCanonicalCode, field.TypeString, value)
@@ -704,6 +729,18 @@ func (u *MovieUpsert) SetCode(v string) *MovieUpsert {
 // UpdateCode sets the "code" field to the value that was provided on create.
 func (u *MovieUpsert) UpdateCode() *MovieUpsert {
 	u.SetExcluded(movie.FieldCode)
+	return u
+}
+
+// SetManualCode sets the "manual_code" field.
+func (u *MovieUpsert) SetManualCode(v string) *MovieUpsert {
+	u.Set(movie.FieldManualCode, v)
+	return u
+}
+
+// UpdateManualCode sets the "manual_code" field to the value that was provided on create.
+func (u *MovieUpsert) UpdateManualCode() *MovieUpsert {
+	u.SetExcluded(movie.FieldManualCode)
 	return u
 }
 
@@ -1089,6 +1126,20 @@ func (u *MovieUpsertOne) SetCode(v string) *MovieUpsertOne {
 func (u *MovieUpsertOne) UpdateCode() *MovieUpsertOne {
 	return u.Update(func(s *MovieUpsert) {
 		s.UpdateCode()
+	})
+}
+
+// SetManualCode sets the "manual_code" field.
+func (u *MovieUpsertOne) SetManualCode(v string) *MovieUpsertOne {
+	return u.Update(func(s *MovieUpsert) {
+		s.SetManualCode(v)
+	})
+}
+
+// UpdateManualCode sets the "manual_code" field to the value that was provided on create.
+func (u *MovieUpsertOne) UpdateManualCode() *MovieUpsertOne {
+	return u.Update(func(s *MovieUpsert) {
+		s.UpdateManualCode()
 	})
 }
 
@@ -1692,6 +1743,20 @@ func (u *MovieUpsertBulk) SetCode(v string) *MovieUpsertBulk {
 func (u *MovieUpsertBulk) UpdateCode() *MovieUpsertBulk {
 	return u.Update(func(s *MovieUpsert) {
 		s.UpdateCode()
+	})
+}
+
+// SetManualCode sets the "manual_code" field.
+func (u *MovieUpsertBulk) SetManualCode(v string) *MovieUpsertBulk {
+	return u.Update(func(s *MovieUpsert) {
+		s.SetManualCode(v)
+	})
+}
+
+// UpdateManualCode sets the "manual_code" field to the value that was provided on create.
+func (u *MovieUpsertBulk) UpdateManualCode() *MovieUpsertBulk {
+	return u.Update(func(s *MovieUpsert) {
+		s.UpdateManualCode()
 	})
 }
 

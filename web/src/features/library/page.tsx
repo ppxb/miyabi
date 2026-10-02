@@ -26,8 +26,10 @@ export function LibraryPage({
   const tasks = useTasks()
   const connection = useTaskConnection()
   const source = library.data?.source
-  const latest = tasks.data?.filter(isScanTask).find(task => sameSource(task.source, source))
+  const sourceTasks = tasks.data?.filter(isScanTask).filter(task => sameSource(task.source, source))
+  const latest = sourceTasks?.find(task => !task.movie_id && !task.offline_task_id)
   const scanning = latest !== undefined && isTaskActive(latest)
+  const processingMovies = new Set(sourceTasks?.filter(isTaskActive).map(task => task.movie_id))
 
   return (
     <AppPage>
@@ -70,7 +72,11 @@ export function LibraryPage({
           {library.data.movies.length > 0 ? (
             <MovieGridLayout>
               {library.data.movies.map(movie => (
-                <LibraryMovieCard key={movie.id} movie={movie} />
+                <LibraryMovieCard
+                  key={movie.id}
+                  movie={movie}
+                  busy={!source || scanning || processingMovies.has(movie.id)}
+                />
               ))}
             </MovieGridLayout>
           ) : (

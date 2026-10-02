@@ -173,16 +173,20 @@ func init() {
 	movieDescCode := movieFields[0].Descriptor()
 	// movie.CodeValidator is a validator for the "code" field. It is called by the builders before save.
 	movie.CodeValidator = movieDescCode.Validators[0].(func(string) error)
+	// movieDescManualCode is the schema descriptor for manual_code field.
+	movieDescManualCode := movieFields[1].Descriptor()
+	// movie.DefaultManualCode holds the default value on creation for the manual_code field.
+	movie.DefaultManualCode = movieDescManualCode.Default.(string)
 	// movieDescCanonicalCode is the schema descriptor for canonical_code field.
-	movieDescCanonicalCode := movieFields[1].Descriptor()
+	movieDescCanonicalCode := movieFields[2].Descriptor()
 	// movie.DefaultCanonicalCode holds the default value on creation for the canonical_code field.
 	movie.DefaultCanonicalCode = movieDescCanonicalCode.Default.(string)
 	// movieDescTitle is the schema descriptor for title field.
-	movieDescTitle := movieFields[3].Descriptor()
+	movieDescTitle := movieFields[4].Descriptor()
 	// movie.DefaultTitle holds the default value on creation for the title field.
 	movie.DefaultTitle = movieDescTitle.Default.(string)
 	// movieDescFanarts is the schema descriptor for fanarts field.
-	movieDescFanarts := movieFields[15].Descriptor()
+	movieDescFanarts := movieFields[16].Descriptor()
 	// movie.DefaultFanarts holds the default value on creation for the fanarts field.
 	movie.DefaultFanarts = movieDescFanarts.Default.(func() []string)
 	offlinedownloadMixin := schema.OfflineDownload{}.Mixin()

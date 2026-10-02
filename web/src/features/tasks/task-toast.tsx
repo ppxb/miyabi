@@ -38,6 +38,7 @@ export function notifyTaskError(id: string, title: string, description: string) 
 export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
   const active = isTaskActive(task)
   const action = task.rebuild ? '重建' : '同步'
+  const title = task.movie_id ? `${task.code} 重新刮削` : `媒体库${action}`
   const props = taskToastOptions(
     scanToastID(task.id),
     active,
@@ -46,29 +47,37 @@ export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
   )
   if (active) {
     // Sonner's loading type hides the close button; long tasks remain dismissible.
-    toast.info(options.waiting ? '正在连接任务服务' : `正在${action}媒体库`, {
-      ...props,
-      icon:
-        options.waiting || task.paused ? undefined : (
-          <LoaderCircleIcon className="size-4 animate-spin" />
-        ),
-      description: (
-        <TaskProgress
-          current={scanStage(task)}
-          label={scanStatus(task)}
-          progress={task.scan.metadata_total > 0 ? task.progress : undefined}
-        />
-      )
-    })
+    toast.info(
+      options.waiting
+        ? '正在连接任务服务'
+        : task.movie_id
+          ? `正在重新刮削 ${task.code}`
+          : `正在${action}媒体库`,
+      {
+        ...props,
+        icon:
+          options.waiting || task.paused ? undefined : (
+            <LoaderCircleIcon className="size-4 animate-spin" />
+          ),
+        description: (
+          <TaskProgress
+            current={scanStage(task)}
+            label={scanStatus(task)}
+            progress={task.scan.metadata_total > 0 ? task.progress : undefined}
+          />
+        )
+      }
+    )
   } else if (task.status === 'failed') {
-    toast.error(task.scan.metadata_failed ? `媒体库${action}结束` : `媒体库${action}失败`, {
+    toast.error(task.scan.metadata_failed && !task.movie_id ? `${title}结束` : `${title}失败`, {
       ...props,
-      description: task.scan.metadata_failed
-        ? `${task.scan.metadata_failed} 部影片失败`
-        : task.error
+      description:
+        task.scan.metadata_failed && !task.movie_id
+          ? `${task.scan.metadata_failed} 部影片失败`
+          : task.error
     })
   } else {
-    toast.success(`媒体库${action}完成`, {
+    toast.success(`${title}完成`, {
       ...props,
       description: undefined
     })

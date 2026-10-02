@@ -155,7 +155,7 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 	r.payload.ReusedTasks = nil
 	for after := 0; ; {
 		records, err := tx.Movie.Query().Where(movie.IDGT(after), movie.HasFilesWith(indexed)).
-			Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID, movie.FieldUpdatedAt).
+			Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID, movie.FieldManualCode, movie.FieldUpdatedAt).
 			Order(movie.ByID()).Limit(reconcileBatchSize).All(ctx)
 		if err != nil {
 			return fmt.Errorf("find scanned metadata jobs: %w", err)
@@ -214,7 +214,7 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 			input := scrape.MetadataPayload{
 				Rebuild: r.payload.Rebuild,
 				Source:  r.payload.Source, ScanTaskID: r.taskID, MovieID: record.ID,
-				Code: record.Code, JavDBID: domain.ValueOrZero(record.JavdbID),
+				Code: record.Code, JavDBID: domain.ValueOrZero(record.JavdbID), ManualCode: record.ManualCode,
 			}
 			encoded, err := tasks.EncodePayload(input)
 			if err != nil {

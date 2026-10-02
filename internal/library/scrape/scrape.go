@@ -30,6 +30,7 @@ type MetadataPayload struct {
 	MovieID    int                  `json:"movie_id"`
 	Code       string               `json:"code"`
 	JavDBID    string               `json:"javdb_id,omitempty"`
+	ManualCode string               `json:"manual_code,omitempty"`
 }
 
 // Payload holds the checkpoints of one movie scraping workflow.
@@ -167,6 +168,13 @@ func (service *Service) Scrape(ctx context.Context, job tasks.Job) error {
 	if err != nil {
 		return err
 	}
+	current, err := service.db.Movie.Query().Where(movie.IDEQ(input.MovieID)).Select(movie.FieldID, movie.FieldManualCode).Only(ctx)
+	if err != nil {
+		return err
+	}
+	if current.ManualCode != input.ManualCode {
+		return domain.E(domain.KindConflict, "影片番号已纠正，请使用新的刮削任务", nil)
+	}
 	if !input.MetadataReady {
 		if err := service.prepareMetadata(ctx, sess, job.ID, &input); err != nil {
 			return err
@@ -252,6 +260,7 @@ func (service *Service) Finished(ctx context.Context, tx *ent.Tx, job tasks.Job,
 	}
 	update := tx.Movie.Update().Where(
 		movie.IDEQ(input.MovieID),
+		movie.ManualCodeEQ(input.ManualCode),
 		movie.HasFilesWith(database.LibraryFiles(input.Source)),
 	)
 	if !input.Rebuild {

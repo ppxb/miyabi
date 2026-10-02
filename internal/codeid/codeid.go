@@ -247,6 +247,17 @@ func Normalize(raw string) string {
 	return value
 }
 
+// Valid reports whether the entire input is a catalogue number, not a filename or URL.
+func Valid(raw string) bool {
+	value := Normalize(raw)
+	for _, pattern := range []*regexp.Regexp{westernPattern, fc2Pattern, numericPattern, heydougaPattern, compactDatePattern, separatedPattern, letterSerialPattern, compactPattern} {
+		if pattern.MatchString(value) {
+			return true
+		}
+	}
+	return false
+}
+
 // Candidates lists the catalogue numbers that may name the same movie as code,
 // most specific first. Release filenames decorate catalogue numbers in ways
 // catalogue sites omit: distributor label digits before the prefix (259LUXU-1899
