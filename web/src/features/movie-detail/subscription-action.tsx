@@ -15,9 +15,9 @@ export function MovieSubscriptionAction({ movieID }: { movieID: string }) {
     <div className="flex flex-wrap items-center gap-3">
       <p className="text-sm text-muted-foreground">
         {subscribed
-          ? '已订阅，出现磁力后会自动加入 115。'
+          ? '已订阅，将持续检查符合偏好的磁力。'
           : subscription?.status === 'added'
-            ? '已成功加入 115 离线下载。'
+            ? '已加入 115 离线下载。'
             : '暂无磁力链'}
       </p>
       <Button

@@ -23,7 +23,11 @@ export function TasksSection() {
       </SettingRow>
       {tasks.isPending ? <p className="text-xs text-muted-foreground">正在读取任务…</p> : null}
       {tasks.isError ? (
-        <InlineError onRetry={connection.reconnect} retrying={connection.status === 'connecting'}>
+        <InlineError
+          onRetry={connection.reconnect}
+          retrying={connection.status === 'connecting'}
+          retryLabel="重新连接"
+        >
           无法读取任务，请启动后端服务后重试。
         </InlineError>
       ) : null}

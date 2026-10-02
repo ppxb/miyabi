@@ -1,4 +1,4 @@
-import { BellPlusIcon, BellRingIcon, LoaderCircleIcon } from 'lucide-react'
+import { BellPlusIcon, BellRingIcon, CircleCheckIcon, LoaderCircleIcon } from 'lucide-react'
 import type { MouseEvent } from 'react'
 
 import type { DiscoverMovie } from '@/api/discover'
@@ -10,12 +10,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 export function MovieSubscribeButton({ movie }: { movie: DiscoverMovie }) {
   const { subscription, isPending } = useSubscription('movie', movie.id)
   const add = useAddSubscription()
-  const subscribed = subscription?.status === 'waiting' || subscription?.status === 'added'
+  const waiting = subscription?.status === 'waiting'
+  const added = subscription?.status === 'added'
+  const canSubscribe = !waiting && !added
 
   function handleClick(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
     event.stopPropagation()
-    if (subscribed || add.isPending) return
+    if (!canSubscribe || add.isPending) return
     add.mutate({ kind: 'movie', target_id: movie.id })
   }
 
@@ -24,15 +26,17 @@ export function MovieSubscribeButton({ movie }: { movie: DiscoverMovie }) {
       <TooltipTrigger asChild>
         <Button
           type="button"
-          variant={subscribed ? 'default' : 'outline'}
+          variant={canSubscribe ? 'outline' : 'default'}
           size="icon-sm"
           disabled={isPending || add.isPending}
-          className={subscribed ? undefined : 'bg-background/85 backdrop-blur'}
+          className={canSubscribe ? 'bg-background/85 backdrop-blur' : undefined}
           onClick={handleClick}
         >
           {add.isPending ? (
             <LoaderCircleIcon className="animate-spin" />
-          ) : subscribed ? (
+          ) : added ? (
+            <CircleCheckIcon />
+          ) : waiting ? (
             <BellRingIcon />
           ) : (
             <BellPlusIcon />
@@ -40,7 +44,13 @@ export function MovieSubscribeButton({ movie }: { movie: DiscoverMovie }) {
         </Button>
       </TooltipTrigger>
       <TooltipContent side="left">
-        {subscribed ? '已订阅，出现磁力后将自动处理' : '订阅影片'}
+        {waiting
+          ? '已订阅，将持续检查符合偏好的磁力'
+          : added
+            ? '已加入 115 离线下载'
+            : subscription
+              ? '重新订阅'
+              : '订阅影片'}
       </TooltipContent>
     </Tooltip>
   )

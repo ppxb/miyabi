@@ -1,4 +1,4 @@
-import { BellPlusIcon, BellRingIcon, LoaderCircleIcon } from 'lucide-react'
+import { BellOffIcon, BellPlusIcon, LoaderCircleIcon } from 'lucide-react'
 
 import { useDiscoverMovies, useDiscoverTags, type JavDBZone } from '@/api/discover'
 import { useAddSubscription, useRemoveSubscription, useSubscription } from '@/api/subscriptions'
@@ -123,11 +123,11 @@ function ActorSubscribeButton({ actorID, actorName }: { actorID: string; actorNa
       {add.isPending || remove.isPending ? (
         <LoaderCircleIcon className="animate-spin" />
       ) : subscribed ? (
-        <BellRingIcon />
+        <BellOffIcon />
       ) : (
         <BellPlusIcon />
       )}
-      {subscribed ? '已订阅演员' : '订阅演员'}
+      {subscribed ? '取消订阅' : '订阅演员'}
     </Button>
   )
 }

@@ -29,7 +29,7 @@ export function ScanProgressView({ task }: { task: ScanTask }) {
         {disconnected ? (
           <Button variant="link" size="xs" className="h-5 px-0" onClick={connection.reconnect}>
             <RefreshCwIcon />
-            重连进度
+            重新连接
           </Button>
         ) : (
           <Tooltip>

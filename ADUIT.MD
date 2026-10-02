@@ -2,24 +2,24 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166、168、173、184 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166、168、173、184、189 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 
 ## 复核结果
 
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
-| 确认仍存在，待处理 | 11 | 有明确代码依据的边界、状态反馈或行为问题 |
+| 确认仍存在，待处理 | 9 | 有明确代码依据的边界、状态反馈或行为问题 |
 | 可选优化与整理 | 57 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
-| 按现有约定暂缓 | 8 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
+| 按现有约定暂缓 | 9 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 22 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 23 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
 1. **235**：STRM token 进入请求日志。
 2. **237**：可信代理配置及 HTTPS 转发头。
-3. **187、189、192、193、194、206、222、224**：已确认的界面状态和反馈问题；具体视觉效果由用户验收。
+3. **192、193、194、206、222、224**：已确认的界面状态和反馈问题；具体视觉效果由用户验收。
 
 ### 当前约定
 
@@ -30,6 +30,9 @@
 - 不增加番号特例黑名单、不因文件短或只有一个调用方而强制合并、不机械抽取通用组件。
 
 ### 本轮验证与限制
+
+- 第 187 项仅统一重连按钮文案，通过前端 `npm run typecheck`、`npm run lint` 及两个修改文件的 oxfmt 格式检查。未新增测试或执行浏览器测试；加载展示与设置重试入口按用户决定暂缓。
+- 第 189 项修复后通过：前端 `npm run test -- tests/subscriptions.test.ts tests/subscription-card.test.tsx tests/movie-detail-content.test.tsx`（3 个文件 / 11 项既有回归）、`npm run typecheck`、`npm run lint` 及三个修改文件的 oxfmt 格式检查。本次调整状态展示与动作文案，未新增测试或执行浏览器测试；图标与提示的实际视觉效果由用户确认。
 
 - 通过：`go test ./internal/api ./internal/app ./internal/database ./internal/tasks ./internal/library/... ./internal/emby ./internal/netx ./internal/monitor`。
 - 通过：前端 `npm run test`，25 个文件 / 141 项测试。相关用例验证任务共享快照、索引、事务、来源隔离、重启恢复、Emby 通知和详情交互逻辑。
@@ -49,10 +52,6 @@
 
 ## 确认仍存在，待处理
 
-- [ ] **187.** 订阅设置加载中仍展示 true/preferred 等假默认值（虽已禁用）；网络、Emby、订阅读取错误仍没有直接重试按钮，任务页与媒体库重连文案不同。旧数据源页已删除；Emby 关闭时详情设置不再展示，应删除原“加载中同步头像必然显示开启”的描述。
-  - 定位：`web/src/features/settings/subscription-section.tsx:61`；`web/src/features/settings/network-section.tsx`；`web/src/features/settings/emby-section.tsx`；`web/src/features/settings/tasks-section.tsx`。
-- [ ] **189.** 订阅状态语义仍不一致：卡片将 waiting/added 都视为已订阅，详情仅把 waiting 视为已订阅，added 展示“重新订阅”；两处强调样式也相反。演员“已订阅演员”按钮实际执行取消，文案未表达动作。应明确状态与动作语义。
-  - 定位：`web/src/components/movie/movie-subscribe-button.tsx:13`；`web/src/features/movie-detail/subscription-action.tsx`；`web/src/features/discover/metadata-search-page.tsx`。
 - [ ] **192.** 详情骨架仍画三个独立统计块，实际统计为合并 dl；预览圆角与磁力间距也不匹配，磁力骨架重复。加载完成时结构差异已由代码确认，具体跳动程度尚未浏览器复测。
   - 定位：`web/src/features/movie-detail/skeleton.tsx:15`；`web/src/features/movie-detail/hero.tsx`；`web/src/features/movie-detail/previews.tsx`；`web/src/features/movie-detail/magnets.tsx`。
 - [ ] **193.** 分类重试 InlineError 未传 retrying，重试中缺少禁用/加载反馈。isLoading/isPending 和骨架圆角的差别仍在，但这两点只属一致性整理，不单独断言功能错误。
@@ -206,6 +205,8 @@
   - 定位：`internal/javdb/media.go:26`；`internal/catalogue/service.go`；`internal/api/router.go`；`internal/netx/client.go`。
 - **186.** Emby 已按用户要求与代理一致：开启后展开并保存，关闭立即提交；本地外观、即时订阅设置与文本表单职责不同。不再强制统一所有设置为即时保存，也不恢复已删除的 JavDB 线路设置。
   - 定位：`web/src/features/settings/emby-section.tsx`；`web/src/features/settings/network-section.tsx`；`web/src/features/settings/subscription-section.tsx`。
+- **187.** 已将设置任务区域及共享进度组件的重连按钮统一为“重新连接”，与媒体库一致，重连行为不变。其余两项按用户决定暂缓：订阅设置首次加载时仍显示禁用的默认选项，网络/Emby/订阅设置读取失败仍仅显示错误文字，不增加加载占位或就地重试入口，用户接受刷新页面恢复。此项为部分完成，不标记整项已解决；Emby 关闭时详情设置已隐藏。
+  - 定位：`web/src/features/settings/tasks-section.tsx`；`web/src/features/tasks/scan-progress.tsx`；`web/src/features/library/page.tsx`；`web/src/features/settings/subscription-section.tsx`；`web/src/features/settings/network-section.tsx`；`web/src/features/settings/emby-section.tsx`。
 - **205.** 撤回强制引入同时附加 aria-label 和 Tooltip 的 IconButton。用户已明确移除 shadcn 原始组件之外的 ARIA 描述，并取消 toast/媒体库动作 tooltip；不能以复用为由重新添加。其他现存 Tooltip 是否抽取单独评估。
   - 定位：`web/src/features/library/scan-button.tsx`；`web/src/features/tasks/task-toast-actions.tsx`。
 - **230.** 图标控件缺少自定义可访问名称的事实仍在，但属于用户已决定不补充的自定义 ARIA 范围；不标记“已修复”，也不重新添加标签或 tooltip。旧数据源页和已删除的控件引用移除。
@@ -284,6 +285,8 @@
   - 定位：`web/src/features/settings/network-section.tsx`；`web/src/features/settings/emby-section.tsx`；`web/src/features/access-gate/access-gate.tsx`。
 - [x] **184.** 已移除 export 内的 ./data/emby 和 8080 默认推导，默认目录/播放地址统一由 config.Load 按 DataDir/Listen 解析。实际导出与批量重写共用 export.Config.Validate，缺失目的目录或播放地址时在写文件前报错，Manager 不再静默跳过空配置重写；纯路径/内容构造函数使用调用方提供的已解析配置。OutboundIP 注释已准确描述出口路由优先、失败后遍历网卡优先私网、最终回环的顺序，选址行为保留。前端补协议的少量重复不单独认定为缺陷，Emby 端口拆分与代理输入继续保留各自职责。
   - 定位：`internal/export/config.go`；`internal/export/export.go`；`internal/library/scrape/export.go`；`internal/netx/ip.go`；`internal/library/scrape/export_config_test.go`；`internal/export/export_test.go`。
+- [x] **189.** 影片卡片已区分 waiting 的铃铛图标和 added 的勾选图标，提示分别为持续检查符合偏好的磁力、已加入 115 离线下载；已有长期无源记录的可操作入口显示“重新订阅”。卡片与详情的等待提示不再无条件承诺自动加入 115，手动入库设置同样适用。详情保留 waiting 的取消操作及 added/stale 的重新订阅，演员 active/paused 的取消按钮改用 BellOff 和“取消订阅”。卡片防重复提交与详情重新启动检查的行为保留；状态按钮与操作按钮的样式差异不再认定为缺陷。
+  - 定位：`web/src/components/movie/movie-subscribe-button.tsx`；`web/src/features/movie-detail/subscription-action.tsx`；`web/src/features/discover/metadata-search-page.tsx`。
 - [x] **212.** movie-hover-details 已删除，详情统计栏与悬浮卡片之间的重复不存在。
   - 定位：`web/src/features/movie-detail/hero.tsx`。
 - [x] **239.** 旧 115 字幕、旧封面 payload 和历史迁移测试已清理；dir_cache、snapshot、检查点、来源隔离与事务测试仍验证当前功能，不按旧报告要求删除。剩余跨包测试归属统一放入 219/240。
