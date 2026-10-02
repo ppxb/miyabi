@@ -3,7 +3,6 @@ import { FolderMinusIcon, FolderOpenIcon, LoaderCircleIcon } from 'lucide-react'
 import { useClearPanDirectory, type PanDirectory } from '@/api/pan'
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { PanDirectoryDialog } from './pan-directory-dialog'
 import { SettingRow } from './shared'
@@ -22,19 +21,8 @@ export function PanDirectoryRow({
 
   return (
     <>
-      <SettingRow
-        title="媒体目录"
-        description="选择 115 中的目录作为媒体库来源"
-        inline={!directory}
-      >
-        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
-          {directory ? (
-            <Input
-              value={directory.path}
-              disabled
-              className="min-w-0 flex-1 text-ellipsis sm:w-64 sm:flex-none"
-            />
-          ) : null}
+      <SettingRow title="媒体目录" description="选择 115 中的目录作为媒体库来源" inline>
+        <div className="flex items-center gap-2">
           <Tooltip>
             <PanDirectoryDialog accountID={accountID} directory={directory}>
               <TooltipTrigger asChild>
