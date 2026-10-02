@@ -36,7 +36,6 @@ export function NetworkSection() {
   function handleToggle(checked: boolean) {
     if (checked) {
       setUserEnabled(true)
-      setTimeout(() => inputRef.current?.focus(), 50)
     } else {
       if (config?.enabled) {
         updateConfig.mutate(
@@ -112,6 +111,7 @@ export function NetworkSection() {
           <SettingRow title="代理地址" description="支持 HTTP、HTTPS 与 SOCKS5 代理协议">
             <Input
               ref={inputRef}
+              autoFocus={userEnabled === true}
               type="text"
               value={url}
               placeholder="http://127.0.0.1:7890"

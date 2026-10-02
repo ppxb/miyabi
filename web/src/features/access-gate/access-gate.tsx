@@ -9,19 +9,20 @@ import { Input } from '@/components/ui/input'
 
 export function AccessGate({ children }: PropsWithChildren) {
   const config = useAccessGateConfig()
+  const { refetch } = config
   const login = useAccessGateLogin()
   const [password, setPassword] = useState('')
 
   useEffect(() => {
     function handleUnauthorized() {
-      void config.refetch()
+      void refetch()
     }
 
     window.addEventListener('miyabi:unauthorized', handleUnauthorized)
     return () => {
       window.removeEventListener('miyabi:unauthorized', handleUnauthorized)
     }
-  }, [config])
+  }, [refetch])
 
   const isGranted = config.data?.enabled === false || config.data?.authenticated === true
 

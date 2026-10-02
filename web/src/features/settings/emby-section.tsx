@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { LoaderCircleIcon, RefreshCwIcon, TvMinimalIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -38,7 +38,6 @@ export function EmbySection() {
   const emby = useEmbyConfig()
   const updateConfig = useUpdateEmbyConfig()
   const testConfig = useTestEmbyConfig()
-  const hostRef = useRef<HTMLInputElement>(null)
 
   const config = emby.data
   const initial = useMemo(() => configToFormData(config), [config])
@@ -73,7 +72,6 @@ export function EmbySection() {
   function handleToggle(checked: boolean) {
     if (checked) {
       updateField('enabled', true)
-      setTimeout(() => hostRef.current?.focus(), 50)
       return
     }
 
@@ -200,7 +198,7 @@ export function EmbySection() {
 
           <SettingRow title="服务器地址" description="Emby 服务的 IP 或域名">
             <Input
-              ref={hostRef}
+              autoFocus={form?.enabled === true && !initial.enabled}
               value={current.host}
               placeholder="http://192.168.1.100"
               disabled={disabled}

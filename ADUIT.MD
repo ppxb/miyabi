@@ -2,18 +2,18 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166、168 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166、168、173 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 
 ## 复核结果
 
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
-| 确认仍存在，待处理 | 13 | 有明确代码依据的边界、状态反馈或行为问题 |
+| 确认仍存在，待处理 | 12 | 有明确代码依据的边界、状态反馈或行为问题 |
 | 可选优化与整理 | 57 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
 | 按现有约定暂缓 | 8 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 20 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 21 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
@@ -43,12 +43,11 @@
 - 第 161 项修复后通过：`go test ./internal/api ./internal/app`、同范围 `go vet`。并发 HTTP 回归验证 16 个同 IP 请求仅 5 个进入验证，其他请求返回 429；覆盖成功与在途请求交错、格式错误释放名额且不清除失败历史、容量上限、未访问记录回收、封禁/窗口到期边界及动态时长文案。保留密码关闭、Cookie 登录和伪造代理 IP 等现有回归；未运行 race 检测或浏览器测试。
 - 第 166 项修复后通过：`go test ./internal/api ./internal/app ./cmd/miyabi`、同范围 `go vet`。新增 HTTP 回归覆盖目录拒绝访问、入口缺失时不列目录、SPA 页面回退、哈希/非哈希资源缓存策略、缺失资源与 API 请求不回退 HTML、HEAD、304、Range、方法限制及原请求路径保留；浏览器缓存和发布更新体验未做实测。
 - 第 168 项修复后通过：`go test ./internal/gfriends ./internal/emby ./internal/app`、同范围 `go vet`。新增离线回归覆盖网络/缓存恰好达到上限、声明超限、缺失或低报长度的超限流、镜像回退与响应体关闭、只持久化有效索引、超大缓存重新下载，以及首次加载失败/旧索引保留后的退避和恢复；同时验证头像超限不再返回截断数据。2026-10-02 查询 GitHub 文件元数据，Filetree.json 为 6,502,018 字节（约 6.2 MiB），据此设置 32 MiB 上限；未进行真实 Emby 头像同步或浏览器测试。上限约束输入文件体积，不是 JSON 解析后的内存硬上限。
+- 第 173 项修复后通过：前端 `npm run test -- tests/access-gate.test.tsx tests/emby-settings.test.ts`（2 个文件 / 6 项既有登录与 Emby 保存回归）、`npm run typecheck`、`npm run lint` 及三个修改文件的 oxfmt 格式检查。未新增 DOM 测试或执行浏览器测试；实际自动聚焦体验由用户确认，不将现有用例通过当作焦点行为已实测。
 - **独立工具链问题仍存在**：本地执行 `web/node_modules/.bin/shadcn --version` 仍报 `ERR_PACKAGE_PATH_NOT_EXPORTED`：MCP SDK 依赖访问 zod 的 `./v3` 导出失败。未安装或调整依赖；这不是应用构建失败，也不意味着需要恢复旧数据兼容。
 
 ## 确认仍存在，待处理
 
-- [ ] **173.** 代理与 Emby 开关都通过未清理的 50ms setTimeout 聚焦输入，关闭或切换期间可能抢焦点；AccessGate effect 仍依赖整个查询对象，每次渲染重新注册监听。可在条件挂载时聚焦，并收窄 effect 依赖。
-  - 定位：`web/src/features/settings/network-section.tsx:39`；`web/src/features/settings/emby-section.tsx`；`web/src/features/access-gate/access-gate.tsx`。
 - [ ] **184.** export 仍有 ./data/emby 和硬编码 8080 的默认推导，与 config.Load 按 DataDir/Listen 的推导不一致；应集中默认值。当前正常初始化已传配置，风险主要在空值调用。前端 URL 规范化仍重复；OutboundIP 注释声称优先私网，但成功 UDP 路由路径可能先返回公网地址。
   - 定位：`internal/export/export.go:19`；`internal/config/config.go`；`internal/netx/ip.go`；`web/src/features/settings/emby-url.ts`；`web/src/features/settings/network-section.tsx`。
 - [ ] **187.** 订阅设置加载中仍展示 true/preferred 等假默认值（虽已禁用）；网络、Emby、订阅读取错误仍没有直接重试按钮，任务页与媒体库重连文案不同。旧数据源页已删除；Emby 关闭时详情设置不再展示，应删除原“加载中同步头像必然显示开启”的描述。
@@ -282,6 +281,8 @@
   - 定位：`internal/api/router.go`；`internal/api/frontend_test.go`；`web/vite.config.ts`。
 - [x] **168.** GFriends 索引下载与本地缓存读取统一限制为 32 MiB，先检查已知大小，再限量读取至上限加 1 字节以识别超限，不接受截断数据。超限镜像尝试下一来源；全部失败时沿用有效旧索引及 5 分钟重试间隔，首次无索引时返回错误，超大磁盘缓存不阻止重新下载。7 天缓存有效期保留。共享下载函数同时严格执行头像原有的 10 MiB 限额，超限进入镜像回退；第 167 项图片代理仍暂缓。
   - 定位：`internal/gfriends/client.go`；`internal/gfriends/limits_test.go`；`internal/gfriends/refresh_test.go`。
+- [x] **173.** 代理与 Emby 开启后的地址聚焦改为条件 autoFocus，由用户开启时随输入框挂载执行，移除 50ms 定时器；读取已开启的配置不自动聚焦，代理空地址校验的主动聚焦保留。AccessGate 的登录失效监听仅依赖 refetch，保留解绑清理，避免每次渲染重复绑定。原监听已有清理，并不存在持续累积监听或每次输入都请求后端的问题。
+  - 定位：`web/src/features/settings/network-section.tsx`；`web/src/features/settings/emby-section.tsx`；`web/src/features/access-gate/access-gate.tsx`。
 - [x] **212.** movie-hover-details 已删除，详情统计栏与悬浮卡片之间的重复不存在。
   - 定位：`web/src/features/movie-detail/hero.tsx`。
 - [x] **239.** 旧 115 字幕、旧封面 payload 和历史迁移测试已清理；dir_cache、snapshot、检查点、来源隔离与事务测试仍验证当前功能，不按旧报告要求删除。剩余跨包测试归属统一放入 219/240。
