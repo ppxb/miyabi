@@ -24,6 +24,8 @@ const (
 	defaultRawURL    = "https://raw.githubusercontent.com/gfriends/gfriends/master"
 	cacheExpiration  = 7 * 24 * time.Hour
 	indexRetryDelay  = 5 * time.Minute
+	// Filetree.json is about 6.2 MiB as of October 2026; allow room for growth.
+	maxIndexBytes = 32 << 20
 )
 
 // mirrors serve the same repository; the CDN is tried before GitHub.
@@ -99,7 +101,7 @@ func (c *Client) EnsureIndex(ctx context.Context) error {
 	}
 
 	var index map[string]string
-	body, err := c.download(ctx, "Filetree.json", 0, func(data []byte) error {
+	body, err := c.download(ctx, "Filetree.json", maxIndexBytes, func(data []byte) error {
 		var err error
 		index, err = parseIndex(data)
 		return err
@@ -129,11 +131,19 @@ func (c *Client) EnsureIndex(ctx context.Context) error {
 }
 
 func readCachedIndex(path string) (map[string]string, time.Time, error) {
-	info, err := os.Stat(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	data, err := os.ReadFile(path)
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	if info.Size() > maxIndexBytes {
+		return nil, time.Time{}, fmt.Errorf("gfriends index exceeds %d bytes", maxIndexBytes)
+	}
+	data, err := readLimited(file, maxIndexBytes)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
@@ -255,11 +265,12 @@ func (c *Client) download(ctx context.Context, path string, limit int64, validat
 			lastErr = fmt.Errorf("download status: %d", resp.StatusCode)
 			continue
 		}
-		var reader io.Reader = resp.Body
-		if limit > 0 {
-			reader = io.LimitReader(reader, limit)
+		if resp.ContentLength > limit {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("gfriends download exceeds %d bytes", limit)
+			continue
 		}
-		data, err := io.ReadAll(reader)
+		data, err := readLimited(resp.Body, limit)
 		resp.Body.Close()
 		if err == nil && validate != nil {
 			err = validate(data)
@@ -271,6 +282,17 @@ func (c *Client) download(ctx context.Context, path string, limit int64, validat
 		return data, nil
 	}
 	return nil, lastErr
+}
+
+func readLimited(reader io.Reader, limit int64) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(reader, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
+		return nil, fmt.Errorf("gfriends data exceeds %d bytes", limit)
+	}
+	return data, nil
 }
 
 func normalizeName(s string) string {

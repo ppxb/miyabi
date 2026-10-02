@@ -2,22 +2,22 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166、168 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 
 ## 复核结果
 
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
-| 确认仍存在，待处理 | 15 | 有明确代码依据的边界、状态反馈或行为问题 |
+| 确认仍存在，待处理 | 13 | 有明确代码依据的边界、状态反馈或行为问题 |
 | 可选优化与整理 | 57 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
-| 按现有约定暂缓 | 7 | 不恢复用户已取消的 UI、ARIA 或旧数据兼容要求 |
+| 按现有约定暂缓 | 8 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 19 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 20 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
-1. **235、167**：STRM token 进入请求日志，以及图片代理缺少地址/体积约束。
+1. **235**：STRM token 进入请求日志。
 2. **237**：可信代理配置及 HTTPS 转发头。
 3. **187、189、192、193、194、206、222、224**：已确认的界面状态和反馈问题；具体视觉效果由用户验收。
 
@@ -42,14 +42,11 @@
 - 第 149 项修复后通过：`go generate ./internal/ent`、`go test ./internal/database ./internal/library/... ./internal/app ./internal/api`、同测试范围 `go vet`。捕获实际列表 SQL 并用 EXPLAIN QUERY PLAN 验证排序索引生效且没有临时排序；覆盖本地/挂载来源筛选、相同创建时间的分页顺序和多文件去重。本地扫描回归覆盖跨根目录同名文件、等价相对/绝对根路径、文件信息刷新、手动番号保护及 STRM 网盘身份保留。未新增真实大库性能结论。
 - 第 161 项修复后通过：`go test ./internal/api ./internal/app`、同范围 `go vet`。并发 HTTP 回归验证 16 个同 IP 请求仅 5 个进入验证，其他请求返回 429；覆盖成功与在途请求交错、格式错误释放名额且不清除失败历史、容量上限、未访问记录回收、封禁/窗口到期边界及动态时长文案。保留密码关闭、Cookie 登录和伪造代理 IP 等现有回归；未运行 race 检测或浏览器测试。
 - 第 166 项修复后通过：`go test ./internal/api ./internal/app ./cmd/miyabi`、同范围 `go vet`。新增 HTTP 回归覆盖目录拒绝访问、入口缺失时不列目录、SPA 页面回退、哈希/非哈希资源缓存策略、缺失资源与 API 请求不回退 HTML、HEAD、304、Range、方法限制及原请求路径保留；浏览器缓存和发布更新体验未做实测。
+- 第 168 项修复后通过：`go test ./internal/gfriends ./internal/emby ./internal/app`、同范围 `go vet`。新增离线回归覆盖网络/缓存恰好达到上限、声明超限、缺失或低报长度的超限流、镜像回退与响应体关闭、只持久化有效索引、超大缓存重新下载，以及首次加载失败/旧索引保留后的退避和恢复；同时验证头像超限不再返回截断数据。2026-10-02 查询 GitHub 文件元数据，Filetree.json 为 6,502,018 字节（约 6.2 MiB），据此设置 32 MiB 上限；未进行真实 Emby 头像同步或浏览器测试。上限约束输入文件体积，不是 JSON 解析后的内存硬上限。
 - **独立工具链问题仍存在**：本地执行 `web/node_modules/.bin/shadcn --version` 仍报 `ERR_PACKAGE_PATH_NOT_EXPORTED`：MCP SDK 依赖访问 zod 的 `./v3` 导出失败。未安装或调整依赖；这不是应用构建失败，也不意味着需要恢复旧数据兼容。
 
 ## 确认仍存在，待处理
 
-- [ ] **167.** 【优先】/api/image 经 Catalogue.Media 直接调用 FetchMedia，仅检查 https 和非空 host，未限制目标主机/IP，也未设置响应体大小上限；标准 transport 没有 SafeDownload 的地址防护。可用于访问服务器可达的任意 HTTPS 目标并占用大量内存。访问密码启用时需会话，未启用时可直接访问；图片 MIME 检查发生在下载之后。
-  - 定位：`internal/javdb/media.go:26`；`internal/catalogue/service.go`；`internal/api/router.go`；`internal/netx/client.go`。
-- [ ] **168.** GFriends Filetree.json 下载仍将 maxBytes 设为 0，本地缓存也直接 ReadFile，文件体积无上限。错误包装已修复，仅保留大小约束问题；应按实际索引规模制定上限而非套用头像大小。
-  - 定位：`internal/gfriends/client.go:102`。
 - [ ] **173.** 代理与 Emby 开关都通过未清理的 50ms setTimeout 聚焦输入，关闭或切换期间可能抢焦点；AccessGate effect 仍依赖整个查询对象，每次渲染重新注册监听。可在条件挂载时聚焦，并收窄 effect 依赖。
   - 定位：`web/src/features/settings/network-section.tsx:39`；`web/src/features/settings/emby-section.tsx`；`web/src/features/access-gate/access-gate.tsx`。
 - [ ] **184.** export 仍有 ./data/emby 和硬编码 8080 的默认推导，与 config.Load 按 DataDir/Listen 的推导不一致；应集中默认值。当前正常初始化已传配置，风险主要在空值调用。前端 URL 规范化仍重复；OutboundIP 注释声称优先私网，但成功 UDP 路由路径可能先返回公网地址。
@@ -207,6 +204,8 @@
 
 - **155.** 卡片模糊背景仍存在；每卡片 matchMedia 的旧 hover hook 已删除。按用户选择保留模糊效果，尚无浏览器性能证据证明它是滚动卡顿原因，不据此要求移除。独立预览缩略图已按用户要求回退，不能重新列为必做优化。
   - 定位：`web/src/components/media-image.tsx`；`web/src/features/movie-detail/previews.tsx`。
+- **167.** 用户明确当前无法限制上游地址，图片代理的地址与体积约束整项暂不处理。/api/image 经 Catalogue.Media 调用 FetchMedia，仅检查 https 和非空 host，未限制目标主机/IP，也未设置响应体大小上限；图片 MIME 检查发生在下载之后。当前客户端已禁止重定向，但仍可请求服务器可达的任意 HTTPS 目标并产生无上限的响应体读取。访问密码启用时需会话，未启用时可直接访问。此项仅暂缓，未解决或撤回风险结论。
+  - 定位：`internal/javdb/media.go:26`；`internal/catalogue/service.go`；`internal/api/router.go`；`internal/netx/client.go`。
 - **186.** Emby 已按用户要求与代理一致：开启后展开并保存，关闭立即提交；本地外观、即时订阅设置与文本表单职责不同。不再强制统一所有设置为即时保存，也不恢复已删除的 JavDB 线路设置。
   - 定位：`web/src/features/settings/emby-section.tsx`；`web/src/features/settings/network-section.tsx`；`web/src/features/settings/subscription-section.tsx`。
 - **205.** 撤回强制引入同时附加 aria-label 和 Tooltip 的 IconButton。用户已明确移除 shadcn 原始组件之外的 ARIA 描述，并取消 toast/媒体库动作 tooltip；不能以复用为由重新添加。其他现存 Tooltip 是否抽取单独评估。
@@ -281,6 +280,8 @@
   - 定位：`internal/api/rate_limiter.go`；`internal/api/auth.go`；`internal/api/rate_limiter_test.go`；`internal/api/auth_rate_limit_test.go`。
 - [x] **166.** 前端目录请求返回 404，首页与 SPA 回退直接提供 index.html，入口缺失也不列目录。仅已存在且符合当前 Vite 八位哈希命名的 assets 资源使用 `public, max-age=31536000, immutable`；入口和普通静态文件使用 `no-cache`。缺失资源、无效文件路径和 API 路径不回退 HTML；前端只接受 GET/HEAD，并保留静态文件条件请求与 Range 支持。SPA 回退不再改写原请求路径。
   - 定位：`internal/api/router.go`；`internal/api/frontend_test.go`；`web/vite.config.ts`。
+- [x] **168.** GFriends 索引下载与本地缓存读取统一限制为 32 MiB，先检查已知大小，再限量读取至上限加 1 字节以识别超限，不接受截断数据。超限镜像尝试下一来源；全部失败时沿用有效旧索引及 5 分钟重试间隔，首次无索引时返回错误，超大磁盘缓存不阻止重新下载。7 天缓存有效期保留。共享下载函数同时严格执行头像原有的 10 MiB 限额，超限进入镜像回退；第 167 项图片代理仍暂缓。
+  - 定位：`internal/gfriends/client.go`；`internal/gfriends/limits_test.go`；`internal/gfriends/refresh_test.go`。
 - [x] **212.** movie-hover-details 已删除，详情统计栏与悬浮卡片之间的重复不存在。
   - 定位：`web/src/features/movie-detail/hero.tsx`。
 - [x] **239.** 旧 115 字幕、旧封面 payload 和历史迁移测试已清理；dir_cache、snapshot、检查点、来源隔离与事务测试仍验证当前功能，不按旧报告要求删除。剩余跨包测试归属统一放入 219/240。
