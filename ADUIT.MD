@@ -2,24 +2,24 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166、168、173、184、189、192、193 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166、168、173、184、189、192、193、194 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 
 ## 复核结果
 
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
-| 确认仍存在，待处理 | 7 | 有明确代码依据的边界、状态反馈或行为问题 |
+| 确认仍存在，待处理 | 6 | 有明确代码依据的边界、状态反馈或行为问题 |
 | 可选优化与整理 | 57 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
 | 按现有约定暂缓 | 9 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 25 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 26 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
 1. **235**：STRM token 进入请求日志。
 2. **237**：可信代理配置及 HTTPS 转发头。
-3. **194、206、222、224**：已确认的界面状态和反馈问题；具体视觉效果由用户验收。
+3. **206、222、224**：已确认的界面状态和反馈问题；具体视觉效果由用户验收。
 
 ### 当前约定
 
@@ -32,6 +32,7 @@
 
 ### 本轮验证与限制
 
+- 第 194 项修复后通过：前端 `npm run typecheck`、`npm run lint` 及修改文件的 oxfmt 格式检查。仅调整说明文字的 CSS 换行规则，未新增测试或执行浏览器测试；窄屏中英文与长路径的实际换行效果由用户确认。
 - 第 193 项修复后通过：前端 `npm run test -- tests/category-filters.test.ts tests/error-state.test.tsx`（2 个文件 / 6 项既有回归）、`npm run typecheck`、`npm run lint` 及修改文件的 oxfmt 格式检查。现有用例覆盖分类参数和错误组件重试禁用状态；未新增测试或执行浏览器测试。
 - 第 187 项仅统一重连按钮文案，通过前端 `npm run typecheck`、`npm run lint` 及两个修改文件的 oxfmt 格式检查。未新增测试或执行浏览器测试；加载展示与设置重试入口按用户决定暂缓。
 - 第 189 项修复后通过：前端 `npm run test -- tests/subscriptions.test.ts tests/subscription-card.test.tsx tests/movie-detail-content.test.tsx`（3 个文件 / 11 项既有回归）、`npm run typecheck`、`npm run lint` 及三个修改文件的 oxfmt 格式检查。本次调整状态展示与动作文案，未新增测试或执行浏览器测试；图标与提示的实际视觉效果由用户确认。
@@ -55,8 +56,6 @@
 
 ## 确认仍存在，待处理
 
-- [ ] **194.** SettingRow 所有描述仍使用 break-all，英文地址以外的普通文字也会被强制断词。控件宽度仍按场景不同；不应强制所有 Input/Select 同宽。
-  - 定位：`web/src/features/settings/shared.tsx:45`；`web/src/features/settings/pan-directory-row.tsx`；`web/src/features/settings/subscription-section.tsx`。
 - [ ] **206.** 网络、Emby、订阅设置的 mutation 错误仍直接展示 Error.message，fetch 网络异常可能以英文出现；describeApiError 已存在但这些路径尚未使用。优先统一用户错误文案，并核对 inline/toast 是否重复。
   - 定位：`web/src/features/settings/network-section.tsx:51`；`web/src/features/settings/emby-section.tsx`；`web/src/features/settings/subscription-section.tsx`；`web/src/api/client.ts`。
 - [ ] **222.** 清理缓存按钮的 busy 仍包含 info.isFetching，后台刷新统计会让按钮禁用；统计刷新按钮仍放在数据目录行。可分开操作中与后台刷新状态，防止交互无故不可用。
@@ -290,6 +289,8 @@
   - 定位：`web/src/features/movie-detail/skeleton.tsx`；`web/src/features/movie-detail/magnets.tsx`；`web/src/features/movie-detail/content.tsx`。
 - [x] **193.** 分类错误组件已传入 taxonomy.isFetching，错误提示仍可见时，重试期间按钮禁用并显示旋转图标。首次无数据的重试仍切回原有骨架，保持原请求与分支逻辑。复核确认分类页和元资料筛选页骨架均为 rounded-full，撤回原圆角差异描述；isLoading/isPending 的差别不作为缺陷或强制统一项。
   - 定位：`web/src/features/discover/category-filters.tsx`；`web/src/components/error-state.tsx`；`web/src/features/discover/metadata-search-page.tsx`。
+- [x] **194.** SettingRow 说明文字已从 break-all 改为 wrap-break-word，优先按正常规则换行，仅在长单词或路径无法容纳时允许断开。保留 min-w-0 及现有 Input/Select 宽度，不强制不同用途的控件同宽。
+  - 定位：`web/src/features/settings/shared.tsx:45`。
 - [x] **212.** movie-hover-details 已删除，详情统计栏与悬浮卡片之间的重复不存在。
   - 定位：`web/src/features/movie-detail/hero.tsx`。
 - [x] **239.** 旧 115 字幕、旧封面 payload 和历史迁移测试已清理；dir_cache、snapshot、检查点、来源隔离与事务测试仍验证当前功能，不按旧报告要求删除。剩余跨包测试归属统一放入 219/240。

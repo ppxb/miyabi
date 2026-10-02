@@ -42,7 +42,7 @@ export function SettingRow({
     >
       <div className="min-w-0 space-y-1">
         <div className="text-sm font-medium">{title}</div>
-        <div className="text-xs leading-5 break-all text-muted-foreground">{description}</div>
+        <div className="text-xs leading-5 wrap-break-word text-muted-foreground">{description}</div>
       </div>
       <div className="max-w-full shrink-0">{children}</div>
     </div>
