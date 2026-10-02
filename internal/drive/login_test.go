@@ -363,12 +363,7 @@ func TestInFlightAccountFetchDoesNotPoisonCacheAfterRelogin(t *testing.T) {
 	d.mu.Unlock()
 	d.invalidateAccountCache()
 
-	releaseFetch()
-	err := await(t, fetchDone)
-	if !errors.Is(err, pan.ErrUnauthorized) {
-		t.Fatalf("in-flight verifyAccount error = %v, want pan.ErrUnauthorized", err)
-	}
-
+	// The new login must not wait for or join the old credential's lookup.
 	state2 := d.snapshot()
 	acc2, err := d.verifyAccount(t.Context(), state2)
 	if err != nil {
@@ -376,6 +371,10 @@ func TestInFlightAccountFetchDoesNotPoisonCacheAfterRelogin(t *testing.T) {
 	}
 	if acc2.ID != newAccount.ID {
 		t.Fatalf("verifyAccount returned old account %s, want new account %s", acc2.ID, newAccount.ID)
+	}
+	releaseFetch()
+	if err := await(t, fetchDone); !errors.Is(err, pan.ErrUnauthorized) {
+		t.Fatalf("in-flight verifyAccount error = %v, want pan.ErrUnauthorized", err)
 	}
 
 	d.accountCacheMu.Lock()

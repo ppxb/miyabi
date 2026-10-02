@@ -2,18 +2,18 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135 项目录缓存和第 138 项资料下载重复限流修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、142 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 
 ## 复核结果
 
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
-| 确认仍存在，待处理 | 20 | 有明确代码依据的边界、状态反馈或行为问题 |
+| 确认仍存在，待处理 | 19 | 有明确代码依据的边界、状态反馈或行为问题 |
 | 可选优化与整理 | 57 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
 | 按现有约定暂缓 | 7 | 不恢复用户已取消的 UI、ARIA 或旧数据兼容要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 14 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 15 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
@@ -38,12 +38,11 @@
 - 没有浏览器测试、真实上游/Emby 联调、race 检测或新的性能基准。旧报告中的毫秒数、倍数、对比度和固定积压耗时不再作为本轮结论。
 - 第 135 项修复后通过：`go test ./internal/library/... ./internal/app`、`go vet ./internal/library/... ./internal/app`；新增覆盖跨目录过期回收（命中、未命中及请求失败）、目录数/文件总数上限、淘汰后重新读取、超大目录完整读取且不驻留、账号隔离和返回列表修改隔离。保留现有视频位置核验与发布回放回归。限额约束缓存记录数，不代表内存字节硬上限或真实大库性能结论。
 - 第 138 项修复后通过：`go test ./internal/pan ./internal/drive ./internal/library/... ./internal/app`、同范围 `go vet`。新增离线回归覆盖仅 downurl 使用 API 限流、CDN 请求 UA/凭据隔离、文件大小边界与响应体关闭、瞬时故障重试、Retry-After、请求头/正文超时及退避期间取消。未测量真实网盘扫描提速比例。
+- 第 142 项修复后通过：`go test ./internal/pan ./internal/drive ./internal/library/... ./internal/app ./internal/api ./internal/monitor`、同范围 `go vet`。新增回归覆盖并发账号校验的成功/失败共享、TTL 到期重查、等待者取消、共享请求超时与关闭流程、明确拒绝后的凭据持久化清除与重启、临时故障后重试、正在进行的扫码登录及新旧凭据交错；保留原有刷新合并、来源切换与登录回归。
 - **独立工具链问题仍存在**：本地执行 `web/node_modules/.bin/shadcn --version` 仍报 `ERR_PACKAGE_PATH_NOT_EXPORTED`：MCP SDK 依赖访问 zod 的 `./v3` 导出失败。未安装或调整依赖；这不是应用构建失败，也不意味着需要恢复旧数据兼容。
 
 ## 确认仍存在，待处理
 
-- [ ] **142.** 账号缓存失效时并发 verifyAccount 仍会各自 fetchAccount；refreshTokens 有并发合并，但 RefreshToken 明确拒绝后未标记该凭据版本失效，后续请求仍重复刷新。应区分凭据吊销与暂时网络失败，不能把所有错误都当登出。
-  - 定位：`internal/drive/account.go:27`；`internal/drive/token.go`。
 - [ ] **148.** 订阅检查仍每轮最多 10 部影片和 5 个演员，由 5 分钟周期触发；到期积压无法在一轮内排空。BatchHandler 与 EnqueueSingle 重复读取订阅，后者每项读取配置；无磁力且未过期的分支更新 checks/时间却不发业务通知。应优先处理积压调度和状态通知，保留请求节流；撤回固定“500 项约 2.8 小时”的估算。
   - 定位：`internal/monitor/check.go:18`；`internal/monitor/batch.go`；`internal/app/app.go`。
 - [ ] **149.** 媒体库仍按 created_at DESC/id DESC 排序，Movie schema 没有对应排序索引。另有身份风险：本地 fileID 仅由相对路径哈希生成，不包含扫描根目录；切换根目录但相对路径相同时会命中旧记录，已有文件分支也未刷新名称、大小等字段。跨根目录影响需专门回归，不能沿用旧 local.go 行号。
@@ -277,6 +276,8 @@
   - 定位：`internal/pan/metadata.go`；`internal/pan/client.go`；`internal/pan/metadata_test.go`。
 - [x] **139.** 115 sidecar 上传实现已删除，已无逐文件申请 OSS STS token 的生产路径；不再增加 token 缓存。
   - 定位：`internal/pan/client.go`。
+- [x] **142.** verifyAccount 按 credentialVersion 合并并发校验，复用 60 秒成功缓存；共享请求使用独立 45 秒超时并纳入关闭等待，单个等待者取消不影响其他调用，失败不缓存。RefreshToken 明确返回 ErrUnauthorized 时，在提交锁内重新核对凭据和 token 版本，再清除数据库与内存中的对应凭据并失效账号缓存；后续请求及重启不再重复刷新已拒绝的凭据。挂载目录和正在进行的扫码登录保留，旧响应不能清除新登录；网络超时、限流、服务端故障和响应解析错误不清除凭据。
+  - 定位：`internal/drive/account.go`；`internal/drive/token.go`；`internal/drive/account_test.go`；`internal/drive/token_test.go`；`internal/drive/login_test.go`。
 - [x] **212.** movie-hover-details 已删除，详情统计栏与悬浮卡片之间的重复不存在。
   - 定位：`web/src/features/movie-detail/hero.tsx`。
 - [x] **239.** 旧 115 字幕、旧封面 payload 和历史迁移测试已清理；dir_cache、snapshot、检查点、来源隔离与事务测试仍验证当前功能，不按旧报告要求删除。剩余跨包测试归属统一放入 219/240。

@@ -27,9 +27,9 @@ func (d *Drive) refreshTokens(ctx context.Context, expected snapshot) error {
 		}
 		tokenContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), upstreamTimeout)
 		defer cancel()
-		tokens, err := d.client.RefreshToken(tokenContext, current.tokens.RefreshToken)
-		if err != nil {
-			return nil, fmt.Errorf("refresh 115 credentials: %w", err)
+		tokens, refreshErr := d.client.RefreshToken(tokenContext, current.tokens.RefreshToken)
+		if refreshErr != nil && !errors.Is(refreshErr, pan.ErrUnauthorized) {
+			return nil, fmt.Errorf("refresh 115 credentials: %w", refreshErr)
 		}
 		if err := d.commit.Lock(tokenContext); err != nil {
 			return nil, err
@@ -38,6 +38,14 @@ func (d *Drive) refreshTokens(ctx context.Context, expected snapshot) error {
 		current, err = d.credentials(expected)
 		if err != nil || current.tokenVersion != expected.tokenVersion {
 			return nil, err
+		}
+		if refreshErr != nil {
+			// A rejection only invalidates the credentials used by this attempt.
+			// Persist removal so later requests and restarts cannot refresh them again.
+			if err := d.clearCredentials(tokenContext); err != nil {
+				return nil, err
+			}
+			return nil, fmt.Errorf("refresh 115 credentials: %w", refreshErr)
 		}
 		if err := database.SaveSetting(tokenContext, d.database, credentialsSetting, tokens); err != nil {
 			return nil, err

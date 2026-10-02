@@ -81,6 +81,7 @@ type Drive struct {
 	closed               bool
 
 	accountCacheMu          sync.Mutex
+	accountChecks           singleflight.Group
 	cachedAccount           pan.Account
 	cachedAccountTime       time.Time
 	cachedCredentialVersion uint64

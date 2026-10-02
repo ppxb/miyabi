@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
@@ -286,5 +287,122 @@ func TestCloseFinishesRefreshBeforeStoppingQueuedRequests(t *testing.T) {
 	assertTokens(t, d, tokens)
 	if requests.Load() != 0 {
 		t.Fatal("request started after the service closed")
+	}
+}
+
+func TestRejectedRefreshClearsOnlyCredentialsAndAllowsRelogin(t *testing.T) {
+	d, client := mountedTestDrive(t)
+	ctx := t.Context()
+	state := d.snapshot()
+	login, err := d.BeginLogin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expireTokens(d)
+	var refreshes, listings atomic.Int32
+	client.refreshToken = func(context.Context, string) (pan.Tokens, error) {
+		refreshes.Add(1)
+		return pan.Tokens{}, fmt.Errorf("rejected refresh: %w", pan.ErrUnauthorized)
+	}
+	client.list = func(context.Context, string, string, int, int) (pan.FilePage, error) {
+		listings.Add(1)
+		return pan.FilePage{}, nil
+	}
+	for range 3 {
+		if _, err := d.Files(ctx, "10", 1); !errors.Is(err, pan.ErrUnauthorized) {
+			t.Fatalf("request with rejected credentials=%v", err)
+		}
+	}
+	if refreshes.Load() != 1 || listings.Load() != 0 {
+		t.Fatalf("refreshes=%d listings=%d", refreshes.Load(), listings.Load())
+	}
+	assertTokens(t, d, pan.Tokens{})
+	if _, err := d.verifyAccount(ctx, state); !errors.Is(err, pan.ErrUnauthorized) {
+		t.Fatalf("cached account accepted rejected credentials: %v", err)
+	}
+	if status, err := d.Account(ctx); err != nil || status.Connected {
+		t.Fatalf("account after rejection=%+v err=%v", status, err)
+	}
+	if directory, found := savedDirectory(t, d); !found || directory != state.directory || d.snapshot().directory != state.directory {
+		t.Fatal("credential rejection removed the mounted directory")
+	}
+	restarted, err := NewWithClient(ctx, d.database, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restarted.Close()
+	if _, err := restarted.Files(ctx, "10", 1); !errors.Is(err, pan.ErrUnauthorized) || refreshes.Load() != 1 {
+		t.Fatalf("restart reused rejected credentials: refreshes=%d err=%v", refreshes.Load(), err)
+	}
+	// A QR login already in progress can replace the rejected credentials.
+	want := testTokens("new-login")
+	client.exchangeToken = func(context.Context, *pan.Login) (pan.Tokens, error) { return want, nil }
+	if status, err := d.LoginStatus(ctx, login.ID); err != nil || status.State != pan.LoginAuthorized {
+		t.Fatalf("pending login after rejection=%+v err=%v", status, err)
+	}
+	assertTokens(t, d, want)
+	if status, err := d.Account(ctx); err != nil || !status.Connected || status.Directory == nil || status.Directory.ID != state.directory.ID {
+		t.Fatalf("account after relogin=%+v err=%v", status, err)
+	}
+}
+
+func TestRefreshFailuresPreserveCredentialsForRetry(t *testing.T) {
+	for _, failure := range []error{
+		context.DeadlineExceeded,
+		context.Canceled,
+		&domain.HTTPError{Source: "115", StatusCode: 429},
+		&domain.HTTPError{Source: "115", StatusCode: 503},
+		errors.New("invalid token response"),
+	} {
+		t.Run(failure.Error(), func(t *testing.T) {
+			d, client := mountedTestDrive(t)
+			state := d.snapshot()
+			refreshed := testTokens("refreshed")
+			calls := 0
+			client.refreshToken = func(context.Context, string) (pan.Tokens, error) {
+				calls++
+				if calls == 1 {
+					return pan.Tokens{}, failure
+				}
+				return refreshed, nil
+			}
+			if err := d.refreshTokens(t.Context(), state); !errors.Is(err, failure) {
+				t.Fatalf("refresh failure=%v", err)
+			}
+			assertTokens(t, d, state.tokens)
+			if d.snapshot().credentialVersion != state.credentialVersion {
+				t.Fatal("temporary refresh failure invalidated credentials")
+			}
+			if err := d.refreshTokens(t.Context(), state); err != nil || calls != 2 {
+				t.Fatalf("retry calls=%d err=%v", calls, err)
+			}
+			assertTokens(t, d, refreshed)
+		})
+	}
+}
+
+func TestLateRefreshRejectionCannotClearNewLogin(t *testing.T) {
+	d, client := mountedTestDrive(t)
+	started := make(chan struct{}, 1)
+	hold, release := testGate(t)
+	client.refreshToken = func(context.Context, string) (pan.Tokens, error) {
+		started <- struct{}{}
+		<-hold
+		return pan.Tokens{}, pan.ErrUnauthorized
+	}
+	state := d.snapshot()
+	finished := make(chan error, 1)
+	go func() { finished <- d.refreshTokens(t.Context(), state) }()
+	await(t, started)
+	want := testTokens("new-login")
+	client.exchangeToken = func(context.Context, *pan.Login) (pan.Tokens, error) { return want, nil }
+	loginTestAccount(t, d)
+	release()
+	if err := await(t, finished); !errors.Is(err, pan.ErrUnauthorized) {
+		t.Fatalf("stale refresh=%v", err)
+	}
+	assertTokens(t, d, want)
+	if status, err := d.Account(t.Context()); err != nil || !status.Connected {
+		t.Fatalf("new login was invalidated: status=%+v err=%v", status, err)
 	}
 }
