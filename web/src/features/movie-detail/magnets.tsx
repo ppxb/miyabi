@@ -15,10 +15,10 @@ import { InlineError } from '@/components/error-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
 import { formatSize } from '@/lib/format'
 import { notifyOfflineTask, notifyTaskError } from '@/features/tasks/task-toast'
 import { MovieSubscriptionAction } from './subscription-action'
+import { MovieMagnetsSkeleton } from './skeleton'
 
 const sourceLabels: Record<string, string> = { javdb: 'JavDB', javbus: 'JavBus' }
 
@@ -76,11 +76,7 @@ export function MovieMagnets({
         </InlineError>
       ) : null}
       {query.isPending ? (
-        <div className="space-y-2">
-          {Array.from({ length: 3 }, (_, index) => (
-            <Skeleton key={index} className="h-30 rounded-2xl" />
-          ))}
-        </div>
+        <MovieMagnetsSkeleton />
       ) : query.isError ? (
         <InlineError onRetry={() => void query.refetch()} retrying={query.isFetching}>
           磁力加载失败

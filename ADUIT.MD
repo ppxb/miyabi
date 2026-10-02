@@ -2,24 +2,24 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166、168、173、184、189 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166、168、173、184、189、192 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 
 ## 复核结果
 
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
-| 确认仍存在，待处理 | 9 | 有明确代码依据的边界、状态反馈或行为问题 |
+| 确认仍存在，待处理 | 8 | 有明确代码依据的边界、状态反馈或行为问题 |
 | 可选优化与整理 | 57 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
 | 按现有约定暂缓 | 9 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 23 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 24 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
 1. **235**：STRM token 进入请求日志。
 2. **237**：可信代理配置及 HTTPS 转发头。
-3. **192、193、194、206、222、224**：已确认的界面状态和反馈问题；具体视觉效果由用户验收。
+3. **193、194、206、222、224**：已确认的界面状态和反馈问题；具体视觉效果由用户验收。
 
 ### 当前约定
 
@@ -27,12 +27,14 @@
 - 已入库使用紫色 badge；Emby 关闭时隐藏更多设置，并沿用与代理一致的保存方式。
 - 不恢复 toast 和媒体库同步/重建按钮的 tooltip，不新增 shadcn 原始组件之外的自定义 ARIA 描述。相关无障碍缺口是暂缓项，不写成“已经修复”。
 - 固定圆角、手势按帧更新保留；独立预览缩略图已经回退。保留模糊背景，未经性能记录不把它认定为卡顿根因。
+- 本地详情继续复用完整的详情骨架，包括磁力和推荐占位；用户计划后续可能将非 JavDB 来源聚合为统一详情数据，因此暂不按本地来源裁减骨架区域。此约定不代表数据聚合已经实现。
 - 不增加番号特例黑名单、不因文件短或只有一个调用方而强制合并、不机械抽取通用组件。
 
 ### 本轮验证与限制
 
 - 第 187 项仅统一重连按钮文案，通过前端 `npm run typecheck`、`npm run lint` 及两个修改文件的 oxfmt 格式检查。未新增测试或执行浏览器测试；加载展示与设置重试入口按用户决定暂缓。
 - 第 189 项修复后通过：前端 `npm run test -- tests/subscriptions.test.ts tests/subscription-card.test.tsx tests/movie-detail-content.test.tsx`（3 个文件 / 11 项既有回归）、`npm run typecheck`、`npm run lint` 及三个修改文件的 oxfmt 格式检查。本次调整状态展示与动作文案，未新增测试或执行浏览器测试；图标与提示的实际视觉效果由用户确认。
+- 第 192 项修复后通过：前端 `npm run test -- tests/movie-detail-content.test.tsx tests/movie-detail.test.ts`（2 个文件 / 21 项既有回归）、`npm run typecheck`、`npm run lint` 及两个修改文件的 oxfmt 格式检查。未新增测试或执行浏览器测试；实际加载切换效果由用户确认，未宣称消除动态标题、资料数量等导致的所有布局变化。
 
 - 通过：`go test ./internal/api ./internal/app ./internal/database ./internal/tasks ./internal/library/... ./internal/emby ./internal/netx ./internal/monitor`。
 - 通过：前端 `npm run test`，25 个文件 / 141 项测试。相关用例验证任务共享快照、索引、事务、来源隔离、重启恢复、Emby 通知和详情交互逻辑。
@@ -52,8 +54,6 @@
 
 ## 确认仍存在，待处理
 
-- [ ] **192.** 详情骨架仍画三个独立统计块，实际统计为合并 dl；预览圆角与磁力间距也不匹配，磁力骨架重复。加载完成时结构差异已由代码确认，具体跳动程度尚未浏览器复测。
-  - 定位：`web/src/features/movie-detail/skeleton.tsx:15`；`web/src/features/movie-detail/hero.tsx`；`web/src/features/movie-detail/previews.tsx`；`web/src/features/movie-detail/magnets.tsx`。
 - [ ] **193.** 分类重试 InlineError 未传 retrying，重试中缺少禁用/加载反馈。isLoading/isPending 和骨架圆角的差别仍在，但这两点只属一致性整理，不单独断言功能错误。
   - 定位：`web/src/features/discover/category-filters.tsx:66`；`web/src/features/discover/metadata-search-page.tsx`。
 - [ ] **194.** SettingRow 所有描述仍使用 break-all，英文地址以外的普通文字也会被强制断词。控件宽度仍按场景不同；不应强制所有 Input/Select 同宽。
@@ -287,6 +287,8 @@
   - 定位：`internal/export/config.go`；`internal/export/export.go`；`internal/library/scrape/export.go`；`internal/netx/ip.go`；`internal/library/scrape/export_config_test.go`；`internal/export/export_test.go`。
 - [x] **189.** 影片卡片已区分 waiting 的铃铛图标和 added 的勾选图标，提示分别为持续检查符合偏好的磁力、已加入 115 离线下载；已有长期无源记录的可操作入口显示“重新订阅”。卡片与详情的等待提示不再无条件承诺自动加入 115，手动入库设置同样适用。详情保留 waiting 的取消操作及 added/stale 的重新订阅，演员 active/paused 的取消按钮改用 BellOff 和“取消订阅”。卡片防重复提交与详情重新启动检查的行为保留；状态按钮与操作按钮的样式差异不再认定为缺陷。
   - 定位：`web/src/components/movie/movie-subscribe-button.tsx`；`web/src/features/movie-detail/subscription-action.tsx`；`web/src/features/discover/metadata-search-page.tsx`。
+- [x] **192.** 继续使用 shadcn Skeleton，将番号与标题归组，元资料改为标签/内容两列占位并对齐行距；统计区域改为带分隔线的一整条三栏容器，内边距与实际内容一致。预览占位统一为 rounded-xl。整页加载和磁力单独加载共用 MovieMagnetsSkeleton，使用与实际列表一致的 Card、space-y-4 间距及桌面/移动端内容与按钮布局。按用户要求，本地详情继续使用完整共享骨架，保留磁力和推荐占位；未修改真实详情布局或请求逻辑。原磁力骨架重复是代码重复，不是已证实的重复渲染或性能故障。
+  - 定位：`web/src/features/movie-detail/skeleton.tsx`；`web/src/features/movie-detail/magnets.tsx`；`web/src/features/movie-detail/content.tsx`。
 - [x] **212.** movie-hover-details 已删除，详情统计栏与悬浮卡片之间的重复不存在。
   - 定位：`web/src/features/movie-detail/hero.tsx`。
 - [x] **239.** 旧 115 字幕、旧封面 payload 和历史迁移测试已清理；dir_cache、snapshot、检查点、来源隔离与事务测试仍验证当前功能，不按旧报告要求删除。剩余跨包测试归属统一放入 219/240。
