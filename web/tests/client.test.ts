@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test, onTestFinished, vi } from 'vitest'
 
-import { ApiError, apiPost, clearLegacyAuthToken, notifyUnauthorized } from '@/api/client'
+import { ApiError, apiPost, notifyUnauthorized } from '@/api/client'
 
 test('requests use cookies without reading or sending a stored JWT', async () => {
   const originalStorage = globalThis.localStorage
@@ -21,27 +21,6 @@ test('requests use cookies without reading or sending a stored JWT', async () =>
     return new Response('{}')
   })
   await apiPost('/api/test', { value: 1 })
-})
-
-test('upgrade removes only the legacy JWT and tolerates blocked storage', () => {
-  const originalStorage = globalThis.localStorage
-  onTestFinished(() => {
-    globalThis.localStorage = originalStorage
-  })
-  const storage = new Map([
-    ['miyabi_jwt_token', 'old-token'],
-    ['miyabi-theme', 'dark']
-  ])
-  vi.stubGlobal('localStorage', { removeItem: (key: string) => storage.delete(key) })
-  clearLegacyAuthToken()
-  assert.equal(storage.has('miyabi_jwt_token'), false)
-  assert.equal(storage.get('miyabi-theme'), 'dark')
-  vi.stubGlobal('localStorage', {
-    removeItem() {
-      throw new Error('blocked')
-    }
-  })
-  assert.doesNotThrow(clearLegacyAuthToken)
 })
 
 for (const scenario of [
@@ -119,15 +98,8 @@ test('cancellation while reading an error body remains cancellation', async () =
 
 test('401 with code UNAUTHORIZED dispatches miyabi:unauthorized', async () => {
   const events: string[] = []
-  const storage = new Map([['miyabi_jwt_token', 'test-token']])
   const originalWindow = globalThis.window
-  const originalLocalStorage = globalThis.localStorage
 
-  vi.stubGlobal('localStorage', {
-    getItem: (key: string) => storage.get(key) ?? null,
-    setItem: (key: string, val: string) => storage.set(key, val),
-    removeItem: (key: string) => storage.delete(key)
-  })
   vi.stubGlobal('window', {
     dispatchEvent: (event: Event) => {
       events.push(event.type)
@@ -137,7 +109,6 @@ test('401 with code UNAUTHORIZED dispatches miyabi:unauthorized', async () => {
 
   onTestFinished(() => {
     globalThis.window = originalWindow
-    globalThis.localStorage = originalLocalStorage
   })
 
   vi.spyOn(globalThis, 'fetch').mockImplementation(
@@ -154,22 +125,13 @@ test('401 with code UNAUTHORIZED dispatches miyabi:unauthorized', async () => {
     assert.equal(error.code, 'UNAUTHORIZED')
     return true
   })
-
-  assert.equal(storage.get('miyabi_jwt_token'), 'test-token')
   assert.deepEqual(events, ['miyabi:unauthorized'])
 })
 
-test('401 without code UNAUTHORIZED preserves token and does not dispatch miyabi:unauthorized', async () => {
+test('401 without code UNAUTHORIZED does not dispatch miyabi:unauthorized', async () => {
   const events: string[] = []
-  const storage = new Map([['miyabi_jwt_token', 'test-token']])
   const originalWindow = globalThis.window
-  const originalLocalStorage = globalThis.localStorage
 
-  vi.stubGlobal('localStorage', {
-    getItem: (key: string) => storage.get(key) ?? null,
-    setItem: (key: string, val: string) => storage.set(key, val),
-    removeItem: (key: string) => storage.delete(key)
-  })
   vi.stubGlobal('window', {
     dispatchEvent: (event: Event) => {
       events.push(event.type)
@@ -179,7 +141,6 @@ test('401 without code UNAUTHORIZED preserves token and does not dispatch miyabi
 
   onTestFinished(() => {
     globalThis.window = originalWindow
-    globalThis.localStorage = originalLocalStorage
   })
 
   vi.spyOn(globalThis, 'fetch').mockImplementation(
@@ -196,22 +157,13 @@ test('401 without code UNAUTHORIZED preserves token and does not dispatch miyabi
     assert.equal(error.message, '115 登录已失效')
     return true
   })
-
-  assert.equal(storage.get('miyabi_jwt_token'), 'test-token')
   assert.deepEqual(events, [])
 })
 
 test('notifyUnauthorized dispatches miyabi:unauthorized', () => {
   const events: string[] = []
-  const storage = new Map([['miyabi_jwt_token', 'test-token']])
   const originalWindow = globalThis.window
-  const originalLocalStorage = globalThis.localStorage
 
-  vi.stubGlobal('localStorage', {
-    getItem: (key: string) => storage.get(key) ?? null,
-    setItem: (key: string, val: string) => storage.set(key, val),
-    removeItem: (key: string) => storage.delete(key)
-  })
   vi.stubGlobal('window', {
     dispatchEvent: (event: Event) => {
       events.push(event.type)
@@ -221,10 +173,8 @@ test('notifyUnauthorized dispatches miyabi:unauthorized', () => {
 
   try {
     notifyUnauthorized()
-    assert.equal(storage.get('miyabi_jwt_token'), 'test-token')
     assert.deepEqual(events, ['miyabi:unauthorized'])
   } finally {
     globalThis.window = originalWindow
-    globalThis.localStorage = originalLocalStorage
   }
 })

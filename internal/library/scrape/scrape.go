@@ -201,12 +201,15 @@ func (service *Service) Scrape(ctx context.Context, job tasks.Job) error {
 
 func (service *Service) prepareMetadata(ctx context.Context, sess drive.Session, taskID int, input *Payload) error {
 	record, err := service.db.Movie.Query().Where(movie.IDEQ(input.MovieID),
-		movie.HasFilesWith(database.LibraryFiles(input.Source))).WithActors().WithTags().Only(ctx)
+		movie.HasFilesWith(database.LibraryFiles(input.Source))).Only(ctx)
 	if err != nil {
 		return fmt.Errorf("load indexed movie for metadata: %w", err)
 	}
 	if record.ScrapeStatus == movie.ScrapeStatusDone && !input.Rebuild {
-		input.Document = MovieNFO(record)
+		input.Document, err = MovieNFO(record)
+		if err != nil {
+			return err
+		}
 		artwork := MovieArtwork(record)
 		cached, err := service.images.Exists(artwork)
 		if err != nil {

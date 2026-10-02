@@ -146,7 +146,7 @@ func TestBatchPersistsFailureIDsAndRetriesSuccessfulSubset(t *testing.T) {
 	}
 }
 
-func TestLegacyBatchDoesNotGuessMissingFailureIDs(t *testing.T) {
+func TestBatchRetryRejectsInconsistentFailureRecords(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
 	body, err := tasks.EncodePayload(batchPayload{IDs: []int{1, 2}, Batch: domain.SubscriptionBatch{Total: 2, Processed: 2, Failed: 1, Waiting: 1}})
 	if err != nil {
@@ -155,12 +155,12 @@ func TestLegacyBatchDoesNotGuessMissingFailureIDs(t *testing.T) {
 	record := f.client.Task.Create().SetType(string(tasks.KindSubscriptionBatch)).SetStatus(task.StatusDone).SetPayload(body).SaveX(ctx)
 	info, err := batchTaskInfo(record)
 	if err != nil || info.CanRetry {
-		t.Fatalf("legacy batch offered unsafe retry: %+v, %v", info, err)
+		t.Fatalf("inconsistent batch offered unsafe retry: %+v, %v", info, err)
 	}
 	if _, err := f.service.RetryTask(ctx, record.ID); !domain.IsKind(err, domain.KindConflict) {
-		t.Fatalf("legacy failure IDs were guessed: %v", err)
+		t.Fatalf("missing failure IDs were guessed: %v", err)
 	}
 	if got := f.client.Task.GetX(ctx, record.ID); string(got.Payload) != string(body) || got.Status != task.StatusDone {
-		t.Fatal("legacy history changed")
+		t.Fatal("inconsistent batch was changed")
 	}
 }

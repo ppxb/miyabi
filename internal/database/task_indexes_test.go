@@ -9,7 +9,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/task"
 )
 
-func TestTaskWorkflowIndexUpgradesAndSurvivesReopen(t *testing.T) {
+func TestTaskWorkflowIndexSurvivesReopen(t *testing.T) {
 	ctx := t.Context()
 	dir := t.TempDir()
 	store, err := Open(ctx, dir)
@@ -21,12 +21,8 @@ func TestTaskWorkflowIndexUpgradesAndSurvivesReopen(t *testing.T) {
 			_ = store.Close()
 		}
 	})
-	payload := json.RawMessage(`{"scan_task_id":12,"scrape_task_id":34,"future":{"keep":true}}`)
+	payload := json.RawMessage(`{"scan_task_id":12,"movie_id":34,"code":"ABP-001"}`)
 	job := store.Client.Task.Create().SetType("scrape").SetPayload(payload).SetProgress(40).SetError("preserved").SaveX(ctx)
-	if _, err := store.db.ExecContext(ctx, "DROP INDEX task_scan_workflow"); err != nil {
-		t.Fatal(err)
-	}
-	setMigrationVersion(t, store, 6)
 	for range 2 {
 		if err := store.Close(); err != nil {
 			t.Fatal(err)
@@ -38,7 +34,7 @@ func TestTaskWorkflowIndexUpgradesAndSurvivesReopen(t *testing.T) {
 		got := store.Client.Task.GetX(ctx, job.ID)
 		if string(got.Payload) != string(payload) || got.Status != job.Status || got.Progress != job.Progress ||
 			got.Error == nil || *got.Error != *job.Error || !got.UpdatedAt.Equal(job.UpdatedAt) {
-			t.Fatalf("index migration changed task: %+v", got)
+			t.Fatalf("reopen changed task: %+v", got)
 		}
 		// Match metadataGroups' partition, ordering and parameterized filter.
 		rows, err := store.db.QueryContext(ctx, `EXPLAIN QUERY PLAN SELECT id,
@@ -75,7 +71,7 @@ func TestTaskWorkflowIndexUpgradesAndSurvivesReopen(t *testing.T) {
 	}
 }
 
-func TestTaskQueueIndexUpgradePreservesHistoryAndRecords(t *testing.T) {
+func TestTaskQueueIndexesAndRecordsSurviveReopen(t *testing.T) {
 	ctx := t.Context()
 	dir := t.TempDir()
 	store, err := Open(ctx, dir)
@@ -102,7 +98,7 @@ func TestTaskQueueIndexUpgradePreservesHistoryAndRecords(t *testing.T) {
 		{"scrape", task.StatusRunning},
 	} {
 		job := store.Client.Task.Create().SetType(entry.kind).SetStatus(entry.status).
-			SetPayload(json.RawMessage(`{"scan_task_id":12,"future":{"keep":true}}`)).
+			SetPayload(json.RawMessage(`{"scan_task_id":12}`)).
 			SetProgress(42).SetError("preserved").SaveX(ctx)
 		ids = append(ids, job.ID)
 	}
@@ -159,15 +155,6 @@ func TestTaskQueueIndexUpgradePreservesHistoryAndRecords(t *testing.T) {
 		}
 	}
 	checkQueries() // New installations get the indexes from the Ent schema.
-	for _, statement := range []string{
-		"DROP INDEX task_type_status",
-		"CREATE INDEX task_status_created_at ON tasks (status, created_at)",
-	} {
-		if _, err := store.db.ExecContext(ctx, statement); err != nil {
-			t.Fatal(err)
-		}
-	}
-	setMigrationVersion(t, store, 7)
 	for range 2 {
 		if err := store.Close(); err != nil {
 			t.Fatal(err)
@@ -176,23 +163,16 @@ func TestTaskQueueIndexUpgradePreservesHistoryAndRecords(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := migrationVersion(t, store.db); got != len(migrations) {
-			t.Fatalf("migration version=%d", got)
-		}
-		var obsolete int
-		if err := store.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='task_status_created_at'").Scan(&obsolete); err != nil || obsolete != 0 {
-			t.Fatalf("obsolete index survived reopen: %d, %v", obsolete, err)
-		}
 		after := store.Client.Task.Query().Order(task.ByID()).AllX(ctx)
 		if len(after) != len(before) {
-			t.Fatal("index upgrade changed the task count")
+			t.Fatal("reopen changed the task count")
 		}
 		for i, got := range after {
 			want := before[i]
 			if got.ID != want.ID || got.Type != want.Type || got.Status != want.Status || got.Progress != want.Progress ||
 				string(got.Payload) != string(want.Payload) || got.Error == nil || *got.Error != *want.Error ||
 				!got.CreatedAt.Equal(want.CreatedAt) || !got.UpdatedAt.Equal(want.UpdatedAt) {
-				t.Fatalf("index upgrade changed task %d", want.ID)
+				t.Fatalf("reopen changed task %d", want.ID)
 			}
 		}
 		checkQueries()

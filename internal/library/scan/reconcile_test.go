@@ -20,6 +20,7 @@ import (
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scrape"
+	"github.com/ppxb/miyabi/internal/nfo"
 	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -129,7 +130,7 @@ func reconcileFixture(t *testing.T, completed, pending int) *scanRun {
 			video := pan.File{ID: fmt.Sprint(i), Name: code + ".mp4", ParentID: "folder", Size: 1024}
 			builder := tx.Movie.Create().SetCode(code)
 			if i < completed {
-				builder.SetScrapeStatus(movie.ScrapeStatusDone).SetPoster(artwork.Poster).SetCover(artwork.Thumbnail).
+				builder.SetMetadata(&nfo.Movie{Code: code}).SetScrapeStatus(movie.ScrapeStatusDone).SetPoster(artwork.Poster).SetCover(artwork.Thumbnail).
 					SetFanarts([]string{artwork.Fanart}).SetMetadataSnapshot(&domain.MetadataSnapshot{
 					AccountID: payload.Source.AccountID, DirectoryID: payload.Source.Directory.ID,
 					Videos: scrape.VideoFingerprint([]pan.File{video}), PosterVersion: mediaimage.PosterVersion,

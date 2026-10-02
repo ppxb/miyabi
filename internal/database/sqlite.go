@@ -51,17 +51,13 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 		opts = append(opts, ent.Debug())
 	}
 	client := ent.NewClient(opts...)
-	if err := runMigrations(ctx, db, preSchemaVersion); err != nil {
-		client.Close()
-		return nil, fmt.Errorf("migrate legacy schema: %w", err)
-	}
 	if err := client.Schema.Create(ctx); err != nil {
 		client.Close()
-		return nil, fmt.Errorf("migrate database schema: %w", err)
+		return nil, fmt.Errorf("initialize database schema: %w", err)
 	}
-	if err := runMigrations(ctx, db, len(migrations)); err != nil {
+	if err := createTaskIndexes(ctx, db); err != nil {
 		client.Close()
-		return nil, fmt.Errorf("migrate database data: %w", err)
+		return nil, fmt.Errorf("initialize database indexes: %w", err)
 	}
 
 	return &Store{Client: client, db: db}, nil

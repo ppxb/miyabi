@@ -157,14 +157,6 @@ func TestSubscriptionSettings(t *testing.T) {
 			t.Errorf("%s: expected KindInvalid, got %v", name, err)
 		}
 	}
-	// A row written by an older build with blank fields normalizes on read.
-	if err := database.SaveSetting(ctx, f.client, subscriptionConfigSetting, map[string]any{"movie_auto_download": false}); err != nil {
-		t.Fatal(err)
-	}
-	legacy, err := f.service.Config(ctx)
-	if err != nil || legacy.MovieAutoDownload || legacy.CheckTime != "00:00" || legacy.Preferences != magnet.DefaultPreferences() {
-		t.Fatalf("legacy config must normalize: %#v %v", legacy, err)
-	}
 }
 
 func TestSubscriptionTargetsAndPagination(t *testing.T) {

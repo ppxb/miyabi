@@ -117,7 +117,7 @@ func (service *Service) Config(ctx context.Context) (Config, error) {
 	if !found {
 		return DefaultConfig(), nil
 	}
-	return cfg.normalized(), nil
+	return cfg, nil
 }
 
 // config serves background paths, which fall back to defaults when the row is unreadable.

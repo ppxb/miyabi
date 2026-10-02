@@ -65,15 +65,6 @@ export function apiPut<T>(path: string, body: unknown): Promise<T> {
   })
 }
 
-// Remove credentials saved by older versions without requiring storage access to sign in.
-export function clearLegacyAuthToken(): void {
-  try {
-    localStorage.removeItem('miyabi_jwt_token')
-  } catch {
-    // Storage can be unavailable or blocked; authentication now uses cookies.
-  }
-}
-
 export function notifyUnauthorized(): void {
   window.dispatchEvent(new CustomEvent('miyabi:unauthorized'))
 }

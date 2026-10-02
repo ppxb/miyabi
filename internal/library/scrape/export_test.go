@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/ppxb/miyabi/internal/database"
-	"github.com/ppxb/miyabi/internal/ent/actor"
+	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/nfo"
@@ -43,7 +44,12 @@ func TestExportLocalMovie_ScrapedRecordExportsMissingSidecars(t *testing.T) {
 	releaseDate := time.Date(2026, 9, 22, 0, 0, 0, 0, time.UTC)
 	movieRecord, err := store.Client.Movie.Create().
 		SetCode("ALDN-613").
-		SetTitle("兄嫁と中出ししまくった数日間 水野優香").
+		SetTitle("Index title").
+		SetMetadata(&nfo.Movie{
+			Code: "ALDN-613", Title: "兄嫁と中出ししまくった数日間 水野優香",
+			Premiered: "2026-09-22", Runtime: 130, Rating: 4.69,
+			Actors: []nfo.Actor{{Provider: "javdb", ID: "8VXx", Name: "水野優香", Gender: "female"}},
+		}).
 		SetScrapeStatus(movie.ScrapeStatusDone).
 		SetPoster(artwork.Poster).
 		SetFanarts([]string{artwork.Fanart}).
@@ -53,20 +59,6 @@ func TestExportLocalMovie_ScrapedRecordExportsMissingSidecars(t *testing.T) {
 		Save(t.Context())
 	if err != nil {
 		t.Fatalf("create movie: %v", err)
-	}
-
-	actorRecord, err := store.Client.Actor.Create().
-		SetName("水野優香").
-		SetProvider("javdb").SetSourceID("8VXx").
-		SetGender(actor.GenderFemale).
-		Save(t.Context())
-	if err != nil {
-		t.Fatalf("create actor: %v", err)
-	}
-
-	_, err = movieRecord.Update().AddActors(actorRecord).Save(t.Context())
-	if err != nil {
-		t.Fatalf("add actor: %v", err)
 	}
 
 	_, err = store.Client.File.Create().
@@ -93,12 +85,10 @@ func TestExportLocalMovie_ScrapedRecordExportsMissingSidecars(t *testing.T) {
 		t.Fatalf("write strm: %v", err)
 	}
 
-	// Load movie with files, actors, tags
+	// Export reads the saved document without loading actor or tag associations.
 	loadedMovie, err := store.Client.Movie.Query().
 		Where(movie.IDEQ(movieRecord.ID)).
 		WithFiles().
-		WithActors().
-		WithTags().
 		Only(t.Context())
 	if err != nil {
 		t.Fatalf("load movie: %v", err)
@@ -151,6 +141,26 @@ func TestExportLocalMovie_ScrapedRecordExportsMissingSidecars(t *testing.T) {
 	_, err = ExportLocalMovie(embyDir, "http://127.0.0.1:8080", "testtoken", loadedMovie, images)
 	if err != nil {
 		t.Fatalf("second ExportLocalMovie failed: %v", err)
+	}
+}
+
+func TestExportLocalMovieRejectsMissingMetadataWithoutOverwritingFiles(t *testing.T) {
+	root := t.TempDir()
+	record := &ent.Movie{Code: "ABP-001", Title: "Index title", ScrapeStatus: movie.ScrapeStatusDone}
+	dir := EmbyMovieDir(root, record.Code)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	filename := filepath.Join(dir, record.Code+".nfo")
+	if err := os.WriteFile(filename, []byte("saved document"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := ExportLocalMovie(root, "http://localhost", "", record, nil)
+	if changed || !domain.IsKind(err, domain.KindInvalid) {
+		t.Fatalf("incomplete record was exported: %v %v", changed, err)
+	}
+	if body, err := os.ReadFile(filename); err != nil || string(body) != "saved document" {
+		t.Fatalf("existing document changed: %s %v", body, err)
 	}
 }
 

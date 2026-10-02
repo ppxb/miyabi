@@ -6,11 +6,8 @@ import { ThemeProvider } from 'next-themes'
 
 import { router } from '@/router'
 import { createAppQueryClient } from '@/api/query-client'
-import { clearLegacyAuthToken } from '@/api/client'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import '@/styles/globals.css'
-
-clearLegacyAuthToken()
 
 const queryClient = createAppQueryClient()
 

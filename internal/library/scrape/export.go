@@ -188,13 +188,15 @@ func ExportLocalMovie(embyDir, publicURL, strmToken string, record *ent.Movie, i
 		return false, nil
 	}
 
-	doc := MovieNFO(record)
+	doc, err := MovieNFO(record)
+	if err != nil {
+		return false, err
+	}
 	videos := make([]pan.File, 0, len(record.Edges.Files))
 	for _, f := range record.Edges.Files {
 		videos = append(videos, pan.File{ID: f.FileID, Name: f.Name, Size: f.Size, PickCode: f.PickCode})
 	}
 	var posterBytes, fanartBytes []byte
-	var err error
 	artwork := MovieArtwork(record)
 	if artwork.Poster != "" {
 		posterBytes, err = images.ReadURL(artwork.Poster)

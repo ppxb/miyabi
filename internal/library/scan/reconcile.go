@@ -64,9 +64,6 @@ func (r *scanRun) prepareReconcile(ctx context.Context, cfg export.Config) (map[
 		query := r.scanner.db.Movie.Query().Where(movie.IDGT(after), movie.ScrapeStatusEQ(movie.ScrapeStatusDone), movie.HasFilesWith(indexed)).
 			Order(movie.ByID()).Limit(reconcileBatchSize).
 			WithFiles(func(q *ent.FileQuery) { q.Where(retained) })
-		if cfg.EmbyDir != "" {
-			query.WithActors().WithTags()
-		}
 		records, err := query.All(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("load completed scan movies: %w", err)

@@ -62,47 +62,12 @@ func DetailNFO(detail domain.MovieDetail) nfo.Movie {
 	return doc
 }
 
-// MovieNFO builds an NFO Document from an existing indexed ent.Movie record.
-func MovieNFO(record *ent.Movie) nfo.Movie {
-	if record.Metadata != nil {
-		return *record.Metadata
+// MovieNFO reads the complete document saved by scraping or NFO import.
+func MovieNFO(record *ent.Movie) (nfo.Movie, error) {
+	if record.Metadata == nil {
+		return nfo.Movie{}, domain.E(domain.KindInvalid, "影片资料缺失，请重新刮削", nil)
 	}
-	doc := nfo.Movie{
-		Title:    record.Title,
-		Code:     record.Code,
-		Runtime:  domain.ValueOrZero(record.Duration),
-		Rating:   domain.ValueOrZero(record.Rating),
-		Director: nfo.Entity{ID: domain.ValueOrZero(record.DirectorID), Name: domain.ValueOrZero(record.DirectorName)},
-		Studio:   nfo.Entity{ID: domain.ValueOrZero(record.MakerID), Name: domain.ValueOrZero(record.MakerName)},
-		Set:      nfo.Series{ID: domain.ValueOrZero(record.SeriesID), Name: domain.ValueOrZero(record.SeriesName)},
-	}
-	if record.JavdbID != nil {
-		doc.IDs = []nfo.UniqueID{{Type: "javdb", Default: true, Value: *record.JavdbID}}
-	}
-	if record.ReleaseDate != nil {
-		doc.Premiered = record.ReleaseDate.Format(time.DateOnly)
-	}
-	for _, person := range record.Edges.Actors {
-		doc.Actors = append(doc.Actors, nfo.Actor{
-			Provider: person.Provider,
-			ID:       person.SourceID,
-			Name:     person.Name,
-			NameZHT:  domain.ValueOrZero(person.NameZht),
-			Gender:   string(person.Gender),
-			Thumb:    domain.ValueOrZero(person.Avatar),
-		})
-	}
-	for _, item := range record.Edges.Tags {
-		doc.Tags = append(doc.Tags, nfo.Tag{
-			Provider:   item.Provider,
-			ID:         item.SourceID,
-			Name:       item.Name,
-			NameZHT:    domain.ValueOrZero(item.NameZht),
-			CategoryID: item.CategoryID,
-		})
-		doc.Genres = append(doc.Genres, item.Name)
-	}
-	return doc
+	return *record.Metadata, nil
 }
 
 // SaveMovieMetadata updates an ent.Movie record and associates actors and tags from an NFO document.

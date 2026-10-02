@@ -10,7 +10,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/movie"
 )
 
-func TestMovieMatchKeyUpgradePreservesRecordsAndAssociations(t *testing.T) {
+func TestMovieMatchKeysAndAssociationsSurviveReopen(t *testing.T) {
 	ctx := t.Context()
 	dir := t.TempDir()
 	store, err := Open(ctx, dir)
@@ -37,16 +37,6 @@ func TestMovieMatchKeyUpgradePreservesRecordsAndAssociations(t *testing.T) {
 		return data
 	}
 	before := snapshot()
-	// Model version 8, which had neither the lookup column nor its index.
-	for _, statement := range []string{
-		"DROP INDEX movie_canonical_code",
-		"ALTER TABLE movies DROP COLUMN canonical_code",
-	} {
-		if _, err := store.db.ExecContext(ctx, statement); err != nil {
-			t.Fatal(err)
-		}
-	}
-	setMigrationVersion(t, store, 8)
 	for range 2 {
 		if err := store.Close(); err != nil {
 			t.Fatal(err)
@@ -55,14 +45,11 @@ func TestMovieMatchKeyUpgradePreservesRecordsAndAssociations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := migrationVersion(t, store.db); got != len(migrations) {
-			t.Fatalf("migration version=%d", got)
-		}
 		if after := snapshot(); !bytes.Equal(before, after) {
-			t.Fatalf("migration changed movie data or associations:\nbefore=%s\nafter=%s", before, after)
+			t.Fatalf("reopen changed movie data or associations:\nbefore=%s\nafter=%s", before, after)
 		}
 		if count := store.Client.Movie.Query().Where(movie.CanonicalCodeEQ("LUXU-1899")).CountX(ctx); count != 2 {
-			t.Fatalf("backfill lost an alias or merged records: %d", count)
+			t.Fatalf("reopen lost an alias or merged records: %d", count)
 		}
 		plan := queryPlan(t, store, "SELECT id, code, canonical_code, javdb_id FROM movies WHERE canonical_code IN (?, ?) ORDER BY id", "LUXU-1899", "ABC-123")
 		if !strings.Contains(plan, "SEARCH movies USING INDEX movie_canonical_code (canonical_code=?)") {

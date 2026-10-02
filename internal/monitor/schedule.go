@@ -29,10 +29,6 @@ type ActorCursor struct {
 	SeenMovieIDs      []string `json:"seen_movie_ids"`
 }
 
-func (cursor ActorCursor) isInitialized() bool {
-	return cursor.Initialized || len(cursor.SeenMovieIDs) > 0 || cursor.LatestReleaseDate != ""
-}
-
 func decodeCursor(raw string) ActorCursor {
 	var cursor ActorCursor
 	if raw != "" {
