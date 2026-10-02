@@ -2,18 +2,18 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 
 ## 复核结果
 
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
-| 确认仍存在，待处理 | 16 | 有明确代码依据的边界、状态反馈或行为问题 |
+| 确认仍存在，待处理 | 15 | 有明确代码依据的边界、状态反馈或行为问题 |
 | 可选优化与整理 | 57 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
 | 按现有约定暂缓 | 7 | 不恢复用户已取消的 UI、ARIA 或旧数据兼容要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 18 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 19 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
@@ -41,12 +41,11 @@
 - 第 148 项修复后通过：`go test ./internal/monitor ./internal/tasks ./internal/app ./internal/api`、同范围 `go vet`。新增虚拟时间回归覆盖超过单页的影片/演员到期积压、相同到期时间的翻页、保存失败后继续处理、跨页节流、未到期/暂停/过期订阅排除及取消后续查；验证无磁力等待状态通知、批量入库的订阅/配置读取次数和原有节流。未进行真实大量订阅或上游性能测试。
 - 第 149 项修复后通过：`go generate ./internal/ent`、`go test ./internal/database ./internal/library/... ./internal/app ./internal/api`、同测试范围 `go vet`。捕获实际列表 SQL 并用 EXPLAIN QUERY PLAN 验证排序索引生效且没有临时排序；覆盖本地/挂载来源筛选、相同创建时间的分页顺序和多文件去重。本地扫描回归覆盖跨根目录同名文件、等价相对/绝对根路径、文件信息刷新、手动番号保护及 STRM 网盘身份保留。未新增真实大库性能结论。
 - 第 161 项修复后通过：`go test ./internal/api ./internal/app`、同范围 `go vet`。并发 HTTP 回归验证 16 个同 IP 请求仅 5 个进入验证，其他请求返回 429；覆盖成功与在途请求交错、格式错误释放名额且不清除失败历史、容量上限、未访问记录回收、封禁/窗口到期边界及动态时长文案。保留密码关闭、Cookie 登录和伪造代理 IP 等现有回归；未运行 race 检测或浏览器测试。
+- 第 166 项修复后通过：`go test ./internal/api ./internal/app ./cmd/miyabi`、同范围 `go vet`。新增 HTTP 回归覆盖目录拒绝访问、入口缺失时不列目录、SPA 页面回退、哈希/非哈希资源缓存策略、缺失资源与 API 请求不回退 HTML、HEAD、304、Range、方法限制及原请求路径保留；浏览器缓存和发布更新体验未做实测。
 - **独立工具链问题仍存在**：本地执行 `web/node_modules/.bin/shadcn --version` 仍报 `ERR_PACKAGE_PATH_NOT_EXPORTED`：MCP SDK 依赖访问 zod 的 `./v3` 导出失败。未安装或调整依赖；这不是应用构建失败，也不意味着需要恢复旧数据兼容。
 
 ## 确认仍存在，待处理
 
-- [ ] **166.** installFrontend 仍将 fs.Stat 成功的目录交给 FileServer，可列出打包静态目录；带哈希资源未设长缓存头。应明确目录访问策略和静态缓存策略，不能将其夸大为任意服务端目录泄漏。
-  - 定位：`internal/api/router.go:143`。
 - [ ] **167.** 【优先】/api/image 经 Catalogue.Media 直接调用 FetchMedia，仅检查 https 和非空 host，未限制目标主机/IP，也未设置响应体大小上限；标准 transport 没有 SafeDownload 的地址防护。可用于访问服务器可达的任意 HTTPS 目标并占用大量内存。访问密码启用时需会话，未启用时可直接访问；图片 MIME 检查发生在下载之后。
   - 定位：`internal/javdb/media.go:26`；`internal/catalogue/service.go`；`internal/api/router.go`；`internal/netx/client.go`。
 - [ ] **168.** GFriends Filetree.json 下载仍将 maxBytes 设为 0，本地缓存也直接 ReadFile，文件体积无上限。错误包装已修复，仅保留大小约束问题；应按实际索引规模制定上限而非套用头像大小。
@@ -199,7 +198,7 @@
 
 - **195.** 115 登录弹窗关闭立即卸载 LoginContent，目录选择器保留内容直到退出动画结束。代码差异存在，但“动画塌陷”尚未在当前浏览器验证，不作为已复现故障。
   - 定位：`web/src/features/settings/pan-login-dialog.tsx`；`web/src/features/settings/pan-directory-dialog.tsx`。
-- **227.** index.html 未提供 favicon、theme-color 或预先设置主题的脚本；暗色首屏闪白需浏览器冷启动确认。更正：缺 favicon 不必然返回 404，当前 SPA fallback 可能返回 index.html。不得把未测试的视觉现象写成已复现。
+- **227.** index.html 未提供 favicon、theme-color 或预先设置主题的脚本；暗色首屏闪白需浏览器冷启动确认。第 166 项修复后，缺失 favicon 请求返回 404，不再回退 index.html；主题首屏效果仍待实测，不得写成已复现。
   - 定位：`web/index.html`；`web/src/main.tsx`；`internal/api/router.go`。
 - **245.** 补充用户反馈：部分卡片封面只显示一部分且不恢复，尚无具体影片与浏览器复现定位。应核对返回图片完整性、decode/onLoad 状态及容器尺寸；不能声称独立预览缩略图回退已修复它，也不能直接归因于模糊背景。
   - 定位：`web/src/components/media-image.tsx:69`；`web/src/components/movie/movie-card.tsx`。
@@ -280,6 +279,8 @@
   - 定位：`internal/ent/schema/movie.go`；`internal/ent/migrate/schema.go`；`internal/library/scan/local.go`；`internal/library/scan/local_ingest.go`；`internal/library/listing_index_test.go`；`internal/library/scan/local_identity_test.go`。
 - [x] **161.** 登录改为锁内预占与统一结算，失败数和在途数共同限制准入；格式错误只释放名额，成功清除失败历史但保留其他在途请求。IP 记录最多 4096 条，登录访问触发定期过期回收；满额时暂缓新 IP，不淘汰有效失败记录、封禁或在途记录。空闲时不主动清理，但仍受容量约束。保留默认 5 分钟内失败 5 次封禁 24 小时的策略，修正单次失败阈值及到期边界；错误 cause 使用通用限流文案，封禁提示按真实剩余时间生成。
   - 定位：`internal/api/rate_limiter.go`；`internal/api/auth.go`；`internal/api/rate_limiter_test.go`；`internal/api/auth_rate_limit_test.go`。
+- [x] **166.** 前端目录请求返回 404，首页与 SPA 回退直接提供 index.html，入口缺失也不列目录。仅已存在且符合当前 Vite 八位哈希命名的 assets 资源使用 `public, max-age=31536000, immutable`；入口和普通静态文件使用 `no-cache`。缺失资源、无效文件路径和 API 路径不回退 HTML；前端只接受 GET/HEAD，并保留静态文件条件请求与 Range 支持。SPA 回退不再改写原请求路径。
+  - 定位：`internal/api/router.go`；`internal/api/frontend_test.go`；`web/vite.config.ts`。
 - [x] **212.** movie-hover-details 已删除，详情统计栏与悬浮卡片之间的重复不存在。
   - 定位：`web/src/features/movie-detail/hero.tsx`。
 - [x] **239.** 旧 115 字幕、旧封面 payload 和历史迁移测试已清理；dir_cache、snapshot、检查点、来源隔离与事务测试仍验证当前功能，不按旧报告要求删除。剩余跨包测试归属统一放入 219/240。

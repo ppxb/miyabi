@@ -1,10 +1,13 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -140,24 +143,58 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	return router
 }
 
+// Vite's default output names contain an eight-character content hash.
+var hashedFrontendAsset = regexp.MustCompile(`^assets/.+-[A-Za-z0-9_-]{8}\.[^/]+$`)
+
 func installFrontend(router *gin.Engine, frontend fs.FS) {
 	fileServer := http.FileServer(http.FS(frontend))
+	indexHTML, indexErr := fs.ReadFile(frontend, "index.html")
+	serveIndex := func(c *gin.Context) {
+		if indexErr != nil {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+		http.ServeContent(c.Writer, c.Request, "index.html", time.Time{}, bytes.NewReader(indexHTML))
+	}
 	router.NoRoute(func(c *gin.Context) {
-		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+		if c.Request.URL.Path == "/api" || strings.HasPrefix(c.Request.URL.Path, "/api/") {
 			c.Error(domain.E(domain.KindNotFound, "not found", nil))
 			return
 		}
-
-		requestedPath := strings.TrimPrefix(c.Request.URL.Path, "/")
-		if requestedPath != "" {
-			if _, err := fs.Stat(frontend, requestedPath); err == nil {
-				fileServer.ServeHTTP(c.Writer, c.Request)
-				return
-			}
+		c.Header("Cache-Control", "no-cache")
+		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead {
+			c.Header("Allow", "GET, HEAD")
+			c.AbortWithStatus(http.StatusMethodNotAllowed)
+			return
 		}
 
-		c.Request.URL.Path = "/"
-		fileServer.ServeHTTP(c.Writer, c.Request)
+		requestedPath := strings.TrimSuffix(strings.TrimPrefix(c.Request.URL.Path, "/"), "/")
+		if requestedPath == "" || requestedPath == "index.html" {
+			serveIndex(c)
+			return
+		}
+		if !fs.ValidPath(requestedPath) {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+		if info, err := fs.Stat(frontend, requestedPath); err == nil {
+			if info.IsDir() {
+				c.AbortWithStatus(http.StatusNotFound)
+				return
+			}
+			if hashedFrontendAsset.MatchString(requestedPath) {
+				c.Header("Cache-Control", "public, max-age=31536000, immutable")
+			}
+			fileServer.ServeHTTP(c.Writer, c.Request)
+			return
+		}
+		// Missing assets must not receive an HTML response or immutable caching.
+		if requestedPath == "assets" || strings.HasPrefix(requestedPath, "assets/") || path.Ext(requestedPath) != "" {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+
+		serveIndex(c)
 	})
 }
 
