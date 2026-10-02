@@ -1,11 +1,15 @@
 package api
 
 import (
+	"bytes"
 	"context"
+	"image"
+	"image/jpeg"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/domain"
@@ -56,10 +60,14 @@ func (stub *libraryPreviewStub) Preview(_ context.Context, id, index int) (domai
 type metadataImageStub struct {
 	MetadataManager
 	received domain.ImageCandidate
+	body     []byte
 }
 
 func (stub *metadataImageStub) Image(_ context.Context, candidate domain.ImageCandidate) (domain.Media, error) {
 	stub.received = candidate
+	if stub.body != nil {
+		return domain.Media{ContentType: "image/jpeg", Body: stub.body}, nil
+	}
 	return domain.Media{ContentType: "image/jpeg", Body: []byte("preview bytes")}, nil
 }
 
@@ -98,6 +106,37 @@ func TestLibraryPreviewRoutesSavedSourceAndRejectsInvalidTargets(t *testing.T) {
 				t.Fatalf("invalid target fetched an image: %+v", metadata.received)
 			}
 		})
+	}
+}
+
+func TestLibraryPreviewThumbnailShrinksAndOriginalRoutePreservesBytes(t *testing.T) {
+	var original bytes.Buffer
+	if err := jpeg.Encode(&original, image.NewRGBA(image.Rect(0, 0, 1280, 720)), nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, provider := range []string{"fanza", "fc2", "javdb"} {
+		candidate := domain.ImageCandidate{Provider: provider, URL: "https://image.example/preview.jpg", Role: "preview"}
+		metadata := &metadataImageStub{body: original.Bytes()}
+		router := NewRouter(Dependencies{Access: NewAccessGateService("", ""), Library: &libraryPreviewStub{candidate: candidate}, Metadata: metadata,
+			Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+		for _, suffix := range []string{"/thumbnail?v=123", "?v=123"} {
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/library/movies/42/previews/0"+suffix, nil))
+			if response.Code != http.StatusOK || metadata.received != candidate || response.Header().Get("Cache-Control") != "private, max-age=3600" {
+				t.Fatalf("preview response = %d %s", response.Code, response.Body)
+			}
+			config, _, err := image.DecodeConfig(bytes.NewReader(response.Body.Bytes()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.HasPrefix(suffix, "/thumbnail") {
+				if config.Width != 320 || config.Height != 180 || response.Body.Len() >= original.Len() {
+					t.Fatalf("not a small thumbnail: %+v, bytes=%d", config, response.Body.Len())
+				}
+			} else if !bytes.Equal(response.Body.Bytes(), original.Bytes()) {
+				t.Fatal("original route changed the image")
+			}
+		}
 	}
 }
 

@@ -1,11 +1,12 @@
 import { XIcon } from 'lucide-react'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type { PreviewImage } from '@/api/discover'
 import { MediaImage } from '@/components/media-image'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { cn } from 'cn'
+import { createPreviewFrame } from './preview-frame'
 import {
   DOUBLE_TAP_SCALE,
   FIT_SCALE,
@@ -30,11 +31,7 @@ import type {
 /** Pointer travel, in pixels, that turns a click into a pan. */
 const DRAG_THRESHOLD = 4
 
-/**
- * The image frame mirrors `rounded-2xl` from the detail hero cover. The radius comes from a number
- * so it can be counter-scaled and stays visually constant while the image is zoomed.
- */
-const FRAME_RADIUS = 18
+const PreviewMediaImage = memo(MediaImage)
 
 export function MoviePreviewViewer({
   images,
@@ -158,6 +155,7 @@ function PreviewStage({
   onClose: () => void
 }) {
   const [view, setView] = useState<ZoomView>(FIT_VIEW)
+  const [viewFrame] = useState(() => createPreviewFrame(setView))
   const [stageSize, setStageSize] = useState<Size>({ width: 0, height: 0 })
   const [naturalSize, setNaturalSize] = useState<Size | null>(initialNatural)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -170,6 +168,8 @@ function PreviewStage({
   const naturalHeight = naturalSize?.height ?? 0
   const base = previewBase(naturalSize, stageSize)
   const pannable = canPan(view, base, stageSize)
+
+  useEffect(() => () => viewFrame.cancel(), [viewFrame])
 
   const handleImageLoad = useCallback(
     (element: HTMLImageElement) => {
@@ -209,15 +209,15 @@ function PreviewStage({
       }
       const step = event.ctrlKey ? PINCH_ZOOM_STEP : WHEEL_ZOOM_STEP
       const factor = wheelZoomFactor(event.deltaY, event.deltaMode, step)
-      setView(current => zoomAt(current, anchor, factor, baseSize, stage))
+      viewFrame.update(current => zoomAt(current, anchor, factor, baseSize, stage))
     }
     element.addEventListener('wheel', handleWheel, { passive: false })
     return () => element.removeEventListener('wheel', handleWheel)
-  }, [naturalWidth, naturalHeight, stageWidth, stageHeight])
+  }, [naturalWidth, naturalHeight, stageWidth, stageHeight, viewFrame])
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     draggedRef.current = false
-    if (!pannable || event.button !== 0) return
+    if (!canPan(viewFrame.current(), base, stageSize) || event.button !== 0) return
     dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
@@ -232,7 +232,7 @@ function PreviewStage({
     draggedRef.current = true
     drag.x = event.clientX
     drag.y = event.clientY
-    setView(current => panBy(current, dx, dy, base, stageSize))
+    viewFrame.update(current => panBy(current, dx, dy, base, stageSize))
   }
 
   const handlePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -262,7 +262,7 @@ function PreviewStage({
       x: event.clientX - (rect.left + rect.width / 2),
       y: event.clientY - (rect.top + rect.height / 2)
     }
-    setView(current =>
+    viewFrame.update(current =>
       current.scale === FIT_SCALE
         ? zoomAt(current, anchor, DOUBLE_TAP_SCALE, base, stageSize)
         : FIT_VIEW
@@ -286,15 +286,14 @@ function PreviewStage({
       >
         <div
           data-preview-image
-          className="overflow-hidden bg-muted will-change-transform"
+          className="overflow-hidden rounded-2xl bg-muted will-change-transform"
           style={{
             width: base.width,
             height: base.height,
-            transform: `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.scale})`,
-            borderRadius: `${FRAME_RADIUS / view.scale}px`
+            transform: `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.scale})`
           }}
         >
-          <MediaImage
+          <PreviewMediaImage
             source={image.original || image.thumbnail}
             loading="eager"
             onImageLoad={handleImageLoad}

@@ -64,7 +64,8 @@ func (s *Service) Movie(ctx context.Context, id int) (MovieDetail, error) {
 	}
 	for i := range previewCandidates(doc) {
 		url := fmt.Sprintf("/api/library/movies/%d/previews/%d?v=%d", record.ID, i, record.UpdatedAt.UnixMilli())
-		detail.PreviewImages = append(detail.PreviewImages, domain.PreviewImage{Original: url, Thumbnail: url})
+		thumbnail := fmt.Sprintf("/api/library/movies/%d/previews/%d/thumbnail?v=%d", record.ID, i, record.UpdatedAt.UnixMilli())
+		detail.PreviewImages = append(detail.PreviewImages, domain.PreviewImage{Original: url, Thumbnail: thumbnail})
 	}
 	detail.HasPreview = len(detail.PreviewImages) > 0
 	return detail, nil

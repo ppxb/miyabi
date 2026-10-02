@@ -58,6 +58,9 @@ func TestSavedDetailNeedsNoJavDBAndKeepsSourceIdentities(t *testing.T) {
 		t.Fatalf("wrong artwork projection: %+v", detail)
 	}
 	for i, want := range doc.Images[1:] {
+		if detail.PreviewImages[i].Thumbnail == detail.PreviewImages[i].Original || !strings.Contains(detail.PreviewImages[i].Thumbnail, "/thumbnail?v=") {
+			t.Fatal("preview thumbnail still points to the original")
+		}
 		candidate, err := lib.Preview(ctx, film.ID, i)
 		if err != nil || candidate != want {
 			t.Fatalf("preview lost source: %+v %v", candidate, err)
