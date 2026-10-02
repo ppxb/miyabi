@@ -4,9 +4,9 @@ import (
 	"net"
 )
 
-// OutboundIP returns the preferred outbound LAN IPv4 address of the host.
-// It prioritizes standard private network ranges (10.x, 172.16-31.x, 192.168.x).
-// If no LAN IP can be determined, it falls back to "127.0.0.1".
+// OutboundIP first uses the IPv4 address selected by the system's outbound route.
+// If unavailable, it checks interfaces, preferring private addresses over other
+// usable IPv4 addresses, then falls back to "127.0.0.1". The result may be public.
 func OutboundIP() string {
 	conn, err := net.Dial("udp", "223.5.5.5:80")
 	if err == nil {

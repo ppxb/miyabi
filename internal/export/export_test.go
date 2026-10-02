@@ -102,6 +102,45 @@ func TestParseSTRMFileID(t *testing.T) {
 	}
 }
 
+func TestRewriteSTRMRejectsMissingDestinationsWithoutChangingFiles(t *testing.T) {
+	for _, tc := range []struct {
+		name, directory, publicURL string
+	}{
+		{"missing directory", "", "http://localhost:9090"},
+		{"blank directory", " \t", "http://localhost:9090"},
+		{"missing URL", "exports", ""},
+		{"blank URL", "exports", " \t"},
+		{"slash-only URL", "exports", " / "},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			const original = "http://previous.example/api/strm/play/123?token=old\n"
+			paths := []string{filepath.Join("data", "emby", "movie.strm"), filepath.Join("exports", "movie.strm")}
+			for _, path := range paths {
+				if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte(original), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if count, err := RewriteSTRM(t.Context(), tc.directory, tc.publicURL, "new"); err == nil || count != 0 {
+				t.Fatalf("direct rewrite = %d, %v; want error without writes", count, err)
+			}
+			manager := NewManager(Config{EmbyDir: tc.directory, PublicURL: tc.publicURL, STRMToken: "new"})
+			if count, err := manager.RewriteSTRM(t.Context()); err == nil || count != 0 {
+				t.Fatalf("managed rewrite = %d, %v; want error without writes", count, err)
+			}
+			for _, path := range paths {
+				data, err := os.ReadFile(path)
+				if err != nil || string(data) != original {
+					t.Fatalf("existing STRM changed at %s: %q, %v", path, data, err)
+				}
+			}
+		})
+	}
+}
+
 func TestExportManager(t *testing.T) {
 	mgr := NewManager(Config{
 		EmbyDir:   "/tmp/emby",
@@ -132,7 +171,6 @@ func TestEmbyMovieDir(t *testing.T) {
 		code    string
 		wantRel string
 	}{
-		{"", "SSIS-001", filepath.Join("./data/emby", "SSIS", "SSIS-001")},
 		{tempDir, "ALDN-613", filepath.Join(tempDir, "ALDN", "ALDN-613")},
 		{tempDir, "A/B", filepath.Join(tempDir, "OTHERS", "A%2FB")},
 		{tempDir, `A\B`, filepath.Join(tempDir, "OTHERS", "A%5CB")},

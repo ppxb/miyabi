@@ -2,6 +2,8 @@ package export
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -11,6 +13,18 @@ type Config struct {
 	EmbyDir   string
 	PublicURL string
 	STRMToken string
+}
+
+// Validate requires resolved destinations before export files can be written.
+// Defaults are supplied by the application configuration, not by exporters.
+func (c Config) Validate() error {
+	if strings.TrimSpace(c.EmbyDir) == "" {
+		return errors.New("export directory must not be empty")
+	}
+	if strings.TrimRight(strings.TrimSpace(c.PublicURL), "/") == "" {
+		return errors.New("export public URL must not be empty")
+	}
+	return nil
 }
 
 // Manager coordinates atomic access to the export configuration and serializes STRM rewrites.
@@ -62,9 +76,6 @@ func (m *Manager) WithConfig(fn func(Config) error) error {
 func (m *Manager) RewriteSTRM(ctx context.Context) (int, error) {
 	var count int
 	err := m.WithConfig(func(cfg Config) error {
-		if cfg.EmbyDir == "" || cfg.PublicURL == "" {
-			return nil
-		}
 		var err error
 		count, err = RewriteSTRM(ctx, cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken)
 		return err

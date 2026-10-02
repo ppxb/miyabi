@@ -12,11 +12,8 @@ import (
 
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/netx"
 	"github.com/ppxb/miyabi/internal/nfo"
 )
-
-const defaultEmbyDir = "./data/emby"
 
 // STRMPlayPath is the API route prefix for media streaming playback in .strm files.
 const STRMPlayPath = "/api/strm/play/"
@@ -32,25 +29,17 @@ func ParseSTRMFileID(content string) string {
 	return ""
 }
 
-func defaultPublicURL() string {
-	return fmt.Sprintf("http://%s:8080", netx.OutboundIP())
-}
-
 // EmbyMovieDir is the directory holding a movie's exported Emby files,
 // bucketed by catalogue prefix: <embyDir>/<prefix>/<safe-stem>.
+// embyDir must come from the resolved export configuration.
 func EmbyMovieDir(embyDir, code string) string {
-	if embyDir == "" {
-		embyDir = defaultEmbyDir
-	}
 	return filepath.Join(embyDir, nfo.FileStem(codeid.Prefix(code)), nfo.FileStem(code))
 }
 
 // STRMContent is the body of a .strm file: the relay URL that resolves the
 // 115 video to a fresh stream whenever Emby plays it.
+// publicURL must come from the resolved export configuration.
 func STRMContent(publicURL, fileID, strmToken string) []byte {
-	if publicURL == "" {
-		publicURL = defaultPublicURL()
-	}
 	publicURL = strings.TrimRight(strings.TrimSpace(publicURL), "/")
 	content := publicURL + STRMPlayPath + fileID
 	if strmToken != "" {
@@ -63,13 +52,9 @@ func STRMContent(publicURL, fileID, strmToken string) []byte {
 // to use the active publicURL and strmToken. It respects cancellation via ctx.
 // It returns the count of rewritten files.
 func RewriteSTRM(ctx context.Context, embyDir, publicURL, strmToken string) (int, error) {
-	if embyDir == "" {
-		embyDir = defaultEmbyDir
+	if err := (Config{EmbyDir: embyDir, PublicURL: publicURL}).Validate(); err != nil {
+		return 0, err
 	}
-	if publicURL == "" {
-		publicURL = defaultPublicURL()
-	}
-	publicURL = strings.TrimRight(strings.TrimSpace(publicURL), "/")
 
 	rewritten := 0
 	err := filepath.WalkDir(embyDir, func(path string, d os.DirEntry, err error) error {

@@ -93,6 +93,9 @@ func ExportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, 
 // Compare each output independently so repairing one missing sidecar does not
 // touch complete files or trigger unnecessary media-server file events.
 func exportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, videos []pan.File, poster, fanart []byte) (bool, error) {
+	if err := (export.Config{EmbyDir: embyDir, PublicURL: publicURL}).Validate(); err != nil {
+		return false, err
+	}
 	stem := nfo.FileStem(code)
 	destDir := export.EmbyMovieDir(embyDir, code)
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
