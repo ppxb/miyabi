@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/domain"
-	mediaimage "github.com/ppxb/miyabi/internal/image"
 	lib "github.com/ppxb/miyabi/internal/library"
 )
 
@@ -59,7 +58,7 @@ func libraryMovieHandler(library LibraryManager) gin.HandlerFunc {
 	}
 }
 
-func libraryPreviewHandler(library LibraryManager, metadata MetadataManager, thumbnail bool) gin.HandlerFunc {
+func libraryPreviewHandler(library LibraryManager, metadata MetadataManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		uri, ok := bindURI[struct {
 			ID    int `uri:"id" binding:"min=1"`
@@ -77,14 +76,6 @@ func libraryPreviewHandler(library LibraryManager, metadata MetadataManager, thu
 		if err != nil {
 			c.Error(err)
 			return
-		}
-		if thumbnail {
-			media.Body, err = mediaimage.PreviewThumbnail(media.Body)
-			if err != nil {
-				c.Error(err)
-				return
-			}
-			media.ContentType = "image/jpeg"
 		}
 		c.Header("Cache-Control", "private, max-age=3600")
 		c.Data(http.StatusOK, media.ContentType, media.Body)

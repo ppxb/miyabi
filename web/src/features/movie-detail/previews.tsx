@@ -31,7 +31,11 @@ export function MoviePreviews({ images }: { images: PreviewImage[] }) {
               onClick={() => openViewer(index)}
               className="group relative aspect-video cursor-pointer overflow-hidden rounded-xl"
             >
-              <MediaImage source={preview.thumbnail || preview.original} className="object-cover" />
+              <MediaImage
+                source={preview.thumbnail || preview.original}
+                original={preview.original}
+                className="object-cover"
+              />
               <span className="absolute inset-0 hidden items-center justify-center bg-black/40 text-white opacity-0 transition-opacity group-hover:opacity-100 sm:flex">
                 <Maximize2Icon className="size-5" />
               </span>
