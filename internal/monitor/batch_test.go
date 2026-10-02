@@ -1,10 +1,14 @@
 package monitor
 
 import (
+	"context"
+	"fmt"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/subscription"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -37,6 +41,55 @@ func TestEnqueueSingle(t *testing.T) {
 	if _, err := f.service.EnqueueSingle(ctx, actor.ID); !domain.IsKind(err, domain.KindInvalid) {
 		t.Fatalf("enqueueing an actor subscription must be invalid, got %v", err)
 	}
+}
+
+func TestBatchReadsSubscriptionsOnceAndSharesSettings(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		f, ctx := newFixture(t), t.Context()
+		var ids []int
+		for i := range 3 {
+			item, err := f.service.AddMovie(ctx, fmt.Sprint(i), AddMovieOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ids = append(ids, item.ID)
+		}
+		taskID, err := f.service.EnqueueBatch(ctx, BatchEnqueueRequest{IDs: ids})
+		if err != nil {
+			t.Fatal(err)
+		}
+		row := f.client.Task.GetX(ctx, taskID)
+		subscriptionReads, configReads := 0, 0
+		countQueries := func(count *int) ent.Interceptor {
+			return ent.InterceptFunc(func(next ent.Querier) ent.Querier {
+				return ent.QuerierFunc(func(ctx context.Context, query ent.Query) (ent.Value, error) {
+					*count++
+					return next.Query(ctx, query)
+				})
+			})
+		}
+		f.client.Subscription.Intercept(countQueries(&subscriptionReads))
+		f.client.Setting.Intercept(countQueries(&configReads))
+		var requestedAt []time.Time
+		f.service.discover = observedDiscoverer{f.discover, func(string, string) error {
+			requestedAt = append(requestedAt, time.Now())
+			return nil
+		}}
+		if err := f.service.BatchHandler(ctx, tasks.Job{ID: row.ID, Type: tasks.KindSubscriptionBatch, Payload: row.Payload}); err != nil {
+			t.Fatal(err)
+		}
+		if subscriptionReads != len(ids) || configReads != 1 {
+			t.Fatalf("subscription reads=%d config reads=%d", subscriptionReads, configReads)
+		}
+		if len(requestedAt) != len(ids) {
+			t.Fatalf("requests=%d", len(requestedAt))
+		}
+		for i := 1; i < len(requestedAt); i++ {
+			if gap := requestedAt[i].Sub(requestedAt[i-1]); gap < batchGapMin || gap > batchGapMin+batchGapJitter {
+				t.Fatalf("batch request pacing changed: %s", gap)
+			}
+		}
+	})
 }
 
 func TestBatchEnqueueTask(t *testing.T) {

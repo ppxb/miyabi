@@ -21,8 +21,8 @@ const (
 	actorFeedPageSize = 40
 )
 
-// Check polls due movie and actor subscriptions in small batches with a pause
-// between JavDB requests. The scheduler runs checks serially.
+// Check drains subscriptions due at the start of this run in small, alternating
+// movie and actor pages. The scheduler runs checks serially, with paced requests.
 func (service *Service) Check(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -43,44 +43,74 @@ func (service *Service) Check(ctx context.Context) error {
 		return nil
 	}
 
-	now := time.Now()
-	movies, err := service.database.Subscription.Query().
-		Where(subscription.KindEQ(subscription.KindMovie), subscription.StatusEQ(subscription.StatusWaiting), subscription.NextCheckAtLTE(now)).
-		Order(ent.Asc(subscription.FieldNextCheckAt)).Limit(movieBatchSize).All(ctx)
-	if err != nil {
-		return fmt.Errorf("load due movie subscriptions: %w", err)
+	cutoff := time.Now()
+	groups := []struct {
+		kind   subscription.Kind
+		status subscription.Status
+		limit  int
+		after  *ent.Subscription
+		done   bool
+	}{
+		{kind: subscription.KindMovie, status: subscription.StatusWaiting, limit: movieBatchSize},
+		{kind: subscription.KindActor, status: subscription.StatusActive, limit: actorBatchSize},
 	}
-	actors, err := service.database.Subscription.Query().
-		Where(subscription.KindEQ(subscription.KindActor), subscription.StatusEQ(subscription.StatusActive), subscription.NextCheckAtLTE(now)).
-		Order(ent.Asc(subscription.FieldNextCheckAt)).Limit(actorBatchSize).All(ctx)
-	if err != nil {
-		return fmt.Errorf("load due actor subscriptions: %w", err)
-	}
-
 	var checkErrors []error
-	for _, record := range movies {
-		if err := pace(); err != nil {
-			return err
-		}
-		if err := service.checkMovie(ctx, record, picker, cfg.CheckTime); err != nil {
-			if ctx.Err() != nil {
-				return err
+	for {
+		more := false
+		for i := range groups {
+			group := &groups[i]
+			if group.done {
+				continue
 			}
-			checkErrors = append(checkErrors, err)
-		}
-	}
-	for _, record := range actors {
-		if err := pace(); err != nil {
-			return err
-		}
-		if err := service.checkActor(ctx, record, cfg.CheckTime); err != nil {
-			if ctx.Err() != nil {
-				return err
+			records, err := service.dueSubscriptions(ctx, group.kind, group.status, cutoff, group.after, group.limit)
+			if err != nil {
+				return errors.Join(append(checkErrors, err)...)
 			}
-			checkErrors = append(checkErrors, err)
+			group.done = len(records) < group.limit
+			more = more || !group.done
+			if len(records) > 0 {
+				group.after = records[len(records)-1]
+			}
+			for _, record := range records {
+				if err := pace(); err != nil {
+					return err
+				}
+				if group.kind == subscription.KindMovie {
+					err = service.checkMovie(ctx, record, picker, cfg.CheckTime)
+				} else {
+					err = service.checkActor(ctx, record, cfg.CheckTime)
+				}
+				if err != nil {
+					if ctx.Err() != nil {
+						return err
+					}
+					checkErrors = append(checkErrors, err)
+				}
+			}
+		}
+		if !more {
+			break
 		}
 	}
 	return errors.Join(checkErrors...)
+}
+
+func (service *Service) dueSubscriptions(ctx context.Context, kind subscription.Kind, status subscription.Status, cutoff time.Time, after *ent.Subscription, limit int) ([]*ent.Subscription, error) {
+	query := service.database.Subscription.Query().
+		Where(subscription.KindEQ(kind), subscription.StatusEQ(status), subscription.NextCheckAtLTE(cutoff))
+	if after != nil {
+		// Updates remove rows from the due set. A time/ID cursor avoids skipping
+		// rows like offset pagination, or rechecking rows whose update failed.
+		query.Where(subscription.Or(
+			subscription.NextCheckAtGT(*after.NextCheckAt),
+			subscription.And(subscription.NextCheckAtEQ(*after.NextCheckAt), subscription.IDGT(after.ID)),
+		))
+	}
+	records, err := query.Order(ent.Asc(subscription.FieldNextCheckAt), ent.Asc(subscription.FieldID)).Limit(limit).All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load due %s subscriptions: %w", kind, err)
+	}
+	return records, nil
 }
 
 func (service *Service) checkMovie(ctx context.Context, record *ent.Subscription, picker *magnet.Picker, checkTime string) error {
@@ -101,9 +131,7 @@ func (service *Service) checkMovie(ctx context.Context, record *ent.Subscription
 		if err := update.Exec(ctx); err != nil && !ent.IsNotFound(err) {
 			return fmt.Errorf("schedule subscription %d: %w", record.ID, err)
 		}
-		if stale {
-			service.tasks.NotifyMonitorChanged()
-		}
+		service.tasks.NotifyMonitorChanged()
 		return nil
 	}
 	if !record.AutoDownload {

@@ -30,24 +30,28 @@ func (service *Service) EnqueueSingle(ctx context.Context, id int) (Item, error)
 	if err != nil {
 		return Item{}, err
 	}
+	cfg := service.config(ctx)
+	return service.enqueueMovie(ctx, record, magnet.NewPicker(cfg.Preferences), cfg.CheckTime)
+}
+
+func (service *Service) enqueueMovie(ctx context.Context, record *ent.Subscription, picker *magnet.Picker, checkTime string) (Item, error) {
 	if record.Kind != subscription.KindMovie {
 		return Item{}, domain.E(domain.KindInvalid, "只有影片订阅可以入库", nil)
 	}
 	if record.Status == subscription.StatusAdded {
 		return subscriptionItem(record), nil
 	}
-	cfg := service.config(ctx)
 	magnets, err := service.discover.CatalogueMagnets(ctx, record.TargetID)
 	if err != nil {
 		return Item{}, fmt.Errorf("fetch magnets for %s: %w", record.Code, err)
 	}
 	now := time.Now()
-	best, found := magnet.NewPicker(cfg.Preferences).Pick(magnets)
+	best, found := picker.Pick(magnets)
 	if !found {
 		updated, err := record.Update().SetAutoDownload(true).SetStatus(subscription.StatusWaiting).
-			SetLastCheckedAt(now).SetNextCheckAt(nextDaily(now, cfg.CheckTime)).ClearError().Save(ctx)
+			SetLastCheckedAt(now).SetNextCheckAt(nextDaily(now, checkTime)).ClearError().Save(ctx)
 		if err != nil {
-			return Item{}, fmt.Errorf("update subscription %d: %w", id, err)
+			return Item{}, fmt.Errorf("update subscription %d: %w", record.ID, err)
 		}
 		service.tasks.NotifyMonitorChanged()
 		return subscriptionItem(updated), nil
@@ -59,7 +63,7 @@ func (service *Service) EnqueueSingle(ctx context.Context, id int) (Item, error)
 	updated, err := record.Update().SetStatus(subscription.StatusAdded).SetHash(best.Hash).SetTaskID(submission.TaskID).
 		SetLastCheckedAt(now).AddChecks(1).ClearNextCheckAt().ClearError().Save(ctx)
 	if err != nil {
-		return Item{}, fmt.Errorf("complete subscription %d: %w", id, err)
+		return Item{}, fmt.Errorf("complete subscription %d: %w", record.ID, err)
 	}
 	service.tasks.NotifyMonitorChanged()
 	return subscriptionItem(updated), nil
@@ -96,6 +100,8 @@ func (service *Service) BatchHandler(ctx context.Context, job tasks.Job) error {
 		return err
 	}
 	start := min(len(payload.IDs), max(0, payload.Batch.Processed))
+	cfg := service.config(ctx)
+	picker := magnet.NewPicker(cfg.Preferences)
 	for index := start; index < len(payload.IDs); index++ {
 		if index > start {
 			select {
@@ -106,10 +112,12 @@ func (service *Service) BatchHandler(ctx context.Context, job tasks.Job) error {
 		}
 		id := payload.IDs[index]
 		code := ""
-		if record, err := service.database.Subscription.Get(ctx, id); err == nil {
+		var item Item
+		record, err := service.database.Subscription.Get(ctx, id)
+		if err == nil {
 			code = record.Code
+			item, err = service.enqueueMovie(ctx, record, picker, cfg.CheckTime)
 		}
-		item, err := service.EnqueueSingle(ctx, id)
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
