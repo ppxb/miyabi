@@ -27,7 +27,7 @@ export function MovieHero({
               {movie.code}
             </Badge>
             {libraryStatus ? (
-              <Badge variant="secondary">
+              <Badge variant={libraryStatus === 'done' ? 'library' : 'secondary'}>
                 {{ done: '已入库', pending: '待刮削', failed: '刮削失败' }[libraryStatus]}
               </Badge>
             ) : (
