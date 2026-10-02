@@ -61,7 +61,11 @@ type SubtitleExporter interface {
 	Export(ctx context.Context, movieID int, target subtitlemeta.Target) (int, error)
 }
 
-const defaultDirCacheTTL = 45 * time.Second
+const (
+	defaultDirCacheTTL = 45 * time.Second
+	maxDirCacheEntries = 128
+	maxDirCacheFiles   = 20_000
+)
 
 type dirCacheEntry struct {
 	files     []pan.File
@@ -78,7 +82,7 @@ type Service struct {
 	subtitles     SubtitleExporter
 	subtitleQueue *SubtitleQueue
 
-	dirMu    sync.RWMutex
+	dirMu    sync.Mutex
 	dirCache map[string]dirCacheEntry
 
 	exportMgr     *export.Manager
@@ -331,26 +335,57 @@ func (service *Service) directoryEntries(ctx context.Context, sess drive.Session
 		key = src.AccountID + ":" + dirID
 	}
 
-	service.dirMu.RLock()
-	if entry, ok := service.dirCache[key]; ok && time.Now().Before(entry.expiresAt) {
-		service.dirMu.RUnlock()
+	service.dirMu.Lock()
+	service.pruneDirCache(time.Now())
+	entry, ok := service.dirCache[key]
+	service.dirMu.Unlock()
+	if ok {
 		return slices.Clone(entry.files), nil
 	}
-	service.dirMu.RUnlock()
 
 	files, err := drive.DirectoryEntries(ctx, sess, dirID)
 	if err != nil {
 		return nil, err
 	}
+	// Large directories are still read in full, but must not displace the entire cache.
+	if len(files) > maxDirCacheFiles {
+		return files, nil
+	}
 
 	service.dirMu.Lock()
+	now := time.Now()
 	service.dirCache[key] = dirCacheEntry{
 		files:     files,
-		expiresAt: time.Now().Add(defaultDirCacheTTL),
+		expiresAt: now.Add(defaultDirCacheTTL),
 	}
+	service.pruneDirCache(now)
 	service.dirMu.Unlock()
 
 	return slices.Clone(files), nil
+}
+
+// pruneDirCache reclaims expired listings and evicts the oldest listings when over budget.
+// The caller must hold dirMu. Idle caches remain bounded without a background worker.
+func (service *Service) pruneDirCache(now time.Time) {
+	fileCount := 0
+	for key, entry := range service.dirCache {
+		if !now.Before(entry.expiresAt) {
+			delete(service.dirCache, key)
+			continue
+		}
+		fileCount += len(entry.files)
+	}
+	for len(service.dirCache) > maxDirCacheEntries || fileCount > maxDirCacheFiles {
+		var oldestKey string
+		var oldestExpiry time.Time
+		for key, entry := range service.dirCache {
+			if oldestExpiry.IsZero() || entry.expiresAt.Before(oldestExpiry) {
+				oldestKey, oldestExpiry = key, entry.expiresAt
+			}
+		}
+		fileCount -= len(service.dirCache[oldestKey].files)
+		delete(service.dirCache, oldestKey)
+	}
 }
 
 func (service *Service) resolveMetadata(ctx context.Context, input *Payload) error {
