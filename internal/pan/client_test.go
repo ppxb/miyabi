@@ -49,10 +49,7 @@ func TestPanTransport_RateLimitsRetries(t *testing.T) {
 		return r != nil && r.StatusCode() == http.StatusBadGateway
 	})
 
-	client := &Client{
-		http:    restyClient,
-		limiter: limiter,
-	}
+	client := &Client{http: restyClient}
 
 	req := client.http.R().SetContext(context.Background())
 	_, err := client.request(req, http.MethodGet, ts.URL)
@@ -100,10 +97,7 @@ func TestPanTransport_LimitsInFlightConcurrency(t *testing.T) {
 	transport := newPanTransport(http.DefaultTransport, limiter, 2)
 	restyClient.SetTransport(transport)
 
-	client := &Client{
-		http:    restyClient,
-		limiter: limiter,
-	}
+	client := &Client{http: restyClient}
 
 	var wg sync.WaitGroup
 	for range 6 {
@@ -149,10 +143,7 @@ func TestPanTransport_RespectsRetryAfter(t *testing.T) {
 		return r != nil && r.StatusCode() == http.StatusTooManyRequests
 	})
 
-	client := &Client{
-		http:    restyClient,
-		limiter: limiter,
-	}
+	client := &Client{http: restyClient}
 
 	req := client.http.R().SetContext(context.Background())
 	_, err := client.request(req, http.MethodGet, ts.URL)

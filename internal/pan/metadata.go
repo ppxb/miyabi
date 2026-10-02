@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
 )
@@ -75,24 +76,43 @@ func (client *Client) Info(ctx context.Context, accessToken, fileID string) (Fil
 
 // ReadMetadata reads a small sidecar, never the video itself. The signed URL
 // request uses the same User-Agent as downurl and carries no access token.
+// Only downurl consumes API quota; CDN reads use the media transport.
 func (client *Client) ReadMetadata(ctx context.Context, accessToken, pickCode string, limit int64) ([]byte, error) {
 	downloadURL, err := client.DownloadURL(ctx, accessToken, pickCode, MediaUserAgent)
 	if err != nil {
 		return nil, err
 	}
-	if err := client.limiter.Wait(ctx); err != nil {
-		return nil, err
+	// Optional NFO failures fall back to filename identification, so retain bounded
+	// retries here instead of relying on the scan task to retry the download.
+	for attempt := 0; ; attempt++ {
+		body, err := client.readMetadataURL(ctx, downloadURL, limit)
+		delay, retry := domain.RetryDelay(err)
+		if !retry || attempt == 3 || ctx.Err() != nil {
+			return body, err
+		}
+		timer := time.NewTimer(max(delay, time.Second<<attempt))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
 	}
-	download, err := client.http.R().SetContext(ctx).SetHeader("User-Agent", MediaUserAgent).
-		SetDoNotParseResponse(true).Get(downloadURL)
+}
+
+func (client *Client) readMetadataURL(ctx context.Context, address string, limit int64) ([]byte, error) {
+	// Video streams have no total timeout; sidecars must bound headers and body.
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+	download, err := client.OpenMedia(ctx, http.MethodGet, address, http.Header{"User-Agent": {MediaUserAgent}})
 	if err != nil {
 		return nil, err
 	}
-	defer download.RawBody().Close()
-	if !download.IsSuccess() {
-		return nil, &domain.HTTPError{Source: "115 metadata", StatusCode: download.StatusCode(), RetryAfter: parseRetryAfter(download.Header().Get("Retry-After"))}
+	defer download.Body.Close()
+	if download.StatusCode < 200 || download.StatusCode >= 300 {
+		return nil, &domain.HTTPError{Source: "115 metadata", StatusCode: download.StatusCode, RetryAfter: parseRetryAfter(download.Header.Get("Retry-After"))}
 	}
-	body, err := io.ReadAll(io.LimitReader(download.RawBody(), limit+1))
+	body, err := io.ReadAll(io.LimitReader(download.Body, limit+1))
 	if err != nil {
 		return nil, err
 	}

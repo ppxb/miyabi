@@ -2,24 +2,24 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135 项目录缓存修复并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135 项目录缓存和第 138 项资料下载重复限流修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 
 ## 复核结果
 
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
-| 确认仍存在，待处理 | 21 | 有明确代码依据的边界、状态反馈或行为问题 |
+| 确认仍存在，待处理 | 20 | 有明确代码依据的边界、状态反馈或行为问题 |
 | 可选优化与整理 | 57 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
 | 按现有约定暂缓 | 7 | 不恢复用户已取消的 UI、ARIA 或旧数据兼容要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 13 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 14 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
 1. **235、167**：STRM token 进入请求日志，以及图片代理缺少地址/体积约束。
 2. **161、237**：登录限流的并发和存储边界、可信代理配置及 HTTPS 转发头。
-3. **148、149、138**：订阅积压与通知、本地文件身份边界、重复限流。
+3. **148、149**：订阅积压与通知、本地文件身份边界。
 4. **187、189、192、193、194、206、222、224**：已确认的界面状态和反馈问题；具体视觉效果由用户验收。
 
 ### 当前约定
@@ -37,12 +37,11 @@
 - 额外核对依赖实现：slog-gin v1.21.1 的 middleware.go 记录 RawQuery；Gin v1.12.0 的代理解析会在错误时保留已解析前缀。没有读取或输出生产令牌。
 - 没有浏览器测试、真实上游/Emby 联调、race 检测或新的性能基准。旧报告中的毫秒数、倍数、对比度和固定积压耗时不再作为本轮结论。
 - 第 135 项修复后通过：`go test ./internal/library/... ./internal/app`、`go vet ./internal/library/... ./internal/app`；新增覆盖跨目录过期回收（命中、未命中及请求失败）、目录数/文件总数上限、淘汰后重新读取、超大目录完整读取且不驻留、账号隔离和返回列表修改隔离。保留现有视频位置核验与发布回放回归。限额约束缓存记录数，不代表内存字节硬上限或真实大库性能结论。
+- 第 138 项修复后通过：`go test ./internal/pan ./internal/drive ./internal/library/... ./internal/app`、同范围 `go vet`。新增离线回归覆盖仅 downurl 使用 API 限流、CDN 请求 UA/凭据隔离、文件大小边界与响应体关闭、瞬时故障重试、Retry-After、请求头/正文超时及退避期间取消。未测量真实网盘扫描提速比例。
 - **独立工具链问题仍存在**：本地执行 `web/node_modules/.bin/shadcn --version` 仍报 `ERR_PACKAGE_PATH_NOT_EXPORTED`：MCP SDK 依赖访问 zod 的 `./v3` 导出失败。未安装或调整依赖；这不是应用构建失败，也不意味着需要恢复旧数据兼容。
 
 ## 确认仍存在，待处理
 
-- [ ] **138.** ReadMetadata 在 downurl 请求后显式 limiter.Wait，随后又用带 panTransport 限流的 client.http 请求 CDN；无重试时两次 HTTP 请求合计消耗三个令牌。可将 sidecar CDN 读取交给 media client，并保留相同 UA、大小上限和超时。
-  - 定位：`internal/pan/metadata.go:78`；`internal/pan/client.go`。
 - [ ] **142.** 账号缓存失效时并发 verifyAccount 仍会各自 fetchAccount；refreshTokens 有并发合并，但 RefreshToken 明确拒绝后未标记该凭据版本失效，后续请求仍重复刷新。应区分凭据吊销与暂时网络失败，不能把所有错误都当登出。
   - 定位：`internal/drive/account.go:27`；`internal/drive/token.go`。
 - [ ] **148.** 订阅检查仍每轮最多 10 部影片和 5 个演员，由 5 分钟周期触发；到期积压无法在一轮内排空。BatchHandler 与 EnqueueSingle 重复读取订阅，后者每项读取配置；无磁力且未过期的分支更新 checks/时间却不发业务通知。应优先处理积压调度和状态通知，保留请求节流；撤回固定“500 项约 2.8 小时”的估算。
@@ -274,6 +273,8 @@
   - 定位：`internal/library/scrape/artwork.go`；`internal/maintenance/service.go`；`internal/app/task_workers.go`；`internal/app/cover_lock_test.go`。
 - [x] **135.** 目录缓存已限制为最多 128 个目录、合计 20,000 条文件记录，超限淘汰最早写入的列表；45 秒 TTL 到期项在下一次缓存访问或写入时回收，空闲时仍受容量约束。单个超过限额的目录完整读取但不缓存。网络请求仍在锁外，账号隔离、返回列表副本、索引变化后的缓存清空与发布前视频位置核验保留。
   - 定位：`internal/library/scrape/scrape.go`；`internal/library/scrape/dir_cache_test.go`；`internal/library/scrape/publish.go`。
+- [x] **138.** ReadMetadata 已复用 OpenMedia 下载 CDN 文件，删除手动限流与 Client 中多余的 limiter 引用；无重试时两次 HTTP 请求仅 downurl 消耗一次 API 限流额度。保持相同 UA、无 OAuth 凭据的 CDN 请求及大小上限；单次下载用独立 35 秒上下文约束请求头和正文，不改变视频流超时。瞬时错误按 domain.RetryDelay 最多重试 3 次，遵守 Retry-After 和调用方取消，响应体在重试前关闭；CDN 退避不再影响其他 API 请求。
+  - 定位：`internal/pan/metadata.go`；`internal/pan/client.go`；`internal/pan/metadata_test.go`。
 - [x] **139.** 115 sidecar 上传实现已删除，已无逐文件申请 OSS STS token 的生产路径；不再增加 token 缓存。
   - 定位：`internal/pan/client.go`。
 - [x] **212.** movie-hover-details 已删除，详情统计栏与悬浮卡片之间的重复不存在。

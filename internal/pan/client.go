@@ -24,9 +24,8 @@ const (
 )
 
 type Client struct {
-	http    *resty.Client
-	media   *http.Client
-	limiter *rate.Limiter
+	http  *resty.Client
+	media *http.Client
 }
 
 const (
@@ -191,9 +190,8 @@ func New() *Client {
 	mediaTransport := netx.NewTransport(nil)
 	mediaTransport.ResponseHeaderTimeout = requestTimeout
 	return &Client{
-		http:    httpClient,
-		media:   &http.Client{Transport: mediaTransport},
-		limiter: limiter,
+		http:  httpClient,
+		media: &http.Client{Transport: mediaTransport},
 	}
 }
 
