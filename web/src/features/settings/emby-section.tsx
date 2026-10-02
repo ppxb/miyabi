@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { LoaderCircleIcon, RefreshCwIcon, TvMinimalIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { describeApiError } from '@/api/client'
 import { type EmbyConfig, useEmbyConfig, useTestEmbyConfig, useUpdateEmbyConfig } from '@/api/emby'
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
@@ -86,7 +87,7 @@ export function EmbySection() {
           toast.success('已关闭 Emby')
         },
         onError: error => {
-          toast.error(error instanceof Error ? error.message : '关闭 Emby 失败')
+          toast.error(describeApiError(error))
         }
       }
     )
@@ -129,7 +130,7 @@ export function EmbySection() {
           })
         },
         onError: error => {
-          toast.error(error instanceof Error ? error.message : '连接 Emby 服务器失败')
+          toast.error(describeApiError(error))
         }
       }
     )
@@ -167,7 +168,7 @@ export function EmbySection() {
         toast.success('Emby 设置已保存')
       },
       onError: error => {
-        toast.error(error instanceof Error ? error.message : '保存 Emby 设置失败')
+        toast.error(describeApiError(error))
       }
     })
   }

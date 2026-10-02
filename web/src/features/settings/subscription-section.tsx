@@ -1,6 +1,7 @@
 import { BellIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { describeApiError } from '@/api/client'
 import {
   type MagnetPreferences,
   type SubscriptionConfig,
@@ -44,7 +45,7 @@ export function SubscriptionSection() {
       {
         onSuccess: () => toast.success('订阅设置已保存'),
         onError: error => {
-          toast.error(error instanceof Error ? error.message : '保存订阅设置失败')
+          toast.error(describeApiError(error))
         }
       }
     )

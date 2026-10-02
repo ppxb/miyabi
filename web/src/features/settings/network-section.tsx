@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { GlobeIcon, LoaderCircleIcon, RefreshCwIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { describeApiError } from '@/api/client'
 import {
   type NetworkProbeResult,
   type NetworkTestResponse,
@@ -47,7 +48,7 @@ export function NetworkSection() {
               toast.success('已关闭网络代理')
             },
             onError: error => {
-              toast.error(error instanceof Error ? error.message : '关闭网络代理失败')
+              toast.error(describeApiError(error))
             }
           }
         )
@@ -76,7 +77,7 @@ export function NetworkSection() {
           )
         },
         onError: error => {
-          toast.error(error instanceof Error ? error.message : '保存网络代理失败')
+          toast.error(describeApiError(error))
         }
       }
     )
@@ -94,7 +95,7 @@ export function NetworkSection() {
       {
         onSuccess: showProbeResult,
         onError: error => {
-          toast.error(error instanceof Error ? error.message : '连通性测试失败')
+          toast.error(describeApiError(error))
         }
       }
     )
