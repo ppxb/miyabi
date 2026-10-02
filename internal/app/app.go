@@ -24,6 +24,7 @@ import (
 	"github.com/ppxb/miyabi/internal/javbus"
 	"github.com/ppxb/miyabi/internal/library"
 	"github.com/ppxb/miyabi/internal/library/scrape"
+	"github.com/ppxb/miyabi/internal/localsource"
 	"github.com/ppxb/miyabi/internal/maintenance"
 	"github.com/ppxb/miyabi/internal/metadata"
 	"github.com/ppxb/miyabi/internal/metadata/providers"
@@ -92,7 +93,8 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	exportMgr := export.NewManager(export.Config{
 		EmbyDir: cfg.EmbyDir, PublicURL: cfg.PublicURL, STRMToken: cfg.STRMToken,
 	})
-	libSvc := library.New(store.Client, driveSvc, taskSvc, images, library.Options{ExportManager: exportMgr})
+	localSources := localsource.NewManager(store.Client)
+	libSvc := library.New(store.Client, driveSvc, taskSvc, images, library.Options{ExportManager: exportMgr, LocalSources: localSources})
 	javbusClient, err := javbus.New(javbus.Options{Proxy: networkSvc.ProxyManager()})
 	if err != nil {
 		driveSvc.Close()
@@ -191,6 +193,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Offline:        offlineSvc,
 		Monitor:        monitorSvc,
 		Library:        libSvc,
+		LocalSources:   localSources,
 		STRM:           strm.New(store.Client, driveSvc),
 		Tasks:          &taskViews{Service: taskSvc, database: store.Client, library: libSvc, monitor: monitorSvc},
 		Artwork:        scrapeSvc,
@@ -304,17 +307,27 @@ func (a *App) Close() error {
 	return nil
 }
 
-// CheckHealth probes the health of a running server given its listen address.
-func CheckHealth(listen string) error {
+// LocalURL returns the loopback URL that reaches a listening address, which is
+// how a double-clicked build opens its own UI.
+func LocalURL(listen string) (string, error) {
 	host, port, err := net.SplitHostPort(listen)
 	if err != nil {
-		return fmt.Errorf("parse health check address: %w", err)
+		return "", fmt.Errorf("parse listen address: %w", err)
 	}
 	switch host {
 	case "", "0.0.0.0":
 		host = "127.0.0.1"
 	case "::":
 		host = "::1"
+	}
+	return "http://" + net.JoinHostPort(host, port), nil
+}
+
+// CheckHealth probes the health of a running server given its listen address.
+func CheckHealth(listen string) error {
+	local, err := LocalURL(listen)
+	if err != nil {
+		return err
 	}
 	client := &http.Client{
 		Timeout: 4 * time.Second,
@@ -324,7 +337,7 @@ func CheckHealth(listen string) error {
 			return http.ErrUseLastResponse
 		},
 	}
-	response, err := client.Get("http://" + net.JoinHostPort(host, port) + "/api/health")
+	response, err := client.Get(local + "/api/health")
 	if err != nil {
 		return fmt.Errorf("check health: %w", err)
 	}

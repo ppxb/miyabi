@@ -1,0 +1,194 @@
+name: Build Windows portable
+
+# 与 docker-publish.yml 相互独立：同一个 tag 触发，各自构建、各自上传。
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  # 手动触发（不打 tag）用于验证构建：只产出 workflow artifact，不动 Release。
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 用于 zip 命名的版本号，留空使用 dev
+        required: false
+        default: dev
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Resolve and validate version
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Invalid version format: '$version' (expected e.g. 1.2.3)" >&2
+              exit 1
+            fi
+
+            echo "tag=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
+          else
+            version="${{ inputs.version }}"
+            echo "tag=" >> "${GITHUB_OUTPUT}"
+          fi
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+  build:
+    name: Build ${{ matrix.arch }}
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      # web/dist 必须存在：embed.go 内嵌它，缺少时 go build 会直接失败。
+      - name: Build frontend
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build portable package
+        env:
+          CGO_ENABLED: "0"
+          GOOS: windows
+          GOARCH: ${{ matrix.arch }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          package="miyabi-${VERSION}-windows-${GOARCH}"
+          stage="dist/${package}"
+          mkdir -p "${stage}"
+
+          # miyabi.exe 隐藏控制台窗口，miyabi-console.exe 用于排查问题。
+          go build -trimpath -ldflags "-s -w -H=windowsgui" -o "${stage}/miyabi.exe" ./cmd/miyabi
+          go build -trimpath -ldflags "-s -w" -o "${stage}/miyabi-console.exe" ./cmd/miyabi
+
+          cp LICENSE "${stage}/"
+          cp docs/portable-windows.md "${stage}/使用说明.md"
+          (cd dist && zip -qr "${package}.zip" "${package}")
+
+      - name: Upload the package
+        uses: actions/upload-artifact@v4
+        with:
+          name: miyabi-windows-${{ matrix.arch }}
+          path: dist/*.zip
+          if-no-files-found: error
+
+  # 在真实 Windows 上启动便携版并探测它：确认内嵌 UI 真的被提供，
+  # 而不是像 -tags dev 构建那样只回一句 404。
+  smoke:
+    name: Smoke test amd64
+    needs: [version, build]
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download the amd64 package
+        uses: actions/download-artifact@v4
+        with:
+          name: miyabi-windows-amd64
+          path: dist
+
+      - name: Run the portable build and probe it
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          Expand-Archive -Path dist/*.zip -DestinationPath app -Force
+          $exe = Get-ChildItem -Recurse app -Filter miyabi.exe | Select-Object -First 1
+          Write-Host "launching $($exe.FullName)"
+
+          $process = Start-Process -FilePath $exe.FullName -WorkingDirectory $exe.DirectoryName -PassThru
+          try {
+            $ready = $false
+            foreach ($attempt in 1..60) {
+              try {
+                $health = Invoke-WebRequest -Uri 'http://127.0.0.1:8080/api/health' -TimeoutSec 2
+                if ($health.StatusCode -eq 200) { $ready = $true; break }
+              } catch {
+                Start-Sleep -Seconds 1
+              }
+            }
+            if (-not $ready) { throw 'the portable build never answered its health probe' }
+
+            $page = Invoke-WebRequest -Uri 'http://127.0.0.1:8080/' -TimeoutSec 5
+            if ($page.StatusCode -ne 200 -or $page.Content -notmatch 'id="root"') {
+              throw "the portable build served no application page (HTTP $($page.StatusCode))"
+            }
+
+            if (-not (Test-Path (Join-Path $exe.DirectoryName 'miyabi.env'))) {
+              throw 'the portable build did not generate miyabi.env next to the executable'
+            }
+            Write-Host 'portable build serves the embedded UI and generated its configuration'
+          } finally {
+            if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
+          }
+
+  publish:
+    name: Attach packages to the release
+    needs: [version, build, smoke]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download the packages
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: miyabi-windows-*
+          merge-multiple: true
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          # docker-publish.yml 会为同一个 tag 创建 Release 草稿；这里等它出现，
+          # 避免两个独立工作流因顺序不同而互相失败。
+          for attempt in $(seq 1 30); do
+            if gh release view "${TAG}" >/dev/null 2>&1; then break; fi
+            sleep 10
+          done
+
+          if ! gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "::warning::release ${TAG} does not exist yet; the packages stay available as workflow artifacts"
+            exit 0
+          fi
+
+          gh release upload "${TAG}" dist/*.zip --clobber

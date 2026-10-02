@@ -108,6 +108,24 @@ func TestFrontendWithoutIndexDoesNotListRoot(t *testing.T) {
 	}
 }
 
+func TestMissingFrontendExplainsTheDevBuild(t *testing.T) {
+	router := NewRouter(Dependencies{
+		Access: NewAccessGateService("", ""),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/", nil))
+	if response.Code != http.StatusNotFound || !strings.Contains(response.Body.String(), "-tags dev") {
+		t.Fatalf("build without assets did not explain itself: %d %q", response.Code, response.Body.String())
+	}
+	// API paths keep their JSON error instead of the build hint.
+	response = httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/unknown", nil))
+	if response.Code != http.StatusNotFound || !strings.Contains(response.Header().Get("Content-Type"), "application/json") {
+		t.Fatalf("API request lost its error: %d %s", response.Code, response.Body)
+	}
+}
+
 func TestFrontendConditionalAndRangeRequests(t *testing.T) {
 	modified := time.Date(2026, time.October, 1, 0, 0, 0, 0, time.UTC)
 	frontend := fstest.MapFS{

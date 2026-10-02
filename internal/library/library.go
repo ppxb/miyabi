@@ -19,6 +19,7 @@ import (
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scan"
+	"github.com/ppxb/miyabi/internal/localsource"
 	"github.com/ppxb/miyabi/internal/syncx"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -63,18 +64,25 @@ type Page struct {
 	HasMore bool                  `json:"has_more"`
 }
 
+// LocalSources resolves the configured local media directories.
+type LocalSources interface {
+	Find(ctx context.Context, id string) (localsource.Source, bool, error)
+}
+
 type Service struct {
 	database     *ent.Client
 	drive        *drive.Drive
 	tasks        *tasks.Service
 	scanner      *scan.Scanner
 	localScanner *scan.LocalScanner
+	localSources LocalSources
 	exportMgr    *export.Manager
 	scanLock     syncx.ContextLock
 }
 
 type Options struct {
 	ExportManager *export.Manager
+	LocalSources  LocalSources
 	// Pacing defaults to scan.DefaultPacing; tests can provide a no-op.
 	Pacing func(context.Context) error
 }
@@ -86,6 +94,7 @@ func New(database *ent.Client, d *drive.Drive, tasks *tasks.Service, images *med
 		tasks:        tasks,
 		scanner:      scan.New(d, database, images, tasks, options.ExportManager, options.Pacing),
 		localScanner: scan.NewLocalScanner(database, images),
+		localSources: options.LocalSources,
 		exportMgr:    options.ExportManager,
 	}
 	if d != nil && tasks != nil {

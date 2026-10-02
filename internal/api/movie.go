@@ -15,6 +15,7 @@ type LibraryManager interface {
 	Movie(context.Context, int) (lib.MovieDetail, error)
 	Preview(context.Context, int, int) (domain.ImageCandidate, error)
 	StartScan(context.Context) (domain.TaskInfo, error)
+	StartLocalScan(context.Context, string) (domain.TaskInfo, error)
 	StartRebuild(context.Context) (domain.TaskInfo, error)
 	RescrapeMovie(context.Context, int, string) (domain.TaskInfo, error)
 }
@@ -129,6 +130,19 @@ func libraryScanHandler(library LibraryManager, emby EmbyManager) gin.HandlerFun
 			}
 		}
 		task, err := library.StartScan(c.Request.Context())
+		accepted(c, task, err)
+	}
+}
+
+func libraryLocalScanHandler(library LibraryManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		input, ok := bindJSON[struct {
+			SourceID string `json:"source_id" binding:"required,max=64"`
+		}](c)
+		if !ok {
+			return
+		}
+		task, err := library.StartLocalScan(c.Request.Context(), input.SourceID)
 		accepted(c, task, err)
 	}
 }

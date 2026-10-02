@@ -53,6 +53,27 @@ func TestAppLifecycle(t *testing.T) {
 	}
 }
 
+func TestLocalURLUsesLoopbackForWildcardListeners(t *testing.T) {
+	for _, test := range []struct{ listen, want string }{
+		{":8080", "http://127.0.0.1:8080"},
+		{"0.0.0.0:8080", "http://127.0.0.1:8080"},
+		{"127.0.0.1:9090", "http://127.0.0.1:9090"},
+		{"[::]:8080", "http://[::1]:8080"},
+		{"[::1]:8080", "http://[::1]:8080"},
+		{"192.168.1.5:8080", "http://192.168.1.5:8080"},
+	} {
+		t.Run(test.listen, func(t *testing.T) {
+			got, err := app.LocalURL(test.listen)
+			if err != nil || got != test.want {
+				t.Fatalf("LocalURL(%q) = %q, %v; want %q", test.listen, got, err, test.want)
+			}
+		})
+	}
+	if _, err := app.LocalURL("invalid-listen-address"); err == nil {
+		t.Fatal("expected an error for an invalid listen address")
+	}
+}
+
 func TestCheckHealth(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

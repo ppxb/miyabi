@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import { AppearanceSection } from '@/features/settings/appearance-section'
 import { DataSection } from '@/features/settings/data-section'
 import { EmbySection } from '@/features/settings/emby-section'
+import { LocalSourceSection } from '@/features/settings/local-sources-section'
 import { NetworkSection } from '@/features/settings/network-section'
 import { PanSection } from '@/features/settings/pan-section'
 import { PrivacySection } from '@/features/settings/privacy-section'
@@ -34,6 +35,8 @@ function SettingsPage() {
           <ScrapingSection />
           <Separator />
           <EmbySection />
+          <Separator />
+          <LocalSourceSection />
           <Separator />
           <PanSection />
           <Separator />

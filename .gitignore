@@ -1,6 +1,9 @@
 /miyabi
 /miyabi.exe
+/miyabi-console.exe
+/miyabi.env
 /bin/
+/dist/
 *.test
 *.out
 coverage.*
