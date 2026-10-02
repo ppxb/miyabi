@@ -1,10 +1,11 @@
 import { Link } from '@tanstack/react-router'
 import { ListChecksIcon } from 'lucide-react'
 
-import { isScanTask, useTasks } from '@/api/tasks'
+import { isScanTask, isTaskActive, useTasks } from '@/api/tasks'
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsSection } from '@/features/settings/shared'
+import { LibraryPauseButton } from '@/features/tasks/library-pause-button'
 import { ScanProgressView } from '@/features/tasks/scan-progress'
 import { useTaskConnection } from '@/features/tasks/task-events'
 
@@ -12,13 +13,20 @@ export function TasksSection() {
   const tasks = useTasks()
   const connection = useTaskConnection()
   const scans = tasks.data?.filter(isScanTask)
+  const activeScan = scans?.find(isTaskActive)
 
   return (
     <SettingsSection icon={<ListChecksIcon className="size-4" />} title="任务">
-      <SettingRow title="媒体库进度" description="查看扫描与刮削进度，离开页面后任务继续在后台执行">
-        <Button asChild variant="outline" size="sm">
-          <Link to="/">进入媒体库</Link>
-        </Button>
+      <SettingRow
+        title="媒体库进度"
+        description="查看同步与重建进度，暂停会作用于所有扫描与刮削任务并保留进度"
+      >
+        <div className="flex items-center gap-2">
+          {activeScan ? <LibraryPauseButton paused={!!activeScan.paused} /> : null}
+          <Button asChild variant="outline" size="sm">
+            <Link to="/">进入媒体库</Link>
+          </Button>
+        </div>
       </SettingRow>
       {tasks.isPending ? <p className="text-xs text-muted-foreground">正在读取任务…</p> : null}
       {tasks.isError ? (

@@ -93,7 +93,7 @@ test('metadata and artwork share batch progress in scan and offline notification
       const value = Number(html.match(/aria-valuenow="([^"]+)"/)?.[1])
       assert.ok(Number.isFinite(value) && value >= previous, `${stage}: ${previous} -> ${value}`)
       assert.equal(value, isOffline ? 60 + completed * 10 : 50 + completed * 12.5)
-      assert.ok(html.includes(`${completed} / 4 部`))
+      assert.ok(!html.includes(`${completed} / 4 部`))
       previous = value
     }
     scan.status = 'queued'
@@ -105,7 +105,7 @@ test('metadata and artwork share batch progress in scan and offline notification
     assert.ok(isValidElement(options?.description))
     const html = renderToStaticMarkup(options.description)
     assert.ok(html.includes('等待自动重试'))
-    assert.ok(html.includes('1 部等待重试'))
+    assert.ok(!html.includes('1 部等待重试'))
     assert.equal(Number(html.match(/aria-valuenow="([^"]+)"/)?.[1]), previous)
     scan.paused = true
     assert.equal(scanStatus(scan), '已暂停')

@@ -6,12 +6,12 @@ export function LibraryPauseButton({ paused }: { paused: boolean }) {
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant="outline"
       size="sm"
       disabled={control.isPending}
       onClick={() => control.mutate(!paused)}
     >
-      {control.isPending ? '提交中…' : paused ? '继续' : '暂停'}
+      {control.isPending ? '提交中…' : paused ? '继续全部' : '暂停全部'}
     </Button>
   )
 }

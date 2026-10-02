@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import type { OfflineSubmission } from '@/api/offline'
 import { isTaskActive, type BatchTask, type ScanTask } from '@/api/tasks'
 import { isOfflineTaskActive } from '@/api/offline'
-import { scanCount, scanStage, scanStatus } from './scan-status'
+import { scanStage, scanStatus } from './scan-status'
 import { TaskProgress } from './task-progress'
 import { TaskToastActions } from './task-toast-actions'
 import { batchToastID, offlineToastID, scanToastID } from './task-notification-diff'
@@ -18,8 +18,7 @@ function taskToastOptions(
   id: string,
   active: boolean,
   options: TaskToastOptions = {},
-  retryTaskID?: number,
-  libraryPaused?: boolean
+  retryTaskID?: number
 ) {
   return {
     id,
@@ -28,7 +27,7 @@ function taskToastOptions(
     closeButton: false,
     icon: undefined,
     onDismiss: options.onDismiss,
-    action: <TaskToastActions id={id} retryTaskID={retryTaskID} libraryPaused={libraryPaused} />
+    action: <TaskToastActions id={id} retryTaskID={retryTaskID} />
   }
 }
 
@@ -43,8 +42,7 @@ export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
     scanToastID(task.id),
     active,
     options,
-    task.can_retry ? task.id : undefined,
-    active ? !!task.paused : undefined
+    task.can_retry ? task.id : undefined
   )
   if (active) {
     // Sonner's loading type hides the close button; long tasks remain dismissible.
@@ -59,24 +57,20 @@ export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
           current={scanStage(task)}
           label={scanStatus(task)}
           progress={task.scan.metadata_total > 0 ? task.progress : undefined}
-          count={task.scan.metadata_total > 0 ? scanCount(task) : undefined}
         />
       )
     })
   } else if (task.status === 'failed') {
-    toast.error(
-      task.scan.metadata_failed ? `媒体库${action}结束，部分影片失败` : `媒体库${action}失败`,
-      {
-        ...props,
-        description: task.scan.metadata_failed
-          ? `${scanCount(task)}。${task.error ?? ''}`
-          : task.error
-      }
-    )
+    toast.error(task.scan.metadata_failed ? `媒体库${action}结束` : `媒体库${action}失败`, {
+      ...props,
+      description: task.scan.metadata_failed
+        ? `${task.scan.metadata_failed} 部影片失败`
+        : task.error
+    })
   } else {
     toast.success(`媒体库${action}完成`, {
       ...props,
-      description: `识别到 ${task.scan.movies} 部影片${task.scan.metadata_total > 0 ? ` · 元数据 ${task.scan.metadata_completed} 部` : ''}`
+      description: undefined
     })
   }
 }
@@ -91,8 +85,7 @@ export function notifyOfflineTask(
     id,
     active,
     options,
-    options.scan?.can_retry ? options.scan.id : undefined,
-    options.scan && isTaskActive(options.scan) ? !!options.scan.paused : undefined
+    options.scan?.can_retry ? options.scan.id : undefined
   )
   if (active) {
     const scan = options.scan
@@ -123,11 +116,6 @@ export function notifyOfflineTask(
               : scan && scan.scan.metadata_total > 0
                 ? scan.progress
                 : undefined
-          }
-          count={
-            task.phase !== 'downloading' && scan && scan.scan.metadata_total > 0
-              ? scanCount(scan)
-              : undefined
           }
         />
       )

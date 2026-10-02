@@ -7,7 +7,6 @@ import { Progress } from '@/components/ui/progress'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTaskConnection } from '@/features/tasks/task-events'
 import { scanCount, scanStatus } from './scan-status'
-import { LibraryPauseButton } from './library-pause-button'
 
 export function ScanProgressView({ task }: { task: ScanTask }) {
   const connection = useTaskConnection()
@@ -48,7 +47,6 @@ export function ScanProgressView({ task }: { task: ScanTask }) {
         <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">
           {count}
         </span>
-        {active ? <LibraryPauseButton paused={!!task.paused} /> : null}
       </div>
       {task.error ? (
         <OverflowTooltip content={task.error}>
