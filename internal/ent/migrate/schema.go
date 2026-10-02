@@ -158,6 +158,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{MoviesColumns[5]},
 			},
+			{
+				Name:    "movie_created_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{MoviesColumns[1], MoviesColumns[0]},
+			},
 		},
 	}
 	// OfflineDownloadsColumns holds the columns for the "offline_downloads" table.

@@ -53,6 +53,10 @@ type dirGroup struct {
 
 // Scan walks rootDir and imports any found media (.strm, .mp4, etc.) into the SQLite database.
 func (s *LocalScanner) Scan(ctx context.Context, rootDir string) (*LocalScanResult, error) {
+	rootDir, err := filepath.Abs(rootDir)
+	if err != nil {
+		return nil, fmt.Errorf("resolve local directory: %w", err)
+	}
 	stat, err := os.Stat(rootDir)
 	if err != nil {
 		return nil, fmt.Errorf("stat local directory %s: %w", rootDir, err)

@@ -80,7 +80,10 @@ func (Movie) Fields() []ent.Field {
 }
 
 func (Movie) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("canonical_code")}
+	return []ent.Index{
+		index.Fields("canonical_code"),
+		index.Fields("created_at", "id"),
+	}
 }
 
 // Keep the lookup key in the same write as code, including bulk creates and

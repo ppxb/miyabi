@@ -2,25 +2,24 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、142、148 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 
 ## 复核结果
 
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
-| 确认仍存在，待处理 | 18 | 有明确代码依据的边界、状态反馈或行为问题 |
+| 确认仍存在，待处理 | 17 | 有明确代码依据的边界、状态反馈或行为问题 |
 | 可选优化与整理 | 57 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
 | 按现有约定暂缓 | 7 | 不恢复用户已取消的 UI、ARIA 或旧数据兼容要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 16 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 17 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
 1. **235、167**：STRM token 进入请求日志，以及图片代理缺少地址/体积约束。
 2. **161、237**：登录限流的并发和存储边界、可信代理配置及 HTTPS 转发头。
-3. **149**：媒体库排序索引与本地文件身份边界。
-4. **187、189、192、193、194、206、222、224**：已确认的界面状态和反馈问题；具体视觉效果由用户验收。
+3. **187、189、192、193、194、206、222、224**：已确认的界面状态和反馈问题；具体视觉效果由用户验收。
 
 ### 当前约定
 
@@ -40,12 +39,11 @@
 - 第 138 项修复后通过：`go test ./internal/pan ./internal/drive ./internal/library/... ./internal/app`、同范围 `go vet`。新增离线回归覆盖仅 downurl 使用 API 限流、CDN 请求 UA/凭据隔离、文件大小边界与响应体关闭、瞬时故障重试、Retry-After、请求头/正文超时及退避期间取消。未测量真实网盘扫描提速比例。
 - 第 142 项修复后通过：`go test ./internal/pan ./internal/drive ./internal/library/... ./internal/app ./internal/api ./internal/monitor`、同范围 `go vet`。新增回归覆盖并发账号校验的成功/失败共享、TTL 到期重查、等待者取消、共享请求超时与关闭流程、明确拒绝后的凭据持久化清除与重启、临时故障后重试、正在进行的扫码登录及新旧凭据交错；保留原有刷新合并、来源切换与登录回归。
 - 第 148 项修复后通过：`go test ./internal/monitor ./internal/tasks ./internal/app ./internal/api`、同范围 `go vet`。新增虚拟时间回归覆盖超过单页的影片/演员到期积压、相同到期时间的翻页、保存失败后继续处理、跨页节流、未到期/暂停/过期订阅排除及取消后续查；验证无磁力等待状态通知、批量入库的订阅/配置读取次数和原有节流。未进行真实大量订阅或上游性能测试。
+- 第 149 项修复后通过：`go generate ./internal/ent`、`go test ./internal/database ./internal/library/... ./internal/app ./internal/api`、同测试范围 `go vet`。捕获实际列表 SQL 并用 EXPLAIN QUERY PLAN 验证排序索引生效且没有临时排序；覆盖本地/挂载来源筛选、相同创建时间的分页顺序和多文件去重。本地扫描回归覆盖跨根目录同名文件、等价相对/绝对根路径、文件信息刷新、手动番号保护及 STRM 网盘身份保留。未新增真实大库性能结论。
 - **独立工具链问题仍存在**：本地执行 `web/node_modules/.bin/shadcn --version` 仍报 `ERR_PACKAGE_PATH_NOT_EXPORTED`：MCP SDK 依赖访问 zod 的 `./v3` 导出失败。未安装或调整依赖；这不是应用构建失败，也不意味着需要恢复旧数据兼容。
 
 ## 确认仍存在，待处理
 
-- [ ] **149.** 媒体库仍按 created_at DESC/id DESC 排序，Movie schema 没有对应排序索引。另有身份风险：本地 fileID 仅由相对路径哈希生成，不包含扫描根目录；切换根目录但相对路径相同时会命中旧记录，已有文件分支也未刷新名称、大小等字段。跨根目录影响需专门回归，不能沿用旧 local.go 行号。
-  - 定位：`internal/library/library.go`；`internal/ent/schema/movie.go`；`internal/library/scan/local_ingest.go:83`。
 - [ ] **161.** 登录限流 records 没有全局淘汰或容量限制，陌生 IP 可持续留下条目；check 与 recordFailure 分离，多个同时通过检查的请求会突破单批失败次数阈值。应验证并发预占/结算与过期清理，错误 cause 中写死 24 小时的文案也应统一。
   - 定位：`internal/api/rate_limiter.go:36`；`internal/api/auth.go`。
 - [ ] **166.** installFrontend 仍将 fs.Stat 成功的目录交给 FileServer，可列出打包静态目录；带哈希资源未设长缓存头。应明确目录访问策略和静态缓存策略，不能将其夸大为任意服务端目录泄漏。
@@ -279,6 +277,8 @@
   - 定位：`internal/drive/account.go`；`internal/drive/token.go`；`internal/drive/account_test.go`；`internal/drive/token_test.go`；`internal/drive/login_test.go`。
 - [x] **148.** Check 现在按本轮开始时间筛选到期订阅，以 next_check_at/id 游标连续翻页；10 部影片和 5 个演员是交替处理的页大小，不再是整轮上限，跨页保留 2 秒请求间隔。单条查询或保存失败仍继续后续条目，游标避免失败记录在本轮反复命中；取消后未处理条目仍保持到期，供后续检查。5 分钟周期和新增订阅唤醒机制保留。无磁力且继续等待时也发送订阅更新通知。BatchHandler 每项只读取一次订阅，每批复用一次配置与磁力选择器，保留随机节流、失败统计和检查点恢复。
   - 定位：`internal/monitor/check.go`；`internal/monitor/batch.go`；`internal/monitor/check_backlog_test.go`；`internal/monitor/batch_test.go`；`internal/app/app.go`。
+- [x] **149.** Movie schema 已增加 created_at/id 组合索引，实际媒体库列表查询可利用该索引完成倒序分页。本地扫描先规范化绝对根路径，再以媒体绝对路径生成本地 fileID，区分不同根目录的同名文件；STRM 中识别出的网盘 fileID 继续保留。已有本地文件的名称、大小和相对路径仅在变化时更新，即使影片被手动纠正也刷新文件信息，同时保护手动资料及网盘文件属性。未添加旧本地 fileID 迁移或兼容分支。
+  - 定位：`internal/ent/schema/movie.go`；`internal/ent/migrate/schema.go`；`internal/library/scan/local.go`；`internal/library/scan/local_ingest.go`；`internal/library/listing_index_test.go`；`internal/library/scan/local_identity_test.go`。
 - [x] **212.** movie-hover-details 已删除，详情统计栏与悬浮卡片之间的重复不存在。
   - 定位：`web/src/features/movie-detail/hero.tsx`。
 - [x] **239.** 旧 115 字幕、旧封面 payload 和历史迁移测试已清理；dir_cache、snapshot、检查点、来源隔离与事务测试仍验证当前功能，不按旧报告要求删除。剩余跨包测试归属统一放入 219/240。

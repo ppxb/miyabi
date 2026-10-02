@@ -80,7 +80,9 @@ func (s *LocalScanner) prepareMedia(ctx context.Context, rootDir string, media *
 	}
 	media.rel = rel
 	if media.fileID == "" {
-		hash := sha256.Sum256([]byte(rel))
+		// Scan normalizes the root first, so the absolute path distinguishes
+		// identical relative names in different libraries without aliasing rescans.
+		hash := sha256.Sum256([]byte(media.path))
 		media.fileID = "local-" + hex.EncodeToString(hash[:16])
 	}
 	return ctx.Err()
@@ -134,8 +136,17 @@ func (s *LocalScanner) ingestBatch(ctx context.Context, rootDir string, batch []
 			if err := ctx.Err(); err != nil {
 				return err
 			}
+			existing := files[media.fileID]
+			if existing != nil && existing.AccountID == domain.LocalAccountID &&
+				(existing.Name != media.name || existing.Size != media.size || existing.Path != media.rel) {
+				updated, err := tx.File.UpdateOneID(existing.ID).SetName(media.name).SetSize(media.size).SetPath(media.rel).Save(ctx)
+				if err != nil {
+					return err
+				}
+				existing, files[media.fileID] = updated, updated
+			}
 			// A stale exported NFO must not undo a manual correction or reassign its files.
-			if existing := files[media.fileID]; existing != nil && existing.MovieID != nil && manualMovies[*existing.MovieID] {
+			if existing != nil && existing.MovieID != nil && manualMovies[*existing.MovieID] {
 				continue
 			}
 			record := matcher.find(media.code)
@@ -174,7 +185,6 @@ func (s *LocalScanner) ingestBatch(ctx context.Context, rootDir string, batch []
 					return err
 				}
 			}
-			existing := files[media.fileID]
 			if existing == nil {
 				created, err := tx.File.Create().SetFileID(media.fileID).SetName(media.name).SetSize(media.size).
 					SetAccountID(domain.LocalAccountID).SetRootID(domain.LocalAccountID).
