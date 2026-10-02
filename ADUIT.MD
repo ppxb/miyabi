@@ -2,24 +2,24 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166、168、173、184、189、192、193、194、206 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166、168、173、184、189、192、193、194、206、222 项修复，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 
 ## 复核结果
 
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
-| 确认仍存在，待处理 | 5 | 有明确代码依据的边界、状态反馈或行为问题 |
+| 确认仍存在，待处理 | 4 | 有明确代码依据的边界、状态反馈或行为问题 |
 | 可选优化与整理 | 57 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
 | 按现有约定暂缓 | 9 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 27 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 28 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
 1. **235**：STRM token 进入请求日志。
 2. **237**：可信代理配置及 HTTPS 转发头。
-3. **222、224**：已确认的界面状态和反馈问题；具体视觉效果由用户验收。
+3. **224**：挂载路径的只读展示；具体视觉效果由用户验收。
 
 ### 当前约定
 
@@ -32,6 +32,7 @@
 
 ### 本轮验证与限制
 
+- 第 222 项修复后通过：前端 `npm run typecheck`、`npm run lint` 及修改文件的 oxfmt 格式检查。仅拆分按钮禁用条件，未新增测试或执行浏览器测试；未实际执行缓存清理。
 - 第 206 项修复后通过：前端 `npm run test -- tests/query-errors.test.ts tests/client.test.ts tests/emby-settings.test.ts`（3 个文件 / 23 项既有回归）、`npm run typecheck`、`npm run lint` 及三个修改文件的 oxfmt 格式检查。现有用例覆盖错误解析、全局 toast 触发范围和 Emby 保存状态；本次仅让操作错误复用现有文案转换，未新增测试或执行浏览器测试。
 - 第 194 项修复后通过：前端 `npm run typecheck`、`npm run lint` 及修改文件的 oxfmt 格式检查。仅调整说明文字的 CSS 换行规则，未新增测试或执行浏览器测试；窄屏中英文与长路径的实际换行效果由用户确认。
 - 第 193 项修复后通过：前端 `npm run test -- tests/category-filters.test.ts tests/error-state.test.tsx`（2 个文件 / 6 项既有回归）、`npm run typecheck`、`npm run lint` 及修改文件的 oxfmt 格式检查。现有用例覆盖分类参数和错误组件重试禁用状态；未新增测试或执行浏览器测试。
@@ -57,8 +58,6 @@
 
 ## 确认仍存在，待处理
 
-- [ ] **222.** 清理缓存按钮的 busy 仍包含 info.isFetching，后台刷新统计会让按钮禁用；统计刷新按钮仍放在数据目录行。可分开操作中与后台刷新状态，防止交互无故不可用。
-  - 定位：`web/src/features/settings/data-section.tsx:28`。
 - [ ] **224.** 当前挂载路径仍由 disabled Input 展示，不能聚焦且继承禁用淡化样式。改为只读展示可支持正常聚焦/复制；不声称所有浏览器都绝对无法选取禁用文本。
   - 定位：`web/src/features/settings/pan-directory-row.tsx:33`。
 - [ ] **234.** 仍有与 ARIA 无关的结构整理项：FloatingNav 的 ul 直接渲染 Link 而非 li；页码用 href="#"，前后页用 button。PreviewViewer 仍无 DialogTitle，开发态 Radix 提示需浏览器确认；补无障碍标题/自定义描述部分按现有范围暂缓。旧 hover span 问题已删除。
@@ -294,5 +293,7 @@
   - 定位：`web/src/features/settings/network-section.tsx`；`web/src/features/settings/emby-section.tsx`；`web/src/features/settings/subscription-section.tsx`；`web/src/api/client.ts`；`web/src/api/query-client.ts`。
 - [x] **212.** movie-hover-details 已删除，详情统计栏与悬浮卡片之间的重复不存在。
   - 定位：`web/src/features/movie-detail/hero.tsx`。
+- [x] **222.** 刷新统计和清理缓存已分别控制禁用状态：刷新按钮在统计请求或清理期间禁用；清理按钮仅在清理中、读取失败、无统计或无可清理缓存时禁用，已有有效统计的后台刷新不再阻止清理入口。确认弹窗、后端引用检查和清理成功后取消旧统计请求的逻辑保留。按用户认可的范围，刷新按钮继续位于数据目录行，不将位置选择视为缺陷。
+  - 定位：`web/src/features/settings/data-section.tsx`；`web/src/api/data.ts`。
 - [x] **239.** 旧 115 字幕、旧封面 payload 和历史迁移测试已清理；dir_cache、snapshot、检查点、来源隔离与事务测试仍验证当前功能，不按旧报告要求删除。剩余跨包测试归属统一放入 219/240。
   - 定位：`internal/library/scrape/dir_cache_test.go`；`internal/library/scrape/snapshot_test.go`；`internal/library/scrape/cover_checkpoint_test.go`；`internal/database/sqlite_test.go`。

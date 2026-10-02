@@ -25,7 +25,6 @@ export function DataSection() {
   const clearCache = useClearCache()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const cache = info.data?.cache
-  const busy = info.isFetching || clearCache.isPending
 
   function openConfirmation() {
     clearCache.reset()
@@ -58,7 +57,7 @@ export function DataSection() {
           variant="outline"
           size="icon"
           title="刷新统计"
-          disabled={busy}
+          disabled={info.isFetching || clearCache.isPending}
           onClick={() => void info.refetch()}
         >
           <RefreshCwIcon className={cn('size-4', info.isFetching && 'animate-spin')} />
@@ -85,7 +84,9 @@ export function DataSection() {
           type="button"
           variant="destructive"
           size="sm"
-          disabled={busy || info.isError || !cache || cache.unused_entry_count === 0}
+          disabled={
+            clearCache.isPending || info.isError || !cache || cache.unused_entry_count === 0
+          }
           onClick={openConfirmation}
         >
           {clearCache.isPending ? <LoaderCircleIcon className="animate-spin" /> : <Trash2Icon />}
