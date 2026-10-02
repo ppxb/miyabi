@@ -1,4 +1,4 @@
-import { LoaderCircleIcon, RefreshCwIcon, RotateCcwIcon, ScanLineIcon } from 'lucide-react'
+import { LoaderCircleIcon, RefreshCwIcon, RotateCcwIcon } from 'lucide-react'
 
 import { describeApiError } from '@/api/client'
 import { useStartLibraryScan } from '@/api/library'
@@ -12,7 +12,6 @@ export function LibraryScanButton({
   scanning,
   rebuilding,
   connected,
-  failed,
   onStarted
 }: {
   loading: boolean
@@ -20,7 +19,6 @@ export function LibraryScanButton({
   scanning: boolean
   rebuilding: boolean
   connected: boolean
-  failed: boolean
   onStarted: () => void
 }) {
   const startScan = useStartLibraryScan()
@@ -28,22 +26,14 @@ export function LibraryScanButton({
   if (loading) return <Skeleton className="h-9 w-20 rounded-4xl sm:w-60" />
   if (!available) return null
 
-  const processing = scanning && connected
-  const scanLabel = scanning
-    ? processing
-      ? '正在处理'
-      : '等待同步'
-    : failed
-      ? '同步媒体库'
-      : '扫描媒体库'
-
   return (
     <div className="flex items-center gap-2">
       {[false, true].map(rebuild => {
-        const label = rebuild ? (scanning && rebuilding ? '正在重建' : '重建媒体库') : scanLabel
+        const active = scanning && rebuilding === rebuild
+        const activityLabel = connected ? (rebuild ? '正在重建' : '正在同步') : '连接中'
+        const label = active ? activityLabel : rebuild ? '重建媒体库' : '同步媒体库'
         const busy =
-          (processing && rebuilding === rebuild) ||
-          (startScan.isPending && startScan.variables === rebuild)
+          (active && connected) || (startScan.isPending && startScan.variables === rebuild)
         return (
           <Button
             key={String(rebuild)}
@@ -59,7 +49,7 @@ export function LibraryScanButton({
                 onError: error => {
                   notifyTaskError(
                     'scan:submit-error',
-                    rebuild ? '无法创建重建任务' : '无法创建扫描任务',
+                    rebuild ? '无法创建重建任务' : '无法创建同步任务',
                     describeApiError(error)
                   )
                 }
@@ -70,10 +60,8 @@ export function LibraryScanButton({
               <LoaderCircleIcon className="size-4 animate-spin" />
             ) : rebuild ? (
               <RotateCcwIcon className="size-4" />
-            ) : scanning ? (
-              <RefreshCwIcon className="size-4" />
             ) : (
-              <ScanLineIcon className="size-4" />
+              <RefreshCwIcon className="size-4" />
             )}
             <span className="hidden sm:inline">{label}</span>
           </Button>

@@ -27,7 +27,7 @@ export function TasksSection() {
         </InlineError>
       ) : null}
       {scans?.length === 0 ? (
-        <p className="text-xs text-muted-foreground">还没有扫描任务。</p>
+        <p className="text-xs text-muted-foreground">还没有媒体库任务。</p>
       ) : null}
       <div className="divide-y divide-border">
         {scans?.slice(0, 3).map(task => (

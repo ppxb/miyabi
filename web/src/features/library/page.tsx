@@ -38,7 +38,6 @@ export function LibraryPage({
           scanning={scanning}
           rebuilding={!!latest?.rebuild}
           connected={connection.status === 'connected'}
-          failed={latest?.status === 'failed'}
           onStarted={() => onPageChange(1)}
         />
         {library.isSuccess && !source ? (
@@ -79,9 +78,11 @@ export function LibraryPage({
               className="min-h-0 flex-1 py-12"
               title={
                 !source
-                  ? '登录 115 并挂载媒体目录后，将自动扫描入库'
+                  ? '登录 115 并挂载媒体目录后，将自动同步入库'
                   : scanning
-                    ? '正在扫描，识别到的影片会陆续显示'
+                    ? connection.status === 'connected'
+                      ? `${latest?.rebuild ? '正在重建' : '正在同步'}，识别到的影片会陆续显示`
+                      : '连接中，等待更新媒体库进度'
                     : '未识别到影片'
               }
             />
