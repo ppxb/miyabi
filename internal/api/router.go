@@ -13,7 +13,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/domain"
-	sloggin "github.com/samber/slog-gin"
 )
 
 type HealthChecker interface {
@@ -45,6 +44,9 @@ type Dependencies struct {
 func NewRouter(deps Dependencies) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
+	if deps.Logger == nil {
+		deps.Logger = slog.Default()
+	}
 
 	if len(deps.TrustedProxies) > 0 {
 		_ = router.SetTrustedProxies(deps.TrustedProxies)
@@ -53,7 +55,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	}
 
 	router.Use(
-		sloggin.NewWithFilters(deps.Logger, sloggin.IgnoreStatus(statusClientClosedRequest)),
+		requestLoggingMiddleware(deps.Logger),
 		recoveryMiddleware(deps.Logger),
 		errorMiddleware(deps.Logger),
 		securityHeadersMiddleware(),

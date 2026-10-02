@@ -2,23 +2,22 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166、168、173、184、189、192、193、194、206、222、224 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 
 ## 复核结果
 
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
-| 确认仍存在，待处理 | 3 | 有明确代码依据的边界、状态反馈或行为问题 |
+| 确认仍存在，待处理 | 1 | 有明确代码依据的边界、状态反馈或行为问题 |
 | 可选优化与整理 | 57 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
-| 按现有约定暂缓 | 9 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
+| 按现有约定暂缓 | 10 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 29 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 30 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
-1. **235**：STRM token 进入请求日志。
-2. **237**：可信代理配置及 HTTPS 转发头。
+1. **237**：可信代理配置及 HTTPS 转发头。
 
 ### 当前约定
 
@@ -32,6 +31,8 @@
 
 ### 本轮验证与限制
 
+- 第 235 项修复后通过：`go test ./internal/api ./internal/app ./internal/strm ./internal/export`、同范围 `go vet`。新增离线 HTTP 回归覆盖 GET/HEAD 播放鉴权、签名重定向及图片源 URL 原样传递、查询参数/Referer 不落访问日志、错误消息/cause/已写响应错误的地址脱敏、编码与嵌套 URL、panic 堆栈保留及 Gin 原始输出关闭、断链处理和 499 日志过滤。只使用测试凭据，未读取生产令牌、清理历史日志或修改 STRM 文件。
+- 第 235 项局部微基准：`go test ./internal/api -run '^$' -bench '^BenchmarkRequestLogFields$' -benchmem -benchtime=200ms`。Windows/amd64、i5-13490F，128 字节/64 KiB 查询参数的过滤后记录分别约 653/654 ns，每条 160 B、1 次分配；未过滤对照约 734 ns/61.4 μs。该基准仅测合成访问日志字段处理与 JSON 编码，输出到 io.Discard，不含中间件其余工作、错误脱敏、网络或实际日志写入，不据此声称全链路提速或零开销。
 - 第 224 项按用户要求移除路径展示后，通过前端 `npm run typecheck`、`npm run lint` 及修改文件的 oxfmt 格式检查。仅调整设置行展示，未新增测试或执行浏览器测试，未操作实际挂载目录。
 - 第 222 项修复后通过：前端 `npm run typecheck`、`npm run lint` 及修改文件的 oxfmt 格式检查。仅拆分按钮禁用条件，未新增测试或执行浏览器测试；未实际执行缓存清理。
 - 第 206 项修复后通过：前端 `npm run test -- tests/query-errors.test.ts tests/client.test.ts tests/emby-settings.test.ts`（3 个文件 / 23 项既有回归）、`npm run typecheck`、`npm run lint` 及三个修改文件的 oxfmt 格式检查。现有用例覆盖错误解析、全局 toast 触发范围和 Emby 保存状态；本次仅让操作错误复用现有文案转换，未新增测试或执行浏览器测试。
@@ -43,8 +44,8 @@
 
 - 通过：`go test ./internal/api ./internal/app ./internal/database ./internal/tasks ./internal/library/... ./internal/emby ./internal/netx ./internal/monitor`。
 - 通过：前端 `npm run test`，25 个文件 / 141 项测试。相关用例验证任务共享快照、索引、事务、来源隔离、重启恢复、Emby 通知和详情交互逻辑。
-- 额外核对依赖实现：slog-gin v1.21.1 的 middleware.go 记录 RawQuery；Gin v1.12.0 的代理解析会在错误时保留已解析前缀。没有读取或输出生产令牌。
-- 没有浏览器测试、真实上游/Emby 联调、race 检测或新的性能基准。旧报告中的毫秒数、倍数、对比度和固定积压耗时不再作为本轮结论。
+- 额外核对依赖实现：slog-gin v1.21.1 会构造 RawQuery/Referer 字段，第 235 项现已在日志输出前按字段省略；Gin v1.12.0 的代理解析会在错误时保留已解析前缀。没有读取或输出生产令牌。
+- 没有浏览器测试、真实上游/Emby 联调、race 检测或全链路性能基准；第 235 项仅进行了上述局部日志微基准。旧报告中的毫秒数、倍数、对比度和固定积压耗时不再作为本轮结论。
 - 第 135 项修复后通过：`go test ./internal/library/... ./internal/app`、`go vet ./internal/library/... ./internal/app`；新增覆盖跨目录过期回收（命中、未命中及请求失败）、目录数/文件总数上限、淘汰后重新读取、超大目录完整读取且不驻留、账号隔离和返回列表修改隔离。保留现有视频位置核验与发布回放回归。限额约束缓存记录数，不代表内存字节硬上限或真实大库性能结论。
 - 第 138 项修复后通过：`go test ./internal/pan ./internal/drive ./internal/library/... ./internal/app`、同范围 `go vet`。新增离线回归覆盖仅 downurl 使用 API 限流、CDN 请求 UA/凭据隔离、文件大小边界与响应体关闭、瞬时故障重试、Retry-After、请求头/正文超时及退避期间取消。未测量真实网盘扫描提速比例。
 - 第 142 项修复后通过：`go test ./internal/pan ./internal/drive ./internal/library/... ./internal/app ./internal/api ./internal/monitor`、同范围 `go vet`。新增回归覆盖并发账号校验的成功/失败共享、TTL 到期重查、等待者取消、共享请求超时与关闭流程、明确拒绝后的凭据持久化清除与重启、临时故障后重试、正在进行的扫码登录及新旧凭据交错；保留原有刷新合并、来源切换与登录回归。
@@ -59,10 +60,6 @@
 
 ## 确认仍存在，待处理
 
-- [ ] **234.** 仍有与 ARIA 无关的结构整理项：FloatingNav 的 ul 直接渲染 Link 而非 li；页码用 href="#"，前后页用 button。PreviewViewer 仍无 DialogTitle，开发态 Radix 提示需浏览器确认；补无障碍标题/自定义描述部分按现有范围暂缓。旧 hover span 问题已删除。
-  - 定位：`web/src/components/floating-nav.tsx:25`；`web/src/components/list-pagination.tsx`；`web/src/features/movie-detail/preview-viewer.tsx`。
-- [ ] **235.** 【优先】默认 slog-gin v1.21.1 直接将 Request.URL.RawQuery 写入 request.query，NewRouter 未加脱敏；STRM token 仍在 query 中，因此会写入访问日志。已核对依赖 middleware.go 的 query 构造，非仅推测。还应覆盖嵌套 image URL、Referer 与错误 cause；Emby API 调用现用请求头，不再列作 URL token 问题。
-  - 定位：`internal/api/router.go:53`；`internal/api/strm.go`；`internal/api/error.go`。
 - [ ] **237.** setAuthCookie 仍直接相信 X-Forwarded-Proto，未关联可信代理；config.Load 未校验 TrustedProxies，NewRouter 忽略 SetTrustedProxies 错误。已核对 Gin v1.12.0：解析失败返回已解析的 CIDR 前缀并写入，可能静默使用部分列表。应启动时拒绝无效配置，并按可信代理决定 HTTPS 转发头。
   - 定位：`internal/api/auth.go:139`；`internal/api/router.go`；`internal/config/config.go`。
 
@@ -210,6 +207,8 @@
   - 定位：`web/src/components/media-image.tsx`；`web/src/features/movie-detail/previews.tsx`。
 - **233.** SettingRow 标题仍是 div，部分输入只提供 placeholder，缺少程序化名称；按用户移除自定义无障碍描述的要求，本轮只记录现状，不建议自动补 label/ARIA。
   - 定位：`web/src/features/settings/shared.tsx`；`web/src/features/search/page.tsx`。
+- **234.** 用户明确暂不调整底部导航列表结构及页码元素，保留当前样式与行为。FloatingNav 的 ul 仍直接渲染 Link；数字页码使用 href="#" 并阻止默认跳转，前后页使用 button，未将其描述为普通点击必然跳到页首。PreviewViewer 缺少 DialogTitle 的部分继续按无障碍范围约定暂缓，开发态提示尚未浏览器确认。此项整项暂缓，未标记已解决。
+  - 定位：`web/src/components/floating-nav.tsx`；`web/src/components/list-pagination.tsx`；`web/src/features/movie-detail/preview-viewer.tsx`。
 - **244.** 非番号文件名可能符合通用番号模式的问题继续暂缓。用户已拒绝相机前缀、时间戳与分辨率硬编码黑名单；原示例 IMG-XXXX 没有数字，不能据原报告当作已复现样本。后续只在真实样本与通用规则基础上评估。
   - 定位：`internal/codeid/codeid.go:38`。
 
@@ -296,5 +295,7 @@
   - 定位：`web/src/features/settings/data-section.tsx`；`web/src/api/data.ts`。
 - [x] **224.** 用户决定不再展示已挂载媒体目录路径，已删除禁用输入框及其宽度样式，设置行统一为文字与操作按钮同行。挂载/更换目录、取消挂载、请求中禁用及错误提示保留，目录选择器仍接收当前目录。原只读/复制改造随路径展示删除失效，不再添加只读输入框。
   - 定位：`web/src/features/settings/pan-directory-row.tsx`；`web/src/features/settings/pan-directory-dialog.tsx`。
+- [x] **235.** API 访问日志在输出前省略 request.query 与 request.referer，成功请求只按字段名过滤，保留方法、路径、状态码、耗时和请求 ID；不逐个解析请求 URL。错误访问日志消息、error/cause 和 panic 信息中的 HTTP(S)/SOCKS5 地址移除凭据及片段、遮蔽全部查询参数；独立编码或不可解析的 URL 整段遮蔽。Gin 恢复的原始错误/请求输出已关闭，普通 panic 改为结构化脱敏日志并保留堆栈。原请求、响应、STRM 文件及播放鉴权不变，499 访问日志过滤保留。此处理作用于 Miyabi API 日志，不清理既有日志，也不覆盖外部反向代理或 Emby 自身的日志配置。
+  - 定位：`internal/api/logging.go`；`internal/api/logging_test.go`；`internal/api/router.go`；`internal/api/error.go`。
 - [x] **239.** 旧 115 字幕、旧封面 payload 和历史迁移测试已清理；dir_cache、snapshot、检查点、来源隔离与事务测试仍验证当前功能，不按旧报告要求删除。剩余跨包测试归属统一放入 219/240。
   - 定位：`internal/library/scrape/dir_cache_test.go`；`internal/library/scrape/snapshot_test.go`；`internal/library/scrape/cover_checkpoint_test.go`；`internal/database/sqlite_test.go`。
