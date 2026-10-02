@@ -19,7 +19,7 @@ export function ScrapingSection() {
   return (
     <SettingsSection icon={<ScanSearchIcon className="size-4" />} title="影片刮削">
       <p className="text-xs text-muted-foreground">
-        以下来源补充图片及缺失资料。开启后对新刮削生效。
+        以下来源补充图片及缺失资料。开启后对新刮削生效。注意需要开启代理。
       </p>
       {query.isPending ? <p className="text-sm text-muted-foreground">正在读取来源</p> : null}
       {sources.map(source => (
