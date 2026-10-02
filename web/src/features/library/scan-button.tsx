@@ -1,4 +1,4 @@
-import { LoaderCircleIcon, RefreshCwIcon, RotateCcwIcon } from 'lucide-react'
+import { LoaderCircleIcon, RotateCcwIcon, ScanLineIcon } from 'lucide-react'
 
 import { describeApiError } from '@/api/client'
 import { useStartLibraryScan } from '@/api/library'
@@ -61,7 +61,7 @@ export function LibraryScanButton({
             ) : rebuild ? (
               <RotateCcwIcon className="size-4" />
             ) : (
-              <RefreshCwIcon className="size-4" />
+              <ScanLineIcon className="size-4" />
             )}
             <span className="hidden sm:inline">{label}</span>
           </Button>

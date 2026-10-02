@@ -109,16 +109,13 @@ export function LibraryMovieActions({
             })
           }}
         >
-          <label className="grid gap-2 text-sm">
-            正确番号
-            <Input
-              value={code}
-              onChange={event => setCode(event.target.value)}
-              maxLength={120}
-              disabled={scrape.isPending}
-              autoFocus
-            />
-          </label>
+          <Input
+            value={code}
+            onChange={event => setCode(event.target.value)}
+            maxLength={120}
+            disabled={scrape.isPending}
+            autoFocus
+          />
           {scrape.error ? <InlineError>{describeApiError(scrape.error)}</InlineError> : null}
           <DialogFooter>
             <Button

@@ -19,10 +19,9 @@ export function ScrapingSection() {
   return (
     <SettingsSection icon={<ScanSearchIcon className="size-4" />} title="影片刮削">
       <p className="text-xs text-muted-foreground">
-        JavDB
-        已收录的影片优先使用其资料和标签，以下来源补充图片及缺失资料。未收录的影片使用可用的来源资料。保存后对新刮削生效。
+        以下来源补充图片及缺失资料。开启后对新刮削生效。
       </p>
-      {query.isPending ? <p className="text-sm text-muted-foreground">正在读取来源…</p> : null}
+      {query.isPending ? <p className="text-sm text-muted-foreground">正在读取来源</p> : null}
       {sources.map(source => (
         <SettingRow
           key={source.id}
