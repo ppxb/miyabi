@@ -63,7 +63,11 @@ export function CategoryFilters({
           <Skeleton className="h-9 w-full rounded-full sm:w-48" />
         </>
       ) : taxonomy.isError ? (
-        <InlineError onRetry={() => taxonomy.refetch()} retryLabel="重试分类">
+        <InlineError
+          onRetry={() => taxonomy.refetch()}
+          retrying={taxonomy.isFetching}
+          retryLabel="重试分类"
+        >
           分类加载失败
         </InlineError>
       ) : (
