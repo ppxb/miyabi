@@ -54,10 +54,13 @@ func accessConfigHandler(gate AccessGate) gin.HandlerFunc {
 func accessLoginHandler(gate AccessGate, limiter *loginRateLimiter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
-		if err := limiter.check(ip); err != nil {
+		attempt, err := limiter.begin(ip)
+		if err != nil {
 			c.Error(err)
 			return
 		}
+		result := loginNotVerified
+		defer func() { limiter.finish(ip, attempt, result) }()
 
 		input, ok := bindJSON[accessLoginInput](c)
 		if !ok {
@@ -65,12 +68,12 @@ func accessLoginHandler(gate AccessGate, limiter *loginRateLimiter) gin.HandlerF
 		}
 
 		if err := gate.Verify(input.Password); err != nil {
-			limiter.recordFailure(ip)
+			result = loginFailed
 			c.Error(err)
 			return
 		}
 
-		limiter.recordSuccess(ip)
+		result = loginSucceeded
 
 		var token string
 		var expiresAt int64
