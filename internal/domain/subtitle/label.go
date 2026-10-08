@@ -87,16 +87,16 @@ func DetectLanguage(hint, text string) Language {
 		return language
 	}
 	// The first 15000 characters are enough to tell the variants apart.
-	runes := []rune(text)
-	if len(runes) > 15000 {
-		runes = runes[:15000]
-	}
-	var simplified, traditional int
-	for _, r := range runes {
+	var simplified, traditional, scanned int
+	for _, r := range text {
 		if containsRune(simplifiedMarkers, r) {
 			simplified++
 		} else if containsRune(traditionalMarkers, r) {
 			traditional++
+		}
+		scanned++
+		if scanned == 15000 {
+			break
 		}
 	}
 	if traditional > simplified {

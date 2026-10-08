@@ -2,18 +2,18 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、140、142、148、149、161、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、140、142、147、148、149、161、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 
 ## 复核结果
 
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
 | 确认仍存在，待处理 | 1 | 有明确代码依据的边界、状态反馈或行为问题 |
-| 可选优化与整理 | 56 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
+| 可选优化与整理 | 55 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
 | 按现有约定暂缓 | 10 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 31 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 32 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
@@ -31,6 +31,7 @@
 
 ### 本轮验证与限制
 
+- 第 147 项优化后通过：`go test ./internal/domain/subtitle ./internal/subtitle ./internal/library/...`、同范围 `go vet`。新增混合 ASCII、汉字和 emoji 的取样边界回归，验证第 15000 个字符计入、第 15001 个起忽略，保留提示优先、简繁统计及缺省结果。局部基准 `BenchmarkDetectLanguage`（Windows/amd64、i5-12600K、200ms，重复汉字合成输入）中，15000 字符由约 0.476ms / 65536 B 降至 0.353ms / 0 B；100 万字符由约 5.424ms / 4005901 B 降至 0.361ms / 0 B，每次堆分配均从 1 次降至 0 次。仅测语言检测函数，不包含字幕下载、解码或入库，不据此推算整个流程提速。
 - 第 140 项优化后通过：`go test ./...`、`go vet ./internal/strm ./internal/drive ./internal/api ./internal/app`。新增离线回归验证缓存命中跳过文件索引与地址申请、文件/UA/账号/授权版本/挂载隔离、12 个并发请求合并、失败不驻留、签名到期前刷新、未知有效期跳过缓存、容量淘汰、单个调用取消、共享超时和关闭等待，以及 Range 请求仍返回原样签名重定向。未进行真实 115 播放或浏览器测试，不宣称实际起播提速比例；未运行 race 检测（当前 Go 环境 CGO_ENABLED=0）。
 - 第 235 项修复后通过：`go test ./internal/api ./internal/app ./internal/strm ./internal/export`、同范围 `go vet`。新增离线 HTTP 回归覆盖 GET/HEAD 播放鉴权、签名重定向及图片源 URL 原样传递、查询参数/Referer 不落访问日志、错误消息/cause/已写响应错误的地址脱敏、编码与嵌套 URL、panic 堆栈保留及 Gin 原始输出关闭、断链处理和 499 日志过滤。只使用测试凭据，未读取生产令牌、清理历史日志或修改 STRM 文件。
 - 第 235 项局部微基准：`go test ./internal/api -run '^$' -bench '^BenchmarkRequestLogFields$' -benchmem -benchtime=200ms`。Windows/amd64、i5-13490F，128 字节/64 KiB 查询参数的过滤后记录分别约 653/654 ns，每条 160 B、1 次分配；未过滤对照约 734 ns/61.4 μs。该基准仅测合成访问日志字段处理与 JSON 编码，输出到 io.Discard，不含中间件其余工作、错误脱敏、网络或实际日志写入，不据此声称全链路提速或零开销。
@@ -46,7 +47,7 @@
 - 通过：`go test ./internal/api ./internal/app ./internal/database ./internal/tasks ./internal/library/... ./internal/emby ./internal/netx ./internal/monitor`。
 - 通过：前端 `npm run test`，25 个文件 / 141 项测试。相关用例验证任务共享快照、索引、事务、来源隔离、重启恢复、Emby 通知和详情交互逻辑。
 - 额外核对依赖实现：slog-gin v1.21.1 会构造 RawQuery/Referer 字段，第 235 项现已在日志输出前按字段省略；Gin v1.12.0 的代理解析会在错误时保留已解析前缀。没有读取或输出生产令牌。
-- 没有浏览器测试、真实上游/Emby 联调、race 检测或全链路性能基准；第 235 项仅进行了上述局部日志微基准。旧报告中的毫秒数、倍数、对比度和固定积压耗时不再作为本轮结论。
+- 没有浏览器测试、真实上游/Emby 联调、race 检测或全链路性能基准；第 235、147 项仅进行了上述局部日志与语言检测微基准。旧报告中的毫秒数、倍数、对比度和固定积压耗时不再作为本轮结论。
 - 第 135 项修复后通过：`go test ./internal/library/... ./internal/app`、`go vet ./internal/library/... ./internal/app`；新增覆盖跨目录过期回收（命中、未命中及请求失败）、目录数/文件总数上限、淘汰后重新读取、超大目录完整读取且不驻留、账号隔离和返回列表修改隔离。保留现有视频位置核验与发布回放回归。限额约束缓存记录数，不代表内存字节硬上限或真实大库性能结论。
 - 第 138 项修复后通过：`go test ./internal/pan ./internal/drive ./internal/library/... ./internal/app`、同范围 `go vet`。新增离线回归覆盖仅 downurl 使用 API 限流、CDN 请求 UA/凭据隔离、文件大小边界与响应体关闭、瞬时故障重试、Retry-After、请求头/正文超时及退避期间取消。未测量真实网盘扫描提速比例。
 - 第 142 项修复后通过：`go test ./internal/pan ./internal/drive ./internal/library/... ./internal/app ./internal/api ./internal/monitor`、同范围 `go vet`。新增回归覆盖并发账号校验的成功/失败共享、TTL 到期重查、等待者取消、共享请求超时与关闭流程、明确拒绝后的凭据持久化清除与重启、临时故障后重试、正在进行的扫码登录及新旧凭据交错；保留原有刷新合并、来源切换与登录回归。
@@ -74,8 +75,6 @@
   - 定位：`internal/javdb/movie.go`。
 - **146.** selectRoute 非 full 模式仍使用 5ms ticker，存在高频唤醒。可按有效探测开始时间和当前最佳延迟安排 timer；必须保留启动耗时不计入请求延迟的语义。
   - 定位：`internal/javdb/route.go`。
-- **147.** DetectLanguage 先将全文转换为 []rune 再截取 15000 字符，大字幕仍有不必要分配。可先有界遍历；约 40 字符 marker 的线性查找是否改 map 应另测，不能把它直接认定为瓶颈。位置已从旧 subtitle/label.go 更新。
-  - 定位：`internal/domain/subtitle/label.go`。
 - **151.** SSE 首个 changes 事件会将三类 revision 都判为变化并刷新相关查询，手动重连也先失效 tasks。存在首屏刷新合并空间；不能直接删除基线校正，否则查询与订阅建立之间的更新可能漏掉。实际重复请求次数需浏览器确认。
   - 定位：`web/src/features/tasks/task-events.tsx`。
 - **152.** 任务、状态、离线及部分设置查询仍使用 refetchOnMount:'always'。这与 staleTime 共存本身不是错误；应结合挂载次数、SSE 断线恢复和缓存时效逐项测量，不统一删除。
@@ -266,6 +265,8 @@
   - 定位：`internal/strm/relay.go`；`internal/strm/cache.go`；`internal/strm/cache_test.go`；`internal/drive/session.go`；`internal/api/strm_test.go`。
 - [x] **142.** verifyAccount 按 credentialVersion 合并并发校验，复用 60 秒成功缓存；共享请求使用独立 45 秒超时并纳入关闭等待，单个等待者取消不影响其他调用，失败不缓存。RefreshToken 明确返回 ErrUnauthorized 时，在提交锁内重新核对凭据和 token 版本，再清除数据库与内存中的对应凭据并失效账号缓存；后续请求及重启不再重复刷新已拒绝的凭据。挂载目录和正在进行的扫码登录保留，旧响应不能清除新登录；网络超时、限流、服务端故障和响应解析错误不清除凭据。
   - 定位：`internal/drive/account.go`；`internal/drive/token.go`；`internal/drive/account_test.go`；`internal/drive/token_test.go`；`internal/drive/login_test.go`。
+- [x] **147.** DetectLanguage 直接遍历字符串的前 15000 个 Unicode 字符，到达上限即停止，不再为全文构造 []rune。显式语言提示、简繁标记统计和同分时默认简体的规则保留；小型 marker 列表继续使用现有线性查找，不扩展未经测量的替换。
+  - 定位：`internal/domain/subtitle/label.go`；`internal/domain/subtitle/label_test.go`。
 - [x] **148.** Check 现在按本轮开始时间筛选到期订阅，以 next_check_at/id 游标连续翻页；10 部影片和 5 个演员是交替处理的页大小，不再是整轮上限，跨页保留 2 秒请求间隔。单条查询或保存失败仍继续后续条目，游标避免失败记录在本轮反复命中；取消后未处理条目仍保持到期，供后续检查。5 分钟周期和新增订阅唤醒机制保留。无磁力且继续等待时也发送订阅更新通知。BatchHandler 每项只读取一次订阅，每批复用一次配置与磁力选择器，保留随机节流、失败统计和检查点恢复。
   - 定位：`internal/monitor/check.go`；`internal/monitor/batch.go`；`internal/monitor/check_backlog_test.go`；`internal/monitor/batch_test.go`；`internal/app/app.go`。
 - [x] **149.** Movie schema 已增加 created_at/id 组合索引，实际媒体库列表查询可利用该索引完成倒序分页。本地扫描先规范化绝对根路径，再以媒体绝对路径生成本地 fileID，区分不同根目录的同名文件；STRM 中识别出的网盘 fileID 继续保留。已有本地文件的名称、大小和相对路径仅在变化时更新，即使影片被手动纠正也刷新文件信息，同时保护手动资料及网盘文件属性。未添加旧本地 fileID 迁移或兼容分支。

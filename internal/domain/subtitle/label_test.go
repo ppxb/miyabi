@@ -1,6 +1,9 @@
 package subtitle
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestDetectVersion(t *testing.T) {
 	tests := []struct {
@@ -41,17 +44,34 @@ func TestDetectLanguage(t *testing.T) {
 		{name: "simplified text", text: "这是一个关于开发的问题，这个开关还在这里。", want: LangSimplifiedChinese},
 		{name: "traditional text", text: "這是一個關於開發的問題，這個開關還在這裡。", want: LangTraditionalChinese},
 		{name: "no evidence", want: LangSimplifiedChinese},
+		{name: "last sampled rune included", text: strings.Repeat("🙂中a", 4999) + "中a為" + strings.Repeat("为", 15000), want: LangTraditionalChinese},
+		{name: "first rune beyond sample excluded", text: strings.Repeat("🙂中a", 5000) + "為", want: LangSimplifiedChinese},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := DetectLanguage(tt.hint, tt.text); got != tt.want {
-				t.Errorf("DetectLanguage(%q, %q) = %q; want %q", tt.hint, tt.text, got, tt.want)
+				t.Errorf("DetectLanguage(hint=%q) = %q; want %q", tt.hint, got, tt.want)
 			}
 		})
 	}
 	// A code prefix must not read as a language marker.
 	if got := LanguageHint("SSIS-589.srt"); got != LangUnknown {
 		t.Errorf("LanguageHint without markers = %q", got)
+	}
+}
+
+func BenchmarkDetectLanguage(b *testing.B) {
+	for _, size := range []struct {
+		name  string
+		runes int
+	}{{"15000_runes", 15000}, {"1000000_runes", 1000000}} {
+		b.Run(size.name, func(b *testing.B) {
+			text := strings.Repeat("這", size.runes)
+			b.ReportAllocs()
+			for b.Loop() {
+				DetectLanguage("", text)
+			}
+		})
 	}
 }
 
