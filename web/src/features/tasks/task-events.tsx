@@ -35,9 +35,9 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
   const reconnect = useCallback(() => {
     setConnection('connecting')
     setAttempt(value => value + 1)
-    snapshotRequested.current = true
-    void queryClient.invalidateQueries({ queryKey: taskKeys.all, exact: true })
-  }, [queryClient])
+    // Prefer the new stream's snapshot; failure or timeout may request HTTP again.
+    snapshotRequested.current = false
+  }, [])
 
   useEffect(() => {
     const events = new EventSource('/api/tasks/events')

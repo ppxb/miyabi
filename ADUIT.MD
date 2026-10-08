@@ -3,6 +3,7 @@
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
 > 首次复核只更新审计报告；后续已完成第 135、138、140、142、146、147、148、149、161、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 第 151 项已完成手动重连优化；首屏业务数据校正按本轮范围保留，是否进一步合并仍需实测，因此不计作整项完成。
 
 ## 复核结果
 
@@ -31,6 +32,7 @@
 
 ### 本轮验证与限制
 
+- 第 151 项手动重连优化后通过：前端 `npm run test`（27 个文件 / 150 项）、`npm run lint`、`npm run build`（包含 TypeScript 检查）及修改文件的 oxfmt 格式化。新增 6 项 Node 回归，通过模拟 EventSource、驱动实际连接 effect 和 QueryObserver，验证成功重连不追加 HTTP 任务查询、15 秒连接等待超时及失败时恢复兜底、同一断线期间只请求一次、旧 HTTP 响应不能覆盖新 SSE 快照、首屏/重连版本校正保留及卸载时清理定时器。未执行浏览器测试，不据此推算真实首屏请求减少量。
 - 第 146 项优化后通过：`go test ./internal/javdb ./internal/catalogue ./internal/app`、同范围 `go vet`。新增虚拟时间回归覆盖按实际探测开始时间取消、更快结果到达后提前更新截止时间、已取消探测延迟收尾时不忙等，以及相同延迟和零延迟的优先顺序；保留动态线路发现、排除客户端创建耗时、全量测速和调用方取消等既有回归。未进行真实线路测速或 CPU 基准，不据此声称实际请求提速比例。
 - 第 147 项优化后通过：`go test ./internal/domain/subtitle ./internal/subtitle ./internal/library/...`、同范围 `go vet`。新增混合 ASCII、汉字和 emoji 的取样边界回归，验证第 15000 个字符计入、第 15001 个起忽略，保留提示优先、简繁统计及缺省结果。局部基准 `BenchmarkDetectLanguage`（Windows/amd64、i5-12600K、200ms，重复汉字合成输入）中，15000 字符由约 0.476ms / 65536 B 降至 0.353ms / 0 B；100 万字符由约 5.424ms / 4005901 B 降至 0.361ms / 0 B，每次堆分配均从 1 次降至 0 次。仅测语言检测函数，不包含字幕下载、解码或入库，不据此推算整个流程提速。
 - 第 140 项优化后通过：`go test ./...`、`go vet ./internal/strm ./internal/drive ./internal/api ./internal/app`。新增离线回归验证缓存命中跳过文件索引与地址申请、文件/UA/账号/授权版本/挂载隔离、12 个并发请求合并、失败不驻留、签名到期前刷新、未知有效期跳过缓存、容量淘汰、单个调用取消、共享超时和关闭等待，以及 Range 请求仍返回原样签名重定向。未进行真实 115 播放或浏览器测试，不宣称实际起播提速比例；未运行 race 检测（当前 Go 环境 CGO_ENABLED=0）。
@@ -74,8 +76,8 @@
   - 定位：`internal/monitor/batch.go`；`internal/monitor/batch_tasks.go`。
 - **145.** ResolveMovieID 仍多次遍历累积候选，matchCandidates 重复 Normalize/IsFormatEquivalent。可缓存规范化结果；需保留层级优先、同 ID 去重和歧义拒绝，尚无当前负载收益数据。
   - 定位：`internal/javdb/movie.go`。
-- **151.** SSE 首个 changes 事件会将三类 revision 都判为变化并刷新相关查询，手动重连也先失效 tasks。存在首屏刷新合并空间；不能直接删除基线校正，否则查询与订阅建立之间的更新可能漏掉。实际重复请求次数需浏览器确认。
-  - 定位：`web/src/features/tasks/task-events.tsx`。
+- **151.** 手动重连已优先接收新 SSE 的任务快照，不再立即失效 tasks；同时重置本次尝试的兜底标记，连接失败或等待超时时仍能通过 HTTP 校正任务状态。首个 changes 事件仍按三类 revision 刷新相关业务查询，以补齐读取与订阅建立之间的变化；这部分按本轮范围保留，实际首屏重复请求次数及进一步合并收益需浏览器确认。
+  - 定位：`web/src/features/tasks/task-events.tsx`；`web/tests/task-events.test.tsx`。
 - **152.** 任务、状态、离线及部分设置查询仍使用 refetchOnMount:'always'。这与 staleTime 共存本身不是错误；应结合挂载次数、SSE 断线恢复和缓存时效逐项测量，不统一删除。
   - 定位：`web/src/api/tasks.ts`；`web/src/api/movie-states.ts`；`web/src/api/offline.ts`；`web/src/api/query-client.ts`。
 - **153.** 离线提交与扫描成功后仍有 setQueryData、invalidate 和 SSE 刷新交汇。更正：setQueryData 不发网络请求；useOfflineTasks 的影片筛选与来源校验仍有职责，enabled 也不是无效配置。仅评估重复失效调度，不删除跨来源保护。
