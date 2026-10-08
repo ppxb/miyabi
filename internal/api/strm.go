@@ -15,7 +15,7 @@ type STRMRelay interface {
 	Probe(context.Context, string, http.Header) (*http.Response, error)
 }
 
-// strmStreamHandler redirects media servers to a fresh 115 stream URL.
+// strmStreamHandler redirects media servers to a valid 115 stream URL.
 // HEAD requests are answered from the CDN so clients can probe the stream
 // without following the redirect.
 func strmStreamHandler(relay STRMRelay, token string, gate AccessGate) gin.HandlerFunc {

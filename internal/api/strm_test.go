@@ -16,6 +16,7 @@ type strmRelayStub struct {
 	headHeaders http.Header
 	headStatus  int
 	headErr     error
+	probeCalls  int
 }
 
 func (s *strmRelayStub) StreamURL(ctx context.Context, fileID, userAgent string) (string, error) {
@@ -26,6 +27,7 @@ func (s *strmRelayStub) StreamURL(ctx context.Context, fileID, userAgent string)
 }
 
 func (s *strmRelayStub) Probe(ctx context.Context, address string, headers http.Header) (*http.Response, error) {
+	s.probeCalls++
 	if s.headErr != nil {
 		return nil, s.headErr
 	}
@@ -38,6 +40,22 @@ func (s *strmRelayStub) Probe(ctx context.Context, address string, headers http.
 		res.StatusCode = http.StatusOK
 	}
 	return res, nil
+}
+
+func TestSTRMRangeRequestsRedirectWithoutProbing(t *testing.T) {
+	stub := &strmRelayStub{streamURL: "https://cdn.115.com/video.mp4?sign=a%2Bb&t=1700003600"}
+	router := NewRouter(Dependencies{
+		Access: NewAccessGateService("", ""),
+		STRM:   stub,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/strm/play/12345", nil)
+	request.Header.Set("Range", "bytes=1000-2000")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusFound || response.Header().Get("Location") != stub.streamURL || stub.probeCalls != 0 {
+		t.Fatalf("status=%d location=%q probes=%d", response.Code, response.Header().Get("Location"), stub.probeCalls)
+	}
 }
 
 func TestSTRMStreamHandlerRedirectsGET(t *testing.T) {

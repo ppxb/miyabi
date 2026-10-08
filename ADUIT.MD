@@ -2,18 +2,18 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、142、148、149、161、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、140、142、148、149、161、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 
 ## 复核结果
 
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
 | 确认仍存在，待处理 | 1 | 有明确代码依据的边界、状态反馈或行为问题 |
-| 可选优化与整理 | 57 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
+| 可选优化与整理 | 56 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
 | 按现有约定暂缓 | 10 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 30 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 31 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
@@ -31,6 +31,7 @@
 
 ### 本轮验证与限制
 
+- 第 140 项优化后通过：`go test ./...`、`go vet ./internal/strm ./internal/drive ./internal/api ./internal/app`。新增离线回归验证缓存命中跳过文件索引与地址申请、文件/UA/账号/授权版本/挂载隔离、12 个并发请求合并、失败不驻留、签名到期前刷新、未知有效期跳过缓存、容量淘汰、单个调用取消、共享超时和关闭等待，以及 Range 请求仍返回原样签名重定向。未进行真实 115 播放或浏览器测试，不宣称实际起播提速比例；未运行 race 检测（当前 Go 环境 CGO_ENABLED=0）。
 - 第 235 项修复后通过：`go test ./internal/api ./internal/app ./internal/strm ./internal/export`、同范围 `go vet`。新增离线 HTTP 回归覆盖 GET/HEAD 播放鉴权、签名重定向及图片源 URL 原样传递、查询参数/Referer 不落访问日志、错误消息/cause/已写响应错误的地址脱敏、编码与嵌套 URL、panic 堆栈保留及 Gin 原始输出关闭、断链处理和 499 日志过滤。只使用测试凭据，未读取生产令牌、清理历史日志或修改 STRM 文件。
 - 第 235 项局部微基准：`go test ./internal/api -run '^$' -bench '^BenchmarkRequestLogFields$' -benchmem -benchtime=200ms`。Windows/amd64、i5-13490F，128 字节/64 KiB 查询参数的过滤后记录分别约 653/654 ns，每条 160 B、1 次分配；未过滤对照约 734 ns/61.4 μs。该基准仅测合成访问日志字段处理与 JSON 编码，输出到 io.Discard，不含中间件其余工作、错误脱敏、网络或实际日志写入，不据此声称全链路提速或零开销。
 - 第 224 项按用户要求移除路径展示后，通过前端 `npm run typecheck`、`npm run lint` 及修改文件的 oxfmt 格式检查。仅调整设置行展示，未新增测试或执行浏览器测试，未操作实际挂载目录。
@@ -69,8 +70,6 @@
   - 定位：`internal/offline/projection.go`；`web/src/api/offline.ts`。
 - **137.** 批量订阅每项完成后编码并写入包含全部 IDs、FailedIDs 的 payload。全量 JSON 写放大仍存在，但 UI 已共享快照，不再是每个 SSE 连接各查一遍。优化应分离不变输入与检查点，不能简单降低持久化频率而丢失恢复进度。
   - 定位：`internal/monitor/batch.go`；`internal/monitor/batch_tasks.go`。
-- **140.** 每次 STRM 请求仍查询索引并申请新的 115 播放地址。更正：GET/Range 走重定向，只有 HEAD 调用 CDN Probe；并非所有请求都探测 CDN。若增加短缓存，必须包含账号/凭据版本和 UA，并处理签名过期。
-  - 定位：`internal/api/strm.go`；`internal/strm/relay.go`。
 - **145.** ResolveMovieID 仍多次遍历累积候选，matchCandidates 重复 Normalize/IsFormatEquivalent。可缓存规范化结果；需保留层级优先、同 ID 去重和歧义拒绝，尚无当前负载收益数据。
   - 定位：`internal/javdb/movie.go`。
 - **146.** selectRoute 非 full 模式仍使用 5ms ticker，存在高频唤醒。可按有效探测开始时间和当前最佳延迟安排 timer；必须保留启动耗时不计入请求延迟的语义。
@@ -263,6 +262,8 @@
   - 定位：`internal/pan/metadata.go`；`internal/pan/client.go`；`internal/pan/metadata_test.go`。
 - [x] **139.** 115 sidecar 上传实现已删除，已无逐文件申请 OSS STS token 的生产路径；不再增加 token 缓存。
   - 定位：`internal/pan/client.go`。
+- [x] **140.** STRM 地址按文件、UA、账号、挂载目录和授权版本合并请求，最多缓存 256 条、60 秒，并在可识别签名到期前 30 秒停止复用；无法识别有效期或临近到期的地址不驻留，失败不缓存。命中后跳过文件索引和 115 地址申请，仍校验当前授权；登录、断开和换目录会隔离旧结果。共享查询有独立 45 秒超时并纳入关闭等待，调用方取消不影响其他等待者。原画/转码回退、GET/Range 重定向和 HEAD 探测保持原有行为，不缓存 CDN 响应头。
+  - 定位：`internal/strm/relay.go`；`internal/strm/cache.go`；`internal/strm/cache_test.go`；`internal/drive/session.go`；`internal/api/strm_test.go`。
 - [x] **142.** verifyAccount 按 credentialVersion 合并并发校验，复用 60 秒成功缓存；共享请求使用独立 45 秒超时并纳入关闭等待，单个等待者取消不影响其他调用，失败不缓存。RefreshToken 明确返回 ErrUnauthorized 时，在提交锁内重新核对凭据和 token 版本，再清除数据库与内存中的对应凭据并失效账号缓存；后续请求及重启不再重复刷新已拒绝的凭据。挂载目录和正在进行的扫码登录保留，旧响应不能清除新登录；网络超时、限流、服务端故障和响应解析错误不清除凭据。
   - 定位：`internal/drive/account.go`；`internal/drive/token.go`；`internal/drive/account_test.go`；`internal/drive/token_test.go`；`internal/drive/login_test.go`。
 - [x] **148.** Check 现在按本轮开始时间筛选到期订阅，以 next_check_at/id 游标连续翻页；10 部影片和 5 个演员是交替处理的页大小，不再是整轮上限，跨页保留 2 秒请求间隔。单条查询或保存失败仍继续后续条目，游标避免失败记录在本轮反复命中；取消后未处理条目仍保持到期，供后续检查。5 分钟周期和新增订阅唤醒机制保留。无磁力且继续等待时也发送订阅更新通知。BatchHandler 每项只读取一次订阅，每批复用一次配置与磁力选择器，保留随机节流、失败统计和检查点恢复。

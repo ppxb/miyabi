@@ -8,12 +8,15 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/pan"
+	"golang.org/x/sync/singleflight"
 )
 
 // originalDefinition marks the untranscoded source among 115 playback streams.
@@ -21,8 +24,11 @@ const originalDefinition = 100
 
 // Relay exchanges indexed 115 video IDs for playable media URLs.
 type Relay struct {
-	database *ent.Client
-	drive    *drive.Drive
+	database  *ent.Client
+	drive     *drive.Drive
+	resolving singleflight.Group
+	cacheMu   sync.Mutex
+	urls      map[string]cachedURL
 }
 
 // New requires an initialized database and drive.
@@ -30,15 +36,53 @@ func New(database *ent.Client, d *drive.Drive) *Relay {
 	return &Relay{database: database, drive: d}
 }
 
-// StreamURL prefers a direct download URL, falling back to the original stream
-// or highest transcoded resolution. 115 signs these URLs for a short time,
-// so every request resolves a fresh one.
+// StreamURL shares short-lived signed URLs within the same source, authorization
+// and user agent. Each caller still verifies its session, including on cache hits.
 func (relay *Relay) StreamURL(ctx context.Context, fileID, userAgent string) (string, error) {
 	ua := strings.TrimSpace(userAgent)
 	sess, err := relay.drive.Open(ctx)
 	if err != nil {
 		return "", err
 	}
+	source := sess.Source()
+	key := fmt.Sprintf("%d:%q:%q:%q:%q", sess.AuthorizationVersion(), source.AccountID, source.Directory.ID, fileID, ua)
+	result := relay.resolving.DoChan(key, func() (any, error) {
+		done, ok := relay.drive.StartWork()
+		if !ok {
+			return "", context.Canceled
+		}
+		defer done()
+		// One player's canceled probe must not cancel another player's lookup.
+		resolveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 45*time.Second)
+		defer cancel()
+		if address := relay.cached(key, time.Now()); address != "" {
+			return address, nil
+		}
+		address, err := relay.resolveURL(resolveCtx, sess, fileID, ua)
+		if err == nil {
+			relay.remember(key, address, time.Now())
+		}
+		return address, err
+	})
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case completed := <-result:
+		if completed.Err != nil {
+			return "", completed.Err
+		}
+		var address string
+		err := sess.WithSource(ctx, func() error {
+			address = completed.Val.(string)
+			return nil
+		})
+		return address, err
+	}
+}
+
+// resolveURL prefers a direct download URL, then the original stream or highest
+// transcoded resolution. The indexed pick code is read only on cache misses.
+func (relay *Relay) resolveURL(ctx context.Context, sess drive.Session, fileID, ua string) (string, error) {
 	pickCode, err := relay.pickCode(ctx, sess, fileID)
 	if err != nil {
 		return "", err

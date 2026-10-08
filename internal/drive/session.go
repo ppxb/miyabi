@@ -15,6 +15,9 @@ import (
 // commits under the drive commit lock.
 type Session interface {
 	Source() domain.LibrarySource
+	// AuthorizationVersion changes on login, disconnect, and mount changes.
+	// It scopes derived data without exposing credentials or expiring on token refresh.
+	AuthorizationVersion() uint64
 	List(ctx context.Context, dirID string, offset int) (pan.FilePage, error)
 	Info(ctx context.Context, fileID string) (pan.FileInfo, error)
 	Read(ctx context.Context, pickCode string, limit int64) ([]byte, error)
@@ -64,6 +67,10 @@ type sourceSession struct {
 
 func (s *sourceSession) Source() domain.LibrarySource {
 	return s.source
+}
+
+func (s *sourceSession) AuthorizationVersion() uint64 {
+	return s.version
 }
 
 func (s *sourceSession) checkSource() error {

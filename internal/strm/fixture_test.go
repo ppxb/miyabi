@@ -15,6 +15,7 @@ import (
 // Any other call panics through the nil embedded client.
 type panStub struct {
 	drive.Client
+	account      func(context.Context, string) (pan.Account, error)
 	info         func(context.Context, string, string) (pan.FileInfo, error)
 	downloadURL  func(context.Context, string, string, string) (string, error)
 	playURL      func(context.Context, string, string, string) ([]pan.PlaySource, error)
@@ -24,7 +25,10 @@ type panStub struct {
 
 func (*panStub) Close() {}
 
-func (*panStub) Account(context.Context, string) (pan.Account, error) {
+func (client *panStub) Account(ctx context.Context, token string) (pan.Account, error) {
+	if client.account != nil {
+		return client.account(ctx, token)
+	}
 	return pan.Account{ID: "100"}, nil
 }
 
@@ -47,8 +51,8 @@ func (client *panStub) RefreshToken(ctx context.Context, token string) (pan.Toke
 	return pan.Tokens{AccessToken: "refreshed-access", RefreshToken: "refreshed-refresh", ExpiresAt: time.Now().Add(time.Hour)}, nil
 }
 
-func (*panStub) List(context.Context, string, string, int, int) (pan.FilePage, error) {
-	return pan.FilePage{Path: []pan.Directory{{ID: "0", Name: "Root"}, {ID: "10", Name: "Movies"}}}, nil
+func (*panStub) List(_ context.Context, _, directoryID string, _, _ int) (pan.FilePage, error) {
+	return pan.FilePage{Path: []pan.Directory{{ID: "0", Name: "Root"}, {ID: directoryID, Name: "Movies"}}}, nil
 }
 
 func (client *panStub) Info(ctx context.Context, token, id string) (pan.FileInfo, error) {
