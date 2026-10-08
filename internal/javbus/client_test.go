@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -64,8 +65,16 @@ func TestClient_FindUsesFreshDetailParameters(t *testing.T) {
 	expectedGID := "45622804531"
 
 	mock.handlers["/SSIS-001"] = func(req *http.Request) (*http.Response, error) {
-		if !strings.Contains(req.Header.Get("Cookie"), "dv=1") {
-			t.Errorf("expected Cookie to contain dv=1")
+		for key, want := range map[string]string{
+			"User-Agent":       userAgent,
+			"Cookie":           "dv=1; existmag=all",
+			"Accept":           "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+			"Referer":          "",
+			"X-Requested-With": "",
+		} {
+			if got := req.Header.Get(key); got != want {
+				t.Errorf("detail header %s = %q, want %q", key, got, want)
+			}
 		}
 		if req.URL.Query().Get("existmag") != "all" {
 			t.Errorf("expected existmag=all query parameter")
@@ -84,8 +93,19 @@ func TestClient_FindUsesFreshDetailParameters(t *testing.T) {
 		if req.URL.Query().Get("uc") != "0" {
 			t.Errorf("unexpected uc query: %s", req.URL.Query().Get("uc"))
 		}
-		if req.Header.Get("Referer") == "" {
-			t.Errorf("expected Referer header on ajax request")
+		for key, want := range map[string]string{
+			"User-Agent":       userAgent,
+			"Cookie":           "dv=1; existmag=all",
+			"Accept":           "",
+			"Referer":          baseURL + "/SSIS-001",
+			"X-Requested-With": "XMLHttpRequest",
+		} {
+			if got := req.Header.Get(key); got != want {
+				t.Errorf("ajax header %s = %q, want %q", key, got, want)
+			}
+		}
+		if floor, err := strconv.Atoi(req.URL.Query().Get("floor")); err != nil || floor < 1 || floor > 1000 {
+			t.Errorf("unexpected floor query: %s", req.URL.Query().Get("floor"))
 		}
 		return &http.Response{
 			StatusCode: 200,
