@@ -1,8 +1,16 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { LoaderCircleIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import type { OfflineSubmission } from '@/api/offline'
-import { isTaskActive, type BatchTask, type ScanTask } from '@/api/tasks'
+import {
+  isScanTask,
+  isTaskActive,
+  taskKeys,
+  type BatchTask,
+  type ScanTask,
+  type Task
+} from '@/api/tasks'
 import { isOfflineTaskActive } from '@/api/offline'
 import { scanStage, scanStatus } from './scan-status'
 import { TaskProgress } from './task-progress'
@@ -35,6 +43,17 @@ function taskToastOptions(
 
 export function notifyTaskError(id: string, title: string, description: string) {
   toast.error(title, { ...taskToastOptions(id, false), description })
+}
+
+export function useNotifyScanTask() {
+  const queryClient = useQueryClient()
+  return (task: ScanTask) => {
+    // Mutation callbacks may run after a refresh or SSE has already finished the task.
+    const latest = queryClient
+      .getQueryData<Task[]>(taskKeys.all)
+      ?.find((item): item is ScanTask => isScanTask(item) && item.id === task.id)
+    notifyScanTask(latest ?? task)
+  }
 }
 
 export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {

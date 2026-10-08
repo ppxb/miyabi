@@ -4,7 +4,7 @@ import { describeApiError } from '@/api/client'
 import { useStartLibraryScan } from '@/api/library'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { notifyScanTask, notifyTaskError } from '@/features/tasks/task-toast'
+import { notifyTaskError, useNotifyScanTask } from '@/features/tasks/task-toast'
 
 export function LibraryScanButton({
   loading,
@@ -22,6 +22,7 @@ export function LibraryScanButton({
   onStarted: () => void
 }) {
   const startScan = useStartLibraryScan()
+  const notifyScan = useNotifyScanTask()
   // Keep the mutation observer mounted while pagination replaces the visible control.
   if (loading) return <Skeleton className="h-9 w-20 rounded-4xl sm:w-60" />
   if (!available) return null
@@ -43,7 +44,7 @@ export function LibraryScanButton({
             onClick={() =>
               startScan.mutate(rebuild, {
                 onSuccess: task => {
-                  notifyScanTask(task)
+                  notifyScan(task)
                   onStarted()
                 },
                 onError: error => {

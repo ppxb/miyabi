@@ -20,10 +20,10 @@ vi.mock('@/api/tasks', () => ({
 vi.mock('@/features/tasks/task-events', () => ({
   useTaskConnection: () => ({ status: 'connected' })
 }))
-vi.mock('@/features/tasks/task-toast', () => ({
-  notifyScanTask: vi.fn(),
-  notifyTaskError: vi.fn()
-}))
+vi.mock('@/features/tasks/task-toast', () => {
+  const notifyScanTask = vi.fn()
+  return { notifyScanTask, useNotifyScanTask: () => notifyScanTask, notifyTaskError: vi.fn() }
+})
 
 function elements(node: ReactNode): ReactElement<Record<string, unknown>>[] {
   return Children.toArray(node).filter(isValidElement) as ReactElement<Record<string, unknown>>[]

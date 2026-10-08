@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { notifyScanTask, notifyTaskError } from '@/features/tasks/task-toast'
+import { notifyTaskError, useNotifyScanTask } from '@/features/tasks/task-toast'
 
 export function LibraryMovieActions({
   movie,
@@ -33,6 +33,7 @@ export function LibraryMovieActions({
   const [code, setCode] = useState(movie.code)
   const trigger = useRef<HTMLButtonElement>(null)
   const scrape = useRescrapeLibraryMovie(movie.id)
+  const notifyScan = useNotifyScanTask()
   const busy = disabled || scrape.isPending
 
   return (
@@ -58,7 +59,7 @@ export function LibraryMovieActions({
             disabled={busy}
             onSelect={() =>
               scrape.mutate(undefined, {
-                onSuccess: task => notifyScanTask(task),
+                onSuccess: notifyScan,
                 onError: error =>
                   notifyTaskError(
                     `movie:${movie.id}:submit-error`,
@@ -104,7 +105,7 @@ export function LibraryMovieActions({
             scrape.mutate(code.trim(), {
               onSuccess: task => {
                 setCorrecting(false)
-                notifyScanTask(task)
+                notifyScan(task)
               }
             })
           }}
