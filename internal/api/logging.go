@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
@@ -13,7 +14,31 @@ import (
 
 func requestLoggingMiddleware(logger *slog.Logger) gin.HandlerFunc {
 	filtered := slog.New(&requestLogHandler{Handler: logger.Handler()})
-	return sloggin.NewWithFilters(filtered, sloggin.IgnoreStatus(statusClientClosedRequest))
+	config := sloggin.DefaultConfig()
+	config.Filters = []sloggin.Filter{sloggin.IgnoreStatus(statusClientClosedRequest)}
+	config.WithCustomMessage = func(c *gin.Context) string {
+		if len(c.Errors) > 0 || c.Writer.Status() >= http.StatusBadRequest {
+			return "request failed"
+		}
+		return "Incoming request"
+	}
+	return sloggin.NewWithConfig(filtered, config)
+}
+
+// Run inside the access logger and outside recovery so even errors on written
+// responses and broken connections are collected before the request is logged.
+func requestDiagnosticsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+		if len(c.Errors) == 0 || c.Writer.Status() == statusClientClosedRequest {
+			return
+		}
+		_, kind := mapErrorStatus(c.Errors.Last().Err)
+		sloggin.AddCustomAttributes(c,
+			slog.String("kind", kind.String()),
+			slog.String("error", redactLogURLs(strings.Join(c.Errors.Errors(), "\n"))),
+		)
+	}
 }
 
 // Only the access logger uses this handler. Successful requests filter fields
@@ -23,12 +48,7 @@ type requestLogHandler struct {
 }
 
 func (h *requestLogHandler) Handle(ctx context.Context, record slog.Record) error {
-	message := record.Message
-	// slog-gin puts c.Errors in the message for failed HTTP requests.
-	if record.Level >= slog.LevelWarn {
-		message = redactLogURLs(message)
-	}
-	filtered := slog.NewRecord(record.Time, record.Level, message, record.PC)
+	filtered := slog.NewRecord(record.Time, record.Level, record.Message, record.PC)
 	record.Attrs(func(attr slog.Attr) bool {
 		if attr.Key == "request" && attr.Value.Kind() == slog.KindGroup {
 			fields := attr.Value.Group()

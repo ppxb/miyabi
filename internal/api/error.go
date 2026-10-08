@@ -107,29 +107,10 @@ func errorMiddleware(logger *slog.Logger) gin.HandlerFunc {
 			return
 		}
 
-		status, kind := mapErrorStatus(err)
+		status, _ := mapErrorStatus(err)
 		message := domain.PublicMessage(err)
 		if status == http.StatusNotFound && message == "内部服务错误" {
 			message = "资源不存在"
-		}
-
-		attrs := []any{
-			"method", c.Request.Method,
-			"path", c.Request.URL.Path,
-			"status", status,
-			"kind", kind.String(),
-			"id", sloggin.GetRequestID(c),
-			"error", redactLogURLs(err.Error()),
-		}
-		var de *domain.Error
-		if errors.As(err, &de) && de.Cause != nil {
-			attrs = append(attrs, "cause", redactLogURLs(de.Cause.Error()))
-		}
-
-		if status >= http.StatusInternalServerError {
-			logger.ErrorContext(c.Request.Context(), "request failed", attrs...)
-		} else {
-			logger.WarnContext(c.Request.Context(), "request failed", attrs...)
 		}
 
 		body := gin.H{"error": message}
@@ -151,6 +132,7 @@ func recoveryMiddleware(logger *slog.Logger) gin.HandlerFunc {
 		logger.ErrorContext(c.Request.Context(), "request panicked",
 			"method", c.Request.Method,
 			"path", c.Request.URL.Path,
+			"id", sloggin.GetRequestID(c),
 			"error", redactLogURLs(fmt.Sprint(recovered)),
 			"stack", string(debug.Stack()),
 		)

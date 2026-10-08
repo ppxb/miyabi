@@ -56,6 +56,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	router.Use(
 		requestLoggingMiddleware(deps.Logger),
+		requestDiagnosticsMiddleware(),
 		recoveryMiddleware(deps.Logger),
 		errorMiddleware(deps.Logger),
 		securityHeadersMiddleware(),

@@ -94,13 +94,14 @@ func TestErrorMiddlewareMapsDomainErrorsToStatusAndMessage(t *testing.T) {
 	}
 }
 
-func TestErrorMiddlewareLogsCauseAndSeparatesPublicMessage(t *testing.T) {
+func TestRequestLoggingKeepsErrorChainAndPublicResponse(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		err        error
 		wantStatus int
 		wantMsg    string
 		wantLevel  string
+		wantKind   string
 		wantCause  string
 	}{
 		{
@@ -109,14 +110,16 @@ func TestErrorMiddlewareLogsCauseAndSeparatesPublicMessage(t *testing.T) {
 			wantStatus: http.StatusBadRequest,
 			wantMsg:    "客户端参数无效",
 			wantLevel:  "WARN",
+			wantKind:   "invalid",
 			wantCause:  "内部校验细节: id 不合法",
 		},
 		{
 			name:       "5xx error logs error and cause",
-			err:        domain.E(domain.KindUpstream, "上游网关异常", errors.New("连接超时: dial tcp 1.2.3.4:443")),
+			err:        fmt.Errorf("load movie: %w", domain.E(domain.KindUpstream, "上游网关异常", errors.New("连接超时: dial tcp 1.2.3.4:443"))),
 			wantStatus: http.StatusBadGateway,
 			wantMsg:    "上游网关异常",
 			wantLevel:  "ERROR",
+			wantKind:   "upstream",
 			wantCause:  "连接超时: dial tcp 1.2.3.4:443",
 		},
 	} {
@@ -124,9 +127,7 @@ func TestErrorMiddlewareLogsCauseAndSeparatesPublicMessage(t *testing.T) {
 			var logBuf bytes.Buffer
 			logger := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-			gin.SetMode(gin.ReleaseMode)
-			router := gin.New()
-			router.Use(errorMiddleware(logger))
+			router := NewRouter(Dependencies{Logger: logger, Access: NewAccessGateService("", "")})
 			router.GET("/probe", func(c *gin.Context) { c.Error(tc.err) })
 
 			response := httptest.NewRecorder()
@@ -146,11 +147,22 @@ func TestErrorMiddlewareLogsCauseAndSeparatesPublicMessage(t *testing.T) {
 			}
 
 			logOutput := logBuf.String()
-			if !strings.Contains(logOutput, tc.wantCause) {
-				t.Fatalf("log output missing cause %q: %s", tc.wantCause, logOutput)
+			if strings.Count(logOutput, tc.wantCause) != 1 {
+				t.Fatalf("cause should appear once: %s", logOutput)
 			}
-			if !strings.Contains(logOutput, tc.wantLevel) {
-				t.Fatalf("log output missing level %s: %s", tc.wantLevel, logOutput)
+			records := readLogRecords(t, logBuf.Bytes())
+			if len(records) != 1 {
+				t.Fatalf("log count = %d, want one request record", len(records))
+			}
+			record := records[0]
+			if record["level"] != tc.wantLevel || record["kind"] != tc.wantKind || record["error"] != tc.err.Error() ||
+				record["msg"] != "request failed" || record["cause"] != nil {
+				t.Fatalf("unexpected diagnostic fields: %v", record)
+			}
+			requestLog, responseLog := record["request"].(map[string]any), record["response"].(map[string]any)
+			if requestLog["method"] != http.MethodGet || requestLog["path"] != "/probe" || responseLog["status"] != float64(tc.wantStatus) ||
+				responseLog["latency"] == nil || record["id"] != response.Header().Get("X-Request-Id") || record["id"] == "" {
+				t.Fatalf("missing request metadata: %v", record)
 			}
 			if strings.Contains(response.Body.String(), tc.wantCause) {
 				t.Fatalf("response body leaked cause %q: %s", tc.wantCause, response.Body.String())

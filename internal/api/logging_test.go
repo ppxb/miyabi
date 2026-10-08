@@ -142,17 +142,15 @@ func TestImageLoggingPreservesSourceAndRedactsErrorURLs(t *testing.T) {
 				t.Fatalf("image behavior changed: source=%q, status=%d, body=%s", catalogue.address, response.Code, response.Body)
 			}
 			assertPrivateLogValuesAbsent(t, logs.String(), "private-user", "private-password", "image-secret", "nested-secret", "fragment-secret")
+			records := readLogRecords(t, logs.Bytes())
+			if len(records) != 1 {
+				t.Fatalf("request log count = %d, want 1", len(records))
+			}
 			if fail {
-				for _, record := range readLogRecords(t, logs.Bytes()) {
-					for _, key := range []string{"msg", "error", "cause"} {
-						value, ok := record[key].(string)
-						if !ok || value == "request failed" {
-							continue
-						}
-						if !strings.Contains(value, "https://images.example/cover.jpg") || !strings.Contains(value, "TLS handshake timeout") {
-							t.Fatalf("lost error diagnostics: %s", value)
-						}
-					}
+				value, _ := records[0]["error"].(string)
+				if !strings.Contains(value, "https://images.example/cover.jpg") || strings.Count(logs.String(), "TLS handshake timeout") != 1 ||
+					records[0]["cause"] != nil || records[0]["msg"] != "request failed" {
+					t.Fatalf("error diagnostics lost or duplicated: %v", records[0])
 				}
 			}
 		})
@@ -185,7 +183,7 @@ func TestRequestLoggingCoversWrittenErrorsAndRecoveryWithoutRawDumps(t *testing.
 	previous := gin.DefaultErrorWriter
 	gin.DefaultErrorWriter = &rawLogs
 	t.Cleanup(func() { gin.DefaultErrorWriter = previous })
-	for _, mode := range []string{"written error", "panic", "broken pipe", "canceled"} {
+	for _, mode := range []string{"written error", "written success error", "panic", "panic after response", "broken pipe", "canceled"} {
 		t.Run(mode, func(t *testing.T) {
 			var logs bytes.Buffer
 			router := NewRouter(Dependencies{Logger: slog.New(slog.NewJSONHandler(&logs, nil)), Access: NewAccessGateService("", "")})
@@ -195,7 +193,13 @@ func TestRequestLoggingCoversWrittenErrorsAndRecoveryWithoutRawDumps(t *testing.
 				case "written error":
 					c.String(http.StatusBadGateway, "already written")
 					c.Error(err)
+				case "written success error":
+					c.String(http.StatusOK, "already written")
+					c.Error(err)
 				case "panic":
+					panic(err)
+				case "panic after response":
+					c.String(http.StatusOK, "already written")
 					panic(err)
 				case "broken pipe":
 					panic(fmt.Errorf("%v: %w", err, syscall.EPIPE))
@@ -216,13 +220,35 @@ func TestRequestLoggingCoversWrittenErrorsAndRecoveryWithoutRawDumps(t *testing.
 			if rawLogs.Len() != 0 {
 				t.Fatalf("Gin emitted an unfiltered recovery log: %s", rawLogs.String())
 			}
+			records := readLogRecords(t, logs.Bytes())
+			wantRecords := 1
+			if mode == "canceled" {
+				wantRecords = 0
+			} else if strings.HasPrefix(mode, "panic") {
+				wantRecords = 2 // Dedicated panic stack and the access summary share an ID.
+			}
+			if len(records) != wantRecords {
+				t.Fatalf("log count = %d, want %d: %s", len(records), wantRecords, logs.String())
+			}
+			if mode != "canceled" && strings.Count(logs.String(), "timeout") != 1 {
+				t.Fatalf("error diagnostics lost or duplicated: %s", logs.String())
+			}
 			switch mode {
-			case "written error":
-				if response.Code != http.StatusBadGateway || response.Body.String() != "already written" || !strings.Contains(logs.String(), "timeout") {
+			case "written error", "written success error":
+				wantStatus := http.StatusBadGateway
+				if mode == "written success error" {
+					wantStatus = http.StatusOK
+				}
+				if response.Code != wantStatus || response.Body.String() != "already written" || records[0]["kind"] != "unexpected" {
 					t.Fatal("written response or late error diagnostics lost")
 				}
-			case "panic":
-				if response.Code != http.StatusInternalServerError || !strings.Contains(logs.String(), "stack") || !strings.Contains(logs.String(), "logging_test.go") {
+			case "panic", "panic after response":
+				wantStatus := http.StatusInternalServerError
+				if mode == "panic after response" {
+					wantStatus = http.StatusOK
+				}
+				if response.Code != wantStatus || !strings.Contains(logs.String(), "stack") || !strings.Contains(logs.String(), "logging_test.go") ||
+					records[0]["level"] != "ERROR" || records[0]["id"] != records[1]["id"] || records[0]["id"] == "" {
 					t.Fatal("panic recovery lost response or stack trace")
 				}
 			case "broken pipe":
@@ -233,6 +259,65 @@ func TestRequestLoggingCoversWrittenErrorsAndRecoveryWithoutRawDumps(t *testing.
 				if response.Code != statusClientClosedRequest || logs.Len() != 0 {
 					t.Fatal("cancellation no longer suppressed in access logs")
 				}
+			}
+		})
+	}
+}
+
+func TestRequestLoggingKeepsMultipleErrorsAndStatusOnlyFailures(t *testing.T) {
+	for _, withErrors := range []bool{false, true} {
+		t.Run(fmt.Sprintf("errors=%t", withErrors), func(t *testing.T) {
+			var logs bytes.Buffer
+			router := NewRouter(Dependencies{Logger: slog.New(slog.NewJSONHandler(&logs, nil)), Access: NewAccessGateService("", "")})
+			router.GET("/probe", func(c *gin.Context) {
+				if withErrors {
+					c.Error(fmt.Errorf("first attempt: %w", errors.New("Get https://host.example/first?token=first-secret: timeout")))
+					c.Error(domain.E(domain.KindUpstream, "retry failed", errors.New("Get https://host.example/second?token=second-secret: connection reset")))
+				} else {
+					c.AbortWithStatus(http.StatusForbidden)
+				}
+			})
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/probe", nil))
+			records := readLogRecords(t, logs.Bytes())
+			if len(records) != 1 || records[0]["msg"] != "request failed" || records[0]["cause"] != nil {
+				t.Fatalf("unexpected request records: %v", records)
+			}
+			if withErrors {
+				if response.Code != http.StatusBadGateway || records[0]["kind"] != "upstream" || records[0]["level"] != "ERROR" ||
+					strings.Count(logs.String(), "first attempt") != 1 || strings.Count(logs.String(), "retry failed") != 1 ||
+					strings.Count(logs.String(), "connection reset") != 1 {
+					t.Fatalf("error chain lost or duplicated: %v", records[0])
+				}
+			} else if response.Code != http.StatusForbidden || records[0]["level"] != "WARN" || records[0]["error"] != nil {
+				t.Fatalf("status-only failure changed: %v", records[0])
+			}
+			assertPrivateLogValuesAbsent(t, logs.String(), "first-secret", "second-secret")
+		})
+	}
+}
+
+func TestCanceledRequestLoggingRespectsLevel(t *testing.T) {
+	for _, level := range []slog.Level{slog.LevelInfo, slog.LevelDebug} {
+		t.Run(level.String(), func(t *testing.T) {
+			var logs bytes.Buffer
+			logger := slog.New(slog.NewJSONHandler(&logs, &slog.HandlerOptions{Level: level}))
+			router := NewRouter(Dependencies{Logger: logger, Access: NewAccessGateService("", "")})
+			router.GET("/probe", func(c *gin.Context) { c.Error(context.Canceled) })
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/probe", nil).WithContext(ctx))
+			if response.Code != statusClientClosedRequest || response.Body.Len() != 0 {
+				t.Fatal("cancellation response changed")
+			}
+			records := readLogRecords(t, logs.Bytes())
+			if level == slog.LevelInfo {
+				if len(records) != 0 {
+					t.Fatalf("cancellation produced access logs: %v", records)
+				}
+			} else if len(records) != 1 || records[0]["level"] != "DEBUG" || records[0]["msg"] != "request canceled" || records[0]["request"] != nil {
+				t.Fatalf("unexpected cancellation diagnostics: %v", records)
 			}
 		})
 	}
