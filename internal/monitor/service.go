@@ -50,9 +50,6 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 }
 
 func (c Config) normalized() Config {
-	if c.Download == (download.Config{}) {
-		c.Download = download.DefaultConfig()
-	}
 	if c.CheckTime == "" {
 		c.CheckTime = defaultCheckTime
 	}
@@ -63,9 +60,6 @@ func (c Config) normalized() Config {
 func (c Config) validate() error {
 	if !checkTimePattern.MatchString(c.CheckTime) {
 		return domain.E(domain.KindInvalid, "检查时间格式应为 HH:MM", nil)
-	}
-	if err := c.Download.Validate(); err != nil {
-		return err
 	}
 	return c.Preferences.Validate()
 }

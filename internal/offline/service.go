@@ -38,6 +38,7 @@ type Service struct {
 	submitTimeout time.Duration
 	operations    offlineOperations
 	now           func() time.Time
+	policy        recoveryPolicy
 }
 
 // New creates a new offline download management service.
@@ -51,5 +52,11 @@ func New(database *ent.Client, catalogue Catalogue, drive *drive.Drive, tasks *t
 
 		submitTimeout: submitTimeout,
 		now:           time.Now,
+		policy: recoveryPolicy{
+			zeroProgressTimeout: 15 * time.Minute,
+			stalledTimeout:      30 * time.Minute,
+			completionGrace:     60 * time.Minute,
+			maxAttempts:         3,
+		},
 	}
 }

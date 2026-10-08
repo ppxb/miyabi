@@ -31,7 +31,7 @@ type recoveryRig struct {
 func newRecoveryRig(t *testing.T) *recoveryRig {
 	s, client := offlineAddFixture(t)
 	r := &recoveryRig{t: t, s: s, client: client, now: time.Now(), remote: make(map[string]pan.OfflineTask), cfg: download.DefaultConfig()}
-	r.cfg.ZeroProgressMinutes, r.cfg.StalledMinutes, r.cfg.CompletionGraceMinutes = 1, 1, 2
+	s.policy.zeroProgressTimeout, s.policy.stalledTimeout, s.policy.completionGrace = time.Minute, time.Minute, 2*time.Minute
 	s.now = func() time.Time { return r.now }
 	r.saveConfig(magnet.DefaultPreferences())
 	client.addOffline = func(_ context.Context, _, uri, directory string) (string, error) {
@@ -201,7 +201,7 @@ func TestRecoveryExhaustionPreservesCurrentDownloadAndPreferences(t *testing.T) 
 			r := newRecoveryRig(t)
 			prefs := magnet.DefaultPreferences()
 			if limit {
-				r.cfg.MaxAttempts = 1
+				r.s.policy.maxAttempts = 1
 			} else {
 				prefs.Subtitle = magnet.PreferenceRequired
 			}

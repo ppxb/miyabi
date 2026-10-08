@@ -136,6 +136,7 @@ func TestSubscriptionSettings(t *testing.T) {
 		t.Fatalf("default config mismatch: %#v %v", cfg, err)
 	}
 	cfg.ActorAutoDownload, cfg.CheckTime, cfg.Preferences.Subtitle = true, "05:30", magnet.PreferenceRequired
+	cfg.Download.AutoSwitch = false
 	if _, err := f.service.UpdateConfig(ctx, cfg); err != nil {
 		t.Fatal(err)
 	}

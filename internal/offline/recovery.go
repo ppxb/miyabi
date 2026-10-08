@@ -25,6 +25,24 @@ const (
 	observationGap = 90 * time.Second
 )
 
+// Recovery thresholds are internal policy, independent of user preferences.
+type recoveryPolicy struct {
+	zeroProgressTimeout time.Duration
+	stalledTimeout      time.Duration
+	completionGrace     time.Duration
+	maxAttempts         int
+}
+
+func (p recoveryPolicy) timeout(progress float64) time.Duration {
+	if progress == 0 {
+		return p.zeroProgressTimeout
+	}
+	if progress >= 95 {
+		return max(p.stalledTimeout, p.completionGrace)
+	}
+	return p.stalledTimeout
+}
+
 func recovery(record *ent.OfflineDownload, prefs magnet.Preferences) *download.Recovery {
 	if record.Recovery != nil {
 		state := *record.Recovery
@@ -95,13 +113,13 @@ func (s *Service) Recover(ctx context.Context) error {
 		failed := record.Status == offlinedownload.StatusFailed && state.RemoteStatus == -1
 		stalled := record.Status == offlinedownload.StatusRunning && state.RemoteStatus == 1 &&
 			!state.ProgressAt.IsZero() && s.now().Sub(state.ObservedAt) <= observationGap &&
-			s.now().Sub(state.ProgressAt) >= cfg.Timeout(state.Progress)
+			s.now().Sub(state.ProgressAt) >= s.policy.timeout(state.Progress)
 		if !failed && !stalled {
 			continue
 		}
 		if !cfg.AutoSwitch {
 			if stalled && !state.Stalled {
-				if err := s.markStalled(ctx, record.ID, cfg); err != nil {
+				if err := s.markStalled(ctx, record.ID); err != nil {
 					return err
 				}
 			}
@@ -113,7 +131,7 @@ func (s *Service) Recover(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) markStalled(ctx context.Context, id int, cfg download.Config) error {
+func (s *Service) markStalled(ctx context.Context, id int) error {
 	unlock, err := s.lockTask(ctx, id)
 	if err != nil {
 		return err
@@ -127,7 +145,7 @@ func (s *Service) markStalled(ctx context.Context, id int, cfg download.Config) 
 		return nil
 	}
 	state := recovery(record, record.Recovery.Preferences)
-	if state.Action != "" || state.Stalled || state.RemoteStatus != 1 || s.now().Sub(state.ObservedAt) > observationGap || s.now().Sub(state.ProgressAt) < cfg.Timeout(state.Progress) {
+	if state.Action != "" || state.Stalled || state.RemoteStatus != 1 || s.now().Sub(state.ObservedAt) > observationGap || s.now().Sub(state.ProgressAt) < s.policy.timeout(state.Progress) {
 		return nil
 	}
 	state.Stalled = true
@@ -138,8 +156,8 @@ func (s *Service) markStalled(ctx context.Context, id int, cfg download.Config) 
 	return nil
 }
 
-func (s *Service) nextCandidate(ctx context.Context, record *ent.OfflineDownload, state *download.Recovery, cfg download.Config) (string, error) {
-	if len(state.Attempts) >= cfg.MaxAttempts {
+func (s *Service) nextCandidate(ctx context.Context, record *ent.OfflineDownload, state *download.Recovery) (string, error) {
+	if len(state.Attempts) >= s.policy.maxAttempts {
 		state.Reason = "已达磁力尝试上限"
 		return "", nil
 	}

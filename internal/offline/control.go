@@ -54,7 +54,7 @@ func (s *Service) advance(ctx context.Context, id int, requested string) (domain
 	if requested == actionCancel {
 		state.Action, state.NextHash = actionCancel, ""
 	} else if (requested == actionSwitch || requested == "next") && state.Action == "" {
-		next, err := s.nextCandidate(ctx, record, state, cfg)
+		next, err := s.nextCandidate(ctx, record, state)
 		if err != nil {
 			return domain.OfflineSubmission{}, s.deferAction(ctx, record, state, err)
 		}
