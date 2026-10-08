@@ -26,8 +26,7 @@ export function useNetworkConfig() {
   return useQuery({
     queryKey: networkKeys.config,
     queryFn: ({ signal }) => apiGet<NetworkConfig>('/api/settings/network', undefined, signal),
-    staleTime: 15_000,
-    refetchOnMount: 'always'
+    staleTime: 15_000
   })
 }
 

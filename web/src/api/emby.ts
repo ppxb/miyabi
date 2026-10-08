@@ -32,8 +32,7 @@ export function useEmbyConfig() {
   return useQuery({
     queryKey: embyKeys.config,
     queryFn: ({ signal }) => apiGet<EmbyConfig>('/api/settings/emby', undefined, signal),
-    staleTime: 15_000,
-    refetchOnMount: 'always'
+    staleTime: 15_000
   })
 }
 

@@ -4,6 +4,7 @@
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
 > 首次复核只更新审计报告；后续已完成第 135、138、140、142、146、147、148、149、161、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 > 第 151 项已完成手动重连优化；首屏业务数据校正按本轮范围保留，是否进一步合并仍需实测，因此不计作整项完成。
+> 第 152 项已完成四类设置查询的缓存复用；任务、影片状态、离线活动及订阅列表的挂载刷新保留，不计作整项完成。
 
 ## 复核结果
 
@@ -32,6 +33,7 @@
 
 ### 本轮验证与限制
 
+- 第 152 项设置查询优化后通过：前端 `npm run test -- tests/settings-cache.test.tsx tests/emby-settings.test.ts tests/query-errors.test.ts`（3 个文件 / 12 项）、`npm run lint`、`npm run build`（包含 TypeScript 检查）及修改文件的 oxfmt 格式化。新增 4 项 Node 回归，将实际查询选项交给 QueryObserver，验证四类查询首次读取、14999ms 内重新挂载复用缓存、15000ms 边界重新挂载刷新，以及主动失效立即重读；保留既有 Emby 保存回写、部分失败校正和旧响应竞争回归。未执行浏览器测试，不将缓存窗口视为每 15 秒轮询。
 - 第 151 项手动重连优化后通过：前端 `npm run test`（27 个文件 / 150 项）、`npm run lint`、`npm run build`（包含 TypeScript 检查）及修改文件的 oxfmt 格式化。新增 6 项 Node 回归，通过模拟 EventSource、驱动实际连接 effect 和 QueryObserver，验证成功重连不追加 HTTP 任务查询、15 秒连接等待超时及失败时恢复兜底、同一断线期间只请求一次、旧 HTTP 响应不能覆盖新 SSE 快照、首屏/重连版本校正保留及卸载时清理定时器。未执行浏览器测试，不据此推算真实首屏请求减少量。
 - 第 146 项优化后通过：`go test ./internal/javdb ./internal/catalogue ./internal/app`、同范围 `go vet`。新增虚拟时间回归覆盖按实际探测开始时间取消、更快结果到达后提前更新截止时间、已取消探测延迟收尾时不忙等，以及相同延迟和零延迟的优先顺序；保留动态线路发现、排除客户端创建耗时、全量测速和调用方取消等既有回归。未进行真实线路测速或 CPU 基准，不据此声称实际请求提速比例。
 - 第 147 项优化后通过：`go test ./internal/domain/subtitle ./internal/subtitle ./internal/library/...`、同范围 `go vet`。新增混合 ASCII、汉字和 emoji 的取样边界回归，验证第 15000 个字符计入、第 15001 个起忽略，保留提示优先、简繁统计及缺省结果。局部基准 `BenchmarkDetectLanguage`（Windows/amd64、i5-12600K、200ms，重复汉字合成输入）中，15000 字符由约 0.476ms / 65536 B 降至 0.353ms / 0 B；100 万字符由约 5.424ms / 4005901 B 降至 0.361ms / 0 B，每次堆分配均从 1 次降至 0 次。仅测语言检测函数，不包含字幕下载、解码或入库，不据此推算整个流程提速。
@@ -78,8 +80,8 @@
   - 定位：`internal/javdb/movie.go`。
 - **151.** 手动重连已优先接收新 SSE 的任务快照，不再立即失效 tasks；同时重置本次尝试的兜底标记，连接失败或等待超时时仍能通过 HTTP 校正任务状态。首个 changes 事件仍按三类 revision 刷新相关业务查询，以补齐读取与订阅建立之间的变化；这部分按本轮范围保留，实际首屏重复请求次数及进一步合并收益需浏览器确认。
   - 定位：`web/src/features/tasks/task-events.tsx`；`web/tests/task-events.test.tsx`。
-- **152.** 任务、状态、离线及部分设置查询仍使用 refetchOnMount:'always'。这与 staleTime 共存本身不是错误；应结合挂载次数、SSE 断线恢复和缓存时效逐项测量，不统一删除。
-  - 定位：`web/src/api/tasks.ts`；`web/src/api/movie-states.ts`；`web/src/api/offline.ts`；`web/src/api/query-client.ts`。
+- **152.** 网络、Emby、订阅设置及缓存统计已移除 refetchOnMount:'always'，重新挂载时复用 15 秒内的新鲜数据，过期或主动失效后仍刷新；保存/清理成功回写和失败校正保留。任务、影片状态、离线活动及订阅列表仍保留强制挂载刷新，后续需结合 SSE 连接状态与漏事件恢复逐项评估，不统一删除。
+  - 定位：`web/src/api/network.ts`；`web/src/api/emby.ts`；`web/src/api/subscription-settings.ts`；`web/src/api/data.ts`；`web/tests/settings-cache.test.tsx`；`web/src/api/tasks.ts`；`web/src/api/movie-states.ts`；`web/src/api/offline.ts`；`web/src/api/subscriptions.ts`。
 - **153.** 离线提交与扫描成功后仍有 setQueryData、invalidate 和 SSE 刷新交汇。更正：setQueryData 不发网络请求；useOfflineTasks 的影片筛选与来源校验仍有职责，enabled 也不是无效配置。仅评估重复失效调度，不删除跨来源保护。
   - 定位：`web/src/api/offline.ts`；`web/src/api/library.ts`。
 - **154.** 媒体库和关键词搜索查询仍未提供 keepPreviousData，翻页会进入无缓存加载态；发现页查询已经使用。路由 intent 预加载仍未接查询 loader。是否预取及保留旧页应按请求量和交互实测决定。

@@ -19,8 +19,7 @@ export function useDataInfo() {
   return useQuery({
     queryKey: dataKeys.system,
     queryFn: ({ signal }) => apiGet<DataInfo>('/api/settings/system', undefined, signal),
-    staleTime: 15_000,
-    refetchOnMount: 'always'
+    staleTime: 15_000
   })
 }
 
