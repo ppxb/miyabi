@@ -11,8 +11,8 @@ import (
 
 // Session represents controlled access to 115 during an operation.
 // It captures account, mounted directory, and authorization version at issue;
-// checks versions before and after each request; and serializes database
-// commits under the drive commit lock.
+// checks source-bound reads before and after each request; and serializes
+// database commits under the drive commit lock.
 type Session interface {
 	Source() domain.LibrarySource
 	// AuthorizationVersion changes on login, disconnect, and mount changes.
@@ -78,89 +78,52 @@ func (s *sourceSession) checkSource() error {
 	return err
 }
 
-func (s *sourceSession) List(ctx context.Context, dirID string, offset int) (pan.FilePage, error) {
+// readSource discards read results from a replaced source. Remote mutations
+// keep their own completion semantics and must not use this helper.
+func readSource[T any](ctx context.Context, s *sourceSession, request func(string) (T, error)) (T, error) {
+	var zero T
 	state, err := s.drive.sourceState(s.source, s.version)
 	if err != nil {
-		return pan.FilePage{}, err
+		return zero, err
 	}
-	page, err := withPanSourceToken(ctx, s.drive, state, func(token string) (pan.FilePage, error) {
-		return s.drive.client.List(ctx, token, dirID, offset, 100)
-	})
+	value, err := withPanSourceToken(ctx, s.drive, state, request)
 	if err != nil {
-		return pan.FilePage{}, err
+		return zero, err
 	}
 	if err := s.checkSource(); err != nil {
-		return pan.FilePage{}, err
+		return zero, err
 	}
-	return page, nil
+	return value, nil
+}
+
+func (s *sourceSession) List(ctx context.Context, dirID string, offset int) (pan.FilePage, error) {
+	return readSource(ctx, s, func(token string) (pan.FilePage, error) {
+		return s.drive.client.List(ctx, token, dirID, offset, 100)
+	})
 }
 
 func (s *sourceSession) Info(ctx context.Context, fileID string) (pan.FileInfo, error) {
-	state, err := s.drive.sourceState(s.source, s.version)
-	if err != nil {
-		return pan.FileInfo{}, err
-	}
-	info, err := withPanSourceToken(ctx, s.drive, state, func(token string) (pan.FileInfo, error) {
+	return readSource(ctx, s, func(token string) (pan.FileInfo, error) {
 		return s.drive.client.Info(ctx, token, fileID)
 	})
-	if err != nil {
-		return pan.FileInfo{}, err
-	}
-	if err := s.checkSource(); err != nil {
-		return pan.FileInfo{}, err
-	}
-	return info, nil
 }
 
 func (s *sourceSession) Read(ctx context.Context, pickCode string, limit int64) ([]byte, error) {
-	state, err := s.drive.sourceState(s.source, s.version)
-	if err != nil {
-		return nil, err
-	}
-	body, err := withPanSourceToken(ctx, s.drive, state, func(token string) ([]byte, error) {
+	return readSource(ctx, s, func(token string) ([]byte, error) {
 		return s.drive.client.ReadMetadata(ctx, token, pickCode, limit)
 	})
-	if err != nil {
-		return nil, err
-	}
-	if err := s.checkSource(); err != nil {
-		return nil, err
-	}
-	return body, nil
 }
 
 func (s *sourceSession) PlayURL(ctx context.Context, pickCode, userAgent string) ([]pan.PlaySource, error) {
-	state, err := s.drive.sourceState(s.source, s.version)
-	if err != nil {
-		return nil, err
-	}
-	sources, err := withPanSourceToken(ctx, s.drive, state, func(token string) ([]pan.PlaySource, error) {
+	return readSource(ctx, s, func(token string) ([]pan.PlaySource, error) {
 		return s.drive.client.PlayURL(ctx, token, pickCode, userAgent)
 	})
-	if err != nil {
-		return nil, err
-	}
-	if err := s.checkSource(); err != nil {
-		return nil, err
-	}
-	return sources, nil
 }
 
 func (s *sourceSession) DownloadURL(ctx context.Context, pickCode, userAgent string) (string, error) {
-	state, err := s.drive.sourceState(s.source, s.version)
-	if err != nil {
-		return "", err
-	}
-	downloadURL, err := withPanSourceToken(ctx, s.drive, state, func(token string) (string, error) {
+	return readSource(ctx, s, func(token string) (string, error) {
 		return s.drive.client.DownloadURL(ctx, token, pickCode, userAgent)
 	})
-	if err != nil {
-		return "", err
-	}
-	if err := s.checkSource(); err != nil {
-		return "", err
-	}
-	return downloadURL, nil
 }
 
 func (s *sourceSession) AddOffline(ctx context.Context, magnet string) (string, error) {

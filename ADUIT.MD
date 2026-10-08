@@ -2,7 +2,7 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、140、142、146、147、148、149、153、157、161、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、140、142、146、147、148、149、153、156、157、161、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 > 第 151 项已完成手动重连优化；首屏业务数据校正按本轮范围保留，是否进一步合并仍需实测，因此不计作整项完成。
 > 第 152 项已完成四类设置查询的缓存复用；任务、影片状态、离线活动及订阅列表的挂载刷新保留，不计作整项完成。
 
@@ -11,11 +11,11 @@
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
 | 确认仍存在，待处理 | 1 | 有明确代码依据的边界、状态反馈或行为问题 |
-| 可选优化与整理 | 52 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
+| 可选优化与整理 | 51 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
 | 按现有约定暂缓 | 10 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 35 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 36 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
@@ -33,6 +33,7 @@
 
 ### 本轮验证与限制
 
+- 第 156 项整理后通过：`go test ./internal/drive ./internal/offline ./internal/library/... ./internal/strm ./internal/app`、同范围 `go vet`。新增五种来源读取的回归覆盖正常结果、过期会话不刷新令牌、读取中换目录/断开后丢弃结果、上游错误优先且不泄露部分结果、请求前/请求中取消、正常令牌刷新及刷新中来源变更后不发起读取。既有离线提交成功后保留原来源记录、账号级任务同步和播放地址回归通过。未进行真实 115 或浏览器实测，不声称减少网络请求或实际耗时。
 - 第 157 项整理后通过：`go test ./internal/javbus ./internal/catalogue ./internal/magnet ./internal/app`、同范围 `go vet`。新增离线回归覆盖详情与磁力接口的 404/重定向差异、未找到内容与挑战页的判断顺序、来源可用状态、响应体关闭、2 MiB 读取上限和错误上下文；虚拟时间验证共用限流及等待期间取消，既有取消/超时和新鲜详情参数回归保留，并加强两类请求头检查。未进行真实站点的详情/磁力抓取或浏览器实测，不声称减少正常获取磁力所需的两次请求。
 - 第 153 项修复后通过：前端 `npm run test`（29 个文件 / 176 项）、`npm run lint`、`npm run typecheck`、`npm run build` 及修改文件的 oxfmt 格式化。新增 22 项 Node 回归，使用真实 QueryClient/QueryObserver、操作回调及模拟 SSE，覆盖同批失效合并、读取期间多次变化只排一次后续校正、无缓存旧请求丢弃、快照取消当前和排队任务读取、不同客户端隔离、失败后恢复、SSE/操作响应两种顺序及在途交错、账号切换和取消/换源失败后的状态校正。未进行浏览器测试，不宣称每次操作固定只有一次 HTTP 请求；读取开始后发生的变化仍保留必要的后续校正。
 - 第 152 项设置查询优化后通过：前端 `npm run test -- tests/settings-cache.test.tsx tests/emby-settings.test.ts tests/query-errors.test.ts`（3 个文件 / 12 项）、`npm run lint`、`npm run build`（包含 TypeScript 检查）及修改文件的 oxfmt 格式化。新增 4 项 Node 回归，将实际查询选项交给 QueryObserver，验证四类查询首次读取、14999ms 内重新挂载复用缓存、15000ms 边界重新挂载刷新，以及主动失效立即重读；保留既有 Emby 保存回写、部分失败校正和旧响应竞争回归。未执行浏览器测试，不将缓存窗口视为每 15 秒轮询。
@@ -86,8 +87,6 @@
   - 定位：`web/src/api/network.ts`；`web/src/api/emby.ts`；`web/src/api/subscription-settings.ts`；`web/src/api/data.ts`；`web/tests/settings-cache.test.tsx`；`web/src/api/tasks.ts`；`web/src/api/movie-states.ts`；`web/src/api/offline.ts`；`web/src/api/subscriptions.ts`。
 - **154.** 媒体库和关键词搜索查询仍未提供 keepPreviousData，翻页会进入无缓存加载态；发现页查询已经使用。路由 intent 预加载仍未接查询 loader。是否预取及保留旧页应按请求量和交互实测决定。
   - 定位：`web/src/api/library.ts`；`web/src/api/discover.ts`；`web/src/router.tsx`。
-- **156.** sourceSession 多个读取方法仍重复来源检查、令牌调用与完成后检查。若抽取公共调用须区分读操作和已提交的写操作，不把所有方法机械套入同一个模板。
-  - 定位：`internal/drive/session.go`。
 - **158.** errorMiddleware 与 slog-gin 都会记录失败请求，domain error 的 cause 也可能与 error 字符串重复。需明确访问日志与诊断日志职责；敏感字段脱敏优先于减少日志条数（见 235）。
   - 定位：`internal/api/error.go`；`internal/api/router.go`。
 - **159.** authMiddleware 仍直接构造两种 UNAUTHORIZED 响应。可以统一私有响应助手，但必须保留本站会话与 PAN_UNAUTHORIZED 的区别；当前重复未造成已知故障。
@@ -276,6 +275,8 @@
   - 定位：`internal/ent/schema/movie.go`；`internal/ent/migrate/schema.go`；`internal/library/scan/local.go`；`internal/library/scan/local_ingest.go`；`internal/library/listing_index_test.go`；`internal/library/scan/local_identity_test.go`。
 - [x] **153.** 扫描、重新刮削、离线提交/取消/换源、任务控制和 SSE 共用按 QueryClient/查询前缀隔离的刷新队列；开始前合并重复失效，读取期间的变化只排一次后续校正，避免相互取消重发。首轮丢弃变化前的旧请求，完整任务快照取消当前及排队的任务读取，后续新变化仍可刷新。操作响应只在缓存仍与提交前一致且没有读取进行时回写，避免晚到响应回退已更新的状态；原有账号、目录、影片筛选及 enabled 限制保留，重新刮削回写也核对来源。首屏校正、手动重连兜底和失败后的重新读取保留。
   - 定位：`web/src/api/query-refresh.ts`；`web/src/api/offline.ts`；`web/src/api/library.ts`；`web/src/api/tasks.ts`；`web/src/api/movie-states.ts`；`web/src/features/tasks/task-events.tsx`；`web/tests/query-refresh.test.ts`；`web/tests/task-events.test.tsx`。
+- [x] **156.** sourceSession 的 List、Info、Read、PlayURL、DownloadURL 已共用私有 readSource 泛型函数，集中请求前来源检查、现有令牌处理和成功后来源检查；失败或来源改变时返回对应类型零值，保留上游错误优先顺序。AddOffline 继续保留已提交结果，RemoveOffline 继续检查完成后的来源，OfflineTasks 和 CommitAccount 维持账号范围；未统一读写语义、增加策略开关或延长锁的持有范围。
+  - 定位：`internal/drive/session.go`；`internal/drive/session_read_test.go`。
 - [x] **157.** MoviePage 与 fetchMagnets 已共用限流、GET 请求与公共请求头、网络错误处理、限量响应读取，以及挑战页/验证页/状态码校验。详情页独有的未找到空结果规则、两类重定向处理、Accept/Referer 等请求头和各自解析保留在调用方；取消不禁用来源，响应体在成功与提前返回时均关闭。ensureDetailParams 继续只委托详情读取与参数解析，健康探测保持独立，不增加通用策略开关或缓存。
   - 定位：`internal/javbus/client.go`；`internal/javbus/client_test.go`；`internal/javbus/response_test.go`。
 - [x] **161.** 登录改为锁内预占与统一结算，失败数和在途数共同限制准入；格式错误只释放名额，成功清除失败历史但保留其他在途请求。IP 记录最多 4096 条，登录访问触发定期过期回收；满额时暂缓新 IP，不淘汰有效失败记录、封禁或在途记录。空闲时不主动清理，但仍受容量约束。保留默认 5 分钟内失败 5 次封禁 24 小时的策略，修正单次失败阈值及到期边界；错误 cause 使用通用限流文案，封禁提示按真实剩余时间生成。
