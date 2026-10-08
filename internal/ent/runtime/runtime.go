@@ -229,25 +229,25 @@ func init() {
 	// offlinedownload.DefaultDirectoryID holds the default value on creation for the directory_id field.
 	offlinedownload.DefaultDirectoryID = offlinedownloadDescDirectoryID.Default.(string)
 	// offlinedownloadDescProgress is the schema descriptor for progress field.
-	offlinedownloadDescProgress := offlinedownloadFields[7].Descriptor()
+	offlinedownloadDescProgress := offlinedownloadFields[8].Descriptor()
 	// offlinedownload.DefaultProgress holds the default value on creation for the progress field.
 	offlinedownload.DefaultProgress = offlinedownloadDescProgress.Default.(int)
 	// offlinedownload.ProgressValidator is a validator for the "progress" field. It is called by the builders before save.
 	offlinedownload.ProgressValidator = offlinedownloadDescProgress.Validators[0].(func(int) error)
 	// offlinedownloadDescFileID is the schema descriptor for file_id field.
-	offlinedownloadDescFileID := offlinedownloadFields[9].Descriptor()
+	offlinedownloadDescFileID := offlinedownloadFields[10].Descriptor()
 	// offlinedownload.DefaultFileID holds the default value on creation for the file_id field.
 	offlinedownload.DefaultFileID = offlinedownloadDescFileID.Default.(string)
 	// offlinedownloadDescFileIds is the schema descriptor for file_ids field.
-	offlinedownloadDescFileIds := offlinedownloadFields[10].Descriptor()
+	offlinedownloadDescFileIds := offlinedownloadFields[11].Descriptor()
 	// offlinedownload.DefaultFileIds holds the default value on creation for the file_ids field.
 	offlinedownload.DefaultFileIds = offlinedownloadDescFileIds.Default.([]string)
 	// offlinedownloadDescScanTaskID is the schema descriptor for scan_task_id field.
-	offlinedownloadDescScanTaskID := offlinedownloadFields[11].Descriptor()
+	offlinedownloadDescScanTaskID := offlinedownloadFields[12].Descriptor()
 	// offlinedownload.DefaultScanTaskID holds the default value on creation for the scan_task_id field.
 	offlinedownload.DefaultScanTaskID = offlinedownloadDescScanTaskID.Default.(int)
 	// offlinedownloadDescAwaitingLocation is the schema descriptor for awaiting_location field.
-	offlinedownloadDescAwaitingLocation := offlinedownloadFields[12].Descriptor()
+	offlinedownloadDescAwaitingLocation := offlinedownloadFields[13].Descriptor()
 	// offlinedownload.DefaultAwaitingLocation holds the default value on creation for the awaiting_location field.
 	offlinedownload.DefaultAwaitingLocation = offlinedownloadDescAwaitingLocation.Default.(bool)
 	settingMixin := schema.Setting{}.Mixin()

@@ -29,7 +29,7 @@ export function MovieStateBadge({
     return <Badge variant="library">已入库</Badge>
   }
   if (state === 'saving') {
-    return <Badge variant="frosted">下载中</Badge>
+    return <Badge variant="downloading">下载中</Badge>
   }
   if (state === 'processing') {
     return <Badge variant="frosted">入库处理中</Badge>

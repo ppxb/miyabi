@@ -7,6 +7,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/domain/download"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 )
@@ -26,6 +27,10 @@ func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.O
 		return domain.OfflineSubmission{}, err
 	}
 	code := codeid.Normalize(rawCode)
+	_, prefs, err := service.config(ctx)
+	if err != nil {
+		return domain.OfflineSubmission{}, err
+	}
 
 	sess, err := service.drive.Open(ctx)
 	if err != nil {
@@ -41,7 +46,7 @@ func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.O
 	defer unlock()
 
 	existing, err := service.database.OfflineDownload.Query().Where(
-		offlinedownload.AccountIDEQ(source.AccountID), offlinedownload.HashEQ(hash),
+		offlinedownload.AccountIDEQ(source.AccountID), candidateHash(hash),
 		offlinedownload.StatusEQ(offlinedownload.StatusRunning)).First(ctx)
 	if err == nil {
 		if existing.DirectoryID != directory.ID {
@@ -55,7 +60,7 @@ func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.O
 
 	previous, err := service.database.OfflineDownload.Query().Where(
 		offlinedownload.AccountIDEQ(source.AccountID), offlinedownload.DirectoryIDEQ(directory.ID),
-		offlinedownload.HashEQ(hash), offlinedownload.StatusEQ(offlinedownload.StatusDone)).
+		candidateHash(hash), offlinedownload.StatusEQ(offlinedownload.StatusDone)).
 		Order(ent.Desc(offlinedownload.FieldID)).First(ctx)
 	if err == nil {
 		state, err := service.submission(ctx, previous, &source)
@@ -81,26 +86,28 @@ func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.O
 	// Once a remote mutation starts, finish recording it even if the tab closes.
 	submitContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), service.submitTimeout)
 	defer cancel()
-	remote, err := service.submit(submitContext, sess, hash)
-	if err != nil {
-		return domain.OfflineSubmission{}, fmt.Errorf("submit 115 offline download: %w", err)
-	}
+	state := &download.Recovery{Preferences: prefs, CurrentHash: hash, Action: actionSubmit, SubmissionStarted: true,
+		Attempts: []download.Attempt{{Hash: hash, StartedAt: service.now()}}}
 	var created *ent.OfflineDownload
 	if err := service.drive.Commit(submitContext, func(tx *ent.Tx) error {
 		var err error
 		created, err = tx.OfflineDownload.Create().
-			SetCode(code).SetJavdbID(movieID).SetHash(hash).SetInfoHash(remote.Hash).
+			SetCode(code).SetJavdbID(movieID).SetHash(hash).SetInfoHash(hash).SetRecovery(state).
 			SetAccountID(source.AccountID).SetDirectoryID(directory.ID).
 			Save(submitContext)
 		if err != nil {
 			return err
 		}
-		if remote.Status == 2 {
-			return service.completeTask(submitContext, tx, created, remote.FileID)
-		}
 		return nil
 	}); err != nil {
 		return domain.OfflineSubmission{}, fmt.Errorf("record 115 offline download: %w", err)
+	}
+	remote, err := service.submit(submitContext, sess, hash)
+	if err != nil {
+		return domain.OfflineSubmission{}, service.deferAction(submitContext, created, state, fmt.Errorf("submit 115 offline download: %w", err))
+	}
+	if err := service.recordSubmission(submitContext, created, state, remote); err != nil {
+		return domain.OfflineSubmission{}, service.deferAction(submitContext, created, state, err)
 	}
 
 	service.tasks.NotifyOfflineChanged()

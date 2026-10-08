@@ -16,6 +16,8 @@ const badgeVariants = cva(
           'bg-destructive text-white focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/80',
         library:
           'bg-violet-600 text-white focus-visible:ring-violet-600/20 dark:bg-violet-500 [a]:hover:bg-violet-600/80',
+        downloading:
+          'bg-cyan-400 text-white focus-visible:ring-cyan-400/40 [a]:hover:bg-cyan-400/80',
         frosted:
           'border-border/80 bg-background/85 text-foreground backdrop-blur [a]:hover:bg-muted [a]:hover:text-muted-foreground',
         outline:

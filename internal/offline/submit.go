@@ -58,6 +58,17 @@ func (service *Service) submit(ctx context.Context, sess drive.Session, hash str
 }
 
 func (service *Service) findRemoteTask(ctx context.Context, sess drive.Session, hash string) (pan.OfflineTask, error) {
+	remote, found, err := service.lookupRemoteTask(ctx, sess, hash)
+	if err != nil {
+		return pan.OfflineTask{}, err
+	}
+	if found {
+		return remote, nil
+	}
+	return pan.OfflineTask{}, domain.E(domain.KindBusy, "115 提示任务已存在，但任务列表中未找到它，请稍后重试", nil)
+}
+
+func (service *Service) lookupRemoteTask(ctx context.Context, sess drive.Session, hash string) (pan.OfflineTask, bool, error) {
 	var found *pan.OfflineTask
 	err := drive.WalkOfflinePages(ctx, func(page int) (pan.OfflinePage, error) {
 		return sess.OfflineTasks(ctx, page)
@@ -71,12 +82,12 @@ func (service *Service) findRemoteTask(ctx context.Context, sess drive.Session, 
 		return true, nil
 	})
 	if err != nil {
-		return pan.OfflineTask{}, fmt.Errorf("find duplicate 115 task: %w", err)
+		return pan.OfflineTask{}, false, fmt.Errorf("find 115 task: %w", err)
 	}
 	if found != nil {
-		return *found, nil
+		return *found, true, nil
 	}
-	return pan.OfflineTask{}, domain.E(domain.KindBusy, "115 提示任务已存在，但任务列表中未找到它，请稍后重试", nil)
+	return pan.OfflineTask{}, false, nil
 }
 
 func (service *Service) remoteHasVideo(ctx context.Context, sess drive.Session, id string) (bool, error) {

@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/ppxb/miyabi/internal/domain/download"
 )
 
 // OfflineDownload records a remote 115 download independently of executable tasks.
@@ -19,7 +20,8 @@ func (OfflineDownload) Fields() []ent.Field {
 		field.String("info_hash").Default(""),
 		field.String("account_id").Default(""),
 		field.String("directory_id").Default(""),
-		field.Enum("status").Values("running", "done", "failed").Default("running"),
+		field.Enum("status").Values("running", "done", "failed", "cancelled").Default("running"),
+		field.JSON("recovery", &download.Recovery{}).Optional(),
 		field.Int("progress").Range(0, 100).Default(0),
 		field.String("error").Optional().Nillable(),
 		field.String("file_id").Default(""),

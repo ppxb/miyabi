@@ -1,5 +1,11 @@
 import { Link } from '@tanstack/react-router'
-import { CheckIcon, CloudDownloadIcon, CopyIcon, LoaderCircleIcon } from 'lucide-react'
+import {
+  CheckIcon,
+  CloudDownloadIcon,
+  CopyIcon,
+  LoaderCircleIcon,
+  SkipForwardIcon
+} from 'lucide-react'
 import { useState } from 'react'
 
 import type { DiscoverMagnet, useDiscoverMagnets } from '@/api/discover'
@@ -8,6 +14,7 @@ import {
   isOfflineTaskActive,
   useAddOffline,
   useOfflineTasks,
+  useOfflineControl,
   type OfflineSubmission
 } from '@/api/offline'
 import { usePanAccount } from '@/api/pan'
@@ -128,6 +135,7 @@ function MagnetCard({
   onCopy: () => void
 }) {
   const add = useAddOffline(movieID)
+  const next = useOfflineControl('next')
   const submitted = task !== undefined && task.phase !== 'available'
   const busy = add.isPending || (checkingStatus && !submitted)
   let label = '一键加入 115'
@@ -167,6 +175,23 @@ function MagnetCard({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2 self-end sm:self-center">
+            {task?.can_switch ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                title="尝试下一条磁力"
+                aria-label="尝试下一条磁力"
+                disabled={next.isPending || statusError}
+                onClick={() => next.mutate(task.task_id)}
+              >
+                {next.isPending ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : (
+                  <SkipForwardIcon />
+                )}
+              </Button>
+            ) : null}
             <Button type="button" variant="outline" size="sm" onClick={onCopy}>
               {copied ? <CheckIcon /> : <CopyIcon />}
               {copied ? '已复制' : '复制'}
@@ -205,6 +230,11 @@ function MagnetCard({
         </div>
         {task?.phase === 'in_library' && task.processing ? (
           <p className="text-sm text-muted-foreground">文件已入库，后台整理中。</p>
+        ) : null}
+        {task && (task.attempt_count ?? 0) > 1 ? (
+          <p className="text-xs text-muted-foreground">
+            已尝试 {task.attempt_count} 条磁力{task.switch_reason ? ` · ${task.switch_reason}` : ''}
+          </p>
         ) : null}
         {error ? <InlineError>{error}</InlineError> : null}
       </CardContent>

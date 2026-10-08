@@ -1,12 +1,29 @@
 package pan
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 )
+
+func TestOfflineProgressRetainsPrecisionAndRejectsNonFiniteValues(t *testing.T) {
+	result, err := (offlineTaskWire{Progress: json.Number("21.0573")}).task()
+	if err != nil || result.Progress != 21 || result.RawProgress != 21.0573 || result.ProgressUnknown {
+		t.Fatalf("lost precision: %+v, %v", result, err)
+	}
+	unknown, err := (offlineTaskWire{}).task()
+	if err != nil || !unknown.ProgressUnknown {
+		t.Fatal("missing progress was treated as zero")
+	}
+	for _, value := range []string{"NaN", "+Inf", "-Inf"} {
+		if _, err := (offlineTaskWire{Progress: json.Number(value)}).task(); err == nil {
+			t.Fatalf("accepted %s", value)
+		}
+	}
+}
 
 type offlineRoundTrip func(*http.Request) (*http.Response, error)
 

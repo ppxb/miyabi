@@ -284,6 +284,10 @@ type stubCatalogue struct {
 	magnets map[string][]domain.Magnet
 }
 
+func (s *stubCatalogue) CatalogueMagnets(ctx context.Context, movieID string) ([]domain.Magnet, error) {
+	return s.magnets[movieID], nil
+}
+
 func (s *stubCatalogue) HasMagnet(ctx context.Context, movieID, hash string) (bool, error) {
 	for _, m := range s.magnets[movieID] {
 		if strings.EqualFold(m.Hash, hash) {

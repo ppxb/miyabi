@@ -16,6 +16,15 @@ export type SubscriptionConfig = {
   actor_auto_download: boolean
   check_time: string
   preferences: MagnetPreferences
+  download: DownloadConfig
+}
+
+export type DownloadConfig = {
+  auto_switch: boolean
+  zero_progress_minutes: number
+  stalled_minutes: number
+  completion_grace_minutes: number
+  max_attempts: number
 }
 
 export const subscriptionSettingsKey = ['settings', 'subscription'] as const

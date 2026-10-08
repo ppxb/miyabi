@@ -17,13 +17,13 @@
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/noto-sans-sc": "^5.3.0",
-    "@tanstack/react-query": "^5.102.8",
-    "@tanstack/react-router": "^1.170.39",
+    "@tanstack/react-query": "^5.104.1",
+    "@tanstack/react-router": "^1.170.41",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
-    "lucide-react": "^1.48.0",
+    "lucide-react": "^1.52.0",
     "next-themes": "^0.4.6",
-    "radix-ui": "^1.6.7",
+    "radix-ui": "^1.7.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "sonner": "^2.0.8",
@@ -32,17 +32,17 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
-    "@tanstack/router-plugin": "^1.168.40",
+    "@tanstack/router-plugin": "^1.168.42",
     "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.1",
-    "oxfmt": "^0.70.0",
-    "oxlint": "^1.85.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "oxfmt": "^0.72.0",
+    "oxlint": "^1.87.0",
     "shadcn": "^4.21.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^8.3.1",
-    "vitest": "^5.0.2"
+    "vite": "^8.3.3",
+    "vitest": "^5.0.3"
   }
 }

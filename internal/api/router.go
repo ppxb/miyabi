@@ -106,6 +106,8 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.PUT("/tasks/library-control", taskLibraryControlHandler(deps.Tasks))
 	protected.GET("/tasks/events", taskEventsHandler(deps.Tasks))
 	protected.GET("/offline/tasks", noStore(), offlineActivityHandler(deps.Offline))
+	protected.POST("/offline/tasks/:id/cancel", offlineControlHandler(deps.Offline, false))
+	protected.POST("/offline/tasks/:id/next", offlineControlHandler(deps.Offline, true))
 
 	subscriptionsAPI := protected.Group("/subscriptions", noStore())
 	subscriptionsAPI.GET("", subscriptionListHandler(deps.Monitor))

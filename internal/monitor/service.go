@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/domain/download"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/subscription"
 	"github.com/ppxb/miyabi/internal/magnet"
@@ -30,13 +32,27 @@ type Config struct {
 	ActorAutoDownload bool               `json:"actor_auto_download"`
 	CheckTime         string             `json:"check_time"`
 	Preferences       magnet.Preferences `json:"preferences"`
+	Download          download.Config    `json:"download"`
 }
 
 func DefaultConfig() Config {
-	return Config{MovieAutoDownload: true, CheckTime: defaultCheckTime, Preferences: magnet.DefaultPreferences()}
+	return Config{MovieAutoDownload: true, CheckTime: defaultCheckTime, Preferences: magnet.DefaultPreferences(), Download: download.DefaultConfig()}
+}
+
+func (c *Config) UnmarshalJSON(data []byte) error {
+	type plain Config
+	value := plain(DefaultConfig())
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*c = Config(value)
+	return nil
 }
 
 func (c Config) normalized() Config {
+	if c.Download == (download.Config{}) {
+		c.Download = download.DefaultConfig()
+	}
 	if c.CheckTime == "" {
 		c.CheckTime = defaultCheckTime
 	}
@@ -47,6 +63,9 @@ func (c Config) normalized() Config {
 func (c Config) validate() error {
 	if !checkTimePattern.MatchString(c.CheckTime) {
 		return domain.E(domain.KindInvalid, "检查时间格式应为 HH:MM", nil)
+	}
+	if err := c.Download.Validate(); err != nil {
+		return err
 	}
 	return c.Preferences.Validate()
 }

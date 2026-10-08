@@ -609,6 +609,16 @@ func StatusNotIn(vs ...Status) predicate.OfflineDownload {
 	return predicate.OfflineDownload(sql.FieldNotIn(FieldStatus, vs...))
 }
 
+// RecoveryIsNil applies the IsNil predicate on the "recovery" field.
+func RecoveryIsNil() predicate.OfflineDownload {
+	return predicate.OfflineDownload(sql.FieldIsNull(FieldRecovery))
+}
+
+// RecoveryNotNil applies the NotNil predicate on the "recovery" field.
+func RecoveryNotNil() predicate.OfflineDownload {
+	return predicate.OfflineDownload(sql.FieldNotNull(FieldRecovery))
+}
+
 // ProgressEQ applies the EQ predicate on the "progress" field.
 func ProgressEQ(v int) predicate.OfflineDownload {
 	return predicate.OfflineDownload(sql.FieldEQ(FieldProgress, v))

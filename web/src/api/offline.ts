@@ -19,11 +19,24 @@ export type OfflineSubmission = {
   directory_id: string
   scan_task_id?: number
   hash: string
-  status: 'queued' | 'running' | 'done' | 'failed'
+  status: 'queued' | 'running' | 'done' | 'failed' | 'cancelled'
   phase: 'available' | 'downloading' | 'processing' | 'in_library' | 'downloaded'
   processing: boolean
   progress: number
   error?: string
+  download_state?:
+    | 'queued'
+    | 'stalled'
+    | 'exhausted'
+    | 'switching'
+    | 'submitting'
+    | 'cancelling'
+    | 'waiting'
+  attempt_count?: number
+  switch_reason?: string
+  can_cancel?: boolean
+  can_switch?: boolean
+  retry_at?: string
 }
 
 export type OfflineActivity = { source?: LibrarySource; tasks: OfflineSubmission[] }
@@ -81,12 +94,40 @@ export function useAddOffline(movieID: string) {
         activity && sameSource(activity.source, submission)
           ? {
               ...activity,
-              tasks: [submission, ...activity.tasks.filter(task => task.hash !== submission.hash)]
+              tasks: [
+                submission,
+                ...activity.tasks.filter(
+                  task => task.task_id !== submission.task_id && task.hash !== submission.hash
+                )
+              ]
             }
           : activity
       )
       void invalidateMovieStates(queryClient)
       void queryClient.invalidateQueries({ queryKey: offlineKeys.all })
     }
+  })
+}
+
+export function useOfflineControl(action: 'cancel' | 'next') {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (taskID: number) =>
+      apiPost<OfflineSubmission>(`/api/offline/tasks/${taskID}/${action}`),
+    onSuccess: submission => {
+      queryClient.setQueryData<OfflineActivity>(offlineKeys.activity, activity =>
+        activity && sameSource(activity.source, submission)
+          ? {
+              ...activity,
+              tasks: activity.tasks.map(task =>
+                task.task_id === submission.task_id ? submission : task
+              )
+            }
+          : activity
+      )
+      void invalidateMovieStates(queryClient)
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: offlineKeys.all }),
+    meta: { errorTitle: action === 'cancel' ? '取消下载失败' : '切换磁力失败' }
   })
 }

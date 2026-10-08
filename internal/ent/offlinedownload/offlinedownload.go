@@ -32,6 +32,8 @@ const (
 	FieldDirectoryID = "directory_id"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldRecovery holds the string denoting the recovery field in the database.
+	FieldRecovery = "recovery"
 	// FieldProgress holds the string denoting the progress field in the database.
 	FieldProgress = "progress"
 	// FieldError holds the string denoting the error field in the database.
@@ -60,6 +62,7 @@ var Columns = []string{
 	FieldAccountID,
 	FieldDirectoryID,
 	FieldStatus,
+	FieldRecovery,
 	FieldProgress,
 	FieldError,
 	FieldFileID,
@@ -119,9 +122,10 @@ const DefaultStatus = StatusRunning
 
 // Status values.
 const (
-	StatusRunning Status = "running"
-	StatusDone    Status = "done"
-	StatusFailed  Status = "failed"
+	StatusRunning   Status = "running"
+	StatusDone      Status = "done"
+	StatusFailed    Status = "failed"
+	StatusCancelled Status = "cancelled"
 )
 
 func (s Status) String() string {
@@ -131,7 +135,7 @@ func (s Status) String() string {
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s Status) error {
 	switch s {
-	case StatusRunning, StatusDone, StatusFailed:
+	case StatusRunning, StatusDone, StatusFailed, StatusCancelled:
 		return nil
 	default:
 		return fmt.Errorf("offlinedownload: invalid enum value for status field: %q", s)

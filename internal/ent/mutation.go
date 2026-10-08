@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/domain/download"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/embynotification"
 	"github.com/ppxb/miyabi/internal/ent/file"
@@ -5378,6 +5379,7 @@ type OfflineDownloadMutation struct {
 	account_id        *string
 	directory_id      *string
 	status            *offlinedownload.Status
+	recovery          **download.Recovery
 	progress          *int
 	addprogress       *int
 	error             *string
@@ -5815,6 +5817,55 @@ func (m *OfflineDownloadMutation) ResetStatus() {
 	m.status = nil
 }
 
+// SetRecovery sets the "recovery" field.
+func (m *OfflineDownloadMutation) SetRecovery(d *download.Recovery) {
+	m.recovery = &d
+}
+
+// Recovery returns the value of the "recovery" field in the mutation.
+func (m *OfflineDownloadMutation) Recovery() (r *download.Recovery, exists bool) {
+	v := m.recovery
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRecovery returns the old "recovery" field's value of the OfflineDownload entity.
+// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OfflineDownloadMutation) OldRecovery(ctx context.Context) (v *download.Recovery, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRecovery is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRecovery requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRecovery: %w", err)
+	}
+	return oldValue.Recovery, nil
+}
+
+// ClearRecovery clears the value of the "recovery" field.
+func (m *OfflineDownloadMutation) ClearRecovery() {
+	m.recovery = nil
+	m.clearedFields[offlinedownload.FieldRecovery] = struct{}{}
+}
+
+// RecoveryCleared returns if the "recovery" field was cleared in this mutation.
+func (m *OfflineDownloadMutation) RecoveryCleared() bool {
+	_, ok := m.clearedFields[offlinedownload.FieldRecovery]
+	return ok
+}
+
+// ResetRecovery resets all changes to the "recovery" field.
+func (m *OfflineDownloadMutation) ResetRecovery() {
+	m.recovery = nil
+	delete(m.clearedFields, offlinedownload.FieldRecovery)
+}
+
 // SetProgress sets the "progress" field.
 func (m *OfflineDownloadMutation) SetProgress(i int) {
 	m.progress = &i
@@ -6133,7 +6184,7 @@ func (m *OfflineDownloadMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OfflineDownloadMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 16)
 	if m.created_at != nil {
 		fields = append(fields, offlinedownload.FieldCreatedAt)
 	}
@@ -6160,6 +6211,9 @@ func (m *OfflineDownloadMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, offlinedownload.FieldStatus)
+	}
+	if m.recovery != nil {
+		fields = append(fields, offlinedownload.FieldRecovery)
 	}
 	if m.progress != nil {
 		fields = append(fields, offlinedownload.FieldProgress)
@@ -6205,6 +6259,8 @@ func (m *OfflineDownloadMutation) Field(name string) (ent.Value, bool) {
 		return m.DirectoryID()
 	case offlinedownload.FieldStatus:
 		return m.Status()
+	case offlinedownload.FieldRecovery:
+		return m.Recovery()
 	case offlinedownload.FieldProgress:
 		return m.Progress()
 	case offlinedownload.FieldError:
@@ -6244,6 +6300,8 @@ func (m *OfflineDownloadMutation) OldField(ctx context.Context, name string) (en
 		return m.OldDirectoryID(ctx)
 	case offlinedownload.FieldStatus:
 		return m.OldStatus(ctx)
+	case offlinedownload.FieldRecovery:
+		return m.OldRecovery(ctx)
 	case offlinedownload.FieldProgress:
 		return m.OldProgress(ctx)
 	case offlinedownload.FieldError:
@@ -6327,6 +6385,13 @@ func (m *OfflineDownloadMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
+		return nil
+	case offlinedownload.FieldRecovery:
+		v, ok := value.(*download.Recovery)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRecovery(v)
 		return nil
 	case offlinedownload.FieldProgress:
 		v, ok := value.(int)
@@ -6427,6 +6492,9 @@ func (m *OfflineDownloadMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *OfflineDownloadMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(offlinedownload.FieldRecovery) {
+		fields = append(fields, offlinedownload.FieldRecovery)
+	}
 	if m.FieldCleared(offlinedownload.FieldError) {
 		fields = append(fields, offlinedownload.FieldError)
 	}
@@ -6444,6 +6512,9 @@ func (m *OfflineDownloadMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *OfflineDownloadMutation) ClearField(name string) error {
 	switch name {
+	case offlinedownload.FieldRecovery:
+		m.ClearRecovery()
+		return nil
 	case offlinedownload.FieldError:
 		m.ClearError()
 		return nil
@@ -6481,6 +6552,9 @@ func (m *OfflineDownloadMutation) ResetField(name string) error {
 		return nil
 	case offlinedownload.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case offlinedownload.FieldRecovery:
+		m.ResetRecovery()
 		return nil
 	case offlinedownload.FieldProgress:
 		m.ResetProgress()

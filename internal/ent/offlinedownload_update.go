@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
+	"github.com/ppxb/miyabi/internal/domain/download"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 )
@@ -130,6 +131,18 @@ func (_u *OfflineDownloadUpdate) SetNillableStatus(v *offlinedownload.Status) *O
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetRecovery sets the "recovery" field.
+func (_u *OfflineDownloadUpdate) SetRecovery(v *download.Recovery) *OfflineDownloadUpdate {
+	_u.mutation.SetRecovery(v)
+	return _u
+}
+
+// ClearRecovery clears the value of the "recovery" field.
+func (_u *OfflineDownloadUpdate) ClearRecovery() *OfflineDownloadUpdate {
+	_u.mutation.ClearRecovery()
 	return _u
 }
 
@@ -332,6 +345,12 @@ func (_u *OfflineDownloadUpdate) sqlSave(ctx context.Context) (_node int, err er
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(offlinedownload.FieldStatus, field.TypeEnum, value)
 	}
+	if value, ok := _u.mutation.Recovery(); ok {
+		_spec.SetField(offlinedownload.FieldRecovery, field.TypeJSON, value)
+	}
+	if _u.mutation.RecoveryCleared() {
+		_spec.ClearField(offlinedownload.FieldRecovery, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.Progress(); ok {
 		_spec.SetField(offlinedownload.FieldProgress, field.TypeInt, value)
 	}
@@ -485,6 +504,18 @@ func (_u *OfflineDownloadUpdateOne) SetNillableStatus(v *offlinedownload.Status)
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetRecovery sets the "recovery" field.
+func (_u *OfflineDownloadUpdateOne) SetRecovery(v *download.Recovery) *OfflineDownloadUpdateOne {
+	_u.mutation.SetRecovery(v)
+	return _u
+}
+
+// ClearRecovery clears the value of the "recovery" field.
+func (_u *OfflineDownloadUpdateOne) ClearRecovery() *OfflineDownloadUpdateOne {
+	_u.mutation.ClearRecovery()
 	return _u
 }
 
@@ -716,6 +747,12 @@ func (_u *OfflineDownloadUpdateOne) sqlSave(ctx context.Context) (_node *Offline
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(offlinedownload.FieldStatus, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.Recovery(); ok {
+		_spec.SetField(offlinedownload.FieldRecovery, field.TypeJSON, value)
+	}
+	if _u.mutation.RecoveryCleared() {
+		_spec.ClearField(offlinedownload.FieldRecovery, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.Progress(); ok {
 		_spec.SetField(offlinedownload.FieldProgress, field.TypeInt, value)

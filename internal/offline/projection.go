@@ -102,7 +102,7 @@ func (service *Service) submissions(ctx context.Context, records []*ent.OfflineD
 			AccountID:   record.AccountID,
 			DirectoryID: record.DirectoryID,
 			ScanTaskID:  record.ScanTaskID,
-			Hash:        record.Hash,
+			Hash:        currentHash(record),
 			Status:      string(record.Status),
 			Progress:    record.Progress,
 			Error:       record.Error,
@@ -110,6 +110,35 @@ func (service *Service) submissions(ctx context.Context, records []*ent.OfflineD
 		}
 		if source == nil || source.AccountID != record.AccountID || source.Directory.ID != record.DirectoryID {
 			continue
+		}
+		item.CanCancel = record.Status == offlinedownload.StatusRunning || record.Status == offlinedownload.StatusFailed
+		item.CanSwitch = item.CanCancel
+		if state := record.Recovery; state != nil {
+			item.AttemptCount, item.SwitchReason = len(state.Attempts), state.Reason
+			item.CanSwitch = item.CanSwitch && state.Action == ""
+			if state.RetryAt.After(service.now()) && item.CanCancel {
+				item.RetryAt = &state.RetryAt
+			}
+			switch {
+			case state.Action == actionCancel:
+				item.DownloadState = "cancelling"
+			case state.Action == actionSwitch:
+				item.DownloadState = "switching"
+			case state.Action == actionSubmit:
+				item.DownloadState = "submitting"
+			case state.Exhausted:
+				item.DownloadState = "exhausted"
+			case state.Stalled:
+				item.DownloadState = "stalled"
+			case state.RemoteStatus == 0:
+				item.DownloadState = "queued"
+			}
+			if item.RetryAt != nil {
+				item.DownloadState = "waiting"
+			}
+			if !item.CanCancel {
+				item.DownloadState = ""
+			}
 		}
 		if record.Status == offlinedownload.StatusRunning {
 			item.Phase = "downloading"

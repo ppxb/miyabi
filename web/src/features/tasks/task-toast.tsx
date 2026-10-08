@@ -8,6 +8,7 @@ import { scanStage, scanStatus } from './scan-status'
 import { TaskProgress } from './task-progress'
 import { TaskToastActions } from './task-toast-actions'
 import { batchToastID, offlineToastID, scanToastID } from './task-notification-diff'
+import { downloadStatus } from './download-status'
 
 type TaskToastOptions = {
   waiting?: boolean
@@ -18,7 +19,8 @@ function taskToastOptions(
   id: string,
   active: boolean,
   options: TaskToastOptions = {},
-  retryTaskID?: number
+  retryTaskID?: number,
+  cancelTaskID?: number
 ) {
   return {
     id,
@@ -27,7 +29,7 @@ function taskToastOptions(
     closeButton: false,
     icon: undefined,
     onDismiss: options.onDismiss,
-    action: <TaskToastActions id={id} retryTaskID={retryTaskID} />
+    action: <TaskToastActions id={id} retryTaskID={retryTaskID} cancelTaskID={cancelTaskID} />
   }
 }
 
@@ -94,7 +96,8 @@ export function notifyOfflineTask(
     id,
     active,
     options,
-    options.scan?.can_retry ? options.scan.id : undefined
+    options.scan?.can_retry ? options.scan.id : undefined,
+    task.can_cancel ? task.task_id : undefined
   )
   if (active) {
     const scan = options.scan
@@ -109,7 +112,14 @@ export function notifyOfflineTask(
       ) : (
         <TaskProgress
           offline
-          label={task.phase !== 'downloading' && scan ? scanStatus(scan) : undefined}
+          hint={task.error ?? task.switch_reason}
+          label={
+            task.phase === 'downloading'
+              ? downloadStatus(task)
+              : scan
+                ? scanStatus(scan)
+                : undefined
+          }
           current={
             task.phase === 'downloading'
               ? 'downloading'
@@ -129,6 +139,8 @@ export function notifyOfflineTask(
         />
       )
     })
+  } else if (task.status === 'cancelled') {
+    toast.info(task.code, { ...props, description: '已取消下载' })
   } else if (task.phase === 'in_library') {
     const notify = task.error ? toast.warning : toast.success
     notify(task.code, {

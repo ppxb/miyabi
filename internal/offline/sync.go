@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
@@ -42,13 +43,16 @@ func (service *Service) Sync(ctx context.Context) error {
 		return fmt.Errorf("load offline tasks: %w", err)
 	}
 	if len(records) == 0 {
-		return nil
+		return service.Recover(ctx)
 	}
 
 	wanted := make(map[string]*ent.OfflineDownload)
 	seen := make(map[string]bool)
 	var syncErrors []error
 	for _, record := range records {
+		if record.Recovery != nil && record.Recovery.Action != "" {
+			continue
+		}
 		hash := strings.ToLower(record.Hash)
 		if seen[hash] {
 			continue
@@ -98,17 +102,24 @@ func (service *Service) Sync(ctx context.Context) error {
 			syncErrors = append(syncErrors, err)
 		}
 	}
+	if len(syncErrors) == 0 {
+		return service.Recover(ctx)
+	}
 	return errors.Join(syncErrors...)
 }
 
 // UpdateTask applies a 115 offline remote task state to a local offline task.
 // The caller has already matched the remote task to the record by info hash.
 func (service *Service) UpdateTask(ctx context.Context, sess drive.Session, record *ent.OfflineDownload, remote pan.OfflineTask) error {
-	unlock, err := service.operations.Lock(ctx, record.AccountID, strings.ToLower(record.Hash))
+	unlock, err := service.lockTask(ctx, record.ID)
 	if err != nil {
 		return err
 	}
 	defer unlock()
+	_, prefs, err := service.config(ctx)
+	if err != nil {
+		return err
+	}
 
 	notify := false
 	err = sess.CommitAccount(ctx, func(tx *ent.Tx) error {
@@ -118,7 +129,11 @@ func (service *Service) UpdateTask(ctx context.Context, sess drive.Session, reco
 		}
 		// A remote page may have started loading before another completion
 		// committed. Never regress terminal state or overwrite indexed files.
-		if current.Status == offlinedownload.StatusFailed || current.Status == offlinedownload.StatusDone && remote.Status != 2 {
+		if current.Hash != record.Hash || current.InfoHash != record.InfoHash ||
+			current.Status == offlinedownload.StatusCancelled || current.Status == offlinedownload.StatusFailed || current.Status == offlinedownload.StatusDone && remote.Status != 2 {
+			return nil
+		}
+		if current.Recovery != nil && current.Recovery.Action != "" {
 			return nil
 		}
 		status := offlinedownload.StatusRunning
@@ -136,14 +151,26 @@ func (service *Service) UpdateTask(ctx context.Context, sess drive.Session, reco
 		default:
 			return fmt.Errorf("115 returned unknown offline status %d", remote.Status)
 		}
-		if current.Status == status && current.Progress == remote.Progress {
-			return nil
+		state := recovery(current, prefs)
+		now, progress := service.now(), rawProgress(remote)
+		if remote.ProgressUnknown {
+			progress, remote.Progress = state.Progress, current.Progress
 		}
-		update := tx.OfflineDownload.UpdateOneID(current.ID).SetStatus(status).SetProgress(remote.Progress)
+		if remote.ProgressUnknown || state.ObservedAt.IsZero() || now.Sub(state.ObservedAt) > observationGap || progress != state.Progress || remote.Status != state.RemoteStatus {
+			state.ProgressAt, state.Stalled = now, false
+		}
+		state.ObservedAt, state.Progress, state.RemoteStatus = now, progress, remote.Status
+		update := tx.OfflineDownload.UpdateOneID(current.ID).SetStatus(status).SetProgress(remote.Progress).SetRecovery(state)
+		if current.Recovery != nil && progress > current.Recovery.Progress && status == offlinedownload.StatusRunning {
+			state.RetryAt, state.Failures = time.Time{}, 0
+			update.ClearError()
+		}
 		if status == offlinedownload.StatusFailed {
 			update.SetError("115 离线下载失败，请在 115 客户端查看原因")
 		}
-		notify = true
+		notify = current.Status != status || current.Progress != remote.Progress || current.Recovery != nil &&
+			(current.Recovery.Stalled != state.Stalled || current.Recovery.RemoteStatus != state.RemoteStatus ||
+				current.Error != nil && progress > current.Recovery.Progress)
 		return update.Exec(ctx)
 	})
 	if err != nil {
@@ -156,7 +183,7 @@ func (service *Service) UpdateTask(ctx context.Context, sess drive.Session, reco
 }
 
 func (service *Service) markMissing(ctx context.Context, sess drive.Session, record *ent.OfflineDownload) error {
-	unlock, err := service.operations.Lock(ctx, record.AccountID, strings.ToLower(record.Hash))
+	unlock, err := service.lockTask(ctx, record.ID)
 	if err != nil {
 		return err
 	}
@@ -167,6 +194,9 @@ func (service *Service) markMissing(ctx context.Context, sess drive.Session, rec
 		current, err := tx.OfflineDownload.Get(ctx, record.ID)
 		if err != nil {
 			return err
+		}
+		if current.Hash != record.Hash || current.InfoHash != record.InfoHash || current.Recovery != nil && current.Recovery.Action != "" {
+			return nil
 		}
 		update := tx.OfflineDownload.UpdateOneID(current.ID)
 		switch current.Status {
@@ -205,6 +235,14 @@ func (service *Service) completeTask(ctx context.Context, tx *ent.Tx, record *en
 			return err
 		}
 	}
-	return tx.OfflineDownload.UpdateOneID(record.ID).SetStatus(offlinedownload.StatusDone).
-		SetProgress(100).ClearError().SetFileID(fileID).SetAwaitingLocation(fileID == "").SetScanTaskID(scanID).Exec(ctx)
+	update := tx.OfflineDownload.UpdateOneID(record.ID).SetStatus(offlinedownload.StatusDone).
+		SetProgress(100).ClearError().SetFileID(fileID).SetAwaitingLocation(fileID == "").SetScanTaskID(scanID)
+	if record.Recovery != nil {
+		state := recovery(record, record.Recovery.Preferences)
+		state.Action, state.NextHash, state.Reason = "", "", ""
+		state.Stalled, state.Exhausted = false, false
+		state.RemoteStatus, state.Progress = 2, 100
+		update.SetRecovery(state)
+	}
+	return update.Exec(ctx)
 }

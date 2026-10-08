@@ -16,7 +16,7 @@ import (
 func TestBusinessPackagesDoNotImportEachOther(t *testing.T) {
 	const module = "github.com/ppxb/miyabi/internal/"
 	business := []string{"catalogue", "library", "library/scan", "library/scrape", "offline", "monitor", "strm", "maintenance", "emby", "subtitle", "network"}
-	shared := []string{"drive", "tasks", "database", "domain", "domain/subtitle", "export", "netx"}
+	shared := []string{"drive", "tasks", "database", "domain", "domain/subtitle", "domain/download", "export", "netx"}
 	// Subpackages of one bounded context may share code downward only.
 	allowed := map[string][]string{
 		"library":      {"library/scan"},
@@ -42,7 +42,7 @@ func TestBusinessPackagesDoNotImportEachOther(t *testing.T) {
 			banned = append(banned, module+"domain")
 		case "database":
 			banned = append(banned, module+"tasks", module+"drive")
-		case "domain", "domain/subtitle":
+		case "domain", "domain/subtitle", "domain/download":
 			banned = append(banned, module+"tasks", module+"drive", module+"database", module+"export")
 		}
 		for _, imported := range packageImports(t, filepath.Join("..", filepath.FromSlash(pkg))) {

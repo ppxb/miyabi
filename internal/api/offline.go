@@ -11,6 +11,27 @@ import (
 type OfflineManager interface {
 	Add(context.Context, string, string) (domain.OfflineSubmission, error)
 	Activity(context.Context) (offline.Activity, error)
+	Cancel(context.Context, int) (domain.OfflineSubmission, error)
+	TryNext(context.Context, int) (domain.OfflineSubmission, error)
+}
+
+func offlineControlHandler(manager OfflineManager, next bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[struct {
+			ID int `uri:"id" binding:"required,min=1"`
+		}](c)
+		if !ok {
+			return
+		}
+		var result domain.OfflineSubmission
+		var err error
+		if next {
+			result, err = manager.TryNext(c.Request.Context(), uri.ID)
+		} else {
+			result, err = manager.Cancel(c.Request.Context(), uri.ID)
+		}
+		accepted(c, result, err)
+	}
 }
 
 func offlineActivityHandler(offline OfflineManager) gin.HandlerFunc {

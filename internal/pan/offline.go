@@ -4,16 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 )
 
 type OfflineTask struct {
-	Hash        string
-	Status      int
-	Progress    int
-	FileID      string
-	DirectoryID string
+	Hash     string
+	Status   int
+	Progress int
+	// RawProgress retains sub-percent advances for stall detection.
+	RawProgress     float64
+	ProgressUnknown bool
+	FileID          string
+	DirectoryID     string
 }
 
 type offlineTaskWire struct {
@@ -33,14 +37,19 @@ func (wire offlineTaskWire) task() (OfflineTask, error) {
 		if err != nil {
 			return OfflineTask{}, fmt.Errorf("decode 115 offline progress: %w", err)
 		}
+		if math.IsNaN(progress) || math.IsInf(progress, 0) {
+			return OfflineTask{}, fmt.Errorf("115 returned non-finite offline progress")
+		}
 	}
 	return OfflineTask{
 		Hash: wire.Hash, Status: wire.Status, Progress: int(max(0, min(100, progress))),
-		FileID: wire.FileID, DirectoryID: wire.DirectoryID,
+		RawProgress:     max(0, min(100, progress)),
+		ProgressUnknown: wire.Progress == "",
+		FileID:          wire.FileID, DirectoryID: wire.DirectoryID,
 	}, nil
 }
 
-// RemoveOffline removes download history only. Source files are never deleted.
+// RemoveOffline removes one offline task while preserving its source files.
 func (client *Client) RemoveOffline(ctx context.Context, accessToken, hash string) error {
 	_, err := apiRequest[apiResponse](
 		client,

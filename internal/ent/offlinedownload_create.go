@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/ppxb/miyabi/internal/domain/download"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 )
 
@@ -137,6 +138,12 @@ func (_c *OfflineDownloadCreate) SetNillableStatus(v *offlinedownload.Status) *O
 	if v != nil {
 		_c.SetStatus(*v)
 	}
+	return _c
+}
+
+// SetRecovery sets the "recovery" field.
+func (_c *OfflineDownloadCreate) SetRecovery(v *download.Recovery) *OfflineDownloadCreate {
+	_c.mutation.SetRecovery(v)
 	return _c
 }
 
@@ -427,6 +434,10 @@ func (_c *OfflineDownloadCreate) createSpec() (*OfflineDownload, *sqlgraph.Creat
 		_spec.SetField(offlinedownload.FieldStatus, field.TypeEnum, value)
 		_node.Status = value
 	}
+	if value, ok := _c.mutation.Recovery(); ok {
+		_spec.SetField(offlinedownload.FieldRecovery, field.TypeJSON, value)
+		_node.Recovery = value
+	}
 	if value, ok := _c.mutation.Progress(); ok {
 		_spec.SetField(offlinedownload.FieldProgress, field.TypeInt, value)
 		_node.Progress = value
@@ -596,6 +607,24 @@ func (u *OfflineDownloadUpsert) SetStatus(v offlinedownload.Status) *OfflineDown
 // UpdateStatus sets the "status" field to the value that was provided on create.
 func (u *OfflineDownloadUpsert) UpdateStatus() *OfflineDownloadUpsert {
 	u.SetExcluded(offlinedownload.FieldStatus)
+	return u
+}
+
+// SetRecovery sets the "recovery" field.
+func (u *OfflineDownloadUpsert) SetRecovery(v *download.Recovery) *OfflineDownloadUpsert {
+	u.Set(offlinedownload.FieldRecovery, v)
+	return u
+}
+
+// UpdateRecovery sets the "recovery" field to the value that was provided on create.
+func (u *OfflineDownloadUpsert) UpdateRecovery() *OfflineDownloadUpsert {
+	u.SetExcluded(offlinedownload.FieldRecovery)
+	return u
+}
+
+// ClearRecovery clears the value of the "recovery" field.
+func (u *OfflineDownloadUpsert) ClearRecovery() *OfflineDownloadUpsert {
+	u.SetNull(offlinedownload.FieldRecovery)
 	return u
 }
 
@@ -843,6 +872,27 @@ func (u *OfflineDownloadUpsertOne) SetStatus(v offlinedownload.Status) *OfflineD
 func (u *OfflineDownloadUpsertOne) UpdateStatus() *OfflineDownloadUpsertOne {
 	return u.Update(func(s *OfflineDownloadUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetRecovery sets the "recovery" field.
+func (u *OfflineDownloadUpsertOne) SetRecovery(v *download.Recovery) *OfflineDownloadUpsertOne {
+	return u.Update(func(s *OfflineDownloadUpsert) {
+		s.SetRecovery(v)
+	})
+}
+
+// UpdateRecovery sets the "recovery" field to the value that was provided on create.
+func (u *OfflineDownloadUpsertOne) UpdateRecovery() *OfflineDownloadUpsertOne {
+	return u.Update(func(s *OfflineDownloadUpsert) {
+		s.UpdateRecovery()
+	})
+}
+
+// ClearRecovery clears the value of the "recovery" field.
+func (u *OfflineDownloadUpsertOne) ClearRecovery() *OfflineDownloadUpsertOne {
+	return u.Update(func(s *OfflineDownloadUpsert) {
+		s.ClearRecovery()
 	})
 }
 
@@ -1271,6 +1321,27 @@ func (u *OfflineDownloadUpsertBulk) SetStatus(v offlinedownload.Status) *Offline
 func (u *OfflineDownloadUpsertBulk) UpdateStatus() *OfflineDownloadUpsertBulk {
 	return u.Update(func(s *OfflineDownloadUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetRecovery sets the "recovery" field.
+func (u *OfflineDownloadUpsertBulk) SetRecovery(v *download.Recovery) *OfflineDownloadUpsertBulk {
+	return u.Update(func(s *OfflineDownloadUpsert) {
+		s.SetRecovery(v)
+	})
+}
+
+// UpdateRecovery sets the "recovery" field to the value that was provided on create.
+func (u *OfflineDownloadUpsertBulk) UpdateRecovery() *OfflineDownloadUpsertBulk {
+	return u.Update(func(s *OfflineDownloadUpsert) {
+		s.UpdateRecovery()
+	})
+}
+
+// ClearRecovery clears the value of the "recovery" field.
+func (u *OfflineDownloadUpsertBulk) ClearRecovery() *OfflineDownloadUpsertBulk {
+	return u.Update(func(s *OfflineDownloadUpsert) {
+		s.ClearRecovery()
 	})
 }
 

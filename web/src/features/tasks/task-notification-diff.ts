@@ -126,7 +126,7 @@ export function diffTaskNotifications(ctx: DiffContext): DiffResult {
     const active = isOfflineTaskActive(task)
     const scanPart = active && scan ? scanFingerprint(scan) : ''
     const retryable = !!scan?.can_retry
-    const fp = `${task.status}|${task.phase}|${task.processing}|${task.library_id ?? ''}|${task.progress}|${task.error ?? ''}|${scanPart}|${scan?.updated_at ?? ''}|${retryable}|${waitingForOffline}`
+    const fp = `${task.status}|${task.phase}|${task.processing}|${task.library_id ?? ''}|${task.progress}|${task.error ?? ''}|${task.hash}|${task.download_state ?? ''}|${task.attempt_count ?? ''}|${task.can_cancel ?? ''}|${task.retry_at ?? ''}|${scanPart}|${scan?.updated_at ?? ''}|${retryable}|${waitingForOffline}`
     const entry: NotificationEntry = {
       active,
       inLibrary: task.phase === 'in_library',

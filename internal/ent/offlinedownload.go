@@ -10,6 +10,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/ppxb/miyabi/internal/domain/download"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 )
 
@@ -36,6 +37,8 @@ type OfflineDownload struct {
 	DirectoryID string `json:"directory_id,omitempty"`
 	// Status holds the value of the "status" field.
 	Status offlinedownload.Status `json:"status,omitempty"`
+	// Recovery holds the value of the "recovery" field.
+	Recovery *download.Recovery `json:"recovery,omitempty"`
 	// Progress holds the value of the "progress" field.
 	Progress int `json:"progress,omitempty"`
 	// Error holds the value of the "error" field.
@@ -56,7 +59,7 @@ func (*OfflineDownload) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case offlinedownload.FieldFileIds:
+		case offlinedownload.FieldRecovery, offlinedownload.FieldFileIds:
 			values[i] = new([]byte)
 		case offlinedownload.FieldAwaitingLocation:
 			values[i] = new(sql.NullBool)
@@ -140,6 +143,14 @@ func (_m *OfflineDownload) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				_m.Status = offlinedownload.Status(value.String)
+			}
+		case offlinedownload.FieldRecovery:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field recovery", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.Recovery); err != nil {
+					return fmt.Errorf("unmarshal field recovery: %w", err)
+				}
 			}
 		case offlinedownload.FieldProgress:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -242,6 +253,9 @@ func (_m *OfflineDownload) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Status))
+	builder.WriteString(", ")
+	builder.WriteString("recovery=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Recovery))
 	builder.WriteString(", ")
 	builder.WriteString("progress=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Progress))
