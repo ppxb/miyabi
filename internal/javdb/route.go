@@ -62,8 +62,9 @@ type probeEvent struct {
 }
 
 type runningProbe struct {
-	started time.Time
-	cancel  context.CancelFunc
+	started  time.Time
+	cancel   context.CancelFunc
+	canceled bool
 }
 
 func selectRoute(ctx context.Context, options routeSelection, check probeFunc) (RouteStatus, error) {
@@ -105,13 +106,43 @@ func selectRoute(ctx context.Context, options routeSelection, check probeFunc) (
 	dynamicSeen := make(map[string]bool)
 	var failures []error
 	var best probeResult
-	var ticks <-chan time.Time
-	if !options.full {
-		ticker := time.NewTicker(5 * time.Millisecond)
-		defer ticker.Stop()
-		ticks = ticker.C
-	}
+	var timer *time.Timer
+	defer func() {
+		if timer != nil {
+			timer.Stop()
+		}
+	}()
 	for len(running) > 0 {
+		var next time.Time
+		// Until a dynamic source is found, a slow bootstrap may still be its
+		// only source. Construction time never counts as request latency.
+		if !options.full && len(dynamic) > 0 && best.host != "" {
+			now := time.Now()
+			for _, state := range running {
+				if state.started.IsZero() || state.canceled {
+					continue
+				}
+				// Preserve equal-latency results for the existing tie-break order.
+				deadline := state.started.Add(best.latency + time.Nanosecond)
+				if !now.Before(deadline) {
+					state.cancel()
+					state.canceled = true
+				} else if next.IsZero() || deadline.Before(next) {
+					next = deadline
+				}
+			}
+		}
+		var timeout <-chan time.Time
+		if !next.IsZero() {
+			if timer == nil {
+				timer = time.NewTimer(time.Until(next))
+			} else {
+				timer.Reset(time.Until(next))
+			}
+			timeout = timer.C
+		} else if timer != nil {
+			timer.Stop()
+		}
 		select {
 		case <-ctx.Done():
 			return RouteStatus{}, ctx.Err()
@@ -146,17 +177,7 @@ func selectRoute(ctx context.Context, options routeSelection, check probeFunc) (
 					}
 				}
 			}
-		case <-ticks:
-			// Until a dynamic source is found, a slow bootstrap may still be
-			// the only source. Construction time never counts as request latency.
-			if len(dynamic) > 0 && best.host != "" {
-				now := time.Now()
-				for _, state := range running {
-					if !state.started.IsZero() && now.Sub(state.started) > best.latency {
-						state.cancel()
-					}
-				}
-			}
+		case <-timeout:
 		}
 	}
 	if err := ctx.Err(); err != nil {

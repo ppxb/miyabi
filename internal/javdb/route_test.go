@@ -210,6 +210,108 @@ func TestSelectRouteDoesNotCountTransportConstructionAsLatency(t *testing.T) {
 	})
 }
 
+func TestSelectRouteCancelsAtDeadlineAndWaitsForCleanup(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		const dynamicHost = "https://dynamic.example"
+		startup := startupWithDynamicHost(t, dynamicHost)
+		var canceledAt time.Time
+		check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, startupData, error) {
+			onStart(time.Now())
+			switch host {
+			case bootstrapHosts[0]:
+				time.Sleep(11 * time.Millisecond)
+				return 11 * time.Millisecond, startup, nil
+			case dynamicHost:
+				<-ctx.Done()
+				canceledAt = time.Now()
+				// Canceled probes must not repeatedly rearm an already due timer.
+				time.Sleep(17 * time.Millisecond)
+				return 0, startupData{}, ctx.Err()
+			default:
+				return 0, startupData{}, errors.New("offline")
+			}
+		}
+		started := time.Now()
+		result, err := selectRoute(t.Context(), routeSelection{}, check)
+		deadline := 22*time.Millisecond + time.Nanosecond
+		if err != nil || result.Host != bootstrapHosts[0] || canceledAt.Sub(started) != deadline {
+			t.Fatalf("selection=%+v error=%v cancellation=%v", result, err, canceledAt.Sub(started))
+		}
+		if elapsed := time.Since(started); elapsed != deadline+17*time.Millisecond {
+			t.Fatalf("selection did not wait for cleanup: %v", elapsed)
+		}
+		for _, candidate := range result.Candidates {
+			if candidate.Host == dynamicHost && candidate.Status != RouteUntested {
+				t.Fatalf("canceled candidate marked unavailable: %+v", candidate)
+			}
+		}
+	})
+}
+
+func TestSelectRouteReschedulesWhenFasterResultArrives(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		const dynamicHost = "https://dynamic.example"
+		startup := startupWithDynamicHost(t, dynamicHost)
+		var canceledAt time.Time
+		check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, startupData, error) {
+			if host == bootstrapHosts[1] {
+				time.Sleep(22 * time.Millisecond)
+			}
+			onStart(time.Now())
+			switch host {
+			case bootstrapHosts[0]:
+				time.Sleep(20 * time.Millisecond)
+				return 20 * time.Millisecond, startup, nil
+			case dynamicHost:
+				time.Sleep(5 * time.Millisecond)
+				return 5 * time.Millisecond, startupData{}, nil
+			case bootstrapHosts[1]:
+				<-ctx.Done()
+				canceledAt = time.Now()
+				return 0, startupData{}, ctx.Err()
+			default:
+				return 0, startupData{}, errors.New("offline")
+			}
+		}
+		started := time.Now()
+		result, err := selectRoute(t.Context(), routeSelection{}, check)
+		// The late-starting probe's deadline moves from 42 ms to 27 ms.
+		if err != nil || result.Host != dynamicHost || canceledAt.Sub(started) != 27*time.Millisecond+time.Nanosecond {
+			t.Fatalf("selection=%+v error=%v cancellation=%v", result, err, canceledAt.Sub(started))
+		}
+	})
+}
+
+func TestSelectRouteKeepsEqualLatencyCandidates(t *testing.T) {
+	for _, latency := range []time.Duration{0, 10 * time.Millisecond} {
+		t.Run(latency.String(), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				const dynamicHost = "https://dynamic.example"
+				startup := startupWithDynamicHost(t, dynamicHost)
+				check := func(ctx context.Context, host string, onStart func(time.Time)) (time.Duration, startupData, error) {
+					onStart(time.Now())
+					if host != bootstrapHosts[0] && host != dynamicHost {
+						return 0, startupData{}, errors.New("offline")
+					}
+					select {
+					case <-time.After(latency):
+						if host == bootstrapHosts[0] {
+							return latency, startup, nil
+						}
+						return latency, startupData{}, nil
+					case <-ctx.Done():
+						return 0, startupData{}, ctx.Err()
+					}
+				}
+				result, err := selectRoute(t.Context(), routeSelection{}, check)
+				if err != nil || result.Host != dynamicHost || result.Latency != latency {
+					t.Fatalf("dynamic candidate lost its tie: selection=%+v error=%v", result, err)
+				}
+			})
+		})
+	}
+}
+
 func TestSelectRouteWaitsForDynamicSourceEvenWhenBootstrapIsSlow(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		const dynamicHost = "https://dynamic.example"
