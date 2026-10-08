@@ -2,7 +2,7 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、140、142、146、147、148、149、161、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、140、142、146、147、148、149、153、161、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 > 第 151 项已完成手动重连优化；首屏业务数据校正按本轮范围保留，是否进一步合并仍需实测，因此不计作整项完成。
 > 第 152 项已完成四类设置查询的缓存复用；任务、影片状态、离线活动及订阅列表的挂载刷新保留，不计作整项完成。
 
@@ -11,11 +11,11 @@
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
 | 确认仍存在，待处理 | 1 | 有明确代码依据的边界、状态反馈或行为问题 |
-| 可选优化与整理 | 54 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
+| 可选优化与整理 | 53 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
 | 按现有约定暂缓 | 10 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 33 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 34 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
@@ -33,6 +33,7 @@
 
 ### 本轮验证与限制
 
+- 第 153 项修复后通过：前端 `npm run test`（29 个文件 / 176 项）、`npm run lint`、`npm run typecheck`、`npm run build` 及修改文件的 oxfmt 格式化。新增 22 项 Node 回归，使用真实 QueryClient/QueryObserver、操作回调及模拟 SSE，覆盖同批失效合并、读取期间多次变化只排一次后续校正、无缓存旧请求丢弃、快照取消当前和排队任务读取、不同客户端隔离、失败后恢复、SSE/操作响应两种顺序及在途交错、账号切换和取消/换源失败后的状态校正。未进行浏览器测试，不宣称每次操作固定只有一次 HTTP 请求；读取开始后发生的变化仍保留必要的后续校正。
 - 第 152 项设置查询优化后通过：前端 `npm run test -- tests/settings-cache.test.tsx tests/emby-settings.test.ts tests/query-errors.test.ts`（3 个文件 / 12 项）、`npm run lint`、`npm run build`（包含 TypeScript 检查）及修改文件的 oxfmt 格式化。新增 4 项 Node 回归，将实际查询选项交给 QueryObserver，验证四类查询首次读取、14999ms 内重新挂载复用缓存、15000ms 边界重新挂载刷新，以及主动失效立即重读；保留既有 Emby 保存回写、部分失败校正和旧响应竞争回归。未执行浏览器测试，不将缓存窗口视为每 15 秒轮询。
 - 第 151 项手动重连优化后通过：前端 `npm run test`（27 个文件 / 150 项）、`npm run lint`、`npm run build`（包含 TypeScript 检查）及修改文件的 oxfmt 格式化。新增 6 项 Node 回归，通过模拟 EventSource、驱动实际连接 effect 和 QueryObserver，验证成功重连不追加 HTTP 任务查询、15 秒连接等待超时及失败时恢复兜底、同一断线期间只请求一次、旧 HTTP 响应不能覆盖新 SSE 快照、首屏/重连版本校正保留及卸载时清理定时器。未执行浏览器测试，不据此推算真实首屏请求减少量。
 - 第 146 项优化后通过：`go test ./internal/javdb ./internal/catalogue ./internal/app`、同范围 `go vet`。新增虚拟时间回归覆盖按实际探测开始时间取消、更快结果到达后提前更新截止时间、已取消探测延迟收尾时不忙等，以及相同延迟和零延迟的优先顺序；保留动态线路发现、排除客户端创建耗时、全量测速和调用方取消等既有回归。未进行真实线路测速或 CPU 基准，不据此声称实际请求提速比例。
@@ -82,8 +83,6 @@
   - 定位：`web/src/features/tasks/task-events.tsx`；`web/tests/task-events.test.tsx`。
 - **152.** 网络、Emby、订阅设置及缓存统计已移除 refetchOnMount:'always'，重新挂载时复用 15 秒内的新鲜数据，过期或主动失效后仍刷新；保存/清理成功回写和失败校正保留。任务、影片状态、离线活动及订阅列表仍保留强制挂载刷新，后续需结合 SSE 连接状态与漏事件恢复逐项评估，不统一删除。
   - 定位：`web/src/api/network.ts`；`web/src/api/emby.ts`；`web/src/api/subscription-settings.ts`；`web/src/api/data.ts`；`web/tests/settings-cache.test.tsx`；`web/src/api/tasks.ts`；`web/src/api/movie-states.ts`；`web/src/api/offline.ts`；`web/src/api/subscriptions.ts`。
-- **153.** 离线提交与扫描成功后仍有 setQueryData、invalidate 和 SSE 刷新交汇。更正：setQueryData 不发网络请求；useOfflineTasks 的影片筛选与来源校验仍有职责，enabled 也不是无效配置。仅评估重复失效调度，不删除跨来源保护。
-  - 定位：`web/src/api/offline.ts`；`web/src/api/library.ts`。
 - **154.** 媒体库和关键词搜索查询仍未提供 keepPreviousData，翻页会进入无缓存加载态；发现页查询已经使用。路由 intent 预加载仍未接查询 loader。是否预取及保留旧页应按请求量和交互实测决定。
   - 定位：`web/src/api/library.ts`；`web/src/api/discover.ts`；`web/src/router.tsx`。
 - **156.** sourceSession 多个读取方法仍重复来源检查、令牌调用与完成后检查。若抽取公共调用须区分读操作和已提交的写操作，不把所有方法机械套入同一个模板。
@@ -276,6 +275,8 @@
   - 定位：`internal/monitor/check.go`；`internal/monitor/batch.go`；`internal/monitor/check_backlog_test.go`；`internal/monitor/batch_test.go`；`internal/app/app.go`。
 - [x] **149.** Movie schema 已增加 created_at/id 组合索引，实际媒体库列表查询可利用该索引完成倒序分页。本地扫描先规范化绝对根路径，再以媒体绝对路径生成本地 fileID，区分不同根目录的同名文件；STRM 中识别出的网盘 fileID 继续保留。已有本地文件的名称、大小和相对路径仅在变化时更新，即使影片被手动纠正也刷新文件信息，同时保护手动资料及网盘文件属性。未添加旧本地 fileID 迁移或兼容分支。
   - 定位：`internal/ent/schema/movie.go`；`internal/ent/migrate/schema.go`；`internal/library/scan/local.go`；`internal/library/scan/local_ingest.go`；`internal/library/listing_index_test.go`；`internal/library/scan/local_identity_test.go`。
+- [x] **153.** 扫描、重新刮削、离线提交/取消/换源、任务控制和 SSE 共用按 QueryClient/查询前缀隔离的刷新队列；开始前合并重复失效，读取期间的变化只排一次后续校正，避免相互取消重发。首轮丢弃变化前的旧请求，完整任务快照取消当前及排队的任务读取，后续新变化仍可刷新。操作响应只在缓存仍与提交前一致且没有读取进行时回写，避免晚到响应回退已更新的状态；原有账号、目录、影片筛选及 enabled 限制保留，重新刮削回写也核对来源。首屏校正、手动重连兜底和失败后的重新读取保留。
+  - 定位：`web/src/api/query-refresh.ts`；`web/src/api/offline.ts`；`web/src/api/library.ts`；`web/src/api/tasks.ts`；`web/src/api/movie-states.ts`；`web/src/features/tasks/task-events.tsx`；`web/tests/query-refresh.test.ts`；`web/tests/task-events.test.tsx`。
 - [x] **161.** 登录改为锁内预占与统一结算，失败数和在途数共同限制准入；格式错误只释放名额，成功清除失败历史但保留其他在途请求。IP 记录最多 4096 条，登录访问触发定期过期回收；满额时暂缓新 IP，不淘汰有效失败记录、封禁或在途记录。空闲时不主动清理，但仍受容量约束。保留默认 5 分钟内失败 5 次封禁 24 小时的策略，修正单次失败阈值及到期边界；错误 cause 使用通用限流文案，封禁提示按真实剩余时间生成。
   - 定位：`internal/api/rate_limiter.go`；`internal/api/auth.go`；`internal/api/rate_limiter_test.go`；`internal/api/auth_rate_limit_test.go`。
 - [x] **166.** 前端目录请求返回 404，首页与 SPA 回退直接提供 index.html，入口缺失也不列目录。仅已存在且符合当前 Vite 八位哈希命名的 assets 资源使用 `public, max-age=31536000, immutable`；入口和普通静态文件使用 `no-cache`。缺失资源、无效文件路径和 API 路径不回退 HTML；前端只接受 GET/HEAD，并保留静态文件条件请求与 Range 支持。SPA 回退不再改写原请求路径。

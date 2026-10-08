@@ -1,7 +1,8 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiGet, apiPost } from '@/api/client'
-import { invalidateMovieStates } from '@/api/movie-states'
+import { movieStateKeys } from '@/api/movie-states'
+import { refreshQueries } from '@/api/query-refresh'
 import { panKeys, type PanAccountStatus } from '@/api/pan'
 import type { LibrarySource } from '@/api/tasks'
 import { sameSource } from '@/lib/source'
@@ -78,8 +79,8 @@ export function useAddOffline(movieID: string) {
       apiPost<OfflineSubmission>(`/api/discover/movies/${encodeURIComponent(movieID)}/offline`, {
         hash
       }),
-    onSuccess: async submission => {
-      await queryClient.cancelQueries({ queryKey: offlineKeys.activity, exact: true })
+    onMutate: () => queryClient.getQueryData<OfflineActivity>(offlineKeys.activity),
+    onSuccess: (submission, _hash, previous) => {
       const account = queryClient.getQueryData<PanAccountStatus>(panKeys.account)
       if (
         account &&
@@ -87,24 +88,27 @@ export function useAddOffline(movieID: string) {
           account.account?.id !== submission.account_id ||
           account.directory?.id !== submission.directory_id)
       ) {
-        void queryClient.invalidateQueries({ queryKey: offlineKeys.all })
+        void refreshQueries(queryClient, offlineKeys.all)
         return
       }
-      queryClient.setQueryData<OfflineActivity>(offlineKeys.activity, activity =>
-        activity && sameSource(activity.source, submission)
-          ? {
-              ...activity,
-              tasks: [
-                submission,
-                ...activity.tasks.filter(
-                  task => task.task_id !== submission.task_id && task.hash !== submission.hash
-                )
-              ]
-            }
-          : activity
-      )
-      void invalidateMovieStates(queryClient)
-      void queryClient.invalidateQueries({ queryKey: offlineKeys.all })
+      const state = queryClient.getQueryState(offlineKeys.activity)
+      // A read or SSE-triggered refresh may already contain a newer task state.
+      if ((state?.fetchStatus ?? 'idle') === 'idle' && state?.data === previous) {
+        queryClient.setQueryData<OfflineActivity>(offlineKeys.activity, activity =>
+          activity && sameSource(activity.source, submission)
+            ? {
+                ...activity,
+                tasks: [
+                  submission,
+                  ...activity.tasks.filter(
+                    task => task.task_id !== submission.task_id && task.hash !== submission.hash
+                  )
+                ]
+              }
+            : activity
+        )
+      }
+      void refreshQueries(queryClient, movieStateKeys.all, offlineKeys.all)
     }
   })
 }
@@ -114,20 +118,24 @@ export function useOfflineControl(action: 'cancel' | 'next') {
   return useMutation({
     mutationFn: (taskID: number) =>
       apiPost<OfflineSubmission>(`/api/offline/tasks/${taskID}/${action}`),
-    onSuccess: submission => {
-      queryClient.setQueryData<OfflineActivity>(offlineKeys.activity, activity =>
-        activity && sameSource(activity.source, submission)
-          ? {
-              ...activity,
-              tasks: activity.tasks.map(task =>
-                task.task_id === submission.task_id ? submission : task
-              )
-            }
-          : activity
-      )
-      void invalidateMovieStates(queryClient)
+    onMutate: () => queryClient.getQueryData<OfflineActivity>(offlineKeys.activity),
+    onSuccess: (submission, _taskID, previous) => {
+      const state = queryClient.getQueryState(offlineKeys.activity)
+      if ((state?.fetchStatus ?? 'idle') === 'idle' && state?.data === previous) {
+        queryClient.setQueryData<OfflineActivity>(offlineKeys.activity, activity =>
+          activity && sameSource(activity.source, submission)
+            ? {
+                ...activity,
+                tasks: activity.tasks.map(task =>
+                  task.task_id === submission.task_id ? submission : task
+                )
+              }
+            : activity
+        )
+      }
+      void refreshQueries(queryClient, movieStateKeys.all)
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: offlineKeys.all }),
+    onSettled: () => refreshQueries(queryClient, offlineKeys.all),
     meta: { errorTitle: action === 'cancel' ? '取消下载失败' : '切换磁力失败' }
   })
 }

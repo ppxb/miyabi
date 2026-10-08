@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 
 import { apiGet, apiPost, apiPut } from '@/api/client'
 import { offlineKeys } from '@/api/offline'
+import { refreshQueries } from '@/api/query-refresh'
 import type { PanDirectory } from '@/api/pan'
 
 export type LibrarySource = {
@@ -82,12 +83,7 @@ export function useRetryTask() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => apiPost<Task>(`/api/tasks/${id}/retry`),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: taskKeys.all }),
-        queryClient.invalidateQueries({ queryKey: offlineKeys.all })
-      ])
-    },
+    onSuccess: () => refreshQueries(queryClient, taskKeys.all, offlineKeys.all),
     onError: error => toast.error('重试失败', { description: error.message })
   })
 }
@@ -96,7 +92,7 @@ export function useSetLibraryPaused() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (paused: boolean) => apiPut('/api/tasks/library-control', { paused }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: taskKeys.all }),
+    onSuccess: () => refreshQueries(queryClient, taskKeys.all),
     onError: error => toast.error('操作失败', { description: error.message })
   })
 }

@@ -1,6 +1,7 @@
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
 
 import { apiPost } from '@/api/client'
+import { refreshQueries } from '@/api/query-refresh'
 
 import type { DiscoverMovie } from '@/api/discover'
 
@@ -80,7 +81,7 @@ export function movieStateOptions(load: StateLoader, movie?: MovieIdentity) {
 }
 
 export function invalidateMovieStates(queryClient: QueryClient) {
-  return queryClient.invalidateQueries({ queryKey: movieStateKeys.all })
+  return refreshQueries(queryClient, movieStateKeys.all)
 }
 
 export async function resetMovieStates(queryClient: QueryClient) {

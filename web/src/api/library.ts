@@ -1,8 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
 import { apiGet, apiPost } from '@/api/client'
 import type { DiscoverMovieDetail } from '@/api/discover'
-import { invalidateMovieStates } from '@/api/movie-states'
+import { movieStateKeys } from '@/api/movie-states'
+import { refreshQueries } from '@/api/query-refresh'
 import { panKeys, type PanAccountStatus } from '@/api/pan'
 import { taskKeys, type LibrarySource, type ScanTask, type Task } from '@/api/tasks'
 
@@ -69,20 +70,10 @@ export function useStartLibraryScan() {
   return useMutation({
     mutationFn: (rebuild: boolean) =>
       apiPost<ScanTask>(rebuild ? '/api/library/rebuild' : '/api/library/scan'),
-    onSuccess: task => {
-      const account = queryClient.getQueryData<PanAccountStatus>(panKeys.account)
-      if (
-        account &&
-        (!account.connected ||
-          account.account?.id !== task.source.account_id ||
-          account.directory?.id !== task.source.directory.id)
-      )
-        return queryClient.invalidateQueries({ queryKey: taskKeys.all })
-      queryClient.setQueryData<Task[]>(taskKeys.all, tasks => [
-        task,
-        ...(tasks ?? []).filter(item => item.id !== task.id)
-      ])
-      return queryClient.invalidateQueries({ queryKey: taskKeys.all })
+    onMutate: () => queryClient.getQueryData<Task[]>(taskKeys.all),
+    onSuccess: (task, _rebuild, previous) => {
+      cacheScanTask(queryClient, task, previous)
+      return refreshQueries(queryClient, taskKeys.all)
     }
   })
 }
@@ -91,16 +82,27 @@ export function useRescrapeLibraryMovie(id: number) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (code?: string) => apiPost<ScanTask>(`/api/library/movies/${id}/scrape`, { code }),
-    onSuccess: async task => {
-      queryClient.setQueryData<Task[]>(taskKeys.all, tasks => [
-        task,
-        ...(tasks ?? []).filter(item => item.id !== task.id)
-      ])
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: libraryKeys.all }),
-        queryClient.invalidateQueries({ queryKey: taskKeys.all }),
-        invalidateMovieStates(queryClient)
-      ])
+    onMutate: () => queryClient.getQueryData<Task[]>(taskKeys.all),
+    onSuccess: (task, _code, previous) => {
+      cacheScanTask(queryClient, task, previous)
+      return refreshQueries(queryClient, libraryKeys.all, taskKeys.all, movieStateKeys.all)
     }
   })
+}
+
+function cacheScanTask(queryClient: QueryClient, task: ScanTask, previous: Task[] | undefined) {
+  const account = queryClient.getQueryData<PanAccountStatus>(panKeys.account)
+  if (
+    account &&
+    (!account.connected ||
+      account.account?.id !== task.source.account_id ||
+      account.directory?.id !== task.source.directory.id)
+  )
+    return
+  const state = queryClient.getQueryState(taskKeys.all)
+  if ((state?.fetchStatus ?? 'idle') !== 'idle' || state?.data !== previous) return
+  queryClient.setQueryData<Task[]>(taskKeys.all, tasks => [
+    task,
+    ...(tasks ?? []).filter(item => item.id !== task.id)
+  ])
 }

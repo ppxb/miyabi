@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, type QueryKey } from '@tanstack/react-query'
 import {
   createContext,
   useCallback,
@@ -11,7 +11,8 @@ import {
 } from 'react'
 
 import { notifyUnauthorized } from '@/api/client'
-import { invalidateMovieStates } from '@/api/movie-states'
+import { movieStateKeys } from '@/api/movie-states'
+import { cancelQueryRefresh, refreshQueries } from '@/api/query-refresh'
 import { libraryKeys } from '@/api/library'
 import { offlineKeys } from '@/api/offline'
 import { subscriptionKeys } from '@/api/subscriptions'
@@ -44,10 +45,6 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
     let revisions: TaskRevisions | undefined
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     let connectionTimer: ReturnType<typeof setTimeout> | undefined
-    let libraryChanged = false
-    let offlineChanged = false
-    let monitorChanged = false
-    let refreshing = false
     let disposed = false
 
     function markDisconnected() {
@@ -55,7 +52,7 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
       // Reconcile cached "running" tasks once per outage, including a missed completion event.
       if (!snapshotRequested.current) {
         snapshotRequested.current = true
-        void queryClient.invalidateQueries({ queryKey: taskKeys.all, exact: true })
+        void refreshQueries(queryClient, taskKeys.all)
       }
     }
 
@@ -95,41 +92,11 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
       connectionTimer = setTimeout(() => void restartConnection(), timeout)
     }
 
-    async function refreshData() {
-      if (refreshing) return
-      refreshing = true
-      try {
-        // Refresh immediately, then reconcile once more if changes arrive
-        // during the request. Bursts do not cancel each other's responses.
-        while (!disposed && (libraryChanged || offlineChanged || monitorChanged)) {
-          const refreshLibrary = libraryChanged
-          const refreshMovieStates = libraryChanged || offlineChanged
-          const refreshMonitors = monitorChanged
-          libraryChanged = false
-          offlineChanged = false
-          monitorChanged = false
-          await Promise.all([
-            refreshMovieStates ? invalidateMovieStates(queryClient) : Promise.resolve(),
-            refreshMovieStates
-              ? queryClient.invalidateQueries({ queryKey: offlineKeys.all })
-              : Promise.resolve(),
-            refreshMonitors
-              ? queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
-              : Promise.resolve(),
-            refreshLibrary
-              ? queryClient.invalidateQueries({ queryKey: libraryKeys.all })
-              : Promise.resolve()
-          ])
-        }
-      } finally {
-        refreshing = false
-      }
-    }
-
     events.addEventListener('tasks', async (event: MessageEvent<string>) => {
+      if (disposed) return
       const snapshot = JSON.parse(event.data) as Task[]
-      await queryClient.cancelQueries({ queryKey: taskKeys.all, exact: true })
-      if (events.readyState !== EventSource.OPEN) return
+      await cancelQueryRefresh(queryClient, taskKeys.all)
+      if (disposed || events.readyState !== EventSource.OPEN) return
       queryClient.setQueryData(taskKeys.all, snapshot)
       snapshotRequested.current = false
       waitForActivity()
@@ -137,13 +104,18 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
     })
 
     events.addEventListener('changes', (event: MessageEvent<string>) => {
+      if (disposed) return
       const next = JSON.parse(event.data) as TaskRevisions
       waitForActivity()
-      libraryChanged ||= revisions?.library !== next.library
-      offlineChanged ||= revisions?.offline !== next.offline
-      monitorChanged ||= revisions?.monitor !== next.monitor
+      const keys: QueryKey[] = []
+      const libraryChanged = revisions?.library !== next.library
+      if (libraryChanged) keys.push(libraryKeys.all)
+      if (libraryChanged || revisions?.offline !== next.offline) {
+        keys.push(movieStateKeys.all, offlineKeys.all)
+      }
+      if (revisions?.monitor !== next.monitor) keys.push(subscriptionKeys.all)
       revisions = next
-      void refreshData()
+      void refreshQueries(queryClient, ...keys)
     })
 
     // The server sends a heartbeat every 15 seconds, even when no task changes.
