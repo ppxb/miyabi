@@ -38,11 +38,7 @@ export async function apiGet<T>(
 }
 
 export function apiPost<T>(path: string, body?: unknown): Promise<T> {
-  return request<T>(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  })
+  return requestJSON<T>(path, 'POST', body)
 }
 
 export function apiDelete<T>(path: string): Promise<T> {
@@ -50,19 +46,11 @@ export function apiDelete<T>(path: string): Promise<T> {
 }
 
 export function apiPatch<T>(path: string, body?: unknown): Promise<T> {
-  return request<T>(path, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  })
+  return requestJSON<T>(path, 'PATCH', body)
 }
 
 export function apiPut<T>(path: string, body: unknown): Promise<T> {
-  return request<T>(path, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  })
+  return requestJSON<T>(path, 'PUT', body)
 }
 
 export function notifyUnauthorized(): void {
@@ -75,6 +63,14 @@ export function imageURL(source: string) {
   if (/^\/api\/library\/movies\/\d+\/previews\/\d+(?:\?v=\d+)?$/.test(source)) return source
   // Invalidate the encoded image responses cached before the backend decoded them.
   return `/api/image?v=3&url=${encodeURIComponent(source)}`
+}
+
+function requestJSON<T>(path: string, method: 'POST' | 'PATCH' | 'PUT', body: unknown): Promise<T> {
+  return request<T>(path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
