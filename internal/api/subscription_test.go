@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -19,6 +21,7 @@ type subscriptionStub struct {
 	actorFeedID       int
 	actorFeedPage     int
 	actorFeedLimit    int
+	actorFeedCalls    int
 }
 
 func (s *subscriptionStub) Targets(_ context.Context, kind string) ([]monitor.TargetItem, error) {
@@ -30,6 +33,7 @@ func (s *subscriptionStub) Targets(_ context.Context, kind string) ([]monitor.Ta
 }
 
 func (s *subscriptionStub) ActorFeed(_ context.Context, actorID, page, limit int) ([]monitor.Item, error) {
+	s.actorFeedCalls++
 	s.actorFeedID = actorID
 	s.actorFeedPage = page
 	s.actorFeedLimit = limit
@@ -69,23 +73,55 @@ func TestSubscriptionTargetsHandler(t *testing.T) {
 	}
 }
 
-func TestSubscriptionActorFeedHandlerAllSpawned(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	stub := &subscriptionStub{}
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/subscriptions/actors/feed?page=2&limit=20", nil)
-
-	subscriptionActorFeedHandler(stub)(c)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-	if stub.actorFeedID != 0 {
-		t.Fatalf("expected actor ID 0, got %d", stub.actorFeedID)
-	}
-	if stub.actorFeedPage != 2 || stub.actorFeedLimit != 20 {
-		t.Fatalf("expected page 2 limit 20, got page %d limit %d", stub.actorFeedPage, stub.actorFeedLimit)
+func TestSubscriptionActorFeedEndpoint(t *testing.T) {
+	for _, tc := range []struct {
+		path            string
+		status          int
+		id, page, limit int
+	}{
+		{"/feed", http.StatusOK, 0, 1, 50},
+		{"/feed?page=2&limit=20", http.StatusOK, 0, 2, 20},
+		{"/42/feed", http.StatusOK, 42, 1, 50},
+		{"/42/feed?page=3&limit=100", http.StatusOK, 42, 3, 100},
+		{"/feed?kind=unused", http.StatusOK, 0, 1, 50},
+		{"/42/feed?kind=unused", http.StatusOK, 42, 1, 50},
+		{"/abc/feed", http.StatusBadRequest, 0, 0, 0},
+		{"/0/feed", http.StatusBadRequest, 0, 0, 0},
+		{"/-1/feed", http.StatusBadRequest, 0, 0, 0},
+		{"/999999999999999999999999/feed", http.StatusBadRequest, 0, 0, 0},
+		{"/feed?page=0", http.StatusBadRequest, 0, 0, 0},
+		{"/42/feed?page=abc", http.StatusBadRequest, 0, 0, 0},
+		{"/feed?limit=0", http.StatusBadRequest, 0, 0, 0},
+		{"/42/feed?limit=101", http.StatusBadRequest, 0, 0, 0},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			stub := &subscriptionStub{}
+			router := NewRouter(Dependencies{Access: NewAccessGateService("", ""), Monitor: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/subscriptions/actors"+tc.path, nil))
+			if response.Code != tc.status {
+				t.Fatalf("status=%d, want %d: %s", response.Code, tc.status, response.Body)
+			}
+			if tc.status != http.StatusOK {
+				if stub.actorFeedCalls != 0 {
+					t.Fatal("invalid request reached actor feed service")
+				}
+				var body struct {
+					Error string `json:"error"`
+				}
+				if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil || body.Error == "" {
+					t.Fatalf("missing error response: %s (%v)", response.Body, err)
+				}
+				return
+			}
+			if stub.actorFeedCalls != 1 || stub.actorFeedID != tc.id || stub.actorFeedPage != tc.page || stub.actorFeedLimit != tc.limit {
+				t.Fatalf("unexpected feed call: %+v", stub)
+			}
+			var items []monitor.Item
+			if err := json.Unmarshal(response.Body.Bytes(), &items); err != nil || len(items) != 1 || items[0].ID != 3 {
+				t.Fatalf("unexpected feed response: %s (%v)", response.Body, err)
+			}
+		})
 	}
 }
 

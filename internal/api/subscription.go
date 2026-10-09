@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/monitor"
@@ -26,6 +25,11 @@ type subscriptionListQuery struct {
 	Kind  string `form:"kind" binding:"omitempty,oneof=movie actor"`
 	Page  int    `form:"page,default=1" binding:"min=1"`
 	Limit int    `form:"limit,default=50" binding:"min=1,max=100"`
+}
+
+type subscriptionFeedQuery struct {
+	Page  int `form:"page,default=1" binding:"min=1"`
+	Limit int `form:"limit,default=50" binding:"min=1,max=100"`
 }
 
 type subscriptionTargetsQuery struct {
@@ -52,10 +56,6 @@ type subscriptionEnqueueBatchInput struct {
 
 type subscriptionURI struct {
 	ID int `uri:"id" binding:"required,min=1"`
-}
-
-type optionalSubscriptionURI struct {
-	ID int `uri:"id" binding:"omitempty,min=1"`
 }
 
 func subscriptionTargetsHandler(mgr SubscriptionManager) gin.HandlerFunc {
@@ -153,22 +153,25 @@ func subscriptionEnqueueBatchHandler(mgr SubscriptionManager) gin.HandlerFunc {
 			IDs: input.IDs,
 			All: input.All,
 		})
-		if err != nil {
-			respond(c, nil, err)
-			return
-		}
-		c.JSON(http.StatusAccepted, gin.H{"task_id": taskID})
+		accepted(c, gin.H{"task_id": taskID}, err)
 	}
 }
 
 func subscriptionActorFeedHandler(mgr SubscriptionManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		uri, _ := bindURI[optionalSubscriptionURI](c)
-		query, ok := bindQuery[subscriptionListQuery](c)
+		var actorID int
+		if c.Param("id") != "" {
+			uri, ok := bindURI[subscriptionURI](c)
+			if !ok {
+				return
+			}
+			actorID = uri.ID
+		}
+		query, ok := bindQuery[subscriptionFeedQuery](c)
 		if !ok {
 			return
 		}
-		items, err := mgr.ActorFeed(c.Request.Context(), uri.ID, query.Page, query.Limit)
+		items, err := mgr.ActorFeed(c.Request.Context(), actorID, query.Page, query.Limit)
 		respond(c, items, err)
 	}
 }

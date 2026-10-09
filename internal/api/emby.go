@@ -39,17 +39,20 @@ func embyUpdateHandler(manager EmbyManager) gin.HandlerFunc {
 
 func embyTestHandler(manager EmbyManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cfg, err := manager.Config(c.Request.Context())
-		if err != nil {
-			c.Error(err)
-			return
-		}
+		var cfg emby.Config
 		if c.Request.ContentLength != 0 {
 			bodyConfig, ok := bindJSON[emby.Config](c)
 			if !ok {
 				return
 			}
 			cfg = bodyConfig
+		} else {
+			var err error
+			cfg, err = manager.Config(c.Request.Context())
+			if err != nil {
+				c.Error(err)
+				return
+			}
 		}
 		info, err := manager.Test(c.Request.Context(), cfg)
 		respond(c, info, err)

@@ -38,13 +38,15 @@ func networkUpdateHandler(network NetworkManager) gin.HandlerFunc {
 // with the saved configuration when the body is empty.
 func networkTestHandler(network NetworkManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		config := network.Config()
+		var config netx.ProxyConfig
 		if c.Request.ContentLength != 0 {
 			bodyConfig, ok := bindJSON[netx.ProxyConfig](c)
 			if !ok {
 				return
 			}
 			config = bodyConfig
+		} else {
+			config = network.Config()
 		}
 		result, err := network.TestNetwork(c.Request.Context(), config)
 		respond(c, result, err)
