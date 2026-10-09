@@ -104,23 +104,24 @@ func authMiddleware(gate AccessGate) gin.HandlerFunc {
 
 		token := extractToken(c)
 		if token == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "未提供认证令牌，请登录",
-				"code":  "UNAUTHORIZED",
-			})
+			abortAccessUnauthorized(c, "未提供认证令牌，请登录")
 			return
 		}
 
 		if err := gate.VerifyToken(token); err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "认证令牌无效或已过期，请重新登录",
-				"code":  "UNAUTHORIZED",
-			})
+			abortAccessUnauthorized(c, "认证令牌无效或已过期，请重新登录")
 			return
 		}
 
 		c.Next()
 	}
+}
+
+func abortAccessUnauthorized(c *gin.Context, message string) {
+	c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+		"error": message,
+		"code":  "UNAUTHORIZED",
+	})
 }
 
 func extractToken(c *gin.Context) string {

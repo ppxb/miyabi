@@ -2,7 +2,7 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、140、142、146、147、148、149、153、156、157、158、161、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、140、142、146、147、148、149、153、156、157、158、159、161、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 > 第 151 项已完成手动重连优化；首屏业务数据校正按本轮范围保留，是否进一步合并仍需实测，因此不计作整项完成。
 > 第 152 项已完成四类设置查询的缓存复用；任务、影片状态、离线活动及订阅列表的挂载刷新保留，不计作整项完成。
 
@@ -11,11 +11,11 @@
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
 | 确认仍存在，待处理 | 1 | 有明确代码依据的边界、状态反馈或行为问题 |
-| 可选优化与整理 | 50 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
+| 可选优化与整理 | 49 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
 | 按现有约定暂缓 | 10 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 37 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 38 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
@@ -33,6 +33,7 @@
 
 ### 本轮验证与限制
 
+- 第 159 项整理后通过：`go test ./internal/api ./internal/app`、同范围 `go vet`。扩充现有 Cookie 鉴权用例，验证缺失、伪造和过期 Cookie 返回原有文案及 UNAUTHORIZED，拒绝后受保护处理器不执行；有效 Cookie、忽略 Bearer/查询参数令牌、关闭密码保护及 PAN_UNAUTHORIZED 等既有回归通过。未执行浏览器测试。
 - 第 158 项整理后通过：`go test ./internal/api ./internal/app ./internal/strm ./internal/export`、同范围 `go vet`。回归验证普通 4xx/5xx 只记录一条请求日志、完整错误链与多个错误均保留且不重复写 cause、请求 ID/耗时/分类及公共响应保持正确、URL 凭据与查询参数不泄露。覆盖已写成功/失败响应后的错误、仅状态码的失败、断链、panic 及已写响应后的 panic；panic 仍保留专用 ERROR 堆栈日志和同 ID 的访问摘要。499 访问日志继续过滤，DEBUG 取消诊断保留。未执行浏览器测试或性能基准，不将日志条数减少换算成接口提速。
 - 第 156 项整理后通过：`go test ./internal/drive ./internal/offline ./internal/library/... ./internal/strm ./internal/app`、同范围 `go vet`。新增五种来源读取的回归覆盖正常结果、过期会话不刷新令牌、读取中换目录/断开后丢弃结果、上游错误优先且不泄露部分结果、请求前/请求中取消、正常令牌刷新及刷新中来源变更后不发起读取。既有离线提交成功后保留原来源记录、账号级任务同步和播放地址回归通过。未进行真实 115 或浏览器实测，不声称减少网络请求或实际耗时。
 - 第 157 项整理后通过：`go test ./internal/javbus ./internal/catalogue ./internal/magnet ./internal/app`、同范围 `go vet`。新增离线回归覆盖详情与磁力接口的 404/重定向差异、未找到内容与挑战页的判断顺序、来源可用状态、响应体关闭、2 MiB 读取上限和错误上下文；虚拟时间验证共用限流及等待期间取消，既有取消/超时和新鲜详情参数回归保留，并加强两类请求头检查。未进行真实站点的详情/磁力抓取或浏览器实测，不声称减少正常获取磁力所需的两次请求。
@@ -88,8 +89,6 @@
   - 定位：`web/src/api/network.ts`；`web/src/api/emby.ts`；`web/src/api/subscription-settings.ts`；`web/src/api/data.ts`；`web/tests/settings-cache.test.tsx`；`web/src/api/tasks.ts`；`web/src/api/movie-states.ts`；`web/src/api/offline.ts`；`web/src/api/subscriptions.ts`。
 - **154.** 媒体库和关键词搜索查询仍未提供 keepPreviousData，翻页会进入无缓存加载态；发现页查询已经使用。路由 intent 预加载仍未接查询 loader。是否预取及保留旧页应按请求量和交互实测决定。
   - 定位：`web/src/api/library.ts`；`web/src/api/discover.ts`；`web/src/router.tsx`。
-- **159.** authMiddleware 仍直接构造两种 UNAUTHORIZED 响应。可以统一私有响应助手，但必须保留本站会话与 PAN_UNAUTHORIZED 的区别；当前重复未造成已知故障。
-  - 定位：`internal/api/auth.go`；`internal/api/error.go`。
 - **160.** Emby/网络测试接口仍先加载已保存配置再用请求体替换；订阅批量接口仍单独写 202，feed 复用含 kind 的查询结构。router 的 STRM 方法注册、gin 全局模式及命名整理均是可选重构；代理错误另归 237，不强制新增泛型 handler。
   - 定位：`internal/api/emby.go`；`internal/api/network.go`；`internal/api/subscription.go`；`internal/api/router.go`。
 - **162.** Claim 仍先 SELECT 后条件 UPDATE，但已有队列锁、状态条件与资源顺序约束，不能据此判定重复领取。批次列表的近期+活动合并及 registry 检查仍存在；更改单条 SQL 前须证明收益并保留重试/暂停语义。
@@ -280,6 +279,8 @@
   - 定位：`internal/javbus/client.go`；`internal/javbus/client_test.go`；`internal/javbus/response_test.go`。
 - [x] **158.** 普通业务错误由访问日志统一输出一条记录：错误中间件保留响应映射，恢复中间件外侧统一收集最终错误，附加 kind 和经脱敏的完整错误链；固定日志消息，移除重复的 cause 字段。已写响应及断链恢复后的错误也可记录，实际响应状态与日志级别规则保持原有行为。panic 单独保留 ERROR 堆栈诊断，并增加请求 ID 与访问摘要关联；499 访问过滤和 DEBUG 取消诊断保留，未修改领域错误字符串或公共响应。
   - 定位：`internal/api/error.go`；`internal/api/logging.go`；`internal/api/router.go`；`internal/api/error_test.go`；`internal/api/logging_test.go`。
+- [x] **159.** authMiddleware 的令牌缺失和无效/过期分支已共用私有 abortAccessUnauthorized 响应函数，保留 HTTP 401、UNAUTHORIZED、两种提示文案及中止后续处理的行为。仅整理本站 Cookie 鉴权响应，不改变 PAN_UNAUTHORIZED、密码错误、播放令牌错误或通用错误中间件。
+  - 定位：`internal/api/auth.go`；`internal/api/cookie_auth_test.go`。
 - [x] **161.** 登录改为锁内预占与统一结算，失败数和在途数共同限制准入；格式错误只释放名额，成功清除失败历史但保留其他在途请求。IP 记录最多 4096 条，登录访问触发定期过期回收；满额时暂缓新 IP，不淘汰有效失败记录、封禁或在途记录。空闲时不主动清理，但仍受容量约束。保留默认 5 分钟内失败 5 次封禁 24 小时的策略，修正单次失败阈值及到期边界；错误 cause 使用通用限流文案，封禁提示按真实剩余时间生成。
   - 定位：`internal/api/rate_limiter.go`；`internal/api/auth.go`；`internal/api/rate_limiter_test.go`；`internal/api/auth_rate_limit_test.go`。
 - [x] **166.** 前端目录请求返回 404，首页与 SPA 回退直接提供 index.html，入口缺失也不列目录。仅已存在且符合当前 Vite 八位哈希命名的 assets 资源使用 `public, max-age=31536000, immutable`；入口和普通静态文件使用 `no-cache`。缺失资源、无效文件路径和 API 路径不回退 HTML；前端只接受 GET/HEAD，并保留静态文件条件请求与 Range 支持。SPA 回退不再改写原请求路径。

@@ -26,14 +26,15 @@ func TestCookieAuthentication(t *testing.T) {
 	for _, tc := range []struct {
 		name, cookie, bearer, query string
 		status                      int
+		message                     string
 	}{
-		{"cookie", valid, "", "", 204},
-		{"stale bearer cannot override cookie", valid, "expired", "", 204},
-		{"anonymous", "", "", "", 401},
-		{"bearer only", "", valid, "", 401},
-		{"URL JWT only", "", "", valid, 401},
-		{"forged cookie", "forged", "", "", 401},
-		{"expired cookie", expired, "", "", 401},
+		{"cookie", valid, "", "", 204, ""},
+		{"stale bearer cannot override cookie", valid, "expired", "", 204, ""},
+		{"anonymous", "", "", "", 401, "未提供认证令牌，请登录"},
+		{"bearer only", "", valid, "", 401, "未提供认证令牌，请登录"},
+		{"URL JWT only", "", "", valid, 401, "未提供认证令牌，请登录"},
+		{"forged cookie", "forged", "", "", 401, "认证令牌无效或已过期，请重新登录"},
+		{"expired cookie", expired, "", "", 401, "认证令牌无效或已过期，请重新登录"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/cookie-test?token="+tc.query, nil)
@@ -46,10 +47,26 @@ func TestCookieAuthentication(t *testing.T) {
 			rec := httptest.NewRecorder()
 			router := NewRouter(Dependencies{Access: gate, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 			// Test the auth boundary independently of downstream resource implementations.
-			router.GET("/cookie-test", authMiddleware(gate), func(c *gin.Context) { c.Status(204) })
+			called := false
+			router.GET("/cookie-test", authMiddleware(gate), func(c *gin.Context) {
+				called = true
+				c.Status(204)
+			})
 			router.ServeHTTP(rec, req)
 			if rec.Code != tc.status {
 				t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+			}
+			if called != (tc.status == 204) {
+				t.Fatalf("protected handler called=%t for status=%d", called, tc.status)
+			}
+			if tc.status == http.StatusUnauthorized {
+				var body struct {
+					Error string `json:"error"`
+					Code  string `json:"code"`
+				}
+				if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || body.Error != tc.message || body.Code != "UNAUTHORIZED" {
+					t.Fatalf("incorrect access rejection: %s (%v)", rec.Body, err)
+				}
 			}
 			req.URL.Path = "/api/auth/config"
 			rec = httptest.NewRecorder()
