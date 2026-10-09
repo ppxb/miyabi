@@ -124,21 +124,46 @@ func TestFingerprintRefreshPreservesInFlightRequest(t *testing.T) {
 }
 
 func TestFingerprintConcurrentRefreshAndClose(t *testing.T) {
-	client, err := NewProxiedFingerprintClient(nil, FingerprintOptions{Timeout: time.Second})
+	manager, err := NewProxyManager(ProxyConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if client.Changes() != nil {
-		t.Fatal("direct client should not subscribe")
-	}
-	var group sync.WaitGroup
-	for range 8 {
-		group.Go(func() { _ = client.Refresh() })
-		group.Go(client.Close)
-	}
-	group.Wait()
-	if err := client.Refresh(); !errors.Is(err, net.ErrClosed) {
-		t.Fatalf("closed client was revived: %v", err)
+	for _, tc := range []struct {
+		name    string
+		manager *ProxyManager
+	}{{"direct", nil}, {"subscribed", manager}} {
+		t.Run(tc.name, func(t *testing.T) {
+			client, err := NewProxiedFingerprintClient(tc.manager, FingerprintOptions{Timeout: time.Second})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer client.Close()
+			if (client.Changes() == nil) != (tc.manager == nil) {
+				t.Fatal("unexpected proxy subscription")
+			}
+			var group sync.WaitGroup
+			for range 8 {
+				group.Go(func() { _ = client.Refresh() })
+				group.Go(client.Close)
+			}
+			group.Wait()
+			if err := client.Refresh(); !errors.Is(err, net.ErrClosed) {
+				t.Fatalf("closed client was revived: %v", err)
+			}
+			if tc.manager != nil {
+				select {
+				case _, ok := <-client.Changes():
+					if ok {
+						t.Fatal("closed client still receives notifications")
+					}
+				default:
+					t.Fatal("closed client retained an open subscription")
+				}
+				if len(tc.manager.subs) != 0 {
+					t.Fatal("concurrent close leaked a subscription")
+				}
+			}
+		})
 	}
 }
 

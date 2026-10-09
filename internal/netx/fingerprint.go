@@ -17,23 +17,24 @@ type FingerprintHTTPClient interface {
 // Callers consume Changes and call Refresh before their service-specific probes.
 // It starts no goroutines and leaves in-flight requests on their original client.
 type ProxiedFingerprintClient struct {
-	manager *ProxyManager
-	changes <-chan struct{}
-	options FingerprintOptions
-	mu      sync.RWMutex
-	client  FingerprintHTTPClient
+	manager     *ProxyManager
+	changes     <-chan struct{}
+	unsubscribe func()
+	options     FingerprintOptions
+	mu          sync.RWMutex
+	client      FingerprintHTTPClient
 }
 
 func NewProxiedFingerprintClient(manager *ProxyManager, options FingerprintOptions) (*ProxiedFingerprintClient, error) {
 	c := &ProxiedFingerprintClient{manager: manager, options: options}
 	if manager != nil {
-		c.changes = manager.Subscribe()
+		c.changes, c.unsubscribe = manager.Subscribe()
 		options.Proxy = manager.Resolve()
 	}
 	client, err := NewFingerprintClient(options)
 	if err != nil {
-		if manager != nil {
-			manager.Unsubscribe(c.changes)
+		if c.unsubscribe != nil {
+			c.unsubscribe()
 		}
 		return nil, err
 	}
@@ -91,7 +92,7 @@ func (c *ProxiedFingerprintClient) Close() {
 	}
 	c.client.CloseIdleConnections()
 	c.client = nil
-	if c.manager != nil {
-		c.manager.Unsubscribe(c.changes)
+	if c.unsubscribe != nil {
+		c.unsubscribe()
 	}
 }

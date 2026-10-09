@@ -103,22 +103,19 @@ func (m *ProxyManager) Update(config ProxyConfig) error {
 	return nil
 }
 
-func (m *ProxyManager) Subscribe() <-chan struct{} {
+// Subscribe returns coalesced notifications and an idempotent unsubscribe function.
+// Unsubscribing closes the channel after removing it from future broadcasts.
+func (m *ProxyManager) Subscribe() (<-chan struct{}, func()) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	ch := make(chan struct{}, 1)
 	m.subs[ch] = struct{}{}
-	return ch
-}
-
-func (m *ProxyManager) Unsubscribe(ch <-chan struct{}) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for candidate := range m.subs {
-		if candidate == ch {
-			delete(m.subs, candidate)
-			close(candidate)
-			return
+	return ch, func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		if _, subscribed := m.subs[ch]; subscribed {
+			delete(m.subs, ch)
+			close(ch)
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package netx
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -83,7 +84,8 @@ func TestProxyManagerUpdateNotifiesSubscribers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	subscriber := manager.Subscribe()
+	subscriber, unsubscribe := manager.Subscribe()
+	defer unsubscribe()
 	if err := manager.Update(ProxyConfig{Enabled: true, URL: "https://127.0.0.1:7890"}); err != nil {
 		t.Fatal(err)
 	}
@@ -110,6 +112,113 @@ func TestProxyManagerUpdateNotifiesSubscribers(t *testing.T) {
 	}
 }
 
+func TestProxySubscriptionUnsubscribePreservesOtherListeners(t *testing.T) {
+	manager, err := NewProxyManager(ProxyConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, unsubscribeFirst := manager.Subscribe()
+	defer unsubscribeFirst()
+	second, unsubscribeSecond := manager.Subscribe()
+	defer unsubscribeSecond()
+	for _, enabled := range []bool{true, false} {
+		if err := manager.Update(ProxyConfig{Enabled: enabled, URL: "http://127.0.0.1:7890"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	unsubscribeFirst()
+	unsubscribeFirst()
+	// Closing preserves the single coalesced notification already buffered.
+	select {
+	case _, ok := <-first:
+		if !ok {
+			t.Fatal("unsubscribe discarded the buffered notification")
+		}
+	default:
+		t.Fatal("missing buffered notification")
+	}
+	select {
+	case _, ok := <-first:
+		if ok {
+			t.Fatal("notifications were not coalesced")
+		}
+	default:
+		t.Fatal("unsubscribed channel is not closed")
+	}
+	select {
+	case _, ok := <-second:
+		if !ok {
+			t.Fatal("unsubscribe closed another listener")
+		}
+	default:
+		t.Fatal("other listener lost its notification")
+	}
+	if err := manager.Update(ProxyConfig{Enabled: true, URL: "http://127.0.0.1:7890"}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case _, ok := <-second:
+		if !ok {
+			t.Fatal("remaining listener was closed")
+		}
+	default:
+		t.Fatal("remaining listener no longer receives updates")
+	}
+	unsubscribeSecond()
+	if len(manager.subs) != 0 {
+		t.Fatal("subscriptions leaked after unsubscribe")
+	}
+}
+
+func TestProxySubscriptionConcurrentUnsubscribeAndUpdate(t *testing.T) {
+	manager, err := NewProxyManager(ProxyConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := make(chan struct{})
+	var group sync.WaitGroup
+	var listeners []<-chan struct{}
+	for range 16 {
+		updates, unsubscribe := manager.Subscribe()
+		defer unsubscribe()
+		listeners = append(listeners, updates)
+		for range 4 {
+			group.Go(func() {
+				<-start
+				unsubscribe()
+			})
+		}
+	}
+	group.Go(func() {
+		<-start
+		for i := range 64 {
+			if err := manager.Update(ProxyConfig{Enabled: i%2 == 0, URL: "http://127.0.0.1:7890"}); err != nil {
+				t.Error(err)
+				return
+			}
+		}
+	})
+	close(start)
+	group.Wait()
+	for _, updates := range listeners {
+		// A notification sent before unsubscribe may still be buffered.
+		for len(updates) > 0 {
+			<-updates
+		}
+		select {
+		case _, ok := <-updates:
+			if ok {
+				t.Fatal("unsubscribed channel still receives notifications")
+			}
+		default:
+			t.Fatal("unsubscribed channel is not closed")
+		}
+	}
+	if len(manager.subs) != 0 {
+		t.Fatal("concurrent unsubscribe leaked subscriptions")
+	}
+}
+
 func TestProxyManagerResolveReturnsCopy(t *testing.T) {
 	manager, err := NewProxyManager(ProxyConfig{Enabled: true, URL: "http://127.0.0.1:7890"})
 	if err != nil {
@@ -128,8 +237,8 @@ func TestProxyManagerNotifiesOnlyForEffectiveChanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	updates := manager.Subscribe()
-	defer manager.Unsubscribe(updates)
+	updates, unsubscribe := manager.Subscribe()
+	defer unsubscribe()
 	for _, step := range []struct {
 		name   string
 		config ProxyConfig
