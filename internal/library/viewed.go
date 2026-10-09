@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/viewedmovie"
 )
@@ -75,25 +76,15 @@ func (s *Service) AddViewedMovieIDs(ctx context.Context, ids []string) error {
 			return fmt.Errorf("upsert viewed movies: %w", err)
 		}
 
-		total, err := tx.ViewedMovie.Query().Count(ctx)
-		if err != nil {
-			return err
-		}
-		if total > maxViewedMovies {
-			excess := total - maxViewedMovies
-			oldestIDs, err := tx.ViewedMovie.Query().
-				Order(ent.Asc(viewedmovie.FieldViewedAt), ent.Asc(viewedmovie.FieldID)).
-				Limit(excess).
-				IDs(ctx)
-			if err != nil {
-				return err
-			}
-			if len(oldestIDs) > 0 {
-				if _, err := tx.ViewedMovie.Delete().Where(viewedmovie.IDIn(oldestIDs...)).Exec(ctx); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
+		_, err = tx.ViewedMovie.Delete().Where(func(s *sql.Selector) {
+			viewed := sql.Table(viewedmovie.Table)
+			// Keep the read order; SQLite's LIMIT -1 selects every row after
+			// the retained prefix without an additional count query.
+			oldest := sql.Select(viewed.C(viewedmovie.FieldID)).From(viewed).
+				OrderBy(sql.Desc(viewed.C(viewedmovie.FieldViewedAt)), sql.Desc(viewed.C(viewedmovie.FieldID))).
+				Limit(-1).Offset(maxViewedMovies)
+			s.Where(sql.In(s.C(viewedmovie.FieldID), oldest))
+		}).Exec(ctx)
+		return err
 	})
 }
