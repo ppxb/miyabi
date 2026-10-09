@@ -5,8 +5,10 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"testing/synctest"
 
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/task"
@@ -70,6 +72,118 @@ func TestMovieRescrapeIsFreshScopedAndDeduplicated(t *testing.T) {
 	if _, err := lib.RescrapeMovie(t.Context(), record.ID, "IPX-123"); !domain.IsKind(err, domain.KindConflict) {
 		t.Fatalf("correction while scraping: %v", err)
 	}
+}
+
+func TestMovieRescrapeDoesNotBlockMountEnqueue(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		lib, record, _ := movieActionFixture(t)
+		client := stubOf(t, lib.drive)
+		client.list = func(context.Context, string, string, int, int) (pan.FilePage, error) {
+			return pan.FilePage{Path: []pan.Directory{{ID: "20", Name: "Other"}}}, nil
+		}
+		mountEntered := make(chan struct{})
+		resumeMount := make(chan struct{})
+		lib.drive.SetMountListener(func(ctx context.Context, event drive.MountEvent) error {
+			close(mountEntered)
+			<-resumeMount
+			_, err := lib.EnqueueFreshScan(ctx, event.Source)
+			return err
+		})
+		mounted := make(chan error, 1)
+		go func() {
+			_, err := lib.drive.SelectDirectory(t.Context(), "20")
+			mounted <- err
+		}()
+		<-mountEntered
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		rescraped := make(chan error, 1)
+		go func() {
+			_, err := lib.RescrapeMovie(ctx, record.ID, "IPX-123")
+			rescraped <- err
+		}()
+		// The mount owns the source lock; rescrape is now waiting for it.
+		synctest.Wait()
+		close(resumeMount)
+		synctest.Wait()
+		select {
+		case err := <-mounted:
+			if err != nil {
+				t.Fatal(err)
+			}
+		default:
+			// Release both requests before reporting the old lock-order failure.
+			cancel()
+			synctest.Wait()
+			<-mounted
+			<-rescraped
+			t.Fatal("mount enqueue and movie rescrape are waiting for each other's locks")
+		}
+		if err := <-rescraped; !domain.IsKind(err, domain.KindNotFound) {
+			t.Fatalf("movie from the previous mount was not rejected: %v", err)
+		}
+		if source := lib.drive.Source(); source == nil || source.Directory.ID != "20" {
+			t.Fatalf("new mount was not retained: %+v", source)
+		}
+		queued := lib.database.Task.Query().Where(task.TypeEQ("scan"), task.StatusEQ(task.StatusQueued)).OnlyX(t.Context())
+		payload, err := tasks.DecodePayload[domain.ScanPayload](queued.Payload)
+		if err != nil || payload.Source.Directory.ID != "20" {
+			t.Fatalf("new mount lost its scan: %+v %v", payload, err)
+		}
+		got := lib.database.Movie.GetX(t.Context(), record.ID)
+		if got.Code != record.Code || got.ManualCode != "" || got.ScrapeStatus != movie.ScrapeStatusDone {
+			t.Fatalf("rejected rescrape changed the old movie: %+v", got)
+		}
+		if lib.database.Task.Query().Where(task.TypeEQ("scrape")).ExistX(t.Context()) {
+			t.Fatal("rejected rescrape created a metadata task")
+		}
+	})
+}
+
+func TestMovieRescrapeQueueWaitDoesNotHoldDatabaseWriter(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		lib, record, _ := movieActionFixture(t)
+		if err := lib.tasks.Queue().Lock(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		unlock := sync.OnceFunc(lib.tasks.Queue().Unlock)
+		defer unlock()
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		finished := make(chan error, 1)
+		go func() {
+			_, err := lib.RescrapeMovie(ctx, record.ID, "IPX-123")
+			finished <- err
+		}()
+		synctest.Wait()
+		// Queue owners can write while rescrape waits; starting the transaction
+		// before acquiring the queue would invert the writer/queue lock order.
+		written := make(chan error, 1)
+		go func() {
+			written <- lib.database.Task.Create().SetType("unrelated").Exec(t.Context())
+		}()
+		synctest.Wait()
+		cancel()
+		synctest.Wait()
+		if err := <-written; err != nil {
+			t.Fatalf("rescrape held the database writer while waiting for the queue: %v", err)
+		}
+		if err := <-finished; !errors.Is(err, context.Canceled) {
+			t.Fatalf("queue wait ignored cancellation: %v", err)
+		}
+		// Clearing the mount must acquire the source lock even while the test
+		// still owns the queue, proving cancellation released source protection.
+		if err := lib.drive.ClearDirectory(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		got := lib.database.Movie.GetX(t.Context(), record.ID)
+		if got.Code != record.Code || got.ManualCode != "" || got.ScrapeStatus != movie.ScrapeStatusDone {
+			t.Fatalf("canceled rescrape changed the movie: %+v", got)
+		}
+		if lib.database.Task.Query().Where(task.TypeEQ("scrape")).ExistX(t.Context()) {
+			t.Fatal("canceled rescrape created a metadata task")
+		}
+	})
 }
 
 func TestMovieCorrectionValidatesBeforeChangingIdentity(t *testing.T) {

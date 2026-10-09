@@ -227,6 +227,7 @@ func libraryFixture(t testing.TB) (*libraryTestService, domain.TaskInfo, domain.
 	}
 
 	scrape := scrapePkg.New(store.Client, driveSvc, nil, images, taskSvc, scrapePkg.Dependencies{})
+	t.Cleanup(scrape.Close)
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScan, lib.Scan, lib.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScrape, scrape.Scrape, scrape.Finished))
 	return lib, queued, domain.ScanPayload{Source: source, Scan: domain.ScanProgress{Stage: "scanning"}}

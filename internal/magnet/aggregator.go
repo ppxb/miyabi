@@ -56,15 +56,13 @@ func (a *Aggregator) FindDetailed(ctx context.Context, ref domain.MovieRef) ([]d
 
 	results := make([]queryResult, len(a.sources))
 	var wg sync.WaitGroup
-	for i, s := range a.sources {
-		wg.Add(1)
-		go func(idx int, src Source) {
-			defer wg.Done()
+	for i, src := range a.sources {
+		wg.Go(func() {
 			sourceCtx, cancel := context.WithTimeout(ctx, a.timeout)
 			defer cancel()
 			magnets, err := src.Find(sourceCtx, ref)
-			results[idx] = queryResult{source: src.Name(), magnets: magnets, err: err}
-		}(i, s)
+			results[i] = queryResult{source: src.Name(), magnets: magnets, err: err}
+		})
 	}
 	wg.Wait()
 

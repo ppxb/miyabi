@@ -235,21 +235,17 @@ func (a *App) Run(ctx context.Context) error {
 
 	var workers sync.WaitGroup
 	poolError := make(chan error, len(a.pools))
-	workers.Add(len(a.pools) + 2)
 	for _, pool := range a.pools {
-		go func() {
-			defer workers.Done()
+		workers.Go(func() {
 			poolError <- pool.Run(ctx)
-		}()
+		})
 	}
-	go func() {
-		defer workers.Done()
+	workers.Go(func() {
 		tasks.RunPeriodic(ctx, a.logger, "sync 115 offline tasks", offlineSyncInterval, nil, a.offline.Sync)
-	}()
-	go func() {
-		defer workers.Done()
+	})
+	workers.Go(func() {
 		tasks.RunPeriodic(ctx, a.logger, "monitor", monitorCheckInterval, a.monitors.Pending(), a.monitors.Check)
-	}()
+	})
 
 	serverError := make(chan error, 1)
 	go func() {

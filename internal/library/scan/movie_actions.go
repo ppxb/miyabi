@@ -28,92 +28,96 @@ func (s *Scanner) RescrapeMovie(ctx context.Context, id int, code string) (*ent.
 	if err != nil {
 		return nil, err
 	}
-	if err := s.tasksSvc.Queue().Lock(ctx); err != nil {
-		return nil, err
-	}
-	defer s.tasksSvc.Queue().Unlock()
 	var parent *ent.Task
-	err = sess.Commit(ctx, func(tx *ent.Tx) error {
-		record, err := tx.Movie.Query().Where(movie.IDEQ(id), movie.HasFilesWith(database.LibraryFiles(sess.Source()))).Only(ctx)
-		if ent.IsNotFound(err) {
-			return domain.E(domain.KindNotFound, "当前挂载目录中未找到该影片的媒体文件", nil)
-		}
-		if err != nil {
+	// Mount callbacks enqueue with the source lock held. Keep the same order,
+	// and acquire the queue before opening a database write transaction.
+	err = sess.WithSource(ctx, func() error {
+		if err := s.tasksSvc.Queue().Lock(ctx); err != nil {
 			return err
 		}
-		correcting := code != "" && code != record.Code
-		active, err := tx.Task.Query().Where(task.TypeEQ(tasks.KindScrape.String()),
-			task.ResourceKeyEQ(fmt.Sprintf("movie:%d", id)), task.StatusIn(task.StatusQueued, task.StatusRunning)).First(ctx)
-		if err != nil && !ent.IsNotFound(err) {
-			return err
-		}
-		if active != nil {
-			input, err := tasks.DecodePayload[scrape.MetadataPayload](active.Payload)
+		defer s.tasksSvc.Queue().Unlock()
+		return ent.WithTx(ctx, s.db, func(tx *ent.Tx) error {
+			record, err := tx.Movie.Query().Where(movie.IDEQ(id), movie.HasFilesWith(database.LibraryFiles(sess.Source()))).Only(ctx)
+			if ent.IsNotFound(err) {
+				return domain.E(domain.KindNotFound, "当前挂载目录中未找到该影片的媒体文件", nil)
+			}
 			if err != nil {
 				return err
 			}
-			if !correcting && input.Rebuild && input.Source == sess.Source() {
-				parent, err = tx.Task.Get(ctx, input.ScanTaskID)
+			correcting := code != "" && code != record.Code
+			active, err := tx.Task.Query().Where(task.TypeEQ(tasks.KindScrape.String()),
+				task.ResourceKeyEQ(fmt.Sprintf("movie:%d", id)), task.StatusIn(task.StatusQueued, task.StatusRunning)).First(ctx)
+			if err != nil && !ent.IsNotFound(err) {
 				return err
 			}
-			return domain.E(domain.KindConflict, "该影片正在处理中，请完成后再操作", nil)
-		}
-		busy, err := tx.Task.Query().Where(task.TypeEQ(tasks.KindScan.String()),
-			task.StatusIn(task.StatusQueued, task.StatusRunning), func(q *sql.Selector) {
-				q.Where(sqljson.ValueEQ(task.FieldPayload, sess.Source().AccountID, sqljson.Path("source", "account_id")))
-				q.Where(sqljson.ValueEQ(task.FieldPayload, sess.Source().Directory.ID, sqljson.Path("source", "directory", "id")))
-			}).Exist(ctx)
-		if err != nil {
-			return err
-		}
-		if busy {
-			return domain.E(domain.KindConflict, "媒体库正在扫描，请完成后再操作", nil)
-		}
-		if correcting {
-			matches, err := MatchMovies(ctx, tx, []string{code})
-			if err != nil {
-				return err
-			}
-			if other := matches[code]; other != 0 && other != id {
-				return domain.E(domain.KindConflict, "该番号已存在于媒体库，请检查后重试", nil)
-			}
-			if err := scrape.SaveMovieMetadata(ctx, tx, id, nfo.Movie{Code: code}); err != nil {
-				return err
-			}
-			update := tx.Movie.UpdateOneID(id).SetManualCode(code).ClearCover().ClearPoster().SetFanarts([]string{})
-			if record.MetadataSnapshot != nil {
-				snapshot := *record.MetadataSnapshot
-				if snapshot.Code == "" {
-					snapshot.Code = record.Code
+			if active != nil {
+				input, err := tasks.DecodePayload[scrape.MetadataPayload](active.Payload)
+				if err != nil {
+					return err
 				}
-				update.SetMetadataSnapshot(&snapshot)
+				if !correcting && input.Rebuild && input.Source == sess.Source() {
+					parent, err = tx.Task.Get(ctx, input.ScanTaskID)
+					return err
+				}
+				return domain.E(domain.KindConflict, "该影片正在处理中，请完成后再操作", nil)
 			}
-			record, err = update.Save(ctx)
+			busy, err := tx.Task.Query().Where(task.TypeEQ(tasks.KindScan.String()),
+				task.StatusIn(task.StatusQueued, task.StatusRunning), func(q *sql.Selector) {
+					q.Where(sqljson.ValueEQ(task.FieldPayload, sess.Source().AccountID, sqljson.Path("source", "account_id")))
+					q.Where(sqljson.ValueEQ(task.FieldPayload, sess.Source().Directory.ID, sqljson.Path("source", "directory", "id")))
+				}).Exist(ctx)
 			if err != nil {
 				return err
 			}
-		} else if err := tx.Movie.UpdateOneID(id).SetScrapeStatus(movie.ScrapeStatusPending).Exec(ctx); err != nil {
-			return err
-		}
-		body, err := tasks.EncodePayload(domain.ScanPayload{
-			MovieID: id, Code: record.Code, Rebuild: true, Source: sess.Source(),
-			Scan: domain.ScanProgress{Stage: "done", Movies: 1, CurrentPath: sess.Source().Directory.Path},
+			if busy {
+				return domain.E(domain.KindConflict, "媒体库正在扫描，请完成后再操作", nil)
+			}
+			if correcting {
+				matches, err := MatchMovies(ctx, tx, []string{code})
+				if err != nil {
+					return err
+				}
+				if other := matches[code]; other != 0 && other != id {
+					return domain.E(domain.KindConflict, "该番号已存在于媒体库，请检查后重试", nil)
+				}
+				if err := scrape.SaveMovieMetadata(ctx, tx, id, nfo.Movie{Code: code}); err != nil {
+					return err
+				}
+				update := tx.Movie.UpdateOneID(id).SetManualCode(code).ClearCover().ClearPoster().SetFanarts([]string{})
+				if record.MetadataSnapshot != nil {
+					snapshot := *record.MetadataSnapshot
+					if snapshot.Code == "" {
+						snapshot.Code = record.Code
+					}
+					update.SetMetadataSnapshot(&snapshot)
+				}
+				record, err = update.Save(ctx)
+				if err != nil {
+					return err
+				}
+			} else if err := tx.Movie.UpdateOneID(id).SetScrapeStatus(movie.ScrapeStatusPending).Exec(ctx); err != nil {
+				return err
+			}
+			body, err := tasks.EncodePayload(domain.ScanPayload{
+				MovieID: id, Code: record.Code, Rebuild: true, Source: sess.Source(),
+				Scan: domain.ScanProgress{Stage: "done", Movies: 1, CurrentPath: sess.Source().Directory.Path},
+			})
+			if err != nil {
+				return err
+			}
+			parent, err = tx.Task.Create().SetType(tasks.KindScan.String()).SetStatus(task.StatusDone).SetPayload(body).Save(ctx)
+			if err != nil {
+				return err
+			}
+			body, err = tasks.EncodePayload(scrape.MetadataPayload{
+				Rebuild: true, Source: sess.Source(), ScanTaskID: parent.ID, MovieID: id,
+				Code: record.Code, JavDBID: domain.ValueOrZero(record.JavdbID), ManualCode: record.ManualCode,
+			})
+			if err != nil {
+				return err
+			}
+			return tx.Task.Create().SetType(tasks.KindScrape.String()).SetResourceKey(fmt.Sprintf("movie:%d", id)).SetPayload(body).Exec(ctx)
 		})
-		if err != nil {
-			return err
-		}
-		parent, err = tx.Task.Create().SetType(tasks.KindScan.String()).SetStatus(task.StatusDone).SetPayload(body).Save(ctx)
-		if err != nil {
-			return err
-		}
-		body, err = tasks.EncodePayload(scrape.MetadataPayload{
-			Rebuild: true, Source: sess.Source(), ScanTaskID: parent.ID, MovieID: id,
-			Code: record.Code, JavDBID: domain.ValueOrZero(record.JavdbID), ManualCode: record.ManualCode,
-		})
-		if err != nil {
-			return err
-		}
-		return tx.Task.Create().SetType(tasks.KindScrape.String()).SetResourceKey(fmt.Sprintf("movie:%d", id)).SetPayload(body).Exec(ctx)
 	})
 	if err != nil {
 		return nil, err

@@ -2,7 +2,7 @@
 
 > 复核日期：2026-10-02。基线：`v0.2.0 / e79cb1e`。
 > 本轮逐项复核原清单 111 项，保留原编号；补充用户反馈第 245 项，共 112 项。已解决项移出待办，仅保留简短结论及代码位置。
-> 首次复核只更新审计报告；后续已完成第 135、138、140、142、146、147、148、149、153、156、157、158、159、160、161、163、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
+> 首次复核只更新审计报告；后续已完成第 135、138、140、142、146、147、148、149、153、156、157、158、159、160、161、163、164、166、168、173、184、189、192、193、194、206、222、224、235 项处理，并同步结论。“确认存在”表示代码路径仍在，不代表已经在真实大库或浏览器中测得故障。可选重构不能计作已确认 bug。
 > 第 151 项已完成手动重连优化；首屏业务数据校正按本轮范围保留，是否进一步合并仍需实测，因此不计作整项完成。
 > 第 152 项已完成四类设置查询的缓存复用；任务、影片状态、离线活动及订阅列表的挂载刷新保留，不计作整项完成。
 
@@ -11,11 +11,11 @@
 | 状态 | 数量 | 含义 |
 | --- | ---: | --- |
 | 确认仍存在，待处理 | 1 | 有明确代码依据的边界、状态反馈或行为问题 |
-| 可选优化与整理 | 47 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
+| 可选优化与整理 | 46 | 重复、风格或潜在成本仍在，但收益和方案需验证 |
 | 需要用户实测 | 3 | 195、227 为视觉推断；245 为用户反馈，尚未定位 |
 | 按现有约定暂缓 | 10 | 用户明确暂不处理的事项，或不恢复已取消的 UI、ARIA 等要求 |
 | 撤回原问题结论 | 11 | 原结论不成立、风险描述过度，或把设计选择当成 bug |
-| 已解决或随功能删除失效 | 40 | 移出实施队列，保留回归能力 |
+| 已解决或随功能删除失效 | 41 | 移出实施队列，保留回归能力 |
 
 优先处理顺序：
 
@@ -33,6 +33,7 @@
 
 ### 本轮验证与限制
 
+- 第 164 项修复后通过：`go test ./...`、`go vet ./...`。使用 synctest、真实 Drive/任务队列及模拟 115 复现挂载与重新刮削相反加锁顺序导致的互相等待，修复后挂载扫描可完成，旧目录影片的更正请求被拒绝且不改数据、不创建刮削任务。新增队列等待期间数据库仍可写、取消后释放来源锁的回归，以及 ContextLock 的非法解锁、取消等待、复用和串行访问测试；保留现有并发刮削去重、磁力来源超时及应用退出回归。测试夹具补齐 scrape.Close，关闭其字幕 worker。未执行浏览器或真实 115 测试，未运行 race 检测（当前 Go 环境 CGO_ENABLED=0）。
 - 第 163 项整理后通过：`go test ./internal/netx ./internal/network ./internal/javdb ./internal/javbus ./internal/app`、同范围 `go vet`。新增退订幂等、缓冲通知保留、多监听者隔离及并发广播/退订回归；扩充客户端并发刷新/关闭测试，覆盖实际代理订阅的释放，既有代理切换、有效配置变化通知及在途请求保留回归通过。未执行浏览器或真实站点测试，未运行 race 检测（当前 Go 环境 CGO_ENABLED=0），不将取消遍历换算为实际提速。
 - 第 160 项修复后通过：`go test ./internal/api ./internal/app`、同范围 `go vet`。先以真实路由和桩服务复现非法演员 ID 返回 200，再验证非数字、零、负数、溢出 ID 返回 400 且不调用查询；保留全部演员、指定演员和分页默认值/边界，feed 忽略无关 kind。配置测试覆盖空请求体回退、候选配置跳过读取、未知长度请求体、部分字段/空对象不合并已保存配置、无效 JSON 及读取/探测错误，测试操作不修改配置。未执行浏览器或真实连接测试，不将内存读取减少换算为实际提速。
 - 第 159 项整理后通过：`go test ./internal/api ./internal/app`、同范围 `go vet`。扩充现有 Cookie 鉴权用例，验证缺失、伪造和过期 Cookie 返回原有文案及 UNAUTHORIZED，拒绝后受保护处理器不执行；有效 Cookie、忽略 Bearer/查询参数令牌、关闭密码保护及 PAN_UNAUTHORIZED 等既有回归通过。未执行浏览器测试。
@@ -93,8 +94,6 @@
   - 定位：`web/src/api/library.ts`；`web/src/api/discover.ts`；`web/src/router.tsx`。
 - **162.** Claim 仍先 SELECT 后条件 UPDATE，但已有队列锁、状态条件与资源顺序约束，不能据此判定重复领取。批次列表的近期+活动合并及 registry 检查仍存在；更改单条 SQL 前须证明收益并保留重试/暂停语义。
   - 定位：`internal/tasks/queue.go`；`internal/tasks/pool.go`；`internal/monitor/batch_tasks.go`。
-- **164.** 部分 goroutine 仍使用 Add/Done，Kind 字符串转换风格不一。ContextLock 未持锁 Unlock 会阻塞，但本轮未发现生产误用路径；不将它写成已发生死锁。wg.Go 和锁误用诊断属于可选整理。
-  - 定位：`internal/app/app.go`；`internal/magnet/aggregator.go`；`internal/syncx/lock.go`。
 - **165.** 浏览记录裁剪仍是 Count、读取最旧 ID、Delete；可评估单条有界删除，但须保留 viewed_at/id 同序规则与单调时间。当前已有限额，未证明此处为性能瓶颈。
   - 定位：`internal/library/viewed.go`。
 - **169.** apiPost/apiPatch/apiPut 的 JSON 请求初始化仍重复，imageURL 也仍位于 client.ts。可以小范围整理，但改参数形状或新增转发层不一定改善维护性，不以调用次数要求全面重写。
@@ -285,6 +284,8 @@
   - 定位：`internal/api/rate_limiter.go`；`internal/api/auth.go`；`internal/api/rate_limiter_test.go`；`internal/api/auth_rate_limit_test.go`。
 - [x] **163.** ProxyManager.Subscribe 已返回通知通道和幂等退订函数，退订在广播共用的锁内直接删除 map 项并关闭通道，移除按只读通道遍历查找的 Unsubscribe 方法。指纹客户端保存退订函数，在初始化失败和关闭时释放订阅；保留缓冲通知及既有代理刷新行为。Bus 继续由 context 控制监听退出，Drive 保留可拒绝挂载的单个同步回调，不统一通道关闭语义或新增通用事件总线；本项属于接口整理，不认定原实现存在订阅泄漏。
   - 定位：`internal/netx/proxy.go`；`internal/netx/fingerprint.go`；`internal/netx/proxy_test.go`；`internal/netx/fingerprint_test.go`。
+- [x] **164.** 重新刮削改为先通过 WithSource 取得来源锁，再取得队列锁，最后开启数据库事务，与挂载回调的加锁顺序一致，并避免持数据库写锁等待队列。影片更正、来源校验和任务去重仍在锁与事务保护内。ContextLock 在锁为空时 Unlock 会立即 panic，正常取消和解锁语义保留；此改动用于诊断误用，不把原来未观察到的错误解锁写成生产事故。App 后台任务和磁力聚合器改用 WaitGroup.Go；Kind.String() 与 string(kind) 语义等价，本轮保留其写法，不做全库机械替换。
+  - 定位：`internal/library/scan/movie_actions.go`；`internal/library/movie_actions_test.go`；`internal/library/fixture_test.go`；`internal/syncx/lock.go`；`internal/syncx/lock_test.go`；`internal/app/app.go`；`internal/magnet/aggregator.go`。
 - [x] **166.** 前端目录请求返回 404，首页与 SPA 回退直接提供 index.html，入口缺失也不列目录。仅已存在且符合当前 Vite 八位哈希命名的 assets 资源使用 `public, max-age=31536000, immutable`；入口和普通静态文件使用 `no-cache`。缺失资源、无效文件路径和 API 路径不回退 HTML；前端只接受 GET/HEAD，并保留静态文件条件请求与 Range 支持。SPA 回退不再改写原请求路径。
   - 定位：`internal/api/router.go`；`internal/api/frontend_test.go`；`web/vite.config.ts`。
 - [x] **168.** GFriends 索引下载与本地缓存读取统一限制为 32 MiB，先检查已知大小，再限量读取至上限加 1 字节以识别超限，不接受截断数据。超限镜像尝试下一来源；全部失败时沿用有效旧索引及 5 分钟重试间隔，首次无索引时返回错误，超大磁盘缓存不阻止重新下载。7 天缓存有效期保留。共享下载函数同时严格执行头像原有的 10 MiB 限额，超限进入镜像回退；第 167 项图片代理仍暂缓。

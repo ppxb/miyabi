@@ -44,4 +44,12 @@ func (lock *ContextLock) TryLock() bool {
 	}
 }
 
-func (lock *ContextLock) Unlock() { <-lock.gate }
+// Unlock releases the lock. It panics if the lock is not held.
+func (lock *ContextLock) Unlock() {
+	lock.init()
+	select {
+	case <-lock.gate:
+	default:
+		panic("syncx: unlock of unlocked ContextLock")
+	}
+}
