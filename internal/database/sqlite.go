@@ -63,10 +63,6 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 	return &Store{Client: client, db: db}, nil
 }
 
-func (store *Store) Ping(ctx context.Context) error {
-	return store.db.PingContext(ctx)
-}
-
 func (store *Store) Close() error {
 	return store.Client.Close()
 }

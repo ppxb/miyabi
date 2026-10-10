@@ -9,6 +9,7 @@ func TestRemovedRoutesLeaveActiveWorkflowsRegistered(t *testing.T) {
 		routes[route.Method+" "+route.Path] = true
 	}
 	for _, route := range []string{
+		"GET /api/health",
 		"POST /api/auth/logout",
 		"POST /api/library/scan/local",
 		"GET /api/discover/movies/:id/offline",

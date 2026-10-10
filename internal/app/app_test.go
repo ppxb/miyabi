@@ -4,9 +4,6 @@ import (
 	"context"
 	"io"
 	"log/slog"
-	"net"
-	"net/http"
-	"net/http/httptest"
 	"path/filepath"
 	"testing"
 	"time"
@@ -51,42 +48,4 @@ func TestAppLifecycle(t *testing.T) {
 	if err := application.Close(); err != nil {
 		t.Fatalf("failed to close app: %v", err)
 	}
-}
-
-func TestCheckHealth(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path != "/api/health" {
-				w.WriteHeader(http.StatusNotFound)
-				return
-			}
-			w.WriteHeader(http.StatusOK)
-		}))
-		defer server.Close()
-
-		_, port, err := net.SplitHostPort(server.Listener.Addr().String())
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := app.CheckHealth("127.0.0.1:" + port); err != nil {
-			t.Fatalf("expected healthcheck success, got: %v", err)
-		}
-	})
-
-	t.Run("unhealthy status", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusServiceUnavailable)
-		}))
-		defer server.Close()
-
-		if err := app.CheckHealth(server.Listener.Addr().String()); err == nil {
-			t.Fatal("expected healthcheck failure for status 503")
-		}
-	})
-
-	t.Run("invalid address", func(t *testing.T) {
-		if err := app.CheckHealth("invalid-listen-address"); err == nil {
-			t.Fatal("expected error for invalid address")
-		}
-	})
 }

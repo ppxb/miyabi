@@ -2,7 +2,6 @@ package api
 
 import (
 	"bytes"
-	"context"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -15,13 +14,8 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 )
 
-type HealthChecker interface {
-	Ping(context.Context) error
-}
-
 type Dependencies struct {
 	Logger         *slog.Logger
-	Health         HealthChecker
 	Access         AccessGate
 	Catalogue      CatalogueManager
 	Metadata       MetadataManager
@@ -65,7 +59,6 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	loginLimiter := newLoginRateLimiter(5, 5*time.Minute, 24*time.Hour)
 
 	api := router.Group("/api", sameOriginMiddleware())
-	api.GET("/health", healthHandler(deps.Health))
 
 	authAPI := api.Group("/auth", noStore())
 	authAPI.GET("/config", accessConfigHandler(deps.Access))

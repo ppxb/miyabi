@@ -29,7 +29,7 @@ COPY embed.go embed_dev.go ./
 COPY --from=web-builder /build/web/dist ./web/dist
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=readonly -trimpath -ldflags="-s -w" -o /out/miyabi ./cmd/miyabi
+    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -mod=readonly -trimpath -ldflags="-s -w" -o /out/miyabi ./cmd
 
 FROM debian:bookworm-slim AS runtime
 
@@ -49,9 +49,6 @@ ENV MIYABI_LISTEN=":8080" MIYABI_DATA_DIR="/app/data" MIYABI_LOG_LEVEL="info"
 
 VOLUME ["/app/data"]
 EXPOSE 8080
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD ["/app/miyabi", "healthcheck"]
 
 ENTRYPOINT ["/app/miyabi"]
 
