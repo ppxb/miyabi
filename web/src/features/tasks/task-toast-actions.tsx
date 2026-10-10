@@ -25,7 +25,6 @@ export function TaskToastActions({
           variant="ghost"
           size="icon-sm"
           title="取消任务"
-          aria-label="取消任务"
           disabled={cancel.isPending}
           onClick={() => cancel.mutate(cancelTaskID)}
         >
@@ -48,7 +47,6 @@ export function TaskToastActions({
         variant="ghost"
         size="icon-sm"
         title="关闭通知"
-        aria-label="关闭通知"
         onClick={() => toast.dismiss(id)}
       >
         <XIcon />

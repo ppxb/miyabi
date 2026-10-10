@@ -181,7 +181,6 @@ function MagnetCard({
                 variant="outline"
                 size="icon-sm"
                 title="尝试下一条磁力"
-                aria-label="尝试下一条磁力"
                 disabled={next.isPending || statusError}
                 onClick={() => next.mutate(task.task_id)}
               >

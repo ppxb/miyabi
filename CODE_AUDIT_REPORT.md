@@ -45,15 +45,15 @@
 
 **验证：** 生产构建、TypeScript、目标文件 Lint 与格式检查通过；静态对比确认四种徽标在明暗主题下的背景、前景和交互色值均与修改前一致，并检查了生成的 CSS。未新增测试文件，未执行浏览器测试。
 
-### F02 · P3 · 三处业务组件手写 aria 与最新项目约定不一致
+### F02 · P3 · 三处业务组件手写 aria 与最新项目约定不一致（已完成）
 
-**位置：** [task-toast-actions.tsx:28](E:/ppxb/miyabi/web/src/features/tasks/task-toast-actions.tsx:28)、[task-toast-actions.tsx:51](E:/ppxb/miyabi/web/src/features/tasks/task-toast-actions.tsx:51)、[magnets.tsx:184](E:/ppxb/miyabi/web/src/features/movie-detail/magnets.tsx:184)。
+**位置：** [task-toast-actions.tsx:27](E:/ppxb/miyabi/web/src/features/tasks/task-toast-actions.tsx:27)、[task-toast-actions.tsx:49](E:/ppxb/miyabi/web/src/features/tasks/task-toast-actions.tsx:49)、[magnets.tsx:183](E:/ppxb/miyabi/web/src/features/movie-detail/magnets.tsx:183)。
 
-排除 shadcn 基础组件目录后，发现取消任务、关闭通知、尝试下一条磁力三个业务按钮手写了 `aria-label`。三处同时已有同内容的 `title`。
+**原问题：** 取消任务、关闭通知、尝试下一条磁力三个业务按钮手写了 `aria-label`，三处同时已有同内容的 `title`。
 
-**影响：** 业务层的实现约定不统一；此项是根据本次新增约定识别的整理项，不作为功能故障。
+**处理结果（2026-10-10）：** 已按项目约定移除三处业务层手写 `aria-label`，保留现有 title、点击行为、禁用状态和样式，未改动 shadcn 原始组件内部实现。
 
-**建议与验收：** 后续整理时移除这三处业务层手写 aria，保留现有 title、点击行为和禁用状态，不改动 shadcn 原始组件内部实现。通过源码检索核对即可，不新增以 aria 属性为目标的业务组件测试。
+**验证：** 排除 shadcn 基础组件目录后，源码检索未再发现业务组件手写的 aria 属性；TypeScript、目标文件 Lint 与格式检查通过。未新增测试，未执行浏览器测试。
 
 ### F03 · P2 · 每张订阅卡片重复建立全量订阅 Map
 
