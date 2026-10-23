@@ -37,13 +37,13 @@ export function MovieRecommendations({
 function RecommendationCard({ movie }: { movie: MovieReference }) {
   const cardRef = useRef<HTMLDivElement>(null)
   const [readyCover, setReadyCover] = useState<string>()
-  const nsfwMode = useSettingsStore(state => state.nsfwMode)
+  const imageSafety = useSettingsStore(state => state.imageSafety)
   const detail = useRecommendationMovie(movie.id)
   const { request, prioritize } = detail
   const data = detail.movie
   const failed = detail.isError && !detail.isFetching
   const cover = data || failed ? data?.cover || data?.thumbnail || movie.thumbnail : ''
-  const coverKey = JSON.stringify([cover, nsfwMode])
+  const coverKey = JSON.stringify([cover, imageSafety])
   const loading = (!data && !failed) || readyCover !== coverKey
   const onCoverReady = useCallback(() => setReadyCover(coverKey), [coverKey])
 
@@ -66,6 +66,7 @@ function RecommendationCard({ movie }: { movie: MovieReference }) {
             movie={{
               code: data?.code ?? movie.code,
               title: data?.title ?? '',
+              actors: data?.actors,
               cover
             }}
             coverLoading="eager"

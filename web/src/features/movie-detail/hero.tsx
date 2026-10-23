@@ -17,7 +17,7 @@ export function MovieHero({
   return (
     <section className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-8">
       <div className="aspect-3/2 overflow-hidden rounded-2xl bg-muted ring-1 ring-foreground/10">
-        <MovieCover source={movie.cover} loading="eager" />
+        <MovieCover source={movie.cover} movie={movie} loading="eager" />
       </div>
 
       <div className="min-w-0 space-y-5 py-1">

@@ -38,7 +38,7 @@ function LibraryMovieDetail({ movieId }: { movieId: number }) {
         </InlineError>
       ) : null}
       <MovieHero movie={detail.data} libraryStatus={detail.data.scrape_status} />
-      <MoviePreviews images={detail.data.preview_images} />
+      <MoviePreviews images={detail.data.preview_images} label={detail.data.code} />
       {detail.data.id ? <LibraryCatalogueExtras movieId={detail.data.id} /> : null}
     </div>
   )
@@ -102,7 +102,7 @@ function IdentifiedMovieDetail({ movieId }: { movieId: string }) {
         </InlineError>
       ) : null}
       <MovieHero movie={detail.data} />
-      <MoviePreviews images={detail.data.preview_images} />
+      <MoviePreviews images={detail.data.preview_images} label={detail.data.code} />
       <MovieMagnets movieID={movieId} query={magnets} />
       <MovieRecommendations title="TA（们）还出演过" movies={detail.data.actor_movies} />
       <MovieRecommendations title="你可能也喜欢" movies={detail.data.related_movies} />

@@ -5,7 +5,7 @@ import type { PreviewImage } from '@/api/discover'
 import { MediaImage } from '@/components/media-image'
 import { MoviePreviewViewer } from './preview-viewer'
 
-export function MoviePreviews({ images }: { images: PreviewImage[] }) {
+export function MoviePreviews({ images, label }: { images: PreviewImage[]; label: string }) {
   // The viewer stays mounted so its closing animation can play; the index outlives `open`.
   const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerIndex, setViewerIndex] = useState(0)
@@ -25,26 +25,32 @@ export function MoviePreviews({ images }: { images: PreviewImage[] }) {
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
           {images.map((preview, index) => (
-            <button
+            <div
               key={`${preview.original}:${index}`}
-              type="button"
-              onClick={() => openViewer(index)}
-              className="group relative aspect-video cursor-pointer overflow-hidden rounded-xl"
+              className="group relative aspect-video overflow-hidden rounded-xl"
             >
               <MediaImage
                 source={preview.thumbnail || preview.original}
                 original={preview.original}
+                label={label}
+                description={`预览图 ${index + 1}`}
                 className="object-cover"
               />
-              <span className="absolute inset-0 hidden items-center justify-center bg-black/40 text-white opacity-0 transition-opacity group-hover:opacity-100 sm:flex">
-                <Maximize2Icon className="size-5" />
-              </span>
-            </button>
+              <button
+                type="button"
+                aria-label={`放大 ${label} 预览图 ${index + 1}`}
+                onClick={() => openViewer(index)}
+                className="absolute top-1 right-1 cursor-pointer rounded-md bg-black/60 p-1.5 text-white"
+              >
+                <Maximize2Icon className="size-4" />
+              </button>
+            </div>
           ))}
         </div>
       )}
       <MoviePreviewViewer
         images={images}
+        label={label}
         index={viewerIndex}
         open={viewerOpen}
         onIndexChange={setViewerIndex}

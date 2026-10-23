@@ -1,11 +1,11 @@
-import { PauseIcon, PlayIcon, Trash2Icon, UserRoundIcon } from 'lucide-react'
+import { PauseIcon, PlayIcon, Trash2Icon } from 'lucide-react'
 
 import {
   type SubscriptionItem,
   useRemoveSubscription,
   useUpdateSubscription
 } from '@/api/subscriptions'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { MediaImage } from '@/components/media-image'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -33,6 +33,9 @@ export function ActorChip({
 
   return (
     <div className="flex shrink-0 items-center gap-2 rounded-2xl border p-2">
+      <div className="size-12 shrink-0 overflow-hidden rounded-xl">
+        <MediaImage source={actor.cover} label={actor.title} compact className="object-cover" />
+      </div>
       <Button
         type="button"
         variant={selected ? 'secondary' : 'ghost'}
@@ -40,12 +43,6 @@ export function ActorChip({
         onClick={onSelect}
       >
         <div className="flex min-w-0 items-center gap-3">
-          <Avatar key={actor.cover} size="lg">
-            {actor.cover ? <AvatarImage src={actor.cover} alt={actor.title} /> : null}
-            <AvatarFallback>
-              <UserRoundIcon className="size-5" />
-            </AvatarFallback>
-          </Avatar>
           <div className="min-w-0 space-y-1 text-left">
             <div className="flex items-center gap-1.5">
               <span className="truncate text-sm font-semibold">{actor.title}</span>

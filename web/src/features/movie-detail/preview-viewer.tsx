@@ -35,12 +35,14 @@ const PreviewMediaImage = memo(MediaImage)
 
 export function MoviePreviewViewer({
   images,
+  label,
   index,
   open,
   onIndexChange,
   onClose
 }: {
   images: PreviewImage[]
+  label: string
   index: number
   open: boolean
   onIndexChange: (index: number) => void
@@ -99,6 +101,7 @@ export function MoviePreviewViewer({
         <PreviewStage
           key={activeIndex}
           image={current}
+          label={label}
           initialNatural={frameSize}
           onNaturalSize={setFrameSize}
           onClose={onClose}
@@ -115,25 +118,38 @@ export function MoviePreviewViewer({
           {/* Centered while the thumbnails fit, still scrollable once they do not. */}
           <div className="mx-auto flex items-center gap-2">
             {images.map((image, itemIndex) => (
-              <button
+              <div
                 key={`${image.original}:${itemIndex}`}
-                type="button"
                 data-active={itemIndex === activeIndex ? 'true' : undefined}
-                onClick={() => onIndexChange(itemIndex)}
                 className={cn(
-                  'group shrink-0 cursor-pointer rounded-xl p-1 transition-colors',
+                  'group shrink-0 rounded-xl p-1 transition-colors',
                   itemIndex === activeIndex ? 'bg-foreground/15' : 'hover:bg-foreground/10'
                 )}
               >
-                <span
+                <div
                   className={cn(
-                    'block aspect-video w-16 overflow-hidden rounded-lg transition-opacity sm:w-20',
+                    'aspect-video w-16 overflow-hidden rounded-lg transition-opacity sm:w-20',
                     itemIndex === activeIndex ? 'opacity-100' : 'opacity-50 group-hover:opacity-100'
                   )}
                 >
-                  <MediaImage source={image.thumbnail || image.original} className="object-cover" />
-                </span>
-              </button>
+                  <MediaImage
+                    source={image.thumbnail || image.original}
+                    label={label}
+                    description={`预览图 ${itemIndex + 1}`}
+                    compact
+                    className="object-cover"
+                  />
+                </div>
+                <button
+                  type="button"
+                  aria-label={`查看 ${label} 预览图 ${itemIndex + 1}`}
+                  aria-pressed={itemIndex === activeIndex}
+                  onClick={() => onIndexChange(itemIndex)}
+                  className="w-full cursor-pointer rounded-md py-1 text-xs focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  {itemIndex + 1}
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -144,11 +160,13 @@ export function MoviePreviewViewer({
 
 function PreviewStage({
   image,
+  label,
   initialNatural,
   onNaturalSize,
   onClose
 }: {
   image: PreviewImage
+  label: string
   /** Size of the image last shown, so switching frames does not resize the box from scratch. */
   initialNatural: Size | null
   onNaturalSize: (size: Size) => void
@@ -295,6 +313,8 @@ function PreviewStage({
         >
           <PreviewMediaImage
             source={image.original || image.thumbnail}
+            label={label}
+            description="预览图"
             loading="eager"
             onImageLoad={handleImageLoad}
             className="object-contain"
