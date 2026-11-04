@@ -12,6 +12,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/netx"
 	"golang.org/x/time/rate"
 )
@@ -251,8 +252,8 @@ func TestClientDoesNotReselectForProtocolOrClientErrors(t *testing.T) {
 	}
 }
 
-func TestClientReselectsForGatewayErrorsButOnlyReplaysOnce(t *testing.T) {
-	for _, code := range []int{502, 503, 504} {
+func TestClientReselectsForRouteErrorsButOnlyReplaysOnce(t *testing.T) {
+	for _, code := range []int{403, 502, 503, 504} {
 		failed := &stubTransport{err: &HTTPError{StatusCode: code}}
 		replacement := &stubTransport{err: &HTTPError{StatusCode: code}}
 		client := &Client{limiter: rate.NewLimiter(rate.Inf, 1), routeContext: t.Context(), options: Options{Timeout: time.Second}}
@@ -270,6 +271,61 @@ func TestClientReselectsForGatewayErrorsButOnlyReplaysOnce(t *testing.T) {
 		if failed.calls != 1 || replacement.calls != 1 || selections != 1 {
 			t.Fatalf("HTTP %d: calls = %d + %d, selections = %d", code, failed.calls, replacement.calls, selections)
 		}
+	}
+}
+
+func TestBrowseReselectsAfterCachedRouteReturnsForbidden(t *testing.T) {
+	var blockedCalls, availableCalls atomic.Int32
+	blocked := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/movies/tags" {
+			blockedCalls.Add(1)
+		}
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer blocked.Close()
+	body := fixtureFile(t, "browse.json")
+	available := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/startup":
+			_, _ = w.Write([]byte(`{"success":1,"data":{}}`))
+		case "/api/v1/movies/tags":
+			availableCalls.Add(1)
+			query := r.URL.Query()
+			if query.Get("filter_by") != ":t:m::::" || query.Get("sort_by") != "update" ||
+				query.Get("order_by") != "desc" || query.Get("page") != "1" || query.Get("limit") != "20" {
+				t.Errorf("replayed browse parameters changed: %v", query)
+			}
+			_, _ = w.Write(body)
+		default:
+			t.Errorf("unexpected request path %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer available.Close()
+	originalHosts := bootstrapHosts
+	bootstrapHosts = []string{available.URL}
+	defer func() { bootstrapHosts = originalHosts }()
+	client, err := New(Options{
+		DeviceUUID: "00000000-0000-4000-8000-000000000000",
+		CachedHost: blocked.URL, Timeout: time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	client.limiter = rate.NewLimiter(rate.Inf, 1)
+	movies, err := client.Browse(t.Context(), domain.BrowseOptions{
+		Main: []string{"m"}, Sort: "update", Order: "desc", Page: 1, Limit: 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, active := client.Route()
+	if len(movies) != 1 || movies[0].Code != "SONE-001" || !active || status.Host != available.URL {
+		t.Fatalf("browse did not recover on the available route: movies=%+v, route=%+v", movies, status)
+	}
+	if blockedCalls.Load() != 1 || availableCalls.Load() != 1 {
+		t.Fatalf("browse calls = %d blocked + %d available", blockedCalls.Load(), availableCalls.Load())
 	}
 }
 
