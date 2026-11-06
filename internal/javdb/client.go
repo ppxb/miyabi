@@ -375,7 +375,7 @@ func routeFailure(err error) bool {
 	var response *HTTPError
 	if errors.As(err, &response) {
 		switch response.StatusCode {
-		case 502, 503, 504:
+		case 403, 502, 503, 504:
 			return true
 		}
 	}
