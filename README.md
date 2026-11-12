@@ -54,6 +54,7 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
+      # 使用反向代理时可改为 "127.0.0.1:8080:8080"，仅监听宿主机回环地址
       - "8080:8080"
     volumes:
       - /path/to/data:/app/data
@@ -91,7 +92,13 @@ docker stop miyabi
 docker rm miyabi
 ```
 
-然后重新执行 `docker run` 命令（或在 Compose 目录下执行 `docker compose up -d`），沿用原访问密码和数据目录。
+然后重新执行 `docker run` 命令，沿用原访问密码和数据目录。
+
+使用 Docker Compose 时，在 Compose 目录下执行：
+
+```bash
+docker compose pull && docker compose up -d
+```
 
 ## 启动配置
 
@@ -102,6 +109,9 @@ docker rm miyabi
 | 环境变量                 | 用途                                                  | 默认值                                        |
 | ------------------------ | ----------------------------------------------------- | --------------------------------------------- |
 | `MIYABI_ACCESS_PASSWORD` | Web 入口访问密码                                      | 空，关闭门禁（强烈建议配置）                  |
+| `MIYABI_JWT_SECRET`      | 登录 JWT 的签名与校验密钥                              | 空，开启门禁时由访问密码派生固定密钥           |
+| `MIYABI_TRUSTED_PROXIES` | 可信代理 IP 或 CIDR，用于识别客户端 IP，多个用逗号分隔 | 空，不信任任何代理                            |
+| `MIYABI_LOG_LEVEL`       | 日志级别，可选 `debug`、`info`、`warn`、`error`         | `info`                                        |
 | `MIYABI_PUBLIC_URL`      | 外部访问 Miyabi 的根地址，用于生成 STRM 播放直链      | 默认根据监听端口推导                          |
 | `MIYABI_LISTEN`          | HTTP 监听地址                                         | `:8080`                                       |
 | `MIYABI_DATA_DIR`        | SQLite 与图片缓存目录                                 | 容器内为 `/app/data`，二进制为 `./data`       |
@@ -111,6 +121,8 @@ docker rm miyabi
 | `MIYABI_EMBY_API_KEY`    | Emby API 密钥（在 Emby「高级」→「API 密钥」中生成）   | 空，可在 Web 界面动态配置                     |
 | `MIYABI_EMBY_MEDIA_PATH` | Emby 容器内挂载的媒体库路径（如 `/media`）            | 空（默认使用本地路径），可在 Web 界面动态配置 |
 | `MIYABI_STRM_TOKEN`      | STRM 播放直链访问鉴权 Token                           | 空，未启用 Token 鉴权                         |
+
+部署在 nginx 等反向代理后面时，需将反向代理连接 Miyabi 时使用的 IP 填入 `MIYABI_TRUSTED_PROXIES`，以便正确识别客户端 IP。
 
 > [!TIP]
 > Emby 相关配置（服务器地址、API Key、媒体库路径等）除通过环境变量在容器初始化时配置外，也可以在服务启动后随时通过 Web 界面「设置」→「Emby」中进行可视化配置与连通性测试。
