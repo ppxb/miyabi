@@ -13,6 +13,7 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/javdb"
 	"github.com/ppxb/miyabi/internal/pan"
 	sloggin "github.com/samber/slog-gin"
 )
@@ -121,6 +122,8 @@ func errorMiddleware(logger *slog.Logger) gin.HandlerFunc {
 			body["code"] = "PAN_DIRECTORY_REQUIRED"
 		case errors.Is(err, drive.ErrSourceChanged):
 			body["code"] = "PAN_SOURCE_CHANGED"
+		case errors.Is(err, javdb.ErrLoginRequired):
+			body["code"] = "JAVDB_LOGIN_REQUIRED"
 		}
 		c.AbortWithStatusJSON(status, body)
 	}

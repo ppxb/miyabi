@@ -212,7 +212,10 @@ export function useSearchMovies(params: SearchMoviesParams) {
         },
         signal
       ),
-    enabled: query.length > 0
+    enabled: query.length > 0,
+    // Search depends on the JavDB account; never serve a stale login/error or
+    // result set when the page is revisited after signing in.
+    staleTime: 0
   })
 }
 

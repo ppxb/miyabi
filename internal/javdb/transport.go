@@ -17,16 +17,17 @@ type transport struct {
 	host       string
 	client     netx.FingerprintHTTPClient
 	deviceUUID string
+	token      func() string
 }
 
 // routeTransport uses the managed client for normal API requests. Probe
 // transports remain independent and retain the proxy they were created with.
-func routeTransport(host string, client netx.FingerprintHTTPClient, options Options) (*transport, error) {
+func routeTransport(host string, client netx.FingerprintHTTPClient, options Options, token func() string) (*transport, error) {
 	host, err := normalizeHost(host)
 	if err != nil {
 		return nil, err
 	}
-	return &transport{host: host, client: client, deviceUUID: options.DeviceUUID}, nil
+	return &transport{host: host, client: client, deviceUUID: options.DeviceUUID, token: token}, nil
 }
 
 type networkError struct {
@@ -107,16 +108,7 @@ func (t *transport) newRequest(
 	params url.Values,
 	timestamp int64,
 ) (*http.Request, error) {
-	query := url.Values{
-		"app_channel":        {"official"},
-		"app_version":        {appVersion},
-		"app_version_number": {appVersionNumber},
-		"platform":           {"android"},
-		"system_version":     {"13"},
-		"device_model":       {"Pixel 6"},
-		"device_name":        {"Pixel"},
-		"device_uuid":        {t.deviceUUID},
-	}
+	query := publicParams(t.deviceUUID)
 	for key, values := range params {
 		for _, value := range values {
 			query.Add(key, value)
@@ -136,5 +128,24 @@ func (t *transport) newRequest(
 	request.Header.Set("connection", "keep-alive")
 	request.Header.Set("jdsignature", signature(timestamp))
 	request.Header.Set("user-agent", userAgent)
+	if t.token != nil {
+		if token := t.token(); token != "" {
+			request.Header.Set("authorization", "Bearer "+token)
+		}
+	}
 	return request, nil
+}
+
+// publicParams are the device and app identifiers every App API request carries.
+func publicParams(deviceUUID string) url.Values {
+	return url.Values{
+		"app_channel":        {"official"},
+		"app_version":        {appVersion},
+		"app_version_number": {appVersionNumber},
+		"platform":           {"android"},
+		"system_version":     {"13"},
+		"device_model":       {"Pixel 6"},
+		"device_name":        {"Pixel"},
+		"device_uuid":        {deviceUUID},
+	}
 }

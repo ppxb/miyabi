@@ -11,6 +11,7 @@ export function DiscoverResults({
   loading,
   fetching,
   error,
+  errorMessage,
   searching,
   page,
   onPageChange,
@@ -20,6 +21,7 @@ export function DiscoverResults({
   loading: boolean
   fetching: boolean
   error: boolean
+  errorMessage?: string
   searching: boolean
   page: number
   onPageChange: (page: number) => void
@@ -28,7 +30,7 @@ export function DiscoverResults({
   if (error) {
     return (
       <ErrorState
-        message="数据加载失败，请检查网络或代理设置"
+        message={errorMessage ?? '数据加载失败，请检查网络或代理设置'}
         onRetry={onRetry}
         retrying={fetching}
       />

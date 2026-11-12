@@ -45,6 +45,15 @@ type Client struct {
 	stopRoutes    context.CancelFunc
 	selector      func(context.Context, routeSelection) (*routeState, error)
 	fingerprint   *netx.ProxiedFingerprintClient
+	// webFallback serves movie detail from the public web pages once the App API
+	// refuses anonymous access. The gate is stable for the process, so this
+	// avoids re-probing the closed endpoint on every request.
+	webFallback atomic.Bool
+
+	authMu   sync.RWMutex
+	username string
+	password string
+	token    string
 }
 
 func New(options Options) (*Client, error) {
@@ -75,6 +84,7 @@ func New(options Options) (*Client, error) {
 		fingerprint:  fingerprint,
 	}
 	client.selector = client.selectAndInstall
+	client.SetCredentials(options.Username, options.Password)
 	if options.Proxy != nil {
 		go client.watchProxy()
 	}
@@ -321,7 +331,7 @@ func (c *Client) selectAndInstall(ctx context.Context, options routeSelection) (
 }
 
 func (c *Client) installRoute(ctx context.Context, status RouteStatus) (*routeState, error) {
-	transport, err := routeTransport(status.Host, c.fingerprint, c.options)
+	transport, err := routeTransport(status.Host, c.fingerprint, c.options, c.accessToken)
 	if err != nil {
 		return nil, err
 	}

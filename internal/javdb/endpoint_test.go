@@ -49,6 +49,7 @@ func fixtureFile(t *testing.T, name string) []byte {
 
 func clientWithTransport(transport jsonTransport) *Client {
 	client := &Client{limiter: rate.NewLimiter(rate.Inf, 1)}
+	client.SetCredentials("test-user", "test-pass")
 	client.current.Store(&routeState{transport: transport})
 	return client
 }

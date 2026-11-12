@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	javdbDeviceSetting = "javdb.device_uuid"
-	javdbRouteSetting  = "javdb.route"
+	javdbDeviceSetting  = "javdb.device_uuid"
+	javdbRouteSetting   = "javdb.route"
+	javdbAccountSetting = javdb.AccountSettingKey
 )
 
 type persistedRoute struct {
@@ -43,6 +44,11 @@ type Service struct {
 	persistRouteMu sync.Mutex
 	// Used only to avoid redundant database writes; live state belongs to JavDB.
 	lastSavedRoute persistedRoute
+
+	// The concrete client backs the optional account settings; nil for test stubs.
+	accountMu    sync.RWMutex
+	javdbAccount *javdb.Client
+	javdbConfig  javdb.Config
 }
 
 // New creates the lazy JavDB client and restores/persists device UUID and route settings.
@@ -72,11 +78,17 @@ func New(
 	if err != nil {
 		return nil, err
 	}
+	account, _, err := database.LoadSetting[javdb.Config](ctx, db, javdbAccountSetting)
+	if err != nil {
+		return nil, err
+	}
 	client, err := javdb.New(javdb.Options{
 		DeviceUUID:    deviceUUID,
 		Proxy:         proxy,
 		CachedHost:    route.Host,
 		CachedLatency: time.Duration(route.LatencyMS) * time.Millisecond,
+		Username:      account.Username,
+		Password:      account.Password,
 	})
 	if err != nil {
 		return nil, err
@@ -84,6 +96,8 @@ func New(
 
 	service := newService(db, client, supplement, local, route)
 	service.proxy = proxy
+	service.javdbAccount = client
+	service.javdbConfig = account
 	return service, nil
 }
 
@@ -100,7 +114,16 @@ func NewWithClients(
 	if err != nil {
 		return nil, err
 	}
-	return newService(db, primary, supplement, local, route), nil
+	account, _, err := database.LoadSetting[javdb.Config](ctx, db, javdbAccountSetting)
+	if err != nil {
+		return nil, err
+	}
+	service := newService(db, primary, supplement, local, route)
+	service.javdbConfig = account
+	if accountClient, ok := primary.(*javdb.Client); ok {
+		service.javdbAccount = accountClient
+	}
+	return service, nil
 }
 
 // Response caches absorb repeated page loads; entries are small and short-lived

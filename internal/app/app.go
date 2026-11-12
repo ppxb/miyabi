@@ -196,6 +196,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Maintenance:    maintenanceSvc,
 		Network:        networkSvc,
 		Emby:           embySvc,
+		JavDB:          catalogueSvc,
 		Frontend:       miyabi.Frontend(),
 		STRMToken:      cfg.STRMToken,
 		TrustedProxies: cfg.TrustedProxies,

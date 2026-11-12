@@ -18,15 +18,22 @@ var zoneCodes = map[domain.Zone]int{
 	domain.ZoneAnime:      4,
 }
 
-// Search searches JavDB's movie catalogue.
+// Search searches JavDB's movie catalogue. JavDB only serves search to signed-in
+// accounts, so an unconfigured account reports a login prompt instead of a
+// generic upstream failure.
 func (c *Client) Search(ctx context.Context, keyword string, options domain.SearchOptions) ([]domain.Movie, error) {
 	params, err := buildSearchParams(keyword, options)
 	if err != nil {
 		return nil, err
 	}
-
+	if username, password := c.Credentials(); username == "" || password == "" {
+		return nil, ErrLoginRequired
+	}
 	var data wireMoviesData
-	if err := c.getJSON(ctx, "/api/v2/search", params, &data); err != nil {
+	if err := c.getJSONWithAuth(ctx, "/api/v2/search", params, &data); err != nil {
+		if requiresWebFallback(err) {
+			return nil, ErrLoginRequired
+		}
 		return nil, err
 	}
 	return moviesFromWire(ctx, data.Movies)
