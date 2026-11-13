@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ppxb/miyabi"
+	"github.com/ppxb/miyabi/internal/account"
 	"github.com/ppxb/miyabi/internal/api"
 	"github.com/ppxb/miyabi/internal/catalogue"
 	"github.com/ppxb/miyabi/internal/config"
@@ -31,6 +32,7 @@ import (
 	"github.com/ppxb/miyabi/internal/network"
 	"github.com/ppxb/miyabi/internal/netx"
 	"github.com/ppxb/miyabi/internal/offline"
+	"github.com/ppxb/miyabi/internal/setup"
 	"github.com/ppxb/miyabi/internal/strm"
 	"github.com/ppxb/miyabi/internal/subtitle"
 	"github.com/ppxb/miyabi/internal/tasks"
@@ -66,6 +68,17 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	store, err := database.Open(ctx, cfg.DataDir)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
+	}
+
+	accountStore, err := account.New(ctx, store.Client)
+	if err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("initialize admin account: %w", err)
+	}
+	setupStore, err := setup.New(ctx, store.Client)
+	if err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("initialize setup state: %w", err)
 	}
 
 	networkSvc, err := network.New(ctx, store.Client)
@@ -169,7 +182,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	}
 
 	if err := libSvc.ScheduleLocalScan(ctx); err != nil {
-		logger.ErrorContext(ctx, "failed to queue startup Emby directory scan", "error", err)
+		logger.ErrorContext(ctx, "failed to queue startup local directory scan", "error", err)
 	}
 	if exportCfg := exportMgr.Config(); exportCfg.PublicURL != "" && exportCfg.EmbyDir != "" {
 		embySvc.StartStartupSTRMRewrite()
@@ -181,9 +194,11 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 
 	pools := newTaskPools(taskSvc, logger)
 
+	var accessGate api.AccessGate = api.NewAccessGateServiceWithAccount(accountStore, cfg.JWTSecret)
+
 	router := api.NewRouter(api.Dependencies{
 		Logger:         logger,
-		Access:         api.NewAccessGateService(cfg.AccessPassword, cfg.JWTSecret),
+		Access:         accessGate,
 		Catalogue:      catalogueSvc,
 		Metadata:       metadataSvc,
 		Drive:          driveSvc,
@@ -197,6 +212,8 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Network:        networkSvc,
 		Emby:           embySvc,
 		JavDB:          catalogueSvc,
+		Setup:          setupStore,
+		Account:        accountStore,
 		Frontend:       miyabi.Frontend(),
 		STRMToken:      cfg.STRMToken,
 		TrustedProxies: cfg.TrustedProxies,

@@ -27,12 +27,12 @@ func (s *Service) RetryTask(ctx context.Context, id int) (domain.TaskInfo, error
 	}
 	commit := func(fn func(*ent.Tx) error) error { return ent.WithTx(ctx, s.database, fn) }
 	if input.Source.AccountID == domain.LocalAccountID {
-		root, err := s.localScanRoot()
+		root, err := s.localRoot(ctx)
 		if err != nil {
 			return domain.TaskInfo{}, err
 		}
 		if root != input.Source.Directory.ID {
-			return domain.TaskInfo{}, domain.E(domain.KindConflict, "Emby 本地目录已变更，请扫描当前目录", nil)
+			return domain.TaskInfo{}, domain.E(domain.KindConflict, "本地媒体目录已变更，请重新扫描", nil)
 		}
 	} else {
 		sess, err := s.drive.OpenSource(ctx, input.Source)

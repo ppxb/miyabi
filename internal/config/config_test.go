@@ -16,7 +16,7 @@ func clearConfigEnvironment(t *testing.T) {
 	for _, key := range []string{
 		"MIYABI_LISTEN", "MIYABI_DATA_DIR", "MIYABI_EMBY_DIR",
 		"MIYABI_PUBLIC_URL", "MIYABI_STRM_TOKEN",
-		"MIYABI_LOG_LEVEL", "MIYABI_ACCESS_PASSWORD", "MIYABI_JWT_SECRET", "MIYABI_TRUSTED_PROXIES",
+		"MIYABI_LOG_LEVEL", "MIYABI_JWT_SECRET", "MIYABI_TRUSTED_PROXIES",
 		"MIYABI_EMBY_ENABLED", "MIYABI_EMBY_SERVER_URL", "MIYABI_EMBY_API_KEY", "MIYABI_EMBY_MEDIA_PATH", "MIYABI_EMBY_SYNC_ACTORS",
 		"MIYABI_EMBY_URL",
 	} {
@@ -46,7 +46,7 @@ func TestLoadDefaultsAndEnvironment(t *testing.T) {
 			},
 		},
 		{
-			name: "environment overrides defaults and preserves password whitespace",
+			name: "environment overrides defaults",
 			env: map[string]string{
 				"MIYABI_LISTEN":           " 127.0.0.1:9090 ",
 				"MIYABI_DATA_DIR":         " ./custom-data ",
@@ -54,7 +54,6 @@ func TestLoadDefaultsAndEnvironment(t *testing.T) {
 				"MIYABI_PUBLIC_URL":       " http://192.168.1.100:8080/ ",
 				"MIYABI_STRM_TOKEN":       " secret-token ",
 				"MIYABI_LOG_LEVEL":        " DEBUG ",
-				"MIYABI_ACCESS_PASSWORD":  " password with spaces ",
 				"MIYABI_EMBY_ENABLED":     " true ",
 				"MIYABI_EMBY_SERVER_URL":  " http://192.168.1.50:8096/ ",
 				"MIYABI_EMBY_API_KEY":     " my-emby-key ",
@@ -68,24 +67,11 @@ func TestLoadDefaultsAndEnvironment(t *testing.T) {
 				PublicURL:      "http://192.168.1.100:8080",
 				STRMToken:      "secret-token",
 				LogLevel:       slog.LevelDebug,
-				AccessPassword: " password with spaces ",
 				EmbyEnabled:    true,
 				EmbyServerURL:  "http://192.168.1.50:8096",
 				EmbyAPIKey:     "my-emby-key",
 				EmbyMediaPath:  "/media",
 				EmbySyncActors: false,
-			},
-		},
-		{
-			name: "empty optional value disables access gate",
-			env:  map[string]string{"MIYABI_ACCESS_PASSWORD": ""},
-			want: Config{
-				Listen:         ":8080",
-				DataDir:        "./data",
-				EmbyDir:        filepath.Join("./data", "emby"),
-				PublicURL:      "http://" + netx.OutboundIP() + ":8080",
-				LogLevel:       slog.LevelInfo,
-				EmbySyncActors: true,
 			},
 		},
 	} {
@@ -129,6 +115,24 @@ func TestLoadNormalizesBeforeDerivingExportDefaults(t *testing.T) {
 	}
 	if cfg.DataDir != "./custom-data" || cfg.EmbyDir != filepath.Join("./custom-data", "emby") || !strings.HasSuffix(cfg.PublicURL, ":9090") {
 		t.Fatalf("incorrect derived defaults: %+v", cfg)
+	}
+}
+
+func TestLocalURL(t *testing.T) {
+	for listen, want := range map[string]string{
+		":8080":             "http://127.0.0.1:8080",
+		"0.0.0.0:9090":      "http://127.0.0.1:9090",
+		"[::]:8080":         "http://127.0.0.1:8080",
+		"127.0.0.1:8081":    "http://127.0.0.1:8081",
+		"localhost:8082":    "http://localhost:8082",
+		"192.168.1.10:8080": "http://192.168.1.10:8080",
+		"invalid":           "http://127.0.0.1:8080",
+	} {
+		t.Run(listen, func(t *testing.T) {
+			if got := (Config{Listen: listen}).LocalURL(); got != want {
+				t.Fatalf("LocalURL(%q) = %q; want %q", listen, got, want)
+			}
+		})
 	}
 }
 

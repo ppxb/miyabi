@@ -103,28 +103,62 @@ func New(database *ent.Client, d *drive.Drive, tasks *tasks.Service, images *med
 }
 
 func (s *Service) StartScan(ctx context.Context) (domain.TaskInfo, error) {
-	sess, err := s.drive.Open(ctx)
-	if err != nil {
-		return domain.TaskInfo{}, err
+	var driveTask *domain.TaskInfo
+	driveErr := error(nil)
+	if sess, err := s.drive.Open(ctx); err == nil {
+		task, err := s.EnqueueScan(ctx, sess.Source())
+		if err != nil {
+			return domain.TaskInfo{}, err
+		}
+		driveTask = &task
+	} else {
+		driveErr = err
 	}
-	return s.EnqueueScan(ctx, sess.Source())
+
+	if root, err := s.configuredLocalRoot(ctx); err == nil && root != "" {
+		localTask, err := s.EnqueueScan(ctx, localSource(root))
+		if err != nil {
+			return domain.TaskInfo{}, err
+		}
+		if driveTask == nil {
+			return localTask, nil
+		}
+	}
+	if driveTask == nil {
+		if driveErr == nil {
+			driveErr = domain.E(domain.KindInvalid, "尚未配置影片来源", nil)
+		}
+		return domain.TaskInfo{}, driveErr
+	}
+	return *driveTask, nil
 }
 
 // StartRebuild scans the current source and refreshes every matched movie.
 func (s *Service) StartRebuild(ctx context.Context) (domain.TaskInfo, error) {
-	sess, err := s.drive.Open(ctx)
-	if err != nil {
-		return domain.TaskInfo{}, err
+	sess, driveErr := s.drive.Open(ctx)
+	if driveErr == nil {
+		return s.enqueueScan(ctx, sess.Source(), true, task.StatusQueued, task.StatusRunning)
 	}
-	return s.enqueueScan(ctx, sess.Source(), true, task.StatusQueued, task.StatusRunning)
+	if root, err := s.configuredLocalRoot(ctx); err == nil && root != "" {
+		return s.enqueueScan(ctx, localSource(root), true, task.StatusQueued, task.StatusRunning)
+	}
+	return domain.TaskInfo{}, driveErr
 }
 
-// Source returns the currently mounted library source, or nil if unmounted.
+// Source returns the currently mounted 115 library source, otherwise the
+// explicitly bound local media directory, or nil when neither is configured.
 func (s *Service) Source() *domain.LibrarySource {
-	if s.drive == nil {
+	if s.drive != nil {
+		if source := s.drive.Source(); source != nil {
+			return source
+		}
+	}
+	root, err := s.configuredLocalRoot(context.Background())
+	if err != nil || root == "" {
 		return nil
 	}
-	return s.drive.Source()
+	source := localSource(root)
+	return &source
 }
 
 // MatchingMovies queries local movies matching any of the given JavDB IDs or normalized codes

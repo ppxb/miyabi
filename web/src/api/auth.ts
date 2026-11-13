@@ -11,6 +11,7 @@ import { apiGet, apiPost } from '@/api/client'
 export type AccessGateConfig = {
   enabled: boolean
   authenticated: boolean
+  username_required?: boolean
 }
 
 export type LoginResponse = {
@@ -31,12 +32,17 @@ export function useAccessGateConfig() {
 
 export function accessGateLoginOptions(queryClient: QueryClient) {
   return mutationOptions({
-    mutationFn: (password: string) => apiPost<LoginResponse>('/api/auth/login', { password }),
-    onSuccess: async () => {
+    mutationFn: (input: string | { username: string; password: string }) =>
+      apiPost<LoginResponse>(
+        '/api/auth/login',
+        typeof input === 'string' ? { password: input } : input
+      ),
+    onSuccess: async (_data, input) => {
       await queryClient.cancelQueries({ queryKey: authKeys.config })
       queryClient.setQueryData<AccessGateConfig>(authKeys.config, {
         enabled: true,
-        authenticated: true
+        authenticated: true,
+        username_required: typeof input !== 'string' && input.username !== ''
       })
     }
   })

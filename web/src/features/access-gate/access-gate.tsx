@@ -11,7 +11,9 @@ export function AccessGate({ children }: PropsWithChildren) {
   const config = useAccessGateConfig()
   const { refetch } = config
   const login = useAccessGateLogin()
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const usernameRequired = config.data?.username_required === true
 
   useEffect(() => {
     function handleUnauthorized() {
@@ -30,11 +32,14 @@ export function AccessGate({ children }: PropsWithChildren) {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    login.mutate(password, {
-      onSuccess: () => {
-        setPassword('')
+    login.mutate(
+      { username, password },
+      {
+        onSuccess: () => {
+          setPassword('')
+        }
       }
-    })
+    )
   }
 
   return (
@@ -60,17 +65,31 @@ export function AccessGate({ children }: PropsWithChildren) {
             </InlineError>
           ) : (
             <form className="space-y-4" onSubmit={handleSubmit}>
+              {usernameRequired ? (
+                <Input
+                  value={username}
+                  placeholder="用户名"
+                  autoComplete="username"
+                  autoFocus
+                  disabled={login.isPending}
+                  onChange={event => setUsername(event.target.value)}
+                />
+              ) : null}
               <Input
                 type="password"
                 value={password}
                 placeholder="访问密码"
                 autoComplete="current-password"
-                autoFocus
+                autoFocus={!usernameRequired}
                 disabled={login.isPending}
                 onChange={event => setPassword(event.target.value)}
               />
               {login.error ? <InlineError>{login.error.message}</InlineError> : null}
-              <Button type="submit" className="w-full" disabled={!password || login.isPending}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={!password || (usernameRequired && !username) || login.isPending}
+              >
                 {login.isPending ? <LoaderCircleIcon className="size-4 animate-spin" /> : null}
                 进入
               </Button>

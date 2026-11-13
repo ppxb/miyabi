@@ -51,7 +51,11 @@ test('login unlocks the gate despite an older config response, and a fresh confi
   assert.equal(readSignal.aborted, false)
   await login.execute('password')
   assert.equal(readSignal.aborted, true)
-  assert.deepEqual(client.getQueryData(authKeys.config), { enabled: true, authenticated: true })
+  assert.deepEqual(client.getQueryData(authKeys.config), {
+    enabled: true,
+    authenticated: true,
+    username_required: false
+  })
   assert.equal(renderGate(client), '<p>Protected content</p>')
 
   // Even if the transport still delivers the canceled response, it must not relock the gate.

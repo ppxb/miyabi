@@ -42,15 +42,9 @@ export function MovieDetailDialogProvider({ children }: PropsWithChildren) {
         <DialogContent
           ref={contentRef}
           showCloseButton={false}
-          className="flex h-[min(56rem,calc(100dvh-2rem))] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl"
-          onOpenAutoFocus={event => {
-            event.preventDefault()
-            contentRef.current?.focus()
-          }}
-          onCloseAutoFocus={event => {
-            event.preventDefault()
-            triggerRef.current?.focus({ preventScroll: true })
-          }}
+          className="flex h-[min(56rem,calc(100dvh-2rem))] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 outline-none sm:max-w-6xl"
+          initialFocus={() => contentRef.current}
+          finalFocus={() => triggerRef.current}
         >
           <DialogTitle className="sr-only">影片详情</DialogTitle>
           <div

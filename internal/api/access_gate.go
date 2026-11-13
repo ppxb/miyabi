@@ -10,15 +10,23 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 )
 
-var ErrAccessPassword = domain.E(domain.KindUnauthorized, "访问密码错误", nil)
+var ErrAccessPassword = domain.E(domain.KindUnauthorized, "璁块棶瀵嗙爜閿欒", nil)
 
 const defaultJWTSalt = "miyabi-jwt-signature-secret-v1"
 
-// AccessGateService provides password verification and JWT token issuance/verification.
+// Account is the credential source behind the access gate. An empty username
+// keeps the legacy password-only behavior.
+type Account interface {
+	Configured() bool
+	Username() string
+	Verify(username, password string) error
+	SigningKey() []byte
+}
+
+// AccessGateService provides account verification and JWT token issuance/verification.
 type AccessGateService struct {
-	enabled      bool
-	passwordHash [sha256.Size]byte
-	jwtSecret    []byte
+	account   Account
+	jwtSecret []byte
 }
 
 func NewAccessGateService(password, jwtSecret string) *AccessGateService {
@@ -30,32 +38,48 @@ func NewAccessGateService(password, jwtSecret string) *AccessGateService {
 		mac.Write([]byte(password))
 		secret = mac.Sum(nil)
 	}
-
 	return &AccessGateService{
-		enabled:      password != "",
-		passwordHash: sha256.Sum256([]byte(password)),
-		jwtSecret:    secret,
+		account:   staticAccount{enabled: password != "", password: password},
+		jwtSecret: secret,
 	}
+}
+
+// NewAccessGateServiceWithAccount builds a gate backed by a persistent account.
+func NewAccessGateServiceWithAccount(account Account, jwtSecret string) *AccessGateService {
+	var secret []byte
+	if jwtSecret != "" {
+		secret = []byte(jwtSecret)
+	}
+	return &AccessGateService{account: account, jwtSecret: secret}
 }
 
 func (gate *AccessGateService) Enabled() bool {
-	return gate.enabled
+	return gate.account.Configured()
 }
 
+// Verify keeps the legacy password-only contract used by older callers.
 func (gate *AccessGateService) Verify(password string) error {
-	if !gate.enabled {
-		return nil
-	}
-	actual := sha256.Sum256([]byte(password))
-	if subtle.ConstantTimeCompare(gate.passwordHash[:], actual[:]) != 1 {
-		return ErrAccessPassword
-	}
-	return nil
+	return gate.account.Verify("", password)
+}
+
+// VerifyAccount verifies a username and password pair.
+func (gate *AccessGateService) VerifyAccount(username, password string) error {
+	return gate.account.Verify(username, password)
+}
+
+// AccountUsername returns the configured username, or an empty string in the
+// password-only mode.
+func (gate *AccessGateService) AccountUsername() string {
+	return gate.account.Username()
 }
 
 func (gate *AccessGateService) GenerateToken() (string, int64, error) {
-	if !gate.enabled {
+	if !gate.Enabled() {
 		return "", 0, errors.New("access gate is disabled")
+	}
+	secret := gate.signingKey()
+	if len(secret) == 0 {
+		return "", 0, errors.New("access gate has no signing key")
 	}
 	now := time.Now().Unix()
 	expiresAt := now + int64(defaultTokenTTL.Seconds())
@@ -65,7 +89,7 @@ func (gate *AccessGateService) GenerateToken() (string, int64, error) {
 		IssuedAt:  now,
 		ExpiresAt: expiresAt,
 	}
-	token, err := signToken(gate.jwtSecret, claims)
+	token, err := signToken(secret, claims)
 	if err != nil {
 		return "", 0, err
 	}
@@ -73,9 +97,46 @@ func (gate *AccessGateService) GenerateToken() (string, int64, error) {
 }
 
 func (gate *AccessGateService) VerifyToken(token string) error {
-	if !gate.enabled {
+	if !gate.Enabled() {
 		return nil
 	}
-	_, err := verifyToken(gate.jwtSecret, token)
+	_, err := verifyToken(gate.signingKey(), token)
 	return err
+}
+
+func (gate *AccessGateService) signingKey() []byte {
+	if len(gate.jwtSecret) > 0 {
+		return gate.jwtSecret
+	}
+	return gate.account.SigningKey()
+}
+
+type staticAccount struct {
+	enabled  bool
+	password string
+}
+
+func (a staticAccount) Configured() bool { return a.enabled }
+
+func (a staticAccount) Username() string { return "" }
+
+func (a staticAccount) Verify(_ string, password string) error {
+	if !a.enabled {
+		return nil
+	}
+	actual := sha256.Sum256([]byte(password))
+	expected := sha256.Sum256([]byte(a.password))
+	if subtle.ConstantTimeCompare(expected[:], actual[:]) != 1 {
+		return ErrAccessPassword
+	}
+	return nil
+}
+
+func (a staticAccount) SigningKey() []byte {
+	if !a.enabled {
+		return nil
+	}
+	mac := hmac.New(sha256.New, []byte(defaultJWTSalt))
+	mac.Write([]byte(a.password))
+	return mac.Sum(nil)
 }

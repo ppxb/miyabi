@@ -10,6 +10,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/app"
 	"github.com/ppxb/miyabi/internal/config"
+	"github.com/ppxb/miyabi/internal/tray"
 )
 
 func main() {
@@ -40,5 +41,12 @@ func run(ctx context.Context, args []string) error {
 	}
 	defer application.Close()
 
-	return application.Run(ctx)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	return tray.Run(ctx, cancel, tray.Options{
+		Title:   "Miyabi",
+		URL:     cfg.LocalURL(),
+		DataDir: cfg.DataDir,
+	}, application.Run)
 }

@@ -21,6 +21,7 @@ type AccessGate interface {
 }
 
 type accessLoginInput struct {
+	Username string `json:"username"`
 	Password string `json:"password" binding:"required"`
 }
 
@@ -44,9 +45,15 @@ func accessConfigHandler(gate AccessGate) gin.HandlerFunc {
 			}
 		}
 
+		usernameRequired := false
+		if account, ok := gate.(interface{ AccountUsername() string }); ok {
+			usernameRequired = account.AccountUsername() != ""
+		}
+
 		respond(c, gin.H{
-			"enabled":       true,
-			"authenticated": authenticated,
+			"enabled":           true,
+			"authenticated":     authenticated,
+			"username_required": usernameRequired,
 		}, nil)
 	}
 }
@@ -67,12 +74,11 @@ func accessLoginHandler(gate AccessGate, limiter *loginRateLimiter) gin.HandlerF
 			return
 		}
 
-		if err := gate.Verify(input.Password); err != nil {
+		if err := verifyAccount(gate, input.Username, input.Password); err != nil {
 			result = loginFailed
 			c.Error(err)
 			return
 		}
-
 		result = loginSucceeded
 
 		var token string
@@ -115,6 +121,13 @@ func authMiddleware(gate AccessGate) gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func verifyAccount(gate AccessGate, username, password string) error {
+	if verifier, ok := gate.(interface{ VerifyAccount(string, string) error }); ok {
+		return verifier.VerifyAccount(username, password)
+	}
+	return gate.Verify(password)
 }
 
 func abortAccessUnauthorized(c *gin.Context, message string) {

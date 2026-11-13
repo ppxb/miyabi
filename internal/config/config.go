@@ -19,7 +19,6 @@ type Config struct {
 	PublicURL      string
 	STRMToken      string
 	LogLevel       slog.Level
-	AccessPassword string
 	JWTSecret      string
 	EmbyEnabled    bool
 	EmbyServerURL  string
@@ -75,7 +74,6 @@ func Load() (Config, error) {
 		PublicURL:      publicURL,
 		STRMToken:      strings.TrimSpace(os.Getenv("MIYABI_STRM_TOKEN")),
 		LogLevel:       logLevel,
-		AccessPassword: os.Getenv("MIYABI_ACCESS_PASSWORD"),
 		JWTSecret:      strings.TrimSpace(os.Getenv("MIYABI_JWT_SECRET")),
 		EmbyEnabled:    embyEnabled,
 		EmbyServerURL:  embyServerURL,
@@ -88,6 +86,19 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// LocalURL returns the loopback address of the web UI for the tray menu.
+func (cfg Config) LocalURL() string {
+	host, port, err := net.SplitHostPort(cfg.Listen)
+	if err != nil {
+		return "http://127.0.0.1:8080"
+	}
+	switch host {
+	case "", "0.0.0.0", "::":
+		host = "127.0.0.1"
+	}
+	return "http://" + net.JoinHostPort(host, port)
 }
 
 func envOrDefault(key, fallback string) string {

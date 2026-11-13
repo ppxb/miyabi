@@ -1,6 +1,5 @@
-import * as React from 'react'
+import { Progress as ProgressPrimitive } from '@base-ui/react/progress'
 import { cn } from 'cn'
-import { Progress as ProgressPrimitive } from 'radix-ui'
 
 const indicatorColors = {
   default: 'bg-primary',
@@ -14,7 +13,7 @@ function Progress({
   max = 100,
   variant = 'default',
   ...props
-}: React.ComponentProps<typeof ProgressPrimitive.Root> & {
+}: ProgressPrimitive.Root.Props & {
   variant?: keyof typeof indicatorColors
 }) {
   const percent = value == null ? null : (value / max) * 100

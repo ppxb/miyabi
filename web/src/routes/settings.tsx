@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { AppearanceSection } from '@/features/settings/appearance-section'
+import { AccountSection } from '@/features/settings/account-section'
 import { DataSection } from '@/features/settings/data-section'
 import { EmbySection } from '@/features/settings/emby-section'
 import { JavDBSection } from '@/features/settings/javdb-section'
@@ -27,6 +28,8 @@ function SettingsPage() {
       <Card>
         <CardContent className="space-y-8">
           <AppearanceSection />
+          <Separator />
+          <AccountSection />
           <Separator />
           <PrivacySection />
           <Separator />

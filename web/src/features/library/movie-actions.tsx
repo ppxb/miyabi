@@ -49,12 +49,7 @@ export function LibraryMovieActions({
             <Ellipsis />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          onCloseAutoFocus={event => {
-            if (correcting) event.preventDefault()
-          }}
-        >
+        <DropdownMenuContent align="end" finalFocus={() => (correcting ? false : trigger.current)}>
           <DropdownMenuItem
             disabled={busy}
             onSelect={() =>
@@ -85,12 +80,7 @@ export function LibraryMovieActions({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <DialogContent
-        onCloseAutoFocus={event => {
-          event.preventDefault()
-          trigger.current?.focus()
-        }}
-      >
+      <DialogContent finalFocus={() => trigger.current}>
         <DialogHeader>
           <DialogTitle>纠正番号</DialogTitle>
           <DialogDescription>

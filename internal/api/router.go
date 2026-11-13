@@ -30,6 +30,8 @@ type Dependencies struct {
 	Network        NetworkManager
 	Emby           EmbyManager
 	JavDB          JavDBManager
+	Setup          SetupManager
+	Account        AccountManager
 	Frontend       fs.FS
 	STRMToken      string
 	TrustedProxies []string
@@ -64,6 +66,16 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	authAPI := api.Group("/auth", noStore())
 	authAPI.GET("/config", accessConfigHandler(deps.Access))
 	authAPI.POST("/login", accessLoginHandler(deps.Access, loginLimiter))
+
+	if deps.Setup != nil && deps.Account != nil {
+		setupAPI := api.Group("/setup", noStore())
+		setupAPI.GET("/status", setupStatusHandler(deps.Setup, deps.Account))
+		setupWrite := setupAPI.Group("", setupAccessMiddleware(deps.Access))
+		setupWrite.POST("/account", setupAccountHandler(deps.Access, deps.Account))
+		setupWrite.GET("/local-directory", setupLocalDirectoryHandler(deps.Setup))
+		setupWrite.PUT("/local-directory", setupLocalDirectoryHandler(deps.Setup))
+		setupWrite.POST("/complete", setupCompleteHandler(deps.Setup))
+	}
 
 	// Exported .strm files keep this path; it must stay stable across releases.
 	strmHandler := strmStreamHandler(deps.STRM, deps.STRMToken, deps.Access)
