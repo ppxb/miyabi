@@ -7,10 +7,18 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"golang.org/x/net/html"
 	"golang.org/x/time/rate"
+)
+
+var ErrWebSearchBlocked = domain.E(domain.KindRateLimited, "JavDB 搜索页面被限流，请稍后重试或切换代理出口", nil)
+
+const (
+	apiLoginWallDuration = 6 * time.Hour
+	webSearchCooldown    = 15 * time.Minute
 )
 
 var zoneCodes = map[domain.Zone]int{
@@ -29,28 +37,50 @@ var webZoneFilters = map[domain.Zone]string{
 	domain.ZoneAnime:      "anime",
 }
 
-// Search searches JavDB's movie catalogue. The App API asks for an account,
-// so an unconfigured client and a rejected API both fall back to the anonymous
-// public search page.
+// Search searches JavDB's movie catalogue. The App API is tried first without
+// credentials; if it requires login, the client remembers the wall briefly and
+// falls back to the anonymous public search page.
 func (c *Client) Search(ctx context.Context, keyword string, options domain.SearchOptions) ([]domain.Movie, error) {
 	params, err := buildSearchParams(keyword, options)
 	if err != nil {
 		return nil, err
 	}
-	if username, password := c.Credentials(); username == "" || password == "" {
-		return c.searchFromWeb(ctx, keyword, options)
-	}
-	var data wireMoviesData
-	if err := c.getJSONWithAuth(ctx, "/api/v2/search", params, &data); err != nil {
-		if requiresWebFallback(err) {
-			return c.searchFromWeb(ctx, keyword, options)
+	if !c.apiLoginBlocked() {
+		username, password := c.Credentials()
+		var data wireMoviesData
+		if username != "" && password != "" {
+			err = c.getJSONWithAuth(ctx, "/api/v2/search", params, &data)
+		} else {
+			err = c.getJSON(ctx, "/api/v2/search", params, &data)
 		}
-		return nil, err
+		if err == nil {
+			return moviesFromWire(ctx, data.Movies)
+		}
+		if requiresWebFallback(err) {
+			c.markAPILoginWall()
+		}
 	}
-	return moviesFromWire(ctx, data.Movies)
+	return c.searchFromWeb(ctx, keyword, options)
+}
+
+func (c *Client) apiLoginBlocked() bool {
+	until := c.apiLoginUntil.Load()
+	return until > 0 && time.Now().UnixNano() < until
+}
+
+func (c *Client) markAPILoginWall() {
+	c.apiLoginUntil.Store(time.Now().Add(apiLoginWallDuration).UnixNano())
+}
+
+func (c *Client) webSearchBlocked() bool {
+	until := c.webSearchPausedUntil.Load()
+	return until > 0 && time.Now().UnixNano() < until
 }
 
 func (c *Client) searchFromWeb(ctx context.Context, keyword string, options domain.SearchOptions) ([]domain.Movie, error) {
+	if c.webSearchBlocked() {
+		return nil, ErrWebSearchBlocked
+	}
 	if c.webSearchLimiter == nil {
 		c.webSearchLimiter = rate.NewLimiter(rate.Every(webSearchInterval), 1)
 	}
@@ -71,6 +101,11 @@ func (c *Client) searchFromWeb(ctx context.Context, keyword string, options doma
 	}
 	body, err := c.fetchWebHTML(ctx, "/search", params)
 	if err != nil {
+		var response *HTTPError
+		if errors.As(err, &response) && (response.StatusCode == 403 || response.StatusCode == 429) {
+			c.webSearchPausedUntil.Store(time.Now().Add(webSearchCooldown).UnixNano())
+			return nil, ErrWebSearchBlocked
+		}
 		return nil, err
 	}
 	if webLoginTitlePattern.Match(body) {

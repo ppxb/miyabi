@@ -107,14 +107,15 @@ func TestSearchAndDetailFallBackToWebWithoutAccount(t *testing.T) {
 	defer fingerprint.Close()
 
 	transport := &fixtureTransport{responses: map[string][]byte{
+		"/api/v2/search":       webAuthRequiredEnvelope,
 		"/api/v4/movies/QD3n9": webAuthRequiredEnvelope,
 	}}
 	client := clientWithTransport(transport)
 	client.SetCredentials("", "")
 	client.fingerprint = fingerprint
 
-	// Without an account, search reads the anonymous public search page and
-	// never calls the account-gated App API.
+	// Without an account, search first tries the App API, sees the login wall,
+	// then reads the anonymous public search page.
 	movies, err := client.Search(context.Background(), "IPX-811", domain.SearchOptions{Page: 1, Limit: 20})
 	if err != nil {
 		t.Fatal(err)
@@ -122,8 +123,11 @@ func TestSearchAndDetailFallBackToWebWithoutAccount(t *testing.T) {
 	if len(movies) != 1 || movies[0].ID != "QD3n9" || movies[0].Code != "IPX-811" {
 		t.Fatalf("web search = %#v", movies)
 	}
-	if len(transport.calls) != 0 {
-		t.Fatalf("search made %d API calls, want 0", len(transport.calls))
+	if !client.apiLoginBlocked() {
+		t.Fatal("search did not remember the API login wall")
+	}
+	if len(transport.calls) != 1 {
+		t.Fatalf("search made %d API calls, want 1", len(transport.calls))
 	}
 
 	// Detail keeps working anonymously through the public page.
@@ -134,7 +138,7 @@ func TestSearchAndDetailFallBackToWebWithoutAccount(t *testing.T) {
 	if detail.Code != "IPX-811" || len(detail.ActorMovies) != 2 {
 		t.Fatalf("web detail = %#v", detail)
 	}
-	if len(transport.calls) != 1 {
-		t.Fatalf("detail API calls = %d, want 1", len(transport.calls))
+	if len(transport.calls) != 2 {
+		t.Fatalf("detail API calls = %d, want 2", len(transport.calls))
 	}
 }

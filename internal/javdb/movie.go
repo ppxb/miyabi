@@ -31,6 +31,7 @@ func (c *Client) MovieDetail(ctx context.Context, movieID string) (domain.MovieD
 	); err != nil {
 		if requiresWebFallback(err) {
 			c.webFallback.Store(true)
+			c.markAPILoginWall()
 			return c.movieDetailFromWeb(ctx, movieID)
 		}
 		return domain.MovieDetail{}, err

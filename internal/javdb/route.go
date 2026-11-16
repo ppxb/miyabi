@@ -20,7 +20,6 @@ var bootstrapHosts = []string{
 	"https://jdforrepam.com",
 	"https://apidd.spthgb.com",
 	"https://apidd.czssdgz.com",
-	"https://javdb.com",
 }
 
 const (
@@ -35,6 +34,7 @@ var backupKey, backupIV = backupKeyMaterial()
 type routeSelection struct {
 	full  bool
 	hosts []string
+	skip  func(string) bool
 }
 
 type startupData struct {
@@ -76,7 +76,7 @@ func selectRoute(ctx context.Context, options routeSelection, check probeFunc) (
 	known := make(map[string]probeResult)
 
 	start := func(host string) {
-		if seen[host] {
+		if seen[host] || (options.skip != nil && options.skip(host)) {
 			return
 		}
 		seen[host] = true
@@ -190,6 +190,9 @@ func selectRoute(ctx context.Context, options routeSelection, check probeFunc) (
 	result := RouteStatus{Candidates: routeCandidates(hosts, known)}
 	var selected probeResult
 	for _, host := range hosts {
+		if options.skip != nil && options.skip(host) {
+			continue
+		}
 		candidate := known[host]
 		if candidate.err == nil && (selected.host == "" || candidate.latency < selected.latency) {
 			selected = candidate

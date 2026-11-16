@@ -65,8 +65,6 @@ func TestSelectRouteChoosesFastestDynamicHost(t *testing.T) {
 			return 30 * time.Millisecond, startupData{}, nil
 		case bootstrapHosts[2]:
 			return 5 * time.Millisecond, startupData{}, nil
-		case bootstrapHosts[3]:
-			return 0, startupData{}, errors.New("offline")
 		default:
 			return 0, startupData{}, errors.New("unexpected host")
 		}
@@ -371,9 +369,6 @@ func TestSelectRouteFullMeasuresSlowKnownAndNewDynamicCandidates(t *testing.T) {
 			}
 			select {
 			case <-time.After(delay):
-				if host == bootstrapHosts[3] {
-					return 0, startupData{}, context.DeadlineExceeded
-				}
 				return delay, startup, nil
 			case <-ctx.Done():
 				return 0, startupData{}, ctx.Err()
@@ -391,9 +386,6 @@ func TestSelectRouteFullMeasuresSlowKnownAndNewDynamicCandidates(t *testing.T) {
 		}
 		for _, candidate := range result.Candidates {
 			want := RouteAvailable
-			if candidate.Host == bootstrapHosts[3] {
-				want = RouteUnavailable
-			}
 			if candidate.Status != want || calls[candidate.Host] != 1 {
 				t.Fatalf("candidate = %+v, calls = %d", candidate, calls[candidate.Host])
 			}

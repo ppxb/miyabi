@@ -36,6 +36,8 @@ type Client struct {
 	limiter       *rate.Limiter
 	cooldownMu    sync.Mutex
 	cooldownUntil time.Time
+	hostPauseMu   sync.Mutex
+	hostPaused    map[string]time.Time
 	media         *resty.Client
 	current       atomic.Pointer[routeState]
 	lastProbe     atomic.Pointer[[]RouteCandidate]
@@ -46,7 +48,9 @@ type Client struct {
 	selector      func(context.Context, routeSelection) (*routeState, error)
 	fingerprint   *netx.ProxiedFingerprintClient
 	// Anonymous web search has a much tighter budget than the App API.
-	webSearchLimiter *rate.Limiter
+	webSearchLimiter     *rate.Limiter
+	webSearchPausedUntil atomic.Int64
+	apiLoginUntil        atomic.Int64
 	// webFallback serves movie detail from the public web pages once the App API
 	// refuses anonymous access. The gate is stable for the process, so this
 	// avoids re-probing the closed endpoint on every request.
@@ -127,7 +131,7 @@ func (c *Client) Initialize(ctx context.Context) error {
 // reselect measures every candidate and replaces the active route on success.
 func (c *Client) reselect(ctx context.Context) (RouteStatus, error) {
 	state, err := c.waitRoute(ctx, "probe-all", func(ctx context.Context) (*routeState, error) {
-		return c.selector(ctx, routeSelection{full: true, hosts: c.routeHosts()})
+		return c.selector(ctx, routeSelection{full: true, hosts: c.routeHosts(), skip: c.routeHostPaused})
 	})
 	if err != nil {
 		return RouteStatus{}, err
@@ -228,6 +232,27 @@ func (c *Client) reinstall() (*routeState, error) {
 	return &state, nil
 }
 
+func (c *Client) routeFailurePause(host string, delay time.Duration) {
+	if host == "" {
+		return
+	}
+	c.hostPauseMu.Lock()
+	defer c.hostPauseMu.Unlock()
+	if c.hostPaused == nil {
+		c.hostPaused = make(map[string]time.Time)
+	}
+	until := time.Now().Add(delay)
+	if until.After(c.hostPaused[host]) {
+		c.hostPaused[host] = until
+	}
+}
+
+func (c *Client) routeHostPaused(host string) bool {
+	c.hostPauseMu.Lock()
+	defer c.hostPauseMu.Unlock()
+	return time.Now().Before(c.hostPaused[host])
+}
+
 func (c *Client) getJSON(
 	ctx context.Context,
 	path string,
@@ -246,6 +271,12 @@ func (c *Client) getJSON(
 		}
 		if current := c.current.Load(); current != nil {
 			state = current
+		}
+		if c.routeHostPaused(state.host) {
+			state, err = c.replaceFailedRoute(ctx, state)
+			if err != nil {
+				return err
+			}
 		}
 		err = state.transport.getJSON(ctx, path, params, destination)
 		if ctx.Err() != nil {
@@ -268,6 +299,13 @@ func (c *Client) getJSON(
 		if !routeFailure(err) || failover {
 			return err
 		}
+		if errors.As(err, &response) {
+			if response.StatusCode == 403 {
+				c.routeFailurePause(state.host, 15*time.Minute)
+			} else {
+				c.routeFailurePause(state.host, time.Minute)
+			}
+		}
 		state, err = c.replaceFailedRoute(ctx, state)
 		if err != nil {
 			return err
@@ -284,7 +322,7 @@ func (c *Client) ensureRoute(ctx context.Context) (*routeState, error) {
 		if state := c.current.Load(); state != nil {
 			return state, nil
 		}
-		return c.selector(ctx, routeSelection{full: true, hosts: c.routeHosts()})
+		return c.selector(ctx, routeSelection{full: true, hosts: c.routeHosts(), skip: c.routeHostPaused})
 	})
 }
 
@@ -293,7 +331,7 @@ func (c *Client) replaceFailedRoute(ctx context.Context, failed *routeState) (*r
 		if current := c.current.Load(); current != failed {
 			return current, nil
 		}
-		return c.selector(ctx, routeSelection{hosts: c.routeHosts()})
+		return c.selector(ctx, routeSelection{hosts: c.routeHosts(), skip: c.routeHostPaused})
 	})
 }
 
