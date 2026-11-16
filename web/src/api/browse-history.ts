@@ -69,14 +69,18 @@ export function useIsMovieViewed(id?: string): boolean {
   return !!cleanID && (viewed.data === true || pending.length > 0)
 }
 
-export function useRecordMovieView(id: string): void {
+export function useRecordMovieView(id: string, ready = true): void {
   const client = useQueryClient()
   const cleanID = id.trim()
   const { mutate } = useMutation(recordMovieViewOptions(client, cleanID))
   useEffect(() => {
-    if (!cleanID || client.getQueryData<string[]>(browseHistoryKeys.viewed)?.includes(cleanID))
+    if (
+      !ready ||
+      !cleanID ||
+      client.getQueryData<string[]>(browseHistoryKeys.viewed)?.includes(cleanID)
+    )
       return
     if (client.isMutating({ mutationKey: browseHistoryKeys.record(cleanID), exact: true })) return
     mutate()
-  }, [client, cleanID, mutate])
+  }, [client, cleanID, mutate, ready])
 }

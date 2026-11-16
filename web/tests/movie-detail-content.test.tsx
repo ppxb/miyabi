@@ -106,7 +106,7 @@ test('unresolved and failed code lookups never fetch magnets or record an invali
   }
 })
 
-test('resolved codes load existing JavDB detail, magnets and history with the confirmed ID', () => {
+test('resolved codes load detail and magnets but do not record history until detail arrives', () => {
   vi.mocked(useResolveDiscoverMovie).mockReturnValue({
     isPending: false,
     data: { id: 'confirmed-id' }
@@ -114,5 +114,5 @@ test('resolved codes load existing JavDB detail, magnets and history with the co
   renderToStaticMarkup(<MovieDetailContent movie={{ code: 'ABP-123' }} />)
   expect(useDiscoverMovie).toHaveBeenCalledWith('confirmed-id')
   expect(useDiscoverMagnets).toHaveBeenCalledWith('confirmed-id')
-  expect(useRecordMovieView).toHaveBeenCalledWith('confirmed-id')
+  expect(useRecordMovieView).toHaveBeenCalledWith('confirmed-id', false)
 })

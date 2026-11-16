@@ -49,7 +49,7 @@ function LibraryMovieDetail({ movieId }: { movieId: number }) {
 function LibraryCatalogueExtras({ movieId }: { movieId: string }) {
   const detail = useDiscoverMovie(movieId)
   const magnets = useDiscoverMagnets(movieId)
-  useRecordMovieView(movieId)
+  useRecordMovieView(movieId, detail.data !== undefined)
   return (
     <>
       <MovieMagnets movieID={movieId} query={magnets} />
@@ -81,7 +81,7 @@ function MovieDetailByCode({ code }: { code: string }) {
 function IdentifiedMovieDetail({ movieId }: { movieId: string }) {
   const detail = useDiscoverMovie(movieId)
   const magnets = useDiscoverMagnets(movieId)
-  useRecordMovieView(movieId)
+  useRecordMovieView(movieId, detail.data !== undefined)
 
   if (detail.isPending) return <MovieDetailSkeleton />
   if (!detail.data) {
