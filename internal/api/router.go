@@ -27,6 +27,7 @@ type Dependencies struct {
 	Tasks          TaskManager
 	Artwork        ArtworkReader
 	Maintenance    MaintenanceManager
+	Logs           LogReader
 	Network        NetworkManager
 	Emby           EmbyManager
 	Setup          SetupManager
@@ -90,6 +91,9 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	settingsAPI.PUT("/scraping", metadataUpdateHandler(deps.Metadata))
 	settingsAPI.GET("/system", dataInfoHandler(deps.Maintenance))
 	settingsAPI.DELETE("/cache", dataClearCacheHandler(deps.Maintenance))
+	if deps.Logs != nil {
+		settingsAPI.GET("/logs", dataLogsHandler(deps.Logs))
+	}
 	settingsAPI.GET("/network", networkHandler(deps.Network))
 	settingsAPI.PUT("/network", networkUpdateHandler(deps.Network))
 	settingsAPI.POST("/network/test", networkTestHandler(deps.Network))

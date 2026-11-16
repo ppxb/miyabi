@@ -2,9 +2,10 @@ import { DatabaseIcon, LoaderCircleIcon, RefreshCwIcon, Trash2Icon } from 'lucid
 import { useState } from 'react'
 import { toast } from 'sonner'
 
-import { useClearCache, useDataInfo } from '@/api/data'
+import { useClearCache, useDataInfo, useLogs } from '@/api/data'
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,7 @@ const numberFormat = new Intl.NumberFormat('zh-CN')
 
 export function DataSection() {
   const info = useDataInfo()
+  const logs = useLogs()
   const clearCache = useClearCache()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const cache = info.data?.cache
@@ -72,6 +74,30 @@ export function DataSection() {
           </span>
         )}
       </SettingRow>
+      <SettingRow title="运行日志" description={logs.data?.path ?? '正在读取日志路径…'}>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          title="刷新日志"
+          disabled={logs.isFetching}
+          onClick={() => void logs.refetch()}
+        >
+          <RefreshCwIcon className={cn('size-4', logs.isFetching && 'animate-spin')} />
+        </Button>
+      </SettingRow>
+      <div className="overflow-hidden rounded-xl border bg-muted/30">
+        <ScrollArea className="h-64">
+          <pre className="p-3 font-sans text-xs leading-5 break-words whitespace-pre-wrap text-muted-foreground">
+            {logs.data?.lines.length ? logs.data.lines.join('\n') : '暂无日志'}
+          </pre>
+        </ScrollArea>
+      </div>
+      {logs.isError ? (
+        <InlineError onRetry={() => void logs.refetch()} retrying={logs.isFetching}>
+          无法读取运行日志。
+        </InlineError>
+      ) : null}
       <SettingRow
         title="图片缓存"
         description={

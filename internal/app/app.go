@@ -209,6 +209,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Tasks:          &taskViews{Service: taskSvc, database: store.Client, library: libSvc, monitor: monitorSvc},
 		Artwork:        scrapeSvc,
 		Maintenance:    maintenanceSvc,
+		Logs:           maintenanceSvc,
 		Network:        networkSvc,
 		Emby:           embySvc,
 		Setup:          setupStore,

@@ -13,13 +13,30 @@ export type DataInfo = {
   }
 }
 
-const dataKeys = { system: ['settings', 'system'] as const }
+export type LogInfo = {
+  path: string
+  lines: string[]
+  size_bytes: number
+}
+
+const dataKeys = {
+  system: ['settings', 'system'] as const,
+  logs: ['settings', 'logs'] as const
+}
 
 export function useDataInfo() {
   return useQuery({
     queryKey: dataKeys.system,
     queryFn: ({ signal }) => apiGet<DataInfo>('/api/settings/system', undefined, signal),
     staleTime: 15_000
+  })
+}
+
+export function useLogs() {
+  return useQuery({
+    queryKey: dataKeys.logs,
+    queryFn: ({ signal }) => apiGet<LogInfo>('/api/settings/logs', { limit: 500 }, signal),
+    refetchInterval: 3000
   })
 }
 
