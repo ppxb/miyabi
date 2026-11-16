@@ -17,6 +17,9 @@ importers:
       '@fontsource-variable/noto-sans-sc':
         specifier: ^5.3.0
         version: 5.3.0
+      '@stepperize/react':
+        specifier: ^8.0.1
+        version: 8.0.1(react@19.3.0)(typescript@7.0.2)
       '@tanstack/react-query':
         specifier: ^5.104.1
         version: 5.104.1(react@19.3.0)
@@ -793,6 +796,19 @@ packages:
   '@sindresorhus/merge-streams@4.0.0':
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
+
+  '@stepperize/core@4.0.0':
+    resolution: {integrity: sha512-ciSSDJnylQNAZIudFJHXsDG3sPlYEA3XAmRrogeJTdxGwM7R/HnH3aNoWoPn7+hstHpHuzMx6xN9GVWyAnvXAQ==}
+    peerDependencies:
+      typescript: '>=5.0.2'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  '@stepperize/react@8.0.1':
+    resolution: {integrity: sha512-/Sz9QXzRblvqUlmQfKsMzzjH1TCGruip0DHlLRzYSoHL1XAUFhtVYnytGH2Gf7esNjyfPEQJoFcm+mO69bVx3Q==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0
 
   '@tailwindcss/node@4.3.3':
     resolution: {integrity: sha512-/T8IKEsf9VTU6tLjgC7+sv2mOPtQxzE2jMw7u4Tt40Tx+QSZxpzh95/H6cMKoja9XuW7iMdLJYBB0o9G1CaAgg==}
@@ -3279,6 +3295,17 @@ snapshots:
   '@sec-ant/readable-stream@0.4.1': {}
 
   '@sindresorhus/merge-streams@4.0.0': {}
+
+  '@stepperize/core@4.0.0(typescript@7.0.2)':
+    optionalDependencies:
+      typescript: 7.0.2
+
+  '@stepperize/react@8.0.1(react@19.3.0)(typescript@7.0.2)':
+    dependencies:
+      '@stepperize/core': 4.0.0(typescript@7.0.2)
+      react: 19.3.0
+    transitivePeerDependencies:
+      - typescript
 
   '@tailwindcss/node@4.3.3':
     dependencies:

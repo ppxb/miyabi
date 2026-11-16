@@ -1,35 +1,51 @@
-import { cn } from 'cn'
+import {
+  Stepper,
+  StepperIndicator,
+  StepperItem,
+  StepperNav,
+  StepperSeparator,
+  StepperTitle,
+  StepperTrigger
+} from '@/components/ui/stepper'
 
-export function OnboardingStepper({ steps, current }: { steps: string[]; current: number }) {
+export type OnboardingStep = {
+  id: string
+  title: string
+}
+
+export function OnboardingStepper({
+  steps,
+  current,
+  onChange
+}: {
+  steps: OnboardingStep[]
+  current: string
+  onChange: (id: string) => void
+}) {
+  const currentIndex = Math.max(
+    0,
+    steps.findIndex(step => step.id === current)
+  )
+
   return (
-    <div className="flex items-center gap-2 overflow-x-auto">
-      {steps.map((label, index) => {
-        const done = index < current
-        const active = index === current
-        return (
-          <div key={label} className="flex shrink-0 items-center gap-2">
-            <span
-              className={cn(
-                'flex size-6 items-center justify-center rounded-full border text-xs font-medium tabular-nums',
-                done && 'border-primary bg-primary text-primary-foreground',
-                active && 'border-primary text-primary',
-                !done && !active && 'border-border text-muted-foreground'
-              )}
-            >
-              {index + 1}
-            </span>
-            <span
-              className={cn(
-                'text-xs whitespace-nowrap',
-                active ? 'font-medium text-foreground' : 'text-muted-foreground'
-              )}
-            >
-              {label}
-            </span>
-            {index < steps.length - 1 ? <span className="mx-1 h-px w-4 bg-border" /> : null}
-          </div>
-        )
-      })}
-    </div>
+    <Stepper
+      steps={steps}
+      value={current}
+      onValueChange={onChange}
+      orientation="horizontal"
+      className="w-full"
+    >
+      <StepperNav className="gap-1 overflow-x-auto py-1">
+        {steps.map((step, index) => (
+          <StepperItem key={step.id} stepId={step.id} disabled={index > currentIndex}>
+            <StepperTrigger className="gap-2 rounded-full px-1 py-1 outline-none focus:outline-none focus-visible:outline-none">
+              <StepperIndicator className="size-6 text-xs">{index + 1}</StepperIndicator>
+              <StepperTitle className="text-xs whitespace-nowrap">{step.title}</StepperTitle>
+            </StepperTrigger>
+            {index < steps.length - 1 ? <StepperSeparator className="mx-1 h-0.5 flex-1" /> : null}
+          </StepperItem>
+        ))}
+      </StepperNav>
+    </Stepper>
   )
 }

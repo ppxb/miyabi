@@ -11,7 +11,7 @@ export function LibraryMovieCard({ movie, busy = false }: { movie: LibraryMovie;
         movie={{ libraryId: movie.id }}
         className="block h-full min-w-0 rounded-2xl outline-ring"
       >
-        <MovieCard movie={movie} titleTooltip={false}>
+        <MovieCard movie={movie}>
           <div className="flex min-h-7 items-center pr-9">
             <LibraryMovieStatus movie={movie} />
           </div>

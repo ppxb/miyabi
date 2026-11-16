@@ -42,7 +42,15 @@ export function OnboardingPage() {
   }, [mode])
 
   const safeIndex = Math.min(stepIndex, steps.length - 1)
-  const current = steps[safeIndex]
+  const current = steps[safeIndex] ?? 'account'
+  const stepDefinitions = useMemo(
+    () =>
+      steps.map(step => ({
+        id: step,
+        title: STEP_LABELS[step] ?? step
+      })),
+    [steps]
+  )
   const sources: SetupSource[] = mode === 'both' ? ['local', '115'] : mode ? [mode] : []
 
   const next = () => setStepIndex(Math.min(safeIndex + 1, steps.length - 1))
@@ -124,8 +132,13 @@ export function OnboardingPage() {
         <Card>
           <CardContent className="space-y-8 p-5 sm:p-8">
             <OnboardingStepper
-              steps={steps.map(step => STEP_LABELS[step] ?? step)}
-              current={safeIndex}
+              key={steps.join('|')}
+              steps={stepDefinitions}
+              current={current}
+              onChange={id => {
+                const index = steps.indexOf(id)
+                if (index >= 0) setStepIndex(index)
+              }}
             />
             {safeIndex === 0 ? (
               <div className="space-y-1">

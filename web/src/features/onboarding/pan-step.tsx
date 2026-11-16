@@ -27,7 +27,7 @@ export function PanStep({
 
   return (
     <div className="space-y-6">
-      <Alert variant="info">
+      <Alert>
         <CloudIcon />
         <AlertTitle>登录 115 网盘</AlertTitle>
         <AlertDescription>

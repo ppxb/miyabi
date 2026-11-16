@@ -67,21 +67,11 @@ export function FinishStep({
     }
   }
 
-  const labels: Record<SetupSource, string> = {
-    local: '本地媒体',
-    '115': '115 网盘'
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col items-center gap-4 rounded-2xl border bg-muted/30 p-8 text-center">
-        <CheckCircle2Icon className="size-10 text-success" />
-        <div className="space-y-1">
-          <h2 className="text-base font-semibold">准备就绪</h2>
-          <p className="text-sm text-muted-foreground">
-            已选择：{sources.map(source => labels[source]).join('、')}
-          </p>
-        </div>
+      <div className="flex flex-col items-center gap-4">
+        <CheckCircle2Icon className="size-12 text-success" />
+        <h2 className="text-2xl font-semibold">准备就绪</h2>
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <StepActions onBack={onBack}>

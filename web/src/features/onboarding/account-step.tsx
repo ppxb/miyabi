@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { KeyRoundIcon, ShieldCheckIcon } from 'lucide-react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -23,10 +23,6 @@ export function AccountStep({
   const [password, setPassword] = useState(draft?.password ?? '')
   const [confirm, setConfirm] = useState(draft?.password ?? '')
   const [localError, setLocalError] = useState('')
-
-  useEffect(() => {
-    if (!editing) setUsername(currentUsername)
-  }, [currentUsername, editing])
 
   function resetForm() {
     setUsername(currentUsername)

@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { useId, useState, type ReactElement, type ReactNode } from 'react'
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -7,28 +7,28 @@ type OverflowTooltipProps = {
   content: ReactNode
 }
 
+function isOverflowing(element: HTMLElement) {
+  return (
+    element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1
+  )
+}
+
 export function OverflowTooltip({ children, content }: OverflowTooltipProps) {
-  const triggerRef = useRef<HTMLElement>(null)
+  const triggerId = useId()
   const [open, setOpen] = useState(false)
 
   function handleOpenChange(nextOpen: boolean) {
-    const element = triggerRef.current
-    setOpen(
-      nextOpen &&
-        element !== null &&
-        (element.scrollWidth > element.clientWidth + 1 ||
-          element.scrollHeight > element.clientHeight + 1)
-    )
+    if (!nextOpen) {
+      setOpen(false)
+      return
+    }
+    const element = document.getElementById(triggerId)
+    setOpen(element instanceof HTMLElement && isOverflowing(element))
   }
 
   return (
-    <Tooltip open={open} onOpenChange={handleOpenChange}>
-      <TooltipTrigger
-        asChild
-        ref={element => {
-          triggerRef.current = element
-        }}
-      >
+    <Tooltip open={open} onOpenChange={handleOpenChange} triggerId={triggerId}>
+      <TooltipTrigger asChild id={triggerId}>
         {children}
       </TooltipTrigger>
       <TooltipContent>{content}</TooltipContent>

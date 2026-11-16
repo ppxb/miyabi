@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { ScanSearchIcon } from 'lucide-react'
 
 import { sourceNames, useScrapingSources, type ScrapingSource } from '@/api/metadata'
@@ -25,15 +25,12 @@ export function ScrapingStep({
   onBack: () => void
 }) {
   const query = useScrapingSources()
-  const [sources, setSources] = useState<ScrapingSource[]>(initialSources ?? [])
-
-  useEffect(() => {
-    if (!initialSources && query.data) setSources(query.data)
-  }, [query.data, initialSources])
+  const [edited, setEdited] = useState<ScrapingSource[] | null>(initialSources)
+  const sources = edited ?? query.data ?? []
 
   return (
     <div className="space-y-6">
-      <Alert variant="warning">
+      <Alert>
         <ScanSearchIcon />
         <AlertTitle>刮削来源</AlertTitle>
         <AlertDescription>
@@ -59,8 +56,10 @@ export function ScrapingStep({
             <Switch
               checked={source.enabled}
               onCheckedChange={enabled =>
-                setSources(items =>
-                  items.map(item => (item.id === source.id ? { ...item, enabled } : item))
+                setEdited(items =>
+                  (items ?? sources).map(item =>
+                    item.id === source.id ? { ...item, enabled } : item
+                  )
                 )
               }
             />
@@ -77,7 +76,7 @@ export function ScrapingStep({
       <StepActions onBack={onBack}>
         <Button
           type="button"
-          disabled={query.isPending || query.isError}
+          disabled={query.isError || (query.isPending && !edited)}
           onClick={() => onNext(sources)}
         >
           继续
