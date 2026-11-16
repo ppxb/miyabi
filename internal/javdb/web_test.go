@@ -2,7 +2,6 @@ package javdb
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -80,14 +79,20 @@ func TestRequiresWebFallback(t *testing.T) {
 	}
 }
 
-func TestDetailFallsBackToWebAndSearchRequiresLogin(t *testing.T) {
+func TestSearchAndDetailFallBackToWebWithoutAccount(t *testing.T) {
 	movieHTML := webFixture(t, "web_movie.html")
+	searchHTML := []byte(`<html><body>
+		<a class="box" href="/v/QD3n9" title="IPX-811 sample title"><strong>IPX-811</strong></a>
+	</body></html>`)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v/QD3n9" {
+		switch r.URL.Path {
+		case "/search":
+			_, _ = w.Write(searchHTML)
+		case "/v/QD3n9":
+			_, _ = w.Write(movieHTML)
+		default:
 			http.NotFound(w, r)
-			return
 		}
-		_, _ = w.Write(movieHTML)
 	}))
 	defer server.Close()
 
@@ -108,9 +113,14 @@ func TestDetailFallsBackToWebAndSearchRequiresLogin(t *testing.T) {
 	client.SetCredentials("", "")
 	client.fingerprint = fingerprint
 
-	// Without an account, search reports a login prompt and never calls the API.
-	if _, err := client.Search(context.Background(), "SSNI-497", domain.SearchOptions{Page: 1, Limit: 20}); !errors.Is(err, ErrLoginRequired) {
-		t.Fatalf("search error = %v, want ErrLoginRequired", err)
+	// Without an account, search reads the anonymous public search page and
+	// never calls the account-gated App API.
+	movies, err := client.Search(context.Background(), "IPX-811", domain.SearchOptions{Page: 1, Limit: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(movies) != 1 || movies[0].ID != "QD3n9" || movies[0].Code != "IPX-811" {
+		t.Fatalf("web search = %#v", movies)
 	}
 	if len(transport.calls) != 0 {
 		t.Fatalf("search made %d API calls, want 0", len(transport.calls))

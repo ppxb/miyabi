@@ -16,8 +16,8 @@ import (
 	"golang.org/x/net/html"
 )
 
-// JavDB gates its anonymous App API for search and detail. Movie detail is
-// served from the public web pages; search requires a configured account.
+// JavDB gates its anonymous App API for search and detail. Public web pages
+// serve both, so the App API is used when available and pages are the fallback.
 const (
 	webUserAgent  = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 	webMaxBody    = 4 << 20
@@ -28,9 +28,10 @@ const (
 var webBaseURL = "https://javdb.com"
 
 var (
-	webDurationPattern = regexp.MustCompile(`(\d+)`)
-	webRatingPattern   = regexp.MustCompile(`([0-9]+(?:\.[0-9]+)?)\s*分`)
-	webDatePattern     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	webDurationPattern   = regexp.MustCompile(`(\d+)`)
+	webRatingPattern     = regexp.MustCompile(`([0-9]+(?:\.[0-9]+)?)\s*分`)
+	webDatePattern       = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	webLoginTitlePattern = regexp.MustCompile(`<title>\s*(登入|登录|Sign in)\s*\|`)
 )
 
 // requiresWebFallback reports whether the API refused the request in a way the
@@ -198,6 +199,35 @@ func parseWebMovieDetail(raw []byte, movieID string) (domain.MovieDetail, error)
 	detail.ActorMovies = webRecommendations(document, "出演")
 	detail.RelatedMovies = webRecommendations(document, "喜歡", "喜欢")
 	return detail, nil
+}
+
+func parseWebSearch(document *html.Node, limit int) []domain.Movie {
+	movies := make([]domain.Movie, 0)
+	for _, box := range htmlFindAll(document, func(n *html.Node) bool {
+		return htmlIsElement(n, "a") && htmlHasClass(n, "box") && strings.HasPrefix(htmlAttr(n, "href"), "/v/")
+	}) {
+		id := webMovieID(htmlAttr(box, "href"))
+		if id == "" {
+			continue
+		}
+		number := htmlFind(box, func(n *html.Node) bool { return htmlIsElement(n, "strong") })
+		code := strings.TrimSpace(htmlText(number))
+		if code == "" {
+			continue
+		}
+		movies = append(movies, domain.Movie{
+			Sources:      []domain.SourceID{{Provider: "javdb", ID: id}},
+			RatingSource: "javdb",
+			RatingMax:    5,
+			ID:           id,
+			Code:         code,
+			Title:        strings.TrimSpace(htmlAttr(box, "title")),
+		})
+		if limit > 0 && len(movies) >= limit {
+			break
+		}
+	}
+	return movies
 }
 
 func webMovieID(href string) string {

@@ -52,7 +52,7 @@ export function AccountSection() {
             value={username}
             autoComplete="username"
             disabled={save.isPending}
-            placeholder="输入新的管理员用户名"
+            placeholder="请输入新的管理员用户名"
             onChange={event => setUsername(event.target.value)}
           />
         </div>
@@ -64,7 +64,7 @@ export function AccountSection() {
             value={password}
             autoComplete="new-password"
             disabled={save.isPending}
-            placeholder="至少 8 位"
+            placeholder="请输入新密码"
             onChange={event => setPassword(event.target.value)}
           />
         </div>
@@ -76,7 +76,7 @@ export function AccountSection() {
             value={confirm}
             autoComplete="new-password"
             disabled={save.isPending}
-            placeholder="再次输入新密码"
+            placeholder="请再次输入新密码"
             onChange={event => setConfirm(event.target.value)}
           />
         </div>

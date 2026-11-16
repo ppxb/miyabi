@@ -1,12 +1,10 @@
-import { Link } from '@tanstack/react-router'
-import { LockKeyholeIcon, SearchIcon, XIcon } from 'lucide-react'
+import { SearchIcon, XIcon } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 
-import { describeApiError, isJavDBLoginRequired } from '@/api/client'
+import { describeApiError } from '@/api/client'
 import { useSearchMovies } from '@/api/discover'
 import { AppPage } from '@/components/app-page'
 import { PageHeader } from '@/components/page-header'
-import { Button } from '@/components/ui/button'
 import {
   InputGroup,
   InputGroupAddon,
@@ -101,9 +99,6 @@ function SearchResults({
   onPageChange: (page: number) => void
 }) {
   const movies = useSearchMovies({ query: keyword, page, limit: DISCOVER_PAGE_SIZE })
-  if (movies.isError && isJavDBLoginRequired(movies.error)) {
-    return <JavDBLoginRequired />
-  }
   return (
     <DiscoverResults
       movies={movies.data}
@@ -116,24 +111,5 @@ function SearchResults({
       onPageChange={onPageChange}
       onRetry={() => movies.refetch()}
     />
-  )
-}
-
-function JavDBLoginRequired() {
-  return (
-    <div className="flex min-h-80 w-full flex-col items-center justify-center gap-3 text-center">
-      <div className="flex size-14 items-center justify-center rounded-full bg-muted">
-        <LockKeyholeIcon className="size-7 text-muted-foreground" />
-      </div>
-      <div className="space-y-1">
-        <p className="text-sm font-medium">需要登录 JavDB 才能搜索</p>
-        <p className="text-xs leading-5 text-muted-foreground">
-          请先在「设置 → JavDB 账号」填写用户名和密码，保存后再回来搜索。
-        </p>
-      </div>
-      <Button asChild size="sm">
-        <Link to="/settings">去设置</Link>
-      </Button>
-    </div>
   )
 }

@@ -45,6 +45,8 @@ type Client struct {
 	stopRoutes    context.CancelFunc
 	selector      func(context.Context, routeSelection) (*routeState, error)
 	fingerprint   *netx.ProxiedFingerprintClient
+	// Anonymous web search has a much tighter budget than the App API.
+	webSearchLimiter *rate.Limiter
 	// webFallback serves movie detail from the public web pages once the App API
 	// refuses anonymous access. The gate is stable for the process, so this
 	// avoids re-probing the closed endpoint on every request.
@@ -76,12 +78,13 @@ func New(options Options) (*Client, error) {
 	}
 	routeContext, stopRoutes := context.WithCancel(context.Background())
 	client := &Client{
-		options:      options,
-		limiter:      rate.NewLimiter(defaultRate, defaultBurst),
-		media:        newMediaClient(options),
-		routeContext: routeContext,
-		stopRoutes:   stopRoutes,
-		fingerprint:  fingerprint,
+		options:          options,
+		limiter:          rate.NewLimiter(defaultRate, defaultBurst),
+		webSearchLimiter: rate.NewLimiter(rate.Every(webSearchInterval), 1),
+		media:            newMediaClient(options),
+		routeContext:     routeContext,
+		stopRoutes:       stopRoutes,
+		fingerprint:      fingerprint,
 	}
 	client.selector = client.selectAndInstall
 	client.SetCredentials(options.Username, options.Password)

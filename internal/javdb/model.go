@@ -16,6 +16,9 @@ const (
 	defaultTimeout   = 20 * time.Second
 	defaultRate      = 2.0
 	defaultBurst     = 1
+	// Anonymous search pages rate-limit by exit IP more aggressively than the
+	// App API; keep 12s between them like the observed safe interval.
+	webSearchInterval = 12 * time.Second
 )
 
 // Options configures the anonymous JavDB App API client.

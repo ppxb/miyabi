@@ -8,7 +8,6 @@ import { AppearanceSection } from '@/features/settings/appearance-section'
 import { AccountSection } from '@/features/settings/account-section'
 import { DataSection } from '@/features/settings/data-section'
 import { EmbySection } from '@/features/settings/emby-section'
-import { JavDBSection } from '@/features/settings/javdb-section'
 import { NetworkSection } from '@/features/settings/network-section'
 import { PanSection } from '@/features/settings/pan-section'
 import { PrivacySection } from '@/features/settings/privacy-section'
@@ -36,8 +35,6 @@ function SettingsPage() {
           <NetworkSection />
           <Separator />
           <ScrapingSection />
-          <Separator />
-          <JavDBSection />
           <Separator />
           <EmbySection />
           <Separator />

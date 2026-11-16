@@ -1,6 +1,7 @@
 package javdb
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net/url"
@@ -8,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/ppxb/miyabi/internal/domain"
+	"golang.org/x/net/html"
+	"golang.org/x/time/rate"
 )
 
 var zoneCodes = map[domain.Zone]int{
@@ -18,25 +21,66 @@ var zoneCodes = map[domain.Zone]int{
 	domain.ZoneAnime:      4,
 }
 
-// Search searches JavDB's movie catalogue. JavDB only serves search to signed-in
-// accounts, so an unconfigured account reports a login prompt instead of a
-// generic upstream failure.
+var webZoneFilters = map[domain.Zone]string{
+	domain.ZoneCensored:   "censored",
+	domain.ZoneUncensored: "uncensored",
+	domain.ZoneWestern:    "western",
+	domain.ZoneFC2:        "fc2",
+	domain.ZoneAnime:      "anime",
+}
+
+// Search searches JavDB's movie catalogue. The App API asks for an account,
+// so an unconfigured client and a rejected API both fall back to the anonymous
+// public search page.
 func (c *Client) Search(ctx context.Context, keyword string, options domain.SearchOptions) ([]domain.Movie, error) {
 	params, err := buildSearchParams(keyword, options)
 	if err != nil {
 		return nil, err
 	}
 	if username, password := c.Credentials(); username == "" || password == "" {
-		return nil, ErrLoginRequired
+		return c.searchFromWeb(ctx, keyword, options)
 	}
 	var data wireMoviesData
 	if err := c.getJSONWithAuth(ctx, "/api/v2/search", params, &data); err != nil {
 		if requiresWebFallback(err) {
-			return nil, ErrLoginRequired
+			return c.searchFromWeb(ctx, keyword, options)
 		}
 		return nil, err
 	}
 	return moviesFromWire(ctx, data.Movies)
+}
+
+func (c *Client) searchFromWeb(ctx context.Context, keyword string, options domain.SearchOptions) ([]domain.Movie, error) {
+	if c.webSearchLimiter == nil {
+		c.webSearchLimiter = rate.NewLimiter(rate.Every(webSearchInterval), 1)
+	}
+	if err := c.webSearchLimiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	page := options.Page
+	if page <= 0 {
+		page = 1
+	}
+	params := url.Values{
+		"q":    {strings.TrimSpace(keyword)},
+		"f":    {webZoneFilters[options.Zone]},
+		"page": {strconv.Itoa(page)},
+	}
+	if params.Get("f") == "" {
+		params.Set("f", "all")
+	}
+	body, err := c.fetchWebHTML(ctx, "/search", params)
+	if err != nil {
+		return nil, err
+	}
+	if webLoginTitlePattern.Match(body) {
+		return nil, ErrLoginRequired
+	}
+	document, err := html.Parse(bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	return parseWebSearch(document, options.Limit), nil
 }
 
 func buildSearchParams(keyword string, options domain.SearchOptions) (url.Values, error) {

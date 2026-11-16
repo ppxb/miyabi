@@ -19,7 +19,7 @@ import (
 const AccountSettingKey = "javdb.account"
 
 // ErrLoginRequired is returned when a gated request needs a configured account.
-var ErrLoginRequired = domain.E(domain.KindUnauthorized, "JavDB 搜索需要登录，请先在「设置 → JavDB 账号」配置账号", nil)
+var ErrLoginRequired = domain.E(domain.KindUnauthorized, "JavDB 匿名搜索当前要求登录，请稍后重试或检查网络", nil)
 
 // Config holds the optional JavDB account credentials.
 type Config struct {

@@ -211,7 +211,6 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Maintenance:    maintenanceSvc,
 		Network:        networkSvc,
 		Emby:           embySvc,
-		JavDB:          catalogueSvc,
 		Setup:          setupStore,
 		Account:        accountStore,
 		Frontend:       miyabi.Frontend(),

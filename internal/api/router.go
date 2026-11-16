@@ -29,7 +29,6 @@ type Dependencies struct {
 	Maintenance    MaintenanceManager
 	Network        NetworkManager
 	Emby           EmbyManager
-	JavDB          JavDBManager
 	Setup          SetupManager
 	Account        AccountManager
 	Frontend       fs.FS
@@ -97,9 +96,6 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	settingsAPI.GET("/emby", embyConfigHandler(deps.Emby))
 	settingsAPI.PUT("/emby", embyUpdateHandler(deps.Emby))
 	settingsAPI.POST("/emby/test", embyTestHandler(deps.Emby))
-	settingsAPI.GET("/javdb", javdbConfigHandler(deps.JavDB))
-	settingsAPI.PUT("/javdb", javdbUpdateHandler(deps.JavDB))
-	settingsAPI.POST("/javdb/test", javdbTestHandler(deps.JavDB))
 	settingsAPI.GET("/subscription", subscriptionSettingsGetHandler(deps.Monitor))
 	settingsAPI.PUT("/subscription", subscriptionSettingsUpdateHandler(deps.Monitor))
 
