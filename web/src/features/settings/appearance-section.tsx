@@ -1,6 +1,6 @@
 import { MonitorCogIcon, MonitorIcon, MoonIcon, SunIcon } from 'lucide-react'
-import { useTheme } from 'next-themes'
 
+import { useTheme } from '@/components/theme-provider'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SettingRow, SettingsSection } from './shared'
 

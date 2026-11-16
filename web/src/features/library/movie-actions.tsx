@@ -52,7 +52,7 @@ export function LibraryMovieActions({
         <DropdownMenuContent align="end" finalFocus={() => (correcting ? false : trigger.current)}>
           <DropdownMenuItem
             disabled={busy}
-            onSelect={() =>
+            onClick={() =>
               scrape.mutate(undefined, {
                 onSuccess: notifyScan,
                 onError: error =>
@@ -69,7 +69,7 @@ export function LibraryMovieActions({
           </DropdownMenuItem>
           <DropdownMenuItem
             disabled={busy}
-            onSelect={() => {
+            onClick={() => {
               scrape.reset()
               setCode(movie.code)
               setCorrecting(true)

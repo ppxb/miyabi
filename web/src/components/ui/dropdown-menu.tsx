@@ -22,12 +22,7 @@ function DropdownMenuTrigger({
   const mergedRender = asChild && React.isValidElement(children) ? children : render
 
   return (
-    <MenuPrimitive.Trigger
-      data-slot="dropdown-menu-trigger"
-      nativeButton={asChild ? false : undefined}
-      render={mergedRender}
-      {...props}
-    >
+    <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" render={mergedRender} {...props}>
       {mergedRender ? undefined : children}
     </MenuPrimitive.Trigger>
   )

@@ -20,12 +20,7 @@ function DialogTrigger({
   const mergedRender = asChild && React.isValidElement(children) ? children : render
 
   return (
-    <DialogPrimitive.Trigger
-      data-slot="dialog-trigger"
-      nativeButton={asChild ? false : undefined}
-      render={mergedRender}
-      {...props}
-    >
+    <DialogPrimitive.Trigger data-slot="dialog-trigger" render={mergedRender} {...props}>
       {mergedRender ? undefined : children}
     </DialogPrimitive.Trigger>
   )

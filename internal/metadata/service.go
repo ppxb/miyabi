@@ -188,6 +188,11 @@ func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.Movi
 		}
 	}
 	if len(failures) > 0 {
+		for _, failure := range failures {
+			if domain.KindOf(failure) == domain.KindUnauthorized {
+				return domain.MovieMetadata{}, domain.E(domain.KindUnauthorized, domain.PublicMessage(failure), failure)
+			}
+		}
 		message := "刮削来源查询失败: " + strings.Join(failedSources, "、") + "，请检查网络和代理设置"
 		return domain.MovieMetadata{}, domain.E(domain.KindUpstream, message, errors.Join(failures...))
 	}

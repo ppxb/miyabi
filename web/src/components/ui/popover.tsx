@@ -17,12 +17,7 @@ function PopoverTrigger({
   const mergedRender = asChild && React.isValidElement(children) ? children : render
 
   return (
-    <PopoverPrimitive.Trigger
-      data-slot="popover-trigger"
-      nativeButton={asChild ? false : undefined}
-      render={mergedRender}
-      {...props}
-    >
+    <PopoverPrimitive.Trigger data-slot="popover-trigger" render={mergedRender} {...props}>
       {mergedRender ? undefined : children}
     </PopoverPrimitive.Trigger>
   )

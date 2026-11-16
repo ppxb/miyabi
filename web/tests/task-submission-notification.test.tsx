@@ -98,7 +98,7 @@ function submission(action: 'rescrape' | 'scan' | 'rebuild') {
       <Capture />
     </QueryClientProvider>
   )
-  const event = action === 'rescrape' ? 'onSelect' : 'onClick'
+  const event = 'onClick'
   const controls = elements(tree).filter(element => typeof element.props[event] === 'function')
   ;(controls[action === 'rebuild' ? 1 : 0]!.props[event] as () => void)()
   const callbacks = mutate.mock.calls[0]![1] as { onSuccess: (task: ScanTask) => void }
