@@ -43,7 +43,7 @@ func Run(ctx context.Context, cancel context.CancelFunc, opts Options, serve Ser
 		systray.SetIcon(icon)
 		systray.SetTooltip(opts.Title)
 
-		openItem := systray.AddMenuItem("打开网页", opts.URL)
+		openItem := systray.AddMenuItem("打开引用", opts.URL)
 		dataItem := systray.AddMenuItem("打开数据目录", opts.DataDir)
 		systray.AddSeparator()
 		quitItem := systray.AddMenuItem("退出", "退出 "+opts.Title)
