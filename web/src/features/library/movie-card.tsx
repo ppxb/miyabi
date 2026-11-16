@@ -9,6 +9,7 @@ export function LibraryMovieCard({ movie, busy = false }: { movie: LibraryMovie;
     <div className="relative h-full min-w-0">
       <MovieDetailTrigger
         movie={{ libraryId: movie.id }}
+        disabled={movie.scrape_status === 'failed'}
         className="block h-full min-w-0 rounded-2xl outline-ring"
       >
         <MovieCard movie={movie}>

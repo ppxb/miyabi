@@ -22,7 +22,7 @@ export function MovieDetailTrigger({
       {...props}
       role={role}
       tabIndex={disabled ? -1 : tabIndex}
-      className={cn('cursor-pointer', className)}
+      className={cn(disabled ? 'cursor-default' : 'cursor-pointer', className)}
       onClick={event => {
         if (disabled) return
         onClick?.(event)
