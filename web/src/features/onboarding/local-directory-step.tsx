@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { FolderOpenIcon, LoaderCircleIcon } from 'lucide-react'
+import { FolderOpenIcon } from 'lucide-react'
 
-import { useSetLocalDirectory } from '@/api/setup'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,24 +13,21 @@ export function LocalDirectoryStep({
   onBack
 }: {
   initialPath: string
-  onNext: () => void
+  onNext: (path: string) => void
   onBack: () => void
 }) {
-  const save = useSetLocalDirectory()
   const [path, setPath] = useState(initialPath)
   const [error, setError] = useState('')
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setError('')
-    if (!path.trim()) {
+    const value = path.trim()
+    if (!value) {
       setError('请填写本地媒体目录')
       return
     }
-    save.mutate(path.trim(), {
-      onSuccess: onNext,
-      onError: err => setError(err.message)
-    })
+    setError('')
+    onNext(value)
   }
 
   return (
@@ -50,17 +46,13 @@ export function LocalDirectoryStep({
           id="local-directory"
           value={path}
           autoFocus
-          disabled={save.isPending}
           placeholder="D:\Media 或 /media"
           onChange={event => setPath(event.target.value)}
         />
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <StepActions onBack={onBack}>
-        <Button type="submit" disabled={save.isPending}>
-          {save.isPending ? <LoaderCircleIcon className="animate-spin" /> : null}
-          保存并继续
-        </Button>
+        <Button type="submit">继续</Button>
       </StepActions>
     </form>
   )

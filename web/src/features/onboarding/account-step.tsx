@@ -1,19 +1,39 @@
-import { useState, type FormEvent } from 'react'
-import { LoaderCircleIcon, ShieldCheckIcon } from 'lucide-react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { KeyRoundIcon, ShieldCheckIcon } from 'lucide-react'
 
-import { useSetupAccount } from '@/api/setup'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { StepActions } from './step-actions'
 
-export function AccountStep({ configured, onNext }: { configured: boolean; onNext: () => void }) {
-  const save = useSetupAccount()
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
+export function AccountStep({
+  configured,
+  currentUsername,
+  draft,
+  onNext
+}: {
+  configured: boolean
+  currentUsername: string
+  draft: { username: string; password: string } | null
+  onNext: (draft?: { username: string; password: string }) => void
+}) {
+  const [editing, setEditing] = useState(!configured || draft !== null)
+  const [username, setUsername] = useState(draft?.username ?? currentUsername)
+  const [password, setPassword] = useState(draft?.password ?? '')
+  const [confirm, setConfirm] = useState(draft?.password ?? '')
   const [localError, setLocalError] = useState('')
+
+  useEffect(() => {
+    if (!editing) setUsername(currentUsername)
+  }, [currentUsername, editing])
+
+  function resetForm() {
+    setUsername(currentUsername)
+    setPassword('')
+    setConfirm('')
+    setLocalError('')
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -30,27 +50,29 @@ export function AccountStep({ configured, onNext }: { configured: boolean; onNex
       setLocalError('两次输入的密码不一致')
       return
     }
-    save.mutate(
-      { username: username.trim(), password },
-      {
-        onSuccess: onNext,
-        onError: error => setLocalError(error.message)
-      }
-    )
+    onNext({ username: username.trim(), password })
   }
 
-  if (configured) {
+  if (configured && !editing) {
     return (
       <div className="space-y-6">
         <Alert>
           <ShieldCheckIcon />
           <AlertTitle>管理员账号已设置</AlertTitle>
-          <AlertDescription>可以继续完成剩余的初始化设置。</AlertDescription>
+          <AlertDescription>
+            当前用户名：{currentUsername || 'admin'}。需要修改时点击「修改账号密码」。
+          </AlertDescription>
         </Alert>
         <StepActions showBack={false} onBack={() => {}}>
-          <Button type="button" onClick={onNext}>
-            继续
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" onClick={() => setEditing(true)}>
+              <KeyRoundIcon />
+              修改账号密码
+            </Button>
+            <Button type="button" onClick={() => onNext()}>
+              继续
+            </Button>
+          </div>
         </StepActions>
       </div>
     )
@@ -58,14 +80,13 @@ export function AccountStep({ configured, onNext }: { configured: boolean; onNex
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit}>
-      <div className="space-y-4">
+      <div className="space-y-2">
         <Label htmlFor="setup-username">用户名</Label>
         <Input
           id="setup-username"
           value={username}
           autoComplete="username"
           autoFocus
-          disabled={save.isPending}
           placeholder="请输入用户名"
           onChange={event => setUsername(event.target.value)}
         />
@@ -77,8 +98,7 @@ export function AccountStep({ configured, onNext }: { configured: boolean; onNex
           type="password"
           value={password}
           autoComplete="new-password"
-          disabled={save.isPending}
-          placeholder="请输入密码"
+          placeholder="请输入密码（至少 8 位）"
           onChange={event => setPassword(event.target.value)}
         />
       </div>
@@ -89,17 +109,27 @@ export function AccountStep({ configured, onNext }: { configured: boolean; onNex
           type="password"
           value={confirm}
           autoComplete="new-password"
-          disabled={save.isPending}
           placeholder="请再次输入密码"
           onChange={event => setConfirm(event.target.value)}
         />
       </div>
       {localError ? <p className="text-sm text-destructive">{localError}</p> : null}
       <StepActions showBack={false} onBack={() => {}}>
-        <Button type="submit" disabled={save.isPending}>
-          {save.isPending ? <LoaderCircleIcon className="animate-spin" /> : null}
-          继续
-        </Button>
+        <div className="flex items-center gap-2">
+          {configured ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setEditing(false)
+                resetForm()
+              }}
+            >
+              取消
+            </Button>
+          ) : null}
+          <Button type="submit">{configured ? '保存并继续' : '继续'}</Button>
+        </div>
       </StepActions>
     </form>
   )

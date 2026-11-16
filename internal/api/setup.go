@@ -41,6 +41,7 @@ func setupStatusHandler(manager SetupManager, account AccountManager) gin.Handle
 			"sources":            sources,
 			"local_directory":    localDirectory,
 			"account_configured": account.Configured(),
+			"username":           account.Username(),
 		}, nil)
 	}
 }

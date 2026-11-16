@@ -1,6 +1,7 @@
+import { useEffect, useState } from 'react'
 import { ScanSearchIcon } from 'lucide-react'
 
-import { sourceNames, useScrapingSources, useUpdateScrapingSources } from '@/api/metadata'
+import { sourceNames, useScrapingSources, type ScrapingSource } from '@/api/metadata'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { InlineError } from '@/components/error-state'
@@ -14,10 +15,21 @@ const descriptions: Record<string, string> = {
   pacopacomama: 'Pacopacomama 官方封面和公开预览原图'
 }
 
-export function ScrapingStep({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+export function ScrapingStep({
+  initialSources,
+  onNext,
+  onBack
+}: {
+  initialSources: ScrapingSource[] | null
+  onNext: (sources: ScrapingSource[]) => void
+  onBack: () => void
+}) {
   const query = useScrapingSources()
-  const update = useUpdateScrapingSources()
-  const sources = query.data ?? []
+  const [sources, setSources] = useState<ScrapingSource[]>(initialSources ?? [])
+
+  useEffect(() => {
+    if (!initialSources && query.data) setSources(query.data)
+  }, [query.data, initialSources])
 
   return (
     <div className="space-y-6">
@@ -30,6 +42,9 @@ export function ScrapingStep({ onNext, onBack }: { onNext: () => void; onBack: (
       </Alert>
 
       <div className="space-y-3">
+        {query.isPending ? (
+          <p className="text-sm text-muted-foreground">正在读取刮削来源…</p>
+        ) : null}
         {sources.map(source => (
           <div
             key={source.id}
@@ -43,10 +58,9 @@ export function ScrapingStep({ onNext, onBack }: { onNext: () => void; onBack: (
             </div>
             <Switch
               checked={source.enabled}
-              disabled={update.isPending}
               onCheckedChange={enabled =>
-                update.mutate(
-                  sources.map(item => (item.id === source.id ? { ...item, enabled } : item))
+                setSources(items =>
+                  items.map(item => (item.id === source.id ? { ...item, enabled } : item))
                 )
               }
             />
@@ -54,20 +68,18 @@ export function ScrapingStep({ onNext, onBack }: { onNext: () => void; onBack: (
         ))}
       </div>
 
-      {query.isError || update.isError ? (
-        <InlineError
-          onRetry={() => {
-            if (query.isError) void query.refetch()
-            else if (update.variables) update.mutate(update.variables)
-          }}
-          retrying={query.isFetching || update.isPending}
-        >
-          刮削来源读取或保存失败，请重试。
+      {query.isError ? (
+        <InlineError onRetry={() => void query.refetch()} retrying={query.isFetching}>
+          刮削来源读取失败，请重试。
         </InlineError>
       ) : null}
 
       <StepActions onBack={onBack}>
-        <Button type="button" onClick={onNext}>
+        <Button
+          type="button"
+          disabled={query.isPending || query.isError}
+          onClick={() => onNext(sources)}
+        >
           继续
         </Button>
       </StepActions>

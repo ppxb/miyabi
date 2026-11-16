@@ -9,6 +9,7 @@ export type SetupStatus = {
   sources: string[]
   local_directory: string
   account_configured: boolean
+  username: string
 }
 
 export type SetupSource = 'local' | '115'
@@ -31,9 +32,9 @@ export function useSetupAccount() {
   return useMutation({
     mutationFn: (input: { username: string; password: string }) =>
       apiPost<{ success: boolean }>('/api/setup/account', input),
-    onSuccess: () => {
+    onSuccess: (_data, input) => {
       queryClient.setQueryData<SetupStatus>(setupKeys.status, status =>
-        status ? { ...status, account_configured: true } : status
+        status ? { ...status, account_configured: true, username: input.username.trim() } : status
       )
       void queryClient.invalidateQueries({ queryKey: authKeys.config })
     }

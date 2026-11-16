@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 
+import type { ScrapingSource } from '@/api/metadata'
+import type { PanDirectory } from '@/api/pan'
 import { useSetupStatus, type SetupSource } from '@/api/setup'
 import { Card, CardContent } from '@/components/ui/card'
 import { AccountStep } from './account-step'
@@ -23,6 +25,13 @@ export function OnboardingPage() {
   const status = useSetupStatus()
   const [mode, setMode] = useState<SourceMode | ''>('')
   const [stepIndex, setStepIndex] = useState(0)
+  const [accountDraft, setAccountDraft] = useState<{
+    username: string
+    password: string
+  } | null>(null)
+  const [localDirectory, setLocalDirectory] = useState(status.data?.local_directory ?? '')
+  const [panDirectory, setPanDirectory] = useState<PanDirectory>()
+  const [scrapingSources, setScrapingSources] = useState<ScrapingSource[] | null>(null)
 
   const steps = useMemo(() => {
     const list = ['account', 'source']
@@ -41,7 +50,17 @@ export function OnboardingPage() {
 
   let content = null
   if (current === 'account') {
-    content = <AccountStep configured={status.data?.account_configured ?? false} onNext={next} />
+    content = (
+      <AccountStep
+        configured={status.data?.account_configured ?? false}
+        currentUsername={status.data?.username ?? ''}
+        draft={accountDraft}
+        onNext={draft => {
+          setAccountDraft(draft ?? null)
+          next()
+        }}
+      />
+    )
   } else if (current === 'source') {
     content = (
       <SourceStep
@@ -57,22 +76,51 @@ export function OnboardingPage() {
   } else if (current === 'local') {
     content = (
       <LocalDirectoryStep
-        initialPath={status.data?.local_directory ?? ''}
-        onNext={next}
+        initialPath={localDirectory}
+        onNext={path => {
+          setLocalDirectory(path)
+          next()
+        }}
         onBack={back}
       />
     )
   } else if (current === 'pan') {
-    content = <PanStep onNext={next} onBack={back} />
+    content = (
+      <PanStep
+        directory={panDirectory}
+        onDirectoryChange={setPanDirectory}
+        onNext={next}
+        onBack={back}
+      />
+    )
   } else if (current === 'scraping') {
-    content = <ScrapingStep onNext={next} onBack={back} />
+    content = (
+      <ScrapingStep
+        initialSources={scrapingSources}
+        onNext={sources => {
+          setScrapingSources(sources)
+          next()
+        }}
+        onBack={back}
+      />
+    )
   } else {
-    content = <FinishStep sources={sources} onBack={back} />
+    content = (
+      <FinishStep
+        sources={sources}
+        accountConfigured={status.data?.account_configured ?? false}
+        accountDraft={accountDraft}
+        localDirectory={localDirectory}
+        panDirectory={panDirectory}
+        scrapingSources={scrapingSources}
+        onBack={back}
+      />
+    )
   }
 
   return (
-    <main className="min-h-dvh">
-      <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-4 py-8 sm:py-14">
+    <main className="flex min-h-dvh justify-center overflow-y-auto bg-muted/40 px-4 py-8">
+      <div className="my-auto w-full max-w-3xl">
         <Card>
           <CardContent className="space-y-8 p-5 sm:p-8">
             <OnboardingStepper
