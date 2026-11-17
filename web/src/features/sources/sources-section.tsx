@@ -10,8 +10,12 @@ import {
   UserRoundIcon
 } from 'lucide-react'
 
-import { isPanUnauthorized } from '@/api/client'
-import { useDisconnectPan, usePanAccount, type PanAccount } from '@/api/pan'
+import {
+  useDisconnectPanAccount,
+  usePanAccountStatus,
+  usePanAccounts,
+  type PanAccount
+} from '@/api/pan'
 import { useSaveSources, useSources, type SourceKind, type StorageSource } from '@/api/sources'
 import { InlineError } from '@/components/error-state'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -127,6 +131,16 @@ export function SourcesSection() {
     )
   }
 
+  function bindAccount(source: StorageSource, accountID: string) {
+    persist(
+      (sources.data ?? []).map(item =>
+        item.id === source.id
+          ? { ...item, config: { ...item.config, account_id: accountID } }
+          : item
+      )
+    )
+  }
+
   return (
     <SettingsSection icon={<HardDriveIcon className="size-4" />} title="存储源">
       <SettingRow title="存储源" description="配置本地目录或云盘，作为媒体库的数据来源">
@@ -151,7 +165,12 @@ export function SourcesSection() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {(sources.data ?? []).map(source => (
-          <SourceCard key={source.id} source={source} onEdit={() => openDraft(source)} />
+          <SourceCard
+            key={source.id}
+            source={source}
+            onEdit={() => openDraft(source)}
+            onBind={accountID => bindAccount(source, accountID)}
+          />
         ))}
         {(sources.data?.length ?? 0) === 0 && !sources.isPending && !sources.isError ? (
           <Card size="sm" className="sm:col-span-2">
@@ -177,9 +196,17 @@ export function SourcesSection() {
   )
 }
 
-function SourceCard({ source, onEdit }: { source: StorageSource; onEdit: () => void }) {
+function SourceCard({
+  source,
+  onEdit,
+  onBind
+}: {
+  source: StorageSource
+  onEdit: () => void
+  onBind: (accountID: string) => void
+}) {
   return source.kind === '115' ? (
-    <PanSourceCard source={source} onEdit={onEdit} />
+    <PanSourceCard source={source} onEdit={onEdit} onBind={onBind} />
   ) : (
     <PlainSourceCard source={source} onEdit={onEdit} />
   )
@@ -213,12 +240,21 @@ function PlainSourceCard({ source, onEdit }: { source: StorageSource; onEdit: ()
   )
 }
 
-function PanSourceCard({ source, onEdit }: { source: StorageSource; onEdit: () => void }) {
-  const account = usePanAccount()
-  const disconnect = useDisconnectPan()
-  const unauthorized = isPanUnauthorized(account.error)
-  const connected = account.data?.connected === true && !unauthorized
-  const profile = account.data?.account
+function PanSourceCard({
+  source,
+  onEdit,
+  onBind
+}: {
+  source: StorageSource
+  onEdit: () => void
+  onBind: (accountID: string) => void
+}) {
+  const accountID = source.config?.account_id ?? ''
+  const accounts = usePanAccounts()
+  const status = usePanAccountStatus(accountID)
+  const disconnect = useDisconnectPanAccount(accountID)
+  const profile = status.data?.account
+  const available = (accounts.data ?? []).filter(item => item.connected && item.account)
 
   return (
     <Card size="sm">
@@ -232,18 +268,39 @@ function PanSourceCard({ source, onEdit }: { source: StorageSource; onEdit: () =
         </CardAction>
       </CardHeader>
       <CardContent>
-        {account.isPending ? (
+        {!accountID ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">未绑定账号</span>
+              <PanLoginDialog>
+                <Button size="icon-sm" aria-label="登录 115">
+                  <QrCodeIcon />
+                </Button>
+              </PanLoginDialog>
+            </div>
+            {available.length > 0 ? (
+              <Select value="" onValueChange={value => value && onBind(value)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="选择已登录账号" />
+                </SelectTrigger>
+                <SelectContent>
+                  {available.map(item => (
+                    <SelectItem key={item.account!.id} value={item.account!.id}>
+                      {item.account!.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+          </div>
+        ) : status.isPending ? (
           <LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" />
-        ) : !connected || !profile ? (
+        ) : status.isError || !profile ? (
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground">
-              {unauthorized ? '授权已失效，请重新登录' : '未登录'}
-            </span>
-            <PanLoginDialog>
-              <Button size="icon-sm">
-                <QrCodeIcon />
-              </Button>
-            </PanLoginDialog>
+            <span className="text-xs text-muted-foreground">账号不可用</span>
+            <Button size="sm" variant="outline" onClick={() => onBind('')}>
+              重新绑定
+            </Button>
           </div>
         ) : (
           <div className="space-y-3">
@@ -262,7 +319,7 @@ function PanSourceCard({ source, onEdit }: { source: StorageSource; onEdit: () =
                 size="icon-sm"
                 aria-label="退出登录"
                 disabled={disconnect.isPending}
-                onClick={() => disconnect.mutate()}
+                onClick={() => disconnect.mutate(undefined, { onSuccess: () => onBind('') })}
               >
                 <LogOutIcon />
               </Button>
@@ -272,9 +329,9 @@ function PanSourceCard({ source, onEdit }: { source: StorageSource; onEdit: () =
 
             <div className="flex items-center justify-between gap-2">
               <span className="truncate text-xs text-muted-foreground">
-                {account.data?.directory?.path ?? '未绑定目录'}
+                {status.data?.directory?.path ?? '未绑定目录'}
               </span>
-              <PanDirectoryDialog accountID={profile.id} directory={account.data?.directory}>
+              <PanDirectoryDialog accountID={profile.id} directory={status.data?.directory}>
                 <Button variant="ghost" size="icon-sm" aria-label="修改目录">
                   <FolderOpenIcon />
                 </Button>

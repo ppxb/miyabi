@@ -12,16 +12,25 @@ import (
 type DriveManager interface {
 	Account(context.Context) (drive.AccountStatus, error)
 	Accounts(context.Context) ([]drive.AccountStatus, error)
+	AccountStatusFor(context.Context, string) (drive.AccountStatus, error)
 	BeginLogin(context.Context) (drive.LoginSession, error)
 	LoginStatus(context.Context, string) (drive.LoginStatus, error)
 	Disconnect(context.Context) (drive.AccountStatus, error)
+	DisconnectAccount(context.Context, string) error
 	Files(context.Context, string, int) (pan.FilePage, error)
+	FilesFor(context.Context, string, string, int) (pan.FilePage, error)
 	SelectDirectory(context.Context, string) (domain.LibraryDirectory, error)
+	SelectDirectoryForAccount(context.Context, string, string) (domain.LibraryDirectory, error)
 	ClearDirectory(context.Context) error
+	ClearDirectoryForAccount(context.Context, string) error
 }
 
 type panLoginURI struct {
 	ID string `uri:"id" binding:"required,uuid4"`
+}
+
+type panAccountURI struct {
+	AccountID string `uri:"accountID" binding:"required"`
 }
 
 type panFilesQuery struct {
@@ -52,6 +61,67 @@ func panAccountsHandler(pan DriveManager) gin.HandlerFunc {
 			result[i] = accountResponse(account)
 		}
 		respond(c, result, nil)
+	}
+}
+
+func panAccountStatusHandler(pan DriveManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[panAccountURI](c)
+		if !ok {
+			return
+		}
+		status, err := pan.AccountStatusFor(c.Request.Context(), uri.AccountID)
+		respond(c, accountResponse(status), err)
+	}
+}
+
+func panAccountFilesHandler(pan DriveManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[panAccountURI](c)
+		if !ok {
+			return
+		}
+		query, ok := bindQuery[panFilesQuery](c)
+		if !ok {
+			return
+		}
+		files, err := pan.FilesFor(c.Request.Context(), uri.AccountID, query.DirectoryID, query.Page)
+		respond(c, filesResponse(files), err)
+	}
+}
+
+func panAccountSelectDirectoryHandler(pan DriveManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[panAccountURI](c)
+		if !ok {
+			return
+		}
+		input, ok := bindJSON[panDirectoryInput](c)
+		if !ok {
+			return
+		}
+		directory, err := pan.SelectDirectoryForAccount(c.Request.Context(), uri.AccountID, input.ID)
+		respond(c, directory, err)
+	}
+}
+
+func panAccountClearDirectoryHandler(pan DriveManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[panAccountURI](c)
+		if !ok {
+			return
+		}
+		respond(c, nil, pan.ClearDirectoryForAccount(c.Request.Context(), uri.AccountID))
+	}
+}
+
+func panAccountDisconnectHandler(pan DriveManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[panAccountURI](c)
+		if !ok {
+			return
+		}
+		respond(c, nil, pan.DisconnectAccount(c.Request.Context(), uri.AccountID))
 	}
 }
 

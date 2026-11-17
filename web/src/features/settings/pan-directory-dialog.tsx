@@ -1,7 +1,7 @@
 import { ChevronLeftIcon, ChevronRightIcon, FolderIcon, LoaderCircleIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
-import { usePanFiles, useSelectPanDirectory, type PanDirectory } from '@/api/pan'
+import { usePanAccountFiles, useSelectPanAccountDirectory, type PanDirectory } from '@/api/pan'
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import {
@@ -58,8 +58,8 @@ function DirectoryPicker({
   onSelected: () => void
 }) {
   const [location, setLocation] = useState({ id: initialID, page: 1 })
-  const files = usePanFiles(accountID, location.id, location.page)
-  const select = useSelectPanDirectory(accountID)
+  const files = usePanAccountFiles(accountID, location.id, location.page)
+  const select = useSelectPanAccountDirectory(accountID)
   const mounted = location.id === mountedID
 
   function navigate(id: string, page = 1) {

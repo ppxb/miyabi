@@ -38,6 +38,7 @@ export function PanLoginDialog({ children }: { children: ReactNode }) {
 
   function completeLogin() {
     queryClient.setQueryData<PanAccountStatus>(panKeys.account, { connected: true })
+    void queryClient.invalidateQueries({ queryKey: panKeys.accounts })
     invalidatePanSource(queryClient)
     changeOpen(false)
   }

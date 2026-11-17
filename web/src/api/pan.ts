@@ -59,6 +59,10 @@ type PanLoginStatus = {
 
 export const panKeys = {
   account: ['pan', 'account'] as const,
+  accounts: ['pan', 'accounts'] as const,
+  accountStatus: (accountID: string) => ['pan', 'accounts', accountID] as const,
+  accountFiles: (accountID: string, directoryID: string, page: number) =>
+    ['pan', 'accounts', accountID, 'files', directoryID, page] as const,
   login: (id: string) => ['pan', 'login', id] as const,
   fileLists: ['pan', 'files'] as const,
   files: (accountID: string, directoryID: string, page: number) =>
@@ -156,6 +160,81 @@ export function useClearPanDirectory(accountID: string) {
       queryClient.setQueryData<PanAccountStatus>(panKeys.account, status =>
         status?.account?.id === accountID ? { ...status, directory: undefined } : status
       )
+    }
+  })
+}
+
+export function usePanAccounts() {
+  return useQuery({
+    queryKey: panKeys.accounts,
+    queryFn: ({ signal }) => apiGet<PanAccountStatus[]>('/api/pan/accounts', undefined, signal),
+    staleTime: 30_000
+  })
+}
+
+export function usePanAccountStatus(accountID: string) {
+  return useQuery({
+    queryKey: panKeys.accountStatus(accountID),
+    queryFn: ({ signal }) =>
+      apiGet<PanAccountStatus>(
+        `/api/pan/accounts/${encodeURIComponent(accountID)}`,
+        undefined,
+        signal
+      ),
+    enabled: accountID !== '',
+    staleTime: 30_000
+  })
+}
+
+export function usePanAccountFiles(accountID: string, directoryID: string, page: number) {
+  return useQuery({
+    queryKey: panKeys.accountFiles(accountID, directoryID, page),
+    queryFn: ({ signal }) =>
+      apiGet<PanFilePage>(
+        `/api/pan/accounts/${encodeURIComponent(accountID)}/files`,
+        {
+          directory_id: directoryID,
+          page
+        },
+        signal
+      )
+  })
+}
+
+export function useSelectPanAccountDirectory(accountID: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiPut<PanDirectory>(`/api/pan/accounts/${encodeURIComponent(accountID)}/directory`, { id }),
+    onSuccess: () => {
+      invalidatePanSource(queryClient)
+      void queryClient.invalidateQueries({ queryKey: panKeys.accounts })
+      void queryClient.invalidateQueries({ queryKey: panKeys.accountStatus(accountID) })
+    }
+  })
+}
+
+export function useClearPanAccountDirectory(accountID: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      apiDelete<null>(`/api/pan/accounts/${encodeURIComponent(accountID)}/directory`),
+    onSuccess: () => {
+      invalidatePanSource(queryClient)
+      void queryClient.invalidateQueries({ queryKey: panKeys.accounts })
+      void queryClient.invalidateQueries({ queryKey: panKeys.accountStatus(accountID) })
+    }
+  })
+}
+
+export function useDisconnectPanAccount(accountID: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiDelete<null>(`/api/pan/accounts/${encodeURIComponent(accountID)}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: panKeys.accounts })
+      void queryClient.removeQueries({ queryKey: panKeys.accountStatus(accountID) })
+      invalidatePanSource(queryClient)
     }
   })
 }
