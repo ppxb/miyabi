@@ -1,8 +1,21 @@
 import { useState } from 'react'
-import { HardDriveIcon, PencilIcon, PlusIcon } from 'lucide-react'
+import {
+  FolderOpenIcon,
+  HardDriveIcon,
+  LoaderCircleIcon,
+  LogOutIcon,
+  PencilIcon,
+  PlusIcon,
+  QrCodeIcon,
+  UserRoundIcon
+} from 'lucide-react'
 
+import { isPanUnauthorized } from '@/api/client'
+import { useDisconnectPan, usePanAccount, type PanAccount } from '@/api/pan'
 import { useSaveSources, useSources, type SourceKind, type StorageSource } from '@/api/sources'
 import { InlineError } from '@/components/error-state'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -20,13 +33,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
-  FieldLabel
-} from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -36,7 +43,8 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
-import { Switch } from '@/components/ui/switch'
+import { PanDirectoryDialog } from '@/features/settings/pan-directory-dialog'
+import { PanLoginDialog } from '@/features/settings/pan-login-dialog'
 import { SettingRow, SettingsSection } from '@/features/settings/shared'
 
 const KIND_OPTIONS: {
@@ -119,14 +127,6 @@ export function SourcesSection() {
     )
   }
 
-  function toggle(source: StorageSource) {
-    persist(
-      (sources.data ?? []).map(item =>
-        item.id === source.id ? { ...item, enabled: !item.enabled } : item
-      )
-    )
-  }
-
   return (
     <SettingsSection icon={<HardDriveIcon className="size-4" />} title="存储源">
       <SettingRow title="存储源" description="配置本地目录或云盘，作为媒体库的数据来源">
@@ -149,15 +149,9 @@ export function SourcesSection() {
       ) : null}
       {save.isError ? <InlineError>保存失败，请重试</InlineError> : null}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {(sources.data ?? []).map(source => (
-          <SourceCard
-            key={source.id}
-            source={source}
-            busy={save.isPending}
-            onEdit={() => openDraft(source)}
-            onToggle={() => toggle(source)}
-          />
+          <SourceCard key={source.id} source={source} onEdit={() => openDraft(source)} />
         ))}
         {(sources.data?.length ?? 0) === 0 && !sources.isPending && !sources.isError ? (
           <Card size="sm" className="sm:col-span-2">
@@ -183,42 +177,133 @@ export function SourcesSection() {
   )
 }
 
-function SourceCard({
-  source,
-  busy,
-  onEdit,
-  onToggle
-}: {
-  source: StorageSource
-  busy: boolean
-  onEdit: () => void
-  onToggle: () => void
-}) {
+function SourceCard({ source, onEdit }: { source: StorageSource; onEdit: () => void }) {
+  return source.kind === '115' ? (
+    <PanSourceCard source={source} onEdit={onEdit} />
+  ) : (
+    <PlainSourceCard source={source} onEdit={onEdit} />
+  )
+}
+
+function EditAction({ onEdit }: { onEdit: () => void }) {
+  return (
+    <Button variant="ghost" size="icon-sm" aria-label="编辑存储源" onClick={onEdit}>
+      <PencilIcon />
+    </Button>
+  )
+}
+
+function PlainSourceCard({ source, onEdit }: { source: StorageSource; onEdit: () => void }) {
+  const label = kindOf(source.kind).label
+  const path = sourcePath(source)
+
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle>{source.name}</CardTitle>
-        <CardDescription>
-          {kindOf(source.kind).label} · {sourcePath(source) || '未配置路径'}
-        </CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          <span className="truncate">{source.name}</span>
+          <Badge variant="secondary">{label}</Badge>
+        </CardTitle>
+        {path ? <CardDescription className="truncate">{path}</CardDescription> : null}
         <CardAction>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="编辑存储源"
-            disabled={busy}
-            onClick={onEdit}
-          >
-            <PencilIcon />
-          </Button>
+          <EditAction onEdit={onEdit} />
+        </CardAction>
+      </CardHeader>
+    </Card>
+  )
+}
+
+function PanSourceCard({ source, onEdit }: { source: StorageSource; onEdit: () => void }) {
+  const account = usePanAccount()
+  const disconnect = useDisconnectPan()
+  const unauthorized = isPanUnauthorized(account.error)
+  const connected = account.data?.connected === true && !unauthorized
+  const profile = account.data?.account
+
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <span className="truncate">{source.name}</span>
+          <Badge variant="secondary">115 网盘</Badge>
+        </CardTitle>
+        <CardAction>
+          <EditAction onEdit={onEdit} />
         </CardAction>
       </CardHeader>
       <CardContent>
-        <SettingRow title="启用" description="停用后不参与媒体库聚合" inline>
-          <Switch checked={source.enabled} disabled={busy} onCheckedChange={() => onToggle()} />
-        </SettingRow>
+        {account.isPending ? (
+          <LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" />
+        ) : !connected || !profile ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground">
+              {unauthorized ? '授权已失效，请重新登录' : '未登录'}
+            </span>
+            <PanLoginDialog>
+              <Button size="sm">
+                <QrCodeIcon data-icon="inline-start" />
+                登录
+              </Button>
+            </PanLoginDialog>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <Avatar key={profile.avatar} className="size-6">
+                  {profile.avatar ? <AvatarImage src={profile.avatar} /> : null}
+                  <AvatarFallback>
+                    <UserRoundIcon className="size-3.5" />
+                  </AvatarFallback>
+                </Avatar>
+                <span className="truncate text-sm font-medium">{profile.name}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="退出登录"
+                disabled={disconnect.isPending}
+                onClick={() => disconnect.mutate()}
+              >
+                <LogOutIcon />
+              </Button>
+            </div>
+
+            <PanSpaceBlocks space={profile.space} />
+
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate text-xs text-muted-foreground">
+                {account.data?.directory?.path ?? '未绑定目录'}
+              </span>
+              <PanDirectoryDialog accountID={profile.id} directory={account.data?.directory}>
+                <Button variant="ghost" size="icon-sm" aria-label="修改目录">
+                  <FolderOpenIcon />
+                </Button>
+              </PanDirectoryDialog>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
+  )
+}
+
+function PanSpaceBlocks({ space }: { space: PanAccount['space'] }) {
+  const total = space.total.bytes > 0 ? space.total.bytes : space.used.bytes + space.remaining.bytes
+  const usedPercent = total > 0 ? (space.used.bytes / total) * 100 : 0
+  const remainingPercent = total > 0 ? 100 - usedPercent : 0
+
+  return (
+    <div className="space-y-1">
+      <div className="flex h-2 w-full gap-1">
+        <div className="bg-info" style={{ width: `${usedPercent}%` }} />
+        <div className="bg-muted-foreground/30" style={{ width: `${remainingPercent}%` }} />
+      </div>
+      <div className="flex justify-between gap-2 text-xs text-muted-foreground">
+        <span>已用 {space.used.formatted}</span>
+        <span>可用 {space.remaining.formatted}</span>
+      </div>
+    </div>
   )
 }
 
@@ -240,10 +325,10 @@ function SourceDialog({
   const [name, setName] = useState(source.name)
   const [kind, setKind] = useState<SourceKind>(source.kind)
   const [path, setPath] = useState(sourcePath(source))
-  const [enabled, setEnabled] = useState(source.enabled)
   const [nameError, setNameError] = useState<string | null>(null)
   const [pathError, setPathError] = useState<string | null>(null)
   const option = kindOf(kind)
+  const needsPath = kind === 'local'
 
   function submit() {
     let valid = true
@@ -251,7 +336,7 @@ function SourceDialog({
       setNameError('请输入名称')
       valid = false
     }
-    if (path.trim() === '') {
+    if (needsPath && path.trim() === '') {
       setPathError('请输入目录')
       valid = false
     }
@@ -260,8 +345,8 @@ function SourceDialog({
       id: source.id,
       kind,
       name: name.trim(),
-      enabled,
-      config: { ...source.config, [option.pathKey]: path.trim() }
+      enabled: true,
+      config: needsPath ? { ...source.config, [option.pathKey]: path.trim() } : { ...source.config }
     })
   }
 
@@ -272,10 +357,10 @@ function SourceDialog({
         if (!nextOpen && !saving) onOpenChange(false)
       }}
     >
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{source.id ? '编辑存储源' : '添加存储源'}</DialogTitle>
-          <DialogDescription>配置一个本地或云端媒体目录</DialogDescription>
+          <DialogDescription>配置一个本地或云端媒体目录。</DialogDescription>
         </DialogHeader>
 
         <form
@@ -318,34 +403,29 @@ function SourceDialog({
             </Select>
           </Field>
 
-          <Field data-invalid={Boolean(pathError)}>
-            <FieldLabel htmlFor="source-path">{option.pathLabel}</FieldLabel>
-            <Input
-              id="source-path"
-              value={path}
-              disabled={saving}
-              aria-invalid={Boolean(pathError)}
-              placeholder={option.placeholder}
-              onChange={event => {
-                setPath(event.target.value)
-                setPathError(null)
-              }}
-            />
-            {pathError ? <FieldError>{pathError}</FieldError> : null}
-          </Field>
-
-          <Field orientation="horizontal">
-            <FieldContent>
-              <FieldLabel htmlFor="source-enabled">启用</FieldLabel>
-              <FieldDescription>停用后不参与媒体库聚合</FieldDescription>
-            </FieldContent>
-            <Switch
-              id="source-enabled"
-              checked={enabled}
-              disabled={saving}
-              onCheckedChange={checked => setEnabled(checked)}
-            />
-          </Field>
+          {needsPath ? (
+            <Field data-invalid={Boolean(pathError)}>
+              <FieldLabel htmlFor="source-path">{option.pathLabel}</FieldLabel>
+              <Input
+                id="source-path"
+                value={path}
+                disabled={saving}
+                aria-invalid={Boolean(pathError)}
+                placeholder={option.placeholder}
+                onChange={event => {
+                  setPath(event.target.value)
+                  setPathError(null)
+                }}
+              />
+              {pathError ? <FieldError>{pathError}</FieldError> : null}
+            </Field>
+          ) : (
+            <FieldDescription>
+              {kind === '115'
+                ? '保存后请在卡片中登录 115，登录后再选择媒体目录。'
+                : '保存后请在卡片中完成登录并选择媒体目录。'}
+            </FieldDescription>
+          )}
 
           <DialogFooter>
             {source.id ? (

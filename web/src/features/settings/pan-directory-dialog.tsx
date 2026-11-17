@@ -32,9 +32,7 @@ export function PanDirectoryDialog({
       <DialogContent className="max-h-[calc(100dvh-2rem)] grid-cols-1 overflow-x-hidden overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>选择媒体目录</DialogTitle>
-          <DialogDescription>
-            进入目标文件夹后，点击“挂载当前目录”，系统会自动同步媒体库。
-          </DialogDescription>
+          <DialogDescription>进入目标文件夹后，点击“挂载当前目录”。</DialogDescription>
         </DialogHeader>
         {/* Keep the picker mounted through DialogContent's exit animation. */}
         <DirectoryPicker
