@@ -125,7 +125,8 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	fanzaSource := providers.NewFANZA(networkSvc.ProxyManager())
 	heyzoSource := providers.NewHEYZO(networkSvc.ProxyManager())
 	pacopacomamaSource := providers.NewPacopacomama(networkSvc.ProxyManager())
-	metadataSvc, err := metadata.New(ctx, store.Client, fanzaSource, fc2Source, heyzoSource, pacopacomamaSource, providers.NewJavDB(catalogueSvc))
+	metadataSvc, err := metadata.New(ctx, store.Client, fanzaSource, fc2Source, heyzoSource, pacopacomamaSource,
+		providers.NewJavDB(catalogueSvc), providers.NewJavBus(javbusClient, networkSvc.ProxyManager()))
 	if err != nil {
 		fanzaSource.Close()
 		fc2Source.Close()

@@ -17,10 +17,10 @@ const SETTINGS_NAV = [
   { to: '/settings', label: '常规', icon: SlidersHorizontalIcon },
   { to: '/settings/sources', label: '源管理', icon: HardDriveIcon },
   { to: '/settings/metadata', label: '元数据', icon: TagsIcon },
+  { to: '/settings/data', label: '数据', icon: DatabaseIcon },
   { to: '/settings/outputs', label: '输出目标', icon: Share2Icon },
   { to: '/settings/network', label: '网络', icon: NetworkIcon },
-  { to: '/settings/subscription', label: '订阅', icon: BellIcon },
-  { to: '/settings/data', label: '数据', icon: DatabaseIcon }
+  { to: '/settings/subscription', label: '订阅', icon: BellIcon }
 ] as const
 
 export const Route = createFileRoute('/settings')({
