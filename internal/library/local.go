@@ -61,14 +61,27 @@ func (s *Service) StartLocalSourceScan(ctx context.Context, root string) (domain
 // StartLocalSourceScanMode queues a local scan that either auto-completes
 // metadata or reads only local data.
 func (s *Service) StartLocalSourceScanMode(ctx context.Context, root string, metadataOnly bool) (domain.TaskInfo, error) {
+	return s.startLocalSourceScan(ctx, root, metadataOnly, false)
+}
+
+// StartLocalSourceScanModeIncremental only completes movies that still lack metadata.
+func (s *Service) StartLocalSourceScanModeIncremental(ctx context.Context, root string, metadataOnly bool) (domain.TaskInfo, error) {
+	return s.startLocalSourceScan(ctx, root, metadataOnly, true)
+}
+
+func (s *Service) startLocalSourceScan(ctx context.Context, root string, metadataOnly, incremental bool) (domain.TaskInfo, error) {
 	canonical, err := canonicalDirectory(root)
 	if err != nil {
 		return domain.TaskInfo{}, err
 	}
-	return s.EnqueueScanMode(ctx, domain.LibrarySource{
+	source := domain.LibrarySource{
 		AccountID: domain.LocalAccountID,
 		Directory: domain.LibraryDirectory{ID: canonical, Name: "本地目录", Path: canonical},
-	}, metadataOnly)
+	}
+	if incremental {
+		return s.EnqueueSyncMode(ctx, source, metadataOnly)
+	}
+	return s.EnqueueScanMode(ctx, source, metadataOnly)
 }
 
 func (s *Service) localScanRoot() (string, error) {

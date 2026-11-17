@@ -99,6 +99,8 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.POST("/library/movies/:id/scrape", libraryMovieScrapeHandler(deps.Library))
 	protected.GET("/library/movies/:id/previews/:index", libraryPreviewHandler(deps.Library, deps.Metadata))
 	protected.POST("/library/scan", libraryScanHandler(deps.Library, deps.Emby))
+	protected.POST("/library/sync", librarySyncHandler(deps.Library))
+	protected.GET("/library/pending", libraryPendingHandler(deps.Library))
 	protected.POST("/library/rebuild", libraryRebuildHandler(deps.Library))
 	protected.GET("/library/artwork/:key", libraryArtworkHandler(deps.Artwork))
 

@@ -184,7 +184,11 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 	queued := false
 	r.payload.ReusedTasks = nil
 	for after := 0; ; {
-		records, err := tx.Movie.Query().Where(movie.IDGT(after), movie.HasFilesWith(indexed)).
+		query := tx.Movie.Query().Where(movie.IDGT(after), movie.HasFilesWith(indexed))
+		if r.payload.Incremental {
+			query = query.Where(movie.ScrapeStatusEQ(movie.ScrapeStatusPending))
+		}
+		records, err := query.
 			Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID, movie.FieldManualCode, movie.FieldUpdatedAt).
 			Order(movie.ByID()).Limit(reconcileBatchSize).All(ctx)
 		if err != nil {

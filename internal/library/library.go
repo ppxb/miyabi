@@ -72,12 +72,21 @@ type Service struct {
 	exportMgr    *export.Manager
 	scanLock     syncx.ContextLock
 	sources      func(context.Context) ([]domain.LibrarySource, error)
+	localSources func(context.Context) ([]LocalScanTarget, error)
+}
+
+// LocalScanTarget is an enabled local source directory and its metadata mode.
+type LocalScanTarget struct {
+	Path         string
+	MetadataOnly bool
 }
 
 type Options struct {
 	ExportManager *export.Manager
 	// Sources supplies the enabled cloud sources to aggregate in the library.
 	Sources func(context.Context) ([]domain.LibrarySource, error)
+	// LocalSources supplies the enabled local source directories.
+	LocalSources func(context.Context) ([]LocalScanTarget, error)
 	// Pacing defaults to scan.DefaultPacing; tests can provide a no-op.
 	Pacing func(context.Context) error
 }
@@ -91,6 +100,7 @@ func New(database *ent.Client, d *drive.Drive, tasks *tasks.Service, images *med
 		localScanner: scan.NewLocalScanner(database, images),
 		exportMgr:    options.ExportManager,
 		sources:      options.Sources,
+		localSources: options.LocalSources,
 	}
 	if d != nil && tasks != nil {
 		d.SetMountListener(func(ctx context.Context, event drive.MountEvent) error {
@@ -229,6 +239,43 @@ func libraryScope(source *domain.LibrarySource) predicate.File {
 		return file.Or(database.LibraryFiles(*source), local)
 	}
 	return local
+}
+
+// StartIncrementalSync queues an incremental scan for every enabled source.
+func (s *Service) StartIncrementalSync(ctx context.Context) (int, error) {
+	started := 0
+	if s.localSources != nil {
+		targets, err := s.localSources(ctx)
+		if err != nil {
+			return started, err
+		}
+		for _, target := range targets {
+			if _, err := s.StartLocalSourceScanModeIncremental(ctx, target.Path, target.MetadataOnly); err != nil {
+				return started, err
+			}
+			started++
+		}
+	}
+	if s.sources != nil {
+		list, err := s.sources(ctx)
+		if err != nil {
+			return started, err
+		}
+		for _, source := range list {
+			if _, err := s.EnqueueSyncMode(ctx, source, false); err != nil {
+				return started, err
+			}
+			started++
+		}
+	}
+	return started, nil
+}
+
+// PendingCount reports movies across the aggregated sources still awaiting metadata.
+func (s *Service) PendingCount(ctx context.Context) (int, error) {
+	return s.database.Movie.Query().
+		Where(movie.HasFilesWith(s.scope(ctx)), movie.ScrapeStatusEQ(movie.ScrapeStatusPending)).
+		Count(ctx)
 }
 
 // scope aggregates files across the primary mount, configured cloud sources and

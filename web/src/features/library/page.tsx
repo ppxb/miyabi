@@ -1,5 +1,3 @@
-import { Link } from '@tanstack/react-router'
-
 import { LIBRARY_PAGE_SIZE, useLibraryMovies } from '@/api/library'
 import { isScanTask, isTaskActive, useTasks } from '@/api/tasks'
 import { AppPage } from '@/components/app-page'
@@ -9,9 +7,7 @@ import { ListPagination } from '@/components/list-pagination'
 import { MovieGridLayout } from '@/components/movie/movie-grid-layout'
 import { MovieGridSkeleton } from '@/components/movie/movie-grid-skeleton'
 import { PageHeader } from '@/components/page-header'
-import { Button } from '@/components/ui/button'
 import { LibraryMovieCard } from '@/features/library/movie-card'
-import { LibraryScanButton } from '@/features/library/scan-button'
 import { useTaskConnection } from '@/features/tasks/task-events'
 import { sameSource } from '@/lib/source'
 
@@ -33,21 +29,7 @@ export function LibraryPage({
 
   return (
     <AppPage>
-      <PageHeader title="媒体库" description="来自 115 网盘的影片" inlineActions>
-        <LibraryScanButton
-          loading={library.isPending}
-          available={!!source}
-          scanning={scanning}
-          rebuilding={!!latest?.rebuild}
-          connected={connection.status === 'connected'}
-          onStarted={() => onPageChange(1)}
-        />
-        {library.isSuccess && !source ? (
-          <Button asChild>
-            <Link to="/settings">挂载媒体目录</Link>
-          </Button>
-        ) : null}
-      </PageHeader>
+      <PageHeader title="媒体库" description="来自本地与云盘的影片" />
 
       {tasks.isError ? (
         <InlineError
@@ -84,7 +66,7 @@ export function LibraryPage({
               className="min-h-0 flex-1 py-12"
               title={
                 !source
-                  ? '登录 115 并挂载媒体目录后，将自动同步入库'
+                  ? '在设置 → 源管理中添加并登录存储源后，扫描入库'
                   : scanning
                     ? connection.status === 'connected'
                       ? `${latest?.rebuild ? '正在重建' : '正在同步'}，识别到的影片会陆续显示`

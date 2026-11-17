@@ -14,8 +14,10 @@ type ScanPayload struct {
 	Code          string        `json:"code,omitempty"`
 	JavDBID       string        `json:"javdb_id,omitempty"`
 	// MetadataOnly keeps local scans from auto-completing metadata from sources.
-	MetadataOnly bool   `json:"metadata_only,omitempty"`
-	Checkpoint   string `json:"checkpoint,omitempty"`
+	MetadataOnly bool `json:"metadata_only,omitempty"`
+	// Incremental limits metadata work to still-pending movies.
+	Incremental bool   `json:"incremental,omitempty"`
+	Checkpoint  string `json:"checkpoint,omitempty"`
 	// ReusedTasks links this scan to work already owned by another scan.
 	ReusedTasks []int `json:"reused_tasks,omitempty"`
 	// ObsoleteCodes survives chunk commits until reassigned exports are cleaned.

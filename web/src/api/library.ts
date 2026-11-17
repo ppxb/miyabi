@@ -78,6 +78,22 @@ export function useStartLibraryScan() {
   })
 }
 
+export function useSyncLibrary() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiPost<{ started: number }>('/api/library/sync'),
+    onSuccess: () => refreshQueries(queryClient, taskKeys.all, libraryKeys.all)
+  })
+}
+
+export function useLibraryPending() {
+  return useQuery({
+    queryKey: ['library', 'pending'] as const,
+    queryFn: ({ signal }) => apiGet<{ count: number }>('/api/library/pending', undefined, signal),
+    staleTime: 15_000
+  })
+}
+
 export function useRescrapeLibraryMovie(id: number) {
   const queryClient = useQueryClient()
   return useMutation({

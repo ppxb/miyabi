@@ -16,6 +16,8 @@ type LibraryManager interface {
 	Preview(context.Context, int, int) (domain.ImageCandidate, error)
 	StartScan(context.Context) (domain.TaskInfo, error)
 	StartRebuild(context.Context) (domain.TaskInfo, error)
+	StartIncrementalSync(context.Context) (int, error)
+	PendingCount(context.Context) (int, error)
 	RescrapeMovie(context.Context, int, string) (domain.TaskInfo, error)
 }
 
@@ -42,6 +44,20 @@ func libraryRebuildHandler(library LibraryManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		job, err := library.StartRebuild(c.Request.Context())
 		accepted(c, job, err)
+	}
+}
+
+func librarySyncHandler(library LibraryManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		started, err := library.StartIncrementalSync(c.Request.Context())
+		respond(c, gin.H{"started": started}, err)
+	}
+}
+
+func libraryPendingHandler(library LibraryManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		count, err := library.PendingCount(c.Request.Context())
+		respond(c, gin.H{"count": count}, err)
 	}
 }
 
