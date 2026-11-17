@@ -32,7 +32,13 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldLabel
+} from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -42,6 +48,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
+import { Switch } from '@/components/ui/switch'
 import { PanDirectoryDialog } from '@/features/settings/pan-directory-dialog'
 import { PanLoginDialog } from '@/features/settings/pan-login-dialog'
 import { SettingsSection } from '@/features/settings/shared'
@@ -359,6 +366,7 @@ function SourceDialog({
   const [kind, setKind] = useState<SourceKind>(source.kind)
   const [path, setPath] = useState(sourcePath(source))
   const [scrapeMode, setScrapeMode] = useState(source.config?.scrape_mode ?? 'auto')
+  const [enabled, setEnabled] = useState(source.enabled)
   const [nameError, setNameError] = useState<string | null>(null)
   const [pathError, setPathError] = useState<string | null>(null)
   const option = kindOf(kind)
@@ -379,7 +387,7 @@ function SourceDialog({
       id: source.id,
       kind,
       name: name.trim(),
-      enabled: true,
+      enabled,
       config: needsPath
         ? { ...source.config, [option.pathKey]: path.trim(), scrape_mode: scrapeMode }
         : { ...source.config }
@@ -479,6 +487,19 @@ function SourceDialog({
                 : '保存后请在卡片中完成登录并选择媒体目录。'}
             </FieldDescription>
           )}
+
+          <Field orientation="horizontal">
+            <FieldContent>
+              <FieldLabel htmlFor="source-enabled">启用</FieldLabel>
+              <FieldDescription>停用后该源不参与媒体库聚合与扫描</FieldDescription>
+            </FieldContent>
+            <Switch
+              id="source-enabled"
+              checked={enabled}
+              disabled={saving}
+              onCheckedChange={checked => setEnabled(checked)}
+            />
+          </Field>
 
           <DialogFooter>
             {source.id ? (
