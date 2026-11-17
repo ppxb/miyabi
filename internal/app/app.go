@@ -94,7 +94,15 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	exportMgr := export.NewManager(export.Config{
 		EmbyDir: cfg.EmbyDir, PublicURL: cfg.PublicURL, STRMToken: cfg.STRMToken,
 	})
-	libSvc := library.New(store.Client, driveSvc, taskSvc, images, library.Options{ExportManager: exportMgr})
+	libSvc := library.New(store.Client, driveSvc, taskSvc, images, library.Options{
+		ExportManager: exportMgr,
+		Sources:       sourceSvc.LibrarySources,
+	})
+	sourceSvc.SetMountProvider(driveSvc)
+	sourceSvc.SetScanHandler(func(ctx context.Context, src domain.LibrarySource) error {
+		_, err := libSvc.EnqueueScan(ctx, src)
+		return err
+	})
 	sourceSvc.SetLocalScanHandler(func(ctx context.Context, root string) error {
 		_, err := libSvc.StartLocalSourceScan(ctx, root)
 		return err
@@ -183,6 +191,15 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		for _, root := range roots {
 			if _, err := libSvc.StartLocalSourceScan(ctx, root); err != nil {
 				logger.ErrorContext(ctx, "failed to queue local source scan", "path", root, "error", err)
+			}
+		}
+	}
+	if mounts, err := sourceSvc.LibrarySources(ctx); err != nil {
+		logger.ErrorContext(ctx, "failed to load cloud sources", "error", err)
+	} else {
+		for _, source := range mounts {
+			if _, err := libSvc.EnqueueScan(ctx, source); err != nil {
+				logger.ErrorContext(ctx, "failed to queue cloud source scan", "error", err)
 			}
 		}
 	}

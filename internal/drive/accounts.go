@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/ppxb/miyabi/internal/database"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
@@ -102,6 +103,15 @@ func (d *Drive) accountRecord(ctx context.Context, accountID string) (accountRec
 		return accountRecord{}, err
 	}
 	return store[accountID], nil
+}
+
+// Mount returns the stored library source of an account when it has one.
+func (d *Drive) Mount(ctx context.Context, accountID string) (domain.LibrarySource, bool) {
+	record, err := d.accountRecord(ctx, accountID)
+	if err != nil || record.Directory.ID == "" || record.Directory.AccountID == "" {
+		return domain.LibrarySource{}, false
+	}
+	return record.Directory.source(), true
 }
 
 // Accounts lists every stored 115 account and its mounted directory.

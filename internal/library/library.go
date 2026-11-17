@@ -71,10 +71,13 @@ type Service struct {
 	localScanner *scan.LocalScanner
 	exportMgr    *export.Manager
 	scanLock     syncx.ContextLock
+	sources      func(context.Context) ([]domain.LibrarySource, error)
 }
 
 type Options struct {
 	ExportManager *export.Manager
+	// Sources supplies the enabled cloud sources to aggregate in the library.
+	Sources func(context.Context) ([]domain.LibrarySource, error)
 	// Pacing defaults to scan.DefaultPacing; tests can provide a no-op.
 	Pacing func(context.Context) error
 }
@@ -87,6 +90,7 @@ func New(database *ent.Client, d *drive.Drive, tasks *tasks.Service, images *med
 		scanner:      scan.New(d, database, images, tasks, options.ExportManager, options.Pacing),
 		localScanner: scan.NewLocalScanner(database, images),
 		exportMgr:    options.ExportManager,
+		sources:      options.Sources,
 	}
 	if d != nil && tasks != nil {
 		d.SetMountListener(func(ctx context.Context, event drive.MountEvent) error {
@@ -135,7 +139,7 @@ func (s *Service) MatchingMovies(ctx context.Context, javdbIDs []string, codes [
 	}
 	records, err := s.database.Movie.Query().Where(
 		movie.Or(movie.JavdbIDIn(javdbIDs...), movie.And(movie.JavdbIDIsNil(), movie.CodeIn(codes...))),
-		movie.HasFilesWith(libraryScope(s.Source())),
+		movie.HasFilesWith(s.scope(ctx)),
 	).Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("query matching movies: %w", err)
@@ -227,9 +231,26 @@ func libraryScope(source *domain.LibrarySource) predicate.File {
 	return local
 }
 
+// scope aggregates files across the primary mount, configured cloud sources and
+// the local library, so every enabled source shows up in the media library.
+func (s *Service) scope(ctx context.Context) predicate.File {
+	scopes := []predicate.File{file.AccountIDEQ(domain.LocalAccountID)}
+	if source := s.Source(); source != nil {
+		scopes = append(scopes, database.LibraryFiles(*source))
+	}
+	if s.sources != nil {
+		if list, err := s.sources(ctx); err == nil {
+			for _, source := range list {
+				scopes = append(scopes, database.LibraryFiles(source))
+			}
+		}
+	}
+	return file.Or(scopes...)
+}
+
 func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 	result := Page{Movies: []Movie{}, Page: page, Source: s.Source()}
-	scope := libraryScope(result.Source)
+	scope := s.scope(ctx)
 	var err error
 	result.Total, err = s.database.File.Query().Where(scope).Aggregate(func(selector *sql.Selector) string {
 		return sql.As("COUNT(DISTINCT "+selector.C(file.FieldMovieID)+")", "total")

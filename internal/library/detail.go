@@ -83,7 +83,7 @@ func (s *Service) Preview(ctx context.Context, id, index int) (domain.ImageCandi
 }
 
 func (s *Service) detailRecord(ctx context.Context, id int) (*ent.Movie, error) {
-	record, err := s.database.Movie.Query().Where(movie.IDEQ(id), movie.HasFilesWith(libraryScope(s.Source()))).
+	record, err := s.database.Movie.Query().Where(movie.IDEQ(id), movie.HasFilesWith(s.scope(ctx))).
 		Only(ctx)
 	if ent.IsNotFound(err) {
 		return nil, domain.E(domain.KindNotFound, "影片不在当前媒体库中", err)
