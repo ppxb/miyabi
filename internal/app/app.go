@@ -83,6 +83,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		_ = store.Close()
 		return nil, fmt.Errorf("initialize drive service: %w", err)
 	}
+	driveSvc.StartAccountRefresh(ctx)
 
 	images, err := mediaimage.NewCache(cfg.DataDir)
 	if err != nil {

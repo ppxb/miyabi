@@ -91,6 +91,7 @@ type Drive struct {
 	accountID      string
 	accountTokens  map[string]pan.Tokens
 	accountRefresh singleflight.Group
+	refreshStop    chan struct{}
 }
 
 func New(ctx context.Context, db *ent.Client) (*Drive, error) {
@@ -107,10 +108,11 @@ func NewWithClient(ctx context.Context, db *ent.Client, client Client) (*Drive, 
 		return nil, err
 	}
 	d := &Drive{
-		database:  db,
-		client:    client,
-		tokens:    tokens,
-		directory: directory,
+		database:    db,
+		client:      client,
+		tokens:      tokens,
+		directory:   directory,
+		refreshStop: make(chan struct{}),
 	}
 	d.login.drive = d
 	if store, err := d.loadAccounts(ctx); err != nil {
@@ -126,7 +128,13 @@ func NewWithClient(ctx context.Context, db *ent.Client, client Client) (*Drive, 
 
 func (d *Drive) Close() {
 	d.mu.Lock()
-	d.closed = true
+	if !d.closed {
+		d.closed = true
+		if d.refreshStop != nil {
+			close(d.refreshStop)
+			d.refreshStop = nil
+		}
+	}
 	d.mu.Unlock()
 	d.work.Wait()
 	d.client.Close()

@@ -3,13 +3,18 @@ package drive
 import (
 	"context"
 	"sort"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
-const accountsSetting = "pan.accounts"
+const (
+	accountsSetting      = "pan.accounts"
+	accountRefreshTick   = 10 * time.Minute
+	accountRefreshWindow = 30 * time.Minute
+)
 
 // accountRecord keeps one 115 account's tokens and mounted directory so several
 // accounts can be listed and, in later steps, scanned independently.
@@ -129,6 +134,13 @@ func (d *Drive) Accounts(ctx context.Context) ([]AccountStatus, error) {
 	result := make([]AccountStatus, 0, len(ids))
 	for _, id := range ids {
 		record := store[id]
+		if tokensNeedRefresh(record.Tokens) {
+			if err := d.refreshAccountTokens(ctx, id); err != nil {
+				result = append(result, AccountStatus{Connected: false})
+				continue
+			}
+			record.Tokens = d.accountToken(id)
+		}
 		account, err := d.client.Account(ctx, record.Tokens.AccessToken)
 		if err != nil {
 			result = append(result, AccountStatus{Connected: false})
@@ -142,4 +154,52 @@ func (d *Drive) Accounts(ctx context.Context) ([]AccountStatus, error) {
 		result = append(result, status)
 	}
 	return result, nil
+}
+
+func tokensNeedRefresh(tokens pan.Tokens) bool {
+	if tokens.RefreshToken == "" || tokens.ExpiresAt.IsZero() {
+		return false
+	}
+	return time.Until(tokens.ExpiresAt) <= accountRefreshWindow
+}
+
+// StartAccountRefresh periodically refreshes expiring tokens of stored accounts.
+func (d *Drive) StartAccountRefresh(ctx context.Context) {
+	d.mu.Lock()
+	stop := d.refreshStop
+	d.mu.Unlock()
+	if stop == nil {
+		return
+	}
+	done, ok := d.StartWork()
+	if !ok {
+		return
+	}
+	go func() {
+		defer done()
+		ticker := time.NewTicker(accountRefreshTick)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-stop:
+				return
+			case <-ticker.C:
+				d.refreshExpiringAccounts(ctx)
+			}
+		}
+	}()
+}
+
+func (d *Drive) refreshExpiringAccounts(ctx context.Context) {
+	store, err := d.loadAccounts(ctx)
+	if err != nil {
+		return
+	}
+	for id, record := range store {
+		if tokensNeedRefresh(record.Tokens) {
+			_ = d.refreshAccountTokens(ctx, id)
+		}
+	}
 }
