@@ -1,6 +1,15 @@
 import type { ReactNode } from 'react'
 
+import { Card, CardContent } from '@/components/ui/card'
 import { cn } from 'cn'
+
+export function SettingsCard({ children }: { children: ReactNode }) {
+  return (
+    <Card>
+      <CardContent className="space-y-8">{children}</CardContent>
+    </Card>
+  )
+}
 
 export function SettingsSection({
   icon,

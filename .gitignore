@@ -30,3 +30,5 @@ config.local.*
 *.swp
 .DS_Store
 Thumbs.db
+.openidea/
+backups/

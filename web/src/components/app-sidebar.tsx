@@ -1,5 +1,4 @@
 import { Link } from '@tanstack/react-router'
-import { FilmIcon } from 'lucide-react'
 
 import { AppNavigation } from '@/components/app-navigation'
 import {
@@ -20,7 +19,6 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton render={<Link to="/" />}>
-              <FilmIcon className="size-5 shrink-0" />
               <span className="text-base font-semibold">Miyabi</span>
             </SidebarMenuButton>
           </SidebarMenuItem>

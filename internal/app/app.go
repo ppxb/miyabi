@@ -31,6 +31,7 @@ import (
 	"github.com/ppxb/miyabi/internal/network"
 	"github.com/ppxb/miyabi/internal/netx"
 	"github.com/ppxb/miyabi/internal/offline"
+	"github.com/ppxb/miyabi/internal/source"
 	"github.com/ppxb/miyabi/internal/strm"
 	"github.com/ppxb/miyabi/internal/subtitle"
 	"github.com/ppxb/miyabi/internal/tasks"
@@ -197,6 +198,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Network:        networkSvc,
 		Emby:           embySvc,
 		JavDB:          catalogueSvc,
+		Sources:        source.New(store.Client),
 		Frontend:       miyabi.Frontend(),
 		STRMToken:      cfg.STRMToken,
 		TrustedProxies: cfg.TrustedProxies,

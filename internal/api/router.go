@@ -30,6 +30,7 @@ type Dependencies struct {
 	Network        NetworkManager
 	Emby           EmbyManager
 	JavDB          JavDBManager
+	Sources        SourceManager
 	Frontend       fs.FS
 	STRMToken      string
 	TrustedProxies []string
@@ -90,6 +91,8 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	settingsAPI.POST("/javdb/test", javdbTestHandler(deps.JavDB))
 	settingsAPI.GET("/subscription", subscriptionSettingsGetHandler(deps.Monitor))
 	settingsAPI.PUT("/subscription", subscriptionSettingsUpdateHandler(deps.Monitor))
+	settingsAPI.GET("/sources", sourceListHandler(deps.Sources))
+	settingsAPI.PUT("/sources", sourceUpdateHandler(deps.Sources))
 
 	protected.GET("/library/movies", libraryMoviesHandler(deps.Library))
 	protected.GET("/library/movies/:id", libraryMovieHandler(deps.Library))
