@@ -112,11 +112,11 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	})
 	sourceSvc.SetMountProvider(driveSvc)
 	sourceSvc.SetScanHandler(func(ctx context.Context, src domain.LibrarySource) error {
-		_, err := libSvc.EnqueueScan(ctx, src)
+		_, err := libSvc.EnqueueSyncMode(ctx, src, false)
 		return err
 	})
 	sourceSvc.SetLocalScanHandler(func(ctx context.Context, root string, metadataOnly bool) error {
-		_, err := libSvc.StartLocalSourceScanMode(ctx, root, metadataOnly)
+		_, err := libSvc.StartLocalSourceScanModeIncremental(ctx, root, metadataOnly)
 		return err
 	})
 	javbusClient, err := javbus.New(javbus.Options{Proxy: networkSvc.ProxyManager()})
