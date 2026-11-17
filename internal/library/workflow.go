@@ -206,7 +206,7 @@ func scanTaskInfo(record *ent.Task) (domain.TaskInfo, error) {
 }
 
 // ensureScanTask finds an existing reusable scan task for the source or creates a new queued scan.
-func ensureScanTask(ctx context.Context, taskClient *ent.TaskClient, source domain.LibrarySource, rebuild bool, reusable ...task.Status) (*ent.Task, error) {
+func ensureScanTask(ctx context.Context, taskClient *ent.TaskClient, source domain.LibrarySource, rebuild, metadataOnly bool, reusable ...task.Status) (*ent.Task, error) {
 	record, err := taskClient.Query().Where(
 		task.TypeEQ(string(tasks.KindScan)), task.StatusIn(reusable...),
 		func(selector *sql.Selector) {
@@ -228,7 +228,8 @@ func ensureScanTask(ctx context.Context, taskClient *ent.TaskClient, source doma
 		return nil, fmt.Errorf("find active scan: %w", err)
 	}
 	payload, err := tasks.EncodePayload(domain.ScanPayload{
-		Source: source, Rebuild: rebuild, Scan: domain.ScanProgress{Stage: "queued", CurrentPath: source.Directory.Path},
+		Source: source, Rebuild: rebuild, MetadataOnly: metadataOnly,
+		Scan: domain.ScanProgress{Stage: "queued", CurrentPath: source.Directory.Path},
 	})
 	if err != nil {
 		return nil, err
@@ -246,6 +247,12 @@ func (s *Service) EnqueueScan(ctx context.Context, source domain.LibrarySource) 
 	return s.enqueueScan(ctx, source, false, task.StatusQueued, task.StatusRunning)
 }
 
+// EnqueueScanMode queues a scan that either auto-completes metadata or keeps
+// only the local data.
+func (s *Service) EnqueueScanMode(ctx context.Context, source domain.LibrarySource, metadataOnly bool) (domain.TaskInfo, error) {
+	return s.enqueueScanWith(ctx, source, false, metadataOnly, task.StatusQueued, task.StatusRunning)
+}
+
 // EnqueueFreshScan queues a full scan that observes the current mount. Only a
 // scan that has not started yet is reused: a running one may have been issued
 // against an earlier mount of the same directory and is about to fail its
@@ -255,11 +262,15 @@ func (s *Service) EnqueueFreshScan(ctx context.Context, source domain.LibrarySou
 }
 
 func (s *Service) enqueueScan(ctx context.Context, source domain.LibrarySource, rebuild bool, reusable ...task.Status) (domain.TaskInfo, error) {
+	return s.enqueueScanWith(ctx, source, rebuild, false, reusable...)
+}
+
+func (s *Service) enqueueScanWith(ctx context.Context, source domain.LibrarySource, rebuild, metadataOnly bool, reusable ...task.Status) (domain.TaskInfo, error) {
 	if err := s.tasks.Queue().Lock(ctx); err != nil {
 		return domain.TaskInfo{}, err
 	}
 	defer s.tasks.Queue().Unlock()
-	record, err := ensureScanTask(ctx, s.database.Task, source, rebuild, reusable...)
+	record, err := ensureScanTask(ctx, s.database.Task, source, rebuild, metadataOnly, reusable...)
 	if err != nil {
 		return domain.TaskInfo{}, err
 	}

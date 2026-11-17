@@ -35,9 +35,15 @@ type Source struct {
 // Service persists the configured storage sources as a single settings row.
 type Service struct {
 	client      *ent.Client
-	onLocalScan func(context.Context, string) error
+	onLocalScan func(context.Context, string, bool) error
 	onScan      func(context.Context, domain.LibrarySource) error
 	mounts      MountProvider
+}
+
+// LocalTarget is an enabled local source directory and its metadata mode.
+type LocalTarget struct {
+	Path         string
+	MetadataOnly bool
 }
 
 // MountProvider resolves a 115 account's mounted directory.
@@ -50,7 +56,7 @@ func New(client *ent.Client) *Service {
 }
 
 // SetLocalScanHandler lets the composition root enqueue scans after sources change.
-func (s *Service) SetLocalScanHandler(handler func(context.Context, string) error) {
+func (s *Service) SetLocalScanHandler(handler func(context.Context, string, bool) error) {
 	s.onLocalScan = handler
 }
 
@@ -102,7 +108,7 @@ func (s *Service) triggerScans(ctx context.Context, sources []Source) {
 		switch src.Kind {
 		case KindLocal:
 			if path := strings.TrimSpace(src.Config["path"]); path != "" && s.onLocalScan != nil {
-				_ = s.onLocalScan(ctx, path)
+				_ = s.onLocalScan(ctx, path, localMetadataOnly(src))
 			}
 		case Kind115:
 			accountID := strings.TrimSpace(src.Config["account_id"])
@@ -138,20 +144,37 @@ func (s *Service) LibrarySources(ctx context.Context) ([]domain.LibrarySource, e
 	return result, nil
 }
 
-// LocalRoots returns the enabled local source directories, for startup scanning.
-func (s *Service) LocalRoots(ctx context.Context) ([]string, error) {
+// LocalTargets returns the enabled local source directories with their mode.
+func (s *Service) LocalTargets(ctx context.Context) ([]LocalTarget, error) {
 	sources, err := s.List(ctx)
 	if err != nil {
 		return nil, err
 	}
-	roots := make([]string, 0)
+	targets := make([]LocalTarget, 0)
 	for _, src := range sources {
 		if src.Kind != KindLocal || !src.Enabled {
 			continue
 		}
 		if path := strings.TrimSpace(src.Config["path"]); path != "" {
-			roots = append(roots, path)
+			targets = append(targets, LocalTarget{Path: path, MetadataOnly: localMetadataOnly(src)})
 		}
+	}
+	return targets, nil
+}
+
+func localMetadataOnly(src Source) bool {
+	return strings.TrimSpace(src.Config["scrape_mode"]) == "local"
+}
+
+// LocalRoots returns the enabled local source directories, for startup scanning.
+func (s *Service) LocalRoots(ctx context.Context) ([]string, error) {
+	targets, err := s.LocalTargets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	roots := make([]string, 0, len(targets))
+	for _, target := range targets {
+		roots = append(roots, target.Path)
 	}
 	return roots, nil
 }

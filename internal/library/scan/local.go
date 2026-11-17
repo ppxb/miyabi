@@ -19,10 +19,20 @@ import (
 
 // LocalScanResult summarizes the outcome of a local directory scan.
 type LocalScanResult struct {
-	FilesScanned int `json:"files_scanned"`
-	MediaFiles   int `json:"media_files"`
-	MoviesAdded  int `json:"movies_added"`
-	NFORead      int `json:"nfo_read"`
+	FilesScanned    int   `json:"files_scanned"`
+	MediaFiles      int   `json:"media_files"`
+	MoviesAdded     int   `json:"movies_added"`
+	NFORead         int   `json:"nfo_read"`
+	PendingMovieIDs []int `json:"-"`
+}
+
+func (r *LocalScanResult) addPending(movieID int) {
+	for _, existing := range r.PendingMovieIDs {
+		if existing == movieID {
+			return
+		}
+	}
+	r.PendingMovieIDs = append(r.PendingMovieIDs, movieID)
 }
 
 // LocalScanner scans a local directory structure containing .strm and video files.

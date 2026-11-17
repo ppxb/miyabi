@@ -104,8 +104,8 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		_, err := libSvc.EnqueueScan(ctx, src)
 		return err
 	})
-	sourceSvc.SetLocalScanHandler(func(ctx context.Context, root string) error {
-		_, err := libSvc.StartLocalSourceScan(ctx, root)
+	sourceSvc.SetLocalScanHandler(func(ctx context.Context, root string, metadataOnly bool) error {
+		_, err := libSvc.StartLocalSourceScanMode(ctx, root, metadataOnly)
 		return err
 	})
 	javbusClient, err := javbus.New(javbus.Options{Proxy: networkSvc.ProxyManager()})
@@ -186,12 +186,12 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	if err := libSvc.ScheduleLocalScan(ctx); err != nil {
 		logger.ErrorContext(ctx, "failed to queue startup Emby directory scan", "error", err)
 	}
-	if roots, err := sourceSvc.LocalRoots(ctx); err != nil {
+	if targets, err := sourceSvc.LocalTargets(ctx); err != nil {
 		logger.ErrorContext(ctx, "failed to load local sources", "error", err)
 	} else {
-		for _, root := range roots {
-			if _, err := libSvc.StartLocalSourceScan(ctx, root); err != nil {
-				logger.ErrorContext(ctx, "failed to queue local source scan", "path", root, "error", err)
+		for _, target := range targets {
+			if _, err := libSvc.StartLocalSourceScanMode(ctx, target.Path, target.MetadataOnly); err != nil {
+				logger.ErrorContext(ctx, "failed to queue local source scan", "path", target.Path, "error", err)
 			}
 		}
 	}

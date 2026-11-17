@@ -180,6 +180,9 @@ func (s *LocalScanner) ingestBatch(ctx context.Context, rootDir string, batch []
 				matcher.add(current)
 				record = current
 			}
+			if media.document == nil && record.ScrapeStatus == movie.ScrapeStatusPending {
+				result.addPending(record.ID)
+			}
 			if media.artwork != (mediaimage.Artwork{}) {
 				if err := tx.Movie.UpdateOneID(record.ID).SetPoster(media.artwork.Poster).
 					SetCover(media.artwork.Thumbnail).SetFanarts([]string{media.artwork.Fanart}).Exec(ctx); err != nil {
