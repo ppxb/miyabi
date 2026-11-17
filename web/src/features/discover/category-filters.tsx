@@ -39,13 +39,13 @@ export function CategoryFilters({
       <Select
         value={zone}
         onValueChange={value =>
-          updateCategory({ zone: value as JavDBZone, categoryID: '', tagID: '', main: '' })
+          updateCategory({ zone: (value ?? '') as JavDBZone, categoryID: '', tagID: '', main: '' })
         }
       >
         <SelectTrigger className="w-full sm:w-32">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent position="popper" align="start">
+        <SelectContent align="start">
           <SelectGroup>
             {zones.map(item => (
               <SelectItem key={item.value} value={item.value}>
@@ -74,12 +74,12 @@ export function CategoryFilters({
         <>
           <Select
             value={effectiveCategoryID}
-            onValueChange={value => updateCategory({ categoryID: value, tagID: '' })}
+            onValueChange={value => updateCategory({ categoryID: value ?? '', tagID: '' })}
           >
             <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="选择分类" />
             </SelectTrigger>
-            <SelectContent position="popper" align="start">
+            <SelectContent align="start">
               <SelectGroup>
                 {categories.map(category => (
                   <SelectItem key={category.id} value={category.id}>
@@ -94,14 +94,14 @@ export function CategoryFilters({
             onValueChange={value =>
               updateCategory({
                 categoryID: effectiveCategoryID,
-                tagID: value === 'all' ? '' : value
+                tagID: value === 'all' ? '' : (value ?? '')
               })
             }
           >
             <SelectTrigger className="w-full sm:w-56">
               <SelectValue placeholder="全部标签" />
             </SelectTrigger>
-            <SelectContent position="popper" align="start">
+            <SelectContent align="start">
               <SelectGroup>
                 <SelectItem value="all">全部标签</SelectItem>
                 {selectedCategory?.tags.map(tag => (
@@ -116,7 +116,7 @@ export function CategoryFilters({
             <CommonFilterSelect
               options={mainOptions}
               value={main}
-              onValueChange={mainValue => updateCategory({ main: mainValue })}
+              onValueChange={mainValue => updateCategory({ main: mainValue ?? '' })}
             />
           ) : null}
         </>

@@ -27,7 +27,7 @@ createRoot(document.getElementById('root')!).render(
         enableSystem
         disableTransitionOnChange
       >
-        <TooltipProvider delayDuration={0}>
+        <TooltipProvider delay={0}>
           <RouterProvider router={router} />
         </TooltipProvider>
       </ThemeProvider>

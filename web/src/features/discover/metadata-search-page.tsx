@@ -55,13 +55,13 @@ export function MetadataSearchPage({
           <Select
             value={search.zone ?? 'all'}
             onValueChange={value =>
-              onZoneChange(value === 'all' ? undefined : (value as JavDBZone))
+              onZoneChange(value === 'all' ? undefined : ((value ?? '') as JavDBZone))
             }
           >
             <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent position="popper" align="end">
+            <SelectContent align="end">
               <SelectGroup>
                 <SelectItem value="all">全部分区</SelectItem>
                 {DISCOVER_ZONES.map(zone => (

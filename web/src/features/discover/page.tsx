@@ -25,7 +25,7 @@ export function DiscoverPage() {
 
   return (
     <AppPage>
-      <PageHeader title="发现" description="浏览最新发行、即将发行和分类内容" />
+      <PageHeader title="探索" description="浏览最新发行、即将发行和分类内容" />
       <div className="min-w-0 space-y-6">
         <Tabs value={view} onValueChange={value => setView(value as DiscoverView)}>
           <TabsList>

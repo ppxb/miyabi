@@ -1,5 +1,5 @@
 import { Ellipsis, PencilIcon, RefreshCwIcon } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 
 import { describeApiError } from '@/api/client'
 import { useRescrapeLibraryMovie, type LibraryMovie } from '@/api/library'
@@ -31,7 +31,6 @@ export function LibraryMovieActions({
 }) {
   const [correcting, setCorrecting] = useState(false)
   const [code, setCode] = useState(movie.code)
-  const trigger = useRef<HTMLButtonElement>(null)
   const scrape = useRescrapeLibraryMovie(movie.id)
   const notifyScan = useNotifyScanTask()
   const busy = disabled || scrape.isPending
@@ -45,16 +44,11 @@ export function LibraryMovieActions({
     >
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button ref={trigger} type="button" variant="ghost" size="icon-sm" disabled={busy}>
+          <Button type="button" variant="ghost" size="icon-sm" disabled={busy}>
             <Ellipsis />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          onCloseAutoFocus={event => {
-            if (correcting) event.preventDefault()
-          }}
-        >
+        <DropdownMenuContent align="end">
           <DropdownMenuItem
             disabled={busy}
             onSelect={() =>
@@ -85,12 +79,7 @@ export function LibraryMovieActions({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <DialogContent
-        onCloseAutoFocus={event => {
-          event.preventDefault()
-          trigger.current?.focus()
-        }}
-      >
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>纠正番号</DialogTitle>
           <DialogDescription>

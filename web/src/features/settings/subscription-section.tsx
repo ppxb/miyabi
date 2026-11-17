@@ -93,7 +93,9 @@ export function SubscriptionSection() {
         <Select
           value={config?.preferences.subtitle ?? 'preferred'}
           disabled={disabled}
-          onValueChange={value => save({}, { subtitle: value as MagnetPreferences['subtitle'] })}
+          onValueChange={value =>
+            save({}, { subtitle: (value ?? '') as MagnetPreferences['subtitle'] })
+          }
         >
           <SelectTrigger className="w-32">
             <SelectValue />
@@ -112,7 +114,7 @@ export function SubscriptionSection() {
         <Select
           value={config?.preferences.hd ?? 'preferred'}
           disabled={disabled}
-          onValueChange={value => save({}, { hd: value as MagnetPreferences['hd'] })}
+          onValueChange={value => save({}, { hd: (value ?? '') as MagnetPreferences['hd'] })}
         >
           <SelectTrigger className="w-32">
             <SelectValue />
@@ -132,7 +134,7 @@ export function SubscriptionSection() {
           value={config?.preferences.uncensored ?? 'any'}
           disabled={disabled}
           onValueChange={value =>
-            save({}, { uncensored: value as MagnetPreferences['uncensored'] })
+            save({}, { uncensored: (value ?? '') as MagnetPreferences['uncensored'] })
           }
         >
           <SelectTrigger className="w-32">

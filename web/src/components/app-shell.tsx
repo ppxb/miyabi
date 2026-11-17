@@ -1,28 +1,85 @@
-import type { PropsWithChildren } from 'react'
-import { BellIcon, CompassIcon, FilmIcon, SearchIcon, SettingsIcon } from 'lucide-react'
+import { useState, type CSSProperties, type PropsWithChildren } from 'react'
+import { MonitorIcon, MoonIcon, SunIcon } from 'lucide-react'
+import { useTheme } from 'next-themes'
 
-import { FloatingNav, type FloatingNavItem } from '@/components/floating-nav'
+import { AppSidebar } from '@/components/app-sidebar'
+import { SearchDialog, SearchTrigger } from '@/components/app-search'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { TaskEventsProvider } from '@/features/tasks/task-events'
 import { TaskNotifications } from '@/features/tasks/task-notifications'
 
-const NAV_ITEMS: FloatingNavItem[] = [
-  { id: 'library', label: '媒体库', icon: FilmIcon, to: '/' },
-  { id: 'subscriptions', label: '订阅', icon: BellIcon, to: '/subscriptions' },
-  { id: 'discover', label: '发现', icon: CompassIcon, to: '/discover' },
-  { id: 'search', label: '搜索', icon: SearchIcon, to: '/search' },
-  { id: 'settings', label: '设置', icon: SettingsIcon, to: '/settings' }
-]
+const THEME_CYCLE = ['light', 'dark', 'system'] as const
+type ThemeName = (typeof THEME_CYCLE)[number]
 
 export function AppShell({ children }: PropsWithChildren) {
+  const [searchOpen, setSearchOpen] = useState(false)
+
   return (
     <TaskEventsProvider>
-      <div className="relative min-h-dvh">
-        <FloatingNav items={NAV_ITEMS} />
-        {children}
-        <Toaster position="top-right" closeButton duration={6000} />
-        <TaskNotifications />
-      </div>
+      <SidebarProvider className="flex-row" style={{ '--sidebar-width': '272px' } as CSSProperties}>
+        <div className="flex min-h-0 w-full flex-1">
+          <AppSidebar variant="inset" collapsible="icon" />
+          <SidebarInset className="peer-data-[variant=inset]:border">
+            <AppHeader onOpenSearch={() => setSearchOpen(true)} />
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden p-4">
+              {children}
+            </div>
+          </SidebarInset>
+        </div>
+      </SidebarProvider>
+
+      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <Toaster position="top-right" closeButton duration={6000} />
+      <TaskNotifications />
     </TaskEventsProvider>
+  )
+}
+
+function AppHeader({ onOpenSearch }: { onOpenSearch: () => void }) {
+  return (
+    <header className="sticky top-0 z-50 flex h-12 shrink-0 items-center gap-2 overflow-hidden rounded-t-[inherit] border-b bg-background/50 px-4 backdrop-blur-md transition-[width,height] ease-linear lg:px-6">
+      <div className="flex shrink-0 items-center gap-1 lg:gap-2">
+        <SidebarTrigger className="-ml-1" />
+        <Separator
+          orientation="vertical"
+          className="mx-1 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center lg:mx-2"
+        />
+        <SearchTrigger onOpen={onOpenSearch} />
+      </div>
+
+      <div className="flex min-w-0 flex-1 items-center" />
+
+      <div className="flex shrink-0 items-center gap-3">
+        <ThemeSwitcher />
+      </div>
+    </header>
+  )
+}
+
+function ThemeSwitcher() {
+  const { theme, setTheme } = useTheme()
+  const current = (theme as ThemeName | undefined) ?? 'system'
+  const nextTheme = THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length] ?? 'system'
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon-sm"
+          aria-label="切换主题"
+          onClick={() => setTheme(nextTheme)}
+        >
+          {current === 'system' ? <MonitorIcon /> : current === 'dark' ? <SunIcon /> : <MoonIcon />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" sideOffset={8}>
+        切换主题
+      </TooltipContent>
+    </Tooltip>
   )
 }

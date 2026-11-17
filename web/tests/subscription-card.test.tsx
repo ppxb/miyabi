@@ -105,7 +105,7 @@ test('canceling a subscription stays independent of the card click', () => {
   action!.props.onClick?.({
     preventDefault,
     stopPropagation
-  } as unknown as MouseEvent<HTMLButtonElement>)
+  } as never)
   expect(remove).toHaveBeenCalledWith(item)
   expect(preventDefault).toHaveBeenCalledOnce()
   expect(stopPropagation).toHaveBeenCalledOnce()
