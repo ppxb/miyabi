@@ -86,9 +86,11 @@ type Drive struct {
 	cachedAccountTime       time.Time
 	cachedCredentialVersion uint64
 
-	login         qrLogin
-	mountListener MountListener
-	accountID     string
+	login          qrLogin
+	mountListener  MountListener
+	accountID      string
+	accountTokens  map[string]pan.Tokens
+	accountRefresh singleflight.Group
 }
 
 func New(ctx context.Context, db *ent.Client) (*Drive, error) {
@@ -111,6 +113,14 @@ func NewWithClient(ctx context.Context, db *ent.Client, client Client) (*Drive, 
 		directory: directory,
 	}
 	d.login.drive = d
+	if store, err := d.loadAccounts(ctx); err != nil {
+		return nil, err
+	} else {
+		d.accountTokens = make(map[string]pan.Tokens, len(store))
+		for id, record := range store {
+			d.accountTokens[id] = record.Tokens
+		}
+	}
 	return d, nil
 }
 

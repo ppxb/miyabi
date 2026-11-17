@@ -41,7 +41,23 @@ func (d *Drive) saveAccountTokens(ctx context.Context, accountID string, tokens 
 	record := store[accountID]
 	record.Tokens = tokens
 	store[accountID] = record
+	d.setAccountToken(accountID, tokens)
 	return database.SaveSetting(ctx, d.database, accountsSetting, store)
+}
+
+func (d *Drive) accountToken(accountID string) pan.Tokens {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.accountTokens[accountID]
+}
+
+func (d *Drive) setAccountToken(accountID string, tokens pan.Tokens) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.accountTokens == nil {
+		d.accountTokens = make(map[string]pan.Tokens)
+	}
+	d.accountTokens[accountID] = tokens
 }
 
 func (d *Drive) saveAccountMount(ctx context.Context, accountID string, mount mountRecord) error {
@@ -70,6 +86,7 @@ func (d *Drive) removeAccount(ctx context.Context, accountID string) error {
 		return nil
 	}
 	delete(store, accountID)
+	d.setAccountToken(accountID, pan.Tokens{})
 	return database.SaveSetting(ctx, d.database, accountsSetting, store)
 }
 
@@ -77,6 +94,14 @@ func (d *Drive) currentAccountID() string {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.accountID
+}
+
+func (d *Drive) accountRecord(ctx context.Context, accountID string) (accountRecord, error) {
+	store, err := d.loadAccounts(ctx)
+	if err != nil {
+		return accountRecord{}, err
+	}
+	return store[accountID], nil
 }
 
 // Accounts lists every stored 115 account and its mounted directory.

@@ -46,16 +46,30 @@ func (d *Drive) Open(ctx context.Context) (Session, error) {
 	}, nil
 }
 
-// OpenSource opens a Session ensuring the current mount matches the expected source.
+// OpenSource opens a Session for the expected source, using the primary mount
+// for the current account or the account registry for any other 115 account.
 func (d *Drive) OpenSource(ctx context.Context, expected domain.LibrarySource) (Session, error) {
-	sess, err := d.Open(ctx)
+	if expected.AccountID == "" {
+		return nil, ErrSourceChanged
+	}
+	if primary := d.snapshot().directory.AccountID; primary != "" && expected.AccountID == primary {
+		sess, err := d.Open(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if sess.Source().AccountID != expected.AccountID || sess.Source().Directory.ID != expected.Directory.ID {
+			return nil, ErrSourceChanged
+		}
+		return sess, nil
+	}
+	record, err := d.accountRecord(ctx, expected.AccountID)
 	if err != nil {
 		return nil, err
 	}
-	if sess.Source().AccountID != expected.AccountID || sess.Source().Directory.ID != expected.Directory.ID {
+	if record.Tokens.AccessToken == "" || record.Directory.ID != expected.Directory.ID {
 		return nil, ErrSourceChanged
 	}
-	return sess, nil
+	return &accountSession{drive: d, accountID: expected.AccountID, source: expected}, nil
 }
 
 type sourceSession struct {
