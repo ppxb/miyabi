@@ -135,6 +135,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	panAPI := protected.Group("/pan", noStore())
 	panAPI.GET("/account", panAccountHandler(deps.Drive))
+	panAPI.GET("/accounts", panAccountsHandler(deps.Drive))
 	panAPI.DELETE("/account", panDisconnectHandler(deps.Drive))
 	panAPI.POST("/login", panBeginLoginHandler(deps.Drive))
 	panAPI.GET("/login/:id", panLoginStatusHandler(deps.Drive))

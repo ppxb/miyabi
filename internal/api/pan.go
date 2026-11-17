@@ -11,6 +11,7 @@ import (
 
 type DriveManager interface {
 	Account(context.Context) (drive.AccountStatus, error)
+	Accounts(context.Context) ([]drive.AccountStatus, error)
 	BeginLogin(context.Context) (drive.LoginSession, error)
 	LoginStatus(context.Context, string) (drive.LoginStatus, error)
 	Disconnect(context.Context) (drive.AccountStatus, error)
@@ -36,6 +37,21 @@ func panAccountHandler(pan DriveManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		account, err := pan.Account(c.Request.Context())
 		respond(c, accountResponse(account), err)
+	}
+}
+
+func panAccountsHandler(pan DriveManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		accounts, err := pan.Accounts(c.Request.Context())
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		result := make([]panAccountStatusResponse, len(accounts))
+		for i, account := range accounts {
+			result[i] = accountResponse(account)
+		}
+		respond(c, result, nil)
 	}
 }
 

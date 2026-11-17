@@ -78,6 +78,9 @@ func (d *Drive) loadAccount(ctx context.Context, state snapshot) (pan.Account, e
 	if err != nil {
 		return pan.Account{}, err
 	}
+	d.mu.Lock()
+	d.accountID = account.ID
+	d.mu.Unlock()
 
 	d.accountCacheMu.Lock()
 	defer d.accountCacheMu.Unlock()
@@ -168,11 +171,17 @@ func (d *Drive) acceptLogin(ctx context.Context, session *loginSession, tokens p
 	if err != nil {
 		return fmt.Errorf("verify 115 login account: %w", err)
 	}
+	d.mu.Lock()
+	d.accountID = account.ID
+	d.mu.Unlock()
 	if err := d.commit.Lock(ctx); err != nil {
 		return err
 	}
 	defer d.commit.Unlock()
 	if _, err := d.credentials(state); err != nil {
+		return err
+	}
+	if err := d.saveAccountTokens(ctx, account.ID, state.tokens); err != nil {
 		return err
 	}
 	return d.discardOtherAccountDirectory(ctx, account.ID)
@@ -183,7 +192,11 @@ func (d *Drive) Disconnect(ctx context.Context) (AccountStatus, error) {
 		return AccountStatus{}, err
 	}
 	defer d.commit.Unlock()
+	accountID := d.currentAccountID()
 	if err := d.clearCredentials(ctx); err != nil {
+		return AccountStatus{}, err
+	}
+	if err := d.removeAccount(ctx, accountID); err != nil {
 		return AccountStatus{}, err
 	}
 	d.mu.Lock()

@@ -50,6 +50,11 @@ func (d *Drive) refreshTokens(ctx context.Context, expected snapshot) error {
 		if err := database.SaveSetting(tokenContext, d.database, credentialsSetting, tokens); err != nil {
 			return nil, err
 		}
+		if accountID := d.currentAccountID(); accountID != "" {
+			if err := d.saveAccountTokens(tokenContext, accountID, tokens); err != nil {
+				return nil, err
+			}
+		}
 		d.mu.Lock()
 		d.tokens = tokens
 		d.tokenVersion++

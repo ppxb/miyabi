@@ -88,6 +88,7 @@ type Drive struct {
 
 	login         qrLogin
 	mountListener MountListener
+	accountID     string
 }
 
 func New(ctx context.Context, db *ent.Client) (*Drive, error) {

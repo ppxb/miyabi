@@ -79,6 +79,9 @@ func (d *Drive) SelectDirectory(ctx context.Context, directoryID string) (domain
 		}
 		return domain.LibraryDirectory{}, fmt.Errorf("mount media directory: %w", err)
 	}
+	if err := d.saveAccountMount(ctx, record.AccountID, record); err != nil {
+		return domain.LibraryDirectory{}, fmt.Errorf("remember 115 account mount: %w", err)
+	}
 	return directory, nil
 }
 
@@ -131,12 +134,16 @@ func (d *Drive) discardOtherAccountDirectory(ctx context.Context, accountID stri
 }
 
 func (d *Drive) clearDirectory(ctx context.Context) error {
+	accountID := d.snapshot().directory.AccountID
 	if err := d.persistDirectory(ctx, mountRecord{}); err != nil {
 		return err
 	}
 	d.swapDirectory(mountRecord{})
 	if err := d.publishMount(ctx, domain.LibrarySource{}); err != nil {
 		return fmt.Errorf("publish unmount event: %w", err)
+	}
+	if err := d.saveAccountMount(ctx, accountID, mountRecord{AccountID: accountID}); err != nil {
+		return fmt.Errorf("remember 115 account mount: %w", err)
 	}
 	return nil
 }
