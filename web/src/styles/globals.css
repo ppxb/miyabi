@@ -193,3 +193,8 @@
   width: 0;
   height: 0;
 }
+
+/* Applied for a single frame while switching themes so colours do not animate. */
+.disable-transitions * {
+  transition: none !important;
+}

@@ -4,6 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Miyabi</title>
+    <script>
+      // Apply the stored theme before first paint to avoid a flash of the wrong theme.
+      ;(function () {
+        try {
+          var raw = localStorage.getItem('miyabi-theme')
+          var theme = 'system'
+          if (raw) {
+            try {
+              theme = JSON.parse(raw).state.theme
+            } catch (error) {
+              theme = raw
+            }
+          }
+          var dark =
+            theme === 'dark' ||
+            (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.classList.toggle('dark', dark)
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        } catch (error) {
+          void error
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

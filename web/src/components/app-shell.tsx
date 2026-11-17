@@ -1,6 +1,5 @@
 import { useState, type CSSProperties, type PropsWithChildren } from 'react'
 import { MonitorIcon, MoonIcon, SunIcon } from 'lucide-react'
-import { useTheme } from 'next-themes'
 
 import { AppSidebar } from '@/components/app-sidebar'
 import { SearchDialog, SearchTrigger } from '@/components/app-search'
@@ -11,6 +10,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { TaskEventsProvider } from '@/features/tasks/task-events'
 import { TaskNotifications } from '@/features/tasks/task-notifications'
+import { useTheme } from '@/stores/theme'
 
 const THEME_CYCLE = ['light', 'dark', 'system'] as const
 type ThemeName = (typeof THEME_CYCLE)[number]
