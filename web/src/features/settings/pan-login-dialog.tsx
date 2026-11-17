@@ -50,15 +50,14 @@ export function PanLoginDialog({ children }: { children: ReactNode }) {
           <DialogTitle>登录 115 网盘</DialogTitle>
           <DialogDescription>请使用 115 手机客户端扫码，并在手机上确认登录。</DialogDescription>
         </DialogHeader>
-        {open ? (
-          <LoginContent
-            session={login.data}
-            pending={login.isPending}
-            failed={login.isError}
-            onRetry={() => login.mutate()}
-            onAuthorized={completeLogin}
-          />
-        ) : null}
+        {/* Keep the login content mounted through DialogContent's exit animation. */}
+        <LoginContent
+          session={login.data}
+          pending={login.isPending}
+          failed={login.isError}
+          onRetry={() => login.mutate()}
+          onAuthorized={completeLogin}
+        />
       </DialogContent>
     </Dialog>
   )

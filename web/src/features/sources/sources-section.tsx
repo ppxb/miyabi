@@ -240,9 +240,8 @@ function PanSourceCard({ source, onEdit }: { source: StorageSource; onEdit: () =
               {unauthorized ? '授权已失效，请重新登录' : '未登录'}
             </span>
             <PanLoginDialog>
-              <Button size="sm">
-                <QrCodeIcon data-icon="inline-start" />
-                登录
+              <Button size="icon-sm">
+                <QrCodeIcon />
               </Button>
             </PanLoginDialog>
           </div>
