@@ -358,6 +358,7 @@ function SourceDialog({
   const [name, setName] = useState(source.name)
   const [kind, setKind] = useState<SourceKind>(source.kind)
   const [path, setPath] = useState(sourcePath(source))
+  const [scrapeMode, setScrapeMode] = useState(source.config?.scrape_mode ?? 'auto')
   const [nameError, setNameError] = useState<string | null>(null)
   const [pathError, setPathError] = useState<string | null>(null)
   const option = kindOf(kind)
@@ -379,7 +380,9 @@ function SourceDialog({
       kind,
       name: name.trim(),
       enabled: true,
-      config: needsPath ? { ...source.config, [option.pathKey]: path.trim() } : { ...source.config }
+      config: needsPath
+        ? { ...source.config, [option.pathKey]: path.trim(), scrape_mode: scrapeMode }
+        : { ...source.config }
     })
   }
 
@@ -437,21 +440,38 @@ function SourceDialog({
           </Field>
 
           {needsPath ? (
-            <Field data-invalid={Boolean(pathError)}>
-              <FieldLabel htmlFor="source-path">{option.pathLabel}</FieldLabel>
-              <Input
-                id="source-path"
-                value={path}
-                disabled={saving}
-                aria-invalid={Boolean(pathError)}
-                placeholder={option.placeholder}
-                onChange={event => {
-                  setPath(event.target.value)
-                  setPathError(null)
-                }}
-              />
-              {pathError ? <FieldError>{pathError}</FieldError> : null}
-            </Field>
+            <>
+              <Field data-invalid={Boolean(pathError)}>
+                <FieldLabel htmlFor="source-path">{option.pathLabel}</FieldLabel>
+                <Input
+                  id="source-path"
+                  value={path}
+                  disabled={saving}
+                  aria-invalid={Boolean(pathError)}
+                  placeholder={option.placeholder}
+                  onChange={event => {
+                    setPath(event.target.value)
+                    setPathError(null)
+                  }}
+                />
+                {pathError ? <FieldError>{pathError}</FieldError> : null}
+              </Field>
+
+              <Field>
+                <FieldLabel>刮削方式</FieldLabel>
+                <Select value={scrapeMode} onValueChange={value => value && setScrapeMode(value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue>
+                      {scrapeMode === 'local' ? '仅使用本地数据' : '自动补全'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">自动补全</SelectItem>
+                    <SelectItem value="local">仅使用本地数据</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </>
           ) : (
             <FieldDescription>
               {kind === '115'
