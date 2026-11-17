@@ -49,7 +49,7 @@ import {
 import { Spinner } from '@/components/ui/spinner'
 import { PanDirectoryDialog } from '@/features/settings/pan-directory-dialog'
 import { PanLoginDialog } from '@/features/settings/pan-login-dialog'
-import { SettingRow, SettingsSection } from '@/features/settings/shared'
+import { SettingsSection } from '@/features/settings/shared'
 
 const KIND_OPTIONS: {
   value: SourceKind
@@ -143,14 +143,14 @@ export function SourcesSection() {
 
   return (
     <SettingsSection icon={<HardDriveIcon className="size-4" />} title="存储源">
-      <SettingRow title="存储源" description="配置本地目录或云盘，作为媒体库的数据来源">
+      <div className="flex justify-end">
         <Button
           onClick={() => openDraft({ id: '', kind: 'local', name: '', enabled: true, config: {} })}
         >
           <PlusIcon data-icon="inline-start" />
           添加源
         </Button>
-      </SettingRow>
+      </div>
 
       {sources.isError ? (
         <InlineError
