@@ -1,10 +1,17 @@
 import { useState } from 'react'
-import { BoxesIcon, CloudIcon, HardDriveIcon, PencilIcon, PlusIcon } from 'lucide-react'
+import { HardDriveIcon, PencilIcon, PlusIcon } from 'lucide-react'
 
 import { useSaveSources, useSources, type SourceKind, type StorageSource } from '@/api/sources'
-import { ErrorState } from '@/components/error-state'
+import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -13,6 +20,13 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldLabel
+} from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -21,7 +35,9 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
+import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
+import { SettingRow, SettingsSection } from '@/features/settings/shared'
 
 const KIND_OPTIONS: {
   value: SourceKind
@@ -29,31 +45,27 @@ const KIND_OPTIONS: {
   pathKey: string
   pathLabel: string
   placeholder: string
-  icon: typeof HardDriveIcon
 }[] = [
   {
     value: 'local',
     label: '本地目录',
     pathKey: 'path',
     pathLabel: '目录路径',
-    placeholder: '/mnt/media',
-    icon: HardDriveIcon
+    placeholder: '/mnt/media'
   },
   {
     value: '115',
     label: '115 网盘',
     pathKey: 'directory',
     pathLabel: '媒体目录',
-    placeholder: '/媒体/影片',
-    icon: CloudIcon
+    placeholder: '/媒体/影片'
   },
   {
     value: 'pikpak',
     label: 'PikPak',
     pathKey: 'path',
     pathLabel: '目录路径',
-    placeholder: '/media',
-    icon: BoxesIcon
+    placeholder: '/media'
   }
 ]
 
@@ -116,31 +128,26 @@ export function SourcesSection() {
   }
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h2 className="text-sm font-semibold">存储源</h2>
-          <p className="text-xs text-muted-foreground">
-            配置本地目录或云盘，作为媒体库的数据来源。
-          </p>
-        </div>
+    <SettingsSection icon={<HardDriveIcon className="size-4" />} title="存储源">
+      <SettingRow title="存储源" description="配置本地目录或云盘，作为媒体库的数据来源">
         <Button
           onClick={() => openDraft({ id: '', kind: 'local', name: '', enabled: true, config: {} })}
         >
           <PlusIcon data-icon="inline-start" />
           添加源
         </Button>
-      </div>
+      </SettingRow>
 
       {sources.isError ? (
-        <ErrorState
-          message="无法读取存储源"
+        <InlineError
           onRetry={() => void sources.refetch()}
           retrying={sources.isFetching}
-        />
+          retryLabel="重试"
+        >
+          无法读取存储源
+        </InlineError>
       ) : null}
-
-      {save.isError ? <p className="text-xs text-destructive">保存失败，请重试。</p> : null}
+      {save.isError ? <InlineError>保存失败，请重试</InlineError> : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
         {(sources.data ?? []).map(source => (
@@ -153,9 +160,11 @@ export function SourcesSection() {
           />
         ))}
         {(sources.data?.length ?? 0) === 0 && !sources.isPending && !sources.isError ? (
-          <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground sm:col-span-2">
-            还没有存储源，点击「添加源」开始。
-          </div>
+          <Card size="sm" className="sm:col-span-2">
+            <CardContent>
+              <CardDescription>还没有存储源，点击「添加源」开始。</CardDescription>
+            </CardContent>
+          </Card>
         ) : null}
       </div>
 
@@ -170,7 +179,7 @@ export function SourcesSection() {
           onDelete={() => remove(draft.id)}
         />
       ) : null}
-    </section>
+    </SettingsSection>
   )
 }
 
@@ -185,30 +194,14 @@ function SourceCard({
   onEdit: () => void
   onToggle: () => void
 }) {
-  const option = kindOf(source.kind)
-  const Icon = option.icon
-
   return (
-    <Card>
-      <CardContent className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-            <Icon className="size-4" />
-          </span>
-          <div className="min-w-0 space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-medium">{source.name}</span>
-              <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                {option.label}
-              </span>
-            </div>
-            <div className="truncate text-xs text-muted-foreground">
-              {sourcePath(source) || '未配置路径'}
-            </div>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Switch checked={source.enabled} disabled={busy} onCheckedChange={() => onToggle()} />
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>{source.name}</CardTitle>
+        <CardDescription>
+          {kindOf(source.kind).label} · {sourcePath(source) || '未配置路径'}
+        </CardDescription>
+        <CardAction>
           <Button
             variant="ghost"
             size="icon-sm"
@@ -218,7 +211,12 @@ function SourceCard({
           >
             <PencilIcon />
           </Button>
-        </div>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <SettingRow title="启用" description="停用后不参与媒体库聚合" inline>
+          <Switch checked={source.enabled} disabled={busy} onCheckedChange={() => onToggle()} />
+        </SettingRow>
       </CardContent>
     </Card>
   )
@@ -243,11 +241,21 @@ function SourceDialog({
   const [kind, setKind] = useState<SourceKind>(source.kind)
   const [path, setPath] = useState(sourcePath(source))
   const [enabled, setEnabled] = useState(source.enabled)
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [pathError, setPathError] = useState<string | null>(null)
   const option = kindOf(kind)
-  const canSave = name.trim() !== '' && path.trim() !== ''
 
   function submit() {
-    if (!canSave) return
+    let valid = true
+    if (name.trim() === '') {
+      setNameError('请输入名称')
+      valid = false
+    }
+    if (path.trim() === '') {
+      setPathError('请输入目录')
+      valid = false
+    }
+    if (!valid) return
     onSubmit({
       id: source.id,
       kind,
@@ -258,31 +266,47 @@ function SourceDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={nextOpen => {
+        if (!nextOpen && !saving) onOpenChange(false)
+      }}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{source.id ? '编辑存储源' : '添加存储源'}</DialogTitle>
-          <DialogDescription>配置一个本地或云端媒体目录。</DialogDescription>
+          <DialogDescription>配置一个本地或云端媒体目录</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium" htmlFor="source-name">
-              名称
-            </label>
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={event => {
+            event.preventDefault()
+            submit()
+          }}
+        >
+          <Field data-invalid={Boolean(nameError)}>
+            <FieldLabel htmlFor="source-name">名称</FieldLabel>
             <Input
               id="source-name"
               value={name}
+              autoFocus
+              disabled={saving}
+              aria-invalid={Boolean(nameError)}
               placeholder="我的媒体库"
-              onChange={event => setName(event.target.value)}
+              onChange={event => {
+                setName(event.target.value)
+                setNameError(null)
+              }}
             />
-          </div>
+            {nameError ? <FieldError>{nameError}</FieldError> : null}
+          </Field>
 
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">类型</label>
+          <Field>
+            <FieldLabel>类型</FieldLabel>
             <Select value={kind} onValueChange={value => setKind(value as SourceKind)}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
+              <SelectTrigger>
+                <SelectValue>{option.label}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {KIND_OPTIONS.map(option => (
@@ -292,42 +316,69 @@ function SourceDialog({
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </Field>
 
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium" htmlFor="source-path">
-              {option.pathLabel}
-            </label>
+          <Field data-invalid={Boolean(pathError)}>
+            <FieldLabel htmlFor="source-path">{option.pathLabel}</FieldLabel>
             <Input
               id="source-path"
               value={path}
+              disabled={saving}
+              aria-invalid={Boolean(pathError)}
               placeholder={option.placeholder}
-              onChange={event => setPath(event.target.value)}
+              onChange={event => {
+                setPath(event.target.value)
+                setPathError(null)
+              }}
             />
-          </div>
+            {pathError ? <FieldError>{pathError}</FieldError> : null}
+          </Field>
 
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div className="space-y-0.5">
-              <div className="text-sm font-medium">启用</div>
-              <div className="text-xs text-muted-foreground">停用后不参与媒体库聚合</div>
-            </div>
-            <Switch checked={enabled} onCheckedChange={checked => setEnabled(checked)} />
-          </div>
-        </div>
+          <Field orientation="horizontal">
+            <FieldContent>
+              <FieldLabel htmlFor="source-enabled">启用</FieldLabel>
+              <FieldDescription>停用后不参与媒体库聚合</FieldDescription>
+            </FieldContent>
+            <Switch
+              id="source-enabled"
+              checked={enabled}
+              disabled={saving}
+              onCheckedChange={checked => setEnabled(checked)}
+            />
+          </Field>
 
-        <DialogFooter>
-          {source.id ? (
-            <Button variant="destructive" className="mr-auto" disabled={saving} onClick={onDelete}>
-              删除
+          <DialogFooter>
+            {source.id ? (
+              <Button
+                type="button"
+                variant="destructive"
+                className="mr-auto"
+                disabled={saving}
+                onClick={onDelete}
+              >
+                删除
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saving}
+              onClick={() => onOpenChange(false)}
+            >
+              取消
             </Button>
-          ) : null}
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            取消
-          </Button>
-          <Button disabled={!canSave || saving} onClick={submit}>
-            保存
-          </Button>
-        </DialogFooter>
+            <Button type="submit" disabled={saving}>
+              {saving ? (
+                <>
+                  <Spinner />
+                  保存中
+                </>
+              ) : (
+                '保存'
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )
