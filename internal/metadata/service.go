@@ -55,9 +55,7 @@ func New(ctx context.Context, db *ent.Client, sources ...Source) (*Service, erro
 			return nil, fmt.Errorf("duplicate metadata source %s", source.ID())
 		}
 		s.sources[source.ID()] = source
-		if source.ID() != "javdb" {
-			s.settings = append(s.settings, SourceSetting{ID: source.ID(), Enabled: true})
-		}
+		s.settings = append(s.settings, SourceSetting{ID: source.ID(), Enabled: true})
 	}
 	settings, found, err := database.LoadSetting[[]SourceSetting](ctx, db, "metadata.sources")
 	if err != nil {
@@ -69,7 +67,7 @@ func New(ctx context.Context, db *ent.Client, sources ...Source) (*Service, erro
 		registered := make(map[string]bool, len(s.sources))
 		var current []SourceSetting
 		for _, setting := range settings {
-			if setting.ID != "javdb" && s.sources[setting.ID] != nil {
+			if s.sources[setting.ID] != nil {
 				current = append(current, setting)
 				registered[setting.ID] = true
 			}
@@ -94,6 +92,8 @@ func sourceOrder(id string) int {
 	switch id {
 	case "fanza":
 		return -1
+	case "javdb":
+		return 1
 	default:
 		return 0
 	}
@@ -107,15 +107,12 @@ func (s *Service) Settings() []SourceSetting {
 
 func (s *Service) validate(settings []SourceSetting) error {
 	count := len(s.sources)
-	if s.sources["javdb"] != nil {
-		count--
-	}
 	if len(settings) != count {
 		return domain.E(domain.KindInvalid, "请提供完整的刮削来源列表", nil)
 	}
 	seen := make(map[string]bool)
 	for i, item := range settings {
-		if item.ID == "javdb" || s.sources[item.ID] == nil || seen[item.ID] {
+		if s.sources[item.ID] == nil || seen[item.ID] {
 			return domain.E(domain.KindInvalid, "未知或重复的刮削来源", nil)
 		}
 		seen[item.ID] = true
@@ -144,9 +141,6 @@ func (s *Service) UpdateSettings(ctx context.Context, settings []SourceSetting) 
 // A network failure never permits a weaker identity.
 func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
 	settings := s.Settings()
-	if s.sources["javdb"] != nil {
-		settings = append(settings, SourceSetting{ID: "javdb", Enabled: true})
-	}
 	var failures []error
 	var failedSources []string
 	for _, layer := range codeid.Layers(ref.Code) {
@@ -252,6 +246,9 @@ func attachJavDBIdentity(result domain.MovieMetadata, knownID string) (domain.Mo
 // Fallback is used after independent artwork downloads fail. It checks only
 // the confirmed code, never downgrading to another film to obtain an image.
 func (s *Service) Fallback(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
+	if !s.enabled("javdb") {
+		return domain.MovieMetadata{}, ErrNotFound
+	}
 	source := s.sources["javdb"]
 	if source == nil {
 		return domain.MovieMetadata{}, ErrNotFound
@@ -345,9 +342,6 @@ func (s *Service) fetch(ctx context.Context, source Source, ref domain.MovieRef)
 }
 
 func (s *Service) enabled(id string) bool {
-	if id == "javdb" {
-		return s.sources[id] != nil
-	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	for _, setting := range s.settings {

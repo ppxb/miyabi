@@ -244,7 +244,7 @@ func TestPacopacomamaResolveKeepsJavDBEntitiesAndWorksWithoutCatalogue(t *testin
 				t.Fatal(err)
 			}
 			defer s.Close()
-			if !reflect.DeepEqual(s.Settings(), []metadata.SourceSetting{{ID: "pacopacomama", Enabled: true}}) {
+			if !reflect.DeepEqual(s.Settings(), []metadata.SourceSetting{{ID: "pacopacomama", Enabled: true}, {ID: "javdb", Enabled: true}}) {
 				t.Fatalf("source not enabled by default: %+v", s.Settings())
 			}
 			for range 2 {
