@@ -77,6 +77,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 
 	taskRegistry := tasks.NewRegistry()
 	taskSvc := tasks.NewService(store.Client, taskRegistry)
+	sourceSvc := source.New(store.Client)
 	driveSvc, err := drive.New(ctx, store.Client)
 	if err != nil {
 		_ = store.Close()
@@ -94,6 +95,10 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		EmbyDir: cfg.EmbyDir, PublicURL: cfg.PublicURL, STRMToken: cfg.STRMToken,
 	})
 	libSvc := library.New(store.Client, driveSvc, taskSvc, images, library.Options{ExportManager: exportMgr})
+	sourceSvc.SetLocalScanHandler(func(ctx context.Context, root string) error {
+		_, err := libSvc.StartLocalSourceScan(ctx, root)
+		return err
+	})
 	javbusClient, err := javbus.New(javbus.Options{Proxy: networkSvc.ProxyManager()})
 	if err != nil {
 		driveSvc.Close()
@@ -172,6 +177,15 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	if err := libSvc.ScheduleLocalScan(ctx); err != nil {
 		logger.ErrorContext(ctx, "failed to queue startup Emby directory scan", "error", err)
 	}
+	if roots, err := sourceSvc.LocalRoots(ctx); err != nil {
+		logger.ErrorContext(ctx, "failed to load local sources", "error", err)
+	} else {
+		for _, root := range roots {
+			if _, err := libSvc.StartLocalSourceScan(ctx, root); err != nil {
+				logger.ErrorContext(ctx, "failed to queue local source scan", "path", root, "error", err)
+			}
+		}
+	}
 	if exportCfg := exportMgr.Config(); exportCfg.PublicURL != "" && exportCfg.EmbyDir != "" {
 		embySvc.StartStartupSTRMRewrite()
 	}
@@ -198,7 +212,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Network:        networkSvc,
 		Emby:           embySvc,
 		JavDB:          catalogueSvc,
-		Sources:        source.New(store.Client),
+		Sources:        sourceSvc,
 		Frontend:       miyabi.Frontend(),
 		STRMToken:      cfg.STRMToken,
 		TrustedProxies: cfg.TrustedProxies,

@@ -167,10 +167,14 @@ func (s *Service) Scan(ctx context.Context, job tasks.Job) error {
 		return err
 	}
 	if payload.Source.AccountID == domain.LocalAccountID {
-		// Imports must not observe partially rewritten STRM or exported sidecars.
-		return s.exportMgr.WithConfig(func(export.Config) error {
-			return s.scanLocal(ctx, job.ID, payload)
-		})
+		// Emby imports must not observe partially rewritten STRM or exported sidecars;
+		// user-configured local sources are independent of the export directory.
+		if payload.Source.Directory.Name == embyLocalDirectoryName {
+			return s.exportMgr.WithConfig(func(export.Config) error {
+				return s.scanLocal(ctx, job.ID, payload)
+			})
+		}
+		return s.scanLocal(ctx, job.ID, payload)
 	}
 	return s.scanner.Run(ctx, job)
 }
