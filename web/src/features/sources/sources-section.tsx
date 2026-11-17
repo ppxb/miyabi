@@ -10,12 +10,7 @@ import {
   UserRoundIcon
 } from 'lucide-react'
 
-import {
-  useDisconnectPanAccount,
-  usePanAccountStatus,
-  usePanAccounts,
-  type PanAccount
-} from '@/api/pan'
+import { useDisconnectPanAccount, usePanAccountStatus, type PanAccount } from '@/api/pan'
 import { useSaveSources, useSources, type SourceKind, type StorageSource } from '@/api/sources'
 import { InlineError } from '@/components/error-state'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -250,11 +245,9 @@ function PanSourceCard({
   onBind: (accountID: string) => void
 }) {
   const accountID = source.config?.account_id ?? ''
-  const accounts = usePanAccounts()
   const status = usePanAccountStatus(accountID)
   const disconnect = useDisconnectPanAccount(accountID)
   const profile = status.data?.account
-  const available = (accounts.data ?? []).filter(item => item.connected && item.account)
 
   return (
     <Card size="sm">
@@ -269,29 +262,13 @@ function PanSourceCard({
       </CardHeader>
       <CardContent>
         {!accountID ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-muted-foreground">未绑定账号</span>
-              <PanLoginDialog>
-                <Button size="icon-sm" aria-label="登录 115">
-                  <QrCodeIcon />
-                </Button>
-              </PanLoginDialog>
-            </div>
-            {available.length > 0 ? (
-              <Select value="" onValueChange={value => value && onBind(value)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="选择已登录账号" />
-                </SelectTrigger>
-                <SelectContent>
-                  {available.map(item => (
-                    <SelectItem key={item.account!.id} value={item.account!.id}>
-                      {item.account!.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground">未绑定账号</span>
+            <PanLoginDialog onAuthorized={onBind}>
+              <Button size="icon-sm" aria-label="登录 115">
+                <QrCodeIcon />
+              </Button>
+            </PanLoginDialog>
           </div>
         ) : status.isPending ? (
           <LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" />

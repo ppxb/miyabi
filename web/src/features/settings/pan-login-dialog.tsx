@@ -3,6 +3,7 @@ import { CheckCircle2Icon, LoaderCircleIcon, QrCodeIcon, RefreshCwIcon } from 'l
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 
+import { apiGet } from '@/api/client'
 import {
   invalidatePanSource,
   panKeys,
@@ -21,7 +22,13 @@ import {
   DialogTrigger
 } from '@/components/ui/dialog'
 
-export function PanLoginDialog({ children }: { children: ReactNode }) {
+export function PanLoginDialog({
+  children,
+  onAuthorized
+}: {
+  children: ReactNode
+  onAuthorized?: (accountID: string) => void
+}) {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const login = useBeginPanLogin()
@@ -41,6 +48,13 @@ export function PanLoginDialog({ children }: { children: ReactNode }) {
     void queryClient.invalidateQueries({ queryKey: panKeys.accounts })
     invalidatePanSource(queryClient)
     changeOpen(false)
+    if (onAuthorized) {
+      void apiGet<PanAccountStatus>('/api/pan/account')
+        .then(status => {
+          if (status.account?.id) onAuthorized(status.account.id)
+        })
+        .catch(() => undefined)
+    }
   }
 
   return (
