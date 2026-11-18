@@ -116,31 +116,26 @@ test('recommendations prioritize their request before opening in the dialog', ()
   assert.ok(prioritize.mock.invocationCallOrder[0]! < openMovie.mock.invocationCallOrder[0]!)
 })
 
-test('library cards always use an explicit local detail target', () => {
-  for (const javdb_id of [undefined, '', 'javdb-movie']) {
-    const card = LibraryMovieCard({
-      movie: {
-        id: 42,
-        code: 'ABP-123',
-        title: 'Library movie',
-        javdb_id,
-        duration: 0,
-        rating: 0,
-        actors: [],
-        tags: [],
-        scrape_status: 'done'
-      }
-    })
-    const triggerWrapper = card.props.children[0]
-    assert.equal(triggerWrapper.type, ContextMenuTrigger)
-    const trigger = triggerWrapper.props.children
-    assert.equal(trigger.type, MovieDetailTrigger)
-    const { openMovie, props, html } = renderTrigger(trigger.props)
-    assert.match(html, /role="button"/)
-    assert.match(html, /tabindex="0"/)
-    assert.doesNotMatch(html, /href=|<a\b/)
-    const event = click()
-    props.onClick?.(event)
-    assert.deepEqual(openMovie.mock.calls, [[{ libraryId: 42 }, event.currentTarget]])
-  }
+test('library cards play on activation instead of opening details', () => {
+  const onPlay = vi.fn()
+  const card = LibraryMovieCard({
+    movie: {
+      id: 42,
+      code: 'ABP-123',
+      title: 'Library movie',
+      duration: 0,
+      rating: 0,
+      actors: [],
+      tags: [],
+      scrape_status: 'done'
+    },
+    onPlay
+  })
+  const triggerWrapper = card.props.children[0]
+  assert.equal(triggerWrapper.type, ContextMenuTrigger)
+  const trigger = triggerWrapper.props.children
+  assert.equal(trigger.type, 'div')
+  assert.equal(trigger.props.role, 'button')
+  trigger.props.onClick({ preventDefault() {} })
+  assert.equal(onPlay.mock.calls.length, 1)
 })

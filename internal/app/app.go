@@ -31,6 +31,7 @@ import (
 	"github.com/ppxb/miyabi/internal/network"
 	"github.com/ppxb/miyabi/internal/netx"
 	"github.com/ppxb/miyabi/internal/offline"
+	"github.com/ppxb/miyabi/internal/playback"
 	"github.com/ppxb/miyabi/internal/source"
 	"github.com/ppxb/miyabi/internal/strm"
 	"github.com/ppxb/miyabi/internal/subtitle"
@@ -54,6 +55,7 @@ type App struct {
 	offline   *offline.Service
 	monitors  *monitor.Service
 	driveSvc  *drive.Drive
+	play      *playback.Service
 	catalogue *catalogue.Service
 	scrape    *scrape.Service
 	metadata  *metadata.Service
@@ -95,6 +97,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	exportMgr := export.NewManager(export.Config{
 		EmbyDir: cfg.EmbyDir, PublicURL: cfg.PublicURL, STRMToken: cfg.STRMToken,
 	})
+	playSvc := playback.New(store.Client, driveSvc, 8*time.Hour)
 	libSvc := library.New(store.Client, driveSvc, taskSvc, images, library.Options{
 		ExportManager: exportMgr,
 		Sources:       sourceSvc.LibrarySources,
@@ -238,6 +241,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Offline:        offlineSvc,
 		Monitor:        monitorSvc,
 		Library:        libSvc,
+		Play:           playSvc,
 		STRM:           strm.New(store.Client, driveSvc),
 		Tasks:          &taskViews{Service: taskSvc, database: store.Client, library: libSvc, monitor: monitorSvc},
 		Artwork:        scrapeSvc,
@@ -267,6 +271,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		offline:   offlineSvc,
 		monitors:  monitorSvc,
 		driveSvc:  driveSvc,
+		play:      playSvc,
 		catalogue: catalogueSvc,
 		scrape:    scrapeSvc,
 		metadata:  metadataSvc,
@@ -339,6 +344,9 @@ func (a *App) Close() error {
 	}
 	if a.catalogue != nil {
 		a.catalogue.Close()
+	}
+	if a.play != nil {
+		a.play.Close()
 	}
 	if a.driveSvc != nil {
 		a.driveSvc.Close()

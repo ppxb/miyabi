@@ -23,6 +23,7 @@ type Dependencies struct {
 	Offline        OfflineManager
 	Monitor        SubscriptionManager
 	Library        LibraryManager
+	Play           PlayManager
 	STRM           STRMRelay
 	Tasks          TaskManager
 	Artwork        ArtworkReader
@@ -103,6 +104,13 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.GET("/library/pending", libraryPendingHandler(deps.Library))
 	protected.POST("/library/rebuild", libraryRebuildHandler(deps.Library))
 	protected.GET("/library/artwork/:key", libraryArtworkHandler(deps.Artwork))
+
+	playAPI := protected.Group("/play", noStore())
+	playAPI.GET("/files", playFilesHandler(deps.Play))
+	playAPI.GET("/:id", playStartHandler(deps.Play))
+	playAPI.DELETE("/:id", playReleaseHandler(deps.Play))
+	playAPI.GET("/:id/stream/:resource", playStreamHandler(deps.Play))
+	playAPI.HEAD("/:id/stream/:resource", playStreamHandler(deps.Play))
 
 	protected.GET("/tasks", noStore(), tasksHandler(deps.Tasks))
 	protected.POST("/tasks/:id/retry", taskRetryHandler(deps.Tasks))

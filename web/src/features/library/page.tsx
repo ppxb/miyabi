@@ -1,3 +1,5 @@
+import { lazy, Suspense, useState } from 'react'
+
 import { LIBRARY_PAGE_SIZE, useLibraryMovies } from '@/api/library'
 import { isScanTask, isTaskActive, useTasks } from '@/api/tasks'
 import { AppPage } from '@/components/app-page'
@@ -11,6 +13,12 @@ import { LibraryMovieCard } from '@/features/library/movie-card'
 import { LibraryProgress } from '@/features/library/library-progress'
 import { useTaskConnection } from '@/features/tasks/task-events'
 
+const LibraryPlayerDialog = lazy(() =>
+  import('@/features/library/player-dialog').then(module => ({
+    default: module.LibraryPlayerDialog
+  }))
+)
+
 export function LibraryPage({
   page,
   onPageChange
@@ -21,6 +29,7 @@ export function LibraryPage({
   const library = useLibraryMovies(page)
   const tasks = useTasks()
   const connection = useTaskConnection()
+  const [playingId, setPlayingId] = useState<number | null>(null)
   const source = library.data?.source
   const libraryTasks = tasks.data?.filter(isScanTask)
   const latestScan = libraryTasks?.find(task => !task.movie_id && !task.offline_task_id)
@@ -62,6 +71,7 @@ export function LibraryPage({
                   key={movie.id}
                   movie={movie}
                   busy={scanning || processingMovies.has(movie.id)}
+                  onPlay={() => setPlayingId(movie.id)}
                 />
               ))}
             </MovieGridLayout>
@@ -88,6 +98,11 @@ export function LibraryPage({
           />
         </>
       )}
+      {playingId !== null ? (
+        <Suspense fallback={null}>
+          <LibraryPlayerDialog movieId={playingId} onClose={() => setPlayingId(null)} />
+        </Suspense>
+      ) : null}
     </AppPage>
   )
 }

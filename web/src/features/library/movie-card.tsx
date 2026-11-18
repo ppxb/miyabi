@@ -4,10 +4,17 @@ import type { LibraryMovie } from '@/api/library'
 import { MovieCard } from '@/components/movie'
 import { Badge } from '@/components/ui/badge'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
-import { MovieDetailTrigger } from '@/features/movie-detail/detail-trigger'
 import { LibraryMovieActions } from './movie-actions'
 
-export function LibraryMovieCard({ movie, busy = false }: { movie: LibraryMovie; busy?: boolean }) {
+export function LibraryMovieCard({
+  movie,
+  busy = false,
+  onPlay
+}: {
+  movie: LibraryMovie
+  busy?: boolean
+  onPlay?: () => void
+}) {
   const title = movie.title || movie.code
   const actors = movie.actors
     .map(actor => actor.name)
@@ -17,9 +24,16 @@ export function LibraryMovieCard({ movie, busy = false }: { movie: LibraryMovie;
   return (
     <ContextMenu>
       <ContextMenuTrigger className="block h-full min-w-0">
-        <MovieDetailTrigger
-          movie={{ libraryId: movie.id }}
-          className="block h-full min-w-0 rounded-2xl outline-ring"
+        <div
+          role="button"
+          tabIndex={0}
+          className="block h-full min-w-0 cursor-pointer rounded-2xl outline-ring"
+          onClick={() => onPlay?.()}
+          onKeyDown={event => {
+            if (event.key !== 'Enter' && event.key !== ' ') return
+            event.preventDefault()
+            if (!event.repeat) onPlay?.()
+          }}
         >
           <MovieCard
             movie={movie}
@@ -43,7 +57,7 @@ export function LibraryMovieCard({ movie, busy = false }: { movie: LibraryMovie;
               </>
             }
           />
-        </MovieDetailTrigger>
+        </div>
       </ContextMenuTrigger>
       <LibraryMovieActions movie={movie} disabled={busy} />
     </ContextMenu>

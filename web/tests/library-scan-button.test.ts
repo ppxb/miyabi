@@ -1,10 +1,10 @@
-import { Children, isValidElement, type ReactElement, type ReactNode } from 'react'
+import { Children, createElement, isValidElement, type ReactElement, type ReactNode } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { expect, test, vi } from 'vitest'
 
 import { useLibraryMovies, useStartLibraryScan } from '@/api/library'
 import { useTasks } from '@/api/tasks'
 import { LibraryPage } from '@/features/library/page'
-import { LibraryProgress } from '@/features/library/library-progress'
 import { LibraryScanButton } from '@/features/library/scan-button'
 import { notifyScanTask, notifyTaskError } from '@/features/tasks/task-toast'
 
@@ -36,10 +36,9 @@ test('library page header shows the multi-source description without scan contro
     isSuccess: true,
     data: { movies: [], total: 0 }
   } as unknown as ReturnType<typeof useLibraryMovies>)
-  const page = LibraryPage({ page: 2, onPageChange: vi.fn() })
-  const header = elements(page.props.children)[0]!
-  expect(header.props.description).toBe('来自本地与云盘的影片')
-  expect(elements(header.props.children as ReactNode)[0]!.type).toBe(LibraryProgress)
+  const html = renderToStaticMarkup(createElement(LibraryPage, { page: 2, onPageChange: vi.fn() }))
+  expect(html).toContain('来自本地与云盘的影片')
+  expect(html).not.toContain('同步媒体库')
 })
 
 test('loading and hidden controls still retain the scan mutation hook', () => {
