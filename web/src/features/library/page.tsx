@@ -8,6 +8,7 @@ import { MovieGridLayout } from '@/components/movie/movie-grid-layout'
 import { MovieGridSkeleton } from '@/components/movie/movie-grid-skeleton'
 import { PageHeader } from '@/components/page-header'
 import { LibraryMovieCard } from '@/features/library/movie-card'
+import { LibraryProgress } from '@/features/library/library-progress'
 import { useTaskConnection } from '@/features/tasks/task-events'
 import { sameSource } from '@/lib/source'
 
@@ -29,7 +30,9 @@ export function LibraryPage({
 
   return (
     <AppPage>
-      <PageHeader title="媒体库" description="来自本地与云盘的影片" />
+      <PageHeader title="媒体库" description="来自本地与云盘的影片" inlineActions>
+        <LibraryProgress task={latest} />
+      </PageHeader>
 
       {tasks.isError ? (
         <InlineError

@@ -70,7 +70,12 @@ func (d *Drive) SelectDirectoryForAccount(ctx context.Context, accountID, direct
 		Name: files.Path[len(files.Path)-1].Name,
 		Path: directoryPath(files.Path),
 	}
-	if err := d.saveAccountMount(ctx, accountID, mountRecord{AccountID: accountID, LibraryDirectory: directory}); err != nil {
+	record := mountRecord{AccountID: accountID, LibraryDirectory: directory}
+	if err := d.saveAccountMount(ctx, accountID, record); err != nil {
+		return domain.LibraryDirectory{}, err
+	}
+	// The library queues its scan from this event; a stored mount alone is silent.
+	if err := d.publishMount(ctx, domain.LibrarySource{AccountID: accountID, Directory: directory}); err != nil {
 		return domain.LibraryDirectory{}, err
 	}
 	return directory, nil

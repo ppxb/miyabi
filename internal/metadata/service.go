@@ -143,6 +143,7 @@ func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.Movi
 	settings := s.Settings()
 	var failures []error
 	var failedSources []string
+	answered := false
 	for _, layer := range codeid.Layers(ref.Code) {
 		var results []domain.MovieMetadata
 		var merged domain.MovieMetadata
@@ -152,7 +153,9 @@ func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.Movi
 			}
 			result, err := s.resolveLayer(ctx, s.sources[setting.ID], ref, layer)
 			if err != nil {
-				if !errors.Is(err, ErrNotFound) {
+				if errors.Is(err, ErrNotFound) {
+					answered = true
+				} else {
 					failures = append(failures, fmt.Errorf("%s: %w", setting.ID, err))
 					if !slices.Contains(failedSources, setting.ID) {
 						failedSources = append(failedSources, setting.ID)
@@ -182,10 +185,19 @@ func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.Movi
 		}
 	}
 	if len(failures) > 0 {
+		// A javdb outage must not fail movies that the other enabled sources
+		// simply do not carry; they are "not found", not a network outage.
+		if answered && onlyJavDB(failedSources) {
+			return domain.MovieMetadata{}, domain.E(domain.KindNotFound, "已启用的来源未找到可确认的影片资料", ErrNotFound)
+		}
 		message := "刮削来源查询失败: " + strings.Join(failedSources, "、") + "，请检查网络和代理设置"
 		return domain.MovieMetadata{}, domain.E(domain.KindUpstream, message, errors.Join(failures...))
 	}
 	return domain.MovieMetadata{}, domain.E(domain.KindNotFound, "已启用的来源未找到可确认的影片资料", ErrNotFound)
+}
+
+func onlyJavDB(sources []string) bool {
+	return len(sources) == 1 && sources[0] == "javdb"
 }
 
 func (s *Service) resolveLayer(ctx context.Context, source Source, ref domain.MovieRef, codes []string) (domain.MovieMetadata, error) {
