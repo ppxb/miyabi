@@ -139,6 +139,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	metadataSvc, err := metadata.New(ctx, store.Client, fanzaSource, fc2Source, heyzoSource, pacopacomamaSource,
 		providers.NewJavDB(catalogueSvc), providers.NewJavBus(javbusClient, networkSvc.ProxyManager()),
 		providers.NewR18(networkSvc.ProxyManager()), providers.NewOnePondo(networkSvc.ProxyManager()),
+		providers.NewCodeAV(networkSvc.ProxyManager()),
 		providers.NewJavDatabase(networkSvc.ProxyManager()))
 	if err != nil {
 		fanzaSource.Close()

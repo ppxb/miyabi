@@ -14,7 +14,8 @@ export const sourceNames: Record<string, string> = {
   javbus: 'JavBus',
   r18dev: 'r18.dev',
   onepondo: '一本道',
-  javdatabase: 'JavDatabase'
+  javdatabase: 'JavDatabase',
+  codeav: 'CodeAV'
 }
 
 export function useScrapingSources() {
