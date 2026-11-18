@@ -37,7 +37,7 @@ export function LibraryMovieActions({
       <ContextMenuContent>
         <ContextMenuItem
           disabled={busy}
-          onSelect={() =>
+          onClick={() =>
             scrape.mutate(undefined, {
               onSuccess: notifyScan,
               onError: error =>
@@ -54,7 +54,7 @@ export function LibraryMovieActions({
         </ContextMenuItem>
         <ContextMenuItem
           disabled={busy}
-          onSelect={() => {
+          onClick={() => {
             scrape.reset()
             setCode(movie.code)
             setCorrecting(true)

@@ -7,7 +7,12 @@ export function LibraryProgress({ task }: { task?: ScanTask }) {
   const total = scan.metadata_total
   const done = scan.metadata_completed
   const failed = scan.metadata_failed ?? 0
-  const percent = total > 0 ? ((done + failed) / total) * 100 : task.progress
+  const percent =
+    total > 0
+      ? ((done + failed) / total) * 100
+      : scan.directories_discovered > 0
+        ? (scan.directories_scanned / scan.directories_discovered) * 100
+        : task.progress
   const bounded = Math.max(0, Math.min(100, Math.round(percent)))
   const label =
     total > 0

@@ -10,7 +10,6 @@ import { PageHeader } from '@/components/page-header'
 import { LibraryMovieCard } from '@/features/library/movie-card'
 import { LibraryProgress } from '@/features/library/library-progress'
 import { useTaskConnection } from '@/features/tasks/task-events'
-import { sameSource } from '@/lib/source'
 
 export function LibraryPage({
   page,
@@ -23,15 +22,17 @@ export function LibraryPage({
   const tasks = useTasks()
   const connection = useTaskConnection()
   const source = library.data?.source
-  const sourceTasks = tasks.data?.filter(isScanTask).filter(task => sameSource(task.source, source))
-  const latest = sourceTasks?.find(task => !task.movie_id && !task.offline_task_id)
-  const scanning = latest !== undefined && isTaskActive(latest)
-  const processingMovies = new Set(sourceTasks?.filter(isTaskActive).map(task => task.movie_id))
+  const libraryTasks = tasks.data?.filter(isScanTask)
+  const latestScan = libraryTasks?.find(task => !task.movie_id && !task.offline_task_id)
+  const scanning = latestScan !== undefined && isTaskActive(latestScan)
+  // Show progress for any active library task, including a single-movie rescrape.
+  const progressTask = libraryTasks?.find(isTaskActive)
+  const processingMovies = new Set(libraryTasks?.filter(isTaskActive).map(task => task.movie_id))
 
   return (
     <AppPage>
       <PageHeader title="媒体库" description="来自本地与云盘的影片" inlineActions>
-        <LibraryProgress task={latest} />
+        <LibraryProgress task={progressTask} />
       </PageHeader>
 
       {tasks.isError ? (
@@ -60,7 +61,7 @@ export function LibraryPage({
                 <LibraryMovieCard
                   key={movie.id}
                   movie={movie}
-                  busy={!source || scanning || processingMovies.has(movie.id)}
+                  busy={scanning || processingMovies.has(movie.id)}
                 />
               ))}
             </MovieGridLayout>
@@ -72,7 +73,7 @@ export function LibraryPage({
                   ? '在设置 → 源管理中添加并登录存储源后，扫描入库'
                   : scanning
                     ? connection.status === 'connected'
-                      ? `${latest?.rebuild ? '正在重建' : '正在同步'}，识别到的影片会陆续显示`
+                      ? `${latestScan?.rebuild ? '正在重建' : '正在同步'}，识别到的影片会陆续显示`
                       : '连接中，等待更新媒体库进度'
                     : '未识别到影片'
               }
