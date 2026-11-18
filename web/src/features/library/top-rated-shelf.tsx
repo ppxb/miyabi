@@ -11,7 +11,7 @@ export function TopRatedShelf({ onPlay }: { onPlay: (movieID: number) => void })
       {items.map(movie => (
         <div
           key={movie.id}
-          className="w-full shrink-0 snap-start sm:w-[calc((100%-1rem)/2)] lg:w-[calc((100%-3rem)/3)] xl:w-[calc((100%-4.5rem)/4)]"
+          className="w-[72vw] shrink-0 snap-start sm:w-[calc((100%-1rem)/2)] lg:w-[calc((100%-3rem)/3)] xl:w-[calc((100%-4.5rem)/4)]"
         >
           <LibraryMovieCard movie={movie} onPlay={() => onPlay(movie.id)} />
         </div>

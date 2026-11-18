@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
 
@@ -64,17 +64,14 @@ function MovieShelfContent({
     if (!list) return
     list.scrollBy({ left: direction * list.clientWidth, behavior: 'smooth' })
   }
-  const startFade = atStart ? '0px' : '2rem'
-  const endFade = atEnd ? '0px' : '2rem'
-  const mask = `linear-gradient(to right, transparent 0, #000 ${startFade}, #000 calc(100% - ${endFade}), transparent 100%)`
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
+    <section className="min-w-0 space-y-3">
+      <div className="flex items-end justify-between gap-3">
         <h2 className="text-lg font-semibold tracking-normal">{title}</h2>
         <div className="flex items-center gap-1">
           {overflow ? (
-            <>
+            <div className="hidden items-center gap-1 sm:flex">
               <Button
                 type="button"
                 variant="ghost"
@@ -95,7 +92,7 @@ function MovieShelfContent({
               >
                 <ChevronRightIcon />
               </Button>
-            </>
+            </div>
           ) : null}
           {href ? (
             <Button variant="default" size="sm" nativeButton={false} render={<Link to={href} />}>
@@ -106,16 +103,7 @@ function MovieShelfContent({
       </div>
       <div
         ref={listRef}
-        style={
-          {
-            maskImage: mask,
-            WebkitMaskImage: mask,
-            maskRepeat: 'no-repeat',
-            WebkitMaskRepeat: 'no-repeat',
-            animation: 'none'
-          } as CSSProperties
-        }
-        className="flex scroll-fade-x snap-x snap-mandatory [scrollbar-width:none] gap-3 overflow-x-auto px-1 py-1 [&::-webkit-scrollbar]:hidden"
+        className="-mx-4 flex snap-x snap-mandatory scroll-px-4 [scrollbar-width:none] scrollbar-none gap-3 overflow-x-auto px-4 pt-1 pb-4 sm:gap-4 sm:py-1 [&::-webkit-scrollbar]:hidden"
       >
         {children}
       </div>
