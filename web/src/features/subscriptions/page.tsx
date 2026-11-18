@@ -121,7 +121,7 @@ export function SubscriptionsPage({
 
   return (
     <AppPage>
-      <PageHeader title="收藏与关注" description="追踪影片磁力与演员新作，出现资源后加入 115">
+      <PageHeader title="关注" description="追踪影片磁力与演员新作，出现资源后加入 115">
         {selecting ? (
           <>
             <Button

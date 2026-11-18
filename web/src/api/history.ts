@@ -12,6 +12,7 @@ export type WatchHistoryItem = {
   poster?: string
   rating?: number
   actors?: Array<{ provider?: string; id?: string; name: string }>
+  source?: string
   watched_at: string
   position: number
   duration: number

@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/page-header'
 import { ContinueWatching } from '@/features/library/continue-watching'
 import { LibraryMovieCard } from '@/features/library/movie-card'
 import { LibraryProgress } from '@/features/library/library-progress'
+import { TopRatedShelf } from '@/features/library/top-rated-shelf'
 import { useTaskConnection } from '@/features/tasks/task-events'
 
 const LibraryPlayerDialog = lazy(() =>
@@ -41,7 +42,7 @@ export function LibraryPage({
 
   return (
     <AppPage>
-      <PageHeader title="媒体库" description="来自本地与云盘的影片" inlineActions>
+      <PageHeader title="媒体库" description="最新、高分或分类影片" inlineActions>
         <LibraryProgress task={progressTask} />
       </PageHeader>
 
@@ -66,6 +67,7 @@ export function LibraryPage({
       ) : (
         <>
           <ContinueWatching onPlay={setPlayingId} />
+          <TopRatedShelf onPlay={setPlayingId} />
           {library.data.movies.length > 0 ? (
             <MovieGridLayout>
               {library.data.movies.map(movie => (

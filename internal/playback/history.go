@@ -80,7 +80,7 @@ func (service *Service) History(ctx context.Context, page int) (domain.WatchHist
 		ids = append(ids, record.MovieID)
 	}
 	movies, err := service.database.Movie.Query().Where(movie.IDIn(ids...)).
-		Select(movie.FieldID, movie.FieldCode, movie.FieldTitle, movie.FieldCover, movie.FieldPoster, movie.FieldRating).
+		Select(movie.FieldID, movie.FieldCode, movie.FieldTitle, movie.FieldCover, movie.FieldPoster, movie.FieldRating, movie.FieldMetadata).
 		WithActors(func(query *ent.ActorQuery) {
 			query.Select(actor.FieldProvider, actor.FieldSourceID, actor.FieldName)
 		}).All(ctx)
@@ -91,18 +91,36 @@ func (service *Service) History(ctx context.Context, page int) (domain.WatchHist
 	for _, item := range movies {
 		byID[item.ID] = item
 	}
+	cloudFiles, err := service.database.File.Query().
+		Where(file.MovieIDIn(ids...), file.AccountIDNEQ(domain.LocalAccountID)).
+		Select(file.FieldMovieID).All(ctx)
+	if err != nil {
+		return result, fmt.Errorf("read history sources: %w", err)
+	}
+	cloud := make(map[int]bool, len(cloudFiles))
+	for _, item := range cloudFiles {
+		if item.MovieID != nil {
+			cloud[*item.MovieID] = true
+		}
+	}
 	for _, record := range records {
 		item, ok := byID[record.MovieID]
 		if !ok {
 			continue
 		}
+		source := ""
+		if cloud[record.MovieID] {
+			source = "115"
+		}
 		actors := make([]domain.Actor, 0, len(item.Edges.Actors))
 		for _, person := range item.Edges.Actors {
 			actors = append(actors, domain.Actor{Provider: person.Provider, ID: person.SourceID, Name: person.Name})
 		}
+		doc := domain.ValueOrZero(item.Metadata)
 		result.Items = append(result.Items, domain.WatchHistoryItem{
 			MovieID: item.ID, Code: item.Code, Title: item.Title, Cover: item.Cover, Poster: item.Poster,
-			Rating: domain.ValueOrZero(item.Rating), Actors: actors,
+			Rating: domain.NormalizeRating10(domain.ValueOrZero(item.Rating), doc.RatingMax),
+			Actors: actors, Source: source,
 			WatchedAt: record.WatchedAt, Position: record.Position, Duration: record.Duration,
 		})
 	}

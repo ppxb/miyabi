@@ -25,6 +25,7 @@ type WatchHistoryItem struct {
 	Poster    *string   `json:"poster,omitempty"`
 	Rating    float64   `json:"rating"`
 	Actors    []Actor   `json:"actors"`
+	Source    string    `json:"source,omitempty"`
 	WatchedAt time.Time `json:"watched_at"`
 	Position  float64   `json:"position"`
 	Duration  float64   `json:"duration"`

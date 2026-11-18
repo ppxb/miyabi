@@ -66,6 +66,13 @@ export function useLibraryMovies(page: number) {
   })
 }
 
+export function useTopRatedMovies(limit = 12) {
+  return useQuery({
+    queryKey: ['library', 'top-rated', limit] as const,
+    queryFn: ({ signal }) => apiGet<LibraryMovie[]>('/api/library/top-rated', { limit }, signal)
+  })
+}
+
 export function useStartLibraryScan() {
   const queryClient = useQueryClient()
   return useMutation({

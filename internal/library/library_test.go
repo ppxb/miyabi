@@ -123,7 +123,7 @@ func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 				!reflect.DeepEqual(item.Tags, []Tag{{ID: tagA.ID, Provider: "javdb", SourceID: tagA.SourceID, Name: tagA.Name}, {ID: tagB.ID, Provider: "javdb", SourceID: tagB.SourceID, Name: tagB.Name}}) {
 				t.Fatalf("card lost or reordered catalogue data: %#v", item)
 			}
-			if item.ReleaseDate != "2026-09-12" || item.Duration != 125 || item.Rating != 4.5 || item.Fanart != "/api/library/artwork/fanart" ||
+			if item.ReleaseDate != "2026-09-12" || item.Duration != 125 || item.Rating != 9 || item.Fanart != "/api/library/artwork/fanart" ||
 				!reflect.DeepEqual(item.Maker, &Entity{ID: "maker-id", Name: "Studio"}) ||
 				!reflect.DeepEqual(item.Series, &Entity{ID: "series-id", Name: "Series"}) ||
 				!reflect.DeepEqual(item.Director, &Entity{ID: "director-id", Name: "Director"}) ||

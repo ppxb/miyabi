@@ -12,6 +12,7 @@ import (
 type LibraryManager interface {
 	ViewedManager
 	Movies(context.Context, int, int) (lib.Page, error)
+	TopRated(context.Context, int) ([]lib.Movie, error)
 	Movie(context.Context, int) (lib.MovieDetail, error)
 	Preview(context.Context, int, int) (domain.ImageCandidate, error)
 	StartScan(context.Context) (domain.TaskInfo, error)
@@ -58,6 +59,19 @@ func libraryPendingHandler(library LibraryManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		count, err := library.PendingCount(c.Request.Context())
 		respond(c, gin.H{"count": count}, err)
+	}
+}
+
+func libraryTopRatedHandler(library LibraryManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		query, ok := bindQuery[struct {
+			Limit int `form:"limit,default=12" binding:"min=1,max=50"`
+		}](c)
+		if !ok {
+			return
+		}
+		movies, err := library.TopRated(c.Request.Context(), query.Limit)
+		respond(c, movies, err)
 	}
 }
 

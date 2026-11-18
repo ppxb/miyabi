@@ -51,7 +51,7 @@ func TestSavedDetailNeedsNoJavDBAndKeepsSourceIdentities(t *testing.T) {
 	if detail.LibraryID != film.ID || detail.ID != "" || detail.Title != doc.Title || detail.Zone != doc.Zone {
 		t.Fatalf("wrong saved detail: %+v", detail)
 	}
-	if detail.RatingSource != "fanza" || detail.RatingMax != 5 || detail.Actors[0].Provider != "fanza" || detail.Maker.Provider != "fanza" {
+	if detail.RatingSource != "fanza" || detail.RatingMax != 10 || detail.Actors[0].Provider != "fanza" || detail.Maker.Provider != "fanza" {
 		t.Fatalf("source identity lost: %+v", detail)
 	}
 	if detail.Cover != "/api/library/artwork/full" || len(detail.PreviewImages) != 2 || !strings.Contains(detail.PreviewImages[0].Original, "/previews/0?v=") {

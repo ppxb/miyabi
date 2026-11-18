@@ -126,6 +126,10 @@ func (goldenLibrary) Movies(context.Context, int, int) (library.Page, error) {
 	}}, nil
 }
 
+func (goldenLibrary) TopRated(context.Context, int) ([]library.Movie, error) {
+	return []library.Movie{}, nil
+}
+
 func (goldenLibrary) ViewedMovieIDs(context.Context) ([]string, error) {
 	return []string{"movie-exact"}, nil
 }

@@ -29,8 +29,9 @@ func (s *Service) Movie(ctx context.Context, id int) (MovieDetail, error) {
 		Zone: doc.Zone,
 		Movie: domain.Movie{
 			ID: doc.JavDBID(), Code: record.Code, Title: doc.Title,
-			ReleaseDate: doc.Premiered, Duration: doc.Runtime, Rating: doc.Rating,
-			RatingSource: doc.RatingSource, RatingMax: doc.RatingMax, FieldSources: doc.FieldSources,
+			ReleaseDate: doc.Premiered, Duration: doc.Runtime,
+			Rating: domain.NormalizeRating10(doc.Rating, doc.RatingMax), RatingMax: 10,
+			RatingSource: doc.RatingSource, FieldSources: doc.FieldSources,
 			Thumbnail: domain.ValueOrZero(record.Cover), Cover: domain.ValueOrZero(record.Poster),
 			Actors: []domain.Actor{}, Tags: []domain.Tag{}, PreviewImages: []domain.PreviewImage{},
 		},

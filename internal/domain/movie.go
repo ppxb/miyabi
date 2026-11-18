@@ -8,6 +8,22 @@ type MovieRef struct {
 	Zone    Zone   `json:"zone,omitempty"`
 }
 
+// NormalizeRating10 converts a source rating to a 10-point scale.
+// Sources that do not report a maximum are treated as 5-point scales.
+func NormalizeRating10(rating, max float64) float64 {
+	if rating <= 0 {
+		return 0
+	}
+	if max <= 0 {
+		max = 5
+	}
+	value := rating * 10 / max
+	if value > 10 {
+		return 10
+	}
+	return value
+}
+
 // LocalMovie represents the identity and library ID of a movie indexed locally.
 type LocalMovie struct {
 	ID      int

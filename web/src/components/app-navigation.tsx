@@ -25,7 +25,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
   { label: '媒体库', icon: FilmIcon, to: '/' },
   { label: '观看历史', icon: HistoryIcon, to: '/history' },
   { label: '探索', icon: CompassIcon, to: '/discover' },
-  { label: '收藏与关注', icon: BookmarkIcon, to: '/subscriptions' },
+  { label: '关注', icon: BookmarkIcon, to: '/subscriptions' },
   { label: '设置', icon: SettingsIcon, to: '/settings' }
 ]
 

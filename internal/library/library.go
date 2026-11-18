@@ -3,6 +3,7 @@ package library
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -348,6 +349,7 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 	records, err := s.database.Movie.Query().Where(movie.HasFilesWith(scope)).
 		Select(movie.FieldID, movie.FieldCode, movie.FieldTitle, movie.FieldJavdbID, movie.FieldCover, movie.FieldPoster,
 			movie.FieldFanarts, movie.FieldReleaseDate, movie.FieldDuration, movie.FieldRating,
+			movie.FieldMetadata,
 			movie.FieldDirectorID, movie.FieldDirectorName, movie.FieldMakerID, movie.FieldMakerName,
 			movie.FieldSeriesID, movie.FieldSeriesName,
 			movie.FieldScrapeStatus).
@@ -363,34 +365,81 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 		return result, fmt.Errorf("list library movies: %w", err)
 	}
 	for _, record := range records {
-		item := Movie{
-			ID: record.ID, Code: record.Code, Title: record.Title,
-			JavDBID: record.JavdbID, Cover: record.Cover, Poster: record.Poster,
-			Duration: domain.ValueOrZero(record.Duration), Rating: domain.ValueOrZero(record.Rating),
-			Director: libraryEntity(record.DirectorID, record.DirectorName),
-			Maker:    libraryEntity(record.MakerID, record.MakerName), Series: libraryEntity(record.SeriesID, record.SeriesName),
-			Actors: make([]Entity, 0, len(record.Edges.Actors)),
-			Tags:   make([]Tag, 0, len(record.Edges.Tags)), ScrapeStatus: record.ScrapeStatus,
-		}
-		if record.ReleaseDate != nil {
-			item.ReleaseDate = record.ReleaseDate.Format(time.DateOnly)
-		}
-		if len(record.Fanarts) > 0 {
-			item.Fanart = record.Fanarts[0]
-		}
-		for _, person := range record.Edges.Actors {
-			item.Actors = append(item.Actors, Entity{Provider: person.Provider, ID: person.SourceID, Name: person.Name})
-		}
-		for _, label := range record.Edges.Tags {
-			item.Tags = append(item.Tags, Tag{ID: label.ID, Provider: label.Provider, SourceID: label.SourceID, Name: label.Name})
-		}
-		result.Movies = append(result.Movies, item)
+		result.Movies = append(result.Movies, movieItem(record))
 	}
 	if err := s.markCloudSources(ctx, result.Movies, cloudScope); err != nil {
 		return result, err
 	}
 	result.HasMore = (page-1)*limit+len(result.Movies) < result.Total
 	return result, nil
+}
+
+func movieItem(record *ent.Movie) Movie {
+	doc := domain.ValueOrZero(record.Metadata)
+	item := Movie{
+		ID: record.ID, Code: record.Code, Title: record.Title,
+		JavDBID: record.JavdbID, Cover: record.Cover, Poster: record.Poster,
+		Duration: domain.ValueOrZero(record.Duration),
+		Rating:   domain.NormalizeRating10(domain.ValueOrZero(record.Rating), doc.RatingMax),
+		Director: libraryEntity(record.DirectorID, record.DirectorName),
+		Maker:    libraryEntity(record.MakerID, record.MakerName), Series: libraryEntity(record.SeriesID, record.SeriesName),
+		Actors: make([]Entity, 0, len(record.Edges.Actors)),
+		Tags:   make([]Tag, 0, len(record.Edges.Tags)), ScrapeStatus: record.ScrapeStatus,
+	}
+	if record.ReleaseDate != nil {
+		item.ReleaseDate = record.ReleaseDate.Format(time.DateOnly)
+	}
+	if len(record.Fanarts) > 0 {
+		item.Fanart = record.Fanarts[0]
+	}
+	for _, person := range record.Edges.Actors {
+		item.Actors = append(item.Actors, Entity{Provider: person.Provider, ID: person.SourceID, Name: person.Name})
+	}
+	for _, label := range record.Edges.Tags {
+		item.Tags = append(item.Tags, Tag{ID: label.ID, Provider: label.Provider, SourceID: label.SourceID, Name: label.Name})
+	}
+	return item
+}
+
+// TopRated lists the highest rated movies on a normalized 10-point scale.
+func (s *Service) TopRated(ctx context.Context, limit int) ([]Movie, error) {
+	if limit <= 0 {
+		limit = 12
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	sources := s.cloudSources(ctx)
+	scope := fileScope(sources)
+	cloudScope := cloudFileScope(sources)
+	records, err := s.database.Movie.Query().
+		Where(movie.HasFilesWith(scope), movie.RatingNotNil(), movie.RatingGT(0)).
+		WithActors(func(query *ent.ActorQuery) {
+			query.Select(actor.FieldID, actor.FieldProvider, actor.FieldSourceID, actor.FieldName).Order(ent.Asc(actor.FieldName), ent.Asc(actor.FieldID))
+		}).
+		WithTags(func(query *ent.TagQuery) {
+			query.Select(tag.FieldID, tag.FieldProvider, tag.FieldSourceID, tag.FieldName).Order(ent.Asc(tag.FieldName), ent.Asc(tag.FieldID))
+		}).All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list top rated movies: %w", err)
+	}
+	items := make([]Movie, 0, len(records))
+	for _, record := range records {
+		items = append(items, movieItem(record))
+	}
+	if err := s.markCloudSources(ctx, items, cloudScope); err != nil {
+		return nil, err
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].Rating != items[j].Rating {
+			return items[i].Rating > items[j].Rating
+		}
+		return items[i].ID > items[j].ID
+	})
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
 }
 
 // markCloudSources flags movies that have at least one file in a 115 source.

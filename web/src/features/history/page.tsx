@@ -1,15 +1,19 @@
 import { useState } from 'react'
 
-import { HISTORY_PAGE_SIZE, useClearHistory, useHistory } from '@/api/history'
+import {
+  HISTORY_PAGE_SIZE,
+  useClearHistory,
+  useHistory,
+  type WatchHistoryItem
+} from '@/api/history'
+import type { LibraryMovie } from '@/api/library'
 import { AppPage } from '@/components/app-page'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { ListPagination } from '@/components/list-pagination'
-import { MovieCard } from '@/components/movie'
 import { MovieGridLayout } from '@/components/movie/movie-grid-layout'
 import { MovieGridSkeleton } from '@/components/movie/movie-grid-skeleton'
 import { PageHeader } from '@/components/page-header'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -19,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import { LibraryMovieCard } from '@/features/library/movie-card'
 import { LibraryPlayerDialog } from '@/features/library/player-dialog'
 
 export function HistoryPage({
@@ -107,53 +112,23 @@ export function HistoryPage({
   )
 }
 
-function HistoryCard({
-  item,
-  onPlay
-}: {
-  item: {
-    movie_id: number
-    code: string
-    title: string
-    cover?: string
-    poster?: string
-    position: number
-    duration: number
-  }
-  onPlay: () => void
-}) {
+function HistoryCard({ item, onPlay }: { item: WatchHistoryItem; onPlay: () => void }) {
   const percent =
     item.duration > 0
       ? Math.max(0, Math.min(100, Math.round((item.position / item.duration) * 100)))
       : 0
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      className="block h-full min-w-0 cursor-pointer rounded-2xl outline-ring"
-      onClick={onPlay}
-      onKeyDown={event => {
-        if (event.key !== 'Enter' && event.key !== ' ') return
-        event.preventDefault()
-        if (!event.repeat) onPlay()
-      }}
-    >
-      <MovieCard
-        movie={{ code: item.code, title: item.title, cover: item.cover ?? item.poster }}
-        titleTooltip={false}
-        hideContent
-        state={<Badge variant="secondary">{percent}%</Badge>}
-        coverOverlay={
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-3 pt-8">
-            <h3 className="line-clamp-2 text-sm leading-5 font-semibold text-white">
-              {item.title || item.code}
-            </h3>
-            <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/25">
-              <div className="h-full bg-success" style={{ width: `${percent}%` }} />
-            </div>
-          </div>
-        }
-      />
-    </div>
-  )
+  const movie: LibraryMovie = {
+    id: item.movie_id,
+    code: item.code,
+    title: item.title,
+    cover: item.cover,
+    poster: item.poster,
+    duration: item.duration,
+    rating: item.rating ?? 0,
+    actors: item.actors ?? [],
+    source: item.source,
+    tags: [],
+    scrape_status: 'done'
+  }
+  return <LibraryMovieCard movie={movie} progress={percent} onPlay={onPlay} />
 }
