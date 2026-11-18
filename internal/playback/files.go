@@ -94,6 +94,11 @@ func (service *Service) openFile(ctx context.Context, fileID string) (openedFile
 	if err != nil {
 		return openedFile{}, fmt.Errorf("read indexed video: %w", err)
 	}
+	return service.openFileRecord(ctx, record)
+}
+
+func (service *Service) openFileRecord(ctx context.Context, record *ent.File) (openedFile, error) {
+	fileID := record.FileID
 	source, err := service.sourceFor(ctx, record.AccountID, record.RootID)
 	if err != nil {
 		return openedFile{}, err
@@ -125,36 +130,46 @@ func (service *Service) openFile(ctx context.Context, fileID string) (openedFile
 
 // StartMovie starts playback for a movie's primary video in one call.
 func (service *Service) StartMovie(ctx context.Context, movieID int, userAgent string) (Playback, error) {
-	files, err := service.Files(ctx, movieID)
+	records, err := service.database.File.Query().
+		Where(file.MovieIDEQ(movieID), file.AccountIDNEQ(domain.LocalAccountID)).
+		Select(file.FieldFileID, file.FieldSize, file.FieldAccountID, file.FieldRootID, file.FieldPickCode, file.FieldName, file.FieldPath).
+		Order(ent.Desc(file.FieldSize), ent.Asc(file.FieldPath), ent.Asc(file.FieldID)).All(ctx)
 	if err != nil {
-		return Playback{}, err
+		return Playback{}, fmt.Errorf("read indexed videos: %w", err)
 	}
-	if len(files.Files) == 0 {
+	if len(records) == 0 {
 		return Playback{}, domain.E(domain.KindNotFound, "当前挂载目录中未找到该影片的媒体文件", nil)
 	}
 	resume, err := service.Resume(ctx, movieID)
 	if err != nil {
 		return Playback{}, err
 	}
-	fileID := files.Files[0].ID
+	target := records[0]
 	if resume != nil {
-		for _, item := range files.Files {
-			if item.ID == resume.FileID {
-				fileID = item.ID
+		for _, item := range records {
+			if item.FileID == resume.FileID {
+				target = item
 				break
 			}
 		}
-		if fileID != files.Files[0].ID && fileID != resume.FileID {
+		if target.FileID != resume.FileID {
 			resume = nil
 		}
 	}
-	result, err := service.Start(ctx, fileID, userAgent)
+	opened, err := service.openFileRecord(ctx, target)
 	if err != nil {
 		return Playback{}, err
 	}
-	if resume != nil && resume.FileID == fileID {
-		result.Resume = resume
+	specs, err := mediaSpecs(ctx, opened.sess, opened.pickCode, userAgent)
+	if err != nil {
+		return Playback{}, err
 	}
+	result, err := service.createSession(opened.source, specs)
+	if err != nil {
+		return Playback{}, err
+	}
+	result.FileID = target.FileID
+	result.Resume = resume
 	return result, nil
 }
 

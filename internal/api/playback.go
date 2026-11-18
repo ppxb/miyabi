@@ -138,7 +138,7 @@ func playStreamHandler(play PlayManager) gin.HandlerFunc {
 			return
 		}
 		defer response.Body.Close()
-		for _, name := range []string{"Content-Type", "Content-Length", "Content-Range", "Accept-Ranges", "ETag", "Last-Modified"} {
+		for _, name := range []string{"Content-Type", "Content-Length", "Content-Range", "Accept-Ranges", "ETag", "Last-Modified", "Location"} {
 			if value := response.Header.Get(name); value != "" {
 				c.Header(name, value)
 			}

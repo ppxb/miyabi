@@ -29,6 +29,15 @@ func (service *Service) Stream(ctx context.Context, id string, index int, method
 	if err != nil {
 		return nil, err
 	}
+	if !resource.playlist {
+		// Direct media: let the browser stream from the 115 CDN itself instead of
+		// relaying every byte through this server.
+		return &http.Response{
+			StatusCode: http.StatusFound,
+			Header:     http.Header{"Location": []string{resource.url.String()}},
+			Body:       http.NoBody,
+		}, nil
+	}
 	ctx, cancel := context.WithCancel(ctx)
 	stop := context.AfterFunc(session.ctx, cancel)
 	release := func() { stop(); cancel() }
