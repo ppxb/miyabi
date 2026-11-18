@@ -59,10 +59,7 @@ export function MovieHero({
 function MovieStats({
   movie
 }: {
-  movie: Pick<
-    DiscoverMovie,
-    'release_date' | 'duration' | 'rating' | 'rating_source' | 'rating_max'
-  >
+  movie: Pick<DiscoverMovie, 'release_date' | 'duration' | 'rating' | 'rating_max'>
 }) {
   const stats: Array<{ label: string; value: string; icon: LucideIcon }> = []
   if (movie.release_date) {
@@ -72,9 +69,8 @@ function MovieStats({
     stats.push({ label: '片长', value: `${movie.duration} 分钟`, icon: ClockIcon })
   }
   if (movie.rating > 0) {
-    const source = movie.rating_source === 'javdb' ? 'JavDB' : movie.rating_source?.toUpperCase()
     stats.push({
-      label: source ? `${source} 评分` : '评分',
+      label: '评分',
       value: movie.rating_max
         ? `${movie.rating.toFixed(1)} / ${movie.rating_max}`
         : movie.rating.toFixed(1),
