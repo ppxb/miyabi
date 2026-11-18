@@ -3,6 +3,7 @@ import type { ComponentProps, KeyboardEvent, MouseEvent } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { test, vi } from 'vitest'
 
+import { ContextMenuTrigger } from '@/components/ui/context-menu'
 import { MovieDetailTrigger } from '@/features/movie-detail/detail-trigger'
 import { MovieDetailDialogContext } from '@/features/movie-detail/dialog-context'
 import { LibraryMovieCard } from '@/features/library/movie-card'
@@ -130,7 +131,9 @@ test('library cards always use an explicit local detail target', () => {
         scrape_status: 'done'
       }
     })
-    const trigger = card.props.children[0]
+    const triggerWrapper = card.props.children[0]
+    assert.equal(triggerWrapper.type, ContextMenuTrigger)
+    const trigger = triggerWrapper.props.children
     assert.equal(trigger.type, MovieDetailTrigger)
     const { openMovie, props, html } = renderTrigger(trigger.props)
     assert.match(html, /role="button"/)

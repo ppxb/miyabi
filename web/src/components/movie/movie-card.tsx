@@ -13,6 +13,7 @@ export function MovieCard({
   coverOverlay,
   titleTooltip = true,
   state,
+  hideContent = false,
   children
 }: {
   movie: { code: string; title: string; cover?: string }
@@ -22,6 +23,7 @@ export function MovieCard({
   coverOverlay?: ReactNode
   titleTooltip?: boolean
   state?: ReactNode
+  hideContent?: boolean
   children?: ReactNode
 }) {
   const title = movie.title || movie.code
@@ -40,13 +42,15 @@ export function MovieCard({
         </div>
         {coverOverlay}
       </div>
-      <CardContent className="min-w-0 space-y-2 p-3">
-        {titleTooltip ? <OverflowTooltip content={title}>{heading}</OverflowTooltip> : heading}
-        {description != null ? (
-          <div className="text-xs text-muted-foreground">{description}</div>
-        ) : null}
-        {children ? <div className="flex flex-wrap gap-1.5">{children}</div> : null}
-      </CardContent>
+      {hideContent ? null : (
+        <CardContent className="min-w-0 space-y-2 p-3">
+          {titleTooltip ? <OverflowTooltip content={title}>{heading}</OverflowTooltip> : heading}
+          {description != null ? (
+            <div className="text-xs text-muted-foreground">{description}</div>
+          ) : null}
+          {children ? <div className="flex flex-wrap gap-1.5">{children}</div> : null}
+        </CardContent>
+      )}
     </Card>
   )
 }
