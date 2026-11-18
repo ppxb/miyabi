@@ -23,8 +23,9 @@ type MediaSource struct {
 }
 
 type Playback struct {
-	ID      string        `json:"id"`
-	Sources []MediaSource `json:"sources"`
+	ID      string               `json:"id"`
+	Sources []MediaSource        `json:"sources"`
+	Source  domain.LibrarySource `json:"source"`
 }
 
 // Service manages playback sessions and stream proxying.

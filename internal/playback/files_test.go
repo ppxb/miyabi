@@ -1,0 +1,84 @@
+package playback
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/ppxb/miyabi/internal/drive"
+	"github.com/ppxb/miyabi/internal/pan"
+)
+
+type stubSourceSession struct {
+	download func(context.Context, string, string) (string, error)
+	play     func(context.Context, string, string) ([]pan.PlaySource, error)
+}
+
+func (s stubSourceSession) DownloadURL(ctx context.Context, pickCode, userAgent string) (string, error) {
+	return s.download(ctx, pickCode, userAgent)
+}
+
+func (s stubSourceSession) PlayURL(ctx context.Context, pickCode, userAgent string) ([]pan.PlaySource, error) {
+	return s.play(ctx, pickCode, userAgent)
+}
+
+func TestMediaSpecsPrefersDirectDownload(t *testing.T) {
+	specs, err := mediaSpecs(context.Background(), stubSourceSession{
+		download: func(context.Context, string, string) (string, error) { return "https://cdn.example/video.mp4", nil },
+		play: func(context.Context, string, string) ([]pan.PlaySource, error) {
+			t.Fatal("playback URL must not be requested when a download URL exists")
+			return nil, nil
+		},
+	}, "pick", "ua")
+	if err != nil || len(specs) != 1 {
+		t.Fatalf("specs=%+v err=%v", specs, err)
+	}
+	if specs[0].mediaType != "video/mp4" || specs[0].address != "https://cdn.example/video.mp4" || specs[0].playlist || specs[0].label != "原画" {
+		t.Fatalf("unexpected direct spec: %+v", specs[0])
+	}
+}
+
+func TestMediaSpecsFallsBackToHLS(t *testing.T) {
+	specs, err := mediaSpecs(context.Background(), stubSourceSession{
+		download: func(context.Context, string, string) (string, error) { return "", pan.ErrDownloadUnavailable },
+		play: func(context.Context, string, string) ([]pan.PlaySource, error) {
+			return []pan.PlaySource{
+				{URL: "https://cdn.example/1080.m3u8", Height: 1080, Definition: 1},
+				{URL: "https://cdn.example/2160.m3u8", Height: 2160, Definition: 100},
+			}, nil
+		},
+	}, "pick", "ua")
+	if err != nil || len(specs) != 2 {
+		t.Fatalf("specs=%+v err=%v", specs, err)
+	}
+	if specs[0].mediaType != "application/x-mpegurl" || !specs[0].playlist || specs[0].label != "1080p" {
+		t.Fatalf("unexpected first spec: %+v", specs[0])
+	}
+	if specs[1].label != "原画 · 2160p" || !specs[1].playlist {
+		t.Fatalf("unexpected original spec: %+v", specs[1])
+	}
+}
+
+func TestMediaSpecsReportsDownloadErrors(t *testing.T) {
+	cause := errors.New("network down")
+	if _, err := mediaSpecs(context.Background(), stubSourceSession{
+		download: func(context.Context, string, string) (string, error) { return "", cause },
+		play: func(context.Context, string, string) ([]pan.PlaySource, error) {
+			return nil, nil
+		},
+	}, "pick", "ua"); !errors.Is(err, cause) {
+		t.Fatalf("error = %v, want wrapped download failure", err)
+	}
+}
+
+func TestMediaSpecsReportsTranscodeUnavailable(t *testing.T) {
+	_, err := mediaSpecs(context.Background(), stubSourceSession{
+		download: func(context.Context, string, string) (string, error) { return "", pan.ErrDownloadUnavailable },
+		play: func(context.Context, string, string) ([]pan.PlaySource, error) {
+			return nil, pan.ErrTranscodeUnavailable
+		},
+	}, "pick", "ua")
+	if !errors.Is(err, drive.ErrTranscodeUnavailable) {
+		t.Fatalf("error = %v, want transcode unavailable", err)
+	}
+}

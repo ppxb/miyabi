@@ -5,7 +5,7 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 
 import { useLibraryMovie } from '@/api/library'
 import type { LibraryMovieDetail } from '@/api/library'
-import { usePlayback, usePlayFiles } from '@/api/play'
+import { useStartMoviePlayback } from '@/api/play'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
@@ -38,16 +38,14 @@ export function LibraryPlayerDialog({
 
 function LibraryPlayer({ movieId }: { movieId: number }) {
   const detail = useLibraryMovie(movieId)
-  const files = usePlayFiles(movieId)
-  const file = files.data?.files[0]
-  const playback = usePlayback(file?.id)
+  const playback = useStartMoviePlayback(movieId)
   const source = useMemo(() => {
     const sources = playback.data?.sources ?? []
     return sources.find(item => item.label.startsWith('原画')) ?? sources[0]
   }, [playback.data])
+  const error = playback.isError
 
   const title = detail.data?.title || detail.data?.code || '播放'
-  const error = !file || playback.isError || files.isError
   const hls = source?.type.includes('mpegurl') ?? false
   const skinStyle = {
     aspectRatio: '16 / 9',
@@ -77,7 +75,7 @@ function LibraryPlayer({ movieId }: { movieId: number }) {
         )}
       </div>
       <aside className="min-w-0 shrink-0 overflow-y-auto border-t bg-background p-5 lg:w-[26rem] lg:border-t-0 lg:border-l">
-        <MovieInfo movieId={movieId} show115={!!files.data?.source} />
+        <MovieInfo movieId={movieId} show115={!!playback.data?.source} />
       </aside>
     </>
   )

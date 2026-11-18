@@ -14,7 +14,11 @@ export type PlayFiles = {
 
 export type PlaySource = { src: string; type: string; label: string }
 
-export type Playback = { id: string; sources: PlaySource[] }
+export type Playback = {
+  id: string
+  sources: PlaySource[]
+  source: { account_id: string; directory: { id: string; name: string; path: string } }
+}
 
 const options = {
   gcTime: 0,
@@ -46,6 +50,27 @@ export function usePlayback(fileID?: string) {
     if (!id) return
     return () => {
       // The player aborts media requests on unmount; also release the server session.
+      void apiDelete(`/api/play/${id}`).catch(() => {})
+    }
+  }, [id])
+
+  return query
+}
+
+export function useStartMoviePlayback(movieID: number | null) {
+  const query = useQuery({
+    ...options,
+    staleTime: 0,
+    queryKey: ['play', 'start', movieID],
+    queryFn: ({ signal }) =>
+      apiGet<Playback>('/api/play/start', { movie_id: movieID ?? undefined }, signal),
+    enabled: movieID !== null
+  })
+  const id = query.data?.id
+
+  useEffect(() => {
+    if (!id) return
+    return () => {
       void apiDelete(`/api/play/${id}`).catch(() => {})
     }
   }, [id])

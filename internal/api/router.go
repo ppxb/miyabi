@@ -107,6 +107,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 
 	playAPI := protected.Group("/play", noStore())
 	playAPI.GET("/files", playFilesHandler(deps.Play))
+	playAPI.GET("/start", playStartMovieHandler(deps.Play))
 	playAPI.GET("/:id", playStartHandler(deps.Play))
 	playAPI.DELETE("/:id", playReleaseHandler(deps.Play))
 	playAPI.GET("/:id/stream/:resource", playStreamHandler(deps.Play))

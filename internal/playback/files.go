@@ -43,7 +43,7 @@ func (service *Service) Files(ctx context.Context, movieID int) (PlayFiles, erro
 // Start creates a playback session for one indexed video file.
 func (service *Service) Start(ctx context.Context, fileID, userAgent string) (Playback, error) {
 	record, err := service.database.File.Query().Where(file.FileIDEQ(fileID)).
-		Select(file.FieldAccountID, file.FieldRootID).Only(ctx)
+		Select(file.FieldAccountID, file.FieldRootID, file.FieldPickCode, file.FieldName).Only(ctx)
 	if err != nil {
 		return Playback{}, fmt.Errorf("read indexed video: %w", err)
 	}
@@ -55,34 +55,66 @@ func (service *Service) Start(ctx context.Context, fileID, userAgent string) (Pl
 	if err != nil {
 		return Playback{}, err
 	}
-	if _, err := service.database.File.Query().Where(database.LibraryFiles(source), file.FileIDEQ(fileID)).Only(ctx); err != nil {
-		return Playback{}, fmt.Errorf("read indexed video: %w", err)
+	pickCode, name := record.PickCode, record.Name
+	// Only ask 115 for file info when the index predates pick-code storage.
+	if pickCode == "" {
+		info, err := sess.Info(ctx, fileID)
+		if err != nil {
+			return Playback{}, fmt.Errorf("read 115 video: %w", err)
+		}
+		if info.IsDirectory || !domain.IsVideo(info.Name) || !drive.WithinSource(info, source) {
+			return Playback{}, domain.E(domain.KindNotFound, "视频已不在当前媒体目录中，请重新扫描", fs.ErrNotExist)
+		}
+		pickCode, name = info.PickCode, info.Name
 	}
-	info, err := sess.Info(ctx, fileID)
-	if err != nil {
-		return Playback{}, fmt.Errorf("read 115 video: %w", err)
-	}
-	if info.IsDirectory || !domain.IsVideo(info.Name) || !drive.WithinSource(info, source) {
+	if !domain.IsVideo(name) {
 		return Playback{}, domain.E(domain.KindNotFound, "视频已不在当前媒体目录中，请重新扫描", fs.ErrNotExist)
 	}
-	if info.PickCode == "" {
+	if pickCode == "" {
 		return Playback{}, fmt.Errorf("115 returned no pick code for video")
 	}
 	// Prefer the direct download URL: it starts immediately, seeks natively and
 	// avoids waiting for a transcode that may still be generating.
-	downloadURL, err := sess.DownloadURL(ctx, info.PickCode, userAgent)
+	specs, err := mediaSpecs(ctx, sess, pickCode, userAgent)
+	if err != nil {
+		return Playback{}, err
+	}
+	return service.createSession(source, specs)
+}
+
+// StartMovie starts playback for a movie's primary video in one call.
+func (service *Service) StartMovie(ctx context.Context, movieID int, userAgent string) (Playback, error) {
+	files, err := service.Files(ctx, movieID)
+	if err != nil {
+		return Playback{}, err
+	}
+	if len(files.Files) == 0 {
+		return Playback{}, domain.E(domain.KindNotFound, "当前挂载目录中未找到该影片的媒体文件", nil)
+	}
+	return service.Start(ctx, files.Files[0].ID, userAgent)
+}
+
+// playSourceSession is the subset of a drive session needed to resolve media.
+type playSourceSession interface {
+	DownloadURL(ctx context.Context, pickCode, userAgent string) (string, error)
+	PlayURL(ctx context.Context, pickCode, userAgent string) ([]pan.PlaySource, error)
+}
+
+// mediaSpecs prefers the direct download URL and falls back to transcoded HLS.
+func mediaSpecs(ctx context.Context, sess playSourceSession, pickCode, userAgent string) ([]mediaSpec, error) {
+	downloadURL, err := sess.DownloadURL(ctx, pickCode, userAgent)
 	if err == nil {
-		return service.createSession(source, []mediaSpec{{address: downloadURL, mediaType: "video/mp4", label: "原画"}})
+		return []mediaSpec{{address: downloadURL, mediaType: "video/mp4", label: "原画"}}, nil
 	}
 	if !errors.Is(err, pan.ErrDownloadUnavailable) {
-		return Playback{}, fmt.Errorf("get 115 download URL: %w", err)
+		return nil, fmt.Errorf("get 115 download URL: %w", err)
 	}
-	sources, err := sess.PlayURL(ctx, info.PickCode, userAgent)
+	sources, err := sess.PlayURL(ctx, pickCode, userAgent)
 	if err != nil {
 		if errors.Is(err, pan.ErrTranscodeUnavailable) {
-			return Playback{}, drive.ErrTranscodeUnavailable
+			return nil, drive.ErrTranscodeUnavailable
 		}
-		return Playback{}, fmt.Errorf("get 115 playback URL: %w", err)
+		return nil, fmt.Errorf("get 115 playback URL: %w", err)
 	}
 	specs := make([]mediaSpec, 0, len(sources))
 	for _, item := range sources {
@@ -92,7 +124,7 @@ func (service *Service) Start(ctx context.Context, fileID, userAgent string) (Pl
 		}
 		specs = append(specs, mediaSpec{address: item.URL, mediaType: "application/x-mpegurl", label: label, playlist: true})
 	}
-	return service.createSession(source, specs)
+	return specs, nil
 }
 
 func (service *Service) movieSource(ctx context.Context, movieID int) (domain.LibrarySource, error) {

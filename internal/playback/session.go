@@ -36,7 +36,7 @@ type playSession struct {
 
 func (service *Service) createSession(source domain.LibrarySource, specs []mediaSpec) (Playback, error) {
 	session := &playSession{id: uuid.NewString(), source: source, byURL: make(map[string]int)}
-	result := Playback{ID: session.id, Sources: make([]MediaSource, 0, len(specs))}
+	result := Playback{ID: session.id, Source: source, Sources: make([]MediaSource, 0, len(specs))}
 	for _, spec := range specs {
 		address, err := url.Parse(spec.address)
 		if err != nil {
