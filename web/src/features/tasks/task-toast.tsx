@@ -32,7 +32,7 @@ function taskToastOptions(
 ) {
   return {
     id,
-    duration: active || retryTaskID !== undefined ? Infinity : 8000,
+    duration: active ? Infinity : 8000,
     dismissible: true,
     closeButton: false,
     icon: undefined,

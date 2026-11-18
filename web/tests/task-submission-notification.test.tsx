@@ -132,7 +132,7 @@ for (const action of ['rescrape', 'scan', 'rebuild'] as const) {
       expect(vi.mocked(notify).mock.calls[0]![1]).toMatchObject({
         id: 'scan:254',
         description: latest.error,
-        duration: status === 'failed' ? Infinity : 8000
+        duration: 8000
       })
     })
   }

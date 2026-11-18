@@ -18,7 +18,7 @@ export function LibraryProgress({ task }: { task?: ScanTask }) {
     total > 0
       ? `刮削 ${done}/${total}${failed > 0 ? ` · 失败 ${failed}` : ''}`
       : `扫描中：${scan.movies} 部影片 / ${scan.files_scanned} 个文件`
-  const radius = 16
+  const radius = 18
   const circumference = 2 * Math.PI * radius
   const offset = circumference * (1 - bounded / 100)
 
@@ -30,25 +30,29 @@ export function LibraryProgress({ task }: { task?: ScanTask }) {
           aria-label={label}
           className="relative inline-flex size-11 shrink-0 items-center justify-center"
         >
-          <svg viewBox="0 0 40 40" className="size-11 -rotate-90">
+          <svg
+            viewBox="0 0 44 44"
+            className="size-11 -rotate-90"
+            shapeRendering="geometricPrecision"
+          >
             <circle
-              cx="20"
-              cy="20"
+              cx="22"
+              cy="22"
               r={radius}
               fill="none"
               strokeWidth="4"
               className="stroke-muted"
             />
             <circle
-              cx="20"
-              cy="20"
+              cx="22"
+              cy="22"
               r={radius}
               fill="none"
               strokeWidth="4"
               strokeLinecap="round"
               strokeDasharray={circumference}
               strokeDashoffset={offset}
-              className="stroke-primary transition-[stroke-dashoffset] duration-500"
+              className="stroke-success transition-[stroke-dashoffset] duration-500"
             />
           </svg>
           <span className="absolute text-[10px] font-medium tabular-nums">{bounded}%</span>
