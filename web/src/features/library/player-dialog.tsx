@@ -1,9 +1,10 @@
 import { HlsVideo } from '@videojs/react/media/hls-video'
-import { VideoPlayer, VideoSkin } from '@videojs/react/video'
-import { StarIcon } from 'lucide-react'
-import { useMemo, type ReactNode } from 'react'
+import { Video, VideoPlayer, VideoSkin } from '@videojs/react/video'
+import { CalendarIcon, ClockIcon, StarIcon, type LucideIcon } from 'lucide-react'
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 
 import { useLibraryMovie } from '@/api/library'
+import type { LibraryMovieDetail } from '@/api/library'
 import { usePlayback, usePlayFiles } from '@/api/play'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -17,13 +18,18 @@ export function LibraryPlayerDialog({
   movieId: number | null
   onClose: () => void
 }) {
+  const [open, setOpen] = useState(true)
   if (movieId === null) return null
   return (
-    <Dialog open onOpenChange={open => (open ? undefined : onClose())}>
-      <DialogContent
-        showCloseButton={false}
-        className="flex h-[min(54rem,calc(100dvh-2rem))] w-[calc(100%-2rem)] max-w-[96rem] flex-col gap-0 overflow-hidden p-0 sm:max-w-[96rem] lg:flex-row"
-      >
+    <Dialog
+      open={open}
+      onOpenChange={setOpen}
+      disablePointerDismissal
+      onOpenChangeComplete={next => {
+        if (!next) onClose()
+      }}
+    >
+      <DialogContent className="flex h-[min(54rem,calc(100dvh-2rem))] w-[calc(100%-2rem)] max-w-[96rem] flex-col gap-0 overflow-hidden p-0 sm:max-w-[96rem] lg:flex-row">
         <LibraryPlayer movieId={movieId} />
       </DialogContent>
     </Dialog>
@@ -42,6 +48,13 @@ function LibraryPlayer({ movieId }: { movieId: number }) {
 
   const title = detail.data?.title || detail.data?.code || '播放'
   const error = !file || playback.isError || files.isError
+  const hls = source?.type.includes('mpegurl') ?? false
+  const skinStyle = {
+    aspectRatio: '16 / 9',
+    width: '100%',
+    fontFamily: 'var(--font-sans)',
+    '--media-font-family': 'var(--font-sans)'
+  } as CSSProperties
 
   return (
     <>
@@ -49,8 +62,12 @@ function LibraryPlayer({ movieId }: { movieId: number }) {
       <div className="flex min-w-0 flex-1 items-center justify-center bg-black">
         {source && !error ? (
           <VideoPlayer title={title}>
-            <VideoSkin style={{ aspectRatio: '16 / 9', width: '100%' }}>
-              <HlsVideo src={source.src} playsInline autoPlay />
+            <VideoSkin style={skinStyle}>
+              {hls ? (
+                <HlsVideo src={source.src} playsInline autoPlay />
+              ) : (
+                <Video src={source.src} playsInline autoPlay />
+              )}
             </VideoSkin>
           </VideoPlayer>
         ) : (
@@ -60,13 +77,13 @@ function LibraryPlayer({ movieId }: { movieId: number }) {
         )}
       </div>
       <aside className="min-w-0 shrink-0 overflow-y-auto border-t bg-background p-5 lg:w-[26rem] lg:border-t-0 lg:border-l">
-        <MovieInfo movieId={movieId} />
+        <MovieInfo movieId={movieId} show115={!!files.data?.source} />
       </aside>
     </>
   )
 }
 
-function MovieInfo({ movieId }: { movieId: number }) {
+function MovieInfo({ movieId, show115 = false }: { movieId: number; show115?: boolean }) {
   const detail = useLibraryMovie(movieId)
   const movie = detail.data
 
@@ -77,16 +94,9 @@ function MovieInfo({ movieId }: { movieId: number }) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="tabular-nums">
-            {movie.code}
-          </Badge>
-          {movie.rating > 0 ? (
-            <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-500">
-              <StarIcon className="size-4 fill-amber-400 text-amber-400" />
-              <span className="tabular-nums">{movie.rating.toFixed(1)}</span>
-            </span>
-          ) : null}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant="frosted">{movie.code}</Badge>
+          {show115 ? <Badge variant="frosted">115</Badge> : null}
         </div>
         <h2 className="text-xl leading-snug font-bold">{movie.title || movie.code}</h2>
         {movie.origin_title && movie.origin_title !== movie.title ? (
@@ -94,32 +104,10 @@ function MovieInfo({ movieId }: { movieId: number }) {
         ) : null}
       </div>
 
-      <dl className="grid grid-cols-2 gap-3 text-sm">
-        {movie.release_date ? (
-          <div>
-            <dt className="text-xs text-muted-foreground">发行日期</dt>
-            <dd className="tabular-nums">{movie.release_date}</dd>
-          </div>
-        ) : null}
-        {movie.duration > 0 ? (
-          <div>
-            <dt className="text-xs text-muted-foreground">片长</dt>
-            <dd className="tabular-nums">{movie.duration} 分钟</dd>
-          </div>
-        ) : null}
-        {movie.maker?.name ? (
-          <div>
-            <dt className="text-xs text-muted-foreground">厂商</dt>
-            <dd>{movie.maker.name}</dd>
-          </div>
-        ) : null}
-        {movie.series?.name ? (
-          <div>
-            <dt className="text-xs text-muted-foreground">系列</dt>
-            <dd>{movie.series.name}</dd>
-          </div>
-        ) : null}
-      </dl>
+      <MovieStats movie={movie} />
+
+      <InfoRow label="厂商">{movie.maker?.name || 'N/A'}</InfoRow>
+      <InfoRow label="系列">{movie.series?.name || 'N/A'}</InfoRow>
 
       <InfoRow label="演员">
         {movie.actors.length > 0 ? (
@@ -147,6 +135,43 @@ function MovieInfo({ movieId }: { movieId: number }) {
         )}
       </InfoRow>
     </div>
+  )
+}
+
+function MovieStats({ movie }: { movie: LibraryMovieDetail }) {
+  const stats: Array<{ label: string; value: string; icon: LucideIcon }> = []
+  if (movie.release_date) {
+    stats.push({ label: '发行日期', value: movie.release_date, icon: CalendarIcon })
+  }
+  if (movie.duration > 0) {
+    stats.push({ label: '片长', value: `${movie.duration} 分钟`, icon: ClockIcon })
+  }
+  if (movie.rating > 0) {
+    stats.push({
+      label: '评分',
+      value: movie.rating_max
+        ? `${movie.rating.toFixed(1)} / ${movie.rating_max}`
+        : movie.rating.toFixed(1),
+      icon: StarIcon
+    })
+  }
+  if (stats.length === 0) return null
+
+  return (
+    <dl className="flex flex-wrap divide-x divide-border/60 rounded-2xl bg-muted py-1 ring-1 ring-border dark:bg-card/60 dark:ring-0">
+      {stats.map(stat => (
+        <div
+          key={stat.label}
+          className="flex min-w-0 flex-1 flex-col items-center gap-2 p-3 sm:p-4"
+        >
+          <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <stat.icon className="size-4" />
+            {stat.label}
+          </dt>
+          <dd className="text-sm font-semibold whitespace-nowrap tabular-nums">{stat.value}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 

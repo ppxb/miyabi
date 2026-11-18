@@ -68,6 +68,15 @@ func (service *Service) Start(ctx context.Context, fileID, userAgent string) (Pl
 	if info.PickCode == "" {
 		return Playback{}, fmt.Errorf("115 returned no pick code for video")
 	}
+	// Prefer the direct download URL: it starts immediately, seeks natively and
+	// avoids waiting for a transcode that may still be generating.
+	downloadURL, err := sess.DownloadURL(ctx, info.PickCode, userAgent)
+	if err == nil {
+		return service.createSession(source, []mediaSpec{{address: downloadURL, mediaType: "video/mp4", label: "原画"}})
+	}
+	if !errors.Is(err, pan.ErrDownloadUnavailable) {
+		return Playback{}, fmt.Errorf("get 115 download URL: %w", err)
+	}
 	sources, err := sess.PlayURL(ctx, info.PickCode, userAgent)
 	if err != nil {
 		if errors.Is(err, pan.ErrTranscodeUnavailable) {
@@ -75,7 +84,15 @@ func (service *Service) Start(ctx context.Context, fileID, userAgent string) (Pl
 		}
 		return Playback{}, fmt.Errorf("get 115 playback URL: %w", err)
 	}
-	return service.createSession(source, sources)
+	specs := make([]mediaSpec, 0, len(sources))
+	for _, item := range sources {
+		label := fmt.Sprintf("%dp", item.Height)
+		if item.Definition == 100 {
+			label = "原画 · " + label
+		}
+		specs = append(specs, mediaSpec{address: item.URL, mediaType: "application/x-mpegurl", label: label, playlist: true})
+	}
+	return service.createSession(source, specs)
 }
 
 func (service *Service) movieSource(ctx context.Context, movieID int) (domain.LibrarySource, error) {

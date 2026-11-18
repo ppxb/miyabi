@@ -10,12 +10,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ppxb/miyabi/internal/domain"
-	"github.com/ppxb/miyabi/internal/pan"
 )
 
 type playResource struct {
 	url      *url.URL
 	playlist bool
+}
+
+type mediaSpec struct {
+	address   string
+	mediaType string
+	label     string
+	playlist  bool
 }
 
 type playSession struct {
@@ -28,23 +34,19 @@ type playSession struct {
 	byURL     map[string]int
 }
 
-func (service *Service) createSession(source domain.LibrarySource, sources []pan.PlaySource) (Playback, error) {
+func (service *Service) createSession(source domain.LibrarySource, specs []mediaSpec) (Playback, error) {
 	session := &playSession{id: uuid.NewString(), source: source, byURL: make(map[string]int)}
-	result := Playback{ID: session.id, Sources: make([]MediaSource, 0, len(sources))}
-	for _, item := range sources {
-		address, err := url.Parse(item.URL)
+	result := Playback{ID: session.id, Sources: make([]MediaSource, 0, len(specs))}
+	for _, spec := range specs {
+		address, err := url.Parse(spec.address)
 		if err != nil {
 			return Playback{}, fmt.Errorf("115 returned an invalid playback URL")
 		}
-		local, err := session.register(address, true)
+		local, err := session.register(address, spec.playlist)
 		if err != nil {
 			return Playback{}, err
 		}
-		label := fmt.Sprintf("%dp", item.Height)
-		if item.Definition == 100 {
-			label = "原画 · " + label
-		}
-		result.Sources = append(result.Sources, MediaSource{Src: local, Type: "application/x-mpegurl", Label: label})
+		result.Sources = append(result.Sources, MediaSource{Src: local, Type: spec.mediaType, Label: spec.label})
 	}
 	service.mu.Lock()
 	defer service.mu.Unlock()
