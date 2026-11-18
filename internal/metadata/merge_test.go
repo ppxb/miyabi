@@ -35,7 +35,8 @@ func TestMergeKeepsJavDBEntitiesAndAllSourceArtwork(t *testing.T) {
 		got.Detail.Rating != 4.2 || got.Detail.RatingSource != "javdb" {
 		t.Fatalf("incorrect field priority: %+v", got.Detail)
 	}
-	if !reflect.DeepEqual(got.Detail.Actors, catalogue.Detail.Actors) || !reflect.DeepEqual(got.Detail.Tags, catalogue.Detail.Tags) ||
+	wantTags := append(append([]domain.Tag{}, catalogue.Detail.Tags...), domain.Tag{Provider: "fanza", ID: "official-only", Name: "Official genre"})
+	if !reflect.DeepEqual(got.Detail.Actors, catalogue.Detail.Actors) || !reflect.DeepEqual(got.Detail.Tags, wantTags) ||
 		!reflect.DeepEqual(got.Detail.Maker, catalogue.Detail.Maker) || !reflect.DeepEqual(got.Detail.Series, catalogue.Detail.Series) || !reflect.DeepEqual(got.Detail.Director, catalogue.Detail.Director) {
 		t.Fatalf("catalogue entity identities were replaced: %+v", got.Detail)
 	}

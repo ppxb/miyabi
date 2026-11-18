@@ -3,17 +3,21 @@ package metadata
 import (
 	"cmp"
 	"slices"
+	"strings"
 
 	"github.com/ppxb/miyabi/internal/domain"
 )
 
 // merge only combines confirmed results for the same film. JavDB owns catalogue
 // metadata when available, while artwork keeps the configured source order.
-// Entity lists stay intact so names cannot replace another provider's IDs.
+// Actors and tags are unioned across providers (deduplicated by name) so every
+// source can contribute instead of stopping at the first complete one.
 func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 	var result domain.MovieMetadata
 	result.Detail.FieldSources = make(map[string]string)
 	images := make(map[string]bool)
+	actors := make(map[string]bool)
+	tags := make(map[string]bool)
 	for _, item := range results {
 		for _, image := range item.Images {
 			key := image.Role + ":" + image.URL
@@ -70,9 +74,19 @@ func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 			out.RatingMax = m.RatingMax
 			out.RatingSource = provider
 		}
-		if len(out.Actors) == 0 && len(m.Actors) > 0 {
-			out.Actors = m.Actors
-			out.FieldSources["actors"] = provider
+		for _, person := range m.Actors {
+			key := "name:" + strings.ToLower(strings.TrimSpace(person.Name))
+			if strings.TrimSpace(person.Name) == "" {
+				key = person.Provider + ":" + person.ID
+			}
+			if actors[key] {
+				continue
+			}
+			actors[key] = true
+			out.Actors = append(out.Actors, person)
+			if _, ok := out.FieldSources["actors"]; !ok {
+				out.FieldSources["actors"] = provider
+			}
 		}
 		if out.Maker == nil && m.Maker != nil {
 			out.Maker = m.Maker
@@ -86,9 +100,19 @@ func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 			out.Series = m.Series
 			out.FieldSources["series"] = provider
 		}
-		if len(out.Tags) == 0 && len(m.Tags) > 0 {
-			out.Tags = m.Tags
-			out.FieldSources["tags"] = provider
+		for _, label := range m.Tags {
+			key := "name:" + strings.ToLower(strings.TrimSpace(label.Name))
+			if strings.TrimSpace(label.Name) == "" {
+				key = label.Provider + ":" + label.ID
+			}
+			if tags[key] {
+				continue
+			}
+			tags[key] = true
+			out.Tags = append(out.Tags, label)
+			if _, ok := out.FieldSources["tags"]; !ok {
+				out.FieldSources["tags"] = provider
+			}
 		}
 	}
 	result.Detail.HasPreview = len(result.Detail.PreviewImages) > 0 || result.Detail.PreviewVideo != ""

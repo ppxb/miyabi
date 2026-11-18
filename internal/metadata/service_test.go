@@ -59,7 +59,7 @@ func TestRefreshBypassesSuccessfulAndMissingSourceCaches(t *testing.T) {
 	}
 }
 
-func TestRefreshDoesNotPublishOfficialOnlyDataWhenJavDBFails(t *testing.T) {
+func TestRefreshAcceptsCompleteOfficialDataWhenJavDBFails(t *testing.T) {
 	official := &sourceStub{id: "fanza", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
 		return completeFixture("fanza", code), nil
 	}}
@@ -68,11 +68,8 @@ func TestRefreshDoesNotPublishOfficialOnlyDataWhenJavDBFails(t *testing.T) {
 	}}
 	s := newTestService(t, official, catalogue)
 	m, err := s.Resolve(t.Context(), domain.MovieRef{Code: "IPZZ-960", Refresh: true})
-	if err == nil || m.Detail.Code != "" {
-		t.Fatalf("partial rebuild accepted: %+v %v", m, err)
-	}
-	if _, retry := domain.RetryDelay(err); !retry {
-		t.Fatalf("source failure cannot retry: %v", err)
+	if err != nil || m.Detail.Code != "IPZZ-960" || m.Detail.Title != "fanza title" {
+		t.Fatalf("complete official result rejected: %+v %v", m, err)
 	}
 }
 

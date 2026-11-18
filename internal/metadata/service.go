@@ -148,7 +148,7 @@ func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.Movi
 		var results []domain.MovieMetadata
 		var merged domain.MovieMetadata
 		for _, setting := range settings {
-			if !setting.Enabled || (setting.ID != "javdb" && merged.Detail.Code != "" && !needsSupplement(merged)) {
+			if !setting.Enabled {
 				continue
 			}
 			result, err := s.resolveLayer(ctx, s.sources[setting.ID], ref, layer)
@@ -171,11 +171,6 @@ func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.Movi
 		}
 		if err := ctx.Err(); err != nil {
 			return domain.MovieMetadata{}, err
-		}
-		// A rebuild must not replace saved catalogue data with a partial result
-		// merely because a source is temporarily unavailable.
-		if ref.Refresh && len(failures) > 0 {
-			break
 		}
 		if merged.Detail.Code != "" {
 			return attachJavDBIdentity(merged, ref.JavDBID)
