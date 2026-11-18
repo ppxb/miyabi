@@ -134,12 +134,16 @@ func init() {
 	fileDescRootID := fileFields[7].Descriptor()
 	// file.DefaultRootID holds the default value on creation for the root_id field.
 	file.DefaultRootID = fileDescRootID.Default.(string)
+	// fileDescUploadTime is the schema descriptor for upload_time field.
+	fileDescUploadTime := fileFields[8].Descriptor()
+	// file.DefaultUploadTime holds the default value on creation for the upload_time field.
+	file.DefaultUploadTime = fileDescUploadTime.Default.(int64)
 	// fileDescPath is the schema descriptor for path field.
-	fileDescPath := fileFields[8].Descriptor()
+	fileDescPath := fileFields[9].Descriptor()
 	// file.DefaultPath holds the default value on creation for the path field.
 	file.DefaultPath = fileDescPath.Default.(string)
 	// fileDescScanID is the schema descriptor for scan_id field.
-	fileDescScanID := fileFields[9].Descriptor()
+	fileDescScanID := fileFields[10].Descriptor()
 	// file.DefaultScanID holds the default value on creation for the scan_id field.
 	file.DefaultScanID = fileDescScanID.Default.(string)
 	metadatacacheFields := schema.MetadataCache{}.Fields()

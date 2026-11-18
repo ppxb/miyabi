@@ -110,7 +110,9 @@ func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 	if page.Source == nil || *page.Source != payload.Source || page.Total != 2 || page.HasMore || len(page.Movies) != 2 {
 		t.Fatalf("library statistics escaped the mounted source: %#v", page)
 	}
-	wantQueries := map[string]int{"*ent.FileQuery": 1, "*ent.MovieQuery": 1, "*ent.TagQuery": 1, "*ent.ActorQuery": 1}
+	// One file query counts the scoped movies, the second flags which of the
+	// page's movies have files in a 115 source for the source badge.
+	wantQueries := map[string]int{"*ent.FileQuery": 2, "*ent.MovieQuery": 1, "*ent.TagQuery": 1, "*ent.ActorQuery": 1}
 	if !reflect.DeepEqual(queries, wantQueries) {
 		t.Fatalf("library cards made redundant queries: %#v", queries)
 	}
@@ -208,6 +210,52 @@ func TestLibraryPageKeepsEmptyAndUnmatchedSourcesUsable(t *testing.T) {
 		page, err := lib.Movies(t.Context(), 1, 24)
 		if err != nil || page.Total != 0 || page.Movies == nil || len(page.Movies) != 0 || page.HasMore {
 			t.Fatalf("empty/unmatched source: %#v, %v", page, err)
+		}
+	}
+}
+
+func TestLibraryOrdersBy115UploadTimeAndFlagsCloudSource(t *testing.T) {
+	lib, _, payload := libraryFixture(t)
+	ctx := t.Context()
+	base := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	create := func(code, account, root string, uploadTime int64, created time.Time) int {
+		film := lib.database.Movie.Create().SetCode(code).SetCreatedAt(created).SaveX(ctx)
+		lib.database.File.Create().SetFileID(code).SetName(code + ".mp4").SetSize(1).
+			SetAccountID(account).SetRootID(root).SetUploadTime(uploadTime).SetMovieID(film.ID).SetCreatedAt(created).ExecX(ctx)
+		return film.ID
+	}
+	// upload_time is the 115 upload timestamp, so it must drive the order even
+	// when the local scan created the movie row later.
+	lowUpload := create("LOW-UPT", payload.Source.AccountID, payload.Source.Directory.ID, 100, base.Add(10*time.Hour))
+	highUpload := create("HIGH-UPT", payload.Source.AccountID, payload.Source.Directory.ID, 900, base)
+	// Local titles have no 115 file and rank after every 115 title.
+	local := create("LOC-001", domain.LocalAccountID, "local", 999999, base.Add(20*time.Hour))
+	// A 115-account file outside the mounted root stays local: it must not be
+	// badged as 115 nor take a 115 upload time.
+	stray := create("STRAY-001", domain.LocalAccountID, "local", 1, base.Add(6*time.Hour))
+	lib.database.File.Create().SetFileID("stray-cloud").SetName("stray.mp4").SetSize(1).
+		SetAccountID(payload.Source.AccountID).SetRootID("other-root").SetUploadTime(9999999).SetMovieID(stray).ExecX(ctx)
+
+	page, err := lib.Movies(ctx, 1, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 4 || len(page.Movies) != 4 {
+		t.Fatalf("unexpected page: %+v", page)
+	}
+	wantOrder := []int{highUpload, lowUpload, local, stray}
+	for i, movie := range page.Movies {
+		if movie.ID != wantOrder[i] {
+			t.Fatalf("order[%d] = %d, want %d (%+v)", i, movie.ID, wantOrder[i], page.Movies)
+		}
+	}
+	for _, movie := range page.Movies {
+		wantSource := ""
+		if movie.ID == highUpload || movie.ID == lowUpload {
+			wantSource = "115"
+		}
+		if movie.Source != wantSource {
+			t.Fatalf("movie %d source = %q, want %q", movie.ID, movie.Source, wantSource)
 		}
 	}
 }

@@ -34,6 +34,8 @@ const (
 	FieldAccountID = "account_id"
 	// FieldRootID holds the string denoting the root_id field in the database.
 	FieldRootID = "root_id"
+	// FieldUploadTime holds the string denoting the upload_time field in the database.
+	FieldUploadTime = "upload_time"
 	// FieldPath holds the string denoting the path field in the database.
 	FieldPath = "path"
 	// FieldScanID holds the string denoting the scan_id field in the database.
@@ -66,6 +68,7 @@ var Columns = []string{
 	FieldParentID,
 	FieldAccountID,
 	FieldRootID,
+	FieldUploadTime,
 	FieldPath,
 	FieldScanID,
 	FieldMovieID,
@@ -104,6 +107,8 @@ var (
 	DefaultAccountID string
 	// DefaultRootID holds the default value on creation for the "root_id" field.
 	DefaultRootID string
+	// DefaultUploadTime holds the default value on creation for the "upload_time" field.
+	DefaultUploadTime int64
 	// DefaultPath holds the default value on creation for the "path" field.
 	DefaultPath string
 	// DefaultScanID holds the default value on creation for the "scan_id" field.
@@ -166,6 +171,11 @@ func ByAccountID(opts ...sql.OrderTermOption) OrderOption {
 // ByRootID orders the results by the root_id field.
 func ByRootID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRootID, opts...).ToFunc()
+}
+
+// ByUploadTime orders the results by the upload_time field.
+func ByUploadTime(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUploadTime, opts...).ToFunc()
 }
 
 // ByPath orders the results by the path field.

@@ -24,6 +24,8 @@ type File struct {
 	Size        int64
 	PickCode    string
 	SHA1        string
+	// UploadTime is the 115 upload timestamp in Unix seconds (the "upt" field).
+	UploadTime int64
 }
 
 type FilePage struct {
@@ -46,6 +48,7 @@ func (client *Client) List(ctx context.Context, accessToken, directoryID string,
 			Size     json.Number `json:"fs"`
 			PickCode string      `json:"pc"`
 			SHA1     string      `json:"sha1"`
+			Upload   json.Number `json:"upt"`
 		} `json:"data"`
 		Path []struct {
 			ID   json.Number `json:"cid"`
@@ -84,9 +87,14 @@ func (client *Client) List(ctx context.Context, accessToken, directoryID string,
 		if err != nil && file.Size != "" {
 			return FilePage{}, fmt.Errorf("decode 115 file size: %w", err)
 		}
+		uploadTime, err := file.Upload.Int64()
+		if err != nil && file.Upload != "" {
+			return FilePage{}, fmt.Errorf("decode 115 file upload time: %w", err)
+		}
 		page.Files[index] = File{
 			ID: file.ID, ParentID: file.ParentID, Name: file.Name,
 			IsDirectory: file.Category == "0", Size: fileSize, PickCode: file.PickCode, SHA1: file.SHA1,
+			UploadTime: uploadTime,
 		}
 	}
 	for index, directory := range result.Path {

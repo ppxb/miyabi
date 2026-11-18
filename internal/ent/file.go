@@ -38,6 +38,8 @@ type File struct {
 	AccountID string `json:"account_id,omitempty"`
 	// RootID holds the value of the "root_id" field.
 	RootID string `json:"root_id,omitempty"`
+	// 115 upload time in Unix seconds; 0 when unknown or local.
+	UploadTime int64 `json:"upload_time,omitempty"`
 	// Path holds the value of the "path" field.
 	Path string `json:"path,omitempty"`
 	// ScanID holds the value of the "scan_id" field.
@@ -75,7 +77,7 @@ func (*File) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case file.FieldID, file.FieldSize, file.FieldMovieID:
+		case file.FieldID, file.FieldSize, file.FieldUploadTime, file.FieldMovieID:
 			values[i] = new(sql.NullInt64)
 		case file.FieldFileID, file.FieldPickCode, file.FieldSha1, file.FieldName, file.FieldParentID, file.FieldAccountID, file.FieldRootID, file.FieldPath, file.FieldScanID:
 			values[i] = new(sql.NullString)
@@ -161,6 +163,12 @@ func (_m *File) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field root_id", values[i])
 			} else if value.Valid {
 				_m.RootID = value.String
+			}
+		case file.FieldUploadTime:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field upload_time", values[i])
+			} else if value.Valid {
+				_m.UploadTime = value.Int64
 			}
 		case file.FieldPath:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -251,6 +259,9 @@ func (_m *File) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("root_id=")
 	builder.WriteString(_m.RootID)
+	builder.WriteString(", ")
+	builder.WriteString("upload_time=")
+	builder.WriteString(fmt.Sprintf("%v", _m.UploadTime))
 	builder.WriteString(", ")
 	builder.WriteString("path=")
 	builder.WriteString(_m.Path)

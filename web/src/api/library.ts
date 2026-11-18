@@ -28,6 +28,7 @@ export type LibraryMovie = {
   actors: LibraryEntity[]
   tags: Array<{ id: number; provider: string; source_id: string; name: string }>
   scrape_status: 'pending' | 'done' | 'failed'
+  source?: string
 }
 
 type LibraryPage = {

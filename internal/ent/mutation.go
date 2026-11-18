@@ -1613,28 +1613,30 @@ func (m *EmbyNotificationMutation) ResetEdge(name string) error {
 // FileMutation represents an operation that mutates the File nodes in the graph.
 type FileMutation struct {
 	config
-	op            Op
-	typ           string
-	id            *int
-	created_at    *time.Time
-	updated_at    *time.Time
-	file_id       *string
-	pick_code     *string
-	sha1          *string
-	name          *string
-	size          *int64
-	addsize       *int64
-	parent_id     *string
-	account_id    *string
-	root_id       *string
-	_path         *string
-	scan_id       *string
-	clearedFields map[string]struct{}
-	movie         *int
-	clearedmovie  bool
-	done          bool
-	oldValue      func(context.Context) (*File, error)
-	predicates    []predicate.File
+	op             Op
+	typ            string
+	id             *int
+	created_at     *time.Time
+	updated_at     *time.Time
+	file_id        *string
+	pick_code      *string
+	sha1           *string
+	name           *string
+	size           *int64
+	addsize        *int64
+	parent_id      *string
+	account_id     *string
+	root_id        *string
+	upload_time    *int64
+	addupload_time *int64
+	_path          *string
+	scan_id        *string
+	clearedFields  map[string]struct{}
+	movie          *int
+	clearedmovie   bool
+	done           bool
+	oldValue       func(context.Context) (*File, error)
+	predicates     []predicate.File
 }
 
 var _ ent.Mutation = (*FileMutation)(nil)
@@ -2115,6 +2117,62 @@ func (m *FileMutation) ResetRootID() {
 	m.root_id = nil
 }
 
+// SetUploadTime sets the "upload_time" field.
+func (m *FileMutation) SetUploadTime(i int64) {
+	m.upload_time = &i
+	m.addupload_time = nil
+}
+
+// UploadTime returns the value of the "upload_time" field in the mutation.
+func (m *FileMutation) UploadTime() (r int64, exists bool) {
+	v := m.upload_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUploadTime returns the old "upload_time" field's value of the File entity.
+// If the File object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FileMutation) OldUploadTime(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUploadTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUploadTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUploadTime: %w", err)
+	}
+	return oldValue.UploadTime, nil
+}
+
+// AddUploadTime adds i to the "upload_time" field.
+func (m *FileMutation) AddUploadTime(i int64) {
+	if m.addupload_time != nil {
+		*m.addupload_time += i
+	} else {
+		m.addupload_time = &i
+	}
+}
+
+// AddedUploadTime returns the value that was added to the "upload_time" field in this mutation.
+func (m *FileMutation) AddedUploadTime() (r int64, exists bool) {
+	v := m.addupload_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUploadTime resets all changes to the "upload_time" field.
+func (m *FileMutation) ResetUploadTime() {
+	m.upload_time = nil
+	m.addupload_time = nil
+}
+
 // SetPath sets the "path" field.
 func (m *FileMutation) SetPath(s string) {
 	m._path = &s
@@ -2297,7 +2355,7 @@ func (m *FileMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *FileMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.created_at != nil {
 		fields = append(fields, file.FieldCreatedAt)
 	}
@@ -2327,6 +2385,9 @@ func (m *FileMutation) Fields() []string {
 	}
 	if m.root_id != nil {
 		fields = append(fields, file.FieldRootID)
+	}
+	if m.upload_time != nil {
+		fields = append(fields, file.FieldUploadTime)
 	}
 	if m._path != nil {
 		fields = append(fields, file.FieldPath)
@@ -2365,6 +2426,8 @@ func (m *FileMutation) Field(name string) (ent.Value, bool) {
 		return m.AccountID()
 	case file.FieldRootID:
 		return m.RootID()
+	case file.FieldUploadTime:
+		return m.UploadTime()
 	case file.FieldPath:
 		return m.Path()
 	case file.FieldScanID:
@@ -2400,6 +2463,8 @@ func (m *FileMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldAccountID(ctx)
 	case file.FieldRootID:
 		return m.OldRootID(ctx)
+	case file.FieldUploadTime:
+		return m.OldUploadTime(ctx)
 	case file.FieldPath:
 		return m.OldPath(ctx)
 	case file.FieldScanID:
@@ -2485,6 +2550,13 @@ func (m *FileMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetRootID(v)
 		return nil
+	case file.FieldUploadTime:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUploadTime(v)
+		return nil
 	case file.FieldPath:
 		v, ok := value.(string)
 		if !ok {
@@ -2517,6 +2589,9 @@ func (m *FileMutation) AddedFields() []string {
 	if m.addsize != nil {
 		fields = append(fields, file.FieldSize)
 	}
+	if m.addupload_time != nil {
+		fields = append(fields, file.FieldUploadTime)
+	}
 	return fields
 }
 
@@ -2527,6 +2602,8 @@ func (m *FileMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case file.FieldSize:
 		return m.AddedSize()
+	case file.FieldUploadTime:
+		return m.AddedUploadTime()
 	}
 	return nil, false
 }
@@ -2542,6 +2619,13 @@ func (m *FileMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddSize(v)
+		return nil
+	case file.FieldUploadTime:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUploadTime(v)
 		return nil
 	}
 	return fmt.Errorf("unknown File numeric field %s", name)
@@ -2608,6 +2692,9 @@ func (m *FileMutation) ResetField(name string) error {
 		return nil
 	case file.FieldRootID:
 		m.ResetRootID()
+		return nil
+	case file.FieldUploadTime:
+		m.ResetUploadTime()
 		return nil
 	case file.FieldPath:
 		m.ResetPath()

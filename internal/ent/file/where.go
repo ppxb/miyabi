@@ -105,6 +105,11 @@ func RootID(v string) predicate.File {
 	return predicate.File(sql.FieldEQ(FieldRootID, v))
 }
 
+// UploadTime applies equality check predicate on the "upload_time" field. It's identical to UploadTimeEQ.
+func UploadTime(v int64) predicate.File {
+	return predicate.File(sql.FieldEQ(FieldUploadTime, v))
+}
+
 // Path applies equality check predicate on the "path" field. It's identical to PathEQ.
 func Path(v string) predicate.File {
 	return predicate.File(sql.FieldEQ(FieldPath, v))
@@ -693,6 +698,46 @@ func RootIDEqualFold(v string) predicate.File {
 // RootIDContainsFold applies the ContainsFold predicate on the "root_id" field.
 func RootIDContainsFold(v string) predicate.File {
 	return predicate.File(sql.FieldContainsFold(FieldRootID, v))
+}
+
+// UploadTimeEQ applies the EQ predicate on the "upload_time" field.
+func UploadTimeEQ(v int64) predicate.File {
+	return predicate.File(sql.FieldEQ(FieldUploadTime, v))
+}
+
+// UploadTimeNEQ applies the NEQ predicate on the "upload_time" field.
+func UploadTimeNEQ(v int64) predicate.File {
+	return predicate.File(sql.FieldNEQ(FieldUploadTime, v))
+}
+
+// UploadTimeIn applies the In predicate on the "upload_time" field.
+func UploadTimeIn(vs ...int64) predicate.File {
+	return predicate.File(sql.FieldIn(FieldUploadTime, vs...))
+}
+
+// UploadTimeNotIn applies the NotIn predicate on the "upload_time" field.
+func UploadTimeNotIn(vs ...int64) predicate.File {
+	return predicate.File(sql.FieldNotIn(FieldUploadTime, vs...))
+}
+
+// UploadTimeGT applies the GT predicate on the "upload_time" field.
+func UploadTimeGT(v int64) predicate.File {
+	return predicate.File(sql.FieldGT(FieldUploadTime, v))
+}
+
+// UploadTimeGTE applies the GTE predicate on the "upload_time" field.
+func UploadTimeGTE(v int64) predicate.File {
+	return predicate.File(sql.FieldGTE(FieldUploadTime, v))
+}
+
+// UploadTimeLT applies the LT predicate on the "upload_time" field.
+func UploadTimeLT(v int64) predicate.File {
+	return predicate.File(sql.FieldLT(FieldUploadTime, v))
+}
+
+// UploadTimeLTE applies the LTE predicate on the "upload_time" field.
+func UploadTimeLTE(v int64) predicate.File {
+	return predicate.File(sql.FieldLTE(FieldUploadTime, v))
 }
 
 // PathEQ applies the EQ predicate on the "path" field.

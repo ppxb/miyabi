@@ -107,7 +107,13 @@ func TestLibraryListingUsesSortIndexAndKeepsScopeAndOrder(t *testing.T) {
 			t.Fatal(err)
 		}
 		joined := strings.Join(plan, "; ")
-		if !strings.Contains(joined, "movie_created_at_id") || strings.Contains(joined, "TEMP B-TREE FOR ORDER BY") {
+		if mounted {
+			// Ordering by a movie's newest 115 file uses a computed MIN(...)
+			// scalar subquery, so SQLite must sort through a temporary b-tree.
+			if !strings.Contains(joined, "CORRELATED SCALAR SUBQUERY") {
+				t.Fatalf("mounted=%t listing missing 115 order subquery: %s", mounted, joined)
+			}
+		} else if !strings.Contains(joined, "movie_created_at_id") || strings.Contains(joined, "TEMP B-TREE FOR ORDER BY") {
 			t.Fatalf("mounted=%t listing missed sort index: %s", mounted, joined)
 		}
 	}

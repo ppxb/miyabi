@@ -10,22 +10,25 @@ import (
 
 func TestFileListDecodesNumericAndStringCountsAndSizes(t *testing.T) {
 	for _, test := range []struct {
-		name      string
-		body      string
-		wantTotal int
-		wantSize  int64
+		name           string
+		body           string
+		wantTotal      int
+		wantSize       int64
+		wantUploadTime int64
 	}{
 		{
-			name:      "numeric count and size",
-			body:      `{"state":true,"code":0,"cid":"123","count":42,"data":[{"fid":"f1","pid":"123","fn":"movie.mp4","fc":"1","fs":1048576,"pc":"pick1","sha1":"abc"}],"path":[{"cid":"123","name":"media"}]}`,
-			wantTotal: 42,
-			wantSize:  1048576,
+			name:           "numeric count and size",
+			body:           `{"state":true,"code":0,"cid":"123","count":42,"data":[{"fid":"f1","pid":"123","fn":"movie.mp4","fc":"1","fs":1048576,"pc":"pick1","sha1":"abc","upt":1794900979}],"path":[{"cid":"123","name":"media"}]}`,
+			wantTotal:      42,
+			wantSize:       1048576,
+			wantUploadTime: 1794900979,
 		},
 		{
-			name:      "string count and size",
-			body:      `{"state":true,"code":0,"cid":"123","count":"99","data":[{"fid":"f2","pid":"123","fn":"movie2.mp4","fc":"1","fs":"2097152","pc":"pick2","sha1":"def"}],"path":[{"cid":"123","name":"media"}]}`,
-			wantTotal: 99,
-			wantSize:  2097152,
+			name:           "string count and size",
+			body:           `{"state":true,"code":0,"cid":"123","count":"99","data":[{"fid":"f2","pid":"123","fn":"movie2.mp4","fc":"1","fs":"2097152","pc":"pick2","sha1":"def","upt":"1794900100"}],"path":[{"cid":"123","name":"media"}]}`,
+			wantTotal:      99,
+			wantSize:       2097152,
+			wantUploadTime: 1794900100,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -49,6 +52,9 @@ func TestFileListDecodesNumericAndStringCountsAndSizes(t *testing.T) {
 			}
 			if len(page.Files) != 1 || page.Files[0].Size != test.wantSize {
 				t.Errorf("File size = %d, want %d", page.Files[0].Size, test.wantSize)
+			}
+			if len(page.Files) != 1 || page.Files[0].UploadTime != test.wantUploadTime {
+				t.Errorf("File upload time = %d, want %d", page.Files[0].UploadTime, test.wantUploadTime)
 			}
 		})
 	}
@@ -136,4 +142,3 @@ func TestClientRetryPolicy(t *testing.T) {
 		}
 	})
 }
-

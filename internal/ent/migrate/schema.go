@@ -70,6 +70,7 @@ var (
 		{Name: "parent_id", Type: field.TypeString, Default: ""},
 		{Name: "account_id", Type: field.TypeString, Default: ""},
 		{Name: "root_id", Type: field.TypeString, Default: ""},
+		{Name: "upload_time", Type: field.TypeInt64, Default: 0},
 		{Name: "path", Type: field.TypeString, Default: ""},
 		{Name: "scan_id", Type: field.TypeString, Default: ""},
 		{Name: "movie_files", Type: field.TypeInt, Nullable: true},
@@ -82,7 +83,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "files_movies_files",
-				Columns:    []*schema.Column{FilesColumns[13]},
+				Columns:    []*schema.Column{FilesColumns[14]},
 				RefColumns: []*schema.Column{MoviesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -91,12 +92,12 @@ var (
 			{
 				Name:    "file_account_id_root_id_scan_id",
 				Unique:  false,
-				Columns: []*schema.Column{FilesColumns[9], FilesColumns[10], FilesColumns[12]},
+				Columns: []*schema.Column{FilesColumns[9], FilesColumns[10], FilesColumns[13]},
 			},
 			{
 				Name:    "file_movie_files_account_id_root_id",
 				Unique:  false,
-				Columns: []*schema.Column{FilesColumns[13], FilesColumns[9], FilesColumns[10]},
+				Columns: []*schema.Column{FilesColumns[14], FilesColumns[9], FilesColumns[10]},
 			},
 		},
 	}

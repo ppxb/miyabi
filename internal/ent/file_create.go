@@ -139,6 +139,20 @@ func (_c *FileCreate) SetNillableRootID(v *string) *FileCreate {
 	return _c
 }
 
+// SetUploadTime sets the "upload_time" field.
+func (_c *FileCreate) SetUploadTime(v int64) *FileCreate {
+	_c.mutation.SetUploadTime(v)
+	return _c
+}
+
+// SetNillableUploadTime sets the "upload_time" field if the given value is not nil.
+func (_c *FileCreate) SetNillableUploadTime(v *int64) *FileCreate {
+	if v != nil {
+		_c.SetUploadTime(*v)
+	}
+	return _c
+}
+
 // SetPath sets the "path" field.
 func (_c *FileCreate) SetPath(v string) *FileCreate {
 	_c.mutation.SetPath(v)
@@ -249,6 +263,10 @@ func (_c *FileCreate) defaults() {
 		v := file.DefaultRootID
 		_c.mutation.SetRootID(v)
 	}
+	if _, ok := _c.mutation.UploadTime(); !ok {
+		v := file.DefaultUploadTime
+		_c.mutation.SetUploadTime(v)
+	}
 	if _, ok := _c.mutation.Path(); !ok {
 		v := file.DefaultPath
 		_c.mutation.SetPath(v)
@@ -305,6 +323,9 @@ func (_c *FileCreate) check() error {
 	}
 	if _, ok := _c.mutation.RootID(); !ok {
 		return &ValidationError{Name: "root_id", err: errors.New(`ent: missing required field "File.root_id"`)}
+	}
+	if _, ok := _c.mutation.UploadTime(); !ok {
+		return &ValidationError{Name: "upload_time", err: errors.New(`ent: missing required field "File.upload_time"`)}
 	}
 	if _, ok := _c.mutation.Path(); !ok {
 		return &ValidationError{Name: "path", err: errors.New(`ent: missing required field "File.path"`)}
@@ -378,6 +399,10 @@ func (_c *FileCreate) createSpec() (*File, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.RootID(); ok {
 		_spec.SetField(file.FieldRootID, field.TypeString, value)
 		_node.RootID = value
+	}
+	if value, ok := _c.mutation.UploadTime(); ok {
+		_spec.SetField(file.FieldUploadTime, field.TypeInt64, value)
+		_node.UploadTime = value
 	}
 	if value, ok := _c.mutation.Path(); ok {
 		_spec.SetField(file.FieldPath, field.TypeString, value)
@@ -567,6 +592,24 @@ func (u *FileUpsert) SetRootID(v string) *FileUpsert {
 // UpdateRootID sets the "root_id" field to the value that was provided on create.
 func (u *FileUpsert) UpdateRootID() *FileUpsert {
 	u.SetExcluded(file.FieldRootID)
+	return u
+}
+
+// SetUploadTime sets the "upload_time" field.
+func (u *FileUpsert) SetUploadTime(v int64) *FileUpsert {
+	u.Set(file.FieldUploadTime, v)
+	return u
+}
+
+// UpdateUploadTime sets the "upload_time" field to the value that was provided on create.
+func (u *FileUpsert) UpdateUploadTime() *FileUpsert {
+	u.SetExcluded(file.FieldUploadTime)
+	return u
+}
+
+// AddUploadTime adds v to the "upload_time" field.
+func (u *FileUpsert) AddUploadTime(v int64) *FileUpsert {
+	u.Add(file.FieldUploadTime, v)
 	return u
 }
 
@@ -787,6 +830,27 @@ func (u *FileUpsertOne) SetRootID(v string) *FileUpsertOne {
 func (u *FileUpsertOne) UpdateRootID() *FileUpsertOne {
 	return u.Update(func(s *FileUpsert) {
 		s.UpdateRootID()
+	})
+}
+
+// SetUploadTime sets the "upload_time" field.
+func (u *FileUpsertOne) SetUploadTime(v int64) *FileUpsertOne {
+	return u.Update(func(s *FileUpsert) {
+		s.SetUploadTime(v)
+	})
+}
+
+// AddUploadTime adds v to the "upload_time" field.
+func (u *FileUpsertOne) AddUploadTime(v int64) *FileUpsertOne {
+	return u.Update(func(s *FileUpsert) {
+		s.AddUploadTime(v)
+	})
+}
+
+// UpdateUploadTime sets the "upload_time" field to the value that was provided on create.
+func (u *FileUpsertOne) UpdateUploadTime() *FileUpsertOne {
+	return u.Update(func(s *FileUpsert) {
+		s.UpdateUploadTime()
 	})
 }
 
@@ -1180,6 +1244,27 @@ func (u *FileUpsertBulk) SetRootID(v string) *FileUpsertBulk {
 func (u *FileUpsertBulk) UpdateRootID() *FileUpsertBulk {
 	return u.Update(func(s *FileUpsert) {
 		s.UpdateRootID()
+	})
+}
+
+// SetUploadTime sets the "upload_time" field.
+func (u *FileUpsertBulk) SetUploadTime(v int64) *FileUpsertBulk {
+	return u.Update(func(s *FileUpsert) {
+		s.SetUploadTime(v)
+	})
+}
+
+// AddUploadTime adds v to the "upload_time" field.
+func (u *FileUpsertBulk) AddUploadTime(v int64) *FileUpsertBulk {
+	return u.Update(func(s *FileUpsert) {
+		s.AddUploadTime(v)
+	})
+}
+
+// UpdateUploadTime sets the "upload_time" field to the value that was provided on create.
+func (u *FileUpsertBulk) UpdateUploadTime() *FileUpsertBulk {
+	return u.Update(func(s *FileUpsert) {
+		s.UpdateUploadTime()
 	})
 }
 

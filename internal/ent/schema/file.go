@@ -34,6 +34,9 @@ func (File) Fields() []ent.Field {
 			Default(""),
 		field.String("root_id").
 			Default(""),
+		field.Int64("upload_time").
+			Default(0).
+			Comment("115 upload time in Unix seconds; 0 when unknown or local."),
 		field.String("path").
 			Default(""),
 		field.String("scan_id").

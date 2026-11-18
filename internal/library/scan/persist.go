@@ -102,6 +102,7 @@ func (r *scanRun) processPageTx(ctx context.Context, tx *ent.Tx, directoryPath s
 			old := previousFiles[video.ID]
 			if old != nil && old.Name == video.Name && old.ParentID == video.ParentID &&
 				old.Size == video.Size && old.Sha1 == video.SHA1 && old.PickCode == video.PickCode &&
+				old.UploadTime == video.UploadTime &&
 				old.AccountID == r.payload.Source.AccountID && old.RootID == r.payload.Source.Directory.ID &&
 				old.Path == path.Join(directoryPath, video.Name) && domain.ValueOrZero(old.MovieID) == codes[video.Code] {
 				unchanged = append(unchanged, video.ID)
@@ -114,6 +115,7 @@ func (r *scanRun) processPageTx(ctx context.Context, tx *ent.Tx, directoryPath s
 			builder := tx.File.Create().SetFileID(video.ID).SetName(video.Name).SetSize(video.Size).
 				SetPickCode(video.PickCode).SetSha1(video.SHA1).SetParentID(video.ParentID).
 				SetAccountID(r.payload.Source.AccountID).SetRootID(r.payload.Source.Directory.ID).
+				SetUploadTime(video.UploadTime).
 				SetPath(path.Join(directoryPath, video.Name)).SetScanID(r.payload.ScanID)
 			if video.Code != "" {
 				builder.SetMovieID(codes[video.Code])

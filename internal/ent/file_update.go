@@ -154,6 +154,27 @@ func (_u *FileUpdate) SetNillableRootID(v *string) *FileUpdate {
 	return _u
 }
 
+// SetUploadTime sets the "upload_time" field.
+func (_u *FileUpdate) SetUploadTime(v int64) *FileUpdate {
+	_u.mutation.ResetUploadTime()
+	_u.mutation.SetUploadTime(v)
+	return _u
+}
+
+// SetNillableUploadTime sets the "upload_time" field if the given value is not nil.
+func (_u *FileUpdate) SetNillableUploadTime(v *int64) *FileUpdate {
+	if v != nil {
+		_u.SetUploadTime(*v)
+	}
+	return _u
+}
+
+// AddUploadTime adds value to the "upload_time" field.
+func (_u *FileUpdate) AddUploadTime(v int64) *FileUpdate {
+	_u.mutation.AddUploadTime(v)
+	return _u
+}
+
 // SetPath sets the "path" field.
 func (_u *FileUpdate) SetPath(v string) *FileUpdate {
 	_u.mutation.SetPath(v)
@@ -315,6 +336,12 @@ func (_u *FileUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.RootID(); ok {
 		_spec.SetField(file.FieldRootID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.UploadTime(); ok {
+		_spec.SetField(file.FieldUploadTime, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedUploadTime(); ok {
+		_spec.AddField(file.FieldUploadTime, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.Path(); ok {
 		_spec.SetField(file.FieldPath, field.TypeString, value)
@@ -493,6 +520,27 @@ func (_u *FileUpdateOne) SetNillableRootID(v *string) *FileUpdateOne {
 	if v != nil {
 		_u.SetRootID(*v)
 	}
+	return _u
+}
+
+// SetUploadTime sets the "upload_time" field.
+func (_u *FileUpdateOne) SetUploadTime(v int64) *FileUpdateOne {
+	_u.mutation.ResetUploadTime()
+	_u.mutation.SetUploadTime(v)
+	return _u
+}
+
+// SetNillableUploadTime sets the "upload_time" field if the given value is not nil.
+func (_u *FileUpdateOne) SetNillableUploadTime(v *int64) *FileUpdateOne {
+	if v != nil {
+		_u.SetUploadTime(*v)
+	}
+	return _u
+}
+
+// AddUploadTime adds value to the "upload_time" field.
+func (_u *FileUpdateOne) AddUploadTime(v int64) *FileUpdateOne {
+	_u.mutation.AddUploadTime(v)
 	return _u
 }
 
@@ -687,6 +735,12 @@ func (_u *FileUpdateOne) sqlSave(ctx context.Context) (_node *File, err error) {
 	}
 	if value, ok := _u.mutation.RootID(); ok {
 		_spec.SetField(file.FieldRootID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.UploadTime(); ok {
+		_spec.SetField(file.FieldUploadTime, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedUploadTime(); ok {
+		_spec.AddField(file.FieldUploadTime, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.Path(); ok {
 		_spec.SetField(file.FieldPath, field.TypeString, value)
