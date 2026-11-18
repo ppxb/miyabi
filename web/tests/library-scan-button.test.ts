@@ -21,6 +21,10 @@ vi.mock('@/api/tasks', () => ({
 vi.mock('@/features/tasks/task-events', () => ({
   useTaskConnection: () => ({ status: 'connected' })
 }))
+vi.mock('@/api/history', () => ({
+  HISTORY_PAGE_SIZE: 20,
+  useHistory: () => ({ data: { items: [] }, isPending: false, isError: false, isFetching: false })
+}))
 vi.mock('@/features/tasks/task-toast', () => {
   const notifyScanTask = vi.fn()
   return { notifyScanTask, useNotifyScanTask: () => notifyScanTask, notifyTaskError: vi.fn() }

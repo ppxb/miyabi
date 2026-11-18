@@ -1,5 +1,12 @@
 import { Link, useLocation } from '@tanstack/react-router'
-import { BookmarkIcon, CompassIcon, FilmIcon, SettingsIcon, type LucideIcon } from 'lucide-react'
+import {
+  BookmarkIcon,
+  CompassIcon,
+  FilmIcon,
+  HistoryIcon,
+  SettingsIcon,
+  type LucideIcon
+} from 'lucide-react'
 
 import {
   SidebarMenu,
@@ -11,11 +18,12 @@ import {
 type AppNavItem = {
   label: string
   icon: LucideIcon
-  to: '/' | '/discover' | '/subscriptions' | '/settings'
+  to: '/' | '/history' | '/discover' | '/subscriptions' | '/settings'
 }
 
 export const APP_NAV_ITEMS: readonly AppNavItem[] = [
   { label: '媒体库', icon: FilmIcon, to: '/' },
+  { label: '观看历史', icon: HistoryIcon, to: '/history' },
   { label: '探索', icon: CompassIcon, to: '/discover' },
   { label: '收藏与关注', icon: BookmarkIcon, to: '/subscriptions' },
   { label: '设置', icon: SettingsIcon, to: '/settings' }

@@ -9,6 +9,7 @@ import { ListPagination } from '@/components/list-pagination'
 import { MovieGridLayout } from '@/components/movie/movie-grid-layout'
 import { MovieGridSkeleton } from '@/components/movie/movie-grid-skeleton'
 import { PageHeader } from '@/components/page-header'
+import { ContinueWatching } from '@/features/library/continue-watching'
 import { LibraryMovieCard } from '@/features/library/movie-card'
 import { LibraryProgress } from '@/features/library/library-progress'
 import { useTaskConnection } from '@/features/tasks/task-events'
@@ -64,6 +65,7 @@ export function LibraryPage({
         />
       ) : (
         <>
+          <ContinueWatching onPlay={setPlayingId} />
           {library.data.movies.length > 0 ? (
             <MovieGridLayout>
               {library.data.movies.map(movie => (

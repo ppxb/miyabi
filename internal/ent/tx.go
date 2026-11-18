@@ -36,6 +36,8 @@ type Tx struct {
 	Task *TaskClient
 	// ViewedMovie is the client for interacting with the ViewedMovie builders.
 	ViewedMovie *ViewedMovieClient
+	// WatchHistory is the client for interacting with the WatchHistory builders.
+	WatchHistory *WatchHistoryClient
 
 	// lazily loaded.
 	client     *Client
@@ -179,6 +181,7 @@ func (tx *Tx) init() {
 	tx.Tag = NewTagClient(tx.config)
 	tx.Task = NewTaskClient(tx.config)
 	tx.ViewedMovie = NewViewedMovieClient(tx.config)
+	tx.WatchHistory = NewWatchHistoryClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.

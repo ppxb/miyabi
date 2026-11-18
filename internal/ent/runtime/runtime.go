@@ -19,6 +19,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/tag"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/ent/viewedmovie"
+	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -453,6 +454,28 @@ func init() {
 	viewedmovieDescViewedAt := viewedmovieFields[1].Descriptor()
 	// viewedmovie.DefaultViewedAt holds the default value on creation for the viewed_at field.
 	viewedmovie.DefaultViewedAt = viewedmovieDescViewedAt.Default.(func() time.Time)
+	watchhistoryFields := schema.WatchHistory{}.Fields()
+	_ = watchhistoryFields
+	// watchhistoryDescMovieID is the schema descriptor for movie_id field.
+	watchhistoryDescMovieID := watchhistoryFields[0].Descriptor()
+	// watchhistory.MovieIDValidator is a validator for the "movie_id" field. It is called by the builders before save.
+	watchhistory.MovieIDValidator = watchhistoryDescMovieID.Validators[0].(func(int) error)
+	// watchhistoryDescFileID is the schema descriptor for file_id field.
+	watchhistoryDescFileID := watchhistoryFields[1].Descriptor()
+	// watchhistory.DefaultFileID holds the default value on creation for the file_id field.
+	watchhistory.DefaultFileID = watchhistoryDescFileID.Default.(string)
+	// watchhistoryDescPosition is the schema descriptor for position field.
+	watchhistoryDescPosition := watchhistoryFields[2].Descriptor()
+	// watchhistory.DefaultPosition holds the default value on creation for the position field.
+	watchhistory.DefaultPosition = watchhistoryDescPosition.Default.(float64)
+	// watchhistoryDescDuration is the schema descriptor for duration field.
+	watchhistoryDescDuration := watchhistoryFields[3].Descriptor()
+	// watchhistory.DefaultDuration holds the default value on creation for the duration field.
+	watchhistory.DefaultDuration = watchhistoryDescDuration.Default.(float64)
+	// watchhistoryDescWatchedAt is the schema descriptor for watched_at field.
+	watchhistoryDescWatchedAt := watchhistoryFields[4].Descriptor()
+	// watchhistory.DefaultWatchedAt holds the default value on creation for the watched_at field.
+	watchhistory.DefaultWatchedAt = watchhistoryDescWatchedAt.Default.(func() time.Time)
 }
 
 const (

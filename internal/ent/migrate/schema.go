@@ -383,6 +383,28 @@ var (
 			},
 		},
 	}
+	// WatchHistoriesColumns holds the columns for the "watch_histories" table.
+	WatchHistoriesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "movie_id", Type: field.TypeInt, Unique: true},
+		{Name: "file_id", Type: field.TypeString, Default: ""},
+		{Name: "position", Type: field.TypeFloat64, Default: 0},
+		{Name: "duration", Type: field.TypeFloat64, Default: 0},
+		{Name: "watched_at", Type: field.TypeTime},
+	}
+	// WatchHistoriesTable holds the schema information for the "watch_histories" table.
+	WatchHistoriesTable = &schema.Table{
+		Name:       "watch_histories",
+		Columns:    WatchHistoriesColumns,
+		PrimaryKey: []*schema.Column{WatchHistoriesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "watchhistory_watched_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{WatchHistoriesColumns[5], WatchHistoriesColumns[0]},
+			},
+		},
+	}
 	// MovieActorsColumns holds the columns for the "movie_actors" table.
 	MovieActorsColumns = []*schema.Column{
 		{Name: "movie_id", Type: field.TypeInt},
@@ -447,6 +469,7 @@ var (
 		TagsTable,
 		TasksTable,
 		ViewedMoviesTable,
+		WatchHistoriesTable,
 		MovieActorsTable,
 		MovieTagsTable,
 	}
