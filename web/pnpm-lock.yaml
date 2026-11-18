@@ -26,8 +26,11 @@ importers:
       '@tanstack/react-router':
         specifier: ^1.170.41
         version: 1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@videojs/core':
+        specifier: 10.5.0
+        version: 10.5.0(react@19.3.0)
       '@videojs/react':
-        specifier: ^10.5.0
+        specifier: 10.5.0
         version: 10.5.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       class-variance-authority:
         specifier: ^0.7.1

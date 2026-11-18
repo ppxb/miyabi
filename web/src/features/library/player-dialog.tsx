@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { HlsVideo } from '@videojs/react/media/hls-video'
-import { usePlayer, Video, VideoPlayer, VideoSkin } from '@videojs/react/video'
+import { I18nProvider } from '@videojs/react/i18n'
+import { usePlayer, Video, VideoPlayer } from '@videojs/react/video'
 import { CalendarIcon, ClockIcon, StarIcon, type LucideIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
@@ -11,8 +12,7 @@ import { savePlaybackProgress, usePlayQualities, useStartMoviePlayback } from '@
 import type { PlaySource } from '@/api/play'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-
-import '@videojs/react/video/skin.css'
+import { VideoSkin } from '@/components/videojs/video/skin'
 
 export function LibraryPlayerDialog({
   movieId,
@@ -42,12 +42,29 @@ export function LibraryPlayerDialog({
 function LibraryPlayer({ movieId }: { movieId: number }) {
   const detail = useLibraryMovie(movieId)
   const playback = useStartMoviePlayback(movieId)
+  const qualities = usePlayQualities(playback.data?.file_id, !!playback.data?.file_id)
   const [qualitySource, setQualitySource] = useState<PlaySource>()
   const source = useMemo(() => {
     if (qualitySource) return qualitySource
     const sources = playback.data?.sources ?? []
     return sources.find(item => item.label.startsWith('原画')) ?? sources[0]
   }, [playback.data, qualitySource])
+  const qualityOptions = useMemo(() => {
+    const options = [{ value: 'direct', label: '原画' }]
+    for (const item of qualities.data?.sources ?? []) {
+      options.push({ value: item.src, label: item.label })
+    }
+    return options
+  }, [qualities.data])
+  const qualityValue = qualitySource?.src ?? 'direct'
+  const handleQualityChange = (value: string) => {
+    if (value === 'direct') {
+      setQualitySource(undefined)
+      return
+    }
+    const next = qualities.data?.sources.find(item => item.src === value)
+    if (next) setQualitySource(next)
+  }
   const error = playback.isError
 
   const title = detail.data?.title || detail.data?.code || '播放'
@@ -62,22 +79,29 @@ function LibraryPlayer({ movieId }: { movieId: number }) {
   return (
     <>
       <DialogTitle className="sr-only">{title}</DialogTitle>
-      <div className="flex min-w-0 flex-1 items-center justify-center bg-black">
+      <div className="relative flex min-w-0 flex-1 items-center justify-center bg-black">
         {source && !error ? (
-          <VideoPlayer title={title}>
-            <VideoSkin style={skinStyle}>
-              {hls ? (
-                <HlsVideo src={source.src} playsInline autoPlay />
-              ) : (
-                <Video src={source.src} playsInline autoPlay />
-              )}
-            </VideoSkin>
-            <PlaybackSync
-              movieId={movieId}
-              fileID={playback.data?.file_id}
-              resume={playback.data?.resume}
-            />
-          </VideoPlayer>
+          <I18nProvider locale="zh-CN">
+            <VideoPlayer title={title}>
+              <VideoSkin
+                style={skinStyle}
+                qualityOptions={qualityOptions}
+                qualityValue={qualityValue}
+                onQualityChange={handleQualityChange}
+              >
+                {hls ? (
+                  <HlsVideo src={source.src} playsInline autoPlay />
+                ) : (
+                  <Video src={source.src} playsInline autoPlay />
+                )}
+              </VideoSkin>
+              <PlaybackSync
+                movieId={movieId}
+                fileID={playback.data?.file_id}
+                resume={playback.data?.resume}
+              />
+            </VideoPlayer>
+          </I18nProvider>
         ) : (
           <div className="text-sm text-white/70">
             {error ? '播放地址加载失败' : '正在加载播放地址…'}
@@ -85,85 +109,9 @@ function LibraryPlayer({ movieId }: { movieId: number }) {
         )}
       </div>
       <aside className="min-w-0 shrink-0 overflow-y-auto border-t bg-background p-5 lg:w-[26rem] lg:border-t-0 lg:border-l">
-        <QualityPicker
-          fileID={playback.data?.file_id}
-          selectedSrc={qualitySource?.src}
-          onSelect={setQualitySource}
-        />
         <MovieInfo movieId={movieId} show115={!!playback.data?.source} />
       </aside>
     </>
-  )
-}
-
-function QualityPicker({
-  fileID,
-  selectedSrc,
-  onSelect
-}: {
-  fileID?: string
-  selectedSrc?: string
-  onSelect: (source?: PlaySource) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const qualities = usePlayQualities(fileID, open)
-
-  return (
-    <div className="mb-4 space-y-2">
-      <p className="text-xs text-muted-foreground">清晰度</p>
-      <div className="flex flex-wrap gap-1.5">
-        <QualityButton active={!selectedSrc} onClick={() => onSelect(undefined)}>
-          原画（直链）
-        </QualityButton>
-        {qualities.data?.sources.map(item => (
-          <QualityButton
-            key={item.src}
-            active={selectedSrc === item.src}
-            onClick={() => onSelect(item)}
-          >
-            {item.label}
-          </QualityButton>
-        ))}
-        {!open ? (
-          <QualityButton onClick={() => setOpen(true)} disabled={!fileID}>
-            加载其他清晰度
-          </QualityButton>
-        ) : null}
-        {open && qualities.isPending ? (
-          <span className="self-center text-xs text-muted-foreground">加载中…</span>
-        ) : null}
-        {qualities.isError ? (
-          <span className="self-center text-xs text-destructive">清晰度加载失败</span>
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
-function QualityButton({
-  active = false,
-  disabled = false,
-  onClick,
-  children
-}: {
-  active?: boolean
-  disabled?: boolean
-  onClick: () => void
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={
-        active
-          ? 'rounded-full bg-foreground px-2.5 py-1 text-xs font-semibold text-background'
-          : 'rounded-full bg-muted px-2.5 py-1 text-xs text-foreground hover:bg-muted/70 disabled:opacity-50'
-      }
-    >
-      {children}
-    </button>
   )
 }
 
