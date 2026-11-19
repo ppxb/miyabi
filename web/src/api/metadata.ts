@@ -8,10 +8,12 @@ const sourcesKey = ['settings', 'scraping'] as const
 export const sourceNames: Record<string, string> = {
   fanza: 'FANZA',
   fc2: 'FC2 官方',
+  fc2db: 'FC2 备用库',
   heyzo: 'HEYZO 官方',
   pacopacomama: 'Pacopacomama 官方',
   javdb: 'JavDB',
   javbus: 'JavBus',
+  jav321: 'Jav321',
   r18dev: 'r18.dev',
   onepondo: '一本道',
   javdatabase: 'JavDatabase',

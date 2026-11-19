@@ -8,10 +8,12 @@ import { SettingRow, SettingsSection } from './shared'
 const descriptions: Record<string, string> = {
   fanza: '优先提供官方高清封面、预览图，并补充影片资料',
   fc2: 'FC2 商品资料、封面和预览图',
+  fc2db: 'FC2 备用数据库，补充演员、标签与贩售者',
   heyzo: 'HEYZO 官方封面、公开预览原图及影片资料',
   pacopacomama: 'Pacopacomama 官方封面、公开预览原图及影片资料',
   javdb: '社区目录来源，补充影片资料与封面',
   javbus: '社区目录来源，补充影片资料、演员与封面',
+  jav321: '社区目录来源，番号直达详情，补充演职员、评分与预览图',
   r18dev: '官方镜像目录，补充影片资料与封面',
   onepondo: '一本道官方资料与封面（仅日期式番号匹配时使用）',
   javdatabase: '英文社区数据库，番号直达详情，补充标题、演员、厂牌与标签',
