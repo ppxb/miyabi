@@ -72,6 +72,10 @@ func Parse(name string) (string, bool) {
 	}
 	code := Normalize(name[match[2]:match[3]])
 	code = ssniSubtitle.ReplaceAllString(code, "$1")
+	// A trailing CH marks a Chinese-subtitle variant, not part of the number.
+	if base := withoutSubtitleSuffix(code); base != "" {
+		code = base
+	}
 	// SCUTE includes the model name in its catalogue number. Other studios'
 	// filename titles must not become catalogue suffixes just because they contain dashes.
 	if strings.HasPrefix(code, "SCUTE-") {

@@ -2,6 +2,7 @@
 package subtitle
 
 import (
+	"path"
 	"regexp"
 	"strings"
 )
@@ -33,6 +34,13 @@ var (
 	extendedPattern   = regexp.MustCompile(`(?i)(extended|加长|加長|完整版|完全版)`)
 	// C, UC and CH suffixes mark releases with burned-in Chinese subtitles.
 	hardSubtitlePattern = regexp.MustCompile(`(?i)([-_](?:u?c|ch)(?:[-_. ]|$)|中字|中文字幕)`)
+	// chineseSubtitleTag matches an explicit Chinese language tag or label in a
+	// subtitle or video file name, such as .chs / .zh-CN / 中字.
+	chineseSubtitleTag = regexp.MustCompile(`(?i)(?:[._-](?:chi|chs|cht|zh|zh[-_]?cn|zh[-_]?tw|hans|hant)(?:[._-]|$)|中文字幕|中字)`)
+	// videoChineseSuffix matches a -C/-CH suffix or a CH glued to the number at
+	// the end of a video stem (MEYD-589CH). UC (uncensored) is intentionally not
+	// matched so uncensored releases are not reported as Chinese subtitles.
+	videoChineseSuffix = regexp.MustCompile(`(?i)(?:[-_](?:c|ch)|[0-9]ch)$`)
 
 	traditionalHint = regexp.MustCompile(`(?i)(zh[-_]?(tw|hk|hant)|\bcht\b|繁)`)
 	simplifiedHint  = regexp.MustCompile(`(?i)(zh[-_]?(cn|hans)|\bchs\b|简|簡)`)
@@ -65,6 +73,17 @@ func IsUncensored(name string) bool {
 // HasHardSubtitle reports whether a video name marks burned-in Chinese subtitles.
 func HasHardSubtitle(name string) bool {
 	return hardSubtitlePattern.MatchString(name)
+}
+
+// HasChineseSubtitle reports whether a video or subtitle file name indicates a
+// Chinese-subtitle release: a -C/-CH style suffix on the video stem, or an
+// explicit Chinese tag on a subtitle or video name.
+func HasChineseSubtitle(name string) bool {
+	stem := strings.TrimSuffix(name, path.Ext(name))
+	if videoChineseSuffix.MatchString(stem) {
+		return true
+	}
+	return chineseSubtitleTag.MatchString(name)
 }
 
 // LanguageHint recognizes an explicit Chinese variant in a file name or

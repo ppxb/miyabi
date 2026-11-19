@@ -45,6 +45,8 @@ func TestParse(t *testing.T) {
 		{name: "attached SSNI subtitle", input: "ssni-748c.mkv", want: "SSNI-748", ok: true},
 		{name: "SSNI subtitle and video part", input: "SSNI748C-CD2.mp4", want: "SSNI-748", ok: true},
 		{name: "other catalogue C variant stays distinct", input: "FJIN-106C.mp4", want: "FJIN-106C", ok: true},
+		{name: "attached CH subtitle suffix", input: "MEYD-589CH.mp4", want: "MEYD-589", ok: true},
+		{name: "attached CH subtitle suffix two", input: "NTRH-016CH.mp4", want: "NTRH-016", ok: true},
 		{name: "title suffix", input: "SSIS-589-Example-Title.mp4", want: "SSIS-589", ok: true},
 		{name: "named catalogue", input: "scute-1575-itsuki.mp4", want: "SCUTE-1575-ITSUKI", ok: true},
 		{name: "different catalogue name", input: "scute-1575-nanami.mp4", want: "SCUTE-1575-NANAMI", ok: true},

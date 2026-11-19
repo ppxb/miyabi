@@ -110,9 +110,12 @@ func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 	if page.Source == nil || *page.Source != payload.Source || page.Total != 2 || page.HasMore || len(page.Movies) != 2 {
 		t.Fatalf("library statistics escaped the mounted source: %#v", page)
 	}
-	// One file query counts the scoped movies, the second flags which of the
-	// page's movies have files in a 115 source for the source badge.
-	wantQueries := map[string]int{"*ent.FileQuery": 2, "*ent.MovieQuery": 1, "*ent.TagQuery": 1, "*ent.ActorQuery": 1, "*ent.SettingQuery": 2}
+	// One file query counts the scoped movies, one flags which of the page's
+	// movies have files in a 115 source for the source badge, and one reads the
+	// page's file names for the Chinese-subtitle badge; a single subtitle query
+	// covers sidecar subtitle names. All are batched per page, so the count is
+	// constant regardless of the number of cards.
+	wantQueries := map[string]int{"*ent.FileQuery": 3, "*ent.SubtitleQuery": 1, "*ent.MovieQuery": 1, "*ent.TagQuery": 1, "*ent.ActorQuery": 1, "*ent.SettingQuery": 2}
 	if !reflect.DeepEqual(queries, wantQueries) {
 		t.Fatalf("library cards made redundant queries: %#v", queries)
 	}

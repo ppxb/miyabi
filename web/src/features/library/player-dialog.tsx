@@ -42,7 +42,11 @@ export function LibraryPlayerDialog({
 function LibraryPlayer({ movieId }: { movieId: number }) {
   const detail = useLibraryMovie(movieId)
   const playback = useStartMoviePlayback(movieId)
-  const qualities = usePlayQualities(playback.data?.file_id, !!playback.data?.file_id)
+  const [qualitiesRequested, setQualitiesRequested] = useState(false)
+  const qualities = usePlayQualities(
+    playback.data?.file_id,
+    !!playback.data?.file_id && qualitiesRequested
+  )
   const [qualitySource, setQualitySource] = useState<PlaySource>()
   const source = useMemo(() => {
     if (qualitySource) return qualitySource
@@ -88,6 +92,7 @@ function LibraryPlayer({ movieId }: { movieId: number }) {
                 qualityOptions={qualityOptions}
                 qualityValue={qualityValue}
                 onQualityChange={handleQualityChange}
+                onSettingsOpen={() => setQualitiesRequested(true)}
               >
                 {hls ? (
                   <HlsVideo src={source.src} playsInline autoPlay />
@@ -109,7 +114,7 @@ function LibraryPlayer({ movieId }: { movieId: number }) {
         )}
       </div>
       <aside className="min-w-0 shrink-0 overflow-y-auto border-t bg-background p-5 lg:w-[26rem] lg:border-t-0 lg:border-l">
-        <MovieInfo movieId={movieId} show115={!!playback.data?.source} />
+        <MovieInfo movieId={movieId} show115={detail.data?.source === '115'} />
       </aside>
     </>
   )
@@ -192,6 +197,7 @@ function MovieInfo({ movieId, show115 = false }: { movieId: number; show115?: bo
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="frosted">{movie.code}</Badge>
           {show115 ? <Badge variant="frosted">115</Badge> : null}
+          {movie.has_subtitle ? <Badge variant="frosted">中文</Badge> : null}
         </div>
         <h2 className="text-xl leading-snug font-bold">{movie.title || movie.code}</h2>
         {movie.origin_title && movie.origin_title !== movie.title ? (
@@ -207,8 +213,14 @@ function MovieInfo({ movieId, show115 = false }: { movieId: number; show115?: bo
       <InfoRow label="演员">
         {movie.actors.length > 0 ? (
           <span className="flex flex-wrap gap-x-2 gap-y-1">
-            {movie.actors.map(actor => (
-              <span key={`${actor.provider ?? ''}:${actor.id}`}>{actor.name}</span>
+            {movie.actors.map((actor, index) => (
+              <span
+                key={`${actor.provider ?? ''}:${actor.id || actor.name}:${index}`}
+                className="inline-flex items-center gap-2"
+              >
+                {index > 0 ? <span className="text-muted-foreground">/</span> : null}
+                {actor.name}
+              </span>
             ))}
           </span>
         ) : (

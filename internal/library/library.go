@@ -10,12 +10,14 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
+	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
+	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/ent/tag"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/export"
@@ -57,6 +59,9 @@ type Movie struct {
 	ScrapeStatus movie.ScrapeStatus `json:"scrape_status"`
 	// Source marks movies that have at least one file in a 115 cloud source.
 	Source string `json:"source,omitempty"`
+	// HasSubtitle marks movies whose file or indexed subtitle names indicate a
+	// Chinese-subtitle release.
+	HasSubtitle bool `json:"has_subtitle"`
 }
 
 type Page struct {
@@ -484,6 +489,9 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 	if err := s.markCloudSources(ctx, result.Movies, cloudScope); err != nil {
 		return result, err
 	}
+	if err := s.markSubtitleStatus(ctx, result.Movies); err != nil {
+		return result, err
+	}
 	result.HasMore = (page-1)*limit+len(result.Movies) < result.Total
 	return result, nil
 }
@@ -544,6 +552,9 @@ func (s *Service) TopRated(ctx context.Context, limit int) ([]Movie, error) {
 	if err := s.markCloudSources(ctx, items, cloudScope); err != nil {
 		return nil, err
 	}
+	if err := s.markSubtitleStatus(ctx, items); err != nil {
+		return nil, err
+	}
 	sort.SliceStable(items, func(i, j int) bool {
 		if items[i].Rating != items[j].Rating {
 			return items[i].Rating > items[j].Rating
@@ -580,6 +591,47 @@ func (s *Service) markCloudSources(ctx context.Context, movies []Movie, cloudSco
 	for i := range movies {
 		if inCloud[movies[i].ID] {
 			movies[i].Source = "115"
+		}
+	}
+	return nil
+}
+
+// markSubtitleStatus flags movies whose file or indexed subtitle names carry a
+// Chinese-subtitle marker, keeping list cards consistent with the detail view.
+func (s *Service) markSubtitleStatus(ctx context.Context, movies []Movie) error {
+	if len(movies) == 0 {
+		return nil
+	}
+	ids := make([]int, len(movies))
+	index := make(map[int]*Movie, len(movies))
+	for i := range movies {
+		ids[i] = movies[i].ID
+		index[movies[i].ID] = &movies[i]
+	}
+	files, err := s.database.File.Query().
+		Where(file.MovieIDIn(ids...)).
+		Select(file.FieldMovieID, file.FieldName).All(ctx)
+	if err != nil {
+		return fmt.Errorf("read library subtitle files: %w", err)
+	}
+	for _, record := range files {
+		if record.MovieID != nil && subtitlemeta.HasChineseSubtitle(record.Name) {
+			if item, ok := index[*record.MovieID]; ok {
+				item.HasSubtitle = true
+			}
+		}
+	}
+	tracks, err := s.database.Subtitle.Query().
+		Where(subtitle.MovieIDIn(ids...)).
+		Select(subtitle.FieldMovieID, subtitle.FieldName).All(ctx)
+	if err != nil {
+		return fmt.Errorf("read library subtitles: %w", err)
+	}
+	for _, track := range tracks {
+		if subtitlemeta.HasChineseSubtitle(track.Name) {
+			if item, ok := index[track.MovieID]; ok {
+				item.HasSubtitle = true
+			}
 		}
 	}
 	return nil
@@ -793,6 +845,9 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 		return result, err
 	}
 	if err := s.markCloudSources(ctx, result.Movies, cloudScope); err != nil {
+		return result, err
+	}
+	if err := s.markSubtitleStatus(ctx, result.Movies); err != nil {
 		return result, err
 	}
 	result.HasMore = end < len(items)

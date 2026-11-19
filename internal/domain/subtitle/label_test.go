@@ -92,6 +92,28 @@ func TestHasHardSubtitle(t *testing.T) {
 	}
 }
 
+func TestHasChineseSubtitle(t *testing.T) {
+	for name, want := range map[string]bool{
+		"SSIS-589-C.mp4":     true,
+		"SSIS-589-CH.mp4":    true,
+		"SSIS-589_ch.mp4":    true,
+		"MEYD-589CH.mp4":     true,
+		"NTRH-016CH.mp4":     true,
+		"SSIS-589-UC.mkv":    false,
+		"SSIS-589.mp4":       false,
+		"SSIS-589-CD1.mp4":   false,
+		"SSIS-589.chs.srt":   true,
+		"SSIS-589.zh-CN.srt": true,
+		"SSIS-589.cht.ass":   true,
+		"SSIS-589.zh.srt":    true,
+		"SSIS-589.en.srt":    false,
+	} {
+		if got := HasChineseSubtitle(name); got != want {
+			t.Errorf("HasChineseSubtitle(%q) = %v; want %v", name, got, want)
+		}
+	}
+}
+
 func TestIsUncensored(t *testing.T) {
 	cases := []struct {
 		name string

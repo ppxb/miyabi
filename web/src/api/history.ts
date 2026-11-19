@@ -13,6 +13,7 @@ export type WatchHistoryItem = {
   rating?: number
   actors?: Array<{ provider?: string; id?: string; name: string }>
   source?: string
+  has_subtitle?: boolean
   watched_at: string
   position: number
   duration: number

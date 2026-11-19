@@ -23,6 +23,7 @@ export function ContinueWatching({ onPlay }: { onPlay: (movieID: number) => void
           rating: item.rating ?? 0,
           actors: item.actors ?? [],
           source: item.source,
+          has_subtitle: item.has_subtitle,
           tags: [],
           scrape_status: 'done'
         }

@@ -18,17 +18,18 @@ type WatchResume struct {
 }
 
 type WatchHistoryItem struct {
-	MovieID   int       `json:"movie_id"`
-	Code      string    `json:"code"`
-	Title     string    `json:"title"`
-	Cover     *string   `json:"cover,omitempty"`
-	Poster    *string   `json:"poster,omitempty"`
-	Rating    float64   `json:"rating"`
-	Actors    []Actor   `json:"actors"`
-	Source    string    `json:"source,omitempty"`
-	WatchedAt time.Time `json:"watched_at"`
-	Position  float64   `json:"position"`
-	Duration  float64   `json:"duration"`
+	MovieID     int       `json:"movie_id"`
+	Code        string    `json:"code"`
+	Title       string    `json:"title"`
+	Cover       *string   `json:"cover,omitempty"`
+	Poster      *string   `json:"poster,omitempty"`
+	Rating      float64   `json:"rating"`
+	Actors      []Actor   `json:"actors"`
+	Source      string    `json:"source,omitempty"`
+	HasSubtitle bool      `json:"has_subtitle"`
+	WatchedAt   time.Time `json:"watched_at"`
+	Position    float64   `json:"position"`
+	Duration    float64   `json:"duration"`
 }
 
 type WatchHistoryPage struct {

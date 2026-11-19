@@ -17,13 +17,15 @@ export interface DefaultVideoControlsProps {
   qualityOptions?: import('@/components/videojs/ui/custom-quality-menu').QualityChoice[]
   qualityValue?: string
   onQualityChange?: (value: string) => void
+  onSettingsOpen?: () => void
 }
 
 export function DefaultVideoControls({
   renderThumbnail,
   qualityOptions,
   qualityValue,
-  onQualityChange
+  onQualityChange,
+  onSettingsOpen
 }: DefaultVideoControlsProps = {}) {
   return (
     <Controls.Root>
@@ -161,6 +163,9 @@ export function DefaultVideoControls({
               qualityOptions={qualityOptions}
               qualityValue={qualityValue}
               onQualityChange={onQualityChange}
+              onOpenChange={open => {
+                if (open) onSettingsOpen?.()
+              }}
             />
           </Controls.Group>
 

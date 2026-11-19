@@ -35,6 +35,7 @@ export type LibraryMovie = {
   tags: Array<{ id: number; provider: string; source_id: string; name: string }>
   scrape_status: 'pending' | 'done' | 'failed'
   source?: string
+  has_subtitle?: boolean
 }
 
 export type LibraryPage = {
@@ -78,6 +79,7 @@ export const libraryKeys = {
 export type LibraryMovieDetail = Omit<DiscoverMovieDetail, 'release_status'> & {
   library_id: number
   scrape_status: LibraryMovie['scrape_status']
+  source?: string
 }
 
 export function useLibraryMovie(id: number) {

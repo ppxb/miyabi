@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/pan"
@@ -80,5 +81,29 @@ func TestMediaSpecsReportsTranscodeUnavailable(t *testing.T) {
 	}, "pick", "ua")
 	if !errors.Is(err, drive.ErrTranscodeUnavailable) {
 		t.Fatalf("error = %v, want transcode unavailable", err)
+	}
+}
+
+func TestResolveSpecsCachesDirectURL(t *testing.T) {
+	downloads := 0
+	sess := stubSourceSession{
+		download: func(context.Context, string, string) (string, error) {
+			downloads++
+			return "https://cdn.example/video.mp4", nil
+		},
+		play: func(context.Context, string, string) ([]pan.PlaySource, error) {
+			t.Fatal("playback URL must not be requested when a download URL exists")
+			return nil, nil
+		},
+	}
+	service := New(nil, nil, time.Minute)
+	for i := 0; i < 3; i++ {
+		specs, err := service.resolveSpecs(context.Background(), sess, "acct", "pick", "ua")
+		if err != nil || len(specs) != 1 || specs[0].address != "https://cdn.example/video.mp4" {
+			t.Fatalf("iteration %d: specs=%+v err=%v", i, specs, err)
+		}
+	}
+	if downloads != 1 {
+		t.Fatalf("DownloadURL called %d times, want 1 (second and third served from cache)", downloads)
 	}
 }

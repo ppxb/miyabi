@@ -25,6 +25,7 @@ export interface VideoSkinProps extends Omit<
   qualityOptions?: NonNullable<ComponentProps<typeof DefaultVideoControls>>['qualityOptions']
   qualityValue?: string
   onQualityChange?: (value: string) => void
+  onSettingsOpen?: () => void
 }
 
 export function VideoSkin({
@@ -35,6 +36,7 @@ export function VideoSkin({
   qualityOptions,
   qualityValue,
   onQualityChange,
+  onSettingsOpen,
   ...props
 }: VideoSkinProps = {}) {
   return (
@@ -55,6 +57,7 @@ export function VideoSkin({
         qualityOptions={qualityOptions}
         qualityValue={qualityValue}
         onQualityChange={onQualityChange}
+        onSettingsOpen={onSettingsOpen}
       />
 
       <VideoHotkeys />

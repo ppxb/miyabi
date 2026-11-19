@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"sync"
 
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -48,7 +49,7 @@ func (service *Service) Start(ctx context.Context, fileID, userAgent string) (Pl
 	}
 	// Prefer the direct download URL: it starts immediately, seeks natively and
 	// avoids waiting for a transcode that may still be generating.
-	specs, err := mediaSpecs(ctx, opened.sess, opened.pickCode, userAgent)
+	specs, err := service.resolveSpecs(ctx, opened.sess, opened.source.AccountID, opened.pickCode, userAgent)
 	if err != nil {
 		return Playback{}, err
 	}
@@ -130,19 +131,34 @@ func (service *Service) openFileRecord(ctx context.Context, record *ent.File) (o
 
 // StartMovie starts playback for a movie's primary video in one call.
 func (service *Service) StartMovie(ctx context.Context, movieID int, userAgent string) (Playback, error) {
-	records, err := service.database.File.Query().
-		Where(file.MovieIDEQ(movieID), file.AccountIDNEQ(domain.LocalAccountID)).
-		Select(file.FieldFileID, file.FieldSize, file.FieldAccountID, file.FieldRootID, file.FieldPickCode, file.FieldName, file.FieldPath).
-		Order(ent.Desc(file.FieldSize), ent.Asc(file.FieldPath), ent.Asc(file.FieldID)).All(ctx)
-	if err != nil {
-		return Playback{}, fmt.Errorf("read indexed videos: %w", err)
+	var (
+		records   []*ent.File
+		resume    *domain.WatchResume
+		fileErr   error
+		resumeErr error
+	)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		records, fileErr = service.database.File.Query().
+			Where(file.MovieIDEQ(movieID), file.AccountIDNEQ(domain.LocalAccountID)).
+			Select(file.FieldFileID, file.FieldSize, file.FieldAccountID, file.FieldRootID, file.FieldPickCode, file.FieldName, file.FieldPath).
+			Order(ent.Desc(file.FieldSize), ent.Asc(file.FieldPath), ent.Asc(file.FieldID)).All(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		resume, resumeErr = service.Resume(ctx, movieID)
+	}()
+	wg.Wait()
+	if fileErr != nil {
+		return Playback{}, fmt.Errorf("read indexed videos: %w", fileErr)
 	}
 	if len(records) == 0 {
 		return Playback{}, domain.E(domain.KindNotFound, "当前挂载目录中未找到该影片的媒体文件", nil)
 	}
-	resume, err := service.Resume(ctx, movieID)
-	if err != nil {
-		return Playback{}, err
+	if resumeErr != nil {
+		return Playback{}, resumeErr
 	}
 	target := records[0]
 	if resume != nil {
@@ -160,7 +176,7 @@ func (service *Service) StartMovie(ctx context.Context, movieID int, userAgent s
 	if err != nil {
 		return Playback{}, err
 	}
-	specs, err := mediaSpecs(ctx, opened.sess, opened.pickCode, userAgent)
+	specs, err := service.resolveSpecs(ctx, opened.sess, opened.source.AccountID, opened.pickCode, userAgent)
 	if err != nil {
 		return Playback{}, err
 	}
@@ -196,6 +212,24 @@ func mediaSpecs(ctx context.Context, sess playSourceSession, pickCode, userAgent
 		return nil, fmt.Errorf("get 115 playback URL: %w", err)
 	}
 	return hlsSpecs(sources), nil
+}
+
+// resolveSpecs prefers a recently resolved 115 direct URL so reopening the same
+// file starts without another round trip. Only direct mp4 URLs are cached;
+// transcoded HLS is always re-resolved.
+func (service *Service) resolveSpecs(ctx context.Context, sess playSourceSession, accountID, pickCode, userAgent string) ([]mediaSpec, error) {
+	key := accountID + "|" + pickCode
+	if address, ok := service.cachedDownloadURL(key); ok {
+		return []mediaSpec{{address: address, mediaType: "video/mp4", label: "原画"}}, nil
+	}
+	specs, err := mediaSpecs(ctx, sess, pickCode, userAgent)
+	if err != nil {
+		return nil, err
+	}
+	if len(specs) == 1 && specs[0].mediaType == "video/mp4" && !specs[0].playlist && specs[0].address != "" {
+		service.storeDownloadURL(key, specs[0].address)
+	}
+	return specs, nil
 }
 
 func hlsSpecs(sources []pan.PlaySource) []mediaSpec {

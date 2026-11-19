@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
+	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
 
@@ -91,16 +93,35 @@ func (service *Service) History(ctx context.Context, page int) (domain.WatchHist
 	for _, item := range movies {
 		byID[item.ID] = item
 	}
-	cloudFiles, err := service.database.File.Query().
-		Where(file.MovieIDIn(ids...), file.AccountIDNEQ(domain.LocalAccountID)).
-		Select(file.FieldMovieID).All(ctx)
+	historyFiles, err := service.database.File.Query().
+		Where(file.MovieIDIn(ids...)).
+		Select(file.FieldMovieID, file.FieldName, file.FieldAccountID).All(ctx)
 	if err != nil {
-		return result, fmt.Errorf("read history sources: %w", err)
+		return result, fmt.Errorf("read history files: %w", err)
 	}
-	cloud := make(map[int]bool, len(cloudFiles))
-	for _, item := range cloudFiles {
-		if item.MovieID != nil {
-			cloud[*item.MovieID] = true
+	cloud := make(map[int]bool, len(historyFiles))
+	subtitled := make(map[int]bool, len(historyFiles))
+	for _, record := range historyFiles {
+		if record.MovieID == nil {
+			continue
+		}
+		id := *record.MovieID
+		if record.AccountID != "" && record.AccountID != domain.LocalAccountID {
+			cloud[id] = true
+		}
+		if subtitlemeta.HasChineseSubtitle(record.Name) {
+			subtitled[id] = true
+		}
+	}
+	tracks, err := service.database.Subtitle.Query().
+		Where(subtitle.MovieIDIn(ids...)).
+		Select(subtitle.FieldMovieID, subtitle.FieldName).All(ctx)
+	if err != nil {
+		return result, fmt.Errorf("read history subtitles: %w", err)
+	}
+	for _, track := range tracks {
+		if subtitlemeta.HasChineseSubtitle(track.Name) {
+			subtitled[track.MovieID] = true
 		}
 	}
 	for _, record := range records {
@@ -120,7 +141,7 @@ func (service *Service) History(ctx context.Context, page int) (domain.WatchHist
 		result.Items = append(result.Items, domain.WatchHistoryItem{
 			MovieID: item.ID, Code: item.Code, Title: item.Title, Cover: item.Cover, Poster: item.Poster,
 			Rating: domain.NormalizeRating10(domain.ValueOrZero(item.Rating), doc.RatingMax),
-			Actors: actors, Source: source,
+			Actors: actors, Source: source, HasSubtitle: subtitled[record.MovieID],
 			WatchedAt: record.WatchedAt, Position: record.Position, Duration: record.Duration,
 		})
 	}

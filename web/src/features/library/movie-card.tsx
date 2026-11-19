@@ -45,7 +45,14 @@ export function LibraryMovieCard({
             movie={movie}
             titleTooltip={false}
             hideContent
-            state={movie.source === '115' ? <Badge variant="frosted">115</Badge> : undefined}
+            state={
+              movie.source === '115' || movie.has_subtitle ? (
+                <>
+                  {movie.source === '115' ? <Badge variant="frosted">115</Badge> : null}
+                  {movie.has_subtitle ? <Badge variant="frosted">中文</Badge> : null}
+                </>
+              ) : undefined
+            }
             coverOverlay={
               <>
                 {movie.rating > 0 ? (
