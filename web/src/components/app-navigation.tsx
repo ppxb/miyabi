@@ -1,6 +1,7 @@
 import { Link, useLocation } from '@tanstack/react-router'
 import {
   BookmarkIcon,
+  ClapperboardIcon,
   CompassIcon,
   FilmIcon,
   HistoryIcon,
@@ -18,11 +19,12 @@ import {
 type AppNavItem = {
   label: string
   icon: LucideIcon
-  to: '/' | '/history' | '/discover' | '/subscriptions' | '/settings'
+  to: '/' | '/movies' | '/history' | '/discover' | '/subscriptions' | '/settings'
 }
 
 export const APP_NAV_ITEMS: readonly AppNavItem[] = [
   { label: '媒体库', icon: FilmIcon, to: '/' },
+  { label: '影片', icon: ClapperboardIcon, to: '/movies' },
   { label: '观看历史', icon: HistoryIcon, to: '/history' },
   { label: '探索', icon: CompassIcon, to: '/discover' },
   { label: '关注', icon: BookmarkIcon, to: '/subscriptions' },

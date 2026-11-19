@@ -11,6 +11,7 @@ import { notifyScanTask, notifyTaskError } from '@/features/tasks/task-toast'
 vi.mock('@/api/library', () => ({
   LIBRARY_PAGE_SIZE: 20,
   useLibraryMovies: vi.fn(),
+  useRecentMovies: () => ({ data: { movies: [], total: 0 }, isPending: false }),
   useTopRatedMovies: () => ({ data: [] }),
   useStartLibraryScan: vi.fn()
 }))
@@ -41,8 +42,8 @@ test('library page header shows the multi-source description without scan contro
     isSuccess: true,
     data: { movies: [], total: 0 }
   } as unknown as ReturnType<typeof useLibraryMovies>)
-  const html = renderToStaticMarkup(createElement(LibraryPage, { page: 2, onPageChange: vi.fn() }))
-  expect(html).toContain('最新、高分或分类影片')
+  const html = renderToStaticMarkup(createElement(LibraryPage))
+  expect(html).toContain('最近加入、正在观看与高分影片')
   expect(html).not.toContain('同步媒体库')
 })
 

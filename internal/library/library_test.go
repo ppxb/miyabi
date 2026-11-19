@@ -260,6 +260,160 @@ func TestLibraryOrdersBy115UploadTimeAndFlagsCloudSource(t *testing.T) {
 	}
 }
 
+func TestLibraryBrowseFiltersSortAndOptions(t *testing.T) {
+	lib, _, payload := libraryFixture(t)
+	ctx := t.Context()
+	db := lib.database
+	cloudAccount, cloudRoot := payload.Source.AccountID, payload.Source.Directory.ID
+
+	tagA := db.Tag.Create().SetProvider("javdb").SetSourceID("tag-a").SetName("A tag").SaveX(ctx)
+	tagB := db.Tag.Create().SetProvider("javdb").SetSourceID("tag-b").SetName("B tag").SaveX(ctx)
+	tagADup := db.Tag.Create().SetProvider("fanza").SetSourceID("tag-a-dup").SetName("A tag").SaveX(ctx)
+	actorX := db.Actor.Create().SetProvider("javdb").SetSourceID("actor-x").SetName("X actor").SaveX(ctx)
+
+	createMovie := func(code, title string, rating float64, release, makerID, makerName, seriesName string, local bool, tags ...*ent.Tag) int {
+		builder := db.Movie.Create().SetCode(code).SetTitle(title).SetRating(rating).
+			SetMakerID(makerID).SetMakerName(makerName).SetSeriesName(seriesName)
+		if release != "" {
+			releaseDate, err := time.Parse(time.DateOnly, release)
+			if err != nil {
+				t.Fatal(err)
+			}
+			builder.SetReleaseDate(releaseDate)
+		}
+		if len(tags) > 0 {
+			builder.AddTags(tags...)
+		}
+		if code == "BRW-001" {
+			builder.AddActors(actorX)
+		}
+		film := builder.SaveX(ctx)
+		account, root := cloudAccount, cloudRoot
+		if local {
+			account, root = domain.LocalAccountID, "local"
+		}
+		db.File.Create().SetFileID(code).SetName(code + ".mp4").SetSize(1).
+			SetAccountID(account).SetRootID(root).SetMovieID(film.ID).ExecX(ctx)
+		return film.ID
+	}
+
+	m1 := createMovie("BRW-001", "Alpha", 4.5, "2026-01-10", "maker-1", "Studio One", "Series One", false, tagA)
+	m2 := createMovie("BRW-002", "Beta", 3.6, "2026-03-05", "maker-2", "Studio Two", "", false, tagADup)
+	m3 := createMovie("BRW-003", "Gamma", 5.0, "2026-02-01", "maker-3", "Studio Three", "Series Two", false, tagB)
+	m4 := createMovie("LOC-001", "Delta", 0, "", "", "", "", true)
+
+	ids := func(page Page) []int {
+		result := make([]int, len(page.Movies))
+		for i, item := range page.Movies {
+			result[i] = item.ID
+		}
+		return result
+	}
+
+	all, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20})
+	if err != nil || all.Total != 4 || len(all.Movies) != 4 {
+		t.Fatalf("browse all: %+v err=%v", all, err)
+	}
+
+	high, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, HighRated: true})
+	if err != nil || high.Total != 2 {
+		t.Fatalf("browse high: %+v err=%v", high, err)
+	}
+	for _, item := range high.Movies {
+		if item.ID != m1 && item.ID != m3 {
+			t.Fatalf("high rated filter leaked movie %d", item.ID)
+		}
+	}
+
+	cloud, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, Source: "115"})
+	if err != nil || cloud.Total != 3 {
+		t.Fatalf("source=115: %+v err=%v", cloud, err)
+	}
+	local, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, Source: "local"})
+	if err != nil || local.Total != 1 || local.Movies[0].ID != m4 {
+		t.Fatalf("source=local: %+v err=%v", local, err)
+	}
+
+	byTag, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, TagNames: []string{"A tag"}})
+	if err != nil || byTag.Total != 2 {
+		t.Fatalf("tag filter: %+v err=%v", byTag, err)
+	}
+	if !containsID(ids(byTag), m1) || !containsID(ids(byTag), m2) {
+		t.Fatalf("tag filter must match same-named tags across sources: %v", ids(byTag))
+	}
+	byActor, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, ActorNames: []string{"X actor"}})
+	if err != nil || byActor.Total != 1 || byActor.Movies[0].ID != m1 {
+		t.Fatalf("actor filter: %+v err=%v", byActor, err)
+	}
+	byMaker, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, MakerNames: []string{"Studio Two"}})
+	if err != nil || byMaker.Total != 1 || byMaker.Movies[0].ID != m2 {
+		t.Fatalf("maker filter: %+v err=%v", byMaker, err)
+	}
+	bySeries, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, SeriesNames: []string{"Series One"}})
+	if err != nil || bySeries.Total != 1 || bySeries.Movies[0].ID != m1 {
+		t.Fatalf("series filter: %+v err=%v", bySeries, err)
+	}
+	keyword, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, Query: "beta"})
+	if err != nil || keyword.Total != 1 || keyword.Movies[0].ID != m2 {
+		t.Fatalf("keyword filter: %+v err=%v", keyword, err)
+	}
+
+	rated, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, Sort: "rating"})
+	if err != nil || len(rated.Movies) != 4 || rated.Movies[0].ID != m3 || rated.Movies[1].ID != m1 {
+		t.Fatalf("rating sort: %v err=%v", ids(rated), err)
+	}
+	released, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, Sort: "release"})
+	if err != nil || !reflect.DeepEqual(ids(released), []int{m2, m3, m1, m4}) {
+		t.Fatalf("release sort: %v err=%v", ids(released), err)
+	}
+
+	second, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 2, Limit: 2, Sort: "rating"})
+	if err != nil || second.Total != 4 || len(second.Movies) != 2 || second.HasMore {
+		t.Fatalf("page 2: %+v err=%v", second, err)
+	}
+	clamped, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 9, Limit: 2, Sort: "rating"})
+	if err != nil || clamped.Page != 2 || len(clamped.Movies) != 2 || clamped.HasMore {
+		t.Fatalf("clamped page: %+v err=%v", clamped, err)
+	}
+	bogus, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, Sort: "nope", Source: "nope"})
+	if err != nil || bogus.Total != 4 {
+		t.Fatalf("bogus filters fallback: %+v err=%v", bogus, err)
+	}
+
+	canvas := func(options []FilterOption) []string {
+		names := make([]string, len(options))
+		for i, option := range options {
+			names[i] = option.Name
+		}
+		return names
+	}
+	filterOptions, err := lib.FilterOptions(ctx)
+	if err != nil {
+		t.Fatalf("filter options: %v", err)
+	}
+	if !reflect.DeepEqual(canvas(filterOptions.Tags), []string{"A tag", "B tag"}) {
+		t.Fatalf("tag options: %v", canvas(filterOptions.Tags))
+	}
+	if !reflect.DeepEqual(canvas(filterOptions.Actors), []string{"X actor"}) {
+		t.Fatalf("actor options: %v", canvas(filterOptions.Actors))
+	}
+	if !reflect.DeepEqual(canvas(filterOptions.Makers), []string{"Studio One", "Studio Three", "Studio Two"}) {
+		t.Fatalf("maker options: %v", canvas(filterOptions.Makers))
+	}
+	if !reflect.DeepEqual(canvas(filterOptions.Series), []string{"Series One", "Series Two"}) {
+		t.Fatalf("series options: %v", canvas(filterOptions.Series))
+	}
+}
+
+func containsID(values []int, target int) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
 func TestLibraryMatchingMovies(t *testing.T) {
 	lib, _, payload := libraryFixture(t)
 	ctx := t.Context()

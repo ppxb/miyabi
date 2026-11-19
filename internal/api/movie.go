@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -12,6 +14,8 @@ import (
 type LibraryManager interface {
 	ViewedManager
 	Movies(context.Context, int, int) (lib.Page, error)
+	BrowseMovies(context.Context, lib.BrowseFilter) (lib.Page, error)
+	FilterOptions(context.Context) (lib.FilterOptions, error)
 	TopRated(context.Context, int) ([]lib.Movie, error)
 	Movie(context.Context, int) (lib.MovieDetail, error)
 	Preview(context.Context, int, int) (domain.ImageCandidate, error)
@@ -73,6 +77,54 @@ func libraryTopRatedHandler(library LibraryManager) gin.HandlerFunc {
 		movies, err := library.TopRated(c.Request.Context(), query.Limit)
 		respond(c, movies, err)
 	}
+}
+
+func libraryBrowseHandler(library LibraryManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		page, err := queryInt(c, "page", 1, 1, 1<<31-1)
+		if err != nil {
+			c.Error(badRequest(err))
+			return
+		}
+		limit, err := queryInt(c, "limit", 20, 1, 100)
+		if err != nil {
+			c.Error(badRequest(err))
+			return
+		}
+		filter := lib.BrowseFilter{
+			Query:       c.Query("q"),
+			Sort:        c.DefaultQuery("sort", "recent"),
+			Source:      c.Query("source"),
+			HighRated:   c.Query("high") == "true" || c.Query("high") == "1",
+			TagNames:    c.QueryArray("tag"),
+			ActorNames:  c.QueryArray("actor"),
+			MakerNames:  c.QueryArray("maker"),
+			SeriesNames: c.QueryArray("series"),
+			Page:        page,
+			Limit:       limit,
+		}
+		movies, err := library.BrowseMovies(c.Request.Context(), filter)
+		respond(c, movies, err)
+	}
+}
+
+func libraryFilterOptionsHandler(library LibraryManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		options, err := library.FilterOptions(c.Request.Context())
+		respond(c, options, err)
+	}
+}
+
+func queryInt(c *gin.Context, key string, fallback, min, max int) (int, error) {
+	raw := c.Query(key)
+	if raw == "" {
+		return fallback, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < min || value > max {
+		return 0, fmt.Errorf("%s 参数无效", key)
+	}
+	return value, nil
 }
 
 func libraryMovieHandler(library LibraryManager) gin.HandlerFunc {

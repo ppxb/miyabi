@@ -1,4 +1,10 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient
+} from '@tanstack/react-query'
 
 import { apiGet, apiPost } from '@/api/client'
 import type { DiscoverMovieDetail } from '@/api/discover'
@@ -31,7 +37,7 @@ export type LibraryMovie = {
   source?: string
 }
 
-type LibraryPage = {
+export type LibraryPage = {
   source?: LibrarySource
   movies: LibraryMovie[]
   total: number
@@ -39,10 +45,34 @@ type LibraryPage = {
   has_more: boolean
 }
 
+export type LibraryFilterOption = { id: string; name: string }
+
+export type LibraryFilterOptions = {
+  tags: LibraryFilterOption[]
+  actors: LibraryFilterOption[]
+  makers: LibraryFilterOption[]
+  series: LibraryFilterOption[]
+}
+
+export type BrowseLibraryParams = {
+  q?: string
+  sort?: 'recent' | 'rating' | 'release'
+  source?: '115' | 'local'
+  tagNames?: string[]
+  actorNames?: string[]
+  makerNames?: string[]
+  seriesNames?: string[]
+  page?: number
+  limit?: number
+}
+
 export const libraryKeys = {
   all: ['library'] as const,
   detail: (id: number) => ['library', 'detail', id] as const,
-  movies: (page: number) => ['library', 'movies', page] as const
+  movies: (page: number) => ['library', 'movies', page] as const,
+  recent: (limit: number) => ['library', 'recent', limit] as const,
+  browse: (params: BrowseLibraryParams) => ['library', 'browse', params] as const,
+  filterOptions: ['library', 'filter-options'] as const
 }
 
 export type LibraryMovieDetail = Omit<DiscoverMovieDetail, 'release_status'> & {
@@ -70,6 +100,46 @@ export function useTopRatedMovies(limit = 12) {
   return useQuery({
     queryKey: ['library', 'top-rated', limit] as const,
     queryFn: ({ signal }) => apiGet<LibraryMovie[]>('/api/library/top-rated', { limit }, signal)
+  })
+}
+
+export function useRecentMovies(limit = 12) {
+  return useQuery({
+    queryKey: libraryKeys.recent(limit),
+    queryFn: ({ signal }) =>
+      apiGet<LibraryPage>('/api/library/movies', { page: 1, limit }, signal)
+  })
+}
+
+export function useBrowseLibraryMovies(params: BrowseLibraryParams) {
+  return useQuery({
+    queryKey: libraryKeys.browse(params),
+    placeholderData: keepPreviousData,
+    queryFn: ({ signal }) =>
+      apiGet<LibraryPage>(
+        '/api/library/browse',
+        {
+          q: params.q,
+          sort: params.sort,
+          source: params.source,
+          tag: params.tagNames,
+          actor: params.actorNames,
+          maker: params.makerNames,
+          series: params.seriesNames,
+          page: params.page,
+          limit: params.limit
+        },
+        signal
+      )
+  })
+}
+
+export function useLibraryFilterOptions() {
+  return useQuery({
+    queryKey: libraryKeys.filterOptions,
+    queryFn: ({ signal }) =>
+      apiGet<LibraryFilterOptions>('/api/library/filter-options', undefined, signal),
+    staleTime: 5 * 60_000
   })
 }
 

@@ -96,6 +96,8 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	settingsAPI.PUT("/sources", sourceUpdateHandler(deps.Sources))
 
 	protected.GET("/library/movies", libraryMoviesHandler(deps.Library))
+	protected.GET("/library/browse", libraryBrowseHandler(deps.Library))
+	protected.GET("/library/filter-options", libraryFilterOptionsHandler(deps.Library))
 	protected.GET("/library/top-rated", libraryTopRatedHandler(deps.Library))
 	protected.GET("/library/movies/:id", libraryMovieHandler(deps.Library))
 	protected.POST("/library/movies/:id/scrape", libraryMovieScrapeHandler(deps.Library))
