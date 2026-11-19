@@ -21,6 +21,8 @@ export const sourceNames: Record<string, string> = {
   c0930: 'C0930',
   h0930: 'H0930',
   h4610: 'H4610',
+  tenmusume: '10musume',
+  muramura: 'ムラムラ',
   r18dev: 'r18.dev',
   onepondo: '一本道',
   javdatabase: 'JavDatabase',

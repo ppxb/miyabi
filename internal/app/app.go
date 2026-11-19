@@ -148,12 +148,14 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	c0930Source := providers.NewC0930(networkSvc.ProxyManager())
 	h0930Source := providers.NewH0930(networkSvc.ProxyManager())
 	h4610Source := providers.NewH4610(networkSvc.ProxyManager())
+	tenmusumeSource := providers.NewTenMusume(networkSvc.ProxyManager())
+	muramuraSource := providers.NewMuraMura(networkSvc.ProxyManager())
 	metadataSvc, err := metadata.New(ctx, store.Client, fanzaSource, fc2Source, fc2dbSource, heyzoSource, pacopacomamaSource,
 		providers.NewJavDB(catalogueSvc), providers.NewJavBus(javbusClient, networkSvc.ProxyManager()),
 		providers.NewR18(networkSvc.ProxyManager()), providers.NewOnePondo(networkSvc.ProxyManager()),
 		providers.NewCodeAV(networkSvc.ProxyManager()),
 		providers.NewJavDatabase(networkSvc.ProxyManager()), jav321Source, tokyohotSource, heydougaSource,
-		caribbeancomSource, caribbeancomprSource, c0930Source, h0930Source, h4610Source)
+		caribbeancomSource, caribbeancomprSource, c0930Source, h0930Source, h4610Source, tenmusumeSource, muramuraSource)
 	if err != nil {
 		fanzaSource.Close()
 		fc2Source.Close()
@@ -168,6 +170,8 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		c0930Source.Close()
 		h0930Source.Close()
 		h4610Source.Close()
+		tenmusumeSource.Close()
+		muramuraSource.Close()
 		catalogueSvc.Close()
 		driveSvc.Close()
 		_ = store.Close()
