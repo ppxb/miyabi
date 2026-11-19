@@ -54,6 +54,7 @@ export type DiscoverMovie = {
   code: string
   title: string
   origin_title: string
+  plot?: string
   release_date: string
   duration: number
   rating: number

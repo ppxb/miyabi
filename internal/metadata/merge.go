@@ -18,6 +18,7 @@ func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 	images := make(map[string]bool)
 	actors := make(map[string]bool)
 	tags := make(map[string]bool)
+	javdbPlot, javdbPlotSource := "", ""
 	for _, item := range results {
 		for _, image := range item.Images {
 			key := image.Role + ":" + image.URL
@@ -62,6 +63,17 @@ func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 		text("cover", &out.Cover, m.Cover)
 		text("thumbnail", &out.Thumbnail, m.Thumbnail)
 		text("preview_video", &out.PreviewVideo, m.PreviewVideo)
+		// Synopsis prefers any official source; JavDB is only the fallback.
+		if m.Plot != "" {
+			if provider == "javdb" {
+				if javdbPlot == "" {
+					javdbPlot, javdbPlotSource = m.Plot, provider
+				}
+			} else if out.Plot == "" {
+				out.Plot = m.Plot
+				out.FieldSources["plot"] = provider
+			}
+		}
 		if out.Zone == "" || out.Zone == domain.ZoneUnknown {
 			out.Zone = m.Zone
 		}
@@ -114,6 +126,10 @@ func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 				out.FieldSources["tags"] = provider
 			}
 		}
+	}
+	if result.Detail.Plot == "" && javdbPlot != "" {
+		result.Detail.Plot = javdbPlot
+		result.Detail.FieldSources["plot"] = javdbPlotSource
 	}
 	result.Detail.HasPreview = len(result.Detail.PreviewImages) > 0 || result.Detail.PreviewVideo != ""
 	return result

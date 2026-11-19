@@ -58,7 +58,7 @@
       "relative_movies": [
         { "id": "related-movie-1", "number": "SONE-001a", "thumb_url": "https://media.example/related-movie.jpg" }
       ],
-      "summary": "This field must not enter Miyabi's model."
+      "summary": "Source synopsis."
     }
   }
 }

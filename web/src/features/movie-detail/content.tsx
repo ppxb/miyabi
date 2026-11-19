@@ -38,9 +38,20 @@ function LibraryMovieDetail({ movieId }: { movieId: number }) {
         </InlineError>
       ) : null}
       <MovieHero movie={detail.data} libraryStatus={detail.data.scrape_status} />
+      <MoviePlot plot={detail.data.plot} />
       <MoviePreviews images={detail.data.preview_images} />
       {detail.data.id ? <LibraryCatalogueExtras movieId={detail.data.id} /> : null}
     </div>
+  )
+}
+
+function MoviePlot({ plot }: { plot?: string }) {
+  if (!plot) return null
+  return (
+    <section className="space-y-2">
+      <h2 className="text-sm font-semibold">简介</h2>
+      <p className="text-sm leading-6 whitespace-pre-line text-muted-foreground">{plot}</p>
+    </section>
   )
 }
 
@@ -102,6 +113,7 @@ function IdentifiedMovieDetail({ movieId }: { movieId: string }) {
         </InlineError>
       ) : null}
       <MovieHero movie={detail.data} />
+      <MoviePlot plot={detail.data.plot} />
       <MoviePreviews images={detail.data.preview_images} />
       <MovieMagnets movieID={movieId} query={magnets} />
       <MovieRecommendations title="TA（们）还出演过" movies={detail.data.actor_movies} />

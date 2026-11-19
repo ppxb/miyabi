@@ -79,6 +79,7 @@ func parseHEYZO(body, base, productID string) (domain.MovieMetadata, error) {
 			Type        string `json:"@type"`
 			Duration    string `json:"duration"`
 			DateCreated string `json:"dateCreated"`
+			Description string `json:"description"`
 		}
 		if script.FirstChild == nil || json.Unmarshal([]byte(script.FirstChild.Data), &data) != nil || data.Type != "Movie" {
 			continue
@@ -88,6 +89,9 @@ func parseHEYZO(body, base, productID string) (domain.MovieMetadata, error) {
 		}
 		if m.ReleaseDate == "" {
 			m.ReleaseDate = releaseDate(data.DateCreated)
+		}
+		if m.Plot == "" {
+			m.Plot = strings.TrimSpace(data.Description)
 		}
 		break
 	}

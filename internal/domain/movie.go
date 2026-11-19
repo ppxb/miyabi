@@ -162,6 +162,7 @@ type Movie struct {
 	Code          string            `json:"code"`
 	Title         string            `json:"title"`
 	OriginTitle   string            `json:"origin_title"`
+	Plot          string            `json:"plot,omitempty"`
 	ReleaseDate   string            `json:"release_date"`
 	Duration      int               `json:"duration"`
 	Rating        float64           `json:"rating"`

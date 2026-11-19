@@ -110,9 +110,12 @@ func TestPacopacomamaFetchesConfirmedMetadataAndPublicOriginals(t *testing.T) {
 		len(d.PreviewImages) != 2 || !d.HasPreview || d.PreviewImages[0].Original != wantImages[2].URL || calls.Load() != 2 {
 		t.Fatalf("wrong artwork, tags or requests: %+v calls=%d", m, calls.Load())
 	}
+	if d.Plot != "Excluded synopsis" {
+		t.Fatalf("plot = %q", d.Plot)
+	}
 	encoded, err := json.Marshal(m)
-	if err != nil || bytes.Contains(encoded, []byte("Excluded synopsis")) {
-		t.Fatal("unexpected synopsis or serialization error")
+	if err != nil || !bytes.Contains(encoded, []byte("Excluded synopsis")) {
+		t.Fatal("expected synopsis or serialization error")
 	}
 }
 

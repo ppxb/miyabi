@@ -48,6 +48,26 @@ func TestMergeKeepsJavDBEntitiesAndAllSourceArtwork(t *testing.T) {
 	}
 }
 
+func TestMergePrefersOfficialPlotOverJavDB(t *testing.T) {
+	official := domain.MovieMetadata{Detail: domain.MovieDetail{Movie: domain.Movie{
+		Sources: []domain.SourceID{{Provider: "heyzo", ID: "1234"}},
+		Code:    "HEYZO-1234", Title: "T", Plot: "official plot",
+	}}}
+	catalogue := domain.MovieMetadata{Detail: domain.MovieDetail{Movie: domain.Movie{
+		Sources: []domain.SourceID{{Provider: "javdb", ID: "x"}},
+		Code:    "HEYZO-1234", Title: "T", Plot: "javdb plot",
+	}}}
+	got := merge([]domain.MovieMetadata{official, catalogue})
+	if got.Detail.Plot != "official plot" || got.Detail.FieldSources["plot"] != "heyzo" {
+		t.Fatalf("plot priority = %q/%q", got.Detail.Plot, got.Detail.FieldSources["plot"])
+	}
+	official.Detail.Plot = ""
+	got = merge([]domain.MovieMetadata{official, catalogue})
+	if got.Detail.Plot != "javdb plot" || got.Detail.FieldSources["plot"] != "javdb" {
+		t.Fatalf("javdb plot fallback = %q/%q", got.Detail.Plot, got.Detail.FieldSources["plot"])
+	}
+}
+
 func TestMergeSupplementsMissingJavDBFieldsAndPreviews(t *testing.T) {
 	catalogue := fixture("javdb", "ABP-123", "Catalogue title")
 	official := completeFixture("fanza", "ABP-123")

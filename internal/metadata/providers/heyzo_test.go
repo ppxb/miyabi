@@ -94,9 +94,12 @@ func TestHEYZOParsesIdentityMetadataAndPublicOriginals(t *testing.T) {
 			t.Fatalf("preview not available to local details: %+v", preview)
 		}
 	}
+	if d.Plot != "Excluded synopsis" {
+		t.Fatalf("plot = %q", d.Plot)
+	}
 	encoded, err := json.Marshal(m)
-	if err != nil || bytes.Contains(encoded, []byte("Excluded synopsis")) {
-		t.Fatal("unexpected synopsis or serialization error")
+	if err != nil || !bytes.Contains(encoded, []byte("Excluded synopsis")) {
+		t.Fatal("expected synopsis or serialization error")
 	}
 }
 

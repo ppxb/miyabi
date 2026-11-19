@@ -21,6 +21,7 @@ type Movie struct {
 	XMLName       xml.Name                `xml:"movie" json:"-"`
 	Title         string                  `xml:"title" json:"title"`
 	Code          string                  `xml:"num" json:"code"`
+	Plot          string                  `xml:"plot,omitempty" json:"plot,omitempty"`
 	IDs           []UniqueID              `xml:"uniqueid" json:"ids"`
 	Premiered     string                  `xml:"premiered,omitempty" json:"premiered"`
 	Runtime       int                     `xml:"runtime,omitempty" json:"runtime"`

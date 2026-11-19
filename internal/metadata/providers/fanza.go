@@ -46,7 +46,7 @@ const fanzaSearchQuery = `query MovieSearch($keyword: String!, $offset: Int!) {
 
 const fanzaDetailQuery = `query MovieDetail($id: ID!) {
   ppvContent(id: $id) {
-    id makerContentId floor title duration deliveryStartDate makerReleasedAt
+    id makerContentId floor title duration deliveryStartDate makerReleasedAt description
     packageImage { largeUrl mediumUrl }
     sampleImages { imageUrl largeImageUrl }
     actresses { id name imageUrl }
@@ -70,7 +70,7 @@ type fanzaEntity struct {
 
 type fanzaMovie struct {
 	fanzaIdentity
-	Floor, Title                       string
+	Floor, Title, Description           string
 	Duration                           int
 	DeliveryStartDate, MakerReleasedAt *time.Time
 	PackageImage                       struct {
@@ -260,6 +260,7 @@ func (s *FANZA) graphQL(ctx context.Context, query string, variables map[string]
 func fanzaMetadata(source fanzaMovie, rating float64) domain.MovieMetadata {
 	m := domain.MovieDetail{Movie: domain.Movie{
 		Code: codeid.Normalize(source.Code), Title: source.Title, OriginTitle: source.Title,
+		Plot:     strings.TrimSpace(source.Description),
 		Duration: source.Duration / 60,
 		Rating:   rating, RatingMax: 5, RatingSource: "fanza",
 		Sources: []domain.SourceID{{Provider: "fanza", ID: source.ID}},

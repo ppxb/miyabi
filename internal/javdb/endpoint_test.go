@@ -203,7 +203,7 @@ func TestBrowsePreservesCatalogueNumberSegments(t *testing.T) {
 	}
 }
 
-func TestMovieDetailMapsGraphWithoutPlot(t *testing.T) {
+func TestMovieDetailMapsGraphWithPlot(t *testing.T) {
 	transport := &fixtureTransport{responses: map[string][]byte{
 		"/api/v4/movies/movie-exact": fixtureFile(t, "movie.json"),
 	}}
@@ -215,6 +215,9 @@ func TestMovieDetailMapsGraphWithoutPlot(t *testing.T) {
 	}
 	if movie.Code != "ABP-123" || movie.Rating != 4.5 || movie.PreviewVideo == "" {
 		t.Fatalf("movie = %#v", movie)
+	}
+	if movie.Plot != "Source synopsis." {
+		t.Fatalf("plot = %q", movie.Plot)
 	}
 	if len(movie.Actors) != 2 || movie.Actors[0].NameZHT != "演員" ||
 		movie.Actors[0].Gender != "female" || movie.Actors[1].Gender != "male" {

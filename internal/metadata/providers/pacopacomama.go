@@ -48,6 +48,7 @@ type pacopacomamaMovie struct {
 	MovieID                         string
 	SiteID                          int
 	Title, TitleEn, Release         string
+	Desc                            string
 	Duration                        int
 	AvgRating                       float64
 	Status, Gallery, HasGallery     bool
@@ -106,6 +107,7 @@ func pacopacomamaMetadata(source pacopacomamaMovie) domain.MovieMetadata {
 	title := (pacopacomamaName{source.Title, source.TitleEn}).name()
 	m := domain.MovieDetail{Movie: domain.Movie{
 		Code: source.MovieID, Title: title, OriginTitle: title,
+		Plot:        strings.TrimSpace(source.Desc),
 		Sources:     []domain.SourceID{{Provider: "pacopacomama", ID: source.MovieID}},
 		ReleaseDate: releaseDate(source.Release), Duration: source.Duration / 60,
 		Maker: &domain.Maker{Provider: "pacopacomama", ID: strconv.Itoa(source.SiteID), Name: "Pacopacomama"},

@@ -207,6 +207,7 @@ func movieFromWire(ctx context.Context, source wireMovie) (domain.Movie, error) 
 		Code:          code,
 		Title:         source.Title,
 		OriginTitle:   source.OriginTitle,
+		Plot:          strings.TrimSpace(source.Summary),
 		ReleaseDate:   source.ReleaseDate,
 		Duration:      source.Duration,
 		Rating:        float64(source.Score),

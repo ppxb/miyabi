@@ -21,6 +21,7 @@ func DetailNFO(detail domain.MovieDetail) nfo.Movie {
 		Zone:         detail.Zone,
 		Title:        detail.Title,
 		Code:         detail.Code,
+		Plot:         detail.Plot,
 		Premiered:    detail.ReleaseDate,
 		Runtime:      detail.Duration,
 		Rating:       detail.Rating,

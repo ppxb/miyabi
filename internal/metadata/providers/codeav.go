@@ -71,6 +71,7 @@ type codeAVMovie struct {
 	URL           string `json:"url"`
 	DatePublished string `json:"datePublished"`
 	Duration      string `json:"duration"`
+	Description   string `json:"description"`
 	Image         []struct {
 		URL     string `json:"url"`
 		Caption string `json:"caption"`
@@ -112,6 +113,7 @@ func parseCodeAVHTML(body []byte, code string) (domain.MovieMetadata, error) {
 			Code:        code,
 			Title:       original,
 			OriginTitle: english,
+			Plot:        strings.TrimSpace(doc.Description),
 			ReleaseDate: releaseDate(doc.DatePublished),
 			Duration:    codeAVDurationMinutes(doc.Duration),
 			Sources:     []domain.SourceID{{Provider: "codeav", ID: code}},

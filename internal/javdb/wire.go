@@ -107,6 +107,7 @@ type wireMovie struct {
 	Number           string             `json:"number"`
 	Title            string             `json:"title"`
 	OriginTitle      string             `json:"origin_title"`
+	Summary          string             `json:"summary"`
 	ReleaseDate      string             `json:"release_date"`
 	Duration         int                `json:"duration"`
 	Score            wireRating         `json:"score"`

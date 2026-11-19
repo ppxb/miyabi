@@ -87,8 +87,8 @@ func TestRoundTripPreservesSourceIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(body), "<plot>") {
-		t.Fatal("NFO retained an unused plot")
+	if !strings.Contains(string(body), "<plot>Source synopsis</plot>") {
+		t.Fatal("NFO dropped plot")
 	}
 	got, err := Decode(body)
 	if err != nil {
