@@ -29,9 +29,10 @@ func (service *Service) Stream(ctx context.Context, id string, index int, method
 	if err != nil {
 		return nil, err
 	}
-	if !resource.playlist {
+	if !resource.playlist && !session.proxySegments {
 		// Direct media: let the browser stream from the 115 CDN itself instead of
-		// relaying every byte through this server.
+		// relaying every byte through this server. (A <video> element is not
+		// subject to CORS, so this is safe for the direct mp4 path.)
 		return &http.Response{
 			StatusCode: http.StatusFound,
 			Header:     http.Header{"Location": []string{resource.url.String()}},
@@ -67,6 +68,10 @@ func (service *Service) Stream(ctx context.Context, id string, index int, method
 		return nil, domain.E(domain.KindUpstream, "115 视频流异常，请稍后重试", fmt.Errorf("upstream returned HTTP %d", response.StatusCode))
 	}
 	if method == http.MethodHead || response.StatusCode == http.StatusPartialContent {
+		return response, nil
+	}
+	if !resource.playlist {
+		// HLS segment relayed byte-for-byte (same-origin): no playlist sniffing.
 		return response, nil
 	}
 

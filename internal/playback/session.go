@@ -32,10 +32,18 @@ type playSession struct {
 	timer     *time.Timer
 	resources []playResource
 	byURL     map[string]int
+	// proxySegments relays HLS segment bytes through this server (same-origin) so
+	// browser MSE isn't blocked by the 115 CDN's fixed CORS origin.
+	proxySegments bool
 }
 
 func (service *Service) createSession(source domain.LibrarySource, specs []mediaSpec) (Playback, error) {
 	session := &playSession{id: uuid.NewString(), source: source, byURL: make(map[string]int)}
+	for _, spec := range specs {
+		if spec.playlist {
+			session.proxySegments = true
+		}
+	}
 	result := Playback{ID: session.id, Source: source, Sources: make([]MediaSource, 0, len(specs))}
 	for _, spec := range specs {
 		address, err := url.Parse(spec.address)
