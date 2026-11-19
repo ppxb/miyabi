@@ -46,30 +46,32 @@ func (d *Drive) Open(ctx context.Context) (Session, error) {
 	}, nil
 }
 
-// OpenSource opens a Session for the expected source, using the primary mount
-// for the current account or the account registry for any other 115 account.
+// OpenSource opens a Session for the expected source using the account registry
+// for every account; no account is privileged.
 func (d *Drive) OpenSource(ctx context.Context, expected domain.LibrarySource) (Session, error) {
+	if d.snapshot().closed {
+		return nil, context.Canceled
+	}
 	if expected.AccountID == "" {
 		return nil, ErrSourceChanged
-	}
-	if primary := d.snapshot().directory.AccountID; primary != "" && expected.AccountID == primary {
-		sess, err := d.Open(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if sess.Source().AccountID != expected.AccountID || sess.Source().Directory.ID != expected.Directory.ID {
-			return nil, ErrSourceChanged
-		}
-		return sess, nil
 	}
 	record, err := d.accountRecord(ctx, expected.AccountID)
 	if err != nil {
 		return nil, err
 	}
-	if record.Tokens.AccessToken == "" || record.Directory.ID != expected.Directory.ID {
+	if record.Tokens.AccessToken == "" {
+		return nil, pan.ErrUnauthorized
+	}
+	if record.Directory.ID != expected.Directory.ID {
 		return nil, ErrSourceChanged
 	}
-	return &accountSession{drive: d, accountID: expected.AccountID, source: expected}, nil
+	return &accountSession{
+		drive:       d,
+		accountID:   expected.AccountID,
+		source:      expected,
+		credVersion: d.accountCredVersion(expected.AccountID),
+		authVersion: d.accountAuthVersion(expected.AccountID),
+	}, nil
 }
 
 type sourceSession struct {

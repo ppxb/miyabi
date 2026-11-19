@@ -149,28 +149,94 @@ func New(database *ent.Client, d *drive.Drive, tasks *tasks.Service, images *med
 }
 
 func (s *Service) StartScan(ctx context.Context) (domain.TaskInfo, error) {
-	sess, err := s.drive.Open(ctx)
+	info, queued, err := s.enqueueAllScans(ctx, false)
 	if err != nil {
 		return domain.TaskInfo{}, err
 	}
-	return s.EnqueueScan(ctx, sess.Source())
+	if !queued {
+		return domain.TaskInfo{}, domain.E(domain.KindInvalid, "没有可扫描的存储源，请先在设置 → 源管理中添加", nil)
+	}
+	return info, nil
 }
 
 // StartRebuild scans the current source and refreshes every matched movie.
 func (s *Service) StartRebuild(ctx context.Context) (domain.TaskInfo, error) {
-	sess, err := s.drive.Open(ctx)
+	info, queued, err := s.enqueueAllScans(ctx, true)
 	if err != nil {
 		return domain.TaskInfo{}, err
 	}
-	return s.enqueueScan(ctx, sess.Source(), true, task.StatusQueued, task.StatusRunning)
+	if !queued {
+		return domain.TaskInfo{}, domain.E(domain.KindInvalid, "没有可扫描的存储源，请先在设置 → 源管理中添加", nil)
+	}
+	return info, nil
 }
 
-// Source returns the currently mounted library source, or nil if unmounted.
+// enqueueAllScans queues a full scan (or rebuild) for every enabled source:
+// configured local directories and each mounted 115 account, plus the current
+// primary mount. It reports the first queued task and whether anything was
+// configured, so callers can fall back to the single primary mount only when no
+// sources exist. This keeps multi-account and local-only setups from needlessly
+// requiring one specific 115 account to be logged in.
+func (s *Service) enqueueAllScans(ctx context.Context, rebuild bool) (domain.TaskInfo, bool, error) {
+	var first domain.TaskInfo
+	queued := false
+	record := func(info domain.TaskInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !queued {
+			first, queued = info, true
+		}
+		return nil
+	}
+
+	if s.localSources != nil {
+		targets, err := s.localSources(ctx)
+		if err != nil {
+			return first, queued, err
+		}
+		for _, target := range targets {
+			info, err := s.startLocalSourceScan(ctx, target.Path, target.MetadataOnly, false)
+			if err := record(info, err); err != nil {
+				return first, queued, err
+			}
+		}
+	}
+
+	var cloud []domain.LibrarySource
+	if s.drive != nil {
+		mounts, err := s.drive.Mounts(ctx)
+		if err != nil {
+			return first, queued, err
+		}
+		cloud = mounts
+	}
+	for _, src := range cloud {
+		var info domain.TaskInfo
+		var err error
+		if rebuild {
+			info, err = s.enqueueScan(ctx, src, true, task.StatusQueued, task.StatusRunning)
+		} else {
+			info, err = s.EnqueueScan(ctx, src)
+		}
+		if err := record(info, err); err != nil {
+			return first, queued, err
+		}
+	}
+	return first, queued, nil
+}
+
+// Source returns one mounted library source (the first by account id), used only
+// for display. All accounts are first-class; no account is privileged.
 func (s *Service) Source() *domain.LibrarySource {
 	if s.drive == nil {
 		return nil
 	}
-	return s.drive.Source()
+	mounts, err := s.drive.Mounts(context.Background())
+	if err != nil || len(mounts) == 0 {
+		return nil
+	}
+	return &mounts[0]
 }
 
 // MatchingMovies queries local movies matching any of the given JavDB IDs or normalized codes
@@ -316,18 +382,37 @@ func (s *Service) scope(ctx context.Context) predicate.File {
 	return fileScope(s.cloudSources(ctx))
 }
 
-// cloudSources returns the primary mount plus every configured cloud source.
+// cloudSources aggregates every mounted 115 account plus configured sources so
+// the library lists movies across all accounts, not just one primary mount.
 func (s *Service) cloudSources(ctx context.Context) []domain.LibrarySource {
-	sources := make([]domain.LibrarySource, 0)
-	if source := s.Source(); source != nil {
-		sources = append(sources, *source)
+	seen := make(map[string]bool)
+	result := make([]domain.LibrarySource, 0)
+	add := func(src domain.LibrarySource) {
+		if src.Directory.ID == "" {
+			return
+		}
+		key := src.AccountID + "\x00" + src.Directory.ID
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		result = append(result, src)
+	}
+	if s.drive != nil {
+		if mounts, err := s.drive.Mounts(ctx); err == nil {
+			for _, mount := range mounts {
+				add(mount)
+			}
+		}
 	}
 	if s.sources != nil {
 		if list, err := s.sources(ctx); err == nil {
-			sources = append(sources, list...)
+			for _, source := range list {
+				add(source)
+			}
 		}
 	}
-	return sources
+	return result
 }
 
 func fileScope(sources []domain.LibrarySource) predicate.File {

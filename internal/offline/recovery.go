@@ -2,6 +2,7 @@ package offline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -12,10 +13,12 @@ import (
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/domain/download"
+	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 	"github.com/ppxb/miyabi/internal/magnet"
+	"github.com/ppxb/miyabi/internal/pan"
 )
 
 const (
@@ -78,13 +81,29 @@ func (s *Service) lockTask(ctx context.Context, id int) (func(), error) {
 // Recover advances at most one remote action per poll; all tasks are observed
 // before a slow submission can occupy the serial poller.
 func (s *Service) Recover(ctx context.Context) error {
-	cfg, prefs, err := s.config(ctx)
+	sources, err := s.drive.Mounts(ctx)
 	if err != nil {
 		return err
 	}
-	source := s.drive.Source()
-	if source == nil {
-		return nil
+	var errs []error
+	for _, source := range sources {
+		if err := s.recoverSource(ctx, source); err != nil {
+			if errors.Is(err, drive.ErrSourceChanged) || errors.Is(err, pan.ErrUnauthorized) || errors.Is(err, drive.ErrMediaDirectoryRequired) {
+				continue
+			}
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
+}
+
+func (s *Service) recoverSource(ctx context.Context, source domain.LibrarySource) error {
+	cfg, prefs, err := s.config(ctx)
+	if err != nil {
+		return err
 	}
 	records, err := s.database.OfflineDownload.Query().Where(
 		offlinedownload.AccountIDEQ(source.AccountID), offlinedownload.DirectoryIDEQ(source.Directory.ID),

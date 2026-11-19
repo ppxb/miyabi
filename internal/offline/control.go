@@ -36,10 +36,11 @@ func (s *Service) advance(ctx context.Context, id int, requested string) (domain
 	if err != nil {
 		return domain.OfflineSubmission{}, err
 	}
-	source := s.drive.Source()
-	if source == nil || source.AccountID != record.AccountID || source.Directory.ID != record.DirectoryID {
+	sourceValue, ok := s.drive.Mount(ctx, record.AccountID)
+	if !ok || sourceValue.Directory.ID != record.DirectoryID {
 		return domain.OfflineSubmission{}, drive.ErrSourceChanged
 	}
+	source := &sourceValue
 	if record.Status == offlinedownload.StatusDone || record.Status == offlinedownload.StatusCancelled {
 		return s.submission(ctx, record, source)
 	}
@@ -146,7 +147,7 @@ func (s *Service) removeCurrent(ctx context.Context, sess drive.Session, record 
 		return err
 	}
 	if found && remote.Status == 2 {
-		return sess.Commit(ctx, func(tx *ent.Tx) error { return s.completeTask(ctx, tx, record, remote.FileID) })
+		return sess.Commit(ctx, func(tx *ent.Tx) error { return s.completeTask(ctx, tx, record, remote.FileID, s.currentMountFor(ctx, record)) })
 	}
 	if found && remote.Status != 0 && remote.Status != 1 && remote.Status != -1 {
 		return fmt.Errorf("115 returned unknown offline status %d", remote.Status)
@@ -230,7 +231,7 @@ func (s *Service) resumeSubmission(ctx context.Context, sess drive.Session, reco
 			if remote.DirectoryID != record.DirectoryID {
 				return domain.E(domain.KindConflict, "115 任务位于其他目录", nil)
 			}
-			return s.recordSubmission(ctx, record, state, remote)
+			return s.recordSubmission(ctx, sess, record, state, remote)
 		}
 	}
 	state.SubmissionStarted = true
@@ -241,10 +242,10 @@ func (s *Service) resumeSubmission(ctx context.Context, sess drive.Session, reco
 	if err != nil {
 		return err
 	}
-	return s.recordSubmission(ctx, record, state, remote)
+	return s.recordSubmission(ctx, sess, record, state, remote)
 }
 
-func (s *Service) recordSubmission(ctx context.Context, record *ent.OfflineDownload, state *download.Recovery, remote pan.OfflineTask) error {
+func (s *Service) recordSubmission(ctx context.Context, sess drive.Session, record *ent.OfflineDownload, state *download.Recovery, remote pan.OfflineTask) error {
 	state.Action, state.NextHash = "", ""
 	state.SubmissionStarted, state.RemovalStarted = false, false
 	state.RetryAt, state.Failures = time.Time{}, 0
@@ -256,7 +257,7 @@ func (s *Service) recordSubmission(ctx context.Context, record *ent.OfflineDownl
 		}
 		if remote.Status == 2 {
 			record.Recovery = state
-			return s.completeTask(ctx, tx, record, remote.FileID)
+			return s.completeTask(ctx, tx, record, remote.FileID, s.currentMountFor(ctx, record))
 		}
 		return nil
 	})

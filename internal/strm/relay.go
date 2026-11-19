@@ -40,11 +40,10 @@ func New(database *ent.Client, d *drive.Drive) *Relay {
 // and user agent. Each caller still verifies its session, including on cache hits.
 func (relay *Relay) StreamURL(ctx context.Context, fileID, userAgent string) (string, error) {
 	ua := strings.TrimSpace(userAgent)
-	sess, err := relay.drive.Open(ctx)
+	sess, source, pickCode, err := relay.sessionForFile(ctx, fileID)
 	if err != nil {
 		return "", err
 	}
-	source := sess.Source()
 	key := fmt.Sprintf("%d:%q:%q:%q:%q", sess.AuthorizationVersion(), source.AccountID, source.Directory.ID, fileID, ua)
 	result := relay.resolving.DoChan(key, func() (any, error) {
 		done, ok := relay.drive.StartWork()
@@ -58,7 +57,7 @@ func (relay *Relay) StreamURL(ctx context.Context, fileID, userAgent string) (st
 		if address := relay.cached(key, time.Now()); address != "" {
 			return address, nil
 		}
-		address, err := relay.resolveURL(resolveCtx, sess, fileID, ua)
+		address, err := relay.resolveURL(resolveCtx, sess, fileID, pickCode, ua)
 		if err == nil {
 			relay.remember(key, address, time.Now())
 		}
@@ -82,10 +81,16 @@ func (relay *Relay) StreamURL(ctx context.Context, fileID, userAgent string) (st
 
 // resolveURL prefers a direct download URL, then the original stream or highest
 // transcoded resolution. The indexed pick code is read only on cache misses.
-func (relay *Relay) resolveURL(ctx context.Context, sess drive.Session, fileID, ua string) (string, error) {
-	pickCode, err := relay.pickCode(ctx, sess, fileID)
-	if err != nil {
-		return "", err
+func (relay *Relay) resolveURL(ctx context.Context, sess drive.Session, fileID, pickCode, ua string) (string, error) {
+	if pickCode == "" {
+		info, err := sess.Info(ctx, fileID)
+		if err != nil {
+			return "", fmt.Errorf("read 115 video info: %w", err)
+		}
+		if info.PickCode == "" {
+			return "", domain.E(domain.KindNotFound, "未能获取到视频的 115 提取码", nil)
+		}
+		pickCode = info.PickCode
 	}
 	// Prefer the direct download URL for full CDN throughput and instant seeking.
 	downloadURL, err := sess.DownloadURL(ctx, pickCode, ua)
@@ -124,22 +129,24 @@ func (relay *Relay) Probe(ctx context.Context, address string, headers http.Head
 	return relay.drive.OpenMedia(ctx, http.MethodHead, address, headers)
 }
 
-// pickCode prefers the indexed pick code and asks 115 only for videos indexed
-// before pick codes were stored.
-func (relay *Relay) pickCode(ctx context.Context, sess drive.Session, fileID string) (string, error) {
-	record, err := relay.database.File.Query().Where(file.FileIDEQ(fileID)).Select(file.FieldPickCode).First(ctx)
-	if err != nil && !ent.IsNotFound(err) {
-		return "", fmt.Errorf("read indexed video: %w", err)
-	}
-	if record != nil && record.PickCode != "" {
-		return record.PickCode, nil
-	}
-	info, err := sess.Info(ctx, fileID)
+// sessionForFile opens the session for the 115 account that owns the indexed
+// video, so STRM streams also work for files from any account.
+func (relay *Relay) sessionForFile(ctx context.Context, fileID string) (drive.Session, domain.LibrarySource, string, error) {
+	record, err := relay.database.File.Query().Where(file.FileIDEQ(fileID)).
+		Select(file.FieldAccountID, file.FieldRootID, file.FieldPickCode).First(ctx)
 	if err != nil {
-		return "", fmt.Errorf("read 115 video info: %w", err)
+		if ent.IsNotFound(err) {
+			return nil, domain.LibrarySource{}, "", domain.E(domain.KindNotFound, "视频索引不存在，请重新扫描媒体库", err)
+		}
+		return nil, domain.LibrarySource{}, "", fmt.Errorf("read indexed video: %w", err)
 	}
-	if info.PickCode == "" {
-		return "", domain.E(domain.KindNotFound, "未能获取到视频的 115 提取码", nil)
+	source, ok := relay.drive.Mount(ctx, record.AccountID)
+	if !ok || source.Directory.ID != record.RootID {
+		return nil, domain.LibrarySource{}, "", drive.ErrSourceChanged
 	}
-	return info.PickCode, nil
+	sess, err := relay.drive.OpenSource(ctx, source)
+	if err != nil {
+		return nil, domain.LibrarySource{}, "", err
+	}
+	return sess, source, record.PickCode, nil
 }

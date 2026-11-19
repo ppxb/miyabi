@@ -161,7 +161,7 @@ type goldenOffline struct {
 	OfflineManager
 }
 
-func (goldenOffline) Activity(context.Context) (offline.Activity, error) {
+func (goldenOffline) ActivityForAccount(context.Context, string) (offline.Activity, error) {
 	source := goldenSource()
 	failure := "115 离线任务失败"
 	return offline.Activity{Source: &source, Tasks: []domain.OfflineSubmission{

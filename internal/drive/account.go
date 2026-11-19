@@ -184,6 +184,8 @@ func (d *Drive) acceptLogin(ctx context.Context, session *loginSession, tokens p
 	if err := d.saveAccountTokens(ctx, account.ID, state.tokens); err != nil {
 		return err
 	}
+	d.bumpAccountCredential(account.ID)
+	d.bumpAccountAuthorization(account.ID)
 	return d.discardOtherAccountDirectory(ctx, account.ID)
 }
 

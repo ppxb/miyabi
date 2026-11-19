@@ -66,6 +66,44 @@ func (d *Drive) setAccountToken(accountID string, tokens pan.Tokens) {
 	d.accountTokens[accountID] = tokens
 }
 
+func (d *Drive) accountCredVersion(accountID string) uint64 {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.accountCredVersions[accountID]
+}
+
+func (d *Drive) accountAuthVersion(accountID string) uint64 {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.accountAuthVersions[accountID]
+}
+
+// bumpAccountCredential invalidates commits that were authorized by older credentials.
+func (d *Drive) bumpAccountCredential(accountID string) {
+	if accountID == "" {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.accountCredVersions == nil {
+		d.accountCredVersions = make(map[string]uint64)
+	}
+	d.accountCredVersions[accountID]++
+}
+
+// bumpAccountAuthorization invalidates reads tied to an older mount or login.
+func (d *Drive) bumpAccountAuthorization(accountID string) {
+	if accountID == "" {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.accountAuthVersions == nil {
+		d.accountAuthVersions = make(map[string]uint64)
+	}
+	d.accountAuthVersions[accountID]++
+}
+
 func (d *Drive) saveAccountMount(ctx context.Context, accountID string, mount mountRecord) error {
 	if accountID == "" {
 		return nil
@@ -77,6 +115,7 @@ func (d *Drive) saveAccountMount(ctx context.Context, accountID string, mount mo
 	record := store[accountID]
 	record.Directory = mount
 	store[accountID] = record
+	d.bumpAccountAuthorization(accountID)
 	return database.SaveSetting(ctx, d.database, accountsSetting, store)
 }
 
@@ -93,6 +132,8 @@ func (d *Drive) removeAccount(ctx context.Context, accountID string) error {
 	}
 	delete(store, accountID)
 	d.setAccountToken(accountID, pan.Tokens{})
+	d.bumpAccountCredential(accountID)
+	d.bumpAccountAuthorization(accountID)
 	return database.SaveSetting(ctx, d.database, accountsSetting, store)
 }
 
@@ -117,6 +158,29 @@ func (d *Drive) Mount(ctx context.Context, accountID string) (domain.LibrarySour
 		return domain.LibrarySource{}, false
 	}
 	return record.Directory.source(), true
+}
+
+// Mounts returns every stored account's mounted library source, without
+// verifying credentials, so callers can operate each account independently.
+func (d *Drive) Mounts(ctx context.Context) ([]domain.LibrarySource, error) {
+	store, err := d.loadAccounts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]domain.LibrarySource, 0, len(store))
+	for _, record := range store {
+		if record.Directory.ID == "" || record.Directory.AccountID == "" {
+			continue
+		}
+		result = append(result, record.Directory.source())
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].AccountID != result[j].AccountID {
+			return result[i].AccountID < result[j].AccountID
+		}
+		return result[i].Directory.ID < result[j].Directory.ID
+	})
+	return result, nil
 }
 
 // Accounts lists every stored 115 account and its mounted directory.

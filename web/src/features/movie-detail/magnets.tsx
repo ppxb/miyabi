@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import {
   CheckIcon,
+  ChevronDownIcon,
   CloudDownloadIcon,
   CopyIcon,
   LoaderCircleIcon,
@@ -13,15 +14,23 @@ import { describeApiError, isPanUnauthorized } from '@/api/client'
 import {
   isOfflineTaskActive,
   useAddOffline,
-  useOfflineTasks,
+  useMovieOfflineTasks,
   useOfflineControl,
   type OfflineSubmission
 } from '@/api/offline'
-import { usePanAccount } from '@/api/pan'
+import { usePanAccounts } from '@/api/pan'
 import { InlineError } from '@/components/error-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { formatSize } from '@/lib/format'
 import { notifyOfflineTask, notifyTaskError } from '@/features/tasks/task-toast'
 import { MovieSubscriptionAction } from './subscription-action'
@@ -37,6 +46,8 @@ const phaseLabels: Record<OfflineSubmission['phase'], string> = {
   downloaded: '已下载'
 }
 
+export type OfflineAccount = { id: string; name: string; directory: string }
+
 export function MovieMagnets({
   movieID,
   query
@@ -44,14 +55,21 @@ export function MovieMagnets({
   movieID: string
   query: ReturnType<typeof useDiscoverMagnets>
 }) {
-  const account = usePanAccount(Boolean(query.data?.length))
-  const unauthorized = isPanUnauthorized(account.error)
-  const connected = account.data?.connected === true && !unauthorized
-  const accountID = connected ? (account.data?.account?.id ?? '') : ''
-  const offline = useOfflineTasks(movieID, accountID, account.data?.directory?.id ?? '')
-  const tasks = new Map(offline.data?.map(task => [task.hash, task] as const))
+  const panAccounts = usePanAccounts()
+  const unauthorized = isPanUnauthorized(panAccounts.error)
+  const accounts: OfflineAccount[] = unauthorized
+    ? []
+    : (panAccounts.data ?? [])
+        .filter(status => status.connected && status.account && status.directory)
+        .map(status => ({
+          id: status.account!.id,
+          name: status.account!.name || status.account!.id,
+          directory: status.directory!.name
+        }))
+  const hasAccounts = (panAccounts.data?.length ?? 0) > 0
+  const offline = useMovieOfflineTasks(movieID)
+  const tasks = new Map((offline.data ?? []).map(task => [task.hash, task] as const))
   const checkingStatus = offline.isPending
-  const hasDirectory = Boolean(account.data?.directory)
   const [copiedHash, setCopiedHash] = useState('')
   const [copyError, setCopyError] = useState(false)
 
@@ -68,16 +86,16 @@ export function MovieMagnets({
   return (
     <section className="space-y-4">
       <h2 className="text-xl font-semibold tracking-normal">磁力链</h2>
-      {connected && account.data?.account && !hasDirectory ? (
+      {hasAccounts && accounts.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           请先到{' '}
-          <Link to="/settings" className="text-foreground underline underline-offset-4">
-            设置页
+          <Link to="/settings/sources" className="text-foreground underline underline-offset-4">
+            设置 → 源管理
           </Link>{' '}
-          挂载媒体目录，再一键加入 115。
+          为 115 账号挂载媒体目录，再一键加入 115。
         </p>
       ) : null}
-      {connected && offline.isError ? (
+      {offline.isError ? (
         <InlineError onRetry={() => void offline.refetch()} retrying={offline.isFetching}>
           离线任务状态读取失败，请重试。
         </InlineError>
@@ -100,8 +118,7 @@ export function MovieMagnets({
               task={tasks.get(magnet.hash)}
               checkingStatus={checkingStatus}
               statusError={offline.isError}
-              connected={connected}
-              hasDirectory={hasDirectory}
+              accounts={accounts}
               copied={copiedHash === magnet.hash}
               onCopy={() => void copy(magnet)}
             />
@@ -119,8 +136,7 @@ function MagnetCard({
   task,
   checkingStatus,
   statusError,
-  connected,
-  hasDirectory,
+  accounts,
   copied,
   onCopy
 }: {
@@ -129,8 +145,7 @@ function MagnetCard({
   task?: OfflineSubmission
   checkingStatus: boolean
   statusError: boolean
-  connected: boolean
-  hasDirectory: boolean
+  accounts: OfflineAccount[]
   copied: boolean
   onCopy: () => void
 }) {
@@ -138,7 +153,7 @@ function MagnetCard({
   const next = useOfflineControl('next')
   const submitted = task !== undefined && task.phase !== 'available'
   const busy = add.isPending || (checkingStatus && !submitted)
-  let label = '一键加入 115'
+  let label = '加入 115'
   if (add.isPending) {
     label = '提交中'
   } else if (submitted) {
@@ -150,6 +165,20 @@ function MagnetCard({
   }
 
   const error = !add.isPending ? task?.error : undefined
+  const disabled = busy || statusError || submitted || accounts.length === 0
+  const submit = (accountID: string) =>
+    add.mutate(
+      { accountID, hash: magnet.hash },
+      {
+        onSuccess: submission => notifyOfflineTask(submission),
+        onError: submitError =>
+          notifyTaskError(
+            `offline:submit-error:${movieID}`,
+            '加入 115 失败',
+            describeApiError(submitError)
+          )
+      }
+    )
 
   return (
     <Card size="sm">
@@ -195,25 +224,41 @@ function MagnetCard({
               {copied ? <CheckIcon /> : <CopyIcon />}
               {copied ? '已复制' : '复制'}
             </Button>
-            {connected ? (
+            {accounts.length > 1 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={<Button type="button" size="sm" disabled={disabled} />}
+                >
+                  {busy || (task && isOfflineTaskActive(task)) ? (
+                    <LoaderCircleIcon className="animate-spin" />
+                  ) : submitted ? (
+                    <CheckIcon />
+                  ) : (
+                    <CloudDownloadIcon />
+                  )}
+                  {label}
+                  <ChevronDownIcon className="size-3.5 opacity-70" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-44">
+                  <DropdownMenuLabel>选择加入的 115 账号</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {accounts.map(account => (
+                    <DropdownMenuItem key={account.id} onClick={() => submit(account.id)}>
+                      <CloudDownloadIcon />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm">{account.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{account.directory}</p>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : accounts.length === 1 ? (
               <Button
                 type="button"
                 size="sm"
-                disabled={!hasDirectory || busy || statusError || submitted}
-                onClick={() =>
-                  add.mutate(magnet.hash, {
-                    onSuccess: submission => {
-                      notifyOfflineTask(submission)
-                    },
-                    onError: error => {
-                      notifyTaskError(
-                        `offline:submit-error:${movieID}`,
-                        '加入 115 失败',
-                        describeApiError(error)
-                      )
-                    }
-                  })
-                }
+                disabled={disabled}
+                onClick={() => submit(accounts[0]!.id)}
               >
                 {busy || (task && isOfflineTaskActive(task)) ? (
                   <LoaderCircleIcon className="animate-spin" />

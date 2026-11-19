@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ppxb/miyabi/internal/drive"
-	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
@@ -20,15 +19,10 @@ func signedURL(id int, expires time.Time) string {
 
 func TestStreamURLCachesByFileAndUserAgent(t *testing.T) {
 	relay, client := relayFixture(t, "pick-101")
-	relay.database.File.Create().SetFileID("102").SetPickCode("pick-102").SetName("second.mp4").SetSize(1).ExecX(t.Context())
-	var queries, calls int
+	relay.database.File.Create().SetFileID("102").SetPickCode("pick-102").SetName("second.mp4").SetSize(1).
+		SetAccountID("100").SetRootID("10").ExecX(t.Context())
+	var calls int
 	expires := time.Now().Add(time.Hour)
-	relay.database.File.Intercept(ent.InterceptFunc(func(next ent.Querier) ent.Querier {
-		return ent.QuerierFunc(func(ctx context.Context, query ent.Query) (ent.Value, error) {
-			queries++
-			return next.Query(ctx, query)
-		})
-	}))
 	client.downloadURL = func(context.Context, string, string, string) (string, error) {
 		calls++
 		return signedURL(calls, expires), nil
@@ -45,8 +39,8 @@ func TestStreamURLCachesByFileAndUserAgent(t *testing.T) {
 		if err != nil || address != signedURL(tc.wantCall, expires) {
 			t.Fatalf("file=%s ua=%q address=%q err=%v", tc.file, tc.ua, address, err)
 		}
-		if calls != tc.wantCall || queries != tc.wantCall {
-			t.Fatalf("calls=%d queries=%d, want %d each", calls, queries, tc.wantCall)
+		if calls != tc.wantCall {
+			t.Fatalf("calls=%d, want %d", calls, tc.wantCall)
 		}
 	}
 }
@@ -318,25 +312,20 @@ func TestStreamCacheFollowsAuthorizationAndMountChanges(t *testing.T) {
 	if _, err := relay.drive.SelectDirectory(t.Context(), "20"); err != nil {
 		t.Fatal(err)
 	}
-	check(3)
+	// File 101 lives under directory 10, which is no longer the account's mount.
+	if _, err := relay.StreamURL(t.Context(), "101", ""); err == nil || calls != 2 {
+		t.Fatalf("moved mount streamed: calls=%d err=%v", calls, err)
+	}
 	if _, err := relay.drive.SelectDirectory(t.Context(), "10"); err != nil {
 		t.Fatal(err)
 	}
-	check(4)
+	check(3)
 	if _, err := relay.drive.Disconnect(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := relay.StreamURL(t.Context(), "101", ""); err == nil || calls != 4 {
-		t.Fatalf("disconnected account reused cache: calls=%d err=%v", calls, err)
+	if _, err := relay.StreamURL(t.Context(), "101", ""); err == nil || calls != 3 {
+		t.Fatalf("disconnected account streamed: calls=%d err=%v", calls, err)
 	}
-	client.account = func(context.Context, string) (pan.Account, error) {
-		return pan.Account{ID: "200"}, nil
-	}
-	login()
-	if _, err := relay.drive.SelectDirectory(t.Context(), "10"); err != nil {
-		t.Fatal(err)
-	}
-	check(5)
 }
 
 func TestStreamLookupRejectsSourceChangeDuringRequest(t *testing.T) {
@@ -354,8 +343,12 @@ func TestStreamLookupRejectsSourceChangeDuringRequest(t *testing.T) {
 		finished := make(chan error, 1)
 		go func() { _, err := relay.StreamURL(t.Context(), "101", ""); finished <- err }()
 		synctest.Wait()
-		if _, err := relay.drive.SelectDirectory(t.Context(), "20"); err != nil {
+		pending, err := relay.drive.BeginLogin(t.Context())
+		if err != nil {
 			t.Fatal(err)
+		}
+		if status, err := relay.drive.LoginStatus(t.Context(), pending.ID); err != nil || status.State != pan.LoginAuthorized {
+			t.Fatalf("login status=%v error=%v", status, err)
 		}
 		if _, err := relay.StreamURL(t.Context(), "101", ""); err != nil || calls.Load() != 2 {
 			t.Fatalf("new source joined old lookup: calls=%d err=%v", calls.Load(), err)

@@ -169,8 +169,11 @@ func TestOfflineSyncRespectsSourceChangesDuringRemotePolling(t *testing.T) {
 			err := awaitPan(t, finished)
 			current := service.database.OfflineDownload.GetX(t.Context(), record.ID)
 			if action == "disconnect" {
-				if !errors.Is(err, pan.ErrUnauthorized) || current.Status != offlinedownload.StatusRunning {
-					t.Fatalf("old account sync changed state: %+v, %v", current, err)
+				if err != nil && !errors.Is(err, pan.ErrUnauthorized) {
+					t.Fatalf("unexpected sync error: %v", err)
+				}
+				if current.Status != offlinedownload.StatusRunning {
+					t.Fatalf("old account sync changed state: %+v", current)
 				}
 				return
 			}

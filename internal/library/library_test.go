@@ -112,7 +112,7 @@ func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 	}
 	// One file query counts the scoped movies, the second flags which of the
 	// page's movies have files in a 115 source for the source badge.
-	wantQueries := map[string]int{"*ent.FileQuery": 2, "*ent.MovieQuery": 1, "*ent.TagQuery": 1, "*ent.ActorQuery": 1}
+	wantQueries := map[string]int{"*ent.FileQuery": 2, "*ent.MovieQuery": 1, "*ent.TagQuery": 1, "*ent.ActorQuery": 1, "*ent.SettingQuery": 2}
 	if !reflect.DeepEqual(queries, wantQueries) {
 		t.Fatalf("library cards made redundant queries: %#v", queries)
 	}

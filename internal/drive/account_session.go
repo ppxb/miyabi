@@ -11,17 +11,42 @@ import (
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
-// accountSession is a non-primary 115 account session backed by the account
-// registry, with its own token cache and refresh.
+// accountSession is a 115 account session backed by the account registry, with
+// its own token cache/refresh and credential/authorization version guards.
 type accountSession struct {
-	drive     *Drive
-	accountID string
-	source    domain.LibrarySource
+	drive       *Drive
+	accountID   string
+	source      domain.LibrarySource
+	credVersion uint64
+	authVersion uint64
 }
 
 func (s *accountSession) Source() domain.LibrarySource { return s.source }
 
-func (s *accountSession) AuthorizationVersion() uint64 { return 0 }
+func (s *accountSession) AuthorizationVersion() uint64 { return s.authVersion }
+
+// checkSource rejects reads tied to an older login or mount.
+func (s *accountSession) checkSource(ctx context.Context) error {
+	if s.drive.accountAuthVersion(s.accountID) != s.authVersion {
+		return ErrSourceChanged
+	}
+	source, ok := s.drive.Mount(ctx, s.accountID)
+	if !ok || source.Directory.ID != s.source.Directory.ID {
+		return ErrSourceChanged
+	}
+	return nil
+}
+
+// checkCredentials rejects commits authorized by older credentials.
+func (s *accountSession) checkCredentials() error {
+	if s.drive.accountCredVersion(s.accountID) != s.credVersion {
+		return ErrSourceChanged
+	}
+	if s.drive.accountToken(s.accountID).AccessToken == "" {
+		return pan.ErrUnauthorized
+	}
+	return nil
+}
 
 func accountWithToken[T any](ctx context.Context, s *accountSession, request func(string) (T, error)) (T, error) {
 	var zero T
@@ -76,61 +101,86 @@ func (d *Drive) refreshAccountTokens(ctx context.Context, accountID string) erro
 	}
 }
 
+// readAccount discards read results from a replaced account/mount while keeping
+// token refresh independent of the authorization version.
+func readAccount[T any](ctx context.Context, s *accountSession, request func(string) (T, error)) (T, error) {
+	var zero T
+	if err := s.checkSource(ctx); err != nil {
+		return zero, err
+	}
+	value, err := accountWithToken(ctx, s, request)
+	if err != nil {
+		return zero, err
+	}
+	if err := s.checkSource(ctx); err != nil {
+		return zero, err
+	}
+	return value, nil
+}
+
 func (s *accountSession) List(ctx context.Context, dirID string, offset int) (pan.FilePage, error) {
-	return accountWithToken(ctx, s, func(token string) (pan.FilePage, error) {
+	return readAccount(ctx, s, func(token string) (pan.FilePage, error) {
 		return s.drive.client.List(ctx, token, dirID, offset, 100)
 	})
 }
 
 func (s *accountSession) Info(ctx context.Context, fileID string) (pan.FileInfo, error) {
-	return accountWithToken(ctx, s, func(token string) (pan.FileInfo, error) {
+	return readAccount(ctx, s, func(token string) (pan.FileInfo, error) {
 		return s.drive.client.Info(ctx, token, fileID)
 	})
 }
 
 func (s *accountSession) Read(ctx context.Context, pickCode string, limit int64) ([]byte, error) {
-	return accountWithToken(ctx, s, func(token string) ([]byte, error) {
+	return readAccount(ctx, s, func(token string) ([]byte, error) {
 		return s.drive.client.ReadMetadata(ctx, token, pickCode, limit)
 	})
 }
 
 func (s *accountSession) PlayURL(ctx context.Context, pickCode, userAgent string) ([]pan.PlaySource, error) {
-	return accountWithToken(ctx, s, func(token string) ([]pan.PlaySource, error) {
+	return readAccount(ctx, s, func(token string) ([]pan.PlaySource, error) {
 		return s.drive.client.PlayURL(ctx, token, pickCode, userAgent)
 	})
 }
 
 func (s *accountSession) DownloadURL(ctx context.Context, pickCode, userAgent string) (string, error) {
-	return accountWithToken(ctx, s, func(token string) (string, error) {
+	return readAccount(ctx, s, func(token string) (string, error) {
 		return s.drive.client.DownloadURL(ctx, token, pickCode, userAgent)
 	})
 }
 
 func (s *accountSession) AddOffline(ctx context.Context, magnet string) (string, error) {
+	if err := s.checkSource(ctx); err != nil {
+		return "", err
+	}
 	return accountWithToken(ctx, s, func(token string) (string, error) {
 		return s.drive.client.AddOffline(ctx, token, magnet, s.source.Directory.ID)
 	})
 }
 
 func (s *accountSession) RemoveOffline(ctx context.Context, hash string) error {
+	if err := s.checkSource(ctx); err != nil {
+		return err
+	}
 	_, err := accountWithToken(ctx, s, func(token string) (struct{}, error) {
 		return struct{}{}, s.drive.client.RemoveOffline(ctx, token, hash)
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	return s.checkSource(ctx)
 }
 
 func (s *accountSession) OfflineTasks(ctx context.Context, page int) (pan.OfflinePage, error) {
+	if err := s.checkCredentials(); err != nil {
+		return pan.OfflinePage{}, err
+	}
 	return accountWithToken(ctx, s, func(token string) (pan.OfflinePage, error) {
 		return s.drive.client.OfflineTasks(ctx, token, page)
 	})
 }
 
 func (s *accountSession) Commit(ctx context.Context, fn func(tx *ent.Tx) error) error {
-	if err := s.drive.commit.Lock(ctx); err != nil {
-		return err
-	}
-	defer s.drive.commit.Unlock()
-	return ent.WithTx(ctx, s.drive.database, fn)
+	return s.WithSource(ctx, func() error { return ent.WithTx(ctx, s.drive.database, fn) })
 }
 
 func (s *accountSession) WithSource(ctx context.Context, fn func() error) error {
@@ -138,9 +188,22 @@ func (s *accountSession) WithSource(ctx context.Context, fn func() error) error 
 		return err
 	}
 	defer s.drive.commit.Unlock()
+	if err := s.checkSource(ctx); err != nil {
+		return err
+	}
 	return fn()
 }
 
 func (s *accountSession) CommitAccount(ctx context.Context, fn func(tx *ent.Tx) error) error {
-	return s.Commit(ctx, fn)
+	if err := s.drive.commit.Lock(ctx); err != nil {
+		return err
+	}
+	defer s.drive.commit.Unlock()
+	if err := s.checkCredentials(); err != nil {
+		return err
+	}
+	if s.drive.snapshot().closed {
+		return context.Canceled
+	}
+	return ent.WithTx(ctx, s.drive.database, fn)
 }

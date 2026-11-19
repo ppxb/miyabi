@@ -143,9 +143,6 @@ func (s *Scanner) movieSource(ctx context.Context, id int) (domain.LibrarySource
 		}
 		return domain.LibrarySource{}, err
 	}
-	if primary := s.driveSvc.Source(); primary != nil && primary.AccountID == record.AccountID {
-		return *primary, nil
-	}
 	source, ok := s.driveSvc.Mount(ctx, record.AccountID)
 	if !ok {
 		return domain.LibrarySource{}, domain.E(domain.KindNotFound, "当前挂载目录中未找到该影片的媒体文件", nil)

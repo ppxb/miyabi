@@ -224,9 +224,6 @@ func (service *Service) movieSource(ctx context.Context, movieID int) (domain.Li
 }
 
 func (service *Service) sourceFor(ctx context.Context, accountID, rootID string) (domain.LibrarySource, error) {
-	if primary := service.drive.Source(); primary != nil && primary.AccountID == accountID && primary.Directory.ID == rootID {
-		return *primary, nil
-	}
 	source, ok := service.drive.Mount(ctx, accountID)
 	if !ok || source.Directory.ID != rootID {
 		return domain.LibrarySource{}, domain.E(domain.KindNotFound, "当前挂载目录中未找到该影片的媒体文件", nil)

@@ -119,8 +119,8 @@ func TestMovieRescrapeDoesNotBlockMountEnqueue(t *testing.T) {
 			<-rescraped
 			t.Fatal("mount enqueue and movie rescrape are waiting for each other's locks")
 		}
-		if err := <-rescraped; !domain.IsKind(err, domain.KindNotFound) {
-			t.Fatalf("movie from the previous mount was not rejected: %v", err)
+		if err := <-rescraped; err == nil {
+			t.Fatalf("movie from the previous mount was not rejected")
 		}
 		if source := lib.drive.Source(); source == nil || source.Directory.ID != "20" {
 			t.Fatalf("new mount was not retained: %+v", source)

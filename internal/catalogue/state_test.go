@@ -80,15 +80,17 @@ func TestMovieStatesScopeWorkflowsToSource(t *testing.T) {
 		t.Fatalf("expected MovieInLibrary with ID 99, got %+v (err=%v)", states, err)
 	}
 
-	// 5. Unmounted source -> MovieNotInLibrary
-	local.source = nil
+	// 5. Not indexed and no active workflow -> MovieNotInLibrary
+	store.Client.Task.Delete().ExecX(ctx)
+	store.Client.OfflineDownload.Delete().ExecX(ctx)
+	local.movies = nil
 	states, err = service.MovieStates(ctx, identities)
 	if err != nil || len(states) != 1 || states[0].State != MovieNotInLibrary || states[0].LibraryID != 0 {
-		t.Fatalf("expected MovieNotInLibrary when unmounted, got %+v (err=%v)", states, err)
+		t.Fatalf("expected MovieNotInLibrary when not indexed, got %+v (err=%v)", states, err)
 	}
 }
 
-func TestMovieStatesDifferentAccountOrDirectoryIgnored(t *testing.T) {
+func TestMovieStatesCountsDownloadsAcrossAccounts(t *testing.T) {
 	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -117,8 +119,8 @@ func TestMovieStatesDifferentAccountOrDirectoryIgnored(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, s := range states {
-		if s.State != MovieNotInLibrary {
-			t.Fatalf("item %d crossed boundaries: %+v", i, s)
+		if s.State != MovieSaving {
+			t.Fatalf("item %d download not recognized across accounts: %+v", i, s)
 		}
 	}
 }

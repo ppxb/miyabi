@@ -3,7 +3,6 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/r
 import { apiGet, apiPost } from '@/api/client'
 import { movieStateKeys } from '@/api/movie-states'
 import { refreshQueries } from '@/api/query-refresh'
-import { panKeys, type PanAccountStatus } from '@/api/pan'
 import type { LibrarySource } from '@/api/tasks'
 import { sameSource } from '@/lib/source'
 
@@ -61,41 +60,28 @@ export function useOfflineActivity() {
   })
 }
 
-export function useOfflineTasks(movieID: string, accountID: string, directoryID: string) {
+export function useMovieOfflineTasks(movieID: string) {
   return useQuery({
     ...activityOptions,
-    enabled: accountID !== '' && directoryID !== '',
-    select: activity =>
-      activity.source?.account_id === accountID && activity.source.directory.id === directoryID
-        ? activity.tasks.filter(task => task.javdb_id === movieID)
-        : []
+    select: activity => activity.tasks.filter(task => task.javdb_id === movieID)
   })
 }
 
 export function useAddOffline(movieID: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (hash: string) =>
+    mutationFn: ({ accountID, hash }: { accountID: string; hash: string }) =>
       apiPost<OfflineSubmission>(`/api/discover/movies/${encodeURIComponent(movieID)}/offline`, {
+        account_id: accountID,
         hash
       }),
     onMutate: () => queryClient.getQueryData<OfflineActivity>(offlineKeys.activity),
-    onSuccess: (submission, _hash, previous) => {
-      const account = queryClient.getQueryData<PanAccountStatus>(panKeys.account)
-      if (
-        account &&
-        (!account.connected ||
-          account.account?.id !== submission.account_id ||
-          account.directory?.id !== submission.directory_id)
-      ) {
-        void refreshQueries(queryClient, offlineKeys.all)
-        return
-      }
+    onSuccess: (submission, _vars, previous) => {
       const state = queryClient.getQueryState(offlineKeys.activity)
-      // A read or SSE-triggered refresh may already contain a newer task state.
+      // Merge the new task unless a read/SSE refresh already superseded it.
       if ((state?.fetchStatus ?? 'idle') === 'idle' && state?.data === previous) {
         queryClient.setQueryData<OfflineActivity>(offlineKeys.activity, activity =>
-          activity && sameSource(activity.source, submission)
+          activity
             ? {
                 ...activity,
                 tasks: [

@@ -9,8 +9,8 @@ import (
 )
 
 type OfflineManager interface {
-	Add(context.Context, string, string) (domain.OfflineSubmission, error)
-	Activity(context.Context) (offline.Activity, error)
+	AddForAccount(context.Context, string, string, string) (domain.OfflineSubmission, error)
+	ActivityForAccount(context.Context, string) (offline.Activity, error)
 	Cancel(context.Context, int) (domain.OfflineSubmission, error)
 	TryNext(context.Context, int) (domain.OfflineSubmission, error)
 }
@@ -36,13 +36,14 @@ func offlineControlHandler(manager OfflineManager, next bool) gin.HandlerFunc {
 
 func offlineActivityHandler(offline OfflineManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		activity, err := offline.Activity(c.Request.Context())
+		activity, err := offline.ActivityForAccount(c.Request.Context(), c.Query("account_id"))
 		respond(c, activity, err)
 	}
 }
 
 type offlineInput struct {
-	Hash string `json:"hash" binding:"required,len=40,hexadecimal"`
+	AccountID string `json:"account_id" binding:"required"`
+	Hash      string `json:"hash" binding:"required,len=40,hexadecimal"`
 }
 
 func offlineAddHandler(offline OfflineManager) gin.HandlerFunc {
@@ -55,7 +56,7 @@ func offlineAddHandler(offline OfflineManager) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		submission, err := offline.Add(c.Request.Context(), uri.ID, input.Hash)
+		submission, err := offline.AddForAccount(c.Request.Context(), input.AccountID, uri.ID, input.Hash)
 		accepted(c, submission, err)
 	}
 }

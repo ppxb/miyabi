@@ -22,19 +22,51 @@ type Activity struct {
 
 // Activity only reads local tasks and the mounted file index. Keeping each
 // magnet's latest workflow also retains long downloads until their final state.
+// Activity summarizes offline tasks. With a single mounted account it reports
+// that account (backwards compatible); with several it aggregates all of them.
 func (service *Service) Activity(ctx context.Context) (Activity, error) {
-	result := Activity{Tasks: []domain.OfflineSubmission{}}
-	source := service.drive.Source()
-	result.Source = source
-	if source == nil {
-		return result, nil
+	sources, err := service.drive.Mounts(ctx)
+	if err != nil {
+		return Activity{}, err
 	}
+	if len(sources) == 0 {
+		return Activity{Tasks: []domain.OfflineSubmission{}}, nil
+	}
+	if len(sources) == 1 {
+		return service.activityFor(ctx, sources[0])
+	}
+	result := Activity{Tasks: []domain.OfflineSubmission{}}
+	for _, source := range sources {
+		activity, err := service.activityFor(ctx, source)
+		if err != nil {
+			return Activity{}, err
+		}
+		result.Tasks = append(result.Tasks, activity.Tasks...)
+	}
+	return result, nil
+}
+
+// ActivityForAccount summarizes one account's offline tasks (or every account
+// when accountID is empty).
+func (service *Service) ActivityForAccount(ctx context.Context, accountID string) (Activity, error) {
+	if accountID == "" {
+		return service.Activity(ctx)
+	}
+	source, ok := service.drive.Mount(ctx, accountID)
+	if !ok {
+		return Activity{Tasks: []domain.OfflineSubmission{}}, nil
+	}
+	return service.activityFor(ctx, source)
+}
+
+func (service *Service) activityFor(ctx context.Context, source domain.LibrarySource) (Activity, error) {
+	result := Activity{Source: &source, Tasks: []domain.OfflineSubmission{}}
 	records, err := latestOfflineTasks(ctx, service.database.OfflineDownload.Query().Where(
 		offlinedownload.AccountIDEQ(source.AccountID), offlinedownload.DirectoryIDEQ(source.Directory.ID)))
 	if err != nil {
 		return result, fmt.Errorf("load offline activity: %w", err)
 	}
-	result.Tasks, err = service.submissions(ctx, records, source)
+	result.Tasks, err = service.submissions(ctx, records, &source)
 	return result, err
 }
 

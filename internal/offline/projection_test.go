@@ -63,7 +63,7 @@ func TestOfflineCompletionAndTargetedScanCommitTogether(t *testing.T) {
 	}
 	rollback := errors.New("fixture rollback")
 	err = ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
-		if err := service.completeTask(ctx, tx, record, "download-folder"); err != nil {
+		if err := service.completeTask(ctx, tx, record, "download-folder", &source); err != nil {
 			return err
 		}
 		return rollback
