@@ -141,11 +141,13 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	heyzoSource := providers.NewHEYZO(networkSvc.ProxyManager())
 	pacopacomamaSource := providers.NewPacopacomama(networkSvc.ProxyManager())
 	jav321Source := providers.NewJav321(networkSvc.ProxyManager())
+	tokyohotSource := providers.NewTokyoHot(networkSvc.ProxyManager())
+	heydougaSource := providers.NewHeydouga(networkSvc.ProxyManager())
 	metadataSvc, err := metadata.New(ctx, store.Client, fanzaSource, fc2Source, fc2dbSource, heyzoSource, pacopacomamaSource,
 		providers.NewJavDB(catalogueSvc), providers.NewJavBus(javbusClient, networkSvc.ProxyManager()),
 		providers.NewR18(networkSvc.ProxyManager()), providers.NewOnePondo(networkSvc.ProxyManager()),
 		providers.NewCodeAV(networkSvc.ProxyManager()),
-		providers.NewJavDatabase(networkSvc.ProxyManager()), jav321Source)
+		providers.NewJavDatabase(networkSvc.ProxyManager()), jav321Source, tokyohotSource, heydougaSource)
 	if err != nil {
 		fanzaSource.Close()
 		fc2Source.Close()
@@ -153,6 +155,8 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		heyzoSource.Close()
 		pacopacomamaSource.Close()
 		jav321Source.Close()
+		tokyohotSource.Close()
+		heydougaSource.Close()
 		catalogueSvc.Close()
 		driveSvc.Close()
 		_ = store.Close()

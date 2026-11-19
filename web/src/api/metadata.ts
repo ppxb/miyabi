@@ -14,6 +14,8 @@ export const sourceNames: Record<string, string> = {
   javdb: 'JavDB',
   javbus: 'JavBus',
   jav321: 'Jav321',
+  tokyohot: 'Tokyo-Hot',
+  heydouga: 'Hey動画',
   r18dev: 'r18.dev',
   onepondo: '一本道',
   javdatabase: 'JavDatabase',
