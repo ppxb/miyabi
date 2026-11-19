@@ -25,7 +25,7 @@ func TestEnsureProfilesAndCatalog(t *testing.T) {
 	a2 := db.Actor.Create().SetProvider("duga").SetSourceID("x2").SetName("七ツ森りり").SaveX(ctx)
 	db.Movie.Create().SetCode("TEST-001").AddActors(a1, a2).SaveX(ctx)
 
-	svc := New(db, nil)
+	svc := New(db, nil, "", nil)
 	if err := svc.EnsureProfiles(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestDetailPersistsAliasesAndImages(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(gfDir, "gfriends_tree.json"), []byte(page), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	svc := New(db, gfriends.New(gfDir, nil))
+	svc := New(db, gfriends.New(gfDir, nil), "", nil)
 	if err := svc.EnsureProfiles(ctx); err != nil {
 		t.Fatal(err)
 	}

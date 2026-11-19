@@ -29,6 +29,28 @@ const (
 	FieldGender = "gender"
 	// FieldAvatar holds the string denoting the avatar field in the database.
 	FieldAvatar = "avatar"
+	// FieldSummary holds the string denoting the summary field in the database.
+	FieldSummary = "summary"
+	// FieldBirthday holds the string denoting the birthday field in the database.
+	FieldBirthday = "birthday"
+	// FieldHeight holds the string denoting the height field in the database.
+	FieldHeight = "height"
+	// FieldCupSize holds the string denoting the cup_size field in the database.
+	FieldCupSize = "cup_size"
+	// FieldMeasurements holds the string denoting the measurements field in the database.
+	FieldMeasurements = "measurements"
+	// FieldBloodType holds the string denoting the blood_type field in the database.
+	FieldBloodType = "blood_type"
+	// FieldNationality holds the string denoting the nationality field in the database.
+	FieldNationality = "nationality"
+	// FieldHobby holds the string denoting the hobby field in the database.
+	FieldHobby = "hobby"
+	// FieldSkill holds the string denoting the skill field in the database.
+	FieldSkill = "skill"
+	// FieldDebutDate holds the string denoting the debut_date field in the database.
+	FieldDebutDate = "debut_date"
+	// FieldSourceURL holds the string denoting the source_url field in the database.
+	FieldSourceURL = "source_url"
 	// EdgeSources holds the string denoting the sources edge name in mutations.
 	EdgeSources = "sources"
 	// EdgeAliases holds the string denoting the aliases edge name in mutations.
@@ -70,6 +92,17 @@ var Columns = []string{
 	FieldNameZht,
 	FieldGender,
 	FieldAvatar,
+	FieldSummary,
+	FieldBirthday,
+	FieldHeight,
+	FieldCupSize,
+	FieldMeasurements,
+	FieldBloodType,
+	FieldNationality,
+	FieldHobby,
+	FieldSkill,
+	FieldDebutDate,
+	FieldSourceURL,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -163,6 +196,61 @@ func ByGender(opts ...sql.OrderTermOption) OrderOption {
 // ByAvatar orders the results by the avatar field.
 func ByAvatar(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAvatar, opts...).ToFunc()
+}
+
+// BySummary orders the results by the summary field.
+func BySummary(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSummary, opts...).ToFunc()
+}
+
+// ByBirthday orders the results by the birthday field.
+func ByBirthday(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBirthday, opts...).ToFunc()
+}
+
+// ByHeight orders the results by the height field.
+func ByHeight(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldHeight, opts...).ToFunc()
+}
+
+// ByCupSize orders the results by the cup_size field.
+func ByCupSize(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCupSize, opts...).ToFunc()
+}
+
+// ByMeasurements orders the results by the measurements field.
+func ByMeasurements(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMeasurements, opts...).ToFunc()
+}
+
+// ByBloodType orders the results by the blood_type field.
+func ByBloodType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBloodType, opts...).ToFunc()
+}
+
+// ByNationality orders the results by the nationality field.
+func ByNationality(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNationality, opts...).ToFunc()
+}
+
+// ByHobby orders the results by the hobby field.
+func ByHobby(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldHobby, opts...).ToFunc()
+}
+
+// BySkill orders the results by the skill field.
+func BySkill(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSkill, opts...).ToFunc()
+}
+
+// ByDebutDate orders the results by the debut_date field.
+func ByDebutDate(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDebutDate, opts...).ToFunc()
+}
+
+// BySourceURL orders the results by the source_url field.
+func BySourceURL(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSourceURL, opts...).ToFunc()
 }
 
 // BySourcesCount orders the results by sources count.

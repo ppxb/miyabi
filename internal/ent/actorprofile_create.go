@@ -107,6 +107,160 @@ func (_c *ActorProfileCreate) SetNillableAvatar(v *string) *ActorProfileCreate {
 	return _c
 }
 
+// SetSummary sets the "summary" field.
+func (_c *ActorProfileCreate) SetSummary(v string) *ActorProfileCreate {
+	_c.mutation.SetSummary(v)
+	return _c
+}
+
+// SetNillableSummary sets the "summary" field if the given value is not nil.
+func (_c *ActorProfileCreate) SetNillableSummary(v *string) *ActorProfileCreate {
+	if v != nil {
+		_c.SetSummary(*v)
+	}
+	return _c
+}
+
+// SetBirthday sets the "birthday" field.
+func (_c *ActorProfileCreate) SetBirthday(v string) *ActorProfileCreate {
+	_c.mutation.SetBirthday(v)
+	return _c
+}
+
+// SetNillableBirthday sets the "birthday" field if the given value is not nil.
+func (_c *ActorProfileCreate) SetNillableBirthday(v *string) *ActorProfileCreate {
+	if v != nil {
+		_c.SetBirthday(*v)
+	}
+	return _c
+}
+
+// SetHeight sets the "height" field.
+func (_c *ActorProfileCreate) SetHeight(v int) *ActorProfileCreate {
+	_c.mutation.SetHeight(v)
+	return _c
+}
+
+// SetNillableHeight sets the "height" field if the given value is not nil.
+func (_c *ActorProfileCreate) SetNillableHeight(v *int) *ActorProfileCreate {
+	if v != nil {
+		_c.SetHeight(*v)
+	}
+	return _c
+}
+
+// SetCupSize sets the "cup_size" field.
+func (_c *ActorProfileCreate) SetCupSize(v string) *ActorProfileCreate {
+	_c.mutation.SetCupSize(v)
+	return _c
+}
+
+// SetNillableCupSize sets the "cup_size" field if the given value is not nil.
+func (_c *ActorProfileCreate) SetNillableCupSize(v *string) *ActorProfileCreate {
+	if v != nil {
+		_c.SetCupSize(*v)
+	}
+	return _c
+}
+
+// SetMeasurements sets the "measurements" field.
+func (_c *ActorProfileCreate) SetMeasurements(v string) *ActorProfileCreate {
+	_c.mutation.SetMeasurements(v)
+	return _c
+}
+
+// SetNillableMeasurements sets the "measurements" field if the given value is not nil.
+func (_c *ActorProfileCreate) SetNillableMeasurements(v *string) *ActorProfileCreate {
+	if v != nil {
+		_c.SetMeasurements(*v)
+	}
+	return _c
+}
+
+// SetBloodType sets the "blood_type" field.
+func (_c *ActorProfileCreate) SetBloodType(v string) *ActorProfileCreate {
+	_c.mutation.SetBloodType(v)
+	return _c
+}
+
+// SetNillableBloodType sets the "blood_type" field if the given value is not nil.
+func (_c *ActorProfileCreate) SetNillableBloodType(v *string) *ActorProfileCreate {
+	if v != nil {
+		_c.SetBloodType(*v)
+	}
+	return _c
+}
+
+// SetNationality sets the "nationality" field.
+func (_c *ActorProfileCreate) SetNationality(v string) *ActorProfileCreate {
+	_c.mutation.SetNationality(v)
+	return _c
+}
+
+// SetNillableNationality sets the "nationality" field if the given value is not nil.
+func (_c *ActorProfileCreate) SetNillableNationality(v *string) *ActorProfileCreate {
+	if v != nil {
+		_c.SetNationality(*v)
+	}
+	return _c
+}
+
+// SetHobby sets the "hobby" field.
+func (_c *ActorProfileCreate) SetHobby(v string) *ActorProfileCreate {
+	_c.mutation.SetHobby(v)
+	return _c
+}
+
+// SetNillableHobby sets the "hobby" field if the given value is not nil.
+func (_c *ActorProfileCreate) SetNillableHobby(v *string) *ActorProfileCreate {
+	if v != nil {
+		_c.SetHobby(*v)
+	}
+	return _c
+}
+
+// SetSkill sets the "skill" field.
+func (_c *ActorProfileCreate) SetSkill(v string) *ActorProfileCreate {
+	_c.mutation.SetSkill(v)
+	return _c
+}
+
+// SetNillableSkill sets the "skill" field if the given value is not nil.
+func (_c *ActorProfileCreate) SetNillableSkill(v *string) *ActorProfileCreate {
+	if v != nil {
+		_c.SetSkill(*v)
+	}
+	return _c
+}
+
+// SetDebutDate sets the "debut_date" field.
+func (_c *ActorProfileCreate) SetDebutDate(v string) *ActorProfileCreate {
+	_c.mutation.SetDebutDate(v)
+	return _c
+}
+
+// SetNillableDebutDate sets the "debut_date" field if the given value is not nil.
+func (_c *ActorProfileCreate) SetNillableDebutDate(v *string) *ActorProfileCreate {
+	if v != nil {
+		_c.SetDebutDate(*v)
+	}
+	return _c
+}
+
+// SetSourceURL sets the "source_url" field.
+func (_c *ActorProfileCreate) SetSourceURL(v string) *ActorProfileCreate {
+	_c.mutation.SetSourceURL(v)
+	return _c
+}
+
+// SetNillableSourceURL sets the "source_url" field if the given value is not nil.
+func (_c *ActorProfileCreate) SetNillableSourceURL(v *string) *ActorProfileCreate {
+	if v != nil {
+		_c.SetSourceURL(*v)
+	}
+	return _c
+}
+
 // AddSourceIDs adds the "sources" edge to the Actor entity by IDs.
 func (_c *ActorProfileCreate) AddSourceIDs(ids ...int) *ActorProfileCreate {
 	_c.mutation.AddSourceIDs(ids...)
@@ -287,6 +441,50 @@ func (_c *ActorProfileCreate) createSpec() (*ActorProfile, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.Avatar(); ok {
 		_spec.SetField(actorprofile.FieldAvatar, field.TypeString, value)
 		_node.Avatar = &value
+	}
+	if value, ok := _c.mutation.Summary(); ok {
+		_spec.SetField(actorprofile.FieldSummary, field.TypeString, value)
+		_node.Summary = &value
+	}
+	if value, ok := _c.mutation.Birthday(); ok {
+		_spec.SetField(actorprofile.FieldBirthday, field.TypeString, value)
+		_node.Birthday = &value
+	}
+	if value, ok := _c.mutation.Height(); ok {
+		_spec.SetField(actorprofile.FieldHeight, field.TypeInt, value)
+		_node.Height = &value
+	}
+	if value, ok := _c.mutation.CupSize(); ok {
+		_spec.SetField(actorprofile.FieldCupSize, field.TypeString, value)
+		_node.CupSize = &value
+	}
+	if value, ok := _c.mutation.Measurements(); ok {
+		_spec.SetField(actorprofile.FieldMeasurements, field.TypeString, value)
+		_node.Measurements = &value
+	}
+	if value, ok := _c.mutation.BloodType(); ok {
+		_spec.SetField(actorprofile.FieldBloodType, field.TypeString, value)
+		_node.BloodType = &value
+	}
+	if value, ok := _c.mutation.Nationality(); ok {
+		_spec.SetField(actorprofile.FieldNationality, field.TypeString, value)
+		_node.Nationality = &value
+	}
+	if value, ok := _c.mutation.Hobby(); ok {
+		_spec.SetField(actorprofile.FieldHobby, field.TypeString, value)
+		_node.Hobby = &value
+	}
+	if value, ok := _c.mutation.Skill(); ok {
+		_spec.SetField(actorprofile.FieldSkill, field.TypeString, value)
+		_node.Skill = &value
+	}
+	if value, ok := _c.mutation.DebutDate(); ok {
+		_spec.SetField(actorprofile.FieldDebutDate, field.TypeString, value)
+		_node.DebutDate = &value
+	}
+	if value, ok := _c.mutation.SourceURL(); ok {
+		_spec.SetField(actorprofile.FieldSourceURL, field.TypeString, value)
+		_node.SourceURL = &value
 	}
 	if nodes := _c.mutation.SourcesIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -472,6 +670,210 @@ func (u *ActorProfileUpsert) ClearAvatar() *ActorProfileUpsert {
 	return u
 }
 
+// SetSummary sets the "summary" field.
+func (u *ActorProfileUpsert) SetSummary(v string) *ActorProfileUpsert {
+	u.Set(actorprofile.FieldSummary, v)
+	return u
+}
+
+// UpdateSummary sets the "summary" field to the value that was provided on create.
+func (u *ActorProfileUpsert) UpdateSummary() *ActorProfileUpsert {
+	u.SetExcluded(actorprofile.FieldSummary)
+	return u
+}
+
+// ClearSummary clears the value of the "summary" field.
+func (u *ActorProfileUpsert) ClearSummary() *ActorProfileUpsert {
+	u.SetNull(actorprofile.FieldSummary)
+	return u
+}
+
+// SetBirthday sets the "birthday" field.
+func (u *ActorProfileUpsert) SetBirthday(v string) *ActorProfileUpsert {
+	u.Set(actorprofile.FieldBirthday, v)
+	return u
+}
+
+// UpdateBirthday sets the "birthday" field to the value that was provided on create.
+func (u *ActorProfileUpsert) UpdateBirthday() *ActorProfileUpsert {
+	u.SetExcluded(actorprofile.FieldBirthday)
+	return u
+}
+
+// ClearBirthday clears the value of the "birthday" field.
+func (u *ActorProfileUpsert) ClearBirthday() *ActorProfileUpsert {
+	u.SetNull(actorprofile.FieldBirthday)
+	return u
+}
+
+// SetHeight sets the "height" field.
+func (u *ActorProfileUpsert) SetHeight(v int) *ActorProfileUpsert {
+	u.Set(actorprofile.FieldHeight, v)
+	return u
+}
+
+// UpdateHeight sets the "height" field to the value that was provided on create.
+func (u *ActorProfileUpsert) UpdateHeight() *ActorProfileUpsert {
+	u.SetExcluded(actorprofile.FieldHeight)
+	return u
+}
+
+// AddHeight adds v to the "height" field.
+func (u *ActorProfileUpsert) AddHeight(v int) *ActorProfileUpsert {
+	u.Add(actorprofile.FieldHeight, v)
+	return u
+}
+
+// ClearHeight clears the value of the "height" field.
+func (u *ActorProfileUpsert) ClearHeight() *ActorProfileUpsert {
+	u.SetNull(actorprofile.FieldHeight)
+	return u
+}
+
+// SetCupSize sets the "cup_size" field.
+func (u *ActorProfileUpsert) SetCupSize(v string) *ActorProfileUpsert {
+	u.Set(actorprofile.FieldCupSize, v)
+	return u
+}
+
+// UpdateCupSize sets the "cup_size" field to the value that was provided on create.
+func (u *ActorProfileUpsert) UpdateCupSize() *ActorProfileUpsert {
+	u.SetExcluded(actorprofile.FieldCupSize)
+	return u
+}
+
+// ClearCupSize clears the value of the "cup_size" field.
+func (u *ActorProfileUpsert) ClearCupSize() *ActorProfileUpsert {
+	u.SetNull(actorprofile.FieldCupSize)
+	return u
+}
+
+// SetMeasurements sets the "measurements" field.
+func (u *ActorProfileUpsert) SetMeasurements(v string) *ActorProfileUpsert {
+	u.Set(actorprofile.FieldMeasurements, v)
+	return u
+}
+
+// UpdateMeasurements sets the "measurements" field to the value that was provided on create.
+func (u *ActorProfileUpsert) UpdateMeasurements() *ActorProfileUpsert {
+	u.SetExcluded(actorprofile.FieldMeasurements)
+	return u
+}
+
+// ClearMeasurements clears the value of the "measurements" field.
+func (u *ActorProfileUpsert) ClearMeasurements() *ActorProfileUpsert {
+	u.SetNull(actorprofile.FieldMeasurements)
+	return u
+}
+
+// SetBloodType sets the "blood_type" field.
+func (u *ActorProfileUpsert) SetBloodType(v string) *ActorProfileUpsert {
+	u.Set(actorprofile.FieldBloodType, v)
+	return u
+}
+
+// UpdateBloodType sets the "blood_type" field to the value that was provided on create.
+func (u *ActorProfileUpsert) UpdateBloodType() *ActorProfileUpsert {
+	u.SetExcluded(actorprofile.FieldBloodType)
+	return u
+}
+
+// ClearBloodType clears the value of the "blood_type" field.
+func (u *ActorProfileUpsert) ClearBloodType() *ActorProfileUpsert {
+	u.SetNull(actorprofile.FieldBloodType)
+	return u
+}
+
+// SetNationality sets the "nationality" field.
+func (u *ActorProfileUpsert) SetNationality(v string) *ActorProfileUpsert {
+	u.Set(actorprofile.FieldNationality, v)
+	return u
+}
+
+// UpdateNationality sets the "nationality" field to the value that was provided on create.
+func (u *ActorProfileUpsert) UpdateNationality() *ActorProfileUpsert {
+	u.SetExcluded(actorprofile.FieldNationality)
+	return u
+}
+
+// ClearNationality clears the value of the "nationality" field.
+func (u *ActorProfileUpsert) ClearNationality() *ActorProfileUpsert {
+	u.SetNull(actorprofile.FieldNationality)
+	return u
+}
+
+// SetHobby sets the "hobby" field.
+func (u *ActorProfileUpsert) SetHobby(v string) *ActorProfileUpsert {
+	u.Set(actorprofile.FieldHobby, v)
+	return u
+}
+
+// UpdateHobby sets the "hobby" field to the value that was provided on create.
+func (u *ActorProfileUpsert) UpdateHobby() *ActorProfileUpsert {
+	u.SetExcluded(actorprofile.FieldHobby)
+	return u
+}
+
+// ClearHobby clears the value of the "hobby" field.
+func (u *ActorProfileUpsert) ClearHobby() *ActorProfileUpsert {
+	u.SetNull(actorprofile.FieldHobby)
+	return u
+}
+
+// SetSkill sets the "skill" field.
+func (u *ActorProfileUpsert) SetSkill(v string) *ActorProfileUpsert {
+	u.Set(actorprofile.FieldSkill, v)
+	return u
+}
+
+// UpdateSkill sets the "skill" field to the value that was provided on create.
+func (u *ActorProfileUpsert) UpdateSkill() *ActorProfileUpsert {
+	u.SetExcluded(actorprofile.FieldSkill)
+	return u
+}
+
+// ClearSkill clears the value of the "skill" field.
+func (u *ActorProfileUpsert) ClearSkill() *ActorProfileUpsert {
+	u.SetNull(actorprofile.FieldSkill)
+	return u
+}
+
+// SetDebutDate sets the "debut_date" field.
+func (u *ActorProfileUpsert) SetDebutDate(v string) *ActorProfileUpsert {
+	u.Set(actorprofile.FieldDebutDate, v)
+	return u
+}
+
+// UpdateDebutDate sets the "debut_date" field to the value that was provided on create.
+func (u *ActorProfileUpsert) UpdateDebutDate() *ActorProfileUpsert {
+	u.SetExcluded(actorprofile.FieldDebutDate)
+	return u
+}
+
+// ClearDebutDate clears the value of the "debut_date" field.
+func (u *ActorProfileUpsert) ClearDebutDate() *ActorProfileUpsert {
+	u.SetNull(actorprofile.FieldDebutDate)
+	return u
+}
+
+// SetSourceURL sets the "source_url" field.
+func (u *ActorProfileUpsert) SetSourceURL(v string) *ActorProfileUpsert {
+	u.Set(actorprofile.FieldSourceURL, v)
+	return u
+}
+
+// UpdateSourceURL sets the "source_url" field to the value that was provided on create.
+func (u *ActorProfileUpsert) UpdateSourceURL() *ActorProfileUpsert {
+	u.SetExcluded(actorprofile.FieldSourceURL)
+	return u
+}
+
+// ClearSourceURL clears the value of the "source_url" field.
+func (u *ActorProfileUpsert) ClearSourceURL() *ActorProfileUpsert {
+	u.SetNull(actorprofile.FieldSourceURL)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -612,6 +1014,244 @@ func (u *ActorProfileUpsertOne) UpdateAvatar() *ActorProfileUpsertOne {
 func (u *ActorProfileUpsertOne) ClearAvatar() *ActorProfileUpsertOne {
 	return u.Update(func(s *ActorProfileUpsert) {
 		s.ClearAvatar()
+	})
+}
+
+// SetSummary sets the "summary" field.
+func (u *ActorProfileUpsertOne) SetSummary(v string) *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetSummary(v)
+	})
+}
+
+// UpdateSummary sets the "summary" field to the value that was provided on create.
+func (u *ActorProfileUpsertOne) UpdateSummary() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateSummary()
+	})
+}
+
+// ClearSummary clears the value of the "summary" field.
+func (u *ActorProfileUpsertOne) ClearSummary() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearSummary()
+	})
+}
+
+// SetBirthday sets the "birthday" field.
+func (u *ActorProfileUpsertOne) SetBirthday(v string) *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetBirthday(v)
+	})
+}
+
+// UpdateBirthday sets the "birthday" field to the value that was provided on create.
+func (u *ActorProfileUpsertOne) UpdateBirthday() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateBirthday()
+	})
+}
+
+// ClearBirthday clears the value of the "birthday" field.
+func (u *ActorProfileUpsertOne) ClearBirthday() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearBirthday()
+	})
+}
+
+// SetHeight sets the "height" field.
+func (u *ActorProfileUpsertOne) SetHeight(v int) *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetHeight(v)
+	})
+}
+
+// AddHeight adds v to the "height" field.
+func (u *ActorProfileUpsertOne) AddHeight(v int) *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.AddHeight(v)
+	})
+}
+
+// UpdateHeight sets the "height" field to the value that was provided on create.
+func (u *ActorProfileUpsertOne) UpdateHeight() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateHeight()
+	})
+}
+
+// ClearHeight clears the value of the "height" field.
+func (u *ActorProfileUpsertOne) ClearHeight() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearHeight()
+	})
+}
+
+// SetCupSize sets the "cup_size" field.
+func (u *ActorProfileUpsertOne) SetCupSize(v string) *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetCupSize(v)
+	})
+}
+
+// UpdateCupSize sets the "cup_size" field to the value that was provided on create.
+func (u *ActorProfileUpsertOne) UpdateCupSize() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateCupSize()
+	})
+}
+
+// ClearCupSize clears the value of the "cup_size" field.
+func (u *ActorProfileUpsertOne) ClearCupSize() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearCupSize()
+	})
+}
+
+// SetMeasurements sets the "measurements" field.
+func (u *ActorProfileUpsertOne) SetMeasurements(v string) *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetMeasurements(v)
+	})
+}
+
+// UpdateMeasurements sets the "measurements" field to the value that was provided on create.
+func (u *ActorProfileUpsertOne) UpdateMeasurements() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateMeasurements()
+	})
+}
+
+// ClearMeasurements clears the value of the "measurements" field.
+func (u *ActorProfileUpsertOne) ClearMeasurements() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearMeasurements()
+	})
+}
+
+// SetBloodType sets the "blood_type" field.
+func (u *ActorProfileUpsertOne) SetBloodType(v string) *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetBloodType(v)
+	})
+}
+
+// UpdateBloodType sets the "blood_type" field to the value that was provided on create.
+func (u *ActorProfileUpsertOne) UpdateBloodType() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateBloodType()
+	})
+}
+
+// ClearBloodType clears the value of the "blood_type" field.
+func (u *ActorProfileUpsertOne) ClearBloodType() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearBloodType()
+	})
+}
+
+// SetNationality sets the "nationality" field.
+func (u *ActorProfileUpsertOne) SetNationality(v string) *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetNationality(v)
+	})
+}
+
+// UpdateNationality sets the "nationality" field to the value that was provided on create.
+func (u *ActorProfileUpsertOne) UpdateNationality() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateNationality()
+	})
+}
+
+// ClearNationality clears the value of the "nationality" field.
+func (u *ActorProfileUpsertOne) ClearNationality() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearNationality()
+	})
+}
+
+// SetHobby sets the "hobby" field.
+func (u *ActorProfileUpsertOne) SetHobby(v string) *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetHobby(v)
+	})
+}
+
+// UpdateHobby sets the "hobby" field to the value that was provided on create.
+func (u *ActorProfileUpsertOne) UpdateHobby() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateHobby()
+	})
+}
+
+// ClearHobby clears the value of the "hobby" field.
+func (u *ActorProfileUpsertOne) ClearHobby() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearHobby()
+	})
+}
+
+// SetSkill sets the "skill" field.
+func (u *ActorProfileUpsertOne) SetSkill(v string) *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetSkill(v)
+	})
+}
+
+// UpdateSkill sets the "skill" field to the value that was provided on create.
+func (u *ActorProfileUpsertOne) UpdateSkill() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateSkill()
+	})
+}
+
+// ClearSkill clears the value of the "skill" field.
+func (u *ActorProfileUpsertOne) ClearSkill() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearSkill()
+	})
+}
+
+// SetDebutDate sets the "debut_date" field.
+func (u *ActorProfileUpsertOne) SetDebutDate(v string) *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetDebutDate(v)
+	})
+}
+
+// UpdateDebutDate sets the "debut_date" field to the value that was provided on create.
+func (u *ActorProfileUpsertOne) UpdateDebutDate() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateDebutDate()
+	})
+}
+
+// ClearDebutDate clears the value of the "debut_date" field.
+func (u *ActorProfileUpsertOne) ClearDebutDate() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearDebutDate()
+	})
+}
+
+// SetSourceURL sets the "source_url" field.
+func (u *ActorProfileUpsertOne) SetSourceURL(v string) *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetSourceURL(v)
+	})
+}
+
+// UpdateSourceURL sets the "source_url" field to the value that was provided on create.
+func (u *ActorProfileUpsertOne) UpdateSourceURL() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateSourceURL()
+	})
+}
+
+// ClearSourceURL clears the value of the "source_url" field.
+func (u *ActorProfileUpsertOne) ClearSourceURL() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearSourceURL()
 	})
 }
 
@@ -921,6 +1561,244 @@ func (u *ActorProfileUpsertBulk) UpdateAvatar() *ActorProfileUpsertBulk {
 func (u *ActorProfileUpsertBulk) ClearAvatar() *ActorProfileUpsertBulk {
 	return u.Update(func(s *ActorProfileUpsert) {
 		s.ClearAvatar()
+	})
+}
+
+// SetSummary sets the "summary" field.
+func (u *ActorProfileUpsertBulk) SetSummary(v string) *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetSummary(v)
+	})
+}
+
+// UpdateSummary sets the "summary" field to the value that was provided on create.
+func (u *ActorProfileUpsertBulk) UpdateSummary() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateSummary()
+	})
+}
+
+// ClearSummary clears the value of the "summary" field.
+func (u *ActorProfileUpsertBulk) ClearSummary() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearSummary()
+	})
+}
+
+// SetBirthday sets the "birthday" field.
+func (u *ActorProfileUpsertBulk) SetBirthday(v string) *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetBirthday(v)
+	})
+}
+
+// UpdateBirthday sets the "birthday" field to the value that was provided on create.
+func (u *ActorProfileUpsertBulk) UpdateBirthday() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateBirthday()
+	})
+}
+
+// ClearBirthday clears the value of the "birthday" field.
+func (u *ActorProfileUpsertBulk) ClearBirthday() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearBirthday()
+	})
+}
+
+// SetHeight sets the "height" field.
+func (u *ActorProfileUpsertBulk) SetHeight(v int) *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetHeight(v)
+	})
+}
+
+// AddHeight adds v to the "height" field.
+func (u *ActorProfileUpsertBulk) AddHeight(v int) *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.AddHeight(v)
+	})
+}
+
+// UpdateHeight sets the "height" field to the value that was provided on create.
+func (u *ActorProfileUpsertBulk) UpdateHeight() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateHeight()
+	})
+}
+
+// ClearHeight clears the value of the "height" field.
+func (u *ActorProfileUpsertBulk) ClearHeight() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearHeight()
+	})
+}
+
+// SetCupSize sets the "cup_size" field.
+func (u *ActorProfileUpsertBulk) SetCupSize(v string) *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetCupSize(v)
+	})
+}
+
+// UpdateCupSize sets the "cup_size" field to the value that was provided on create.
+func (u *ActorProfileUpsertBulk) UpdateCupSize() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateCupSize()
+	})
+}
+
+// ClearCupSize clears the value of the "cup_size" field.
+func (u *ActorProfileUpsertBulk) ClearCupSize() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearCupSize()
+	})
+}
+
+// SetMeasurements sets the "measurements" field.
+func (u *ActorProfileUpsertBulk) SetMeasurements(v string) *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetMeasurements(v)
+	})
+}
+
+// UpdateMeasurements sets the "measurements" field to the value that was provided on create.
+func (u *ActorProfileUpsertBulk) UpdateMeasurements() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateMeasurements()
+	})
+}
+
+// ClearMeasurements clears the value of the "measurements" field.
+func (u *ActorProfileUpsertBulk) ClearMeasurements() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearMeasurements()
+	})
+}
+
+// SetBloodType sets the "blood_type" field.
+func (u *ActorProfileUpsertBulk) SetBloodType(v string) *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetBloodType(v)
+	})
+}
+
+// UpdateBloodType sets the "blood_type" field to the value that was provided on create.
+func (u *ActorProfileUpsertBulk) UpdateBloodType() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateBloodType()
+	})
+}
+
+// ClearBloodType clears the value of the "blood_type" field.
+func (u *ActorProfileUpsertBulk) ClearBloodType() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearBloodType()
+	})
+}
+
+// SetNationality sets the "nationality" field.
+func (u *ActorProfileUpsertBulk) SetNationality(v string) *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetNationality(v)
+	})
+}
+
+// UpdateNationality sets the "nationality" field to the value that was provided on create.
+func (u *ActorProfileUpsertBulk) UpdateNationality() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateNationality()
+	})
+}
+
+// ClearNationality clears the value of the "nationality" field.
+func (u *ActorProfileUpsertBulk) ClearNationality() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearNationality()
+	})
+}
+
+// SetHobby sets the "hobby" field.
+func (u *ActorProfileUpsertBulk) SetHobby(v string) *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetHobby(v)
+	})
+}
+
+// UpdateHobby sets the "hobby" field to the value that was provided on create.
+func (u *ActorProfileUpsertBulk) UpdateHobby() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateHobby()
+	})
+}
+
+// ClearHobby clears the value of the "hobby" field.
+func (u *ActorProfileUpsertBulk) ClearHobby() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearHobby()
+	})
+}
+
+// SetSkill sets the "skill" field.
+func (u *ActorProfileUpsertBulk) SetSkill(v string) *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetSkill(v)
+	})
+}
+
+// UpdateSkill sets the "skill" field to the value that was provided on create.
+func (u *ActorProfileUpsertBulk) UpdateSkill() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateSkill()
+	})
+}
+
+// ClearSkill clears the value of the "skill" field.
+func (u *ActorProfileUpsertBulk) ClearSkill() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearSkill()
+	})
+}
+
+// SetDebutDate sets the "debut_date" field.
+func (u *ActorProfileUpsertBulk) SetDebutDate(v string) *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetDebutDate(v)
+	})
+}
+
+// UpdateDebutDate sets the "debut_date" field to the value that was provided on create.
+func (u *ActorProfileUpsertBulk) UpdateDebutDate() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateDebutDate()
+	})
+}
+
+// ClearDebutDate clears the value of the "debut_date" field.
+func (u *ActorProfileUpsertBulk) ClearDebutDate() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearDebutDate()
+	})
+}
+
+// SetSourceURL sets the "source_url" field.
+func (u *ActorProfileUpsertBulk) SetSourceURL(v string) *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetSourceURL(v)
+	})
+}
+
+// UpdateSourceURL sets the "source_url" field to the value that was provided on create.
+func (u *ActorProfileUpsertBulk) UpdateSourceURL() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateSourceURL()
+	})
+}
+
+// ClearSourceURL clears the value of the "source_url" field.
+func (u *ActorProfileUpsertBulk) ClearSourceURL() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearSourceURL()
 	})
 }
 

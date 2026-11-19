@@ -2279,6 +2279,18 @@ type ActorProfileMutation struct {
 	name_zht       *string
 	gender         *actorprofile.Gender
 	avatar         *string
+	summary        *string
+	birthday       *string
+	height         *int
+	addheight      *int
+	cup_size       *string
+	measurements   *string
+	blood_type     *string
+	nationality    *string
+	hobby          *string
+	skill          *string
+	debut_date     *string
+	source_url     *string
 	clearedFields  map[string]struct{}
 	sources        map[int]struct{}
 	removedsources map[int]struct{}
@@ -2670,6 +2682,566 @@ func (m *ActorProfileMutation) ResetAvatar() {
 	delete(m.clearedFields, actorprofile.FieldAvatar)
 }
 
+// SetSummary sets the "summary" field.
+func (m *ActorProfileMutation) SetSummary(s string) {
+	m.summary = &s
+}
+
+// Summary returns the value of the "summary" field in the mutation.
+func (m *ActorProfileMutation) Summary() (r string, exists bool) {
+	v := m.summary
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSummary returns the old "summary" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldSummary(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSummary is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSummary requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSummary: %w", err)
+	}
+	return oldValue.Summary, nil
+}
+
+// ClearSummary clears the value of the "summary" field.
+func (m *ActorProfileMutation) ClearSummary() {
+	m.summary = nil
+	m.clearedFields[actorprofile.FieldSummary] = struct{}{}
+}
+
+// SummaryCleared returns if the "summary" field was cleared in this mutation.
+func (m *ActorProfileMutation) SummaryCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldSummary]
+	return ok
+}
+
+// ResetSummary resets all changes to the "summary" field.
+func (m *ActorProfileMutation) ResetSummary() {
+	m.summary = nil
+	delete(m.clearedFields, actorprofile.FieldSummary)
+}
+
+// SetBirthday sets the "birthday" field.
+func (m *ActorProfileMutation) SetBirthday(s string) {
+	m.birthday = &s
+}
+
+// Birthday returns the value of the "birthday" field in the mutation.
+func (m *ActorProfileMutation) Birthday() (r string, exists bool) {
+	v := m.birthday
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBirthday returns the old "birthday" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldBirthday(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBirthday is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBirthday requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBirthday: %w", err)
+	}
+	return oldValue.Birthday, nil
+}
+
+// ClearBirthday clears the value of the "birthday" field.
+func (m *ActorProfileMutation) ClearBirthday() {
+	m.birthday = nil
+	m.clearedFields[actorprofile.FieldBirthday] = struct{}{}
+}
+
+// BirthdayCleared returns if the "birthday" field was cleared in this mutation.
+func (m *ActorProfileMutation) BirthdayCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldBirthday]
+	return ok
+}
+
+// ResetBirthday resets all changes to the "birthday" field.
+func (m *ActorProfileMutation) ResetBirthday() {
+	m.birthday = nil
+	delete(m.clearedFields, actorprofile.FieldBirthday)
+}
+
+// SetHeight sets the "height" field.
+func (m *ActorProfileMutation) SetHeight(i int) {
+	m.height = &i
+	m.addheight = nil
+}
+
+// Height returns the value of the "height" field in the mutation.
+func (m *ActorProfileMutation) Height() (r int, exists bool) {
+	v := m.height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHeight returns the old "height" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldHeight(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHeight is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHeight requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHeight: %w", err)
+	}
+	return oldValue.Height, nil
+}
+
+// AddHeight adds i to the "height" field.
+func (m *ActorProfileMutation) AddHeight(i int) {
+	if m.addheight != nil {
+		*m.addheight += i
+	} else {
+		m.addheight = &i
+	}
+}
+
+// AddedHeight returns the value that was added to the "height" field in this mutation.
+func (m *ActorProfileMutation) AddedHeight() (r int, exists bool) {
+	v := m.addheight
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearHeight clears the value of the "height" field.
+func (m *ActorProfileMutation) ClearHeight() {
+	m.height = nil
+	m.addheight = nil
+	m.clearedFields[actorprofile.FieldHeight] = struct{}{}
+}
+
+// HeightCleared returns if the "height" field was cleared in this mutation.
+func (m *ActorProfileMutation) HeightCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldHeight]
+	return ok
+}
+
+// ResetHeight resets all changes to the "height" field.
+func (m *ActorProfileMutation) ResetHeight() {
+	m.height = nil
+	m.addheight = nil
+	delete(m.clearedFields, actorprofile.FieldHeight)
+}
+
+// SetCupSize sets the "cup_size" field.
+func (m *ActorProfileMutation) SetCupSize(s string) {
+	m.cup_size = &s
+}
+
+// CupSize returns the value of the "cup_size" field in the mutation.
+func (m *ActorProfileMutation) CupSize() (r string, exists bool) {
+	v := m.cup_size
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCupSize returns the old "cup_size" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldCupSize(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCupSize is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCupSize requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCupSize: %w", err)
+	}
+	return oldValue.CupSize, nil
+}
+
+// ClearCupSize clears the value of the "cup_size" field.
+func (m *ActorProfileMutation) ClearCupSize() {
+	m.cup_size = nil
+	m.clearedFields[actorprofile.FieldCupSize] = struct{}{}
+}
+
+// CupSizeCleared returns if the "cup_size" field was cleared in this mutation.
+func (m *ActorProfileMutation) CupSizeCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldCupSize]
+	return ok
+}
+
+// ResetCupSize resets all changes to the "cup_size" field.
+func (m *ActorProfileMutation) ResetCupSize() {
+	m.cup_size = nil
+	delete(m.clearedFields, actorprofile.FieldCupSize)
+}
+
+// SetMeasurements sets the "measurements" field.
+func (m *ActorProfileMutation) SetMeasurements(s string) {
+	m.measurements = &s
+}
+
+// Measurements returns the value of the "measurements" field in the mutation.
+func (m *ActorProfileMutation) Measurements() (r string, exists bool) {
+	v := m.measurements
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMeasurements returns the old "measurements" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldMeasurements(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMeasurements is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMeasurements requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMeasurements: %w", err)
+	}
+	return oldValue.Measurements, nil
+}
+
+// ClearMeasurements clears the value of the "measurements" field.
+func (m *ActorProfileMutation) ClearMeasurements() {
+	m.measurements = nil
+	m.clearedFields[actorprofile.FieldMeasurements] = struct{}{}
+}
+
+// MeasurementsCleared returns if the "measurements" field was cleared in this mutation.
+func (m *ActorProfileMutation) MeasurementsCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldMeasurements]
+	return ok
+}
+
+// ResetMeasurements resets all changes to the "measurements" field.
+func (m *ActorProfileMutation) ResetMeasurements() {
+	m.measurements = nil
+	delete(m.clearedFields, actorprofile.FieldMeasurements)
+}
+
+// SetBloodType sets the "blood_type" field.
+func (m *ActorProfileMutation) SetBloodType(s string) {
+	m.blood_type = &s
+}
+
+// BloodType returns the value of the "blood_type" field in the mutation.
+func (m *ActorProfileMutation) BloodType() (r string, exists bool) {
+	v := m.blood_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBloodType returns the old "blood_type" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldBloodType(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBloodType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBloodType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBloodType: %w", err)
+	}
+	return oldValue.BloodType, nil
+}
+
+// ClearBloodType clears the value of the "blood_type" field.
+func (m *ActorProfileMutation) ClearBloodType() {
+	m.blood_type = nil
+	m.clearedFields[actorprofile.FieldBloodType] = struct{}{}
+}
+
+// BloodTypeCleared returns if the "blood_type" field was cleared in this mutation.
+func (m *ActorProfileMutation) BloodTypeCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldBloodType]
+	return ok
+}
+
+// ResetBloodType resets all changes to the "blood_type" field.
+func (m *ActorProfileMutation) ResetBloodType() {
+	m.blood_type = nil
+	delete(m.clearedFields, actorprofile.FieldBloodType)
+}
+
+// SetNationality sets the "nationality" field.
+func (m *ActorProfileMutation) SetNationality(s string) {
+	m.nationality = &s
+}
+
+// Nationality returns the value of the "nationality" field in the mutation.
+func (m *ActorProfileMutation) Nationality() (r string, exists bool) {
+	v := m.nationality
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNationality returns the old "nationality" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldNationality(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNationality is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNationality requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNationality: %w", err)
+	}
+	return oldValue.Nationality, nil
+}
+
+// ClearNationality clears the value of the "nationality" field.
+func (m *ActorProfileMutation) ClearNationality() {
+	m.nationality = nil
+	m.clearedFields[actorprofile.FieldNationality] = struct{}{}
+}
+
+// NationalityCleared returns if the "nationality" field was cleared in this mutation.
+func (m *ActorProfileMutation) NationalityCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldNationality]
+	return ok
+}
+
+// ResetNationality resets all changes to the "nationality" field.
+func (m *ActorProfileMutation) ResetNationality() {
+	m.nationality = nil
+	delete(m.clearedFields, actorprofile.FieldNationality)
+}
+
+// SetHobby sets the "hobby" field.
+func (m *ActorProfileMutation) SetHobby(s string) {
+	m.hobby = &s
+}
+
+// Hobby returns the value of the "hobby" field in the mutation.
+func (m *ActorProfileMutation) Hobby() (r string, exists bool) {
+	v := m.hobby
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHobby returns the old "hobby" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldHobby(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHobby is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHobby requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHobby: %w", err)
+	}
+	return oldValue.Hobby, nil
+}
+
+// ClearHobby clears the value of the "hobby" field.
+func (m *ActorProfileMutation) ClearHobby() {
+	m.hobby = nil
+	m.clearedFields[actorprofile.FieldHobby] = struct{}{}
+}
+
+// HobbyCleared returns if the "hobby" field was cleared in this mutation.
+func (m *ActorProfileMutation) HobbyCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldHobby]
+	return ok
+}
+
+// ResetHobby resets all changes to the "hobby" field.
+func (m *ActorProfileMutation) ResetHobby() {
+	m.hobby = nil
+	delete(m.clearedFields, actorprofile.FieldHobby)
+}
+
+// SetSkill sets the "skill" field.
+func (m *ActorProfileMutation) SetSkill(s string) {
+	m.skill = &s
+}
+
+// Skill returns the value of the "skill" field in the mutation.
+func (m *ActorProfileMutation) Skill() (r string, exists bool) {
+	v := m.skill
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSkill returns the old "skill" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldSkill(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSkill is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSkill requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSkill: %w", err)
+	}
+	return oldValue.Skill, nil
+}
+
+// ClearSkill clears the value of the "skill" field.
+func (m *ActorProfileMutation) ClearSkill() {
+	m.skill = nil
+	m.clearedFields[actorprofile.FieldSkill] = struct{}{}
+}
+
+// SkillCleared returns if the "skill" field was cleared in this mutation.
+func (m *ActorProfileMutation) SkillCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldSkill]
+	return ok
+}
+
+// ResetSkill resets all changes to the "skill" field.
+func (m *ActorProfileMutation) ResetSkill() {
+	m.skill = nil
+	delete(m.clearedFields, actorprofile.FieldSkill)
+}
+
+// SetDebutDate sets the "debut_date" field.
+func (m *ActorProfileMutation) SetDebutDate(s string) {
+	m.debut_date = &s
+}
+
+// DebutDate returns the value of the "debut_date" field in the mutation.
+func (m *ActorProfileMutation) DebutDate() (r string, exists bool) {
+	v := m.debut_date
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDebutDate returns the old "debut_date" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldDebutDate(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDebutDate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDebutDate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDebutDate: %w", err)
+	}
+	return oldValue.DebutDate, nil
+}
+
+// ClearDebutDate clears the value of the "debut_date" field.
+func (m *ActorProfileMutation) ClearDebutDate() {
+	m.debut_date = nil
+	m.clearedFields[actorprofile.FieldDebutDate] = struct{}{}
+}
+
+// DebutDateCleared returns if the "debut_date" field was cleared in this mutation.
+func (m *ActorProfileMutation) DebutDateCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldDebutDate]
+	return ok
+}
+
+// ResetDebutDate resets all changes to the "debut_date" field.
+func (m *ActorProfileMutation) ResetDebutDate() {
+	m.debut_date = nil
+	delete(m.clearedFields, actorprofile.FieldDebutDate)
+}
+
+// SetSourceURL sets the "source_url" field.
+func (m *ActorProfileMutation) SetSourceURL(s string) {
+	m.source_url = &s
+}
+
+// SourceURL returns the value of the "source_url" field in the mutation.
+func (m *ActorProfileMutation) SourceURL() (r string, exists bool) {
+	v := m.source_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceURL returns the old "source_url" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldSourceURL(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceURL: %w", err)
+	}
+	return oldValue.SourceURL, nil
+}
+
+// ClearSourceURL clears the value of the "source_url" field.
+func (m *ActorProfileMutation) ClearSourceURL() {
+	m.source_url = nil
+	m.clearedFields[actorprofile.FieldSourceURL] = struct{}{}
+}
+
+// SourceURLCleared returns if the "source_url" field was cleared in this mutation.
+func (m *ActorProfileMutation) SourceURLCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldSourceURL]
+	return ok
+}
+
+// ResetSourceURL resets all changes to the "source_url" field.
+func (m *ActorProfileMutation) ResetSourceURL() {
+	m.source_url = nil
+	delete(m.clearedFields, actorprofile.FieldSourceURL)
+}
+
 // AddSourceIDs adds the "sources" edge to the Actor entity by ids.
 func (m *ActorProfileMutation) AddSourceIDs(ids ...int) {
 	if m.sources == nil {
@@ -2866,7 +3438,7 @@ func (m *ActorProfileMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ActorProfileMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 18)
 	if m.created_at != nil {
 		fields = append(fields, actorprofile.FieldCreatedAt)
 	}
@@ -2887,6 +3459,39 @@ func (m *ActorProfileMutation) Fields() []string {
 	}
 	if m.avatar != nil {
 		fields = append(fields, actorprofile.FieldAvatar)
+	}
+	if m.summary != nil {
+		fields = append(fields, actorprofile.FieldSummary)
+	}
+	if m.birthday != nil {
+		fields = append(fields, actorprofile.FieldBirthday)
+	}
+	if m.height != nil {
+		fields = append(fields, actorprofile.FieldHeight)
+	}
+	if m.cup_size != nil {
+		fields = append(fields, actorprofile.FieldCupSize)
+	}
+	if m.measurements != nil {
+		fields = append(fields, actorprofile.FieldMeasurements)
+	}
+	if m.blood_type != nil {
+		fields = append(fields, actorprofile.FieldBloodType)
+	}
+	if m.nationality != nil {
+		fields = append(fields, actorprofile.FieldNationality)
+	}
+	if m.hobby != nil {
+		fields = append(fields, actorprofile.FieldHobby)
+	}
+	if m.skill != nil {
+		fields = append(fields, actorprofile.FieldSkill)
+	}
+	if m.debut_date != nil {
+		fields = append(fields, actorprofile.FieldDebutDate)
+	}
+	if m.source_url != nil {
+		fields = append(fields, actorprofile.FieldSourceURL)
 	}
 	return fields
 }
@@ -2910,6 +3515,28 @@ func (m *ActorProfileMutation) Field(name string) (ent.Value, bool) {
 		return m.Gender()
 	case actorprofile.FieldAvatar:
 		return m.Avatar()
+	case actorprofile.FieldSummary:
+		return m.Summary()
+	case actorprofile.FieldBirthday:
+		return m.Birthday()
+	case actorprofile.FieldHeight:
+		return m.Height()
+	case actorprofile.FieldCupSize:
+		return m.CupSize()
+	case actorprofile.FieldMeasurements:
+		return m.Measurements()
+	case actorprofile.FieldBloodType:
+		return m.BloodType()
+	case actorprofile.FieldNationality:
+		return m.Nationality()
+	case actorprofile.FieldHobby:
+		return m.Hobby()
+	case actorprofile.FieldSkill:
+		return m.Skill()
+	case actorprofile.FieldDebutDate:
+		return m.DebutDate()
+	case actorprofile.FieldSourceURL:
+		return m.SourceURL()
 	}
 	return nil, false
 }
@@ -2933,6 +3560,28 @@ func (m *ActorProfileMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldGender(ctx)
 	case actorprofile.FieldAvatar:
 		return m.OldAvatar(ctx)
+	case actorprofile.FieldSummary:
+		return m.OldSummary(ctx)
+	case actorprofile.FieldBirthday:
+		return m.OldBirthday(ctx)
+	case actorprofile.FieldHeight:
+		return m.OldHeight(ctx)
+	case actorprofile.FieldCupSize:
+		return m.OldCupSize(ctx)
+	case actorprofile.FieldMeasurements:
+		return m.OldMeasurements(ctx)
+	case actorprofile.FieldBloodType:
+		return m.OldBloodType(ctx)
+	case actorprofile.FieldNationality:
+		return m.OldNationality(ctx)
+	case actorprofile.FieldHobby:
+		return m.OldHobby(ctx)
+	case actorprofile.FieldSkill:
+		return m.OldSkill(ctx)
+	case actorprofile.FieldDebutDate:
+		return m.OldDebutDate(ctx)
+	case actorprofile.FieldSourceURL:
+		return m.OldSourceURL(ctx)
 	}
 	return nil, fmt.Errorf("unknown ActorProfile field %s", name)
 }
@@ -2991,6 +3640,83 @@ func (m *ActorProfileMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetAvatar(v)
 		return nil
+	case actorprofile.FieldSummary:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSummary(v)
+		return nil
+	case actorprofile.FieldBirthday:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBirthday(v)
+		return nil
+	case actorprofile.FieldHeight:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHeight(v)
+		return nil
+	case actorprofile.FieldCupSize:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCupSize(v)
+		return nil
+	case actorprofile.FieldMeasurements:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMeasurements(v)
+		return nil
+	case actorprofile.FieldBloodType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBloodType(v)
+		return nil
+	case actorprofile.FieldNationality:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNationality(v)
+		return nil
+	case actorprofile.FieldHobby:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHobby(v)
+		return nil
+	case actorprofile.FieldSkill:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSkill(v)
+		return nil
+	case actorprofile.FieldDebutDate:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDebutDate(v)
+		return nil
+	case actorprofile.FieldSourceURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceURL(v)
+		return nil
 	}
 	return fmt.Errorf("unknown ActorProfile field %s", name)
 }
@@ -2998,13 +3724,21 @@ func (m *ActorProfileMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *ActorProfileMutation) AddedFields() []string {
-	return nil
+	var fields []string
+	if m.addheight != nil {
+		fields = append(fields, actorprofile.FieldHeight)
+	}
+	return fields
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *ActorProfileMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case actorprofile.FieldHeight:
+		return m.AddedHeight()
+	}
 	return nil, false
 }
 
@@ -3013,6 +3747,13 @@ func (m *ActorProfileMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *ActorProfileMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case actorprofile.FieldHeight:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddHeight(v)
+		return nil
 	}
 	return fmt.Errorf("unknown ActorProfile numeric field %s", name)
 }
@@ -3026,6 +3767,39 @@ func (m *ActorProfileMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(actorprofile.FieldAvatar) {
 		fields = append(fields, actorprofile.FieldAvatar)
+	}
+	if m.FieldCleared(actorprofile.FieldSummary) {
+		fields = append(fields, actorprofile.FieldSummary)
+	}
+	if m.FieldCleared(actorprofile.FieldBirthday) {
+		fields = append(fields, actorprofile.FieldBirthday)
+	}
+	if m.FieldCleared(actorprofile.FieldHeight) {
+		fields = append(fields, actorprofile.FieldHeight)
+	}
+	if m.FieldCleared(actorprofile.FieldCupSize) {
+		fields = append(fields, actorprofile.FieldCupSize)
+	}
+	if m.FieldCleared(actorprofile.FieldMeasurements) {
+		fields = append(fields, actorprofile.FieldMeasurements)
+	}
+	if m.FieldCleared(actorprofile.FieldBloodType) {
+		fields = append(fields, actorprofile.FieldBloodType)
+	}
+	if m.FieldCleared(actorprofile.FieldNationality) {
+		fields = append(fields, actorprofile.FieldNationality)
+	}
+	if m.FieldCleared(actorprofile.FieldHobby) {
+		fields = append(fields, actorprofile.FieldHobby)
+	}
+	if m.FieldCleared(actorprofile.FieldSkill) {
+		fields = append(fields, actorprofile.FieldSkill)
+	}
+	if m.FieldCleared(actorprofile.FieldDebutDate) {
+		fields = append(fields, actorprofile.FieldDebutDate)
+	}
+	if m.FieldCleared(actorprofile.FieldSourceURL) {
+		fields = append(fields, actorprofile.FieldSourceURL)
 	}
 	return fields
 }
@@ -3046,6 +3820,39 @@ func (m *ActorProfileMutation) ClearField(name string) error {
 		return nil
 	case actorprofile.FieldAvatar:
 		m.ClearAvatar()
+		return nil
+	case actorprofile.FieldSummary:
+		m.ClearSummary()
+		return nil
+	case actorprofile.FieldBirthday:
+		m.ClearBirthday()
+		return nil
+	case actorprofile.FieldHeight:
+		m.ClearHeight()
+		return nil
+	case actorprofile.FieldCupSize:
+		m.ClearCupSize()
+		return nil
+	case actorprofile.FieldMeasurements:
+		m.ClearMeasurements()
+		return nil
+	case actorprofile.FieldBloodType:
+		m.ClearBloodType()
+		return nil
+	case actorprofile.FieldNationality:
+		m.ClearNationality()
+		return nil
+	case actorprofile.FieldHobby:
+		m.ClearHobby()
+		return nil
+	case actorprofile.FieldSkill:
+		m.ClearSkill()
+		return nil
+	case actorprofile.FieldDebutDate:
+		m.ClearDebutDate()
+		return nil
+	case actorprofile.FieldSourceURL:
+		m.ClearSourceURL()
 		return nil
 	}
 	return fmt.Errorf("unknown ActorProfile nullable field %s", name)
@@ -3075,6 +3882,39 @@ func (m *ActorProfileMutation) ResetField(name string) error {
 		return nil
 	case actorprofile.FieldAvatar:
 		m.ResetAvatar()
+		return nil
+	case actorprofile.FieldSummary:
+		m.ResetSummary()
+		return nil
+	case actorprofile.FieldBirthday:
+		m.ResetBirthday()
+		return nil
+	case actorprofile.FieldHeight:
+		m.ResetHeight()
+		return nil
+	case actorprofile.FieldCupSize:
+		m.ResetCupSize()
+		return nil
+	case actorprofile.FieldMeasurements:
+		m.ResetMeasurements()
+		return nil
+	case actorprofile.FieldBloodType:
+		m.ResetBloodType()
+		return nil
+	case actorprofile.FieldNationality:
+		m.ResetNationality()
+		return nil
+	case actorprofile.FieldHobby:
+		m.ResetHobby()
+		return nil
+	case actorprofile.FieldSkill:
+		m.ResetSkill()
+		return nil
+	case actorprofile.FieldDebutDate:
+		m.ResetDebutDate()
+		return nil
+	case actorprofile.FieldSourceURL:
+		m.ResetSourceURL()
 		return nil
 	}
 	return fmt.Errorf("unknown ActorProfile field %s", name)

@@ -33,6 +33,17 @@ func (ActorProfile) Fields() []ent.Field {
 		field.String("avatar").
 			Optional().
 			Nillable(),
+		field.String("summary").Optional().Nillable(),
+		field.String("birthday").Optional().Nillable(),
+		field.Int("height").Optional().Nillable(),
+		field.String("cup_size").Optional().Nillable(),
+		field.String("measurements").Optional().Nillable(),
+		field.String("blood_type").Optional().Nillable(),
+		field.String("nationality").Optional().Nillable(),
+		field.String("hobby").Optional().Nillable(),
+		field.String("skill").Optional().Nillable(),
+		field.String("debut_date").Optional().Nillable(),
+		field.String("source_url").Optional().Nillable(),
 	}
 }
 

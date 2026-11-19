@@ -85,6 +85,61 @@ func Avatar(v string) predicate.ActorProfile {
 	return predicate.ActorProfile(sql.FieldEQ(FieldAvatar, v))
 }
 
+// Summary applies equality check predicate on the "summary" field. It's identical to SummaryEQ.
+func Summary(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldSummary, v))
+}
+
+// Birthday applies equality check predicate on the "birthday" field. It's identical to BirthdayEQ.
+func Birthday(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldBirthday, v))
+}
+
+// Height applies equality check predicate on the "height" field. It's identical to HeightEQ.
+func Height(v int) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldHeight, v))
+}
+
+// CupSize applies equality check predicate on the "cup_size" field. It's identical to CupSizeEQ.
+func CupSize(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldCupSize, v))
+}
+
+// Measurements applies equality check predicate on the "measurements" field. It's identical to MeasurementsEQ.
+func Measurements(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldMeasurements, v))
+}
+
+// BloodType applies equality check predicate on the "blood_type" field. It's identical to BloodTypeEQ.
+func BloodType(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldBloodType, v))
+}
+
+// Nationality applies equality check predicate on the "nationality" field. It's identical to NationalityEQ.
+func Nationality(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldNationality, v))
+}
+
+// Hobby applies equality check predicate on the "hobby" field. It's identical to HobbyEQ.
+func Hobby(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldHobby, v))
+}
+
+// Skill applies equality check predicate on the "skill" field. It's identical to SkillEQ.
+func Skill(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldSkill, v))
+}
+
+// DebutDate applies equality check predicate on the "debut_date" field. It's identical to DebutDateEQ.
+func DebutDate(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldDebutDate, v))
+}
+
+// SourceURL applies equality check predicate on the "source_url" field. It's identical to SourceURLEQ.
+func SourceURL(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldSourceURL, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.ActorProfile {
 	return predicate.ActorProfile(sql.FieldEQ(FieldCreatedAt, v))
@@ -463,6 +518,806 @@ func AvatarEqualFold(v string) predicate.ActorProfile {
 // AvatarContainsFold applies the ContainsFold predicate on the "avatar" field.
 func AvatarContainsFold(v string) predicate.ActorProfile {
 	return predicate.ActorProfile(sql.FieldContainsFold(FieldAvatar, v))
+}
+
+// SummaryEQ applies the EQ predicate on the "summary" field.
+func SummaryEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldSummary, v))
+}
+
+// SummaryNEQ applies the NEQ predicate on the "summary" field.
+func SummaryNEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNEQ(FieldSummary, v))
+}
+
+// SummaryIn applies the In predicate on the "summary" field.
+func SummaryIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIn(FieldSummary, vs...))
+}
+
+// SummaryNotIn applies the NotIn predicate on the "summary" field.
+func SummaryNotIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotIn(FieldSummary, vs...))
+}
+
+// SummaryGT applies the GT predicate on the "summary" field.
+func SummaryGT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGT(FieldSummary, v))
+}
+
+// SummaryGTE applies the GTE predicate on the "summary" field.
+func SummaryGTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGTE(FieldSummary, v))
+}
+
+// SummaryLT applies the LT predicate on the "summary" field.
+func SummaryLT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLT(FieldSummary, v))
+}
+
+// SummaryLTE applies the LTE predicate on the "summary" field.
+func SummaryLTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLTE(FieldSummary, v))
+}
+
+// SummaryContains applies the Contains predicate on the "summary" field.
+func SummaryContains(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContains(FieldSummary, v))
+}
+
+// SummaryHasPrefix applies the HasPrefix predicate on the "summary" field.
+func SummaryHasPrefix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasPrefix(FieldSummary, v))
+}
+
+// SummaryHasSuffix applies the HasSuffix predicate on the "summary" field.
+func SummaryHasSuffix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasSuffix(FieldSummary, v))
+}
+
+// SummaryIsNil applies the IsNil predicate on the "summary" field.
+func SummaryIsNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIsNull(FieldSummary))
+}
+
+// SummaryNotNil applies the NotNil predicate on the "summary" field.
+func SummaryNotNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotNull(FieldSummary))
+}
+
+// SummaryEqualFold applies the EqualFold predicate on the "summary" field.
+func SummaryEqualFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEqualFold(FieldSummary, v))
+}
+
+// SummaryContainsFold applies the ContainsFold predicate on the "summary" field.
+func SummaryContainsFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContainsFold(FieldSummary, v))
+}
+
+// BirthdayEQ applies the EQ predicate on the "birthday" field.
+func BirthdayEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldBirthday, v))
+}
+
+// BirthdayNEQ applies the NEQ predicate on the "birthday" field.
+func BirthdayNEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNEQ(FieldBirthday, v))
+}
+
+// BirthdayIn applies the In predicate on the "birthday" field.
+func BirthdayIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIn(FieldBirthday, vs...))
+}
+
+// BirthdayNotIn applies the NotIn predicate on the "birthday" field.
+func BirthdayNotIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotIn(FieldBirthday, vs...))
+}
+
+// BirthdayGT applies the GT predicate on the "birthday" field.
+func BirthdayGT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGT(FieldBirthday, v))
+}
+
+// BirthdayGTE applies the GTE predicate on the "birthday" field.
+func BirthdayGTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGTE(FieldBirthday, v))
+}
+
+// BirthdayLT applies the LT predicate on the "birthday" field.
+func BirthdayLT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLT(FieldBirthday, v))
+}
+
+// BirthdayLTE applies the LTE predicate on the "birthday" field.
+func BirthdayLTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLTE(FieldBirthday, v))
+}
+
+// BirthdayContains applies the Contains predicate on the "birthday" field.
+func BirthdayContains(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContains(FieldBirthday, v))
+}
+
+// BirthdayHasPrefix applies the HasPrefix predicate on the "birthday" field.
+func BirthdayHasPrefix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasPrefix(FieldBirthday, v))
+}
+
+// BirthdayHasSuffix applies the HasSuffix predicate on the "birthday" field.
+func BirthdayHasSuffix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasSuffix(FieldBirthday, v))
+}
+
+// BirthdayIsNil applies the IsNil predicate on the "birthday" field.
+func BirthdayIsNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIsNull(FieldBirthday))
+}
+
+// BirthdayNotNil applies the NotNil predicate on the "birthday" field.
+func BirthdayNotNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotNull(FieldBirthday))
+}
+
+// BirthdayEqualFold applies the EqualFold predicate on the "birthday" field.
+func BirthdayEqualFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEqualFold(FieldBirthday, v))
+}
+
+// BirthdayContainsFold applies the ContainsFold predicate on the "birthday" field.
+func BirthdayContainsFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContainsFold(FieldBirthday, v))
+}
+
+// HeightEQ applies the EQ predicate on the "height" field.
+func HeightEQ(v int) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldHeight, v))
+}
+
+// HeightNEQ applies the NEQ predicate on the "height" field.
+func HeightNEQ(v int) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNEQ(FieldHeight, v))
+}
+
+// HeightIn applies the In predicate on the "height" field.
+func HeightIn(vs ...int) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIn(FieldHeight, vs...))
+}
+
+// HeightNotIn applies the NotIn predicate on the "height" field.
+func HeightNotIn(vs ...int) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotIn(FieldHeight, vs...))
+}
+
+// HeightGT applies the GT predicate on the "height" field.
+func HeightGT(v int) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGT(FieldHeight, v))
+}
+
+// HeightGTE applies the GTE predicate on the "height" field.
+func HeightGTE(v int) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGTE(FieldHeight, v))
+}
+
+// HeightLT applies the LT predicate on the "height" field.
+func HeightLT(v int) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLT(FieldHeight, v))
+}
+
+// HeightLTE applies the LTE predicate on the "height" field.
+func HeightLTE(v int) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLTE(FieldHeight, v))
+}
+
+// HeightIsNil applies the IsNil predicate on the "height" field.
+func HeightIsNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIsNull(FieldHeight))
+}
+
+// HeightNotNil applies the NotNil predicate on the "height" field.
+func HeightNotNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotNull(FieldHeight))
+}
+
+// CupSizeEQ applies the EQ predicate on the "cup_size" field.
+func CupSizeEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldCupSize, v))
+}
+
+// CupSizeNEQ applies the NEQ predicate on the "cup_size" field.
+func CupSizeNEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNEQ(FieldCupSize, v))
+}
+
+// CupSizeIn applies the In predicate on the "cup_size" field.
+func CupSizeIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIn(FieldCupSize, vs...))
+}
+
+// CupSizeNotIn applies the NotIn predicate on the "cup_size" field.
+func CupSizeNotIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotIn(FieldCupSize, vs...))
+}
+
+// CupSizeGT applies the GT predicate on the "cup_size" field.
+func CupSizeGT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGT(FieldCupSize, v))
+}
+
+// CupSizeGTE applies the GTE predicate on the "cup_size" field.
+func CupSizeGTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGTE(FieldCupSize, v))
+}
+
+// CupSizeLT applies the LT predicate on the "cup_size" field.
+func CupSizeLT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLT(FieldCupSize, v))
+}
+
+// CupSizeLTE applies the LTE predicate on the "cup_size" field.
+func CupSizeLTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLTE(FieldCupSize, v))
+}
+
+// CupSizeContains applies the Contains predicate on the "cup_size" field.
+func CupSizeContains(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContains(FieldCupSize, v))
+}
+
+// CupSizeHasPrefix applies the HasPrefix predicate on the "cup_size" field.
+func CupSizeHasPrefix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasPrefix(FieldCupSize, v))
+}
+
+// CupSizeHasSuffix applies the HasSuffix predicate on the "cup_size" field.
+func CupSizeHasSuffix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasSuffix(FieldCupSize, v))
+}
+
+// CupSizeIsNil applies the IsNil predicate on the "cup_size" field.
+func CupSizeIsNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIsNull(FieldCupSize))
+}
+
+// CupSizeNotNil applies the NotNil predicate on the "cup_size" field.
+func CupSizeNotNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotNull(FieldCupSize))
+}
+
+// CupSizeEqualFold applies the EqualFold predicate on the "cup_size" field.
+func CupSizeEqualFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEqualFold(FieldCupSize, v))
+}
+
+// CupSizeContainsFold applies the ContainsFold predicate on the "cup_size" field.
+func CupSizeContainsFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContainsFold(FieldCupSize, v))
+}
+
+// MeasurementsEQ applies the EQ predicate on the "measurements" field.
+func MeasurementsEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldMeasurements, v))
+}
+
+// MeasurementsNEQ applies the NEQ predicate on the "measurements" field.
+func MeasurementsNEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNEQ(FieldMeasurements, v))
+}
+
+// MeasurementsIn applies the In predicate on the "measurements" field.
+func MeasurementsIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIn(FieldMeasurements, vs...))
+}
+
+// MeasurementsNotIn applies the NotIn predicate on the "measurements" field.
+func MeasurementsNotIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotIn(FieldMeasurements, vs...))
+}
+
+// MeasurementsGT applies the GT predicate on the "measurements" field.
+func MeasurementsGT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGT(FieldMeasurements, v))
+}
+
+// MeasurementsGTE applies the GTE predicate on the "measurements" field.
+func MeasurementsGTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGTE(FieldMeasurements, v))
+}
+
+// MeasurementsLT applies the LT predicate on the "measurements" field.
+func MeasurementsLT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLT(FieldMeasurements, v))
+}
+
+// MeasurementsLTE applies the LTE predicate on the "measurements" field.
+func MeasurementsLTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLTE(FieldMeasurements, v))
+}
+
+// MeasurementsContains applies the Contains predicate on the "measurements" field.
+func MeasurementsContains(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContains(FieldMeasurements, v))
+}
+
+// MeasurementsHasPrefix applies the HasPrefix predicate on the "measurements" field.
+func MeasurementsHasPrefix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasPrefix(FieldMeasurements, v))
+}
+
+// MeasurementsHasSuffix applies the HasSuffix predicate on the "measurements" field.
+func MeasurementsHasSuffix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasSuffix(FieldMeasurements, v))
+}
+
+// MeasurementsIsNil applies the IsNil predicate on the "measurements" field.
+func MeasurementsIsNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIsNull(FieldMeasurements))
+}
+
+// MeasurementsNotNil applies the NotNil predicate on the "measurements" field.
+func MeasurementsNotNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotNull(FieldMeasurements))
+}
+
+// MeasurementsEqualFold applies the EqualFold predicate on the "measurements" field.
+func MeasurementsEqualFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEqualFold(FieldMeasurements, v))
+}
+
+// MeasurementsContainsFold applies the ContainsFold predicate on the "measurements" field.
+func MeasurementsContainsFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContainsFold(FieldMeasurements, v))
+}
+
+// BloodTypeEQ applies the EQ predicate on the "blood_type" field.
+func BloodTypeEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldBloodType, v))
+}
+
+// BloodTypeNEQ applies the NEQ predicate on the "blood_type" field.
+func BloodTypeNEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNEQ(FieldBloodType, v))
+}
+
+// BloodTypeIn applies the In predicate on the "blood_type" field.
+func BloodTypeIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIn(FieldBloodType, vs...))
+}
+
+// BloodTypeNotIn applies the NotIn predicate on the "blood_type" field.
+func BloodTypeNotIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotIn(FieldBloodType, vs...))
+}
+
+// BloodTypeGT applies the GT predicate on the "blood_type" field.
+func BloodTypeGT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGT(FieldBloodType, v))
+}
+
+// BloodTypeGTE applies the GTE predicate on the "blood_type" field.
+func BloodTypeGTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGTE(FieldBloodType, v))
+}
+
+// BloodTypeLT applies the LT predicate on the "blood_type" field.
+func BloodTypeLT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLT(FieldBloodType, v))
+}
+
+// BloodTypeLTE applies the LTE predicate on the "blood_type" field.
+func BloodTypeLTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLTE(FieldBloodType, v))
+}
+
+// BloodTypeContains applies the Contains predicate on the "blood_type" field.
+func BloodTypeContains(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContains(FieldBloodType, v))
+}
+
+// BloodTypeHasPrefix applies the HasPrefix predicate on the "blood_type" field.
+func BloodTypeHasPrefix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasPrefix(FieldBloodType, v))
+}
+
+// BloodTypeHasSuffix applies the HasSuffix predicate on the "blood_type" field.
+func BloodTypeHasSuffix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasSuffix(FieldBloodType, v))
+}
+
+// BloodTypeIsNil applies the IsNil predicate on the "blood_type" field.
+func BloodTypeIsNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIsNull(FieldBloodType))
+}
+
+// BloodTypeNotNil applies the NotNil predicate on the "blood_type" field.
+func BloodTypeNotNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotNull(FieldBloodType))
+}
+
+// BloodTypeEqualFold applies the EqualFold predicate on the "blood_type" field.
+func BloodTypeEqualFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEqualFold(FieldBloodType, v))
+}
+
+// BloodTypeContainsFold applies the ContainsFold predicate on the "blood_type" field.
+func BloodTypeContainsFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContainsFold(FieldBloodType, v))
+}
+
+// NationalityEQ applies the EQ predicate on the "nationality" field.
+func NationalityEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldNationality, v))
+}
+
+// NationalityNEQ applies the NEQ predicate on the "nationality" field.
+func NationalityNEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNEQ(FieldNationality, v))
+}
+
+// NationalityIn applies the In predicate on the "nationality" field.
+func NationalityIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIn(FieldNationality, vs...))
+}
+
+// NationalityNotIn applies the NotIn predicate on the "nationality" field.
+func NationalityNotIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotIn(FieldNationality, vs...))
+}
+
+// NationalityGT applies the GT predicate on the "nationality" field.
+func NationalityGT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGT(FieldNationality, v))
+}
+
+// NationalityGTE applies the GTE predicate on the "nationality" field.
+func NationalityGTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGTE(FieldNationality, v))
+}
+
+// NationalityLT applies the LT predicate on the "nationality" field.
+func NationalityLT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLT(FieldNationality, v))
+}
+
+// NationalityLTE applies the LTE predicate on the "nationality" field.
+func NationalityLTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLTE(FieldNationality, v))
+}
+
+// NationalityContains applies the Contains predicate on the "nationality" field.
+func NationalityContains(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContains(FieldNationality, v))
+}
+
+// NationalityHasPrefix applies the HasPrefix predicate on the "nationality" field.
+func NationalityHasPrefix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasPrefix(FieldNationality, v))
+}
+
+// NationalityHasSuffix applies the HasSuffix predicate on the "nationality" field.
+func NationalityHasSuffix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasSuffix(FieldNationality, v))
+}
+
+// NationalityIsNil applies the IsNil predicate on the "nationality" field.
+func NationalityIsNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIsNull(FieldNationality))
+}
+
+// NationalityNotNil applies the NotNil predicate on the "nationality" field.
+func NationalityNotNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotNull(FieldNationality))
+}
+
+// NationalityEqualFold applies the EqualFold predicate on the "nationality" field.
+func NationalityEqualFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEqualFold(FieldNationality, v))
+}
+
+// NationalityContainsFold applies the ContainsFold predicate on the "nationality" field.
+func NationalityContainsFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContainsFold(FieldNationality, v))
+}
+
+// HobbyEQ applies the EQ predicate on the "hobby" field.
+func HobbyEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldHobby, v))
+}
+
+// HobbyNEQ applies the NEQ predicate on the "hobby" field.
+func HobbyNEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNEQ(FieldHobby, v))
+}
+
+// HobbyIn applies the In predicate on the "hobby" field.
+func HobbyIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIn(FieldHobby, vs...))
+}
+
+// HobbyNotIn applies the NotIn predicate on the "hobby" field.
+func HobbyNotIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotIn(FieldHobby, vs...))
+}
+
+// HobbyGT applies the GT predicate on the "hobby" field.
+func HobbyGT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGT(FieldHobby, v))
+}
+
+// HobbyGTE applies the GTE predicate on the "hobby" field.
+func HobbyGTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGTE(FieldHobby, v))
+}
+
+// HobbyLT applies the LT predicate on the "hobby" field.
+func HobbyLT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLT(FieldHobby, v))
+}
+
+// HobbyLTE applies the LTE predicate on the "hobby" field.
+func HobbyLTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLTE(FieldHobby, v))
+}
+
+// HobbyContains applies the Contains predicate on the "hobby" field.
+func HobbyContains(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContains(FieldHobby, v))
+}
+
+// HobbyHasPrefix applies the HasPrefix predicate on the "hobby" field.
+func HobbyHasPrefix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasPrefix(FieldHobby, v))
+}
+
+// HobbyHasSuffix applies the HasSuffix predicate on the "hobby" field.
+func HobbyHasSuffix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasSuffix(FieldHobby, v))
+}
+
+// HobbyIsNil applies the IsNil predicate on the "hobby" field.
+func HobbyIsNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIsNull(FieldHobby))
+}
+
+// HobbyNotNil applies the NotNil predicate on the "hobby" field.
+func HobbyNotNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotNull(FieldHobby))
+}
+
+// HobbyEqualFold applies the EqualFold predicate on the "hobby" field.
+func HobbyEqualFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEqualFold(FieldHobby, v))
+}
+
+// HobbyContainsFold applies the ContainsFold predicate on the "hobby" field.
+func HobbyContainsFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContainsFold(FieldHobby, v))
+}
+
+// SkillEQ applies the EQ predicate on the "skill" field.
+func SkillEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldSkill, v))
+}
+
+// SkillNEQ applies the NEQ predicate on the "skill" field.
+func SkillNEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNEQ(FieldSkill, v))
+}
+
+// SkillIn applies the In predicate on the "skill" field.
+func SkillIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIn(FieldSkill, vs...))
+}
+
+// SkillNotIn applies the NotIn predicate on the "skill" field.
+func SkillNotIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotIn(FieldSkill, vs...))
+}
+
+// SkillGT applies the GT predicate on the "skill" field.
+func SkillGT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGT(FieldSkill, v))
+}
+
+// SkillGTE applies the GTE predicate on the "skill" field.
+func SkillGTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGTE(FieldSkill, v))
+}
+
+// SkillLT applies the LT predicate on the "skill" field.
+func SkillLT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLT(FieldSkill, v))
+}
+
+// SkillLTE applies the LTE predicate on the "skill" field.
+func SkillLTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLTE(FieldSkill, v))
+}
+
+// SkillContains applies the Contains predicate on the "skill" field.
+func SkillContains(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContains(FieldSkill, v))
+}
+
+// SkillHasPrefix applies the HasPrefix predicate on the "skill" field.
+func SkillHasPrefix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasPrefix(FieldSkill, v))
+}
+
+// SkillHasSuffix applies the HasSuffix predicate on the "skill" field.
+func SkillHasSuffix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasSuffix(FieldSkill, v))
+}
+
+// SkillIsNil applies the IsNil predicate on the "skill" field.
+func SkillIsNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIsNull(FieldSkill))
+}
+
+// SkillNotNil applies the NotNil predicate on the "skill" field.
+func SkillNotNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotNull(FieldSkill))
+}
+
+// SkillEqualFold applies the EqualFold predicate on the "skill" field.
+func SkillEqualFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEqualFold(FieldSkill, v))
+}
+
+// SkillContainsFold applies the ContainsFold predicate on the "skill" field.
+func SkillContainsFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContainsFold(FieldSkill, v))
+}
+
+// DebutDateEQ applies the EQ predicate on the "debut_date" field.
+func DebutDateEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldDebutDate, v))
+}
+
+// DebutDateNEQ applies the NEQ predicate on the "debut_date" field.
+func DebutDateNEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNEQ(FieldDebutDate, v))
+}
+
+// DebutDateIn applies the In predicate on the "debut_date" field.
+func DebutDateIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIn(FieldDebutDate, vs...))
+}
+
+// DebutDateNotIn applies the NotIn predicate on the "debut_date" field.
+func DebutDateNotIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotIn(FieldDebutDate, vs...))
+}
+
+// DebutDateGT applies the GT predicate on the "debut_date" field.
+func DebutDateGT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGT(FieldDebutDate, v))
+}
+
+// DebutDateGTE applies the GTE predicate on the "debut_date" field.
+func DebutDateGTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGTE(FieldDebutDate, v))
+}
+
+// DebutDateLT applies the LT predicate on the "debut_date" field.
+func DebutDateLT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLT(FieldDebutDate, v))
+}
+
+// DebutDateLTE applies the LTE predicate on the "debut_date" field.
+func DebutDateLTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLTE(FieldDebutDate, v))
+}
+
+// DebutDateContains applies the Contains predicate on the "debut_date" field.
+func DebutDateContains(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContains(FieldDebutDate, v))
+}
+
+// DebutDateHasPrefix applies the HasPrefix predicate on the "debut_date" field.
+func DebutDateHasPrefix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasPrefix(FieldDebutDate, v))
+}
+
+// DebutDateHasSuffix applies the HasSuffix predicate on the "debut_date" field.
+func DebutDateHasSuffix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasSuffix(FieldDebutDate, v))
+}
+
+// DebutDateIsNil applies the IsNil predicate on the "debut_date" field.
+func DebutDateIsNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIsNull(FieldDebutDate))
+}
+
+// DebutDateNotNil applies the NotNil predicate on the "debut_date" field.
+func DebutDateNotNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotNull(FieldDebutDate))
+}
+
+// DebutDateEqualFold applies the EqualFold predicate on the "debut_date" field.
+func DebutDateEqualFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEqualFold(FieldDebutDate, v))
+}
+
+// DebutDateContainsFold applies the ContainsFold predicate on the "debut_date" field.
+func DebutDateContainsFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContainsFold(FieldDebutDate, v))
+}
+
+// SourceURLEQ applies the EQ predicate on the "source_url" field.
+func SourceURLEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldSourceURL, v))
+}
+
+// SourceURLNEQ applies the NEQ predicate on the "source_url" field.
+func SourceURLNEQ(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNEQ(FieldSourceURL, v))
+}
+
+// SourceURLIn applies the In predicate on the "source_url" field.
+func SourceURLIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIn(FieldSourceURL, vs...))
+}
+
+// SourceURLNotIn applies the NotIn predicate on the "source_url" field.
+func SourceURLNotIn(vs ...string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotIn(FieldSourceURL, vs...))
+}
+
+// SourceURLGT applies the GT predicate on the "source_url" field.
+func SourceURLGT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGT(FieldSourceURL, v))
+}
+
+// SourceURLGTE applies the GTE predicate on the "source_url" field.
+func SourceURLGTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGTE(FieldSourceURL, v))
+}
+
+// SourceURLLT applies the LT predicate on the "source_url" field.
+func SourceURLLT(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLT(FieldSourceURL, v))
+}
+
+// SourceURLLTE applies the LTE predicate on the "source_url" field.
+func SourceURLLTE(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLTE(FieldSourceURL, v))
+}
+
+// SourceURLContains applies the Contains predicate on the "source_url" field.
+func SourceURLContains(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContains(FieldSourceURL, v))
+}
+
+// SourceURLHasPrefix applies the HasPrefix predicate on the "source_url" field.
+func SourceURLHasPrefix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasPrefix(FieldSourceURL, v))
+}
+
+// SourceURLHasSuffix applies the HasSuffix predicate on the "source_url" field.
+func SourceURLHasSuffix(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldHasSuffix(FieldSourceURL, v))
+}
+
+// SourceURLIsNil applies the IsNil predicate on the "source_url" field.
+func SourceURLIsNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIsNull(FieldSourceURL))
+}
+
+// SourceURLNotNil applies the NotNil predicate on the "source_url" field.
+func SourceURLNotNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotNull(FieldSourceURL))
+}
+
+// SourceURLEqualFold applies the EqualFold predicate on the "source_url" field.
+func SourceURLEqualFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEqualFold(FieldSourceURL, v))
+}
+
+// SourceURLContainsFold applies the ContainsFold predicate on the "source_url" field.
+func SourceURLContainsFold(v string) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldContainsFold(FieldSourceURL, v))
 }
 
 // HasSources applies the HasEdge predicate on the "sources" edge.

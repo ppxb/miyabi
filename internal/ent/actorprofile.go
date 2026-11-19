@@ -31,6 +31,28 @@ type ActorProfile struct {
 	Gender actorprofile.Gender `json:"gender,omitempty"`
 	// Avatar holds the value of the "avatar" field.
 	Avatar *string `json:"avatar,omitempty"`
+	// Summary holds the value of the "summary" field.
+	Summary *string `json:"summary,omitempty"`
+	// Birthday holds the value of the "birthday" field.
+	Birthday *string `json:"birthday,omitempty"`
+	// Height holds the value of the "height" field.
+	Height *int `json:"height,omitempty"`
+	// CupSize holds the value of the "cup_size" field.
+	CupSize *string `json:"cup_size,omitempty"`
+	// Measurements holds the value of the "measurements" field.
+	Measurements *string `json:"measurements,omitempty"`
+	// BloodType holds the value of the "blood_type" field.
+	BloodType *string `json:"blood_type,omitempty"`
+	// Nationality holds the value of the "nationality" field.
+	Nationality *string `json:"nationality,omitempty"`
+	// Hobby holds the value of the "hobby" field.
+	Hobby *string `json:"hobby,omitempty"`
+	// Skill holds the value of the "skill" field.
+	Skill *string `json:"skill,omitempty"`
+	// DebutDate holds the value of the "debut_date" field.
+	DebutDate *string `json:"debut_date,omitempty"`
+	// SourceURL holds the value of the "source_url" field.
+	SourceURL *string `json:"source_url,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the ActorProfileQuery when eager-loading is set.
 	Edges        ActorProfileEdges `json:"edges"`
@@ -82,9 +104,9 @@ func (*ActorProfile) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case actorprofile.FieldID:
+		case actorprofile.FieldID, actorprofile.FieldHeight:
 			values[i] = new(sql.NullInt64)
-		case actorprofile.FieldMatchKey, actorprofile.FieldName, actorprofile.FieldNameZht, actorprofile.FieldGender, actorprofile.FieldAvatar:
+		case actorprofile.FieldMatchKey, actorprofile.FieldName, actorprofile.FieldNameZht, actorprofile.FieldGender, actorprofile.FieldAvatar, actorprofile.FieldSummary, actorprofile.FieldBirthday, actorprofile.FieldCupSize, actorprofile.FieldMeasurements, actorprofile.FieldBloodType, actorprofile.FieldNationality, actorprofile.FieldHobby, actorprofile.FieldSkill, actorprofile.FieldDebutDate, actorprofile.FieldSourceURL:
 			values[i] = new(sql.NullString)
 		case actorprofile.FieldCreatedAt, actorprofile.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -152,6 +174,83 @@ func (_m *ActorProfile) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Avatar = new(string)
 				*_m.Avatar = value.String
+			}
+		case actorprofile.FieldSummary:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field summary", values[i])
+			} else if value.Valid {
+				_m.Summary = new(string)
+				*_m.Summary = value.String
+			}
+		case actorprofile.FieldBirthday:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field birthday", values[i])
+			} else if value.Valid {
+				_m.Birthday = new(string)
+				*_m.Birthday = value.String
+			}
+		case actorprofile.FieldHeight:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field height", values[i])
+			} else if value.Valid {
+				_m.Height = new(int)
+				*_m.Height = int(value.Int64)
+			}
+		case actorprofile.FieldCupSize:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cup_size", values[i])
+			} else if value.Valid {
+				_m.CupSize = new(string)
+				*_m.CupSize = value.String
+			}
+		case actorprofile.FieldMeasurements:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field measurements", values[i])
+			} else if value.Valid {
+				_m.Measurements = new(string)
+				*_m.Measurements = value.String
+			}
+		case actorprofile.FieldBloodType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field blood_type", values[i])
+			} else if value.Valid {
+				_m.BloodType = new(string)
+				*_m.BloodType = value.String
+			}
+		case actorprofile.FieldNationality:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field nationality", values[i])
+			} else if value.Valid {
+				_m.Nationality = new(string)
+				*_m.Nationality = value.String
+			}
+		case actorprofile.FieldHobby:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field hobby", values[i])
+			} else if value.Valid {
+				_m.Hobby = new(string)
+				*_m.Hobby = value.String
+			}
+		case actorprofile.FieldSkill:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field skill", values[i])
+			} else if value.Valid {
+				_m.Skill = new(string)
+				*_m.Skill = value.String
+			}
+		case actorprofile.FieldDebutDate:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field debut_date", values[i])
+			} else if value.Valid {
+				_m.DebutDate = new(string)
+				*_m.DebutDate = value.String
+			}
+		case actorprofile.FieldSourceURL:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field source_url", values[i])
+			} else if value.Valid {
+				_m.SourceURL = new(string)
+				*_m.SourceURL = value.String
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -226,6 +325,61 @@ func (_m *ActorProfile) String() string {
 	builder.WriteString(", ")
 	if v := _m.Avatar; v != nil {
 		builder.WriteString("avatar=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.Summary; v != nil {
+		builder.WriteString("summary=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.Birthday; v != nil {
+		builder.WriteString("birthday=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.Height; v != nil {
+		builder.WriteString("height=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.CupSize; v != nil {
+		builder.WriteString("cup_size=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.Measurements; v != nil {
+		builder.WriteString("measurements=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.BloodType; v != nil {
+		builder.WriteString("blood_type=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.Nationality; v != nil {
+		builder.WriteString("nationality=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.Hobby; v != nil {
+		builder.WriteString("hobby=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.Skill; v != nil {
+		builder.WriteString("skill=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DebutDate; v != nil {
+		builder.WriteString("debut_date=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SourceURL; v != nil {
+		builder.WriteString("source_url=")
 		builder.WriteString(*v)
 	}
 	builder.WriteByte(')')

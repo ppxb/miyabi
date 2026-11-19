@@ -191,7 +191,13 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Timeout:   30 * time.Second,
 		Transport: netx.NewTransport(networkSvc.ProxyManager()),
 	})
-	actorsSvc := actors.New(store.Client, gfriendsClient)
+	actorsSvc := actors.New(
+		store.Client,
+		gfriendsClient,
+		cfg.DataDir,
+		netx.NewSafeDownloadClient(networkSvc.ProxyManager(), 30*time.Second),
+		actors.NewAVLeague(networkSvc.ProxyManager()),
+	)
 	syncActors := cfg.EmbySyncActors
 	embySvc, err := emby.NewService(ctx, store.Client, emby.Config{
 		Enabled:    cfg.EmbyEnabled,

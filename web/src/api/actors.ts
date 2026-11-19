@@ -31,6 +31,17 @@ export type ActorDetail = ActorSummary & {
   names: string[]
   image_count: number
   films: LibraryPage
+  summary?: string
+  birthday?: string
+  height?: number
+  cup_size?: string
+  measurements?: string
+  blood_type?: string
+  nationality?: string
+  hobby?: string
+  skill?: string
+  debut_date?: string
+  source_url?: string
 }
 
 export const actorKeys = {

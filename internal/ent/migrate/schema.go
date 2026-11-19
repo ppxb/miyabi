@@ -101,6 +101,17 @@ var (
 		{Name: "name_zht", Type: field.TypeString, Nullable: true},
 		{Name: "gender", Type: field.TypeEnum, Enums: []string{"female", "male", "unknown"}, Default: "unknown"},
 		{Name: "avatar", Type: field.TypeString, Nullable: true},
+		{Name: "summary", Type: field.TypeString, Nullable: true},
+		{Name: "birthday", Type: field.TypeString, Nullable: true},
+		{Name: "height", Type: field.TypeInt, Nullable: true},
+		{Name: "cup_size", Type: field.TypeString, Nullable: true},
+		{Name: "measurements", Type: field.TypeString, Nullable: true},
+		{Name: "blood_type", Type: field.TypeString, Nullable: true},
+		{Name: "nationality", Type: field.TypeString, Nullable: true},
+		{Name: "hobby", Type: field.TypeString, Nullable: true},
+		{Name: "skill", Type: field.TypeString, Nullable: true},
+		{Name: "debut_date", Type: field.TypeString, Nullable: true},
+		{Name: "source_url", Type: field.TypeString, Nullable: true},
 	}
 	// ActorProfilesTable holds the schema information for the "actor_profiles" table.
 	ActorProfilesTable = &schema.Table{

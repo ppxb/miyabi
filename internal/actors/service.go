@@ -7,11 +7,16 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"unicode"
 
+	"github.com/ppxb/miyabi/internal/atomicfile"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/actoralias"
@@ -42,12 +47,23 @@ type Summary struct {
 	Sources    []Source `json:"sources"`
 }
 
-// Detail adds aliases and the number of gfriends images for the actor page.
+// Detail adds aliases, biography fields and the image count for the actor page.
 type Detail struct {
 	Summary
-	Aliases    []string `json:"aliases"`
-	Names      []string `json:"names"`
-	ImageCount int      `json:"image_count"`
+	Aliases      []string `json:"aliases"`
+	Names        []string `json:"names"`
+	ImageCount   int      `json:"image_count"`
+	SummaryText  string   `json:"summary,omitempty"`
+	Birthday     string   `json:"birthday,omitempty"`
+	Height       int      `json:"height,omitempty"`
+	CupSize      string   `json:"cup_size,omitempty"`
+	Measurements string   `json:"measurements,omitempty"`
+	BloodType    string   `json:"blood_type,omitempty"`
+	Nationality  string   `json:"nationality,omitempty"`
+	Hobby        string   `json:"hobby,omitempty"`
+	Skill        string   `json:"skill,omitempty"`
+	DebutDate    string   `json:"debut_date,omitempty"`
+	SourceURL    string   `json:"source_url,omitempty"`
 }
 
 // Page is one page of the actor catalog.
@@ -60,13 +76,17 @@ type Page struct {
 
 // Service builds canonical actor views from the ent actor rows and gfriends.
 type Service struct {
-	db        *ent.Client
-	gfriends  *gfriends.Client
-	persistMu sync.Mutex
+	db              *ent.Client
+	gfriends        *gfriends.Client
+	dataDir         string
+	imageHTTP       *http.Client
+	providers       []Provider
+	persistMu       sync.Mutex
+	enrichAttempted sync.Map
 }
 
-func New(db *ent.Client, g *gfriends.Client) *Service {
-	return &Service{db: db, gfriends: g}
+func New(db *ent.Client, g *gfriends.Client, dataDir string, imageHTTP *http.Client, providers ...Provider) *Service {
+	return &Service{db: db, gfriends: g, dataDir: dataDir, imageHTTP: imageHTTP, providers: providers}
 }
 
 // Key returns a stable URL key for a normalized name.
@@ -250,31 +270,30 @@ func (s *Service) find(ctx context.Context, key string) (*group, error) {
 	return nil, ErrNotFound
 }
 
-// Detail returns one canonical actor with aliases and gfriends image count.
+// Detail returns one canonical actor with aliases, images and biography.
 func (s *Service) Detail(ctx context.Context, key string) (Detail, error) {
 	g, err := s.find(ctx, key)
 	if err != nil {
 		return Detail{}, err
 	}
-	detail := Detail{Summary: g.summary(), Names: g.sortedNames()}
+	detail := Detail{Summary: g.summary(), Names: g.sortedNames(), Aliases: []string{}}
 	display := g.display()
 	for _, name := range detail.Names {
 		if name != display {
 			detail.Aliases = append(detail.Aliases, name)
 		}
 	}
-	rels := s.imageRels(ctx, detail.Names)
-	detail.ImageCount = len(rels)
-	// Lazily persist a profile for actors created after the startup backfill, so
-	// their aliases/images are stored when their page is first viewed.
-	if pid, perr := s.ensureProfile(ctx, g.norm, g.display(), g.nameZHT, g.avatar); perr == nil {
+	pid, perr := s.ensureProfile(ctx, g.norm, display, g.nameZHT, g.avatar)
+	if perr == nil {
 		for _, id := range g.ids {
 			_ = s.db.Actor.UpdateOneID(id).SetProfileID(pid).Exec(ctx)
 		}
 	}
+	// Persist gfriends images (rel paths) once, then enrich with provider data.
+	rels := s.imageRels(ctx, detail.Names)
 	s.persistImages(ctx, g.norm, rels)
-	// Prefer the persisted canonical alias/image rows when they exist.
-	if pid, perr := s.db.ActorProfile.Query().Where(actorprofile.MatchKeyEQ(g.norm)).OnlyID(ctx); perr == nil {
+	if perr == nil {
+		s.enrichProfile(ctx, pid, display)
 		if aliases, aerr := s.db.ActorAlias.Query().
 			Where(actoralias.HasActorWith(actorprofile.ID(pid))).
 			Select(actoralias.FieldAlias).
@@ -287,10 +306,23 @@ func (s *Service) Detail(ctx context.Context, key string) (Detail, error) {
 			}
 			sort.Strings(detail.Aliases)
 		}
-		if count, cerr := s.db.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(pid))).Count(ctx); cerr == nil && count > 0 {
-			detail.ImageCount = count
+		if p, err := s.db.ActorProfile.Query().Where(actorprofile.ID(pid)).Only(ctx); err == nil {
+			detail.SummaryText = deref(p.Summary)
+			detail.Birthday = deref(p.Birthday)
+			if p.Height != nil {
+				detail.Height = *p.Height
+			}
+			detail.CupSize = deref(p.CupSize)
+			detail.Measurements = deref(p.Measurements)
+			detail.BloodType = deref(p.BloodType)
+			detail.Nationality = deref(p.Nationality)
+			detail.Hobby = deref(p.Hobby)
+			detail.Skill = deref(p.Skill)
+			detail.DebutDate = deref(p.DebutDate)
+			detail.SourceURL = deref(p.SourceURL)
 		}
 	}
+	detail.ImageCount = len(s.imageSources(ctx, g.norm, detail.Names))
 	return detail, nil
 }
 
@@ -338,8 +370,8 @@ func (s *Service) findNames(ctx context.Context, key string) ([]string, error) {
 	return names, nil
 }
 
-// FetchImage returns the actor's index-th gfriends image bytes (0-based). It
-// prefers the persisted ActorImage rows and falls back to a live gfriends lookup.
+// FetchImage returns the actor's index-th image bytes (0-based), loaded from the
+// local cache when present and otherwise fetched remotely then cached on disk.
 func (s *Service) FetchImage(ctx context.Context, key string, index int) ([]byte, error) {
 	names, err := s.findNames(ctx, key)
 	if err != nil {
@@ -349,19 +381,186 @@ func (s *Service) FetchImage(ctx context.Context, key string, index int) ([]byte
 		return nil, ErrNotFound
 	}
 	norm := normalizeName(names[0])
-	if pid, perr := s.db.ActorProfile.Query().Where(actorprofile.MatchKeyEQ(norm)).OnlyID(ctx); perr == nil {
+	sources := s.imageSources(ctx, norm, names)
+	if index >= len(sources) {
+		return nil, ErrNotFound
+	}
+	return s.loadImage(ctx, sources[index])
+}
+
+type imageSource struct {
+	provider string
+	ref      string
+}
+
+// imageSources lists the actor's images in display order, preferring persisted
+// ActorImage rows and falling back to a live gfriends lookup.
+func (s *Service) imageSources(ctx context.Context, norm string, names []string) []imageSource {
+	if pid, err := s.db.ActorProfile.Query().Where(actorprofile.MatchKeyEQ(norm)).OnlyID(ctx); err == nil {
 		images, ierr := s.db.ActorImage.Query().
-			Where(actorimage.HasActorWith(actorprofile.ID(pid)), actorimage.PositionEQ(index)).
+			Where(actorimage.HasActorWith(actorprofile.ID(pid))).
+			Order(ent.Asc(actorimage.FieldPosition)).
 			All(ctx)
 		if ierr == nil && len(images) > 0 {
-			return s.gfriends.FetchRel(ctx, images[0].URL)
+			out := make([]imageSource, 0, len(images))
+			for _, im := range images {
+				out = append(out, imageSource{provider: im.Provider, ref: im.URL})
+			}
+			return out
 		}
 	}
 	rels := s.imageRels(ctx, names)
-	if index >= len(rels) {
-		return nil, ErrNotFound
+	out := make([]imageSource, 0, len(rels))
+	for _, rel := range rels {
+		out = append(out, imageSource{provider: "gfriends", ref: rel})
 	}
-	return s.gfriends.FetchRel(ctx, rels[index])
+	return out
+}
+
+func (s *Service) loadImage(ctx context.Context, src imageSource) ([]byte, error) {
+	if s.dataDir == "" {
+		return s.fetchImageBytes(ctx, src)
+	}
+	sum := sha1.Sum([]byte(src.provider + "|" + src.ref))
+	path := filepath.Join(s.dataDir, "actors", hex.EncodeToString(sum[:]))
+	if data, err := os.ReadFile(path); err == nil && len(data) > 0 {
+		return data, nil
+	}
+	data, err := s.fetchImageBytes(ctx, src)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err == nil {
+		_ = atomicfile.WriteFile(path, data, 0o644)
+	}
+	return data, nil
+}
+
+func (s *Service) fetchImageBytes(ctx context.Context, src imageSource) ([]byte, error) {
+	if src.provider == "gfriends" {
+		return s.gfriends.FetchRel(ctx, src.ref)
+	}
+	if s.imageHTTP == nil {
+		return nil, errors.New("actor image http client not configured")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src.ref, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")
+	resp, err := s.imageHTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("actor image status " + resp.Status)
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "" && !strings.HasPrefix(strings.ToLower(ct), "image/") {
+		return nil, errors.New("actor image content-type " + ct)
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, 10<<20))
+}
+
+// enrichProfile fills biography fields (and extra images) from the configured
+// ActorProviders when the canonical profile has no biography yet.
+func (s *Service) enrichProfile(ctx context.Context, pid int, display string) {
+	if pid == 0 || len(s.providers) == 0 {
+		return
+	}
+	// Attempt a remote enrichment at most once per actor per process, so actors
+	// without a source record do not hit the network on every detail request.
+	if _, loaded := s.enrichAttempted.LoadOrStore(pid, true); loaded {
+		return
+	}
+	if p, err := s.db.ActorProfile.Query().Where(actorprofile.ID(pid)).Only(ctx); err != nil {
+		return
+	} else if p.Birthday != nil && *p.Birthday != "" {
+		return
+	}
+	for _, provider := range s.providers {
+		profile, err := provider.Lookup(ctx, display)
+		if err != nil || profile == nil {
+			continue
+		}
+		s.applyProfile(ctx, pid, provider.Name(), profile)
+		return
+	}
+}
+
+func (s *Service) applyProfile(ctx context.Context, pid int, providerName string, p *Profile) {
+	update := s.db.ActorProfile.UpdateOneID(pid)
+	if p.Summary != "" {
+		update.SetSummary(p.Summary)
+	}
+	if p.Birthday != "" {
+		update.SetBirthday(p.Birthday)
+	}
+	if p.Height > 0 {
+		update.SetHeight(p.Height)
+	}
+	if p.CupSize != "" {
+		update.SetCupSize(p.CupSize)
+	}
+	if p.Measurements != "" {
+		update.SetMeasurements(p.Measurements)
+	}
+	if p.BloodType != "" {
+		update.SetBloodType(p.BloodType)
+	}
+	if p.Nationality != "" {
+		update.SetNationality(p.Nationality)
+	}
+	if p.Hobby != "" {
+		update.SetHobby(p.Hobby)
+	}
+	if p.Skill != "" {
+		update.SetSkill(p.Skill)
+	}
+	if p.DebutDate != "" {
+		update.SetDebutDate(p.DebutDate)
+	}
+	if p.SourceURL != "" {
+		update.SetSourceURL(p.SourceURL)
+	}
+	_ = update.Exec(ctx)
+	s.appendProfileImages(ctx, pid, providerName, p.Images)
+}
+
+func (s *Service) appendProfileImages(ctx context.Context, pid int, providerName string, urls []string) {
+	if len(urls) == 0 {
+		return
+	}
+	s.persistMu.Lock()
+	defer s.persistMu.Unlock()
+	existing, err := s.db.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(pid))).All(ctx)
+	if err != nil {
+		return
+	}
+	seen := make(map[string]bool, len(existing))
+	position := 0
+	for _, im := range existing {
+		seen[im.URL] = true
+		if im.Position >= position {
+			position = im.Position + 1
+		}
+	}
+	for _, url := range urls {
+		if url == "" || seen[url] {
+			continue
+		}
+		_, _ = s.db.ActorImage.Create().
+			SetActorID(pid).SetURL(url).SetProvider(providerName).SetRole("portrait").SetPosition(position).Save(ctx)
+		seen[url] = true
+		position++
+	}
+}
+
+func deref(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
 }
 
 // EnsureProfiles backfills canonical ActorProfile rows (and Actor.profile links,

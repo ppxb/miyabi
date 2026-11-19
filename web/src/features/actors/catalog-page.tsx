@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { useActorCatalog } from '@/api/actors'
 import { imageURL } from '@/api/client'
@@ -9,8 +9,9 @@ import { ErrorState } from '@/components/error-state'
 import { ListPagination } from '@/components/list-pagination'
 import { PageHeader } from '@/components/page-header'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Input } from '@/components/ui/input'
 
-const PAGE_SIZE = 24
+const PAGE_SIZE = 40
 
 function displayAvatar(src?: string) {
   if (!src) return undefined
@@ -19,25 +20,32 @@ function displayAvatar(src?: string) {
 
 export function ActorsCatalogPage() {
   const [query, setQuery] = useState('')
+  const [debounced, setDebounced] = useState('')
   const [page, setPage] = useState(1)
-  const catalog = useActorCatalog({ q: query, page, limit: PAGE_SIZE })
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebounced(query)
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [query])
+
+  const catalog = useActorCatalog({ q: debounced, page, limit: PAGE_SIZE })
   const items = catalog.data?.actors ?? []
   const totalPages = Math.max(1, Math.ceil((catalog.data?.total ?? 0) / PAGE_SIZE))
 
   return (
     <AppPage>
       <PageHeader title="演员" description="按演员浏览作品" />
-      <input
+      <Input
+        className="h-8 w-full sm:w-60"
+        placeholder="搜索演员名称"
         value={query}
-        onChange={event => {
-          setQuery(event.target.value)
-          setPage(1)
-        }}
-        placeholder="搜索演员"
-        className="h-9 w-full max-w-sm rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onChange={event => setQuery(event.target.value)}
       />
       {catalog.isPending ? (
-        <p className="text-sm text-muted-foreground">正在读取演员…</p>
+        <p className="text-sm text-muted-foreground">正在读取演员</p>
       ) : catalog.isError ? (
         <ErrorState
           message="无法读取演员，请检查后端服务后重试"
@@ -48,7 +56,7 @@ export function ActorsCatalogPage() {
         <EmptyState title="没有匹配的演员" />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {items.map(actor => (
               <Link
                 key={actor.key}
@@ -56,7 +64,7 @@ export function ActorsCatalogPage() {
                 params={{ key: actor.key }}
                 className="group flex flex-col items-center gap-2 rounded-2xl p-3 text-center transition-colors hover:bg-muted"
               >
-                <Avatar size="lg" className="size-20">
+                <Avatar className="size-32">
                   <AvatarImage src={displayAvatar(actor.avatar)} alt={actor.name} />
                   <AvatarFallback>{actor.name.slice(0, 1)}</AvatarFallback>
                 </Avatar>

@@ -36,11 +36,19 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
 
   const actor = detail.data
   const films = actor.films?.movies ?? []
+  const info: Array<[string, string]> = []
+  if (actor.birthday) info.push(['生日', actor.birthday])
+  if (actor.height) info.push(['身高', `${actor.height}cm`])
+  if (actor.measurements) info.push(['三围', actor.measurements])
+  if (actor.cup_size) info.push(['罩杯', actor.cup_size])
+  if (actor.blood_type) info.push(['血型', actor.blood_type])
+  if (actor.nationality) info.push(['出身', actor.nationality])
+  if (actor.debut_date) info.push(['出道', actor.debut_date])
 
   return (
     <AppPage>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <Avatar size="lg" className="size-24">
+        <Avatar size="lg" className="size-36">
           <AvatarImage src={displayAvatar(actor.avatar)} alt={actor.name} />
           <AvatarFallback>{actor.name.slice(0, 1)}</AvatarFallback>
         </Avatar>
@@ -51,7 +59,7 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
               <span className="text-muted-foreground">{actor.name_zht}</span>
             ) : null}
           </div>
-          {actor.aliases.length > 0 ? (
+          {actor.aliases?.length ? (
             <p className="text-sm text-muted-foreground">别名：{actor.aliases.join(' / ')}</p>
           ) : null}
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -62,6 +70,23 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
           </div>
         </div>
       </div>
+
+      {info.length > 0 ? (
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3 md:grid-cols-4">
+          {info.map(([label, value]) => (
+            <div key={label} className="flex gap-2">
+              <span className="shrink-0 text-muted-foreground">{label}</span>
+              <span className="min-w-0 break-words">{value}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {actor.summary ? (
+        <p className="text-sm leading-6 text-muted-foreground whitespace-pre-line">
+          {actor.summary}
+        </p>
+      ) : null}
 
       {actor.image_count > 0 ? (
         <div className="flex flex-col gap-2">

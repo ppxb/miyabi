@@ -119,6 +119,233 @@ func (_u *ActorProfileUpdate) ClearAvatar() *ActorProfileUpdate {
 	return _u
 }
 
+// SetSummary sets the "summary" field.
+func (_u *ActorProfileUpdate) SetSummary(v string) *ActorProfileUpdate {
+	_u.mutation.SetSummary(v)
+	return _u
+}
+
+// SetNillableSummary sets the "summary" field if the given value is not nil.
+func (_u *ActorProfileUpdate) SetNillableSummary(v *string) *ActorProfileUpdate {
+	if v != nil {
+		_u.SetSummary(*v)
+	}
+	return _u
+}
+
+// ClearSummary clears the value of the "summary" field.
+func (_u *ActorProfileUpdate) ClearSummary() *ActorProfileUpdate {
+	_u.mutation.ClearSummary()
+	return _u
+}
+
+// SetBirthday sets the "birthday" field.
+func (_u *ActorProfileUpdate) SetBirthday(v string) *ActorProfileUpdate {
+	_u.mutation.SetBirthday(v)
+	return _u
+}
+
+// SetNillableBirthday sets the "birthday" field if the given value is not nil.
+func (_u *ActorProfileUpdate) SetNillableBirthday(v *string) *ActorProfileUpdate {
+	if v != nil {
+		_u.SetBirthday(*v)
+	}
+	return _u
+}
+
+// ClearBirthday clears the value of the "birthday" field.
+func (_u *ActorProfileUpdate) ClearBirthday() *ActorProfileUpdate {
+	_u.mutation.ClearBirthday()
+	return _u
+}
+
+// SetHeight sets the "height" field.
+func (_u *ActorProfileUpdate) SetHeight(v int) *ActorProfileUpdate {
+	_u.mutation.ResetHeight()
+	_u.mutation.SetHeight(v)
+	return _u
+}
+
+// SetNillableHeight sets the "height" field if the given value is not nil.
+func (_u *ActorProfileUpdate) SetNillableHeight(v *int) *ActorProfileUpdate {
+	if v != nil {
+		_u.SetHeight(*v)
+	}
+	return _u
+}
+
+// AddHeight adds value to the "height" field.
+func (_u *ActorProfileUpdate) AddHeight(v int) *ActorProfileUpdate {
+	_u.mutation.AddHeight(v)
+	return _u
+}
+
+// ClearHeight clears the value of the "height" field.
+func (_u *ActorProfileUpdate) ClearHeight() *ActorProfileUpdate {
+	_u.mutation.ClearHeight()
+	return _u
+}
+
+// SetCupSize sets the "cup_size" field.
+func (_u *ActorProfileUpdate) SetCupSize(v string) *ActorProfileUpdate {
+	_u.mutation.SetCupSize(v)
+	return _u
+}
+
+// SetNillableCupSize sets the "cup_size" field if the given value is not nil.
+func (_u *ActorProfileUpdate) SetNillableCupSize(v *string) *ActorProfileUpdate {
+	if v != nil {
+		_u.SetCupSize(*v)
+	}
+	return _u
+}
+
+// ClearCupSize clears the value of the "cup_size" field.
+func (_u *ActorProfileUpdate) ClearCupSize() *ActorProfileUpdate {
+	_u.mutation.ClearCupSize()
+	return _u
+}
+
+// SetMeasurements sets the "measurements" field.
+func (_u *ActorProfileUpdate) SetMeasurements(v string) *ActorProfileUpdate {
+	_u.mutation.SetMeasurements(v)
+	return _u
+}
+
+// SetNillableMeasurements sets the "measurements" field if the given value is not nil.
+func (_u *ActorProfileUpdate) SetNillableMeasurements(v *string) *ActorProfileUpdate {
+	if v != nil {
+		_u.SetMeasurements(*v)
+	}
+	return _u
+}
+
+// ClearMeasurements clears the value of the "measurements" field.
+func (_u *ActorProfileUpdate) ClearMeasurements() *ActorProfileUpdate {
+	_u.mutation.ClearMeasurements()
+	return _u
+}
+
+// SetBloodType sets the "blood_type" field.
+func (_u *ActorProfileUpdate) SetBloodType(v string) *ActorProfileUpdate {
+	_u.mutation.SetBloodType(v)
+	return _u
+}
+
+// SetNillableBloodType sets the "blood_type" field if the given value is not nil.
+func (_u *ActorProfileUpdate) SetNillableBloodType(v *string) *ActorProfileUpdate {
+	if v != nil {
+		_u.SetBloodType(*v)
+	}
+	return _u
+}
+
+// ClearBloodType clears the value of the "blood_type" field.
+func (_u *ActorProfileUpdate) ClearBloodType() *ActorProfileUpdate {
+	_u.mutation.ClearBloodType()
+	return _u
+}
+
+// SetNationality sets the "nationality" field.
+func (_u *ActorProfileUpdate) SetNationality(v string) *ActorProfileUpdate {
+	_u.mutation.SetNationality(v)
+	return _u
+}
+
+// SetNillableNationality sets the "nationality" field if the given value is not nil.
+func (_u *ActorProfileUpdate) SetNillableNationality(v *string) *ActorProfileUpdate {
+	if v != nil {
+		_u.SetNationality(*v)
+	}
+	return _u
+}
+
+// ClearNationality clears the value of the "nationality" field.
+func (_u *ActorProfileUpdate) ClearNationality() *ActorProfileUpdate {
+	_u.mutation.ClearNationality()
+	return _u
+}
+
+// SetHobby sets the "hobby" field.
+func (_u *ActorProfileUpdate) SetHobby(v string) *ActorProfileUpdate {
+	_u.mutation.SetHobby(v)
+	return _u
+}
+
+// SetNillableHobby sets the "hobby" field if the given value is not nil.
+func (_u *ActorProfileUpdate) SetNillableHobby(v *string) *ActorProfileUpdate {
+	if v != nil {
+		_u.SetHobby(*v)
+	}
+	return _u
+}
+
+// ClearHobby clears the value of the "hobby" field.
+func (_u *ActorProfileUpdate) ClearHobby() *ActorProfileUpdate {
+	_u.mutation.ClearHobby()
+	return _u
+}
+
+// SetSkill sets the "skill" field.
+func (_u *ActorProfileUpdate) SetSkill(v string) *ActorProfileUpdate {
+	_u.mutation.SetSkill(v)
+	return _u
+}
+
+// SetNillableSkill sets the "skill" field if the given value is not nil.
+func (_u *ActorProfileUpdate) SetNillableSkill(v *string) *ActorProfileUpdate {
+	if v != nil {
+		_u.SetSkill(*v)
+	}
+	return _u
+}
+
+// ClearSkill clears the value of the "skill" field.
+func (_u *ActorProfileUpdate) ClearSkill() *ActorProfileUpdate {
+	_u.mutation.ClearSkill()
+	return _u
+}
+
+// SetDebutDate sets the "debut_date" field.
+func (_u *ActorProfileUpdate) SetDebutDate(v string) *ActorProfileUpdate {
+	_u.mutation.SetDebutDate(v)
+	return _u
+}
+
+// SetNillableDebutDate sets the "debut_date" field if the given value is not nil.
+func (_u *ActorProfileUpdate) SetNillableDebutDate(v *string) *ActorProfileUpdate {
+	if v != nil {
+		_u.SetDebutDate(*v)
+	}
+	return _u
+}
+
+// ClearDebutDate clears the value of the "debut_date" field.
+func (_u *ActorProfileUpdate) ClearDebutDate() *ActorProfileUpdate {
+	_u.mutation.ClearDebutDate()
+	return _u
+}
+
+// SetSourceURL sets the "source_url" field.
+func (_u *ActorProfileUpdate) SetSourceURL(v string) *ActorProfileUpdate {
+	_u.mutation.SetSourceURL(v)
+	return _u
+}
+
+// SetNillableSourceURL sets the "source_url" field if the given value is not nil.
+func (_u *ActorProfileUpdate) SetNillableSourceURL(v *string) *ActorProfileUpdate {
+	if v != nil {
+		_u.SetSourceURL(*v)
+	}
+	return _u
+}
+
+// ClearSourceURL clears the value of the "source_url" field.
+func (_u *ActorProfileUpdate) ClearSourceURL() *ActorProfileUpdate {
+	_u.mutation.ClearSourceURL()
+	return _u
+}
+
 // AddSourceIDs adds the "sources" edge to the Actor entity by IDs.
 func (_u *ActorProfileUpdate) AddSourceIDs(ids ...int) *ActorProfileUpdate {
 	_u.mutation.AddSourceIDs(ids...)
@@ -323,6 +550,75 @@ func (_u *ActorProfileUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if _u.mutation.AvatarCleared() {
 		_spec.ClearField(actorprofile.FieldAvatar, field.TypeString)
+	}
+	if value, ok := _u.mutation.Summary(); ok {
+		_spec.SetField(actorprofile.FieldSummary, field.TypeString, value)
+	}
+	if _u.mutation.SummaryCleared() {
+		_spec.ClearField(actorprofile.FieldSummary, field.TypeString)
+	}
+	if value, ok := _u.mutation.Birthday(); ok {
+		_spec.SetField(actorprofile.FieldBirthday, field.TypeString, value)
+	}
+	if _u.mutation.BirthdayCleared() {
+		_spec.ClearField(actorprofile.FieldBirthday, field.TypeString)
+	}
+	if value, ok := _u.mutation.Height(); ok {
+		_spec.SetField(actorprofile.FieldHeight, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedHeight(); ok {
+		_spec.AddField(actorprofile.FieldHeight, field.TypeInt, value)
+	}
+	if _u.mutation.HeightCleared() {
+		_spec.ClearField(actorprofile.FieldHeight, field.TypeInt)
+	}
+	if value, ok := _u.mutation.CupSize(); ok {
+		_spec.SetField(actorprofile.FieldCupSize, field.TypeString, value)
+	}
+	if _u.mutation.CupSizeCleared() {
+		_spec.ClearField(actorprofile.FieldCupSize, field.TypeString)
+	}
+	if value, ok := _u.mutation.Measurements(); ok {
+		_spec.SetField(actorprofile.FieldMeasurements, field.TypeString, value)
+	}
+	if _u.mutation.MeasurementsCleared() {
+		_spec.ClearField(actorprofile.FieldMeasurements, field.TypeString)
+	}
+	if value, ok := _u.mutation.BloodType(); ok {
+		_spec.SetField(actorprofile.FieldBloodType, field.TypeString, value)
+	}
+	if _u.mutation.BloodTypeCleared() {
+		_spec.ClearField(actorprofile.FieldBloodType, field.TypeString)
+	}
+	if value, ok := _u.mutation.Nationality(); ok {
+		_spec.SetField(actorprofile.FieldNationality, field.TypeString, value)
+	}
+	if _u.mutation.NationalityCleared() {
+		_spec.ClearField(actorprofile.FieldNationality, field.TypeString)
+	}
+	if value, ok := _u.mutation.Hobby(); ok {
+		_spec.SetField(actorprofile.FieldHobby, field.TypeString, value)
+	}
+	if _u.mutation.HobbyCleared() {
+		_spec.ClearField(actorprofile.FieldHobby, field.TypeString)
+	}
+	if value, ok := _u.mutation.Skill(); ok {
+		_spec.SetField(actorprofile.FieldSkill, field.TypeString, value)
+	}
+	if _u.mutation.SkillCleared() {
+		_spec.ClearField(actorprofile.FieldSkill, field.TypeString)
+	}
+	if value, ok := _u.mutation.DebutDate(); ok {
+		_spec.SetField(actorprofile.FieldDebutDate, field.TypeString, value)
+	}
+	if _u.mutation.DebutDateCleared() {
+		_spec.ClearField(actorprofile.FieldDebutDate, field.TypeString)
+	}
+	if value, ok := _u.mutation.SourceURL(); ok {
+		_spec.SetField(actorprofile.FieldSourceURL, field.TypeString, value)
+	}
+	if _u.mutation.SourceURLCleared() {
+		_spec.ClearField(actorprofile.FieldSourceURL, field.TypeString)
 	}
 	if _u.mutation.SourcesCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -567,6 +863,233 @@ func (_u *ActorProfileUpdateOne) ClearAvatar() *ActorProfileUpdateOne {
 	return _u
 }
 
+// SetSummary sets the "summary" field.
+func (_u *ActorProfileUpdateOne) SetSummary(v string) *ActorProfileUpdateOne {
+	_u.mutation.SetSummary(v)
+	return _u
+}
+
+// SetNillableSummary sets the "summary" field if the given value is not nil.
+func (_u *ActorProfileUpdateOne) SetNillableSummary(v *string) *ActorProfileUpdateOne {
+	if v != nil {
+		_u.SetSummary(*v)
+	}
+	return _u
+}
+
+// ClearSummary clears the value of the "summary" field.
+func (_u *ActorProfileUpdateOne) ClearSummary() *ActorProfileUpdateOne {
+	_u.mutation.ClearSummary()
+	return _u
+}
+
+// SetBirthday sets the "birthday" field.
+func (_u *ActorProfileUpdateOne) SetBirthday(v string) *ActorProfileUpdateOne {
+	_u.mutation.SetBirthday(v)
+	return _u
+}
+
+// SetNillableBirthday sets the "birthday" field if the given value is not nil.
+func (_u *ActorProfileUpdateOne) SetNillableBirthday(v *string) *ActorProfileUpdateOne {
+	if v != nil {
+		_u.SetBirthday(*v)
+	}
+	return _u
+}
+
+// ClearBirthday clears the value of the "birthday" field.
+func (_u *ActorProfileUpdateOne) ClearBirthday() *ActorProfileUpdateOne {
+	_u.mutation.ClearBirthday()
+	return _u
+}
+
+// SetHeight sets the "height" field.
+func (_u *ActorProfileUpdateOne) SetHeight(v int) *ActorProfileUpdateOne {
+	_u.mutation.ResetHeight()
+	_u.mutation.SetHeight(v)
+	return _u
+}
+
+// SetNillableHeight sets the "height" field if the given value is not nil.
+func (_u *ActorProfileUpdateOne) SetNillableHeight(v *int) *ActorProfileUpdateOne {
+	if v != nil {
+		_u.SetHeight(*v)
+	}
+	return _u
+}
+
+// AddHeight adds value to the "height" field.
+func (_u *ActorProfileUpdateOne) AddHeight(v int) *ActorProfileUpdateOne {
+	_u.mutation.AddHeight(v)
+	return _u
+}
+
+// ClearHeight clears the value of the "height" field.
+func (_u *ActorProfileUpdateOne) ClearHeight() *ActorProfileUpdateOne {
+	_u.mutation.ClearHeight()
+	return _u
+}
+
+// SetCupSize sets the "cup_size" field.
+func (_u *ActorProfileUpdateOne) SetCupSize(v string) *ActorProfileUpdateOne {
+	_u.mutation.SetCupSize(v)
+	return _u
+}
+
+// SetNillableCupSize sets the "cup_size" field if the given value is not nil.
+func (_u *ActorProfileUpdateOne) SetNillableCupSize(v *string) *ActorProfileUpdateOne {
+	if v != nil {
+		_u.SetCupSize(*v)
+	}
+	return _u
+}
+
+// ClearCupSize clears the value of the "cup_size" field.
+func (_u *ActorProfileUpdateOne) ClearCupSize() *ActorProfileUpdateOne {
+	_u.mutation.ClearCupSize()
+	return _u
+}
+
+// SetMeasurements sets the "measurements" field.
+func (_u *ActorProfileUpdateOne) SetMeasurements(v string) *ActorProfileUpdateOne {
+	_u.mutation.SetMeasurements(v)
+	return _u
+}
+
+// SetNillableMeasurements sets the "measurements" field if the given value is not nil.
+func (_u *ActorProfileUpdateOne) SetNillableMeasurements(v *string) *ActorProfileUpdateOne {
+	if v != nil {
+		_u.SetMeasurements(*v)
+	}
+	return _u
+}
+
+// ClearMeasurements clears the value of the "measurements" field.
+func (_u *ActorProfileUpdateOne) ClearMeasurements() *ActorProfileUpdateOne {
+	_u.mutation.ClearMeasurements()
+	return _u
+}
+
+// SetBloodType sets the "blood_type" field.
+func (_u *ActorProfileUpdateOne) SetBloodType(v string) *ActorProfileUpdateOne {
+	_u.mutation.SetBloodType(v)
+	return _u
+}
+
+// SetNillableBloodType sets the "blood_type" field if the given value is not nil.
+func (_u *ActorProfileUpdateOne) SetNillableBloodType(v *string) *ActorProfileUpdateOne {
+	if v != nil {
+		_u.SetBloodType(*v)
+	}
+	return _u
+}
+
+// ClearBloodType clears the value of the "blood_type" field.
+func (_u *ActorProfileUpdateOne) ClearBloodType() *ActorProfileUpdateOne {
+	_u.mutation.ClearBloodType()
+	return _u
+}
+
+// SetNationality sets the "nationality" field.
+func (_u *ActorProfileUpdateOne) SetNationality(v string) *ActorProfileUpdateOne {
+	_u.mutation.SetNationality(v)
+	return _u
+}
+
+// SetNillableNationality sets the "nationality" field if the given value is not nil.
+func (_u *ActorProfileUpdateOne) SetNillableNationality(v *string) *ActorProfileUpdateOne {
+	if v != nil {
+		_u.SetNationality(*v)
+	}
+	return _u
+}
+
+// ClearNationality clears the value of the "nationality" field.
+func (_u *ActorProfileUpdateOne) ClearNationality() *ActorProfileUpdateOne {
+	_u.mutation.ClearNationality()
+	return _u
+}
+
+// SetHobby sets the "hobby" field.
+func (_u *ActorProfileUpdateOne) SetHobby(v string) *ActorProfileUpdateOne {
+	_u.mutation.SetHobby(v)
+	return _u
+}
+
+// SetNillableHobby sets the "hobby" field if the given value is not nil.
+func (_u *ActorProfileUpdateOne) SetNillableHobby(v *string) *ActorProfileUpdateOne {
+	if v != nil {
+		_u.SetHobby(*v)
+	}
+	return _u
+}
+
+// ClearHobby clears the value of the "hobby" field.
+func (_u *ActorProfileUpdateOne) ClearHobby() *ActorProfileUpdateOne {
+	_u.mutation.ClearHobby()
+	return _u
+}
+
+// SetSkill sets the "skill" field.
+func (_u *ActorProfileUpdateOne) SetSkill(v string) *ActorProfileUpdateOne {
+	_u.mutation.SetSkill(v)
+	return _u
+}
+
+// SetNillableSkill sets the "skill" field if the given value is not nil.
+func (_u *ActorProfileUpdateOne) SetNillableSkill(v *string) *ActorProfileUpdateOne {
+	if v != nil {
+		_u.SetSkill(*v)
+	}
+	return _u
+}
+
+// ClearSkill clears the value of the "skill" field.
+func (_u *ActorProfileUpdateOne) ClearSkill() *ActorProfileUpdateOne {
+	_u.mutation.ClearSkill()
+	return _u
+}
+
+// SetDebutDate sets the "debut_date" field.
+func (_u *ActorProfileUpdateOne) SetDebutDate(v string) *ActorProfileUpdateOne {
+	_u.mutation.SetDebutDate(v)
+	return _u
+}
+
+// SetNillableDebutDate sets the "debut_date" field if the given value is not nil.
+func (_u *ActorProfileUpdateOne) SetNillableDebutDate(v *string) *ActorProfileUpdateOne {
+	if v != nil {
+		_u.SetDebutDate(*v)
+	}
+	return _u
+}
+
+// ClearDebutDate clears the value of the "debut_date" field.
+func (_u *ActorProfileUpdateOne) ClearDebutDate() *ActorProfileUpdateOne {
+	_u.mutation.ClearDebutDate()
+	return _u
+}
+
+// SetSourceURL sets the "source_url" field.
+func (_u *ActorProfileUpdateOne) SetSourceURL(v string) *ActorProfileUpdateOne {
+	_u.mutation.SetSourceURL(v)
+	return _u
+}
+
+// SetNillableSourceURL sets the "source_url" field if the given value is not nil.
+func (_u *ActorProfileUpdateOne) SetNillableSourceURL(v *string) *ActorProfileUpdateOne {
+	if v != nil {
+		_u.SetSourceURL(*v)
+	}
+	return _u
+}
+
+// ClearSourceURL clears the value of the "source_url" field.
+func (_u *ActorProfileUpdateOne) ClearSourceURL() *ActorProfileUpdateOne {
+	_u.mutation.ClearSourceURL()
+	return _u
+}
+
 // AddSourceIDs adds the "sources" edge to the Actor entity by IDs.
 func (_u *ActorProfileUpdateOne) AddSourceIDs(ids ...int) *ActorProfileUpdateOne {
 	_u.mutation.AddSourceIDs(ids...)
@@ -801,6 +1324,75 @@ func (_u *ActorProfileUpdateOne) sqlSave(ctx context.Context) (_node *ActorProfi
 	}
 	if _u.mutation.AvatarCleared() {
 		_spec.ClearField(actorprofile.FieldAvatar, field.TypeString)
+	}
+	if value, ok := _u.mutation.Summary(); ok {
+		_spec.SetField(actorprofile.FieldSummary, field.TypeString, value)
+	}
+	if _u.mutation.SummaryCleared() {
+		_spec.ClearField(actorprofile.FieldSummary, field.TypeString)
+	}
+	if value, ok := _u.mutation.Birthday(); ok {
+		_spec.SetField(actorprofile.FieldBirthday, field.TypeString, value)
+	}
+	if _u.mutation.BirthdayCleared() {
+		_spec.ClearField(actorprofile.FieldBirthday, field.TypeString)
+	}
+	if value, ok := _u.mutation.Height(); ok {
+		_spec.SetField(actorprofile.FieldHeight, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedHeight(); ok {
+		_spec.AddField(actorprofile.FieldHeight, field.TypeInt, value)
+	}
+	if _u.mutation.HeightCleared() {
+		_spec.ClearField(actorprofile.FieldHeight, field.TypeInt)
+	}
+	if value, ok := _u.mutation.CupSize(); ok {
+		_spec.SetField(actorprofile.FieldCupSize, field.TypeString, value)
+	}
+	if _u.mutation.CupSizeCleared() {
+		_spec.ClearField(actorprofile.FieldCupSize, field.TypeString)
+	}
+	if value, ok := _u.mutation.Measurements(); ok {
+		_spec.SetField(actorprofile.FieldMeasurements, field.TypeString, value)
+	}
+	if _u.mutation.MeasurementsCleared() {
+		_spec.ClearField(actorprofile.FieldMeasurements, field.TypeString)
+	}
+	if value, ok := _u.mutation.BloodType(); ok {
+		_spec.SetField(actorprofile.FieldBloodType, field.TypeString, value)
+	}
+	if _u.mutation.BloodTypeCleared() {
+		_spec.ClearField(actorprofile.FieldBloodType, field.TypeString)
+	}
+	if value, ok := _u.mutation.Nationality(); ok {
+		_spec.SetField(actorprofile.FieldNationality, field.TypeString, value)
+	}
+	if _u.mutation.NationalityCleared() {
+		_spec.ClearField(actorprofile.FieldNationality, field.TypeString)
+	}
+	if value, ok := _u.mutation.Hobby(); ok {
+		_spec.SetField(actorprofile.FieldHobby, field.TypeString, value)
+	}
+	if _u.mutation.HobbyCleared() {
+		_spec.ClearField(actorprofile.FieldHobby, field.TypeString)
+	}
+	if value, ok := _u.mutation.Skill(); ok {
+		_spec.SetField(actorprofile.FieldSkill, field.TypeString, value)
+	}
+	if _u.mutation.SkillCleared() {
+		_spec.ClearField(actorprofile.FieldSkill, field.TypeString)
+	}
+	if value, ok := _u.mutation.DebutDate(); ok {
+		_spec.SetField(actorprofile.FieldDebutDate, field.TypeString, value)
+	}
+	if _u.mutation.DebutDateCleared() {
+		_spec.ClearField(actorprofile.FieldDebutDate, field.TypeString)
+	}
+	if value, ok := _u.mutation.SourceURL(); ok {
+		_spec.SetField(actorprofile.FieldSourceURL, field.TypeString, value)
+	}
+	if _u.mutation.SourceURLCleared() {
+		_spec.ClearField(actorprofile.FieldSourceURL, field.TypeString)
 	}
 	if _u.mutation.SourcesCleared() {
 		edge := &sqlgraph.EdgeSpec{
