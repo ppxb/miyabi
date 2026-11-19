@@ -40,21 +40,36 @@ func (a *AVLeague) Lookup(ctx context.Context, name string) (*Profile, error) {
 }
 
 func (a *AVLeague) get(ctx context.Context, target string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
-	if err != nil {
-		return nil, err
+	var lastErr error
+	for attempt := 1; attempt <= 3; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")
+		req.Header.Set("Accept-Language", "ja")
+		resp, err := a.http.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode == http.StatusOK {
+			data, readErr := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+			resp.Body.Close()
+			return data, readErr
+		}
+		lastErr = fmt.Errorf("av-league status %d", resp.StatusCode)
+		resp.Body.Close()
+		// Back off on rate limiting / transient server errors.
+		if resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < 500 {
+			return nil, lastErr
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(time.Duration(attempt) * 2 * time.Second):
+		}
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")
-	req.Header.Set("Accept-Language", "ja")
-	resp, err := a.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("av-league status %d", resp.StatusCode)
-	}
-	return io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	return nil, lastErr
 }
 
 func (a *AVLeague) searchID(ctx context.Context, name string) (string, error) {

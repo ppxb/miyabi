@@ -224,7 +224,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	// Bind it before starting task pools or accepting requests.
 	libSvc.SetMediaNotifier(embySvc)
 	scrapeSvc := scrape.New(store.Client, driveSvc, metadataSvc, images, taskSvc, scrape.Dependencies{
-		ExportManager: exportMgr, MediaNotifier: embySvc, Subtitles: subtitleSvc, Actors: actorsSvc,
+		ExportManager: exportMgr, MediaNotifier: embySvc, Subtitles: subtitleSvc,
 	})
 	maintenanceSvc, err := maintenance.New(cfg.DataDir, store.Client, images, scrapeSvc)
 	if err != nil {

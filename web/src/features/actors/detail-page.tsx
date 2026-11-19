@@ -18,8 +18,10 @@ import { AppPage } from '@/components/app-page'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { MovieGridLayout } from '@/components/movie/movie-grid-layout'
+import { MovieGridSkeleton } from '@/components/movie/movie-grid-skeleton'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { LibraryMovieCard } from '@/features/library/movie-card'
 
 function displayAvatar(src?: string) {
@@ -73,7 +75,27 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
   if (detail.isPending) {
     return (
       <AppPage>
-        <p className="text-sm text-muted-foreground">正在读取演员…</p>
+        <Skeleton className="h-4 w-24" />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <Skeleton className="size-48 rounded-full" />
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-10 w-56" />
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <Skeleton key={index} className="h-20 min-w-24 flex-1 rounded-2xl" />
+          ))}
+        </div>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Skeleton key={index} className="aspect-[3/4] w-full rounded-lg" />
+          ))}
+        </div>
+        <Skeleton className="h-6 w-24" />
+        <MovieGridSkeleton count={6} compact />
       </AppPage>
     )
   }

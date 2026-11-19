@@ -85,11 +85,10 @@ type Service struct {
 	providers       []Provider
 	persistMu       sync.Mutex
 	enrichAttempted sync.Map
-	enrichSem       chan struct{}
 }
 
 func New(db *ent.Client, g *gfriends.Client, dataDir string, imageHTTP *http.Client, providers ...Provider) *Service {
-	return &Service{db: db, gfriends: g, dataDir: dataDir, imageHTTP: imageHTTP, providers: providers, enrichSem: make(chan struct{}, 3)}
+	return &Service{db: db, gfriends: g, dataDir: dataDir, imageHTTP: imageHTTP, providers: providers}
 }
 
 // SourceSetting is one actor data source switch kept in settings.
@@ -377,7 +376,9 @@ func (s *Service) Detail(ctx context.Context, key string) (Detail, error) {
 		s.persistImages(ctx, g.norm, s.imageRels(ctx, detail.Names))
 	}
 	if perr == nil {
-		s.enqueueEnrichment(pid, display)
+		enrichCtx, cancelEnrich := context.WithTimeout(ctx, 20*time.Second)
+		s.enrichIfNeeded(enrichCtx, pid, display)
+		cancelEnrich()
 		if aliases, aerr := s.db.ActorAlias.Query().
 			Where(actoralias.HasActorWith(actorprofile.ID(pid))).
 			Select(actoralias.FieldAlias).
@@ -552,63 +553,47 @@ func (s *Service) fetchImageBytes(ctx context.Context, src imageSource) ([]byte,
 	return io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 }
 
-// EnqueueEnrichment ensures a canonical profile per name and schedules
-// background ActorProvider enrichment. Used right after scraping so new actors
-// are enriched up front instead of on first actor-page view.
-func (s *Service) EnqueueEnrichment(ctx context.Context, names []string) {
-	for _, name := range names {
-		name = strings.TrimSpace(name)
-		norm := normalizeName(name)
-		if norm == "" {
-			continue
-		}
-		pid, err := s.ensureProfile(ctx, norm, name, "", "")
-		if err != nil {
-			continue
-		}
-		s.enqueueEnrichment(pid, name)
-	}
-}
-
-// enqueueEnrichment runs biography enrichment in the background at most once
-// per actor per process, so a detail request never blocks on a remote lookup.
-func (s *Service) enqueueEnrichment(pid int, display string) {
+// enrichIfNeeded enriches a canonical profile on its first detail view (low
+// concurrency, persisted afterwards). No retry once done or known absent.
+func (s *Service) enrichIfNeeded(ctx context.Context, pid int, display string) {
 	if pid == 0 || len(s.providers) == 0 {
 		return
 	}
 	if _, loaded := s.enrichAttempted.LoadOrStore(pid, true); loaded {
 		return
 	}
-	go func() {
-		if s.enrichSem != nil {
-			s.enrichSem <- struct{}{}
-			defer func() { <-s.enrichSem }()
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		s.enrichProfile(ctx, pid, display)
-	}()
+	if err := s.enrichProfile(ctx, pid, display); err != nil {
+		s.enrichAttempted.Delete(pid)
+	}
 }
 
 // enrichProfile fills biography fields (and extra images) from the configured
-// ActorProviders when the canonical profile has no biography yet.
-func (s *Service) enrichProfile(ctx context.Context, pid int, display string) {
+// ActorProviders when the canonical profile has no biography yet. Transient
+// provider errors are returned so the caller can retry later.
+func (s *Service) enrichProfile(ctx context.Context, pid int, display string) error {
 	if p, err := s.db.ActorProfile.Query().Where(actorprofile.ID(pid)).Only(ctx); err != nil {
-		return
+		return nil
 	} else if p.Birthday != nil && *p.Birthday != "" {
-		return
+		return nil
 	}
 	for _, provider := range s.providers {
 		if !s.sourceEnabled(ctx, provider.Name()) {
 			continue
 		}
 		profile, err := provider.Lookup(ctx, display)
-		if err != nil || profile == nil {
+		if err != nil {
+			if errors.Is(err, ErrProviderNotFound) {
+				continue
+			}
+			return err
+		}
+		if profile == nil {
 			continue
 		}
 		s.applyProfile(ctx, pid, provider.Name(), profile)
-		return
+		return nil
 	}
+	return nil
 }
 
 func (s *Service) applyProfile(ctx context.Context, pid int, providerName string, p *Profile) {

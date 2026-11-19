@@ -61,11 +61,6 @@ type SubtitleExporter interface {
 	Export(ctx context.Context, movieID int, target subtitlemeta.Target) (int, error)
 }
 
-// ActorEnricher enqueues background actor-profile enrichment by name.
-type ActorEnricher interface {
-	EnqueueEnrichment(ctx context.Context, names []string)
-}
-
 const (
 	defaultDirCacheTTL = 45 * time.Second
 	maxDirCacheEntries = 128
@@ -85,7 +80,6 @@ type Service struct {
 	images        *mediaimage.Cache
 	notifier      Notifier
 	subtitles     SubtitleExporter
-	actors        ActorEnricher
 	subtitleQueue *SubtitleQueue
 
 	dirMu    sync.Mutex
@@ -106,7 +100,6 @@ type Dependencies struct {
 	ExportManager *export.Manager
 	MediaNotifier export.MediaNotifier
 	Subtitles     SubtitleExporter
-	Actors        ActorEnricher
 }
 
 // New installs dependencies before starting subtitle workers.
@@ -121,7 +114,6 @@ func New(db *ent.Client, d *drive.Drive, metadata MetadataSource, images *mediai
 		exportMgr:     deps.ExportManager,
 		mediaNotifier: deps.MediaNotifier,
 		subtitles:     deps.Subtitles,
-		actors:        deps.Actors,
 	}
 	service.subtitleQueue = newSubtitleQueue(service)
 	return service
@@ -246,15 +238,6 @@ func (service *Service) prepareMetadata(ctx context.Context, sess drive.Session,
 	}
 	if service.notifier != nil {
 		service.notifier.NotifyLibraryChanged()
-	}
-	if service.actors != nil {
-		names := make([]string, 0, len(input.Document.Actors))
-		for _, person := range input.Document.Actors {
-			if person.Name != "" {
-				names = append(names, person.Name)
-			}
-		}
-		service.actors.EnqueueEnrichment(ctx, names)
 	}
 	return nil
 }
