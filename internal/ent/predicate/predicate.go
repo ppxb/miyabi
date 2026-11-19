@@ -9,6 +9,15 @@ import (
 // Actor is the predicate function for actor builders.
 type Actor func(*sql.Selector)
 
+// ActorAlias is the predicate function for actoralias builders.
+type ActorAlias func(*sql.Selector)
+
+// ActorImage is the predicate function for actorimage builders.
+type ActorImage func(*sql.Selector)
+
+// ActorProfile is the predicate function for actorprofile builders.
+type ActorProfile func(*sql.Selector)
+
 // EmbyNotification is the predicate function for embynotification builders.
 type EmbyNotification func(*sql.Selector)
 

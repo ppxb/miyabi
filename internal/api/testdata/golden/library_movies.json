@@ -45,7 +45,8 @@
           "name": "Tag"
         }
       ],
-      "scrape_status": "done"
+      "scrape_status": "done",
+      "has_subtitle": false
     },
     {
       "id": 8,
@@ -55,7 +56,8 @@
       "rating": 0,
       "actors": [],
       "tags": [],
-      "scrape_status": "failed"
+      "scrape_status": "failed",
+      "has_subtitle": false
     }
   ],
   "total": 2,

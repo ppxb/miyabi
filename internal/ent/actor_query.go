@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/ppxb/miyabi/internal/ent/actor"
+	"github.com/ppxb/miyabi/internal/ent/actorprofile"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 )
@@ -20,11 +21,13 @@ import (
 // ActorQuery is the builder for querying Actor entities.
 type ActorQuery struct {
 	config
-	ctx        *QueryContext
-	order      []actor.OrderOption
-	inters     []Interceptor
-	predicates []predicate.Actor
-	withMovies *MovieQuery
+	ctx         *QueryContext
+	order       []actor.OrderOption
+	inters      []Interceptor
+	predicates  []predicate.Actor
+	withMovies  *MovieQuery
+	withProfile *ActorProfileQuery
+	withFKs     bool
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -76,6 +79,28 @@ func (_q *ActorQuery) QueryMovies() *MovieQuery {
 			sqlgraph.From(actor.Table, actor.FieldID, selector),
 			sqlgraph.To(movie.Table, movie.FieldID),
 			sqlgraph.Edge(sqlgraph.M2M, true, actor.MoviesTable, actor.MoviesPrimaryKey...),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryProfile chains the current query on the "profile" edge.
+func (_q *ActorQuery) QueryProfile() *ActorProfileQuery {
+	query := (&ActorProfileClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(actor.Table, actor.FieldID, selector),
+			sqlgraph.To(actorprofile.Table, actorprofile.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, actor.ProfileTable, actor.ProfileColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -270,12 +295,13 @@ func (_q *ActorQuery) Clone() *ActorQuery {
 		return nil
 	}
 	return &ActorQuery{
-		config:     _q.config,
-		ctx:        _q.ctx.Clone(),
-		order:      append([]actor.OrderOption{}, _q.order...),
-		inters:     append([]Interceptor{}, _q.inters...),
-		predicates: append([]predicate.Actor{}, _q.predicates...),
-		withMovies: _q.withMovies.Clone(),
+		config:      _q.config,
+		ctx:         _q.ctx.Clone(),
+		order:       append([]actor.OrderOption{}, _q.order...),
+		inters:      append([]Interceptor{}, _q.inters...),
+		predicates:  append([]predicate.Actor{}, _q.predicates...),
+		withMovies:  _q.withMovies.Clone(),
+		withProfile: _q.withProfile.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -290,6 +316,17 @@ func (_q *ActorQuery) WithMovies(opts ...func(*MovieQuery)) *ActorQuery {
 		opt(query)
 	}
 	_q.withMovies = query
+	return _q
+}
+
+// WithProfile tells the query-builder to eager-load the nodes that are connected to
+// the "profile" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ActorQuery) WithProfile(opts ...func(*ActorProfileQuery)) *ActorQuery {
+	query := (&ActorProfileClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProfile = query
 	return _q
 }
 
@@ -370,11 +407,19 @@ func (_q *ActorQuery) prepareQuery(ctx context.Context) error {
 func (_q *ActorQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Actor, error) {
 	var (
 		nodes       = []*Actor{}
+		withFKs     = _q.withFKs
 		_spec       = _q.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [2]bool{
 			_q.withMovies != nil,
+			_q.withProfile != nil,
 		}
 	)
+	if _q.withProfile != nil {
+		withFKs = true
+	}
+	if withFKs {
+		_spec.Node.Columns = append(_spec.Node.Columns, actor.ForeignKeys...)
+	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*Actor).scanValues(nil, columns)
 	}
@@ -397,6 +442,12 @@ func (_q *ActorQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Actor,
 		if err := _q.loadMovies(ctx, query, nodes,
 			func(n *Actor) { n.Edges.Movies = []*Movie{} },
 			func(n *Actor, e *Movie) { n.Edges.Movies = append(n.Edges.Movies, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withProfile; query != nil {
+		if err := _q.loadProfile(ctx, query, nodes, nil,
+			func(n *Actor, e *ActorProfile) { n.Edges.Profile = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -460,6 +511,38 @@ func (_q *ActorQuery) loadMovies(ctx context.Context, query *MovieQuery, nodes [
 		}
 		for kn := range nodes {
 			assign(kn, n)
+		}
+	}
+	return nil
+}
+func (_q *ActorQuery) loadProfile(ctx context.Context, query *ActorProfileQuery, nodes []*Actor, init func(*Actor), assign func(*Actor, *ActorProfile)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*Actor)
+	for i := range nodes {
+		if nodes[i].actor_profile == nil {
+			continue
+		}
+		fk := *nodes[i].actor_profile
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(actorprofile.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "actor_profile" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
 		}
 	}
 	return nil

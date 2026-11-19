@@ -21,6 +21,42 @@ func (f ActorFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ActorMutation", m)
 }
 
+// The ActorAliasFunc type is an adapter to allow the use of ordinary
+// function as ActorAlias mutator.
+type ActorAliasFunc func(context.Context, *ent.ActorAliasMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ActorAliasFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ActorAliasMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ActorAliasMutation", m)
+}
+
+// The ActorImageFunc type is an adapter to allow the use of ordinary
+// function as ActorImage mutator.
+type ActorImageFunc func(context.Context, *ent.ActorImageMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ActorImageFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ActorImageMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ActorImageMutation", m)
+}
+
+// The ActorProfileFunc type is an adapter to allow the use of ordinary
+// function as ActorProfile mutator.
+type ActorProfileFunc func(context.Context, *ent.ActorProfileMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ActorProfileFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ActorProfileMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ActorProfileMutation", m)
+}
+
 // The EmbyNotificationFunc type is an adapter to allow the use of ordinary
 // function as EmbyNotification mutator.
 type EmbyNotificationFunc func(context.Context, *ent.EmbyNotificationMutation) (ent.Value, error)

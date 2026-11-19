@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ppxb/miyabi"
+	"github.com/ppxb/miyabi/internal/actors"
 	"github.com/ppxb/miyabi/internal/api"
 	"github.com/ppxb/miyabi/internal/catalogue"
 	"github.com/ppxb/miyabi/internal/config"
@@ -190,6 +191,15 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Timeout:   30 * time.Second,
 		Transport: netx.NewTransport(networkSvc.ProxyManager()),
 	})
+	actorsSvc := actors.New(store.Client, gfriendsClient)
+	// Backfill canonical actor profiles from existing provider-scoped rows.
+	go func() {
+		backfillCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		if err := actorsSvc.EnsureProfiles(backfillCtx); err != nil {
+			logger.WarnContext(backfillCtx, "backfill actor profiles failed", "error", err)
+		}
+	}()
 	syncActors := cfg.EmbySyncActors
 	embySvc, err := emby.NewService(ctx, store.Client, emby.Config{
 		Enabled:    cfg.EmbyEnabled,
@@ -278,6 +288,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Emby:           embySvc,
 		JavDB:          catalogueSvc,
 		Sources:        sourceSvc,
+		Actors:         actorsSvc,
 		Frontend:       miyabi.Frontend(),
 		STRMToken:      cfg.STRMToken,
 		TrustedProxies: cfg.TrustedProxies,

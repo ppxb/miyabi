@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +27,8 @@ const (
 	indexRetryDelay  = 5 * time.Minute
 	// Filetree.json is about 6.2 MiB as of October 2026; allow room for growth.
 	maxIndexBytes = 32 << 20
+	// rawContentBase serves a repository file for direct reference.
+	rawContentBase = "https://raw.githubusercontent.com/gfriends/gfriends/master/"
 )
 
 // mirrors serve the same repository; the CDN is tried before GitHub.
@@ -44,6 +47,11 @@ type Client struct {
 	refresh    syncx.ContextLock
 	retryAt    time.Time
 	refreshErr error
+
+	// allImages keeps every file per normalized name for multi-image actors.
+	allMu     sync.RWMutex
+	allImages map[string][]string
+	allAt     time.Time
 }
 
 // New uses the caller's HTTP client, including its timeout and proxy policy.
@@ -299,4 +307,131 @@ func normalizeName(s string) string {
 	s = strings.TrimSpace(s)
 	s = strings.ToLower(s)
 	return s
+}
+
+// ensureAll builds and caches every file per normalized actor name, reusing the
+// on-disk Filetree cache when present. This backs multi-image actor lookups.
+func (c *Client) ensureAll(ctx context.Context) (map[string][]string, error) {
+	c.allMu.RLock()
+	if !c.allAt.IsZero() && time.Since(c.allAt) < cacheExpiration && c.allImages != nil {
+		all := c.allImages
+		c.allMu.RUnlock()
+		return all, nil
+	}
+	c.allMu.RUnlock()
+
+	// Serialize the build so concurrent first callers do not each download the
+	// ~6 MiB Filetree; re-check after acquiring the lock.
+	if err := c.refresh.Lock(ctx); err != nil {
+		return nil, err
+	}
+	defer c.refresh.Unlock()
+	c.allMu.RLock()
+	if !c.allAt.IsZero() && time.Since(c.allAt) < cacheExpiration && c.allImages != nil {
+		all := c.allImages
+		c.allMu.RUnlock()
+		return all, nil
+	}
+	c.allMu.RUnlock()
+
+	var tree fileTree
+	loaded := false
+	if c.dataDir != "" {
+		if data, err := os.ReadFile(filepath.Join(c.dataDir, "gfriends_tree.json")); err == nil && len(data) <= maxIndexBytes {
+			if json.Unmarshal(data, &tree) == nil {
+				loaded = true
+			}
+		}
+	}
+	if !loaded {
+		body, err := c.download(ctx, "Filetree.json", maxIndexBytes, nil)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(body, &tree); err != nil {
+			return nil, err
+		}
+	}
+	all := buildAllIndex(tree)
+	c.allMu.Lock()
+	c.allImages, c.allAt = all, time.Now()
+	c.allMu.Unlock()
+	return all, nil
+}
+
+func buildAllIndex(tree fileTree) map[string][]string {
+	all := make(map[string][]string)
+	for _, folder := range slices.Sorted(maps.Keys(tree.Content)) {
+		for alias, target := range tree.Content[folder] {
+			name := strings.TrimSuffix(strings.TrimSuffix(alias, ".jpg"), ".png")
+			norm := normalizeName(name)
+			if norm == "" || strings.TrimSpace(target) == "" {
+				continue
+			}
+			rel := fmt.Sprintf("Content/%s/%s", folder, target)
+			keys := []string{norm}
+			if noSpace := strings.ReplaceAll(norm, " ", ""); noSpace != norm {
+				keys = append(keys, noSpace)
+			}
+			for _, key := range keys {
+				all[key] = append(all[key], rel)
+			}
+		}
+	}
+	return all
+}
+
+// Images returns every repository path for the given actor name (deduplicated,
+// stable order). Empty when the actor is not in the gfriends dataset.
+func (c *Client) Images(ctx context.Context, name string) ([]string, error) {
+	all, err := c.ensureAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	norm := normalizeName(name)
+	rels := append([]string{}, all[norm]...)
+	if noSpace := strings.ReplaceAll(norm, " ", ""); noSpace != norm {
+		rels = append(rels, all[noSpace]...)
+	}
+	seen := make(map[string]bool, len(rels))
+	out := make([]string, 0, len(rels))
+	for _, rel := range rels {
+		if rel == "" || seen[rel] {
+			continue
+		}
+		seen[rel] = true
+		out = append(out, rel)
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+// FetchImage downloads the actor's index-th image (0-based) as bytes.
+func (c *Client) FetchImage(ctx context.Context, name string, index int) ([]byte, error) {
+	rels, err := c.Images(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	if index < 0 || index >= len(rels) {
+		return nil, os.ErrNotExist
+	}
+	return c.FetchRel(ctx, rels[index])
+}
+
+// FetchRel downloads one repository path (as returned by Images) as bytes.
+func (c *Client) FetchRel(ctx context.Context, rel string) ([]byte, error) {
+	return c.download(ctx, escapeContentRel(rel), 10<<20, nil)
+}
+
+func escapeContentRel(rel string) string {
+	parts := strings.Split(rel, "/")
+	for i, part := range parts {
+		if i == len(parts)-1 && strings.Contains(part, "?") {
+			sub := strings.SplitN(part, "?", 2)
+			parts[i] = url.PathEscape(sub[0]) + "?" + sub[1]
+		} else {
+			parts[i] = url.PathEscape(part)
+		}
+	}
+	return strings.Join(parts, "/")
 }

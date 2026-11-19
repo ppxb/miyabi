@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/ppxb/miyabi/internal/ent/actor"
+	"github.com/ppxb/miyabi/internal/ent/actorprofile"
 )
 
 // Actor is the model entity for the Actor schema.
@@ -35,17 +36,20 @@ type Actor struct {
 	Avatar *string `json:"avatar,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the ActorQuery when eager-loading is set.
-	Edges        ActorEdges `json:"edges"`
-	selectValues sql.SelectValues
+	Edges         ActorEdges `json:"edges"`
+	actor_profile *int
+	selectValues  sql.SelectValues
 }
 
 // ActorEdges holds the relations/edges for other nodes in the graph.
 type ActorEdges struct {
 	// Movies holds the value of the movies edge.
 	Movies []*Movie `json:"movies,omitempty"`
+	// Profile holds the value of the profile edge.
+	Profile *ActorProfile `json:"profile,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // MoviesOrErr returns the Movies value or an error if the edge
@@ -55,6 +59,17 @@ func (e ActorEdges) MoviesOrErr() ([]*Movie, error) {
 		return e.Movies, nil
 	}
 	return nil, &NotLoadedError{edge: "movies"}
+}
+
+// ProfileOrErr returns the Profile value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e ActorEdges) ProfileOrErr() (*ActorProfile, error) {
+	if e.Profile != nil {
+		return e.Profile, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: actorprofile.Label}
+	}
+	return nil, &NotLoadedError{edge: "profile"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -68,6 +83,8 @@ func (*Actor) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullString)
 		case actor.FieldCreatedAt, actor.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
+		case actor.ForeignKeys[0]: // actor_profile
+			values[i] = new(sql.NullInt64)
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -139,6 +156,13 @@ func (_m *Actor) assignValues(columns []string, values []any) error {
 				_m.Avatar = new(string)
 				*_m.Avatar = value.String
 			}
+		case actor.ForeignKeys[0]:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for edge-field actor_profile", value)
+			} else if value.Valid {
+				_m.actor_profile = new(int)
+				*_m.actor_profile = int(value.Int64)
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -155,6 +179,11 @@ func (_m *Actor) Value(name string) (ent.Value, error) {
 // QueryMovies queries the "movies" edge of the Actor entity.
 func (_m *Actor) QueryMovies() *MovieQuery {
 	return NewActorClient(_m.config).QueryMovies(_m)
+}
+
+// QueryProfile queries the "profile" edge of the Actor entity.
+func (_m *Actor) QueryProfile() *ActorProfileQuery {
+	return NewActorClient(_m.config).QueryProfile(_m)
 }
 
 // Update returns a builder for updating this Actor.

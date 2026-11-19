@@ -37,6 +37,8 @@ func (Actor) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.From("movies", Movie.Type).
 			Ref("actors"),
+		edge.To("profile", ActorProfile.Type).
+			Unique(),
 	}
 }
 

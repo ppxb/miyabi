@@ -16,6 +16,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/ppxb/miyabi/internal/ent/actor"
+	"github.com/ppxb/miyabi/internal/ent/actoralias"
+	"github.com/ppxb/miyabi/internal/ent/actorimage"
+	"github.com/ppxb/miyabi/internal/ent/actorprofile"
 	"github.com/ppxb/miyabi/internal/ent/embynotification"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/metadatacache"
@@ -37,6 +40,12 @@ type Client struct {
 	Schema *migrate.Schema
 	// Actor is the client for interacting with the Actor builders.
 	Actor *ActorClient
+	// ActorAlias is the client for interacting with the ActorAlias builders.
+	ActorAlias *ActorAliasClient
+	// ActorImage is the client for interacting with the ActorImage builders.
+	ActorImage *ActorImageClient
+	// ActorProfile is the client for interacting with the ActorProfile builders.
+	ActorProfile *ActorProfileClient
 	// EmbyNotification is the client for interacting with the EmbyNotification builders.
 	EmbyNotification *EmbyNotificationClient
 	// File is the client for interacting with the File builders.
@@ -73,6 +82,9 @@ func NewClient(opts ...Option) *Client {
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.Actor = NewActorClient(c.config)
+	c.ActorAlias = NewActorAliasClient(c.config)
+	c.ActorImage = NewActorImageClient(c.config)
+	c.ActorProfile = NewActorProfileClient(c.config)
 	c.EmbyNotification = NewEmbyNotificationClient(c.config)
 	c.File = NewFileClient(c.config)
 	c.MetadataCache = NewMetadataCacheClient(c.config)
@@ -178,6 +190,9 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ctx:              ctx,
 		config:           cfg,
 		Actor:            NewActorClient(cfg),
+		ActorAlias:       NewActorAliasClient(cfg),
+		ActorImage:       NewActorImageClient(cfg),
+		ActorProfile:     NewActorProfileClient(cfg),
 		EmbyNotification: NewEmbyNotificationClient(cfg),
 		File:             NewFileClient(cfg),
 		MetadataCache:    NewMetadataCacheClient(cfg),
@@ -210,6 +225,9 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ctx:              ctx,
 		config:           cfg,
 		Actor:            NewActorClient(cfg),
+		ActorAlias:       NewActorAliasClient(cfg),
+		ActorImage:       NewActorImageClient(cfg),
+		ActorProfile:     NewActorProfileClient(cfg),
 		EmbyNotification: NewEmbyNotificationClient(cfg),
 		File:             NewFileClient(cfg),
 		MetadataCache:    NewMetadataCacheClient(cfg),
@@ -251,9 +269,9 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.Actor, c.EmbyNotification, c.File, c.MetadataCache, c.Movie,
-		c.OfflineDownload, c.Setting, c.Subscription, c.Subtitle, c.Tag, c.Task,
-		c.ViewedMovie, c.WatchHistory,
+		c.Actor, c.ActorAlias, c.ActorImage, c.ActorProfile, c.EmbyNotification, c.File,
+		c.MetadataCache, c.Movie, c.OfflineDownload, c.Setting, c.Subscription,
+		c.Subtitle, c.Tag, c.Task, c.ViewedMovie, c.WatchHistory,
 	} {
 		n.Use(hooks...)
 	}
@@ -263,9 +281,9 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.Actor, c.EmbyNotification, c.File, c.MetadataCache, c.Movie,
-		c.OfflineDownload, c.Setting, c.Subscription, c.Subtitle, c.Tag, c.Task,
-		c.ViewedMovie, c.WatchHistory,
+		c.Actor, c.ActorAlias, c.ActorImage, c.ActorProfile, c.EmbyNotification, c.File,
+		c.MetadataCache, c.Movie, c.OfflineDownload, c.Setting, c.Subscription,
+		c.Subtitle, c.Tag, c.Task, c.ViewedMovie, c.WatchHistory,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -276,6 +294,12 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
 	case *ActorMutation:
 		return c.Actor.mutate(ctx, m)
+	case *ActorAliasMutation:
+		return c.ActorAlias.mutate(ctx, m)
+	case *ActorImageMutation:
+		return c.ActorImage.mutate(ctx, m)
+	case *ActorProfileMutation:
+		return c.ActorProfile.mutate(ctx, m)
 	case *EmbyNotificationMutation:
 		return c.EmbyNotification.mutate(ctx, m)
 	case *FileMutation:
@@ -429,6 +453,22 @@ func (c *ActorClient) QueryMovies(_m *Actor) *MovieQuery {
 	return query
 }
 
+// QueryProfile queries the profile edge of a Actor.
+func (c *ActorClient) QueryProfile(_m *Actor) *ActorProfileQuery {
+	query := (&ActorProfileClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(actor.Table, actor.FieldID, id),
+			sqlgraph.To(actorprofile.Table, actorprofile.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, actor.ProfileTable, actor.ProfileColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *ActorClient) Hooks() []Hook {
 	return c.hooks.Actor
@@ -451,6 +491,485 @@ func (c *ActorClient) mutate(ctx context.Context, m *ActorMutation) (Value, erro
 		return (&ActorDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Actor mutation op: %q", m.Op())
+	}
+}
+
+// ActorAliasClient is a client for the ActorAlias schema.
+type ActorAliasClient struct {
+	config
+}
+
+// NewActorAliasClient returns a client for the ActorAlias from the given config.
+func NewActorAliasClient(c config) *ActorAliasClient {
+	return &ActorAliasClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `actoralias.Hooks(f(g(h())))`.
+func (c *ActorAliasClient) Use(hooks ...Hook) {
+	c.hooks.ActorAlias = append(c.hooks.ActorAlias, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `actoralias.Intercept(f(g(h())))`.
+func (c *ActorAliasClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ActorAlias = append(c.inters.ActorAlias, interceptors...)
+}
+
+// Create returns a builder for creating a ActorAlias entity.
+func (c *ActorAliasClient) Create() *ActorAliasCreate {
+	mutation := newActorAliasMutation(c.config, OpCreate)
+	return &ActorAliasCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ActorAlias entities.
+func (c *ActorAliasClient) CreateBulk(builders ...*ActorAliasCreate) *ActorAliasCreateBulk {
+	return &ActorAliasCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ActorAliasClient) MapCreateBulk(slice any, setFunc func(*ActorAliasCreate, int)) *ActorAliasCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ActorAliasCreateBulk{err: fmt.Errorf("calling to ActorAliasClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ActorAliasCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ActorAliasCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ActorAlias.
+func (c *ActorAliasClient) Update() *ActorAliasUpdate {
+	mutation := newActorAliasMutation(c.config, OpUpdate)
+	return &ActorAliasUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ActorAliasClient) UpdateOne(_m *ActorAlias) *ActorAliasUpdateOne {
+	mutation := newActorAliasMutation(c.config, OpUpdateOne, withActorAlias(_m))
+	return &ActorAliasUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ActorAliasClient) UpdateOneID(id int) *ActorAliasUpdateOne {
+	mutation := newActorAliasMutation(c.config, OpUpdateOne, withActorAliasID(id))
+	return &ActorAliasUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ActorAlias.
+func (c *ActorAliasClient) Delete() *ActorAliasDelete {
+	mutation := newActorAliasMutation(c.config, OpDelete)
+	return &ActorAliasDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ActorAliasClient) DeleteOne(_m *ActorAlias) *ActorAliasDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ActorAliasClient) DeleteOneID(id int) *ActorAliasDeleteOne {
+	builder := c.Delete().Where(actoralias.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ActorAliasDeleteOne{builder}
+}
+
+// Query returns a query builder for ActorAlias.
+func (c *ActorAliasClient) Query() *ActorAliasQuery {
+	return &ActorAliasQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeActorAlias},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ActorAlias entity by its id.
+func (c *ActorAliasClient) Get(ctx context.Context, id int) (*ActorAlias, error) {
+	return c.Query().Where(actoralias.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ActorAliasClient) GetX(ctx context.Context, id int) *ActorAlias {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryActor queries the actor edge of a ActorAlias.
+func (c *ActorAliasClient) QueryActor(_m *ActorAlias) *ActorProfileQuery {
+	query := (&ActorProfileClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(actoralias.Table, actoralias.FieldID, id),
+			sqlgraph.To(actorprofile.Table, actorprofile.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, actoralias.ActorTable, actoralias.ActorColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ActorAliasClient) Hooks() []Hook {
+	return c.hooks.ActorAlias
+}
+
+// Interceptors returns the client interceptors.
+func (c *ActorAliasClient) Interceptors() []Interceptor {
+	return c.inters.ActorAlias
+}
+
+func (c *ActorAliasClient) mutate(ctx context.Context, m *ActorAliasMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ActorAliasCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ActorAliasUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ActorAliasUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ActorAliasDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ActorAlias mutation op: %q", m.Op())
+	}
+}
+
+// ActorImageClient is a client for the ActorImage schema.
+type ActorImageClient struct {
+	config
+}
+
+// NewActorImageClient returns a client for the ActorImage from the given config.
+func NewActorImageClient(c config) *ActorImageClient {
+	return &ActorImageClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `actorimage.Hooks(f(g(h())))`.
+func (c *ActorImageClient) Use(hooks ...Hook) {
+	c.hooks.ActorImage = append(c.hooks.ActorImage, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `actorimage.Intercept(f(g(h())))`.
+func (c *ActorImageClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ActorImage = append(c.inters.ActorImage, interceptors...)
+}
+
+// Create returns a builder for creating a ActorImage entity.
+func (c *ActorImageClient) Create() *ActorImageCreate {
+	mutation := newActorImageMutation(c.config, OpCreate)
+	return &ActorImageCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ActorImage entities.
+func (c *ActorImageClient) CreateBulk(builders ...*ActorImageCreate) *ActorImageCreateBulk {
+	return &ActorImageCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ActorImageClient) MapCreateBulk(slice any, setFunc func(*ActorImageCreate, int)) *ActorImageCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ActorImageCreateBulk{err: fmt.Errorf("calling to ActorImageClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ActorImageCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ActorImageCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ActorImage.
+func (c *ActorImageClient) Update() *ActorImageUpdate {
+	mutation := newActorImageMutation(c.config, OpUpdate)
+	return &ActorImageUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ActorImageClient) UpdateOne(_m *ActorImage) *ActorImageUpdateOne {
+	mutation := newActorImageMutation(c.config, OpUpdateOne, withActorImage(_m))
+	return &ActorImageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ActorImageClient) UpdateOneID(id int) *ActorImageUpdateOne {
+	mutation := newActorImageMutation(c.config, OpUpdateOne, withActorImageID(id))
+	return &ActorImageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ActorImage.
+func (c *ActorImageClient) Delete() *ActorImageDelete {
+	mutation := newActorImageMutation(c.config, OpDelete)
+	return &ActorImageDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ActorImageClient) DeleteOne(_m *ActorImage) *ActorImageDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ActorImageClient) DeleteOneID(id int) *ActorImageDeleteOne {
+	builder := c.Delete().Where(actorimage.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ActorImageDeleteOne{builder}
+}
+
+// Query returns a query builder for ActorImage.
+func (c *ActorImageClient) Query() *ActorImageQuery {
+	return &ActorImageQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeActorImage},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ActorImage entity by its id.
+func (c *ActorImageClient) Get(ctx context.Context, id int) (*ActorImage, error) {
+	return c.Query().Where(actorimage.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ActorImageClient) GetX(ctx context.Context, id int) *ActorImage {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryActor queries the actor edge of a ActorImage.
+func (c *ActorImageClient) QueryActor(_m *ActorImage) *ActorProfileQuery {
+	query := (&ActorProfileClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(actorimage.Table, actorimage.FieldID, id),
+			sqlgraph.To(actorprofile.Table, actorprofile.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, actorimage.ActorTable, actorimage.ActorColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ActorImageClient) Hooks() []Hook {
+	return c.hooks.ActorImage
+}
+
+// Interceptors returns the client interceptors.
+func (c *ActorImageClient) Interceptors() []Interceptor {
+	return c.inters.ActorImage
+}
+
+func (c *ActorImageClient) mutate(ctx context.Context, m *ActorImageMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ActorImageCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ActorImageUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ActorImageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ActorImageDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ActorImage mutation op: %q", m.Op())
+	}
+}
+
+// ActorProfileClient is a client for the ActorProfile schema.
+type ActorProfileClient struct {
+	config
+}
+
+// NewActorProfileClient returns a client for the ActorProfile from the given config.
+func NewActorProfileClient(c config) *ActorProfileClient {
+	return &ActorProfileClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `actorprofile.Hooks(f(g(h())))`.
+func (c *ActorProfileClient) Use(hooks ...Hook) {
+	c.hooks.ActorProfile = append(c.hooks.ActorProfile, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `actorprofile.Intercept(f(g(h())))`.
+func (c *ActorProfileClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ActorProfile = append(c.inters.ActorProfile, interceptors...)
+}
+
+// Create returns a builder for creating a ActorProfile entity.
+func (c *ActorProfileClient) Create() *ActorProfileCreate {
+	mutation := newActorProfileMutation(c.config, OpCreate)
+	return &ActorProfileCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ActorProfile entities.
+func (c *ActorProfileClient) CreateBulk(builders ...*ActorProfileCreate) *ActorProfileCreateBulk {
+	return &ActorProfileCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ActorProfileClient) MapCreateBulk(slice any, setFunc func(*ActorProfileCreate, int)) *ActorProfileCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ActorProfileCreateBulk{err: fmt.Errorf("calling to ActorProfileClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ActorProfileCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ActorProfileCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ActorProfile.
+func (c *ActorProfileClient) Update() *ActorProfileUpdate {
+	mutation := newActorProfileMutation(c.config, OpUpdate)
+	return &ActorProfileUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ActorProfileClient) UpdateOne(_m *ActorProfile) *ActorProfileUpdateOne {
+	mutation := newActorProfileMutation(c.config, OpUpdateOne, withActorProfile(_m))
+	return &ActorProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ActorProfileClient) UpdateOneID(id int) *ActorProfileUpdateOne {
+	mutation := newActorProfileMutation(c.config, OpUpdateOne, withActorProfileID(id))
+	return &ActorProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ActorProfile.
+func (c *ActorProfileClient) Delete() *ActorProfileDelete {
+	mutation := newActorProfileMutation(c.config, OpDelete)
+	return &ActorProfileDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ActorProfileClient) DeleteOne(_m *ActorProfile) *ActorProfileDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ActorProfileClient) DeleteOneID(id int) *ActorProfileDeleteOne {
+	builder := c.Delete().Where(actorprofile.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ActorProfileDeleteOne{builder}
+}
+
+// Query returns a query builder for ActorProfile.
+func (c *ActorProfileClient) Query() *ActorProfileQuery {
+	return &ActorProfileQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeActorProfile},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ActorProfile entity by its id.
+func (c *ActorProfileClient) Get(ctx context.Context, id int) (*ActorProfile, error) {
+	return c.Query().Where(actorprofile.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ActorProfileClient) GetX(ctx context.Context, id int) *ActorProfile {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QuerySources queries the sources edge of a ActorProfile.
+func (c *ActorProfileClient) QuerySources(_m *ActorProfile) *ActorQuery {
+	query := (&ActorClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(actorprofile.Table, actorprofile.FieldID, id),
+			sqlgraph.To(actor.Table, actor.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, actorprofile.SourcesTable, actorprofile.SourcesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryAliases queries the aliases edge of a ActorProfile.
+func (c *ActorProfileClient) QueryAliases(_m *ActorProfile) *ActorAliasQuery {
+	query := (&ActorAliasClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(actorprofile.Table, actorprofile.FieldID, id),
+			sqlgraph.To(actoralias.Table, actoralias.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, actorprofile.AliasesTable, actorprofile.AliasesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryImages queries the images edge of a ActorProfile.
+func (c *ActorProfileClient) QueryImages(_m *ActorProfile) *ActorImageQuery {
+	query := (&ActorImageClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(actorprofile.Table, actorprofile.FieldID, id),
+			sqlgraph.To(actorimage.Table, actorimage.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, actorprofile.ImagesTable, actorprofile.ImagesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ActorProfileClient) Hooks() []Hook {
+	return c.hooks.ActorProfile
+}
+
+// Interceptors returns the client interceptors.
+func (c *ActorProfileClient) Interceptors() []Interceptor {
+	return c.inters.ActorProfile
+}
+
+func (c *ActorProfileClient) mutate(ctx context.Context, m *ActorProfileMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ActorProfileCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ActorProfileUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ActorProfileUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ActorProfileDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ActorProfile mutation op: %q", m.Op())
 	}
 }
 
@@ -2166,11 +2685,13 @@ func (c *WatchHistoryClient) mutate(ctx context.Context, m *WatchHistoryMutation
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Actor, EmbyNotification, File, MetadataCache, Movie, OfflineDownload, Setting,
-		Subscription, Subtitle, Tag, Task, ViewedMovie, WatchHistory []ent.Hook
+		Actor, ActorAlias, ActorImage, ActorProfile, EmbyNotification, File,
+		MetadataCache, Movie, OfflineDownload, Setting, Subscription, Subtitle, Tag,
+		Task, ViewedMovie, WatchHistory []ent.Hook
 	}
 	inters struct {
-		Actor, EmbyNotification, File, MetadataCache, Movie, OfflineDownload, Setting,
-		Subscription, Subtitle, Tag, Task, ViewedMovie, WatchHistory []ent.Interceptor
+		Actor, ActorAlias, ActorImage, ActorProfile, EmbyNotification, File,
+		MetadataCache, Movie, OfflineDownload, Setting, Subscription, Subtitle, Tag,
+		Task, ViewedMovie, WatchHistory []ent.Interceptor
 	}
 )

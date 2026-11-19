@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/ppxb/miyabi/internal/ent/actor"
+	"github.com/ppxb/miyabi/internal/ent/actoralias"
+	"github.com/ppxb/miyabi/internal/ent/actorimage"
+	"github.com/ppxb/miyabi/internal/ent/actorprofile"
 	"github.com/ppxb/miyabi/internal/ent/embynotification"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/metadatacache"
@@ -53,6 +56,87 @@ func init() {
 	actorDescName := actorFields[2].Descriptor()
 	// actor.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	actor.NameValidator = actorDescName.Validators[0].(func(string) error)
+	actoraliasMixin := schema.ActorAlias{}.Mixin()
+	actoraliasMixinFields0 := actoraliasMixin[0].Fields()
+	_ = actoraliasMixinFields0
+	actoraliasFields := schema.ActorAlias{}.Fields()
+	_ = actoraliasFields
+	// actoraliasDescCreatedAt is the schema descriptor for created_at field.
+	actoraliasDescCreatedAt := actoraliasMixinFields0[0].Descriptor()
+	// actoralias.DefaultCreatedAt holds the default value on creation for the created_at field.
+	actoralias.DefaultCreatedAt = actoraliasDescCreatedAt.Default.(func() time.Time)
+	// actoraliasDescUpdatedAt is the schema descriptor for updated_at field.
+	actoraliasDescUpdatedAt := actoraliasMixinFields0[1].Descriptor()
+	// actoralias.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	actoralias.DefaultUpdatedAt = actoraliasDescUpdatedAt.Default.(func() time.Time)
+	// actoralias.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	actoralias.UpdateDefaultUpdatedAt = actoraliasDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// actoraliasDescAlias is the schema descriptor for alias field.
+	actoraliasDescAlias := actoraliasFields[0].Descriptor()
+	// actoralias.AliasValidator is a validator for the "alias" field. It is called by the builders before save.
+	actoralias.AliasValidator = actoraliasDescAlias.Validators[0].(func(string) error)
+	// actoraliasDescNormalized is the schema descriptor for normalized field.
+	actoraliasDescNormalized := actoraliasFields[1].Descriptor()
+	// actoralias.NormalizedValidator is a validator for the "normalized" field. It is called by the builders before save.
+	actoralias.NormalizedValidator = actoraliasDescNormalized.Validators[0].(func(string) error)
+	actorimageMixin := schema.ActorImage{}.Mixin()
+	actorimageMixinFields0 := actorimageMixin[0].Fields()
+	_ = actorimageMixinFields0
+	actorimageFields := schema.ActorImage{}.Fields()
+	_ = actorimageFields
+	// actorimageDescCreatedAt is the schema descriptor for created_at field.
+	actorimageDescCreatedAt := actorimageMixinFields0[0].Descriptor()
+	// actorimage.DefaultCreatedAt holds the default value on creation for the created_at field.
+	actorimage.DefaultCreatedAt = actorimageDescCreatedAt.Default.(func() time.Time)
+	// actorimageDescUpdatedAt is the schema descriptor for updated_at field.
+	actorimageDescUpdatedAt := actorimageMixinFields0[1].Descriptor()
+	// actorimage.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	actorimage.DefaultUpdatedAt = actorimageDescUpdatedAt.Default.(func() time.Time)
+	// actorimage.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	actorimage.UpdateDefaultUpdatedAt = actorimageDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// actorimageDescProvider is the schema descriptor for provider field.
+	actorimageDescProvider := actorimageFields[0].Descriptor()
+	// actorimage.DefaultProvider holds the default value on creation for the provider field.
+	actorimage.DefaultProvider = actorimageDescProvider.Default.(string)
+	// actorimageDescSourceID is the schema descriptor for source_id field.
+	actorimageDescSourceID := actorimageFields[1].Descriptor()
+	// actorimage.DefaultSourceID holds the default value on creation for the source_id field.
+	actorimage.DefaultSourceID = actorimageDescSourceID.Default.(string)
+	// actorimageDescURL is the schema descriptor for url field.
+	actorimageDescURL := actorimageFields[2].Descriptor()
+	// actorimage.URLValidator is a validator for the "url" field. It is called by the builders before save.
+	actorimage.URLValidator = actorimageDescURL.Validators[0].(func(string) error)
+	// actorimageDescRole is the schema descriptor for role field.
+	actorimageDescRole := actorimageFields[3].Descriptor()
+	// actorimage.DefaultRole holds the default value on creation for the role field.
+	actorimage.DefaultRole = actorimageDescRole.Default.(string)
+	// actorimageDescPosition is the schema descriptor for position field.
+	actorimageDescPosition := actorimageFields[4].Descriptor()
+	// actorimage.DefaultPosition holds the default value on creation for the position field.
+	actorimage.DefaultPosition = actorimageDescPosition.Default.(int)
+	actorprofileMixin := schema.ActorProfile{}.Mixin()
+	actorprofileMixinFields0 := actorprofileMixin[0].Fields()
+	_ = actorprofileMixinFields0
+	actorprofileFields := schema.ActorProfile{}.Fields()
+	_ = actorprofileFields
+	// actorprofileDescCreatedAt is the schema descriptor for created_at field.
+	actorprofileDescCreatedAt := actorprofileMixinFields0[0].Descriptor()
+	// actorprofile.DefaultCreatedAt holds the default value on creation for the created_at field.
+	actorprofile.DefaultCreatedAt = actorprofileDescCreatedAt.Default.(func() time.Time)
+	// actorprofileDescUpdatedAt is the schema descriptor for updated_at field.
+	actorprofileDescUpdatedAt := actorprofileMixinFields0[1].Descriptor()
+	// actorprofile.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	actorprofile.DefaultUpdatedAt = actorprofileDescUpdatedAt.Default.(func() time.Time)
+	// actorprofile.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	actorprofile.UpdateDefaultUpdatedAt = actorprofileDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// actorprofileDescMatchKey is the schema descriptor for match_key field.
+	actorprofileDescMatchKey := actorprofileFields[0].Descriptor()
+	// actorprofile.MatchKeyValidator is a validator for the "match_key" field. It is called by the builders before save.
+	actorprofile.MatchKeyValidator = actorprofileDescMatchKey.Validators[0].(func(string) error)
+	// actorprofileDescName is the schema descriptor for name field.
+	actorprofileDescName := actorprofileFields[1].Descriptor()
+	// actorprofile.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	actorprofile.NameValidator = actorprofileDescName.Validators[0].(func(string) error)
 	embynotificationMixin := schema.EmbyNotification{}.Mixin()
 	embynotificationMixinFields0 := embynotificationMixin[0].Fields()
 	_ = embynotificationMixinFields0

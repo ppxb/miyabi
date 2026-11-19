@@ -1,0 +1,96 @@
+package api
+
+import (
+	"context"
+	"errors"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/ppxb/miyabi/internal/actors"
+	"github.com/ppxb/miyabi/internal/domain"
+	lib "github.com/ppxb/miyabi/internal/library"
+)
+
+// ActorManager exposes the canonical actor read model.
+type ActorManager interface {
+	Catalog(context.Context, string, int, int) (actors.Page, error)
+	Detail(context.Context, string) (actors.Detail, error)
+	FetchImage(context.Context, string, int) ([]byte, error)
+}
+
+func actorListHandler(manager ActorManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		page, err := queryInt(c, "page", 1, 1, 1<<31-1)
+		if err != nil {
+			c.Error(badRequest(err))
+			return
+		}
+		limit, err := queryInt(c, "limit", 24, 1, 100)
+		if err != nil {
+			c.Error(badRequest(err))
+			return
+		}
+		result, err := manager.Catalog(c.Request.Context(), c.Query("q"), page, limit)
+		respond(c, result, err)
+	}
+}
+
+type actorDetailResponse struct {
+	actors.Detail
+	Films lib.Page `json:"films"`
+}
+
+func actorDetailHandler(manager ActorManager, library LibraryManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[struct {
+			Key string `uri:"key" binding:"required,len=40,hexadecimal"`
+		}](c)
+		if !ok {
+			return
+		}
+		detail, err := manager.Detail(c.Request.Context(), uri.Key)
+		if err != nil {
+			if errors.Is(err, actors.ErrNotFound) {
+				c.Error(domain.E(domain.KindNotFound, "演员不存在", nil))
+				return
+			}
+			c.Error(err)
+			return
+		}
+		films, err := library.BrowseMovies(c.Request.Context(), lib.BrowseFilter{
+			ActorNames: detail.Names,
+			Sort:       "release",
+			Page:       1,
+			Limit:      100,
+		})
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		respond(c, actorDetailResponse{Detail: detail, Films: films}, nil)
+	}
+}
+
+func actorImageHandler(manager ActorManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[struct {
+			Key   string `uri:"key" binding:"required,len=40,hexadecimal"`
+			Index int    `uri:"index" binding:"min=0,max=999"`
+		}](c)
+		if !ok {
+			return
+		}
+		data, err := manager.FetchImage(c.Request.Context(), uri.Key, uri.Index)
+		if err != nil {
+			if errors.Is(err, actors.ErrNotFound) {
+				c.Status(http.StatusNotFound)
+				return
+			}
+			c.Error(err)
+			return
+		}
+		c.Header("Cache-Control", "private, max-age=86400")
+		c.Data(http.StatusOK, http.DetectContentType(data), data)
+	}
+}

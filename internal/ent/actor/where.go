@@ -558,6 +558,29 @@ func HasMoviesWith(preds ...predicate.Movie) predicate.Actor {
 	})
 }
 
+// HasProfile applies the HasEdge predicate on the "profile" edge.
+func HasProfile() predicate.Actor {
+	return predicate.Actor(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, ProfileTable, ProfileColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProfileWith applies the HasEdge predicate on the "profile" edge with a given conditions (other predicates).
+func HasProfileWith(preds ...predicate.ActorProfile) predicate.Actor {
+	return predicate.Actor(func(s *sql.Selector) {
+		step := newProfileStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.Actor) predicate.Actor {
 	return predicate.Actor(sql.AndPredicates(predicates...))

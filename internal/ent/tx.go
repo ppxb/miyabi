@@ -14,6 +14,12 @@ type Tx struct {
 	config
 	// Actor is the client for interacting with the Actor builders.
 	Actor *ActorClient
+	// ActorAlias is the client for interacting with the ActorAlias builders.
+	ActorAlias *ActorAliasClient
+	// ActorImage is the client for interacting with the ActorImage builders.
+	ActorImage *ActorImageClient
+	// ActorProfile is the client for interacting with the ActorProfile builders.
+	ActorProfile *ActorProfileClient
 	// EmbyNotification is the client for interacting with the EmbyNotification builders.
 	EmbyNotification *EmbyNotificationClient
 	// File is the client for interacting with the File builders.
@@ -170,6 +176,9 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.Actor = NewActorClient(tx.config)
+	tx.ActorAlias = NewActorAliasClient(tx.config)
+	tx.ActorImage = NewActorImageClient(tx.config)
+	tx.ActorProfile = NewActorProfileClient(tx.config)
 	tx.EmbyNotification = NewEmbyNotificationClient(tx.config)
 	tx.File = NewFileClient(tx.config)
 	tx.MetadataCache = NewMetadataCacheClient(tx.config)

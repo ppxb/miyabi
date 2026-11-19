@@ -32,6 +32,7 @@ type Dependencies struct {
 	Emby           EmbyManager
 	JavDB          JavDBManager
 	Sources        SourceManager
+	Actors         ActorManager
 	Frontend       fs.FS
 	STRMToken      string
 	TrustedProxies []string
@@ -107,6 +108,13 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.GET("/library/pending", libraryPendingHandler(deps.Library))
 	protected.POST("/library/rebuild", libraryRebuildHandler(deps.Library))
 	protected.GET("/library/artwork/:key", libraryArtworkHandler(deps.Artwork))
+
+	actorsAPI := protected.Group("/actors", noStore())
+	{
+		actorsAPI.GET("", actorListHandler(deps.Actors))
+		actorsAPI.GET("/:key", actorDetailHandler(deps.Actors, deps.Library))
+		actorsAPI.GET("/:key/image/:index", actorImageHandler(deps.Actors))
+	}
 
 	playAPI := protected.Group("/play", noStore())
 	playAPI.GET("/files", playFilesHandler(deps.Play))

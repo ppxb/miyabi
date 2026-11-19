@@ -19,12 +19,21 @@ var (
 		{Name: "name_zht", Type: field.TypeString, Nullable: true},
 		{Name: "gender", Type: field.TypeEnum, Enums: []string{"female", "male", "unknown"}, Default: "unknown"},
 		{Name: "avatar", Type: field.TypeString, Nullable: true},
+		{Name: "actor_profile", Type: field.TypeInt, Nullable: true},
 	}
 	// ActorsTable holds the schema information for the "actors" table.
 	ActorsTable = &schema.Table{
 		Name:       "actors",
 		Columns:    ActorsColumns,
 		PrimaryKey: []*schema.Column{ActorsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "actors_actor_profiles_profile",
+				Columns:    []*schema.Column{ActorsColumns[9]},
+				RefColumns: []*schema.Column{ActorProfilesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "actor_provider_source_id",
@@ -32,6 +41,72 @@ var (
 				Columns: []*schema.Column{ActorsColumns[3], ActorsColumns[4]},
 			},
 		},
+	}
+	// ActorAliasColumns holds the columns for the "actor_alias" table.
+	ActorAliasColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "alias", Type: field.TypeString},
+		{Name: "normalized", Type: field.TypeString},
+		{Name: "actor_profile_aliases", Type: field.TypeInt, Nullable: true},
+	}
+	// ActorAliasTable holds the schema information for the "actor_alias" table.
+	ActorAliasTable = &schema.Table{
+		Name:       "actor_alias",
+		Columns:    ActorAliasColumns,
+		PrimaryKey: []*schema.Column{ActorAliasColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "actor_alias_actor_profiles_aliases",
+				Columns:    []*schema.Column{ActorAliasColumns[5]},
+				RefColumns: []*schema.Column{ActorProfilesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+	}
+	// ActorImagesColumns holds the columns for the "actor_images" table.
+	ActorImagesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "provider", Type: field.TypeString, Default: ""},
+		{Name: "source_id", Type: field.TypeString, Default: ""},
+		{Name: "url", Type: field.TypeString},
+		{Name: "role", Type: field.TypeString, Default: ""},
+		{Name: "position", Type: field.TypeInt, Default: 0},
+		{Name: "actor_profile_images", Type: field.TypeInt, Nullable: true},
+	}
+	// ActorImagesTable holds the schema information for the "actor_images" table.
+	ActorImagesTable = &schema.Table{
+		Name:       "actor_images",
+		Columns:    ActorImagesColumns,
+		PrimaryKey: []*schema.Column{ActorImagesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "actor_images_actor_profiles_images",
+				Columns:    []*schema.Column{ActorImagesColumns[8]},
+				RefColumns: []*schema.Column{ActorProfilesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+	}
+	// ActorProfilesColumns holds the columns for the "actor_profiles" table.
+	ActorProfilesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "match_key", Type: field.TypeString, Unique: true},
+		{Name: "name", Type: field.TypeString},
+		{Name: "name_zht", Type: field.TypeString, Nullable: true},
+		{Name: "gender", Type: field.TypeEnum, Enums: []string{"female", "male", "unknown"}, Default: "unknown"},
+		{Name: "avatar", Type: field.TypeString, Nullable: true},
+	}
+	// ActorProfilesTable holds the schema information for the "actor_profiles" table.
+	ActorProfilesTable = &schema.Table{
+		Name:       "actor_profiles",
+		Columns:    ActorProfilesColumns,
+		PrimaryKey: []*schema.Column{ActorProfilesColumns[0]},
 	}
 	// EmbyNotificationsColumns holds the columns for the "emby_notifications" table.
 	EmbyNotificationsColumns = []*schema.Column{
@@ -458,6 +533,9 @@ var (
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		ActorsTable,
+		ActorAliasTable,
+		ActorImagesTable,
+		ActorProfilesTable,
 		EmbyNotificationsTable,
 		FilesTable,
 		MetadataCachesTable,
@@ -476,6 +554,9 @@ var (
 )
 
 func init() {
+	ActorsTable.ForeignKeys[0].RefTable = ActorProfilesTable
+	ActorAliasTable.ForeignKeys[0].RefTable = ActorProfilesTable
+	ActorImagesTable.ForeignKeys[0].RefTable = ActorProfilesTable
 	FilesTable.ForeignKeys[0].RefTable = MoviesTable
 	SubtitlesTable.ForeignKeys[0].RefTable = MoviesTable
 	MovieActorsTable.ForeignKeys[0].RefTable = MoviesTable

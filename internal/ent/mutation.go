@@ -15,6 +15,9 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/domain/download"
 	"github.com/ppxb/miyabi/internal/ent/actor"
+	"github.com/ppxb/miyabi/internal/ent/actoralias"
+	"github.com/ppxb/miyabi/internal/ent/actorimage"
+	"github.com/ppxb/miyabi/internal/ent/actorprofile"
 	"github.com/ppxb/miyabi/internal/ent/embynotification"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/metadatacache"
@@ -41,6 +44,9 @@ const (
 
 	// Node types.
 	TypeActor            = "Actor"
+	TypeActorAlias       = "ActorAlias"
+	TypeActorImage       = "ActorImage"
+	TypeActorProfile     = "ActorProfile"
 	TypeEmbyNotification = "EmbyNotification"
 	TypeFile             = "File"
 	TypeMetadataCache    = "MetadataCache"
@@ -58,24 +64,26 @@ const (
 // ActorMutation represents an operation that mutates the Actor nodes in the graph.
 type ActorMutation struct {
 	config
-	op            Op
-	typ           string
-	id            *int
-	created_at    *time.Time
-	updated_at    *time.Time
-	provider      *string
-	source_id     *string
-	name          *string
-	name_zht      *string
-	gender        *actor.Gender
-	avatar        *string
-	clearedFields map[string]struct{}
-	movies        map[int]struct{}
-	removedmovies map[int]struct{}
-	clearedmovies bool
-	done          bool
-	oldValue      func(context.Context) (*Actor, error)
-	predicates    []predicate.Actor
+	op             Op
+	typ            string
+	id             *int
+	created_at     *time.Time
+	updated_at     *time.Time
+	provider       *string
+	source_id      *string
+	name           *string
+	name_zht       *string
+	gender         *actor.Gender
+	avatar         *string
+	clearedFields  map[string]struct{}
+	movies         map[int]struct{}
+	removedmovies  map[int]struct{}
+	clearedmovies  bool
+	profile        *int
+	clearedprofile bool
+	done           bool
+	oldValue       func(context.Context) (*Actor, error)
+	predicates     []predicate.Actor
 }
 
 var _ ent.Mutation = (*ActorMutation)(nil)
@@ -544,6 +552,45 @@ func (m *ActorMutation) ResetMovies() {
 	m.removedmovies = nil
 }
 
+// SetProfileID sets the "profile" edge to the ActorProfile entity by id.
+func (m *ActorMutation) SetProfileID(id int) {
+	m.profile = &id
+}
+
+// ClearProfile clears the "profile" edge to the ActorProfile entity.
+func (m *ActorMutation) ClearProfile() {
+	m.clearedprofile = true
+}
+
+// ProfileCleared reports if the "profile" edge to the ActorProfile entity was cleared.
+func (m *ActorMutation) ProfileCleared() bool {
+	return m.clearedprofile
+}
+
+// ProfileID returns the "profile" edge ID in the mutation.
+func (m *ActorMutation) ProfileID() (id int, exists bool) {
+	if m.profile != nil {
+		return *m.profile, true
+	}
+	return
+}
+
+// ProfileIDs returns the "profile" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ProfileID instead. It exists only for internal usage by the builders.
+func (m *ActorMutation) ProfileIDs() (ids []int) {
+	if id := m.profile; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetProfile resets all changes to the "profile" edge.
+func (m *ActorMutation) ResetProfile() {
+	m.profile = nil
+	m.clearedprofile = false
+}
+
 // Where appends a list predicates to the ActorMutation builder.
 func (m *ActorMutation) Where(ps ...predicate.Actor) {
 	m.predicates = append(m.predicates, ps...)
@@ -811,9 +858,12 @@ func (m *ActorMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ActorMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.movies != nil {
 		edges = append(edges, actor.EdgeMovies)
+	}
+	if m.profile != nil {
+		edges = append(edges, actor.EdgeProfile)
 	}
 	return edges
 }
@@ -828,13 +878,17 @@ func (m *ActorMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case actor.EdgeProfile:
+		if id := m.profile; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ActorMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.removedmovies != nil {
 		edges = append(edges, actor.EdgeMovies)
 	}
@@ -857,9 +911,12 @@ func (m *ActorMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ActorMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.clearedmovies {
 		edges = append(edges, actor.EdgeMovies)
+	}
+	if m.clearedprofile {
+		edges = append(edges, actor.EdgeProfile)
 	}
 	return edges
 }
@@ -870,6 +927,8 @@ func (m *ActorMutation) EdgeCleared(name string) bool {
 	switch name {
 	case actor.EdgeMovies:
 		return m.clearedmovies
+	case actor.EdgeProfile:
+		return m.clearedprofile
 	}
 	return false
 }
@@ -878,6 +937,9 @@ func (m *ActorMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *ActorMutation) ClearEdge(name string) error {
 	switch name {
+	case actor.EdgeProfile:
+		m.ClearProfile()
+		return nil
 	}
 	return fmt.Errorf("unknown Actor unique edge %s", name)
 }
@@ -889,8 +951,2269 @@ func (m *ActorMutation) ResetEdge(name string) error {
 	case actor.EdgeMovies:
 		m.ResetMovies()
 		return nil
+	case actor.EdgeProfile:
+		m.ResetProfile()
+		return nil
 	}
 	return fmt.Errorf("unknown Actor edge %s", name)
+}
+
+// ActorAliasMutation represents an operation that mutates the ActorAlias nodes in the graph.
+type ActorAliasMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *int
+	created_at    *time.Time
+	updated_at    *time.Time
+	alias         *string
+	normalized    *string
+	clearedFields map[string]struct{}
+	actor         *int
+	clearedactor  bool
+	done          bool
+	oldValue      func(context.Context) (*ActorAlias, error)
+	predicates    []predicate.ActorAlias
+}
+
+var _ ent.Mutation = (*ActorAliasMutation)(nil)
+
+// actoraliasOption allows management of the mutation configuration using functional options.
+type actoraliasOption func(*ActorAliasMutation)
+
+// newActorAliasMutation creates new mutation for the ActorAlias entity.
+func newActorAliasMutation(c config, op Op, opts ...actoraliasOption) *ActorAliasMutation {
+	m := &ActorAliasMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeActorAlias,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withActorAliasID sets the ID field of the mutation.
+func withActorAliasID(id int) actoraliasOption {
+	return func(m *ActorAliasMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ActorAlias
+		)
+		m.oldValue = func(ctx context.Context) (*ActorAlias, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ActorAlias.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withActorAlias sets the old ActorAlias of the mutation.
+func withActorAlias(node *ActorAlias) actoraliasOption {
+	return func(m *ActorAliasMutation) {
+		m.oldValue = func(context.Context) (*ActorAlias, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ActorAliasMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ActorAliasMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ActorAliasMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ActorAliasMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ActorAlias.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ActorAliasMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ActorAliasMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ActorAlias entity.
+// If the ActorAlias object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorAliasMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ActorAliasMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ActorAliasMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ActorAliasMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the ActorAlias entity.
+// If the ActorAlias object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorAliasMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ActorAliasMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetAlias sets the "alias" field.
+func (m *ActorAliasMutation) SetAlias(s string) {
+	m.alias = &s
+}
+
+// Alias returns the value of the "alias" field in the mutation.
+func (m *ActorAliasMutation) Alias() (r string, exists bool) {
+	v := m.alias
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAlias returns the old "alias" field's value of the ActorAlias entity.
+// If the ActorAlias object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorAliasMutation) OldAlias(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAlias is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAlias requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAlias: %w", err)
+	}
+	return oldValue.Alias, nil
+}
+
+// ResetAlias resets all changes to the "alias" field.
+func (m *ActorAliasMutation) ResetAlias() {
+	m.alias = nil
+}
+
+// SetNormalized sets the "normalized" field.
+func (m *ActorAliasMutation) SetNormalized(s string) {
+	m.normalized = &s
+}
+
+// Normalized returns the value of the "normalized" field in the mutation.
+func (m *ActorAliasMutation) Normalized() (r string, exists bool) {
+	v := m.normalized
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNormalized returns the old "normalized" field's value of the ActorAlias entity.
+// If the ActorAlias object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorAliasMutation) OldNormalized(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNormalized is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNormalized requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNormalized: %w", err)
+	}
+	return oldValue.Normalized, nil
+}
+
+// ResetNormalized resets all changes to the "normalized" field.
+func (m *ActorAliasMutation) ResetNormalized() {
+	m.normalized = nil
+}
+
+// SetActorID sets the "actor" edge to the ActorProfile entity by id.
+func (m *ActorAliasMutation) SetActorID(id int) {
+	m.actor = &id
+}
+
+// ClearActor clears the "actor" edge to the ActorProfile entity.
+func (m *ActorAliasMutation) ClearActor() {
+	m.clearedactor = true
+}
+
+// ActorCleared reports if the "actor" edge to the ActorProfile entity was cleared.
+func (m *ActorAliasMutation) ActorCleared() bool {
+	return m.clearedactor
+}
+
+// ActorID returns the "actor" edge ID in the mutation.
+func (m *ActorAliasMutation) ActorID() (id int, exists bool) {
+	if m.actor != nil {
+		return *m.actor, true
+	}
+	return
+}
+
+// ActorIDs returns the "actor" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ActorID instead. It exists only for internal usage by the builders.
+func (m *ActorAliasMutation) ActorIDs() (ids []int) {
+	if id := m.actor; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetActor resets all changes to the "actor" edge.
+func (m *ActorAliasMutation) ResetActor() {
+	m.actor = nil
+	m.clearedactor = false
+}
+
+// Where appends a list predicates to the ActorAliasMutation builder.
+func (m *ActorAliasMutation) Where(ps ...predicate.ActorAlias) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ActorAliasMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ActorAliasMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ActorAlias, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ActorAliasMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ActorAliasMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ActorAlias).
+func (m *ActorAliasMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ActorAliasMutation) Fields() []string {
+	fields := make([]string, 0, 4)
+	if m.created_at != nil {
+		fields = append(fields, actoralias.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, actoralias.FieldUpdatedAt)
+	}
+	if m.alias != nil {
+		fields = append(fields, actoralias.FieldAlias)
+	}
+	if m.normalized != nil {
+		fields = append(fields, actoralias.FieldNormalized)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ActorAliasMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case actoralias.FieldCreatedAt:
+		return m.CreatedAt()
+	case actoralias.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case actoralias.FieldAlias:
+		return m.Alias()
+	case actoralias.FieldNormalized:
+		return m.Normalized()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ActorAliasMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case actoralias.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case actoralias.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case actoralias.FieldAlias:
+		return m.OldAlias(ctx)
+	case actoralias.FieldNormalized:
+		return m.OldNormalized(ctx)
+	}
+	return nil, fmt.Errorf("unknown ActorAlias field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ActorAliasMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case actoralias.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case actoralias.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case actoralias.FieldAlias:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAlias(v)
+		return nil
+	case actoralias.FieldNormalized:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNormalized(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ActorAlias field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ActorAliasMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ActorAliasMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ActorAliasMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown ActorAlias numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ActorAliasMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ActorAliasMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ActorAliasMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown ActorAlias nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ActorAliasMutation) ResetField(name string) error {
+	switch name {
+	case actoralias.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case actoralias.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case actoralias.FieldAlias:
+		m.ResetAlias()
+		return nil
+	case actoralias.FieldNormalized:
+		m.ResetNormalized()
+		return nil
+	}
+	return fmt.Errorf("unknown ActorAlias field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ActorAliasMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.actor != nil {
+		edges = append(edges, actoralias.EdgeActor)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ActorAliasMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case actoralias.EdgeActor:
+		if id := m.actor; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ActorAliasMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ActorAliasMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ActorAliasMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedactor {
+		edges = append(edges, actoralias.EdgeActor)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ActorAliasMutation) EdgeCleared(name string) bool {
+	switch name {
+	case actoralias.EdgeActor:
+		return m.clearedactor
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ActorAliasMutation) ClearEdge(name string) error {
+	switch name {
+	case actoralias.EdgeActor:
+		m.ClearActor()
+		return nil
+	}
+	return fmt.Errorf("unknown ActorAlias unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ActorAliasMutation) ResetEdge(name string) error {
+	switch name {
+	case actoralias.EdgeActor:
+		m.ResetActor()
+		return nil
+	}
+	return fmt.Errorf("unknown ActorAlias edge %s", name)
+}
+
+// ActorImageMutation represents an operation that mutates the ActorImage nodes in the graph.
+type ActorImageMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *int
+	created_at    *time.Time
+	updated_at    *time.Time
+	provider      *string
+	source_id     *string
+	url           *string
+	role          *string
+	position      *int
+	addposition   *int
+	clearedFields map[string]struct{}
+	actor         *int
+	clearedactor  bool
+	done          bool
+	oldValue      func(context.Context) (*ActorImage, error)
+	predicates    []predicate.ActorImage
+}
+
+var _ ent.Mutation = (*ActorImageMutation)(nil)
+
+// actorimageOption allows management of the mutation configuration using functional options.
+type actorimageOption func(*ActorImageMutation)
+
+// newActorImageMutation creates new mutation for the ActorImage entity.
+func newActorImageMutation(c config, op Op, opts ...actorimageOption) *ActorImageMutation {
+	m := &ActorImageMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeActorImage,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withActorImageID sets the ID field of the mutation.
+func withActorImageID(id int) actorimageOption {
+	return func(m *ActorImageMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ActorImage
+		)
+		m.oldValue = func(ctx context.Context) (*ActorImage, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ActorImage.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withActorImage sets the old ActorImage of the mutation.
+func withActorImage(node *ActorImage) actorimageOption {
+	return func(m *ActorImageMutation) {
+		m.oldValue = func(context.Context) (*ActorImage, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ActorImageMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ActorImageMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ActorImageMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ActorImageMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ActorImage.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ActorImageMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ActorImageMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ActorImage entity.
+// If the ActorImage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorImageMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ActorImageMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ActorImageMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ActorImageMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the ActorImage entity.
+// If the ActorImage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorImageMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ActorImageMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetProvider sets the "provider" field.
+func (m *ActorImageMutation) SetProvider(s string) {
+	m.provider = &s
+}
+
+// Provider returns the value of the "provider" field in the mutation.
+func (m *ActorImageMutation) Provider() (r string, exists bool) {
+	v := m.provider
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProvider returns the old "provider" field's value of the ActorImage entity.
+// If the ActorImage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorImageMutation) OldProvider(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProvider is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProvider requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProvider: %w", err)
+	}
+	return oldValue.Provider, nil
+}
+
+// ResetProvider resets all changes to the "provider" field.
+func (m *ActorImageMutation) ResetProvider() {
+	m.provider = nil
+}
+
+// SetSourceID sets the "source_id" field.
+func (m *ActorImageMutation) SetSourceID(s string) {
+	m.source_id = &s
+}
+
+// SourceID returns the value of the "source_id" field in the mutation.
+func (m *ActorImageMutation) SourceID() (r string, exists bool) {
+	v := m.source_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceID returns the old "source_id" field's value of the ActorImage entity.
+// If the ActorImage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorImageMutation) OldSourceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceID: %w", err)
+	}
+	return oldValue.SourceID, nil
+}
+
+// ResetSourceID resets all changes to the "source_id" field.
+func (m *ActorImageMutation) ResetSourceID() {
+	m.source_id = nil
+}
+
+// SetURL sets the "url" field.
+func (m *ActorImageMutation) SetURL(s string) {
+	m.url = &s
+}
+
+// URL returns the value of the "url" field in the mutation.
+func (m *ActorImageMutation) URL() (r string, exists bool) {
+	v := m.url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldURL returns the old "url" field's value of the ActorImage entity.
+// If the ActorImage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorImageMutation) OldURL(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldURL: %w", err)
+	}
+	return oldValue.URL, nil
+}
+
+// ResetURL resets all changes to the "url" field.
+func (m *ActorImageMutation) ResetURL() {
+	m.url = nil
+}
+
+// SetRole sets the "role" field.
+func (m *ActorImageMutation) SetRole(s string) {
+	m.role = &s
+}
+
+// Role returns the value of the "role" field in the mutation.
+func (m *ActorImageMutation) Role() (r string, exists bool) {
+	v := m.role
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRole returns the old "role" field's value of the ActorImage entity.
+// If the ActorImage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorImageMutation) OldRole(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRole is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRole requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRole: %w", err)
+	}
+	return oldValue.Role, nil
+}
+
+// ResetRole resets all changes to the "role" field.
+func (m *ActorImageMutation) ResetRole() {
+	m.role = nil
+}
+
+// SetPosition sets the "position" field.
+func (m *ActorImageMutation) SetPosition(i int) {
+	m.position = &i
+	m.addposition = nil
+}
+
+// Position returns the value of the "position" field in the mutation.
+func (m *ActorImageMutation) Position() (r int, exists bool) {
+	v := m.position
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPosition returns the old "position" field's value of the ActorImage entity.
+// If the ActorImage object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorImageMutation) OldPosition(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPosition is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPosition requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPosition: %w", err)
+	}
+	return oldValue.Position, nil
+}
+
+// AddPosition adds i to the "position" field.
+func (m *ActorImageMutation) AddPosition(i int) {
+	if m.addposition != nil {
+		*m.addposition += i
+	} else {
+		m.addposition = &i
+	}
+}
+
+// AddedPosition returns the value that was added to the "position" field in this mutation.
+func (m *ActorImageMutation) AddedPosition() (r int, exists bool) {
+	v := m.addposition
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPosition resets all changes to the "position" field.
+func (m *ActorImageMutation) ResetPosition() {
+	m.position = nil
+	m.addposition = nil
+}
+
+// SetActorID sets the "actor" edge to the ActorProfile entity by id.
+func (m *ActorImageMutation) SetActorID(id int) {
+	m.actor = &id
+}
+
+// ClearActor clears the "actor" edge to the ActorProfile entity.
+func (m *ActorImageMutation) ClearActor() {
+	m.clearedactor = true
+}
+
+// ActorCleared reports if the "actor" edge to the ActorProfile entity was cleared.
+func (m *ActorImageMutation) ActorCleared() bool {
+	return m.clearedactor
+}
+
+// ActorID returns the "actor" edge ID in the mutation.
+func (m *ActorImageMutation) ActorID() (id int, exists bool) {
+	if m.actor != nil {
+		return *m.actor, true
+	}
+	return
+}
+
+// ActorIDs returns the "actor" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ActorID instead. It exists only for internal usage by the builders.
+func (m *ActorImageMutation) ActorIDs() (ids []int) {
+	if id := m.actor; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetActor resets all changes to the "actor" edge.
+func (m *ActorImageMutation) ResetActor() {
+	m.actor = nil
+	m.clearedactor = false
+}
+
+// Where appends a list predicates to the ActorImageMutation builder.
+func (m *ActorImageMutation) Where(ps ...predicate.ActorImage) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ActorImageMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ActorImageMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ActorImage, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ActorImageMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ActorImageMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ActorImage).
+func (m *ActorImageMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ActorImageMutation) Fields() []string {
+	fields := make([]string, 0, 7)
+	if m.created_at != nil {
+		fields = append(fields, actorimage.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, actorimage.FieldUpdatedAt)
+	}
+	if m.provider != nil {
+		fields = append(fields, actorimage.FieldProvider)
+	}
+	if m.source_id != nil {
+		fields = append(fields, actorimage.FieldSourceID)
+	}
+	if m.url != nil {
+		fields = append(fields, actorimage.FieldURL)
+	}
+	if m.role != nil {
+		fields = append(fields, actorimage.FieldRole)
+	}
+	if m.position != nil {
+		fields = append(fields, actorimage.FieldPosition)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ActorImageMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case actorimage.FieldCreatedAt:
+		return m.CreatedAt()
+	case actorimage.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case actorimage.FieldProvider:
+		return m.Provider()
+	case actorimage.FieldSourceID:
+		return m.SourceID()
+	case actorimage.FieldURL:
+		return m.URL()
+	case actorimage.FieldRole:
+		return m.Role()
+	case actorimage.FieldPosition:
+		return m.Position()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ActorImageMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case actorimage.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case actorimage.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case actorimage.FieldProvider:
+		return m.OldProvider(ctx)
+	case actorimage.FieldSourceID:
+		return m.OldSourceID(ctx)
+	case actorimage.FieldURL:
+		return m.OldURL(ctx)
+	case actorimage.FieldRole:
+		return m.OldRole(ctx)
+	case actorimage.FieldPosition:
+		return m.OldPosition(ctx)
+	}
+	return nil, fmt.Errorf("unknown ActorImage field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ActorImageMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case actorimage.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case actorimage.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case actorimage.FieldProvider:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProvider(v)
+		return nil
+	case actorimage.FieldSourceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceID(v)
+		return nil
+	case actorimage.FieldURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetURL(v)
+		return nil
+	case actorimage.FieldRole:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRole(v)
+		return nil
+	case actorimage.FieldPosition:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPosition(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ActorImage field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ActorImageMutation) AddedFields() []string {
+	var fields []string
+	if m.addposition != nil {
+		fields = append(fields, actorimage.FieldPosition)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ActorImageMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case actorimage.FieldPosition:
+		return m.AddedPosition()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ActorImageMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case actorimage.FieldPosition:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPosition(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ActorImage numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ActorImageMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ActorImageMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ActorImageMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown ActorImage nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ActorImageMutation) ResetField(name string) error {
+	switch name {
+	case actorimage.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case actorimage.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case actorimage.FieldProvider:
+		m.ResetProvider()
+		return nil
+	case actorimage.FieldSourceID:
+		m.ResetSourceID()
+		return nil
+	case actorimage.FieldURL:
+		m.ResetURL()
+		return nil
+	case actorimage.FieldRole:
+		m.ResetRole()
+		return nil
+	case actorimage.FieldPosition:
+		m.ResetPosition()
+		return nil
+	}
+	return fmt.Errorf("unknown ActorImage field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ActorImageMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.actor != nil {
+		edges = append(edges, actorimage.EdgeActor)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ActorImageMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case actorimage.EdgeActor:
+		if id := m.actor; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ActorImageMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ActorImageMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ActorImageMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedactor {
+		edges = append(edges, actorimage.EdgeActor)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ActorImageMutation) EdgeCleared(name string) bool {
+	switch name {
+	case actorimage.EdgeActor:
+		return m.clearedactor
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ActorImageMutation) ClearEdge(name string) error {
+	switch name {
+	case actorimage.EdgeActor:
+		m.ClearActor()
+		return nil
+	}
+	return fmt.Errorf("unknown ActorImage unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ActorImageMutation) ResetEdge(name string) error {
+	switch name {
+	case actorimage.EdgeActor:
+		m.ResetActor()
+		return nil
+	}
+	return fmt.Errorf("unknown ActorImage edge %s", name)
+}
+
+// ActorProfileMutation represents an operation that mutates the ActorProfile nodes in the graph.
+type ActorProfileMutation struct {
+	config
+	op             Op
+	typ            string
+	id             *int
+	created_at     *time.Time
+	updated_at     *time.Time
+	match_key      *string
+	name           *string
+	name_zht       *string
+	gender         *actorprofile.Gender
+	avatar         *string
+	clearedFields  map[string]struct{}
+	sources        map[int]struct{}
+	removedsources map[int]struct{}
+	clearedsources bool
+	aliases        map[int]struct{}
+	removedaliases map[int]struct{}
+	clearedaliases bool
+	images         map[int]struct{}
+	removedimages  map[int]struct{}
+	clearedimages  bool
+	done           bool
+	oldValue       func(context.Context) (*ActorProfile, error)
+	predicates     []predicate.ActorProfile
+}
+
+var _ ent.Mutation = (*ActorProfileMutation)(nil)
+
+// actorprofileOption allows management of the mutation configuration using functional options.
+type actorprofileOption func(*ActorProfileMutation)
+
+// newActorProfileMutation creates new mutation for the ActorProfile entity.
+func newActorProfileMutation(c config, op Op, opts ...actorprofileOption) *ActorProfileMutation {
+	m := &ActorProfileMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeActorProfile,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withActorProfileID sets the ID field of the mutation.
+func withActorProfileID(id int) actorprofileOption {
+	return func(m *ActorProfileMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ActorProfile
+		)
+		m.oldValue = func(ctx context.Context) (*ActorProfile, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ActorProfile.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withActorProfile sets the old ActorProfile of the mutation.
+func withActorProfile(node *ActorProfile) actorprofileOption {
+	return func(m *ActorProfileMutation) {
+		m.oldValue = func(context.Context) (*ActorProfile, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ActorProfileMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ActorProfileMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ActorProfileMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ActorProfileMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ActorProfile.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ActorProfileMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ActorProfileMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ActorProfileMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ActorProfileMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ActorProfileMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ActorProfileMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetMatchKey sets the "match_key" field.
+func (m *ActorProfileMutation) SetMatchKey(s string) {
+	m.match_key = &s
+}
+
+// MatchKey returns the value of the "match_key" field in the mutation.
+func (m *ActorProfileMutation) MatchKey() (r string, exists bool) {
+	v := m.match_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMatchKey returns the old "match_key" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldMatchKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMatchKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMatchKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMatchKey: %w", err)
+	}
+	return oldValue.MatchKey, nil
+}
+
+// ResetMatchKey resets all changes to the "match_key" field.
+func (m *ActorProfileMutation) ResetMatchKey() {
+	m.match_key = nil
+}
+
+// SetName sets the "name" field.
+func (m *ActorProfileMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *ActorProfileMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *ActorProfileMutation) ResetName() {
+	m.name = nil
+}
+
+// SetNameZht sets the "name_zht" field.
+func (m *ActorProfileMutation) SetNameZht(s string) {
+	m.name_zht = &s
+}
+
+// NameZht returns the value of the "name_zht" field in the mutation.
+func (m *ActorProfileMutation) NameZht() (r string, exists bool) {
+	v := m.name_zht
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNameZht returns the old "name_zht" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldNameZht(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNameZht is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNameZht requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNameZht: %w", err)
+	}
+	return oldValue.NameZht, nil
+}
+
+// ClearNameZht clears the value of the "name_zht" field.
+func (m *ActorProfileMutation) ClearNameZht() {
+	m.name_zht = nil
+	m.clearedFields[actorprofile.FieldNameZht] = struct{}{}
+}
+
+// NameZhtCleared returns if the "name_zht" field was cleared in this mutation.
+func (m *ActorProfileMutation) NameZhtCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldNameZht]
+	return ok
+}
+
+// ResetNameZht resets all changes to the "name_zht" field.
+func (m *ActorProfileMutation) ResetNameZht() {
+	m.name_zht = nil
+	delete(m.clearedFields, actorprofile.FieldNameZht)
+}
+
+// SetGender sets the "gender" field.
+func (m *ActorProfileMutation) SetGender(a actorprofile.Gender) {
+	m.gender = &a
+}
+
+// Gender returns the value of the "gender" field in the mutation.
+func (m *ActorProfileMutation) Gender() (r actorprofile.Gender, exists bool) {
+	v := m.gender
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGender returns the old "gender" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldGender(ctx context.Context) (v actorprofile.Gender, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGender is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGender requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGender: %w", err)
+	}
+	return oldValue.Gender, nil
+}
+
+// ResetGender resets all changes to the "gender" field.
+func (m *ActorProfileMutation) ResetGender() {
+	m.gender = nil
+}
+
+// SetAvatar sets the "avatar" field.
+func (m *ActorProfileMutation) SetAvatar(s string) {
+	m.avatar = &s
+}
+
+// Avatar returns the value of the "avatar" field in the mutation.
+func (m *ActorProfileMutation) Avatar() (r string, exists bool) {
+	v := m.avatar
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAvatar returns the old "avatar" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldAvatar(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAvatar is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAvatar requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAvatar: %w", err)
+	}
+	return oldValue.Avatar, nil
+}
+
+// ClearAvatar clears the value of the "avatar" field.
+func (m *ActorProfileMutation) ClearAvatar() {
+	m.avatar = nil
+	m.clearedFields[actorprofile.FieldAvatar] = struct{}{}
+}
+
+// AvatarCleared returns if the "avatar" field was cleared in this mutation.
+func (m *ActorProfileMutation) AvatarCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldAvatar]
+	return ok
+}
+
+// ResetAvatar resets all changes to the "avatar" field.
+func (m *ActorProfileMutation) ResetAvatar() {
+	m.avatar = nil
+	delete(m.clearedFields, actorprofile.FieldAvatar)
+}
+
+// AddSourceIDs adds the "sources" edge to the Actor entity by ids.
+func (m *ActorProfileMutation) AddSourceIDs(ids ...int) {
+	if m.sources == nil {
+		m.sources = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.sources[ids[i]] = struct{}{}
+	}
+}
+
+// ClearSources clears the "sources" edge to the Actor entity.
+func (m *ActorProfileMutation) ClearSources() {
+	m.clearedsources = true
+}
+
+// SourcesCleared reports if the "sources" edge to the Actor entity was cleared.
+func (m *ActorProfileMutation) SourcesCleared() bool {
+	return m.clearedsources
+}
+
+// RemoveSourceIDs removes the "sources" edge to the Actor entity by IDs.
+func (m *ActorProfileMutation) RemoveSourceIDs(ids ...int) {
+	if m.removedsources == nil {
+		m.removedsources = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.sources, ids[i])
+		m.removedsources[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedSources returns the removed IDs of the "sources" edge to the Actor entity.
+func (m *ActorProfileMutation) RemovedSourcesIDs() (ids []int) {
+	for id := range m.removedsources {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// SourcesIDs returns the "sources" edge IDs in the mutation.
+func (m *ActorProfileMutation) SourcesIDs() (ids []int) {
+	for id := range m.sources {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetSources resets all changes to the "sources" edge.
+func (m *ActorProfileMutation) ResetSources() {
+	m.sources = nil
+	m.clearedsources = false
+	m.removedsources = nil
+}
+
+// AddAliasIDs adds the "aliases" edge to the ActorAlias entity by ids.
+func (m *ActorProfileMutation) AddAliasIDs(ids ...int) {
+	if m.aliases == nil {
+		m.aliases = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.aliases[ids[i]] = struct{}{}
+	}
+}
+
+// ClearAliases clears the "aliases" edge to the ActorAlias entity.
+func (m *ActorProfileMutation) ClearAliases() {
+	m.clearedaliases = true
+}
+
+// AliasesCleared reports if the "aliases" edge to the ActorAlias entity was cleared.
+func (m *ActorProfileMutation) AliasesCleared() bool {
+	return m.clearedaliases
+}
+
+// RemoveAliasIDs removes the "aliases" edge to the ActorAlias entity by IDs.
+func (m *ActorProfileMutation) RemoveAliasIDs(ids ...int) {
+	if m.removedaliases == nil {
+		m.removedaliases = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.aliases, ids[i])
+		m.removedaliases[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedAliases returns the removed IDs of the "aliases" edge to the ActorAlias entity.
+func (m *ActorProfileMutation) RemovedAliasesIDs() (ids []int) {
+	for id := range m.removedaliases {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// AliasesIDs returns the "aliases" edge IDs in the mutation.
+func (m *ActorProfileMutation) AliasesIDs() (ids []int) {
+	for id := range m.aliases {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetAliases resets all changes to the "aliases" edge.
+func (m *ActorProfileMutation) ResetAliases() {
+	m.aliases = nil
+	m.clearedaliases = false
+	m.removedaliases = nil
+}
+
+// AddImageIDs adds the "images" edge to the ActorImage entity by ids.
+func (m *ActorProfileMutation) AddImageIDs(ids ...int) {
+	if m.images == nil {
+		m.images = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.images[ids[i]] = struct{}{}
+	}
+}
+
+// ClearImages clears the "images" edge to the ActorImage entity.
+func (m *ActorProfileMutation) ClearImages() {
+	m.clearedimages = true
+}
+
+// ImagesCleared reports if the "images" edge to the ActorImage entity was cleared.
+func (m *ActorProfileMutation) ImagesCleared() bool {
+	return m.clearedimages
+}
+
+// RemoveImageIDs removes the "images" edge to the ActorImage entity by IDs.
+func (m *ActorProfileMutation) RemoveImageIDs(ids ...int) {
+	if m.removedimages == nil {
+		m.removedimages = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.images, ids[i])
+		m.removedimages[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedImages returns the removed IDs of the "images" edge to the ActorImage entity.
+func (m *ActorProfileMutation) RemovedImagesIDs() (ids []int) {
+	for id := range m.removedimages {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ImagesIDs returns the "images" edge IDs in the mutation.
+func (m *ActorProfileMutation) ImagesIDs() (ids []int) {
+	for id := range m.images {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetImages resets all changes to the "images" edge.
+func (m *ActorProfileMutation) ResetImages() {
+	m.images = nil
+	m.clearedimages = false
+	m.removedimages = nil
+}
+
+// Where appends a list predicates to the ActorProfileMutation builder.
+func (m *ActorProfileMutation) Where(ps ...predicate.ActorProfile) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ActorProfileMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ActorProfileMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ActorProfile, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ActorProfileMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ActorProfileMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ActorProfile).
+func (m *ActorProfileMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ActorProfileMutation) Fields() []string {
+	fields := make([]string, 0, 7)
+	if m.created_at != nil {
+		fields = append(fields, actorprofile.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, actorprofile.FieldUpdatedAt)
+	}
+	if m.match_key != nil {
+		fields = append(fields, actorprofile.FieldMatchKey)
+	}
+	if m.name != nil {
+		fields = append(fields, actorprofile.FieldName)
+	}
+	if m.name_zht != nil {
+		fields = append(fields, actorprofile.FieldNameZht)
+	}
+	if m.gender != nil {
+		fields = append(fields, actorprofile.FieldGender)
+	}
+	if m.avatar != nil {
+		fields = append(fields, actorprofile.FieldAvatar)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ActorProfileMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case actorprofile.FieldCreatedAt:
+		return m.CreatedAt()
+	case actorprofile.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case actorprofile.FieldMatchKey:
+		return m.MatchKey()
+	case actorprofile.FieldName:
+		return m.Name()
+	case actorprofile.FieldNameZht:
+		return m.NameZht()
+	case actorprofile.FieldGender:
+		return m.Gender()
+	case actorprofile.FieldAvatar:
+		return m.Avatar()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ActorProfileMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case actorprofile.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case actorprofile.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case actorprofile.FieldMatchKey:
+		return m.OldMatchKey(ctx)
+	case actorprofile.FieldName:
+		return m.OldName(ctx)
+	case actorprofile.FieldNameZht:
+		return m.OldNameZht(ctx)
+	case actorprofile.FieldGender:
+		return m.OldGender(ctx)
+	case actorprofile.FieldAvatar:
+		return m.OldAvatar(ctx)
+	}
+	return nil, fmt.Errorf("unknown ActorProfile field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ActorProfileMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case actorprofile.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case actorprofile.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case actorprofile.FieldMatchKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMatchKey(v)
+		return nil
+	case actorprofile.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case actorprofile.FieldNameZht:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNameZht(v)
+		return nil
+	case actorprofile.FieldGender:
+		v, ok := value.(actorprofile.Gender)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGender(v)
+		return nil
+	case actorprofile.FieldAvatar:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAvatar(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ActorProfile field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ActorProfileMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ActorProfileMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ActorProfileMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown ActorProfile numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ActorProfileMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(actorprofile.FieldNameZht) {
+		fields = append(fields, actorprofile.FieldNameZht)
+	}
+	if m.FieldCleared(actorprofile.FieldAvatar) {
+		fields = append(fields, actorprofile.FieldAvatar)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ActorProfileMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ActorProfileMutation) ClearField(name string) error {
+	switch name {
+	case actorprofile.FieldNameZht:
+		m.ClearNameZht()
+		return nil
+	case actorprofile.FieldAvatar:
+		m.ClearAvatar()
+		return nil
+	}
+	return fmt.Errorf("unknown ActorProfile nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ActorProfileMutation) ResetField(name string) error {
+	switch name {
+	case actorprofile.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case actorprofile.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case actorprofile.FieldMatchKey:
+		m.ResetMatchKey()
+		return nil
+	case actorprofile.FieldName:
+		m.ResetName()
+		return nil
+	case actorprofile.FieldNameZht:
+		m.ResetNameZht()
+		return nil
+	case actorprofile.FieldGender:
+		m.ResetGender()
+		return nil
+	case actorprofile.FieldAvatar:
+		m.ResetAvatar()
+		return nil
+	}
+	return fmt.Errorf("unknown ActorProfile field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ActorProfileMutation) AddedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.sources != nil {
+		edges = append(edges, actorprofile.EdgeSources)
+	}
+	if m.aliases != nil {
+		edges = append(edges, actorprofile.EdgeAliases)
+	}
+	if m.images != nil {
+		edges = append(edges, actorprofile.EdgeImages)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ActorProfileMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case actorprofile.EdgeSources:
+		ids := make([]ent.Value, 0, len(m.sources))
+		for id := range m.sources {
+			ids = append(ids, id)
+		}
+		return ids
+	case actorprofile.EdgeAliases:
+		ids := make([]ent.Value, 0, len(m.aliases))
+		for id := range m.aliases {
+			ids = append(ids, id)
+		}
+		return ids
+	case actorprofile.EdgeImages:
+		ids := make([]ent.Value, 0, len(m.images))
+		for id := range m.images {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ActorProfileMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.removedsources != nil {
+		edges = append(edges, actorprofile.EdgeSources)
+	}
+	if m.removedaliases != nil {
+		edges = append(edges, actorprofile.EdgeAliases)
+	}
+	if m.removedimages != nil {
+		edges = append(edges, actorprofile.EdgeImages)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ActorProfileMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case actorprofile.EdgeSources:
+		ids := make([]ent.Value, 0, len(m.removedsources))
+		for id := range m.removedsources {
+			ids = append(ids, id)
+		}
+		return ids
+	case actorprofile.EdgeAliases:
+		ids := make([]ent.Value, 0, len(m.removedaliases))
+		for id := range m.removedaliases {
+			ids = append(ids, id)
+		}
+		return ids
+	case actorprofile.EdgeImages:
+		ids := make([]ent.Value, 0, len(m.removedimages))
+		for id := range m.removedimages {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ActorProfileMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.clearedsources {
+		edges = append(edges, actorprofile.EdgeSources)
+	}
+	if m.clearedaliases {
+		edges = append(edges, actorprofile.EdgeAliases)
+	}
+	if m.clearedimages {
+		edges = append(edges, actorprofile.EdgeImages)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ActorProfileMutation) EdgeCleared(name string) bool {
+	switch name {
+	case actorprofile.EdgeSources:
+		return m.clearedsources
+	case actorprofile.EdgeAliases:
+		return m.clearedaliases
+	case actorprofile.EdgeImages:
+		return m.clearedimages
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ActorProfileMutation) ClearEdge(name string) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown ActorProfile unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ActorProfileMutation) ResetEdge(name string) error {
+	switch name {
+	case actorprofile.EdgeSources:
+		m.ResetSources()
+		return nil
+	case actorprofile.EdgeAliases:
+		m.ResetAliases()
+		return nil
+	case actorprofile.EdgeImages:
+		m.ResetImages()
+		return nil
+	}
+	return fmt.Errorf("unknown ActorProfile edge %s", name)
 }
 
 // EmbyNotificationMutation represents an operation that mutates the EmbyNotification nodes in the graph.
