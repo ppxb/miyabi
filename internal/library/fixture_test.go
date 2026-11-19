@@ -341,8 +341,18 @@ func loginAccount(t testing.TB, d *drive.Drive, client *panStub, accountID strin
 
 func mountSource(t testing.TB, d *drive.Drive, client *panStub, source domain.LibrarySource) {
 	t.Helper()
-	status, err := d.Account(t.Context())
-	if err != nil || !status.Connected || status.Account == nil || status.Account.ID != source.AccountID {
+	accounts, err := d.Accounts(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	connected := false
+	for _, status := range accounts {
+		if status.Connected && status.Account != nil && status.Account.ID == source.AccountID {
+			connected = true
+			break
+		}
+	}
+	if !connected {
 		loginAccount(t, d, client, source.AccountID)
 	}
 	if source.Directory.ID == "" {
@@ -359,7 +369,7 @@ func mountSource(t testing.TB, d *drive.Drive, client *panStub, source domain.Li
 		return pan.FilePage{}, nil
 	}
 	defer func() { client.list = previous }()
-	if _, err := d.SelectDirectory(t.Context(), source.Directory.ID); err != nil {
+	if _, err := d.SelectDirectoryForAccount(t.Context(), source.AccountID, source.Directory.ID); err != nil {
 		t.Fatal(err)
 	}
 }

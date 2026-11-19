@@ -34,7 +34,7 @@ func TestScanDiscardsLatePageAfterSourceChange(t *testing.T) {
 	finished := make(chan error, 1)
 	go func() { finished <- lib.Scan(ctx, tasks.Job{ID: queued.ID, Type: "scan", Payload: queued.Payload}) }()
 	awaitPan(t, started)
-	if err := drive.ClearDirectory(ctx); err != nil {
+	if err := drive.ClearDirectoryForAccount(ctx, "100"); err != nil {
 		t.Fatal(err)
 	}
 	release()

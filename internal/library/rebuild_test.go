@@ -26,7 +26,7 @@ func TestRebuildQueuesFreshScanAndDeduplicatesRepeatedRequests(t *testing.T) {
 	if err != nil || !input.Rebuild || input.TargetID != "" {
 		t.Fatalf("rebuild does not cover the full mount: %+v %v", input, err)
 	}
-	if err := lib.drive.ClearDirectory(ctx); err != nil {
+	if err := lib.drive.ClearDirectoryForAccount(ctx, "100"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := lib.StartRebuild(ctx); err == nil {

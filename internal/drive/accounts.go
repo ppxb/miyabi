@@ -137,12 +137,6 @@ func (d *Drive) removeAccount(ctx context.Context, accountID string) error {
 	return database.SaveSetting(ctx, d.database, accountsSetting, store)
 }
 
-func (d *Drive) currentAccountID() string {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.accountID
-}
-
 func (d *Drive) accountRecord(ctx context.Context, accountID string) (accountRecord, error) {
 	store, err := d.loadAccounts(ctx)
 	if err != nil {

@@ -86,20 +86,10 @@ func (d *Drive) ClearDirectoryForAccount(ctx context.Context, accountID string) 
 	return d.saveAccountMount(ctx, accountID, mountRecord{AccountID: accountID})
 }
 
-// DisconnectAccount removes a stored account, clearing the primary credentials
-// when it is the currently active account.
+// DisconnectAccount removes a stored account and its mounted directory.
 func (d *Drive) DisconnectAccount(ctx context.Context, accountID string) error {
 	if accountID == "" {
 		return nil
-	}
-	if accountID == d.currentAccountID() {
-		if err := d.commit.Lock(ctx); err != nil {
-			return err
-		}
-		defer d.commit.Unlock()
-		if err := d.clearCredentials(ctx); err != nil {
-			return err
-		}
 	}
 	return d.removeAccount(ctx, accountID)
 }

@@ -9,14 +9,10 @@ import (
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
-// Session represents controlled access to 115 during an operation.
-// It captures account, mounted directory, and authorization version at issue;
-// checks source-bound reads before and after each request; and serializes
-// database commits under the drive commit lock.
+// Session represents controlled access to one 115 account during an operation.
 type Session interface {
 	Source() domain.LibrarySource
-	// AuthorizationVersion changes on login, disconnect, and mount changes.
-	// It scopes derived data without exposing credentials or expiring on token refresh.
+	// AuthorizationVersion changes on login or mount changes for this account.
 	AuthorizationVersion() uint64
 	List(ctx context.Context, dirID string, offset int) (pan.FilePage, error)
 	Info(ctx context.Context, fileID string) (pan.FileInfo, error)
@@ -32,24 +28,10 @@ type Session interface {
 	OfflineTasks(ctx context.Context, page int) (pan.OfflinePage, error)
 }
 
-// Open verifies the current mount and authenticated account, returning a Session.
-func (d *Drive) Open(ctx context.Context) (Session, error) {
-	state, err := d.verifiedSource(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &sourceSession{
-		drive:             d,
-		source:            state.source(),
-		version:           state.authorizationVersion,
-		credentialVersion: state.credentialVersion,
-	}, nil
-}
-
 // OpenSource opens a Session for the expected source using the account registry
 // for every account; no account is privileged.
 func (d *Drive) OpenSource(ctx context.Context, expected domain.LibrarySource) (Session, error) {
-	if d.snapshot().closed {
+	if d.closedState() {
 		return nil, context.Canceled
 	}
 	if expected.AccountID == "" {
@@ -72,137 +54,6 @@ func (d *Drive) OpenSource(ctx context.Context, expected domain.LibrarySource) (
 		credVersion: d.accountCredVersion(expected.AccountID),
 		authVersion: d.accountAuthVersion(expected.AccountID),
 	}, nil
-}
-
-type sourceSession struct {
-	drive             *Drive
-	source            domain.LibrarySource
-	version           uint64
-	credentialVersion uint64
-}
-
-func (s *sourceSession) Source() domain.LibrarySource {
-	return s.source
-}
-
-func (s *sourceSession) AuthorizationVersion() uint64 {
-	return s.version
-}
-
-func (s *sourceSession) checkSource() error {
-	_, err := s.drive.sourceState(s.source, s.version)
-	return err
-}
-
-// readSource discards read results from a replaced source. Remote mutations
-// keep their own completion semantics and must not use this helper.
-func readSource[T any](ctx context.Context, s *sourceSession, request func(string) (T, error)) (T, error) {
-	var zero T
-	state, err := s.drive.sourceState(s.source, s.version)
-	if err != nil {
-		return zero, err
-	}
-	value, err := withPanSourceToken(ctx, s.drive, state, request)
-	if err != nil {
-		return zero, err
-	}
-	if err := s.checkSource(); err != nil {
-		return zero, err
-	}
-	return value, nil
-}
-
-func (s *sourceSession) List(ctx context.Context, dirID string, offset int) (pan.FilePage, error) {
-	return readSource(ctx, s, func(token string) (pan.FilePage, error) {
-		return s.drive.client.List(ctx, token, dirID, offset, 100)
-	})
-}
-
-func (s *sourceSession) Info(ctx context.Context, fileID string) (pan.FileInfo, error) {
-	return readSource(ctx, s, func(token string) (pan.FileInfo, error) {
-		return s.drive.client.Info(ctx, token, fileID)
-	})
-}
-
-func (s *sourceSession) Read(ctx context.Context, pickCode string, limit int64) ([]byte, error) {
-	return readSource(ctx, s, func(token string) ([]byte, error) {
-		return s.drive.client.ReadMetadata(ctx, token, pickCode, limit)
-	})
-}
-
-func (s *sourceSession) PlayURL(ctx context.Context, pickCode, userAgent string) ([]pan.PlaySource, error) {
-	return readSource(ctx, s, func(token string) ([]pan.PlaySource, error) {
-		return s.drive.client.PlayURL(ctx, token, pickCode, userAgent)
-	})
-}
-
-func (s *sourceSession) DownloadURL(ctx context.Context, pickCode, userAgent string) (string, error) {
-	return readSource(ctx, s, func(token string) (string, error) {
-		return s.drive.client.DownloadURL(ctx, token, pickCode, userAgent)
-	})
-}
-
-func (s *sourceSession) AddOffline(ctx context.Context, magnet string) (string, error) {
-	state, err := s.drive.sourceState(s.source, s.version)
-	if err != nil {
-		return "", err
-	}
-	return withPanSourceToken(ctx, s.drive, state, func(token string) (string, error) {
-		return s.drive.client.AddOffline(ctx, token, magnet, s.source.Directory.ID)
-	})
-}
-
-func (s *sourceSession) RemoveOffline(ctx context.Context, hash string) error {
-	state, err := s.drive.sourceState(s.source, s.version)
-	if err != nil {
-		return err
-	}
-	_, err = withPanSourceToken(ctx, s.drive, state, func(token string) (struct{}, error) {
-		return struct{}{}, s.drive.client.RemoveOffline(ctx, token, hash)
-	})
-	if err != nil {
-		return err
-	}
-	return s.checkSource()
-}
-
-func (s *sourceSession) OfflineTasks(ctx context.Context, page int) (pan.OfflinePage, error) {
-	state := snapshot{credentialVersion: s.credentialVersion}
-	return withPanToken(ctx, s.drive, state, func(current snapshot) (pan.OfflinePage, error) {
-		return s.drive.client.OfflineTasks(ctx, current.tokens.AccessToken, page)
-	})
-}
-
-func (s *sourceSession) Commit(ctx context.Context, fn func(tx *ent.Tx) error) error {
-	return s.WithSource(ctx, func() error { return ent.WithTx(ctx, s.drive.database, fn) })
-}
-
-// WithSource excludes source changes without opening a database transaction.
-// The callback must not reenter session commits or change the active source.
-func (s *sourceSession) WithSource(ctx context.Context, fn func() error) error {
-	if err := s.drive.commit.Lock(ctx); err != nil {
-		return err
-	}
-	defer s.drive.commit.Unlock()
-	if _, err := s.drive.sourceState(s.source, s.version); err != nil {
-		return err
-	}
-	return fn()
-}
-
-func (s *sourceSession) CommitAccount(ctx context.Context, fn func(tx *ent.Tx) error) error {
-	if err := s.drive.commit.Lock(ctx); err != nil {
-		return err
-	}
-	defer s.drive.commit.Unlock()
-	current, err := s.drive.credentials(snapshot{credentialVersion: s.credentialVersion})
-	if err != nil {
-		return err
-	}
-	if current.closed {
-		return context.Canceled
-	}
-	return ent.WithTx(ctx, s.drive.database, fn)
 }
 
 // SourceInfo fetches file info and validates that it resides within the session's library source.

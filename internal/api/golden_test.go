@@ -242,7 +242,6 @@ func TestResponseContractsMatchGoldenFiles(t *testing.T) {
 		{name: "tasks", method: http.MethodGet, path: "/api/tasks"},
 		{name: "offline_tasks", method: http.MethodGet, path: "/api/offline/tasks"},
 		{name: "subscriptions", method: http.MethodGet, path: "/api/subscriptions"},
-		{name: "pan_account", method: http.MethodGet, path: "/api/pan/account"},
 		{name: "settings_system", method: http.MethodGet, path: "/api/settings/system"},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {

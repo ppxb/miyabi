@@ -99,7 +99,7 @@ func relayFixture(t *testing.T, pickCode string) (*Relay, *panStub) {
 	if status, err := d.LoginStatus(ctx, login.ID); err != nil || status.State != pan.LoginAuthorized {
 		t.Fatalf("fixture login = %+v, %v", status, err)
 	}
-	if _, err := d.SelectDirectory(ctx, "10"); err != nil {
+	if _, err := d.SelectDirectoryForAccount(ctx, "100", "10"); err != nil {
 		t.Fatal(err)
 	}
 	film := store.Client.Movie.Create().SetCode("ABP-001").SaveX(ctx)

@@ -309,18 +309,18 @@ func TestStreamCacheFollowsAuthorizationAndMountChanges(t *testing.T) {
 	check(1)
 	login() // Reauthorizing the same account invalidates its old signed URLs.
 	check(2)
-	if _, err := relay.drive.SelectDirectory(t.Context(), "20"); err != nil {
+	if _, err := relay.drive.SelectDirectoryForAccount(t.Context(), "100", "20"); err != nil {
 		t.Fatal(err)
 	}
 	// File 101 lives under directory 10, which is no longer the account's mount.
 	if _, err := relay.StreamURL(t.Context(), "101", ""); err == nil || calls != 2 {
 		t.Fatalf("moved mount streamed: calls=%d err=%v", calls, err)
 	}
-	if _, err := relay.drive.SelectDirectory(t.Context(), "10"); err != nil {
+	if _, err := relay.drive.SelectDirectoryForAccount(t.Context(), "100", "10"); err != nil {
 		t.Fatal(err)
 	}
 	check(3)
-	if _, err := relay.drive.Disconnect(t.Context()); err != nil {
+	if err := relay.drive.DisconnectAccount(t.Context(), "100"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := relay.StreamURL(t.Context(), "101", ""); err == nil || calls != 3 {

@@ -36,7 +36,7 @@ func TestLibraryListingAndMatchingShareLocalAndMountedScope(t *testing.T) {
 	}
 	for _, mounted := range []bool{true, false} {
 		if !mounted {
-			if err := lib.drive.ClearDirectory(ctx); err != nil {
+			if err := lib.drive.ClearDirectoryForAccount(ctx, "100"); err != nil {
 				t.Fatal(err)
 			}
 			visible = visible[:2]

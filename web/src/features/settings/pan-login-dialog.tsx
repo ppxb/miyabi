@@ -3,13 +3,11 @@ import { CheckCircle2Icon, LoaderCircleIcon, QrCodeIcon, RefreshCwIcon } from 'l
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 
-import { apiGet } from '@/api/client'
 import {
   invalidatePanSource,
   panKeys,
   useBeginPanLogin,
   usePanLoginStatus,
-  type PanAccountStatus,
   type PanLoginSession
 } from '@/api/pan'
 import { Button } from '@/components/ui/button'
@@ -39,21 +37,16 @@ export function PanLoginDialog({
       login.mutate()
     } else {
       login.reset()
-      void queryClient.invalidateQueries({ queryKey: panKeys.account })
+      void queryClient.invalidateQueries({ queryKey: panKeys.accounts })
     }
   }
 
-  function completeLogin() {
-    queryClient.setQueryData<PanAccountStatus>(panKeys.account, { connected: true })
+  function completeLogin(accountID: string) {
     void queryClient.invalidateQueries({ queryKey: panKeys.accounts })
     invalidatePanSource(queryClient)
     changeOpen(false)
-    if (onAuthorized) {
-      void apiGet<PanAccountStatus>('/api/pan/account')
-        .then(status => {
-          if (status.account?.id) onAuthorized(status.account.id)
-        })
-        .catch(() => undefined)
+    if (onAuthorized && accountID) {
+      onAuthorized(accountID)
     }
   }
 
@@ -89,7 +82,7 @@ function LoginContent({
   pending: boolean
   failed: boolean
   onRetry: () => void
-  onAuthorized: () => void
+  onAuthorized: (accountID: string) => void
 }) {
   const status = usePanLoginStatus(session?.id ?? '')
   const state = status.data?.state
@@ -107,9 +100,9 @@ function LoginContent({
 
   useEffect(() => {
     if (state === 'authorized') {
-      onAuthorized()
+      onAuthorized(status.data?.account_id ?? '')
     }
-  }, [state, onAuthorized])
+  }, [state, status.data?.account_id, onAuthorized])
 
   // An expired code is 115 saying this QR is dead, so replacing it costs the user
   // nothing. A cancellation is the user's own doing: leave that one to them.

@@ -202,7 +202,7 @@ func (s *accountSession) CommitAccount(ctx context.Context, fn func(tx *ent.Tx) 
 	if err := s.checkCredentials(); err != nil {
 		return err
 	}
-	if s.drive.snapshot().closed {
+	if s.drive.closedState() {
 		return context.Canceled
 	}
 	return ent.WithTx(ctx, s.drive.database, fn)

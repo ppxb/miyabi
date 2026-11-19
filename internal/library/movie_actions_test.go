@@ -91,7 +91,7 @@ func TestMovieRescrapeDoesNotBlockMountEnqueue(t *testing.T) {
 		})
 		mounted := make(chan error, 1)
 		go func() {
-			_, err := lib.drive.SelectDirectory(t.Context(), "20")
+			_, err := lib.drive.SelectDirectoryForAccount(t.Context(), "100", "20")
 			mounted <- err
 		}()
 		<-mountEntered
@@ -173,7 +173,7 @@ func TestMovieRescrapeQueueWaitDoesNotHoldDatabaseWriter(t *testing.T) {
 		}
 		// Clearing the mount must acquire the source lock even while the test
 		// still owns the queue, proving cancellation released source protection.
-		if err := lib.drive.ClearDirectory(t.Context()); err != nil {
+		if err := lib.drive.ClearDirectoryForAccount(t.Context(), "100"); err != nil {
 			t.Fatal(err)
 		}
 		got := lib.database.Movie.GetX(t.Context(), record.ID)

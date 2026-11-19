@@ -106,7 +106,7 @@ func TestRecoverySwitchesSeriallyAndPreservesTaskIdentity(t *testing.T) {
 	if !slices.Equal(r.events, []string{"add:" + offlineHashA, "remove:" + offlineHashA, "add:" + offlineHashB}) {
 		t.Fatal(r.events)
 	}
-	sess, err := r.s.drive.Open(t.Context())
+	sess, err := r.s.drive.OpenSource(t.Context(), *r.s.drive.Source())
 	if err != nil {
 		t.Fatal(err)
 	}

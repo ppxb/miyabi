@@ -1,11 +1,11 @@
 import { ChevronRightIcon, FileIcon, FolderIcon, LoaderCircleIcon } from 'lucide-react'
 
-import type { usePanFiles } from '@/api/pan'
+import type { usePanAccountFiles } from '@/api/pan'
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 
 type DirectoryListProps = {
-  files: ReturnType<typeof usePanFiles>
+  files: ReturnType<typeof usePanAccountFiles>
   disabled?: boolean
   onNavigate: (id: string) => void
 }

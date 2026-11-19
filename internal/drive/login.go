@@ -33,11 +33,13 @@ type LoginSession struct {
 
 // LoginStatus represents the current state of a QR login session.
 type LoginStatus struct {
-	State pan.LoginState `json:"state"`
+	State     pan.LoginState `json:"state"`
+	AccountID string         `json:"account_id,omitempty"`
 }
 
 type loginSession struct {
 	id        string
+	accountID string
 	login     *pan.Login
 	state     pan.LoginState
 	err       error
@@ -166,7 +168,11 @@ func (l *qrLogin) poll(ctx context.Context, session *loginSession) (LoginStatus,
 	if state != pan.LoginWaiting && state != pan.LoginScanned {
 		session.login = nil
 	}
-	return LoginStatus{State: state}, nil
+	status := LoginStatus{State: state}
+	if state == pan.LoginAuthorized {
+		status.AccountID = session.accountID
+	}
+	return status, nil
 }
 
 func (l *qrLogin) complete(ctx context.Context, session *loginSession, login *pan.Login) error {

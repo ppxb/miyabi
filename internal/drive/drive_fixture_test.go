@@ -19,22 +19,21 @@ var testSource = domain.LibrarySource{
 	Directory: domain.LibraryDirectory{ID: "10", Name: "Movies", Path: "/Movies"},
 }
 
-// stubClient is a 115 client whose calls can be replaced per test. Unset
-// calls behave like a healthy account so fixtures need no boilerplate.
+// stubClient is a 115 client whose calls can be replaced per test.
 type stubClient struct {
-	account        func(context.Context, string) (pan.Account, error)
-	beginLogin     func(context.Context) (*pan.Login, error)
-	loginStatus    func(context.Context, *pan.Login) (pan.LoginState, error)
-	exchangeToken  func(context.Context, *pan.Login) (pan.Tokens, error)
-	refreshToken   func(context.Context, string) (pan.Tokens, error)
-	list           func(context.Context, string, string, int, int) (pan.FilePage, error)
-	info           func(context.Context, string, string) (pan.FileInfo, error)
-	readMetadata   func(context.Context, string, string, int64) ([]byte, error)
-	addOffline     func(context.Context, string, string, string) (string, error)
-	removeOffline  func(context.Context, string, string) error
-	offlineTasks   func(context.Context, string, int) (pan.OfflinePage, error)
-	playURL        func(context.Context, string, string, string) ([]pan.PlaySource, error)
-	downloadURL    func(context.Context, string, string) (string, error)
+	account       func(context.Context, string) (pan.Account, error)
+	beginLogin    func(context.Context) (*pan.Login, error)
+	loginStatus   func(context.Context, *pan.Login) (pan.LoginState, error)
+	exchangeToken func(context.Context, *pan.Login) (pan.Tokens, error)
+	refreshToken  func(context.Context, string) (pan.Tokens, error)
+	list          func(context.Context, string, string, int, int) (pan.FilePage, error)
+	info          func(context.Context, string, string) (pan.FileInfo, error)
+	readMetadata  func(context.Context, string, string, int64) ([]byte, error)
+	addOffline    func(context.Context, string, string, string) (string, error)
+	removeOffline func(context.Context, string, string) error
+	offlineTasks  func(context.Context, string, int) (pan.OfflinePage, error)
+	playURL       func(context.Context, string, string, string) ([]pan.PlaySource, error)
+	downloadURL   func(context.Context, string, string) (string, error)
 }
 
 func (c *stubClient) Close() {}
@@ -134,8 +133,7 @@ func (c *stubClient) OpenMedia(context.Context, string, string, http.Header) (*h
 	return nil, fmt.Errorf("media streaming is not stubbed")
 }
 
-// directoryPage is what 115 answers when a directory is listed: its ancestry
-// chain. Mounting it yields exactly the given LibraryDirectory.
+// directoryPage is what 115 answers when a directory is listed: its ancestry chain.
 func directoryPage(directory domain.LibraryDirectory) pan.FilePage {
 	page := pan.FilePage{Path: []pan.Directory{{ID: "0", Name: "Root"}}}
 	segments := strings.Split(strings.Trim(directory.Path, "/"), "/")
@@ -170,7 +168,7 @@ func newTestDrive(t testing.TB, client *stubClient) *Drive {
 }
 
 // loginTestAccount completes a QR login through the real state machine; the
-// stub's Account answer decides which account gets logged in.
+// stub's Account answer decides which account is stored.
 func loginTestAccount(t testing.TB, d *Drive) {
 	t.Helper()
 	login, err := d.BeginLogin(t.Context())
@@ -183,9 +181,9 @@ func loginTestAccount(t testing.TB, d *Drive) {
 	}
 }
 
-// selectTestDirectory mounts the directory as the library root, answering the
-// mount listing so the stored directory equals the given value.
-func selectTestDirectory(t testing.TB, d *Drive, client *stubClient, directory domain.LibraryDirectory) {
+// selectTestDirectory mounts the directory for the given account, answering the
+// directory listing so the stored mount equals the given value.
+func selectTestDirectory(t testing.TB, d *Drive, client *stubClient, accountID string, directory domain.LibraryDirectory) {
 	t.Helper()
 	previous := client.list
 	client.list = func(ctx context.Context, token, id string, offset, limit int) (pan.FilePage, error) {
@@ -198,7 +196,7 @@ func selectTestDirectory(t testing.TB, d *Drive, client *stubClient, directory d
 		return pan.FilePage{}, nil
 	}
 	defer func() { client.list = previous }()
-	if _, err := d.SelectDirectory(t.Context(), directory.ID); err != nil {
+	if _, err := d.SelectDirectoryForAccount(t.Context(), accountID, directory.ID); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -208,7 +206,7 @@ func mountTestSource(t testing.TB, d *Drive, client *stubClient, source domain.L
 	client.account = func(context.Context, string) (pan.Account, error) { return pan.Account{ID: source.AccountID}, nil }
 	loginTestAccount(t, d)
 	if source.Directory.ID != "" {
-		selectTestDirectory(t, d, client, source.Directory)
+		selectTestDirectory(t, d, client, source.AccountID, source.Directory)
 	}
 }
 
@@ -253,32 +251,4 @@ func awaitCondition(t testing.TB, ready func() bool) {
 			t.Fatal("concurrent 115 operation did not reach the expected state")
 		}
 	}
-}
-
-func assertTokens(t testing.TB, d *Drive, want pan.Tokens) {
-	t.Helper()
-	saved, exists, err := database.LoadSetting[pan.Tokens](t.Context(), d.database, credentialsSetting)
-	if err != nil || exists != (want.AccessToken != "") {
-		t.Fatalf("persisted credentials: exists=%t err=%v", exists, err)
-	}
-	for _, got := range []pan.Tokens{saved, d.snapshot().tokens} {
-		if got.AccessToken != want.AccessToken || got.RefreshToken != want.RefreshToken || !got.ExpiresAt.Equal(want.ExpiresAt) {
-			t.Fatalf("credentials = %+v, want %+v", got, want)
-		}
-	}
-}
-
-func expireTokens(d *Drive) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.tokens.ExpiresAt = time.Now()
-}
-
-func savedDirectory(t testing.TB, d *Drive) (mountRecord, bool) {
-	t.Helper()
-	record, found, err := database.LoadSetting[mountRecord](t.Context(), d.database, directorySetting)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return record, found
 }

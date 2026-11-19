@@ -29,7 +29,7 @@ func TestRetryScanPreservesCheckpointAndSource(t *testing.T) {
 		t.Fatalf("active scan was retried: %v", err)
 	}
 	record.Update().SetStatus(task.StatusFailed).ExecX(ctx)
-	if err := lib.drive.ClearDirectory(ctx); err != nil {
+	if err := lib.drive.ClearDirectoryForAccount(ctx, "100"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := lib.RetryTask(ctx, record.ID); err == nil {

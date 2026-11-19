@@ -154,19 +154,14 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.GET("/image", imageHandler(deps.Catalogue))
 
 	panAPI := protected.Group("/pan", noStore())
-	panAPI.GET("/account", panAccountHandler(deps.Drive))
 	panAPI.GET("/accounts", panAccountsHandler(deps.Drive))
 	panAPI.GET("/accounts/:accountID", panAccountStatusHandler(deps.Drive))
 	panAPI.GET("/accounts/:accountID/files", panAccountFilesHandler(deps.Drive))
 	panAPI.PUT("/accounts/:accountID/directory", panAccountSelectDirectoryHandler(deps.Drive))
 	panAPI.DELETE("/accounts/:accountID/directory", panAccountClearDirectoryHandler(deps.Drive))
 	panAPI.DELETE("/accounts/:accountID", panAccountDisconnectHandler(deps.Drive))
-	panAPI.DELETE("/account", panDisconnectHandler(deps.Drive))
 	panAPI.POST("/login", panBeginLoginHandler(deps.Drive))
 	panAPI.GET("/login/:id", panLoginStatusHandler(deps.Drive))
-	panAPI.GET("/files", panFilesHandler(deps.Drive))
-	panAPI.PUT("/directory", panSelectDirectoryHandler(deps.Drive))
-	panAPI.DELETE("/directory", panClearDirectoryHandler(deps.Drive))
 
 	if deps.Frontend != nil {
 		installFrontend(router, deps.Frontend)

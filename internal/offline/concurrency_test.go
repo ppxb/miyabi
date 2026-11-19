@@ -116,10 +116,10 @@ func TestOfflineStartedSubmissionKeepsOriginalSourceAfterCancellation(t *testing
 			upstream := awaitPan(t, started)
 			cancel()
 			if action == "disconnect" {
-				if _, err := service.drive.Disconnect(t.Context()); err != nil {
+				if err := service.drive.DisconnectAccount(t.Context(), "100"); err != nil {
 					t.Fatal(err)
 				}
-			} else if err := service.drive.ClearDirectory(t.Context()); err != nil {
+			} else if err := service.drive.ClearDirectoryForAccount(t.Context(), "100"); err != nil {
 				t.Fatal(err)
 			}
 			if deadline, ok := upstream.Deadline(); !ok || time.Until(deadline) > 2*time.Minute || upstream.Err() != nil {
@@ -159,10 +159,10 @@ func TestOfflineSyncRespectsSourceChangesDuringRemotePolling(t *testing.T) {
 			go func() { finished <- service.Sync(t.Context()) }()
 			awaitPan(t, started)
 			if action == "disconnect" {
-				if _, err := service.drive.Disconnect(t.Context()); err != nil {
+				if err := service.drive.DisconnectAccount(t.Context(), "100"); err != nil {
 					t.Fatal(err)
 				}
-			} else if err := service.drive.ClearDirectory(t.Context()); err != nil {
+			} else if err := service.drive.ClearDirectoryForAccount(t.Context(), "100"); err != nil {
 				t.Fatal(err)
 			}
 			release()
@@ -184,7 +184,7 @@ func TestOfflineSyncRespectsSourceChangesDuringRemotePolling(t *testing.T) {
 			if current.Status != offlinedownload.StatusDone || saved.FileID != "download-folder" || saved.ScanTaskID != 0 {
 				t.Fatalf("completion on replaced mount = %+v", saved)
 			}
-			if _, err := service.drive.SelectDirectory(t.Context(), source.Directory.ID); err != nil {
+			if _, err := service.drive.SelectDirectoryForAccount(t.Context(), "100", source.Directory.ID); err != nil {
 				t.Fatal(err)
 			}
 			if err := service.Sync(t.Context()); err != nil {
