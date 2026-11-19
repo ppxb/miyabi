@@ -22,6 +22,7 @@
     "@tanstack/react-query": "^5.104.1",
     "@tanstack/react-router": "^1.170.41",
     "@videojs/core": "10.5.0",
+    "@videojs/hlsjs-video": "^10.5.0",
     "@videojs/react": "10.5.0",
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",

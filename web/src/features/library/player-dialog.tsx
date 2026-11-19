@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { HlsVideo } from '@videojs/react/media/hls-video'
+import { HlsJsVideo } from '@videojs/react/media/hlsjs-video'
 import { I18nProvider } from '@videojs/react/i18n'
 import { usePlayer, Video, VideoPlayer } from '@videojs/react/video'
 import { CalendarIcon, ClockIcon, StarIcon, type LucideIcon } from 'lucide-react'
@@ -95,7 +95,15 @@ function LibraryPlayer({ movieId }: { movieId: number }) {
                 onSettingsOpen={() => setQualitiesRequested(true)}
               >
                 {hls ? (
-                  <HlsVideo src={source.src} playsInline autoPlay />
+                  <HlsJsVideo
+                    source={{
+                      src: source.src,
+                      type: 'application/vnd.apple.mpegurl',
+                      preferPlayback: 'mse'
+                    }}
+                    playsInline
+                    autoPlay
+                  />
                 ) : (
                   <Video src={source.src} playsInline autoPlay />
                 )}
