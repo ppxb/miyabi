@@ -143,11 +143,17 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	jav321Source := providers.NewJav321(networkSvc.ProxyManager())
 	tokyohotSource := providers.NewTokyoHot(networkSvc.ProxyManager())
 	heydougaSource := providers.NewHeydouga(networkSvc.ProxyManager())
+	caribbeancomSource := providers.NewCaribbeancom(networkSvc.ProxyManager())
+	caribbeancomprSource := providers.NewCaribbeancomPremium(networkSvc.ProxyManager())
+	c0930Source := providers.NewC0930(networkSvc.ProxyManager())
+	h0930Source := providers.NewH0930(networkSvc.ProxyManager())
+	h4610Source := providers.NewH4610(networkSvc.ProxyManager())
 	metadataSvc, err := metadata.New(ctx, store.Client, fanzaSource, fc2Source, fc2dbSource, heyzoSource, pacopacomamaSource,
 		providers.NewJavDB(catalogueSvc), providers.NewJavBus(javbusClient, networkSvc.ProxyManager()),
 		providers.NewR18(networkSvc.ProxyManager()), providers.NewOnePondo(networkSvc.ProxyManager()),
 		providers.NewCodeAV(networkSvc.ProxyManager()),
-		providers.NewJavDatabase(networkSvc.ProxyManager()), jav321Source, tokyohotSource, heydougaSource)
+		providers.NewJavDatabase(networkSvc.ProxyManager()), jav321Source, tokyohotSource, heydougaSource,
+		caribbeancomSource, caribbeancomprSource, c0930Source, h0930Source, h4610Source)
 	if err != nil {
 		fanzaSource.Close()
 		fc2Source.Close()
@@ -157,6 +163,11 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		jav321Source.Close()
 		tokyohotSource.Close()
 		heydougaSource.Close()
+		caribbeancomSource.Close()
+		caribbeancomprSource.Close()
+		c0930Source.Close()
+		h0930Source.Close()
+		h4610Source.Close()
 		catalogueSvc.Close()
 		driveSvc.Close()
 		_ = store.Close()

@@ -257,9 +257,20 @@ func splitNames(s string) []string {
 	return names
 }
 
-// japaneseDuration turns "01:38:38" / "1時間20分" / "120分" into whole minutes.
+// japaneseDuration turns "01:38:38" / "1時間20分" / "120分" / "PT1H20M" into
+// whole minutes.
 func japaneseDuration(v string) int {
 	v = strings.TrimSpace(v)
+	if strings.HasPrefix(strings.ToUpper(v), "PT") {
+		total := 0
+		if h := regexp.MustCompile(`(\d+)H`).FindStringSubmatch(v); h != nil {
+			total += integer(h[1]) * 60
+		}
+		if m := regexp.MustCompile(`(\d+)M`).FindStringSubmatch(v); m != nil {
+			total += integer(m[1])
+		}
+		return total
+	}
 	if strings.Contains(v, ":") {
 		total := 0
 		for _, p := range strings.Split(v, ":") {
