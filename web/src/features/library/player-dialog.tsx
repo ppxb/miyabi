@@ -229,6 +229,12 @@ function MovieInfo({ movieId, show115 = false }: { movieId: number; show115?: bo
           <span className="text-muted-foreground">N/A</span>
         )}
       </InfoRow>
+
+      {movie.plot ? (
+        <InfoRow label="简介">
+          <p className="whitespace-pre-line">{movie.plot}</p>
+        </InfoRow>
+      ) : null}
     </div>
   )
 }
