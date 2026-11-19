@@ -136,10 +136,11 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		return nil, fmt.Errorf("initialize catalogue service: %w", err)
 	}
 	fc2Source := providers.NewFC2(networkSvc.ProxyManager())
+	fc2dbSource := providers.NewFC2DB(networkSvc.ProxyManager())
 	fanzaSource := providers.NewFANZA(networkSvc.ProxyManager())
 	heyzoSource := providers.NewHEYZO(networkSvc.ProxyManager())
 	pacopacomamaSource := providers.NewPacopacomama(networkSvc.ProxyManager())
-	metadataSvc, err := metadata.New(ctx, store.Client, fanzaSource, fc2Source, heyzoSource, pacopacomamaSource,
+	metadataSvc, err := metadata.New(ctx, store.Client, fanzaSource, fc2Source, fc2dbSource, heyzoSource, pacopacomamaSource,
 		providers.NewJavDB(catalogueSvc), providers.NewJavBus(javbusClient, networkSvc.ProxyManager()),
 		providers.NewR18(networkSvc.ProxyManager()), providers.NewOnePondo(networkSvc.ProxyManager()),
 		providers.NewCodeAV(networkSvc.ProxyManager()),
@@ -147,6 +148,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	if err != nil {
 		fanzaSource.Close()
 		fc2Source.Close()
+		fc2dbSource.Close()
 		heyzoSource.Close()
 		pacopacomamaSource.Close()
 		catalogueSvc.Close()

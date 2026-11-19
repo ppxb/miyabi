@@ -58,7 +58,7 @@ export function LibraryProgress({ task }: { task?: ScanTask }) {
           <span className="absolute text-[10px] font-medium tabular-nums">{bounded}%</span>
         </div>
       </TooltipTrigger>
-      <TooltipContent side="left">{label}</TooltipContent>
+      <TooltipContent>{label}</TooltipContent>
     </Tooltip>
   )
 }
