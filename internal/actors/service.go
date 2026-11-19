@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 
 	"github.com/ppxb/miyabi/internal/atomicfile"
@@ -83,10 +84,11 @@ type Service struct {
 	providers       []Provider
 	persistMu       sync.Mutex
 	enrichAttempted sync.Map
+	enrichSem       chan struct{}
 }
 
 func New(db *ent.Client, g *gfriends.Client, dataDir string, imageHTTP *http.Client, providers ...Provider) *Service {
-	return &Service{db: db, gfriends: g, dataDir: dataDir, imageHTTP: imageHTTP, providers: providers}
+	return &Service{db: db, gfriends: g, dataDir: dataDir, imageHTTP: imageHTTP, providers: providers, enrichSem: make(chan struct{}, 3)}
 }
 
 // Key returns a stable URL key for a normalized name.
@@ -289,11 +291,19 @@ func (s *Service) Detail(ctx context.Context, key string) (Detail, error) {
 			_ = s.db.Actor.UpdateOneID(id).SetProfileID(pid).Exec(ctx)
 		}
 	}
-	// Persist gfriends images (rel paths) once, then enrich with provider data.
-	rels := s.imageRels(ctx, detail.Names)
-	s.persistImages(ctx, g.norm, rels)
+	// Persist gfriends images (rel paths) only when none are stored yet, so a
+	// detail request doesn't hit the remote gfriends index on every visit.
+	persisted := false
+	if perr == nil && pid > 0 {
+		if n, cerr := s.db.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(pid))).Count(ctx); cerr == nil && n > 0 {
+			persisted = true
+		}
+	}
+	if !persisted {
+		s.persistImages(ctx, g.norm, s.imageRels(ctx, detail.Names))
+	}
 	if perr == nil {
-		s.enrichProfile(ctx, pid, display)
+		s.enqueueEnrichment(pid, display)
 		if aliases, aerr := s.db.ActorAlias.Query().
 			Where(actoralias.HasActorWith(actorprofile.ID(pid))).
 			Select(actoralias.FieldAlias).
@@ -462,17 +472,47 @@ func (s *Service) fetchImageBytes(ctx context.Context, src imageSource) ([]byte,
 	return io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 }
 
-// enrichProfile fills biography fields (and extra images) from the configured
-// ActorProviders when the canonical profile has no biography yet.
-func (s *Service) enrichProfile(ctx context.Context, pid int, display string) {
+// EnqueueEnrichment ensures a canonical profile per name and schedules
+// background ActorProvider enrichment. Used right after scraping so new actors
+// are enriched up front instead of on first actor-page view.
+func (s *Service) EnqueueEnrichment(ctx context.Context, names []string) {
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		norm := normalizeName(name)
+		if norm == "" {
+			continue
+		}
+		pid, err := s.ensureProfile(ctx, norm, name, "", "")
+		if err != nil {
+			continue
+		}
+		s.enqueueEnrichment(pid, name)
+	}
+}
+
+// enqueueEnrichment runs biography enrichment in the background at most once
+// per actor per process, so a detail request never blocks on a remote lookup.
+func (s *Service) enqueueEnrichment(pid int, display string) {
 	if pid == 0 || len(s.providers) == 0 {
 		return
 	}
-	// Attempt a remote enrichment at most once per actor per process, so actors
-	// without a source record do not hit the network on every detail request.
 	if _, loaded := s.enrichAttempted.LoadOrStore(pid, true); loaded {
 		return
 	}
+	go func() {
+		if s.enrichSem != nil {
+			s.enrichSem <- struct{}{}
+			defer func() { <-s.enrichSem }()
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		s.enrichProfile(ctx, pid, display)
+	}()
+}
+
+// enrichProfile fills biography fields (and extra images) from the configured
+// ActorProviders when the canonical profile has no biography yet.
+func (s *Service) enrichProfile(ctx context.Context, pid int, display string) {
 	if p, err := s.db.ActorProfile.Query().Where(actorprofile.ID(pid)).Only(ctx); err != nil {
 		return
 	} else if p.Birthday != nil && *p.Birthday != "" {

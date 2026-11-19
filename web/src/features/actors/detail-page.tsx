@@ -1,3 +1,17 @@
+import { Link } from '@tanstack/react-router'
+import { lazy, Suspense, useState } from 'react'
+import {
+  ArrowLeftIcon,
+  CakeIcon,
+  CalendarDaysIcon,
+  CupSodaIcon,
+  DropletIcon,
+  MapPinIcon,
+  PersonStandingIcon,
+  RulerIcon,
+  type LucideIcon
+} from 'lucide-react'
+
 import { useActorDetail } from '@/api/actors'
 import { imageURL } from '@/api/client'
 import { AppPage } from '@/components/app-page'
@@ -13,8 +27,49 @@ function displayAvatar(src?: string) {
   return src.startsWith('/api/actors/') ? src : imageURL(src)
 }
 
+const LibraryPlayerDialog = lazy(() =>
+  import('@/features/library/player-dialog').then(module => ({
+    default: module.LibraryPlayerDialog
+  }))
+)
+
+function ActorStats({ actor }: { actor: ReturnType<typeof useActorDetail>['data'] }) {
+  if (!actor) return null
+  const stats: Array<{ label: string; value: string; icon: LucideIcon }> = []
+  if (actor.birthday) stats.push({ label: '生日', value: actor.birthday, icon: CakeIcon })
+  if (actor.height) stats.push({ label: '身高', value: `${actor.height} cm`, icon: RulerIcon })
+  if (actor.measurements) {
+    stats.push({ label: '三围', value: actor.measurements, icon: PersonStandingIcon })
+  }
+  if (actor.cup_size) stats.push({ label: '罩杯', value: actor.cup_size, icon: CupSodaIcon })
+  if (actor.blood_type) stats.push({ label: '血型', value: actor.blood_type, icon: DropletIcon })
+  if (actor.nationality) stats.push({ label: '出身', value: actor.nationality, icon: MapPinIcon })
+  if (actor.debut_date) {
+    stats.push({ label: '出道', value: actor.debut_date, icon: CalendarDaysIcon })
+  }
+  if (stats.length === 0) return null
+
+  return (
+    <dl className="flex flex-wrap divide-x divide-border/60 rounded-2xl bg-muted py-1 ring-1 ring-border dark:bg-card/60 dark:ring-0">
+      {stats.map(stat => (
+        <div
+          key={stat.label}
+          className="flex min-w-0 flex-1 flex-col items-center gap-2 p-3 sm:p-4"
+        >
+          <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <stat.icon className="size-4" />
+            {stat.label}
+          </dt>
+          <dd className="text-sm font-semibold whitespace-nowrap tabular-nums">{stat.value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
 export function ActorDetailPage({ actorKey }: { actorKey: string }) {
   const detail = useActorDetail(actorKey)
+  const [playingId, setPlayingId] = useState<number | null>(null)
   if (detail.isPending) {
     return (
       <AppPage>
@@ -36,27 +91,27 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
 
   const actor = detail.data
   const films = actor.films?.movies ?? []
-  const info: Array<[string, string]> = []
-  if (actor.birthday) info.push(['生日', actor.birthday])
-  if (actor.height) info.push(['身高', `${actor.height}cm`])
-  if (actor.measurements) info.push(['三围', actor.measurements])
-  if (actor.cup_size) info.push(['罩杯', actor.cup_size])
-  if (actor.blood_type) info.push(['血型', actor.blood_type])
-  if (actor.nationality) info.push(['出身', actor.nationality])
-  if (actor.debut_date) info.push(['出道', actor.debut_date])
 
   return (
     <AppPage>
+      <Link
+        to="/actors"
+        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeftIcon className="size-4" />
+        返回
+      </Link>
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <Avatar size="lg" className="size-36">
+        <Avatar className="size-32">
           <AvatarImage src={displayAvatar(actor.avatar)} alt={actor.name} />
           <AvatarFallback>{actor.name.slice(0, 1)}</AvatarFallback>
         </Avatar>
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-baseline gap-2">
-            <h1 className="text-3xl font-bold">{actor.name}</h1>
+            <h1 className="text-4xl font-bold">{actor.name}</h1>
             {actor.name_zht ? (
-              <span className="text-muted-foreground">{actor.name_zht}</span>
+              <span className="text-lg text-muted-foreground">{actor.name_zht}</span>
             ) : null}
           </div>
           {actor.aliases?.length ? (
@@ -71,19 +126,10 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
         </div>
       </div>
 
-      {info.length > 0 ? (
-        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3 md:grid-cols-4">
-          {info.map(([label, value]) => (
-            <div key={label} className="flex gap-2">
-              <span className="shrink-0 text-muted-foreground">{label}</span>
-              <span className="min-w-0 break-words">{value}</span>
-            </div>
-          ))}
-        </div>
-      ) : null}
+      <ActorStats actor={actor} />
 
       {actor.summary ? (
-        <p className="text-sm leading-6 text-muted-foreground whitespace-pre-line">
+        <p className="text-sm leading-6 whitespace-pre-line text-muted-foreground">
           {actor.summary}
         </p>
       ) : null}
@@ -111,10 +157,20 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
       ) : (
         <MovieGridLayout>
           {films.map(movie => (
-            <LibraryMovieCard key={movie.id} movie={movie} playIcon={false} />
+            <LibraryMovieCard
+              key={movie.id}
+              movie={movie}
+              onPlay={() => setPlayingId(movie.id)}
+            />
           ))}
         </MovieGridLayout>
       )}
+
+      {playingId !== null ? (
+        <Suspense fallback={null}>
+          <LibraryPlayerDialog movieId={playingId} onClose={() => setPlayingId(null)} />
+        </Suspense>
+      ) : null}
     </AppPage>
   )
 }
