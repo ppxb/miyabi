@@ -192,14 +192,6 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		Transport: netx.NewTransport(networkSvc.ProxyManager()),
 	})
 	actorsSvc := actors.New(store.Client, gfriendsClient)
-	// Backfill canonical actor profiles from existing provider-scoped rows.
-	go func() {
-		backfillCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-		if err := actorsSvc.EnsureProfiles(backfillCtx); err != nil {
-			logger.WarnContext(backfillCtx, "backfill actor profiles failed", "error", err)
-		}
-	}()
 	syncActors := cfg.EmbySyncActors
 	embySvc, err := emby.NewService(ctx, store.Client, emby.Config{
 		Enabled:    cfg.EmbyEnabled,
