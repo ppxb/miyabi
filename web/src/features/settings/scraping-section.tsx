@@ -1,6 +1,13 @@
-import { ScanSearchIcon } from 'lucide-react'
+import { ScanSearchIcon, UserRoundIcon } from 'lucide-react'
 
-import { sourceNames, useScrapingSources, useUpdateScrapingSources } from '@/api/metadata'
+import {
+  actorSourceNames,
+  sourceNames,
+  useActorSources,
+  useScrapingSources,
+  useUpdateActorSources,
+  useUpdateScrapingSources
+} from '@/api/metadata'
 import { InlineError } from '@/components/error-state'
 import { Switch } from '@/components/ui/switch'
 import { SettingRow, SettingsSection } from './shared'
@@ -70,6 +77,56 @@ export function ScrapingSection() {
           retrying={query.isFetching || update.isPending}
         >
           来源设置读取或保存失败，请重试。
+        </InlineError>
+      ) : null}
+    </SettingsSection>
+  )
+}
+
+const actorDescriptions: Record<string, string> = {
+  'av-league': '演员档案来源：生日、身高、三围、罩杯、血型、出身、出道日与图集（需代理）',
+  gfriends: '演员图片图集来源（头像与多图墙）'
+}
+
+export function ActorSourcesSection() {
+  const query = useActorSources()
+  const update = useUpdateActorSources()
+  const sources = query.data ?? []
+  return (
+    <SettingsSection icon={<UserRoundIcon className="size-4" />} title="演员数据源">
+      <p className="text-xs text-muted-foreground">
+        以下来源用于补充演员档案与图片；关闭后对应数据不再抓取或展示。
+      </p>
+      {query.isPending ? <p className="text-sm text-muted-foreground">正在读取来源</p> : null}
+      {sources.map(source => (
+        <SettingRow
+          key={source.id}
+          title={actorSourceNames[source.id] ?? source.id}
+          description={actorDescriptions[source.id]}
+          inline
+        >
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={source.enabled}
+              disabled={update.isPending}
+              onCheckedChange={enabled =>
+                update.mutate(
+                  sources.map(item => (item.id === source.id ? { ...item, enabled } : item))
+                )
+              }
+            />
+          </div>
+        </SettingRow>
+      ))}
+      {query.isError || update.isError ? (
+        <InlineError
+          onRetry={() => {
+            if (query.isError) void query.refetch()
+            else if (update.variables) update.mutate(update.variables)
+          }}
+          retrying={query.isFetching || update.isPending}
+        >
+          演员来源设置读取或保存失败，请重试。
         </InlineError>
       ) : null}
     </SettingsSection>

@@ -17,6 +17,30 @@ type ActorManager interface {
 	Catalog(context.Context, string, int, int) (actors.Page, error)
 	Detail(context.Context, string) (actors.Detail, error)
 	FetchImage(context.Context, string, int) ([]byte, error)
+	Settings(context.Context) ([]actors.SourceSetting, error)
+	UpdateSettings(context.Context, []actors.SourceSetting) error
+}
+
+func actorSourceSettingsHandler(manager ActorManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		settings, err := manager.Settings(c.Request.Context())
+		respond(c, settings, err)
+	}
+}
+
+func actorSourceUpdateHandler(manager ActorManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		settings, ok := bindJSON[[]actors.SourceSetting](c)
+		if !ok {
+			return
+		}
+		if err := manager.UpdateSettings(c.Request.Context(), settings); err != nil {
+			c.Error(err)
+			return
+		}
+		result, err := manager.Settings(c.Request.Context())
+		respond(c, result, err)
+	}
 }
 
 func actorListHandler(manager ActorManager) gin.HandlerFunc {

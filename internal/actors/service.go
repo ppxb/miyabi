@@ -18,6 +18,7 @@ import (
 	"unicode"
 
 	"github.com/ppxb/miyabi/internal/atomicfile"
+	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/actoralias"
@@ -89,6 +90,79 @@ type Service struct {
 
 func New(db *ent.Client, g *gfriends.Client, dataDir string, imageHTTP *http.Client, providers ...Provider) *Service {
 	return &Service{db: db, gfriends: g, dataDir: dataDir, imageHTTP: imageHTTP, providers: providers, enrichSem: make(chan struct{}, 3)}
+}
+
+// SourceSetting is one actor data source switch kept in settings.
+type SourceSetting struct {
+	ID      string `json:"id"`
+	Enabled bool   `json:"enabled"`
+}
+
+const actorSourcesSetting = "metadata.actor_sources"
+
+var actorSourceOrder = []string{"av-league", "gfriends"}
+
+func defaultActorSources() []SourceSetting {
+	return []SourceSetting{{ID: "av-league", Enabled: true}, {ID: "gfriends", Enabled: true}}
+}
+
+// Settings returns the actor data source switches (merged with defaults).
+func (s *Service) Settings(ctx context.Context) ([]SourceSetting, error) {
+	stored, found, err := database.LoadSetting[[]SourceSetting](ctx, s.db, actorSourcesSetting)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return defaultActorSources(), nil
+	}
+	byID := make(map[string]SourceSetting, len(stored))
+	for _, item := range stored {
+		byID[item.ID] = item
+	}
+	out := make([]SourceSetting, 0, len(actorSourceOrder))
+	for _, id := range actorSourceOrder {
+		if item, ok := byID[id]; ok {
+			out = append(out, item)
+		} else {
+			out = append(out, SourceSetting{ID: id, Enabled: true})
+		}
+	}
+	return out, nil
+}
+
+// UpdateSettings validates and persists the actor data source switches.
+func (s *Service) UpdateSettings(ctx context.Context, settings []SourceSetting) error {
+	valid := map[string]bool{"av-league": true, "gfriends": true}
+	seen := make(map[string]bool, len(settings))
+	byID := make(map[string]SourceSetting, len(settings))
+	for _, item := range settings {
+		if !valid[item.ID] || seen[item.ID] {
+			return errors.New("未知或重复的演员来源")
+		}
+		seen[item.ID] = true
+		byID[item.ID] = item
+	}
+	if len(settings) != len(actorSourceOrder) {
+		return errors.New("请提供完整的演员来源列表")
+	}
+	out := make([]SourceSetting, 0, len(actorSourceOrder))
+	for _, id := range actorSourceOrder {
+		out = append(out, byID[id])
+	}
+	return database.SaveSetting(ctx, s.db, actorSourcesSetting, out)
+}
+
+func (s *Service) sourceEnabled(ctx context.Context, id string) bool {
+	settings, err := s.Settings(ctx)
+	if err != nil {
+		return true
+	}
+	for _, item := range settings {
+		if item.ID == id {
+			return item.Enabled
+		}
+	}
+	return true
 }
 
 // Key returns a stable URL key for a normalized name.
@@ -338,6 +412,9 @@ func (s *Service) Detail(ctx context.Context, key string) (Detail, error) {
 
 // imageRels merges gfriends image paths across the given names.
 func (s *Service) imageRels(ctx context.Context, names []string) []string {
+	if !s.sourceEnabled(ctx, "gfriends") {
+		return nil
+	}
 	seen := make(map[string]bool)
 	var rels []string
 	for _, name := range names {
@@ -393,6 +470,9 @@ func (s *Service) FetchImage(ctx context.Context, key string, index int) ([]byte
 	norm := normalizeName(names[0])
 	sources := s.imageSources(ctx, norm, names)
 	if index >= len(sources) {
+		return nil, ErrNotFound
+	}
+	if sources[index].provider == "gfriends" && !s.sourceEnabled(ctx, "gfriends") {
 		return nil, ErrNotFound
 	}
 	return s.loadImage(ctx, sources[index])
@@ -519,6 +599,9 @@ func (s *Service) enrichProfile(ctx context.Context, pid int, display string) {
 		return
 	}
 	for _, provider := range s.providers {
+		if !s.sourceEnabled(ctx, provider.Name()) {
+			continue
+		}
 		profile, err := provider.Lookup(ctx, display)
 		if err != nil || profile == nil {
 			continue

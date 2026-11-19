@@ -80,6 +80,8 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	settingsAPI := protected.Group("/settings", noStore())
 	settingsAPI.GET("/scraping", metadataSettingsHandler(deps.Metadata))
 	settingsAPI.PUT("/scraping", metadataUpdateHandler(deps.Metadata))
+	settingsAPI.GET("/actor-sources", actorSourceSettingsHandler(deps.Actors))
+	settingsAPI.PUT("/actor-sources", actorSourceUpdateHandler(deps.Actors))
 	settingsAPI.GET("/system", dataInfoHandler(deps.Maintenance))
 	settingsAPI.DELETE("/cache", dataClearCacheHandler(deps.Maintenance))
 	settingsAPI.GET("/network", networkHandler(deps.Network))

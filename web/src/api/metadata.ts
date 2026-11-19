@@ -48,3 +48,30 @@ export function useUpdateScrapingSources() {
     }
   })
 }
+
+export type ActorSource = { id: string; enabled: boolean }
+const actorSourcesKey = ['settings', 'actor-sources'] as const
+
+export const actorSourceNames: Record<string, string> = {
+  'av-league': 'AV-LEAGUE',
+  gfriends: 'gfriends'
+}
+
+export function useActorSources() {
+  return useQuery({
+    queryKey: actorSourcesKey,
+    queryFn: ({ signal }) =>
+      apiGet<ActorSource[]>('/api/settings/actor-sources', undefined, signal)
+  })
+}
+
+export function useUpdateActorSources() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (sources: ActorSource[]) =>
+      apiPut<ActorSource[]>('/api/settings/actor-sources', sources),
+    onSuccess: sources => {
+      client.setQueryData(actorSourcesKey, sources)
+    }
+  })
+}

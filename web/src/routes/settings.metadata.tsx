@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-import { ScrapingSection } from '@/features/settings/scraping-section'
+import { ActorSourcesSection, ScrapingSection } from '@/features/settings/scraping-section'
 import { SettingsCard } from '@/features/settings/shared'
 
 export const Route = createFileRoute('/settings/metadata')({
@@ -11,6 +11,7 @@ function SettingsMetadataPage() {
   return (
     <SettingsCard>
       <ScrapingSection />
+      <ActorSourcesSection />
     </SettingsCard>
   )
 }
