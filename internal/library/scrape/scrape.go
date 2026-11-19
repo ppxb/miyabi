@@ -61,6 +61,11 @@ type SubtitleExporter interface {
 	Export(ctx context.Context, movieID int, target subtitlemeta.Target) (int, error)
 }
 
+// ActorMerger merges same-person actor rows discovered during a movie scrape.
+type ActorMerger interface {
+	MergeMovieCrossLanguage(ctx context.Context, movieID int) (int, error)
+}
+
 const (
 	defaultDirCacheTTL = 45 * time.Second
 	maxDirCacheEntries = 128
@@ -80,6 +85,7 @@ type Service struct {
 	images        *mediaimage.Cache
 	notifier      Notifier
 	subtitles     SubtitleExporter
+	merger        ActorMerger
 	subtitleQueue *SubtitleQueue
 
 	dirMu    sync.Mutex
@@ -100,6 +106,7 @@ type Dependencies struct {
 	ExportManager *export.Manager
 	MediaNotifier export.MediaNotifier
 	Subtitles     SubtitleExporter
+	Merger        ActorMerger
 }
 
 // New installs dependencies before starting subtitle workers.
@@ -114,6 +121,7 @@ func New(db *ent.Client, d *drive.Drive, metadata MetadataSource, images *mediai
 		exportMgr:     deps.ExportManager,
 		mediaNotifier: deps.MediaNotifier,
 		subtitles:     deps.Subtitles,
+		merger:        deps.Merger,
 	}
 	service.subtitleQueue = newSubtitleQueue(service)
 	return service
@@ -238,6 +246,9 @@ func (service *Service) prepareMetadata(ctx context.Context, sess drive.Session,
 	}
 	if service.notifier != nil {
 		service.notifier.NotifyLibraryChanged()
+	}
+	if service.merger != nil {
+		_, _ = service.merger.MergeMovieCrossLanguage(ctx, input.MovieID)
 	}
 	return nil
 }

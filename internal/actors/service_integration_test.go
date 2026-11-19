@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/database"
+	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/actorprofile"
 	"github.com/ppxb/miyabi/internal/gfriends"
@@ -106,5 +107,75 @@ func TestDetailPersistsAliasesAndImages(t *testing.T) {
 	}
 	if n := db.ActorImage.Query().CountX(ctx); n != 2 {
 		t.Fatalf("images duplicated on repeat Detail: %d", n)
+	}
+}
+
+func pidOf(t *testing.T, db *ent.Client, actorID int) int {
+	t.Helper()
+	r, err := db.Actor.Query().Where(actor.IDEQ(actorID)).
+		WithProfile(func(q *ent.ActorProfileQuery) { q.Select(actorprofile.FieldID) }).Only(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Edges.Profile == nil {
+		return 0
+	}
+	return r.Edges.Profile.ID
+}
+
+func TestMergeMovieCrossLanguage(t *testing.T) {
+	ctx := context.Background()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	db := store.Client
+	m := db.Movie.Create().SetCode("MERGE-001").SaveX(ctx)
+	ja := db.Actor.Create().SetProvider("fanza").SetSourceID("j1").SetName("瀬戸環奈").AddMovieIDs(m.ID).SaveX(ctx)
+	en := db.Actor.Create().SetProvider("javdatabase").SetSourceID("e1").SetName("Kanna Seto").AddMovieIDs(m.ID).SaveX(ctx)
+
+	svc := New(db, nil, "", nil)
+	n, err := svc.MergeMovieCrossLanguage(ctx, m.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("merged=%d, want 1", n)
+	}
+	jp, ep := pidOf(t, db, ja.ID), pidOf(t, db, en.ID)
+	if jp == 0 || jp != ep {
+		t.Fatalf("profiles not merged: ja=%d en=%d", jp, ep)
+	}
+	page, err := svc.Catalog(ctx, "", 1, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Actors) != 1 {
+		t.Fatalf("catalog actors=%d, want 1 (merged)", len(page.Actors))
+	}
+}
+
+func TestMergeMovieCrossLanguageSkipsMultiCast(t *testing.T) {
+	ctx := context.Background()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	db := store.Client
+	m := db.Movie.Create().SetCode("MERGE-002").SaveX(ctx)
+	db.Actor.Create().SetProvider("fanza").SetSourceID("a").SetName("瀬戸環奈").AddMovieIDs(m.ID).SaveX(ctx)
+	db.Actor.Create().SetProvider("fanza").SetSourceID("b").SetName("奥田咲").AddMovieIDs(m.ID).SaveX(ctx)
+	db.Actor.Create().SetProvider("javdatabase").SetSourceID("c").SetName("Kanna Seto").AddMovieIDs(m.ID).SaveX(ctx)
+	db.Actor.Create().SetProvider("javdatabase").SetSourceID("d").SetName("Saki Okuda").AddMovieIDs(m.ID).SaveX(ctx)
+
+	svc := New(db, nil, "", nil)
+	n, err := svc.MergeMovieCrossLanguage(ctx, m.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("merged=%d, want 0 (ambiguous multi-cast)", n)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -205,27 +206,41 @@ func (g *group) display() string {
 	if len(names) == 0 {
 		return ""
 	}
+	// Prefer a Japanese/CJK spelling as the canonical display name so a merged
+	// Japanese+English person shows the native name.
+	for _, name := range names {
+		if scriptOf(name) == "ja" {
+			return name
+		}
+	}
 	return names[0]
 }
 
 func (s *Service) groups(ctx context.Context) ([]*group, error) {
 	records, err := s.db.Actor.Query().
 		WithMovies(func(q *ent.MovieQuery) { q.Select(movie.FieldID) }).
+		WithProfile(func(q *ent.ActorProfileQuery) { q.Select(actorprofile.FieldID) }).
 		All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	byNorm := make(map[string]*group, len(records))
+	byKey := make(map[string]*group, len(records))
 	seenSource := make(map[string]bool)
 	for _, r := range records {
 		norm := normalizeName(r.Name)
 		if norm == "" {
 			continue
 		}
-		g := byNorm[norm]
+		// Group by canonical profile when linked (so merged cross-language rows
+		// collapse into one), else fall back to the normalized name.
+		key := "n:" + norm
+		if r.Edges.Profile != nil {
+			key = fmt.Sprintf("p:%d", r.Edges.Profile.ID)
+		}
+		g := byKey[key]
 		if g == nil {
-			g = &group{norm: norm, names: make(map[string]bool), movies: make(map[int]bool)}
-			byNorm[norm] = g
+			g = &group{names: make(map[string]bool), movies: make(map[int]bool)}
+			byKey[key] = g
 		}
 		g.names[r.Name] = true
 		g.ids = append(g.ids, r.ID)
@@ -239,9 +254,9 @@ func (s *Service) groups(ctx context.Context) ([]*group, error) {
 		if g.avatar == "" && avatar != "" {
 			g.avatar = avatar
 		}
-		key := r.Provider + "\x00" + r.SourceID
-		if !seenSource[key] {
-			seenSource[key] = true
+		srcKey := r.Provider + "\x00" + r.SourceID
+		if !seenSource[srcKey] {
+			seenSource[srcKey] = true
 			g.sources = append(g.sources, Source{Provider: r.Provider, SourceID: r.SourceID, Name: r.Name, Avatar: avatar})
 		}
 		for _, m := range r.Edges.Movies {
@@ -250,8 +265,9 @@ func (s *Service) groups(ctx context.Context) ([]*group, error) {
 			}
 		}
 	}
-	groups := make([]*group, 0, len(byNorm))
-	for _, g := range byNorm {
+	groups := make([]*group, 0, len(byKey))
+	for _, g := range byKey {
+		g.norm = normalizeName(g.display())
 		sort.SliceStable(g.sources, func(i, j int) bool {
 			if g.sources[i].Provider != g.sources[j].Provider {
 				return g.sources[i].Provider < g.sources[j].Provider
@@ -411,6 +427,193 @@ func (s *Service) Detail(ctx context.Context, key string) (Detail, error) {
 	return detail, nil
 }
 
+// scriptOf classifies a name as Japanese/CJK, Latin, or other.
+func scriptOf(name string) string {
+	for _, r := range name {
+		if unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana) {
+			return "ja"
+		}
+	}
+	for _, r := range name {
+		if unicode.IsLetter(r) {
+			return "latin"
+		}
+	}
+	return "other"
+}
+
+type actorSig struct {
+	id        int
+	name      string
+	script    string
+	movies    []int
+	profileID int
+}
+
+// MergeMovieCrossLanguage merges the single Japanese-named and single
+// English-named actor of one movie when both exist. Cheap, DB-only; called
+// right after a movie is scraped so duplicates never surface.
+func (s *Service) MergeMovieCrossLanguage(ctx context.Context, movieID int) (int, error) {
+	records, err := s.db.Actor.Query().
+		Where(actor.HasMoviesWith(movie.IDEQ(movieID))).
+		WithProfile(func(q *ent.ActorProfileQuery) { q.Select(actorprofile.FieldID) }).
+		All(ctx)
+	if err != nil {
+		return 0, err
+	}
+	var ja, en *actorSig
+	for _, r := range records {
+		if normalizeName(r.Name) == "" {
+			continue
+		}
+		pid := 0
+		if r.Edges.Profile != nil {
+			pid = r.Edges.Profile.ID
+		}
+		sig := actorSig{id: r.ID, name: r.Name, script: scriptOf(r.Name), movies: []int{movieID}, profileID: pid}
+		switch sig.script {
+		case "ja":
+			if ja != nil {
+				return 0, nil // ambiguous cast: more than one CJK name
+			}
+			ja = &sig
+		case "latin":
+			if en != nil {
+				return 0, nil // ambiguous cast: more than one Latin name
+			}
+			en = &sig
+		}
+	}
+	if ja == nil || en == nil {
+		return 0, nil
+	}
+	if err := s.mergeActorPair(ctx, *ja, *en); err != nil {
+		return 0, err
+	}
+	return 1, nil
+}
+
+func (s *Service) mergeActorPair(ctx context.Context, ja, en actorSig) error {
+	canonical := ja.profileID
+	if canonical == 0 {
+		pid, err := s.ensureProfile(ctx, normalizeName(ja.name), ja.name, "", "")
+		if err != nil {
+			return err
+		}
+		canonical = pid
+		_ = s.db.Actor.UpdateOneID(ja.id).SetProfileID(canonical).Exec(ctx)
+	}
+	enPid := en.profileID
+	if enPid == 0 {
+		pid, err := s.ensureProfile(ctx, normalizeName(en.name), en.name, "", "")
+		if err != nil {
+			return err
+		}
+		enPid = pid
+	}
+	if enPid != 0 && enPid != canonical {
+		_, _ = s.db.Actor.Update().
+			Where(actor.HasProfileWith(actorprofile.ID(enPid))).
+			SetProfileID(canonical).
+			Save(ctx)
+		if ep, err := s.db.ActorProfile.Query().Where(actorprofile.ID(enPid)).Only(ctx); err == nil {
+			s.fillProfileFrom(ctx, canonical, ep)
+			s.copyProfileImages(ctx, enPid, canonical)
+		}
+	}
+	// Ensure the English actor row itself points at the canonical profile.
+	_ = s.db.Actor.UpdateOneID(en.id).SetProfileID(canonical).Exec(ctx)
+	normEn := normalizeName(en.name)
+	if normEn != "" && normEn != normalizeName(ja.name) {
+		if exists, _ := s.db.ActorAlias.Query().Where(
+			actoralias.HasActorWith(actorprofile.ID(canonical)),
+			actoralias.NormalizedEQ(normEn),
+		).Exist(ctx); !exists {
+			_, _ = s.db.ActorAlias.Create().
+				SetAlias(en.name).SetNormalized(normEn).SetActorID(canonical).Save(ctx)
+		}
+	}
+	return nil
+}
+
+// fillProfileFrom copies non-empty biography fields into pid where pid is empty.
+func (s *Service) fillProfileFrom(ctx context.Context, pid int, from *ent.ActorProfile) {
+	cur, err := s.db.ActorProfile.Query().Where(actorprofile.ID(pid)).Only(ctx)
+	if err != nil {
+		return
+	}
+	update := s.db.ActorProfile.UpdateOneID(pid)
+	if empty(cur.Summary) && !empty(from.Summary) {
+		update.SetSummary(*from.Summary)
+	}
+	if empty(cur.Birthday) && !empty(from.Birthday) {
+		update.SetBirthday(*from.Birthday)
+	}
+	if cur.Height == nil && from.Height != nil {
+		update.SetHeight(*from.Height)
+	}
+	if empty(cur.CupSize) && !empty(from.CupSize) {
+		update.SetCupSize(*from.CupSize)
+	}
+	if empty(cur.Measurements) && !empty(from.Measurements) {
+		update.SetMeasurements(*from.Measurements)
+	}
+	if empty(cur.BloodType) && !empty(from.BloodType) {
+		update.SetBloodType(*from.BloodType)
+	}
+	if empty(cur.Nationality) && !empty(from.Nationality) {
+		update.SetNationality(*from.Nationality)
+	}
+	if empty(cur.Hobby) && !empty(from.Hobby) {
+		update.SetHobby(*from.Hobby)
+	}
+	if empty(cur.Skill) && !empty(from.Skill) {
+		update.SetSkill(*from.Skill)
+	}
+	if empty(cur.DebutDate) && !empty(from.DebutDate) {
+		update.SetDebutDate(*from.DebutDate)
+	}
+	if empty(cur.SourceURL) && !empty(from.SourceURL) {
+		update.SetSourceURL(*from.SourceURL)
+	}
+	if empty(cur.NameZht) && !empty(from.NameZht) {
+		update.SetNameZht(*from.NameZht)
+	}
+	if empty(cur.Avatar) && !empty(from.Avatar) {
+		update.SetAvatar(*from.Avatar)
+	}
+	_ = update.Exec(ctx)
+}
+
+func (s *Service) copyProfileImages(ctx context.Context, fromPid, toPid int) {
+	images, err := s.db.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(fromPid))).All(ctx)
+	if err != nil || len(images) == 0 {
+		return
+	}
+	s.persistMu.Lock()
+	defer s.persistMu.Unlock()
+	existing, _ := s.db.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(toPid))).All(ctx)
+	seen := make(map[string]bool, len(existing))
+	position := 0
+	for _, im := range existing {
+		seen[im.URL] = true
+		if im.Position >= position {
+			position = im.Position + 1
+		}
+	}
+	for _, im := range images {
+		if seen[im.URL] {
+			continue
+		}
+		_, _ = s.db.ActorImage.Create().
+			SetActorID(toPid).SetURL(im.URL).SetProvider(im.Provider).SetRole(im.Role).SetPosition(position).Save(ctx)
+		seen[im.URL] = true
+		position++
+	}
+}
+
+func empty(v *string) bool { return v == nil || *v == "" }
+
 // imageRels merges gfriends image paths across the given names.
 func (s *Service) imageRels(ctx context.Context, names []string) []string {
 	if !s.sourceEnabled(ctx, "gfriends") {
@@ -437,7 +640,10 @@ func (s *Service) imageRels(ctx context.Context, names []string) []string {
 // findNames resolves a key to the group's names using a lightweight name-only
 // query (no movie edges), for image serving.
 func (s *Service) findNames(ctx context.Context, key string) ([]string, error) {
-	records, err := s.db.Actor.Query().Select(actor.FieldName).All(ctx)
+	records, err := s.db.Actor.Query().
+		Select(actor.FieldName).
+		WithProfile(func(q *ent.ActorProfileQuery) { q.Select(actorprofile.FieldMatchKey) }).
+		All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -445,7 +651,14 @@ func (s *Service) findNames(ctx context.Context, key string) ([]string, error) {
 	var names []string
 	for _, r := range records {
 		norm := normalizeName(r.Name)
-		if norm == "" || Key(norm) != key || seen[r.Name] {
+		if norm == "" || seen[r.Name] {
+			continue
+		}
+		match := Key(norm) == key
+		if !match && r.Edges.Profile != nil && Key(r.Edges.Profile.MatchKey) == key {
+			match = true
+		}
+		if !match {
 			continue
 		}
 		seen[r.Name] = true
