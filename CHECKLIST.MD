@@ -16,10 +16,10 @@
   - 改法：Root 传 `items={options}`（`{value,label}[]` 或 `{[value]: label}`）；`movies/filter-bar.tsx` 的 `sortLabel/sourceLabel` 已同法简化。
 - [x] 🔴 ✅ **扫描"文件未变"判断恒失败**：`internal/library/scan/persist.go:38` Select 漏 `file.FieldUploadTime`，`:105` 却比较 `old.UploadTime`，导致每页全量 upsert + 每页 `NotifyLibraryChanged`。改法：Select 补该字段。（已修复：Select 补 `file.FieldUploadTime`）
 - [x] 🔴 ✅ **115 账号设置读改写无锁/无事务**：`internal/drive/accounts.go:39`（`saveAccountTokens`）、`:107`（`saveAccountMount`）、`:122`（`removeAccount`）并发时互相覆盖，重启后可能读回旧 refresh token。改法：加 `accountsMu` 包住整段读改写，或 `ent.WithTx`。（已修复：新增 `accountsMu` 串行化三处读改写，并加并发测试）
-- [ ] 🔴 ✅ **NSFW 模式被原生 `<img>` 绕过**：
+- [x] 🔴 ✅ **NSFW 模式被原生 `<img>` 绕过**：
   - `web/src/components/app-search.tsx:135`（搜索结果封面）
   - `web/src/features/actors/detail-page.tsx:164`（演员图集）
-  - 改法：改用 `MediaImage`。
+  - 改法：改用 `MediaImage`。（已修复：两处改用 `MediaImage`，并让 `imageURL` 透传本地 `/api/actors/` 路径）
 - [ ] 🟠 ✅ **域名白名单后缀校验缺前导点**：`internal/freejavbt/client.go:245` `HasSuffix(host, "jdbstatic.com")` 放行 `evil-jdbstatic.com`。改法：`host == "jdbstatic.com" || HasSuffix(host, ".jdbstatic.com")`。
 - [ ] 🟠 ✅ **不存在的 Tailwind 类 `scrollbar-none`**：`movie-detail/dialog.tsx:34`、`movie-detail/preview-viewer.tsx:113`、`library/movie-shelf.tsx:106`。改法：换成 `no-scrollbar`。
 - [ ] 🟠 ✅ `internal/api/router.go:49-52`：`SetTrustedProxies` 错误被吞，if/else 两分支等价；配置错误时静默部分生效，影响 `ClientIP()` 与登录限流。改法：调用一次并返回错误。

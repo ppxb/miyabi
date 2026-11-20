@@ -17,6 +17,7 @@ import { imageURL } from '@/api/client'
 import { AppPage } from '@/components/app-page'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
+import { MediaImage } from '@/components/media-image'
 import { MovieGridLayout } from '@/components/movie/movie-grid-layout'
 import { MovieGridSkeleton } from '@/components/movie/movie-grid-skeleton'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -161,13 +162,12 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
           <h2 className="text-xl font-semibold">图片</h2>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
             {Array.from({ length: Math.min(actor.image_count, 12) }).map((_, index) => (
-              <img
-                key={index}
-                src={`/api/actors/${actor.key}/image/${index}`}
-                alt={`${actor.name} ${index + 1}`}
-                loading="lazy"
-                className="aspect-[3/4] w-full rounded-lg object-cover"
-              />
+              <div key={index} className="aspect-[3/4] w-full overflow-hidden rounded-lg">
+                <MediaImage
+                  source={`/api/actors/${actor.key}/image/${index}`}
+                  className="object-cover"
+                />
+              </div>
             ))}
           </div>
         </div>

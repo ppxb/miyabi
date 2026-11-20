@@ -8,6 +8,7 @@ import { apiGet, imageURL } from '@/api/client'
 import type { ActorPage } from '@/api/actors'
 import type { LibraryPage } from '@/api/library'
 import { APP_NAV_ITEMS } from '@/components/app-navigation'
+import { MediaImage } from '@/components/media-image'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -59,10 +60,6 @@ function useDebounced(value: string, delay: number) {
 function avatarURL(avatar?: string) {
   if (!avatar) return undefined
   return avatar.startsWith('/api/actors/') ? avatar : imageURL(avatar)
-}
-
-function coverURL(cover?: string) {
-  return cover ? imageURL(cover) : undefined
 }
 
 function movieDetails(movie: LibraryPage['movies'][number], hasTitle: boolean) {
@@ -126,18 +123,15 @@ function ResultRow({ item }: { item: SearchItem }) {
     <span className="flex w-full min-w-0 items-center gap-3">
       {isActor ? (
         <Avatar className="size-10 shrink-0">
-          <AvatarImage src={item.image} alt={item.label} />
+          <AvatarImage src={avatarURL(item.image)} alt={item.label} />
           <AvatarFallback>
             <UserIcon className="size-4 text-muted-foreground" />
           </AvatarFallback>
         </Avatar>
       ) : item.image ? (
-        <img
-          src={item.image}
-          alt=""
-          loading="lazy"
-          className="h-24 w-36 shrink-0 rounded-md bg-muted object-cover"
-        />
+        <span className="h-24 w-36 shrink-0 overflow-hidden rounded-md bg-muted">
+          <MediaImage source={item.image} className="object-cover" />
+        </span>
       ) : (
         <span className="flex h-24 w-36 shrink-0 items-center justify-center rounded-md bg-muted">
           <FilmIcon className="size-4 text-muted-foreground" />
@@ -212,7 +206,7 @@ export function SearchDialog({
         group: '影片',
         label: hasTitle ? movie.title : movie.code,
         details: movieDetails(movie, hasTitle),
-        image: coverURL(movie.cover || movie.poster),
+        image: movie.cover || movie.poster,
         kind: 'movie',
         run: () => {
           openMovie?.({ libraryId: movie.id }, document.createElement('div'))
@@ -225,7 +219,7 @@ export function SearchDialog({
         group: '演员',
         label: actor.name,
         details: actor.movie_count > 0 ? [`${actor.movie_count} 部作品`] : undefined,
-        image: avatarURL(actor.avatar),
+        image: actor.avatar,
         kind: 'actor',
         run: () => {
           void navigate({ to: '/actors/$key', params: { key: actor.key } })
