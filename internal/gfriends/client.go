@@ -42,16 +42,11 @@ type Client struct {
 	dataDir    string
 	httpClient *http.Client
 	mu         sync.RWMutex
-	index      map[string]string // normalized name -> relative path e.g. "Content/9-Javrave/xxx.jpg?t=..."
+	allImages  map[string][]string // normalized name -> every relative path
 	loadedAt   time.Time
 	refresh    syncx.ContextLock
 	retryAt    time.Time
 	refreshErr error
-
-	// allImages keeps every file per normalized name for multi-image actors.
-	allMu     sync.RWMutex
-	allImages map[string][]string
-	allAt     time.Time
 }
 
 // New uses the caller's HTTP client, including its timeout and proxy policy.
@@ -59,7 +54,6 @@ func New(dataDir string, httpClient *http.Client) *Client {
 	return &Client{
 		dataDir:    dataDir,
 		httpClient: httpClient,
-		index:      make(map[string]string),
 	}
 }
 
@@ -69,76 +63,24 @@ func (c *Client) Lookup(name string) (string, bool) {
 	defer c.mu.RUnlock()
 
 	norm := normalizeName(name)
-	if rel, ok := c.index[norm]; ok {
-		return rel, true
+	if rels := c.allImages[norm]; len(rels) > 0 {
+		return rels[0], true
 	}
 	noSpace := strings.ReplaceAll(norm, " ", "")
-	if rel, ok := c.index[noSpace]; ok {
-		return rel, true
+	if rels := c.allImages[noSpace]; len(rels) > 0 {
+		return rels[0], true
 	}
 	return "", false
 }
 
-// EnsureIndex serializes refreshes without blocking readers of the current index.
+// EnsureIndex loads the avatar index if needed. It is a thin alias for the
+// unified loader that also backs multi-image lookups.
 func (c *Client) EnsureIndex(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if ready, err := c.indexReady(); ready {
-		return err
-	}
-	if err := c.refresh.Lock(ctx); err != nil {
-		return err
-	}
-	defer c.refresh.Unlock()
-	if ready, err := c.indexReady(); ready {
-		return err
-	}
-
-	cacheFile := filepath.Join(c.dataDir, "gfriends_tree.json")
-	c.mu.RLock()
-	loaded := !c.loadedAt.IsZero()
-	c.mu.RUnlock()
-	if !loaded && c.dataDir != "" {
-		if index, updatedAt, err := readCachedIndex(cacheFile); err == nil {
-			c.installIndex(index, updatedAt)
-			if ready, err := c.indexReady(); ready {
-				return err
-			}
-		}
-	}
-
-	var index map[string]string
-	body, err := c.download(ctx, "Filetree.json", maxIndexBytes, func(data []byte) error {
-		var err error
-		index, err = parseIndex(data)
-		return err
-	})
-	if err != nil {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		c.retryAt = time.Now().Add(indexRetryDelay)
-		c.refreshErr = fmt.Errorf("download gfriends filetree: %w", err)
-		if !c.loadedAt.IsZero() {
-			return nil
-		}
-		return c.refreshErr
-	}
-	if c.dataDir != "" {
-		if err := os.MkdirAll(c.dataDir, 0755); err != nil {
-			slog.WarnContext(ctx, "create gfriends cache directory", "path", c.dataDir, "error", err)
-		} else if err := os.WriteFile(cacheFile, body, 0644); err != nil {
-			slog.WarnContext(ctx, "write gfriends index cache", "path", cacheFile, "error", err)
-		}
-	}
-	c.installIndex(index, time.Now())
-	return nil
+	_, err := c.ensureAll(ctx)
+	return err
 }
 
-func readCachedIndex(path string) (map[string]string, time.Time, error) {
+func readCachedAll(path string) (map[string][]string, time.Time, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, time.Time{}, err
@@ -155,69 +97,29 @@ func readCachedIndex(path string) (map[string]string, time.Time, error) {
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	index, err := parseIndex(data)
-	return index, info.ModTime(), err
+	all, err := parseIndex(data)
+	return all, info.ModTime(), err
 }
 
-func parseIndex(data []byte) (map[string]string, error) {
+func parseIndex(data []byte) (map[string][]string, error) {
 	var tree fileTree
 	if err := json.Unmarshal(data, &tree); err != nil {
 		return nil, err
 	}
-	index := buildIndex(tree)
-	if len(index) == 0 {
+	all := buildAllIndex(tree)
+	if len(all) == 0 {
 		return nil, fmt.Errorf("gfriends filetree contains no usable avatars")
 	}
-	return index, nil
+	return all, nil
 }
 
-func (c *Client) indexReady() (bool, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if !c.loadedAt.IsZero() && time.Since(c.loadedAt) < cacheExpiration {
-		return true, nil
-	}
-	if time.Now().Before(c.retryAt) {
-		if !c.loadedAt.IsZero() {
-			return true, nil
-		}
-		return true, c.refreshErr
-	}
-	return false, nil
-}
-
-func (c *Client) installIndex(index map[string]string, updatedAt time.Time) {
+func (c *Client) installAll(all map[string][]string, updatedAt time.Time) {
 	c.mu.Lock()
-	c.index = index
+	c.allImages = all
 	c.loadedAt = updatedAt
 	c.retryAt = time.Time{}
 	c.refreshErr = nil
 	c.mu.Unlock()
-}
-
-// buildIndex indexes folders in name order and keeps the first image per
-// actor, so the chosen avatar does not depend on map iteration order.
-func buildIndex(tree fileTree) map[string]string {
-	index := make(map[string]string)
-	for _, folder := range slices.Sorted(maps.Keys(tree.Content)) {
-		for alias, target := range tree.Content[folder] {
-			name := strings.TrimSuffix(alias, ".jpg")
-			name = strings.TrimSuffix(name, ".png")
-			norm := normalizeName(name)
-			if norm == "" || strings.TrimSpace(target) == "" {
-				continue
-			}
-
-			// Store relative path e.g. Content/folder/target
-			rel := fmt.Sprintf("Content/%s/%s", folder, target)
-			for _, key := range []string{norm, strings.ReplaceAll(norm, " ", "")} {
-				if _, found := index[key]; !found {
-					index[key] = rel
-				}
-			}
-		}
-	}
-	return index
 }
 
 // FetchAvatar downloads the avatar bytes for the specified actor.
@@ -309,60 +211,93 @@ func normalizeName(s string) string {
 	return s
 }
 
-// ensureAll builds and caches every file per normalized actor name, reusing the
-// on-disk Filetree cache when present. This backs multi-image actor lookups.
+// ensureAll loads and caches every file per normalized actor name. It is the
+// single loader behind both avatar lookups and multi-image lookups: the on-disk
+// Filetree cache is honored only while fresh, downloads are written back, and
+// the parsed tree is built once.
 func (c *Client) ensureAll(ctx context.Context) (map[string][]string, error) {
-	c.allMu.RLock()
-	if !c.allAt.IsZero() && time.Since(c.allAt) < cacheExpiration && c.allImages != nil {
-		all := c.allImages
-		c.allMu.RUnlock()
-		return all, nil
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
-	c.allMu.RUnlock()
-
-	// Serialize the build so concurrent first callers do not each download the
-	// ~6 MiB Filetree; re-check after acquiring the lock.
+	if all, ready, err := c.readyImages(); ready {
+		return all, err
+	}
 	if err := c.refresh.Lock(ctx); err != nil {
 		return nil, err
 	}
 	defer c.refresh.Unlock()
-	c.allMu.RLock()
-	if !c.allAt.IsZero() && time.Since(c.allAt) < cacheExpiration && c.allImages != nil {
-		all := c.allImages
-		c.allMu.RUnlock()
-		return all, nil
+	if all, ready, err := c.readyImages(); ready {
+		return all, err
 	}
-	c.allMu.RUnlock()
 
-	var tree fileTree
-	loaded := false
-	if c.dataDir != "" {
-		if data, err := os.ReadFile(filepath.Join(c.dataDir, "gfriends_tree.json")); err == nil && len(data) <= maxIndexBytes {
-			if json.Unmarshal(data, &tree) == nil {
-				loaded = true
+	cacheFile := filepath.Join(c.dataDir, "gfriends_tree.json")
+	c.mu.RLock()
+	loaded := !c.loadedAt.IsZero()
+	c.mu.RUnlock()
+	if !loaded && c.dataDir != "" {
+		if all, updatedAt, err := readCachedAll(cacheFile); err == nil {
+			c.installAll(all, updatedAt)
+			if images, ready, err := c.readyImages(); ready {
+				return images, err
 			}
 		}
 	}
-	if !loaded {
-		body, err := c.download(ctx, "Filetree.json", maxIndexBytes, nil)
-		if err != nil {
-			return nil, err
+
+	var all map[string][]string
+	body, err := c.download(ctx, "Filetree.json", maxIndexBytes, func(data []byte) error {
+		var err error
+		all, err = parseIndex(data)
+		return err
+	})
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
 		}
-		if err := json.Unmarshal(body, &tree); err != nil {
-			return nil, err
+		c.mu.Lock()
+		c.retryAt = time.Now().Add(indexRetryDelay)
+		c.refreshErr = fmt.Errorf("download gfriends filetree: %w", err)
+		failure := c.refreshErr
+		existing, have := c.allImages, !c.loadedAt.IsZero()
+		c.mu.Unlock()
+		if have {
+			return existing, nil
+		}
+		return nil, failure
+	}
+	if c.dataDir != "" {
+		if err := os.MkdirAll(c.dataDir, 0755); err != nil {
+			slog.WarnContext(ctx, "create gfriends cache directory", "path", c.dataDir, "error", err)
+		} else if err := os.WriteFile(cacheFile, body, 0644); err != nil {
+			slog.WarnContext(ctx, "write gfriends index cache", "path", cacheFile, "error", err)
 		}
 	}
-	all := buildAllIndex(tree)
-	c.allMu.Lock()
-	c.allImages, c.allAt = all, time.Now()
-	c.allMu.Unlock()
-	return all, nil
+	c.installAll(all, time.Now())
+	images, _, _ := c.readyImages()
+	return images, nil
+}
+
+// readyImages reports whether the in-memory images are fresh enough to serve,
+// returning them when so (or the stale copy while a retry backoff is pending).
+func (c *Client) readyImages() (map[string][]string, bool, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if !c.loadedAt.IsZero() && time.Since(c.loadedAt) < cacheExpiration {
+		return c.allImages, true, nil
+	}
+	if time.Now().Before(c.retryAt) {
+		if !c.loadedAt.IsZero() {
+			return c.allImages, true, nil
+		}
+		return nil, true, c.refreshErr
+	}
+	return nil, false, nil
 }
 
 func buildAllIndex(tree fileTree) map[string][]string {
 	all := make(map[string][]string)
 	for _, folder := range slices.Sorted(maps.Keys(tree.Content)) {
-		for alias, target := range tree.Content[folder] {
+		for _, alias := range slices.Sorted(maps.Keys(tree.Content[folder])) {
+			target := tree.Content[folder][alias]
 			name := strings.TrimSuffix(strings.TrimSuffix(alias, ".jpg"), ".png")
 			norm := normalizeName(name)
 			if norm == "" || strings.TrimSpace(target) == "" {

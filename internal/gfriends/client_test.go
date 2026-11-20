@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestGFriendsClient_LookupAndCache(t *testing.T) {
@@ -80,6 +81,51 @@ func TestGFriendsClient_LookupAndCache(t *testing.T) {
 	}
 }
 
+func TestGFriendsClient_ImagesCacheWritesBackAndHonorsTTL(t *testing.T) {
+	dir := t.TempDir()
+	cacheFile := filepath.Join(dir, "gfriends_tree.json")
+	newClient := func(calls *int) *Client {
+		return New(dir, &http.Client{Transport: testTransport(func(*http.Request) (*http.Response, error) {
+			*calls++
+			return treeResponse(testTree), nil
+		})})
+	}
+
+	// First load downloads once and must persist the tree to disk.
+	calls := 0
+	if _, err := newClient(&calls).Images(t.Context(), "Actor"); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("first load calls = %d, want 1", calls)
+	}
+	if _, err := os.Stat(cacheFile); err != nil {
+		t.Fatalf("multi-image load did not write cache: %v", err)
+	}
+
+	// A fresh on-disk cache is reused without another download.
+	calls = 0
+	if _, err := newClient(&calls).Images(t.Context(), "Actor"); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 0 {
+		t.Fatalf("fresh cache should avoid a download, calls = %d", calls)
+	}
+
+	// An expired on-disk cache must be ignored and refreshed.
+	old := time.Now().Add(-2 * cacheExpiration)
+	if err := os.Chtimes(cacheFile, old, old); err != nil {
+		t.Fatal(err)
+	}
+	calls = 0
+	if _, err := newClient(&calls).Images(t.Context(), "Actor"); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("stale cache should trigger a download, calls = %d", calls)
+	}
+}
+
 func TestGFriendsClient_PrefersFirstFolderDeterministically(t *testing.T) {
 	tree := fileTree{Content: map[string]map[string]string{
 		"2-Other":  {"三上悠亜.jpg": "三上悠亜.jpg?t=2"},
@@ -88,7 +134,7 @@ func TestGFriendsClient_PrefersFirstFolderDeterministically(t *testing.T) {
 	}}
 	for range 20 {
 		client := New("", &http.Client{})
-		client.index = buildIndex(tree)
+		client.allImages = buildAllIndex(tree)
 		if rel, _ := client.Lookup("三上悠亜"); rel != "Content/0-Manual/三上悠亜.jpg?t=0" {
 			t.Fatalf("Lookup chose %q", rel)
 		}
