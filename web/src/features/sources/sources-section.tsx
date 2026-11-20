@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toast } from 'sonner'
 import {
   FolderOpenIcon,
   HardDriveIcon,
@@ -10,6 +11,7 @@ import {
   UserRoundIcon
 } from 'lucide-react'
 
+import { describeApiError } from '@/api/client'
 import { useDisconnectPanAccount, usePanAccountStatus, type PanAccount } from '@/api/pan'
 import { useSaveSources, useSources, type SourceKind, type StorageSource } from '@/api/sources'
 import { InlineError } from '@/components/error-state'
@@ -106,7 +108,10 @@ export function SourcesSection() {
   const [open, setOpen] = useState(false)
 
   const persist = (next: StorageSource[], onSuccess?: () => void) =>
-    save.mutate(next, { onSuccess })
+    save.mutate(next, {
+      onSuccess,
+      onError: error => toast.error(describeApiError(error))
+    })
 
   function openDraft(source: StorageSource) {
     setDraft(source)
@@ -163,7 +168,6 @@ export function SourcesSection() {
           无法读取存储源
         </InlineError>
       ) : null}
-      {save.isError ? <InlineError>保存失败，请重试</InlineError> : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {(sources.data ?? []).map(source => (
