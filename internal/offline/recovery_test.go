@@ -378,7 +378,7 @@ func TestSwitchKeepsHistoryVisibleAndDeduplicatesCurrentCandidate(t *testing.T) 
 		t.Fatal("switched task vanished", activity)
 	}
 	for _, hash := range []string{offlineHashA, offlineHashB} {
-		result, err := r.s.Add(t.Context(), record.JavdbID, hash)
+		result, err := r.s.Add(t.Context(), record.Code, hash)
 		if err != nil || result.TaskID != record.ID {
 			t.Fatalf("candidate created duplicate: %+v, %v", result, err)
 		}

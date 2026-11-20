@@ -18,14 +18,14 @@ func (s *Service) ViewedMovieIDs(ctx context.Context) ([]string, error) {
 	records, err := s.database.ViewedMovie.Query().
 		Order(ent.Desc(viewedmovie.FieldViewedAt), ent.Desc(viewedmovie.FieldID)).
 		Limit(maxViewedMovies).
-		Select(viewedmovie.FieldJavdbID).
+		Select(viewedmovie.FieldCode).
 		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load viewed movie IDs: %w", err)
 	}
 	ids := make([]string, 0, len(records))
 	for _, r := range records {
-		ids = append(ids, r.JavdbID)
+		ids = append(ids, r.Code)
 	}
 	return ids, nil
 }
@@ -67,10 +67,10 @@ func (s *Service) AddViewedMovieIDs(ctx context.Context, ids []string) error {
 
 		var builders []*ent.ViewedMovieCreate
 		for _, id := range clean {
-			builders = append(builders, tx.ViewedMovie.Create().SetJavdbID(id).SetViewedAt(now))
+			builders = append(builders, tx.ViewedMovie.Create().SetCode(id).SetViewedAt(now))
 		}
 		if err := tx.ViewedMovie.CreateBulk(builders...).
-			OnConflictColumns(viewedmovie.FieldJavdbID).
+			OnConflictColumns(viewedmovie.FieldCode).
 			UpdateViewedAt().
 			Exec(ctx); err != nil {
 			return fmt.Errorf("upsert viewed movies: %w", err)

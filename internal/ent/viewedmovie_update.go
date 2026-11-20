@@ -28,16 +28,16 @@ func (_u *ViewedMovieUpdate) Where(ps ...predicate.ViewedMovie) *ViewedMovieUpda
 	return _u
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (_u *ViewedMovieUpdate) SetJavdbID(v string) *ViewedMovieUpdate {
-	_u.mutation.SetJavdbID(v)
+// SetCode sets the "code" field.
+func (_u *ViewedMovieUpdate) SetCode(v string) *ViewedMovieUpdate {
+	_u.mutation.SetCode(v)
 	return _u
 }
 
-// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
-func (_u *ViewedMovieUpdate) SetNillableJavdbID(v *string) *ViewedMovieUpdate {
+// SetNillableCode sets the "code" field if the given value is not nil.
+func (_u *ViewedMovieUpdate) SetNillableCode(v *string) *ViewedMovieUpdate {
 	if v != nil {
-		_u.SetJavdbID(*v)
+		_u.SetCode(*v)
 	}
 	return _u
 }
@@ -90,9 +90,9 @@ func (_u *ViewedMovieUpdate) ExecX(ctx context.Context) {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *ViewedMovieUpdate) check() error {
-	if v, ok := _u.mutation.JavdbID(); ok {
-		if err := viewedmovie.JavdbIDValidator(v); err != nil {
-			return &ValidationError{Name: "javdb_id", err: fmt.Errorf(`ent: validator failed for field "ViewedMovie.javdb_id": %w`, err)}
+	if v, ok := _u.mutation.Code(); ok {
+		if err := viewedmovie.CodeValidator(v); err != nil {
+			return &ValidationError{Name: "code", err: fmt.Errorf(`ent: validator failed for field "ViewedMovie.code": %w`, err)}
 		}
 	}
 	return nil
@@ -110,8 +110,8 @@ func (_u *ViewedMovieUpdate) sqlSave(ctx context.Context) (_node int, err error)
 			}
 		}
 	}
-	if value, ok := _u.mutation.JavdbID(); ok {
-		_spec.SetField(viewedmovie.FieldJavdbID, field.TypeString, value)
+	if value, ok := _u.mutation.Code(); ok {
+		_spec.SetField(viewedmovie.FieldCode, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.ViewedAt(); ok {
 		_spec.SetField(viewedmovie.FieldViewedAt, field.TypeTime, value)
@@ -136,16 +136,16 @@ type ViewedMovieUpdateOne struct {
 	mutation *ViewedMovieMutation
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (_u *ViewedMovieUpdateOne) SetJavdbID(v string) *ViewedMovieUpdateOne {
-	_u.mutation.SetJavdbID(v)
+// SetCode sets the "code" field.
+func (_u *ViewedMovieUpdateOne) SetCode(v string) *ViewedMovieUpdateOne {
+	_u.mutation.SetCode(v)
 	return _u
 }
 
-// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
-func (_u *ViewedMovieUpdateOne) SetNillableJavdbID(v *string) *ViewedMovieUpdateOne {
+// SetNillableCode sets the "code" field if the given value is not nil.
+func (_u *ViewedMovieUpdateOne) SetNillableCode(v *string) *ViewedMovieUpdateOne {
 	if v != nil {
-		_u.SetJavdbID(*v)
+		_u.SetCode(*v)
 	}
 	return _u
 }
@@ -211,9 +211,9 @@ func (_u *ViewedMovieUpdateOne) ExecX(ctx context.Context) {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *ViewedMovieUpdateOne) check() error {
-	if v, ok := _u.mutation.JavdbID(); ok {
-		if err := viewedmovie.JavdbIDValidator(v); err != nil {
-			return &ValidationError{Name: "javdb_id", err: fmt.Errorf(`ent: validator failed for field "ViewedMovie.javdb_id": %w`, err)}
+	if v, ok := _u.mutation.Code(); ok {
+		if err := viewedmovie.CodeValidator(v); err != nil {
+			return &ValidationError{Name: "code", err: fmt.Errorf(`ent: validator failed for field "ViewedMovie.code": %w`, err)}
 		}
 	}
 	return nil
@@ -248,8 +248,8 @@ func (_u *ViewedMovieUpdateOne) sqlSave(ctx context.Context) (_node *ViewedMovie
 			}
 		}
 	}
-	if value, ok := _u.mutation.JavdbID(); ok {
-		_spec.SetField(viewedmovie.FieldJavdbID, field.TypeString, value)
+	if value, ok := _u.mutation.Code(); ok {
+		_spec.SetField(viewedmovie.FieldCode, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.ViewedAt(); ok {
 		_spec.SetField(viewedmovie.FieldViewedAt, field.TypeTime, value)

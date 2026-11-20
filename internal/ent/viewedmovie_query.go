@@ -262,12 +262,12 @@ func (_q *ViewedMovieQuery) Clone() *ViewedMovieQuery {
 // Example:
 //
 //	var v []struct {
-//		JavdbID string `json:"javdb_id,omitempty"`
+//		Code string `json:"code,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.ViewedMovie.Query().
-//		GroupBy(viewedmovie.FieldJavdbID).
+//		GroupBy(viewedmovie.FieldCode).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (_q *ViewedMovieQuery) GroupBy(field string, fields ...string) *ViewedMovieGroupBy {
@@ -285,11 +285,11 @@ func (_q *ViewedMovieQuery) GroupBy(field string, fields ...string) *ViewedMovie
 // Example:
 //
 //	var v []struct {
-//		JavdbID string `json:"javdb_id,omitempty"`
+//		Code string `json:"code,omitempty"`
 //	}
 //
 //	client.ViewedMovie.Query().
-//		Select(viewedmovie.FieldJavdbID).
+//		Select(viewedmovie.FieldCode).
 //		Scan(ctx, &v)
 func (_q *ViewedMovieQuery) Select(fields ...string) *ViewedMovieSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)

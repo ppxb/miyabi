@@ -40,7 +40,9 @@ func (s *stubLocalState) MatchingMovies(_ context.Context, ids, codes []string) 
 	for _, m := range s.movies {
 		if m.JavDBID != nil && idSet[*m.JavDBID] {
 			matches = append(matches, m)
-		} else if m.JavDBID == nil && codeSet[codeid.Normalize(m.Code)] {
+			continue
+		}
+		if codeSet[codeid.Normalize(m.Code)] {
 			matches = append(matches, m)
 		}
 	}
@@ -165,7 +167,7 @@ func TestProjectMoviesOmitsInvalidDatesWithoutMutatingCatalogue(t *testing.T) {
 	for index, test := range cases {
 		movie := result[index]
 		if movie.ReleaseDate != test.date || movie.ReleaseStatus != test.status ||
-			movie.ID != source[index].ID || movie.Code != source[index].Code || movie.Title != source[index].Title {
+			movie.Code != source[index].Code || movie.Title != source[index].Title {
 			t.Errorf("date %q damaged movie projection: %#v", test.input, movie)
 		}
 		if source[index].ReleaseDate != test.input {
@@ -208,10 +210,10 @@ func TestMovieStatesUsesSourceIDBeforeCatalogueSpelling(t *testing.T) {
 
 	service := &Service{database: store.Client, local: localState}
 	sourceMovies := []domain.Movie{
-		{ID: "known-id", Code: "作品/新版 #001"},
-		{ID: "pending-id", Code: "knb_m014"},
-		{ID: "conflicting-id", Code: "GLOD-0436"},
-		{ID: "queued-id", Code: "Current.Number"},
+		{ID: "OLD-001", Code: "OLD-001"},
+		{ID: "KNB-M014", Code: "KNB-M014"},
+		{ID: "GLOD-0436", Code: "GLOD-0436"},
+		{ID: "PREVIOUS-002", Code: "PREVIOUS-002"},
 	}
 	identities := make([]MovieIdentity, len(sourceMovies))
 	for i, item := range sourceMovies {
@@ -221,8 +223,8 @@ func TestMovieStatesUsesSourceIDBeforeCatalogueSpelling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantIDs := []int{10, 11, 0, 0}
-	wantStates := []MovieState{MovieInLibrary, MovieInLibrary, MovieNotInLibrary, MovieSaving}
+	wantIDs := []int{10, 11, 12, 0}
+	wantStates := []MovieState{MovieInLibrary, MovieInLibrary, MovieInLibrary, MovieSaving}
 	for i, item := range result {
 		if item.LibraryID != wantIDs[i] || item.State != wantStates[i] {
 			t.Fatalf("item %d: got id=%d state=%s, want id=%d state=%s", i, item.LibraryID, item.State, wantIDs[i], wantStates[i])

@@ -25,7 +25,7 @@ func viewedFixture(t testing.TB, count int, viewedAt time.Time) *Service {
 		for start := 0; start < count; start += 500 {
 			var rows []*ent.ViewedMovieCreate
 			for i := start; i < min(start+500, count); i++ {
-				rows = append(rows, tx.ViewedMovie.Create().SetJavdbID(fmt.Sprintf("seed-%d", i)).SetViewedAt(viewedAt))
+				rows = append(rows, tx.ViewedMovie.Create().SetCode(fmt.Sprintf("seed-%d", i)).SetViewedAt(viewedAt))
 			}
 			if err := tx.ViewedMovie.CreateBulk(rows...).Exec(t.Context()); err != nil {
 				return err
@@ -151,7 +151,7 @@ func TestViewedMoviesAdvanceTimeAfterClockRollback(t *testing.T) {
 		if err := svc.AddViewedMovieIDs(t.Context(), []string{id}); err != nil {
 			t.Fatal(err)
 		}
-		row := svc.database.ViewedMovie.Query().Where(viewedmovie.JavdbID(id)).OnlyX(t.Context())
+		row := svc.database.ViewedMovie.Query().Where(viewedmovie.Code(id)).OnlyX(t.Context())
 		want := future.Add(time.Duration(i+1) * time.Microsecond)
 		if !row.ViewedAt.Equal(want) {
 			t.Fatalf("view timestamp=%s, want %s", row.ViewedAt, want)
@@ -180,7 +180,7 @@ func TestViewedMoviesConcurrentWritesStayBounded(t *testing.T) {
 	if count := svc.database.ViewedMovie.Query().CountX(t.Context()); count != maxViewedMovies {
 		t.Fatalf("concurrent writes left %d rows", count)
 	}
-	rows := svc.database.ViewedMovie.Query().Where(viewedmovie.JavdbIDHasPrefix("new-")).AllX(t.Context())
+	rows := svc.database.ViewedMovie.Query().Where(viewedmovie.CodeHasPrefix("new-")).AllX(t.Context())
 	times := make(map[time.Time]bool)
 	var latest time.Time
 	for _, row := range rows {
@@ -192,12 +192,12 @@ func TestViewedMoviesConcurrentWritesStayBounded(t *testing.T) {
 	if len(rows) != 8 || len(times) != 8 {
 		t.Fatalf("concurrent writes lost rows or monotonic times: rows=%d timestamps=%d", len(rows), len(times))
 	}
-	shared := svc.database.ViewedMovie.Query().Where(viewedmovie.JavdbID("shared")).OnlyX(t.Context())
+	shared := svc.database.ViewedMovie.Query().Where(viewedmovie.Code("shared")).OnlyX(t.Context())
 	if !shared.ViewedAt.Equal(latest) {
 		t.Fatal("shared view did not retain the latest update")
 	}
 	for i := range 8 {
-		if svc.database.ViewedMovie.Query().Where(viewedmovie.JavdbID(fmt.Sprintf("seed-%d", i))).ExistX(t.Context()) {
+		if svc.database.ViewedMovie.Query().Where(viewedmovie.Code(fmt.Sprintf("seed-%d", i))).ExistX(t.Context()) {
 			t.Fatalf("oldest seed-%d was not evicted", i)
 		}
 	}
@@ -221,10 +221,10 @@ func TestViewedMoviesPruningFailureRollsBackWrites(t *testing.T) {
 	if count := svc.database.ViewedMovie.Query().CountX(t.Context()); count != maxViewedMovies {
 		t.Fatalf("failed pruning left %d rows", count)
 	}
-	if svc.database.ViewedMovie.Query().Where(viewedmovie.JavdbID("new")).ExistX(t.Context()) {
+	if svc.database.ViewedMovie.Query().Where(viewedmovie.Code("new")).ExistX(t.Context()) {
 		t.Fatal("failed pruning retained an uncommitted view")
 	}
-	row := svc.database.ViewedMovie.Query().Where(viewedmovie.JavdbID("seed-0")).OnlyX(t.Context())
+	row := svc.database.ViewedMovie.Query().Where(viewedmovie.Code("seed-0")).OnlyX(t.Context())
 	if !row.ViewedAt.Equal(before) {
 		t.Fatal("failed pruning retained the timestamp update")
 	}

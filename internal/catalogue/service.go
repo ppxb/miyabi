@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
@@ -316,6 +317,7 @@ func projectMovies(
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 	result := make([]Movie, len(source))
 	for index, item := range source {
+		item.ID = codeid.Normalize(item.Code)
 		releaseStatus := ReleaseUnknown
 		item.ReleaseDate = strings.TrimSpace(item.ReleaseDate)
 		if item.ReleaseDate != "" {

@@ -130,7 +130,7 @@ func (service *Service) submissions(ctx context.Context, records []*ent.OfflineD
 		*item = domain.OfflineSubmission{
 			TaskID:      record.ID,
 			Code:        record.Code,
-			JavDBID:     record.JavdbID,
+			JavDBID:     codeid.Normalize(record.Code),
 			AccountID:   record.AccountID,
 			DirectoryID: record.DirectoryID,
 			ScanTaskID:  record.ScanTaskID,
@@ -200,8 +200,7 @@ func (service *Service) submissions(ctx context.Context, records []*ent.OfflineD
 			if !present {
 				continue
 			}
-			if matched != nil && (matched.JavdbID != nil && *matched.JavdbID == record.JavdbID ||
-				matched.JavdbID == nil && matched.Code == codeid.Normalize(record.Code)) {
+			if matched != nil && matched.Code == codeid.Normalize(record.Code) {
 				item.Phase = "in_library"
 				item.LibraryID = matched.ID
 				if matched.ScrapeStatus != movie.ScrapeStatusFailed {

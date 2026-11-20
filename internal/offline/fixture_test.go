@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
@@ -300,7 +301,17 @@ func (s *stubCatalogue) CatalogueMagnets(ctx context.Context, movieID string) ([
 }
 
 func (s *stubCatalogue) CatalogueMagnetsByCode(ctx context.Context, code string) ([]domain.Magnet, error) {
-	return s.magnets[code], nil
+	for key, magnets := range s.magnets {
+		if codeid.Normalize(key) == codeid.Normalize(code) {
+			return magnets, nil
+		}
+	}
+	for id, movie := range s.movies {
+		if codeid.Normalize(movie.Code) == codeid.Normalize(code) {
+			return s.magnets[id], nil
+		}
+	}
+	return nil, nil
 }
 
 func (s *stubCatalogue) HasMagnet(ctx context.Context, movieID, hash string) (bool, error) {

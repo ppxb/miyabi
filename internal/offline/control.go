@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/domain/download"
 	"github.com/ppxb/miyabi/internal/drive"
@@ -147,7 +148,9 @@ func (s *Service) removeCurrent(ctx context.Context, sess drive.Session, record 
 		return err
 	}
 	if found && remote.Status == 2 {
-		return sess.Commit(ctx, func(tx *ent.Tx) error { return s.completeTask(ctx, tx, record, remote.FileID, s.currentMountFor(ctx, record)) })
+		return sess.Commit(ctx, func(tx *ent.Tx) error {
+			return s.completeTask(ctx, tx, record, remote.FileID, s.currentMountFor(ctx, record))
+		})
 	}
 	if found && remote.Status != 0 && remote.Status != 1 && remote.Status != -1 {
 		return fmt.Errorf("115 returned unknown offline status %d", remote.Status)
@@ -165,7 +168,7 @@ func (s *Service) removeCurrent(ctx context.Context, sess drive.Session, record 
 				return tx.OfflineDownload.UpdateOneID(record.ID).SetRecovery(state).SetProgress(remote.Progress).ClearError().Exec(ctx)
 			})
 		}
-		present, err := s.database.Movie.Query().Where(movie.JavdbIDEQ(record.JavdbID), movie.HasFilesWith(
+		present, err := s.database.Movie.Query().Where(movie.CodeEQ(codeid.Normalize(record.Code)), movie.HasFilesWith(
 			file.AccountIDEQ(record.AccountID), file.RootIDEQ(record.DirectoryID))).Exist(ctx)
 		if err != nil {
 			return err

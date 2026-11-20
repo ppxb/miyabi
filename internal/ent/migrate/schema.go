@@ -453,7 +453,7 @@ var (
 	// ViewedMoviesColumns holds the columns for the "viewed_movies" table.
 	ViewedMoviesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "javdb_id", Type: field.TypeString, Unique: true},
+		{Name: "code", Type: field.TypeString, Unique: true},
 		{Name: "viewed_at", Type: field.TypeTime},
 	}
 	// ViewedMoviesTable holds the schema information for the "viewed_movies" table.

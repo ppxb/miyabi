@@ -17,8 +17,8 @@ type ViewedMovie struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
-	// JavdbID holds the value of the "javdb_id" field.
-	JavdbID string `json:"javdb_id,omitempty"`
+	// Code holds the value of the "code" field.
+	Code string `json:"code,omitempty"`
 	// ViewedAt holds the value of the "viewed_at" field.
 	ViewedAt     time.Time `json:"viewed_at,omitempty"`
 	selectValues sql.SelectValues
@@ -31,7 +31,7 @@ func (*ViewedMovie) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case viewedmovie.FieldID:
 			values[i] = new(sql.NullInt64)
-		case viewedmovie.FieldJavdbID:
+		case viewedmovie.FieldCode:
 			values[i] = new(sql.NullString)
 		case viewedmovie.FieldViewedAt:
 			values[i] = new(sql.NullTime)
@@ -56,11 +56,11 @@ func (_m *ViewedMovie) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			_m.ID = int(value.Int64)
-		case viewedmovie.FieldJavdbID:
+		case viewedmovie.FieldCode:
 			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field javdb_id", values[i])
+				return fmt.Errorf("unexpected type %T for field code", values[i])
 			} else if value.Valid {
-				_m.JavdbID = value.String
+				_m.Code = value.String
 			}
 		case viewedmovie.FieldViewedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -104,8 +104,8 @@ func (_m *ViewedMovie) String() string {
 	var builder strings.Builder
 	builder.WriteString("ViewedMovie(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
-	builder.WriteString("javdb_id=")
-	builder.WriteString(_m.JavdbID)
+	builder.WriteString("code=")
+	builder.WriteString(_m.Code)
 	builder.WriteString(", ")
 	builder.WriteString("viewed_at=")
 	builder.WriteString(_m.ViewedAt.Format(time.ANSIC))

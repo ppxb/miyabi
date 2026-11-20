@@ -22,10 +22,9 @@ func TestOfflineProjectionUsesMovieIdentityAndExposesLibraryID(t *testing.T) {
 		javdbID string
 		phase   string
 	}{
-		{"same id with new spelling", "OLD-001", "fixture-movie", "in_library"},
-		{"pending exact code", "ABP-001", "", "in_library"},
-		{"conflicting id", "ABP-001", "other-movie", "downloaded"},
-		{"pending different code", "ABP-002", "", "downloaded"},
+		{"same code", "ABP-001", "", "in_library"},
+		{"same code with legacy id", "ABP-001", "other-movie", "in_library"},
+		{"different code", "ABP-002", "", "downloaded"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			service, record, input, source := offlineFixture(t)
@@ -102,7 +101,7 @@ func TestOfflineCompletionAndTargetedScanCommitTogether(t *testing.T) {
 		t.Fatal(err)
 	}
 	if target.TargetID != "download-folder" || target.OfflineTaskID != record.ID || target.Source.AccountID != source.AccountID || target.Source.Directory.ID != source.Directory.ID ||
-		target.Code != saved.Code || target.JavDBID != saved.JavdbID {
+		target.Code != saved.Code {
 		t.Fatalf("scan scope: %#v", target)
 	}
 	if count, err := service.database.Task.Query().Where(task.TypeEQ("scan")).Count(ctx); err != nil || count != 2 {
@@ -223,7 +222,7 @@ func TestOfflineActivityKeepsLatestTasksInCurrentSource(t *testing.T) {
 	}
 	current := activity.Tasks[0]
 	if current.TaskID != latest || current.TaskID == original.ID || current.Code != "ABP-002" ||
-		current.JavDBID != "latest-movie" || current.AccountID != source.AccountID ||
+		current.JavDBID != "ABP-002" || current.AccountID != source.AccountID ||
 		current.DirectoryID != source.Directory.ID || current.Phase != "downloading" {
 		t.Fatalf("latest task: %+v", current)
 	}

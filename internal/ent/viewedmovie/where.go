@@ -54,9 +54,9 @@ func IDLTE(id int) predicate.ViewedMovie {
 	return predicate.ViewedMovie(sql.FieldLTE(FieldID, id))
 }
 
-// JavdbID applies equality check predicate on the "javdb_id" field. It's identical to JavdbIDEQ.
-func JavdbID(v string) predicate.ViewedMovie {
-	return predicate.ViewedMovie(sql.FieldEQ(FieldJavdbID, v))
+// Code applies equality check predicate on the "code" field. It's identical to CodeEQ.
+func Code(v string) predicate.ViewedMovie {
+	return predicate.ViewedMovie(sql.FieldEQ(FieldCode, v))
 }
 
 // ViewedAt applies equality check predicate on the "viewed_at" field. It's identical to ViewedAtEQ.
@@ -64,69 +64,69 @@ func ViewedAt(v time.Time) predicate.ViewedMovie {
 	return predicate.ViewedMovie(sql.FieldEQ(FieldViewedAt, v))
 }
 
-// JavdbIDEQ applies the EQ predicate on the "javdb_id" field.
-func JavdbIDEQ(v string) predicate.ViewedMovie {
-	return predicate.ViewedMovie(sql.FieldEQ(FieldJavdbID, v))
+// CodeEQ applies the EQ predicate on the "code" field.
+func CodeEQ(v string) predicate.ViewedMovie {
+	return predicate.ViewedMovie(sql.FieldEQ(FieldCode, v))
 }
 
-// JavdbIDNEQ applies the NEQ predicate on the "javdb_id" field.
-func JavdbIDNEQ(v string) predicate.ViewedMovie {
-	return predicate.ViewedMovie(sql.FieldNEQ(FieldJavdbID, v))
+// CodeNEQ applies the NEQ predicate on the "code" field.
+func CodeNEQ(v string) predicate.ViewedMovie {
+	return predicate.ViewedMovie(sql.FieldNEQ(FieldCode, v))
 }
 
-// JavdbIDIn applies the In predicate on the "javdb_id" field.
-func JavdbIDIn(vs ...string) predicate.ViewedMovie {
-	return predicate.ViewedMovie(sql.FieldIn(FieldJavdbID, vs...))
+// CodeIn applies the In predicate on the "code" field.
+func CodeIn(vs ...string) predicate.ViewedMovie {
+	return predicate.ViewedMovie(sql.FieldIn(FieldCode, vs...))
 }
 
-// JavdbIDNotIn applies the NotIn predicate on the "javdb_id" field.
-func JavdbIDNotIn(vs ...string) predicate.ViewedMovie {
-	return predicate.ViewedMovie(sql.FieldNotIn(FieldJavdbID, vs...))
+// CodeNotIn applies the NotIn predicate on the "code" field.
+func CodeNotIn(vs ...string) predicate.ViewedMovie {
+	return predicate.ViewedMovie(sql.FieldNotIn(FieldCode, vs...))
 }
 
-// JavdbIDGT applies the GT predicate on the "javdb_id" field.
-func JavdbIDGT(v string) predicate.ViewedMovie {
-	return predicate.ViewedMovie(sql.FieldGT(FieldJavdbID, v))
+// CodeGT applies the GT predicate on the "code" field.
+func CodeGT(v string) predicate.ViewedMovie {
+	return predicate.ViewedMovie(sql.FieldGT(FieldCode, v))
 }
 
-// JavdbIDGTE applies the GTE predicate on the "javdb_id" field.
-func JavdbIDGTE(v string) predicate.ViewedMovie {
-	return predicate.ViewedMovie(sql.FieldGTE(FieldJavdbID, v))
+// CodeGTE applies the GTE predicate on the "code" field.
+func CodeGTE(v string) predicate.ViewedMovie {
+	return predicate.ViewedMovie(sql.FieldGTE(FieldCode, v))
 }
 
-// JavdbIDLT applies the LT predicate on the "javdb_id" field.
-func JavdbIDLT(v string) predicate.ViewedMovie {
-	return predicate.ViewedMovie(sql.FieldLT(FieldJavdbID, v))
+// CodeLT applies the LT predicate on the "code" field.
+func CodeLT(v string) predicate.ViewedMovie {
+	return predicate.ViewedMovie(sql.FieldLT(FieldCode, v))
 }
 
-// JavdbIDLTE applies the LTE predicate on the "javdb_id" field.
-func JavdbIDLTE(v string) predicate.ViewedMovie {
-	return predicate.ViewedMovie(sql.FieldLTE(FieldJavdbID, v))
+// CodeLTE applies the LTE predicate on the "code" field.
+func CodeLTE(v string) predicate.ViewedMovie {
+	return predicate.ViewedMovie(sql.FieldLTE(FieldCode, v))
 }
 
-// JavdbIDContains applies the Contains predicate on the "javdb_id" field.
-func JavdbIDContains(v string) predicate.ViewedMovie {
-	return predicate.ViewedMovie(sql.FieldContains(FieldJavdbID, v))
+// CodeContains applies the Contains predicate on the "code" field.
+func CodeContains(v string) predicate.ViewedMovie {
+	return predicate.ViewedMovie(sql.FieldContains(FieldCode, v))
 }
 
-// JavdbIDHasPrefix applies the HasPrefix predicate on the "javdb_id" field.
-func JavdbIDHasPrefix(v string) predicate.ViewedMovie {
-	return predicate.ViewedMovie(sql.FieldHasPrefix(FieldJavdbID, v))
+// CodeHasPrefix applies the HasPrefix predicate on the "code" field.
+func CodeHasPrefix(v string) predicate.ViewedMovie {
+	return predicate.ViewedMovie(sql.FieldHasPrefix(FieldCode, v))
 }
 
-// JavdbIDHasSuffix applies the HasSuffix predicate on the "javdb_id" field.
-func JavdbIDHasSuffix(v string) predicate.ViewedMovie {
-	return predicate.ViewedMovie(sql.FieldHasSuffix(FieldJavdbID, v))
+// CodeHasSuffix applies the HasSuffix predicate on the "code" field.
+func CodeHasSuffix(v string) predicate.ViewedMovie {
+	return predicate.ViewedMovie(sql.FieldHasSuffix(FieldCode, v))
 }
 
-// JavdbIDEqualFold applies the EqualFold predicate on the "javdb_id" field.
-func JavdbIDEqualFold(v string) predicate.ViewedMovie {
-	return predicate.ViewedMovie(sql.FieldEqualFold(FieldJavdbID, v))
+// CodeEqualFold applies the EqualFold predicate on the "code" field.
+func CodeEqualFold(v string) predicate.ViewedMovie {
+	return predicate.ViewedMovie(sql.FieldEqualFold(FieldCode, v))
 }
 
-// JavdbIDContainsFold applies the ContainsFold predicate on the "javdb_id" field.
-func JavdbIDContainsFold(v string) predicate.ViewedMovie {
-	return predicate.ViewedMovie(sql.FieldContainsFold(FieldJavdbID, v))
+// CodeContainsFold applies the ContainsFold predicate on the "code" field.
+func CodeContainsFold(v string) predicate.ViewedMovie {
+	return predicate.ViewedMovie(sql.FieldContainsFold(FieldCode, v))
 }
 
 // ViewedAtEQ applies the EQ predicate on the "viewed_at" field.

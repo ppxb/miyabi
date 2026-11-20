@@ -42,31 +42,20 @@ func (service *Service) AddForAccount(ctx context.Context, accountID, movieID, h
 // resolveMagnet confirms the hash belongs to the movie and returns its code.
 // A known code skips the movie-ID lookup entirely.
 func (service *Service) resolveMagnet(ctx context.Context, movieID, codeHint, hash string) (string, error) {
+	code := codeid.Normalize(movieID)
 	if codeHint != "" {
-		code := codeid.Normalize(codeHint)
-		magnets, err := service.catalogue.CatalogueMagnetsByCode(ctx, code)
-		if err != nil {
-			return "", err
-		}
-		for _, magnet := range magnets {
-			if strings.EqualFold(magnet.Hash, hash) {
-				return code, nil
-			}
-		}
-		return "", ErrMagnetNotFound
+		code = codeid.Normalize(codeHint)
 	}
-	has, err := service.catalogue.HasMagnet(ctx, movieID, hash)
+	magnets, err := service.catalogue.CatalogueMagnetsByCode(ctx, code)
 	if err != nil {
 		return "", err
 	}
-	if !has {
-		return "", ErrMagnetNotFound
+	for _, magnet := range magnets {
+		if strings.EqualFold(magnet.Hash, hash) {
+			return code, nil
+		}
 	}
-	rawCode, err := service.catalogue.MovieCode(ctx, movieID)
-	if err != nil {
-		return "", err
-	}
-	return codeid.Normalize(rawCode), nil
+	return "", ErrMagnetNotFound
 }
 
 func (service *Service) addForAccount(ctx context.Context, accountID, movieID, codeHint, hash string) (domain.OfflineSubmission, error) {
@@ -146,7 +135,7 @@ func (service *Service) addForAccount(ctx context.Context, accountID, movieID, c
 	if err := service.drive.Commit(submitContext, func(tx *ent.Tx) error {
 		var err error
 		created, err = tx.OfflineDownload.Create().
-			SetCode(code).SetJavdbID(movieID).SetHash(hash).SetInfoHash(hash).SetRecovery(state).
+			SetCode(code).SetHash(hash).SetInfoHash(hash).SetRecovery(state).
 			SetAccountID(source.AccountID).SetDirectoryID(directory.ID).
 			Save(submitContext)
 		if err != nil {

@@ -210,16 +210,18 @@ func (r *scanRun) notifyAfterCommit(tx *ent.Tx, change tasks.Change, queued bool
 // IndexDownloadedMovie binds a completed download target to a movie record with its known JavDB ID.
 func IndexDownloadedMovie(ctx context.Context, tx *ent.Tx, payload domain.ScanPayload) (int, error) {
 	code := codeid.Normalize(payload.Code)
-	if err := tx.Movie.Create().SetCode(code).SetJavdbID(payload.JavDBID).
-		OnConflict().Ignore().Exec(ctx); err != nil {
+	create := tx.Movie.Create().SetCode(code)
+	if payload.JavDBID != "" {
+		create.SetJavdbID(payload.JavDBID)
+	}
+	if err := create.OnConflict().Ignore().Exec(ctx); err != nil {
 		return 0, fmt.Errorf("index downloaded movie: %w", err)
 	}
-	record, err := tx.Movie.Query().Where(movie.Or(movie.JavdbIDEQ(payload.JavDBID),
-		movie.And(movie.CodeEQ(code), movie.JavdbIDIsNil()))).Only(ctx)
+	record, err := tx.Movie.Query().Where(movie.CodeEQ(code)).Only(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("resolve downloaded movie association: %w", err)
 	}
-	if record.JavdbID == nil {
+	if record.JavdbID == nil && payload.JavDBID != "" {
 		if err := tx.Movie.UpdateOneID(record.ID).SetJavdbID(payload.JavDBID).Exec(ctx); err != nil {
 			return 0, fmt.Errorf("save downloaded movie identity: %w", err)
 		}

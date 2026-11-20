@@ -248,15 +248,13 @@ func TestRescanRestoresOnlyUnchangedFilesFromTheSameAccount(t *testing.T) {
 	}
 }
 
-func TestDownloadedMovieBindingPreservesKnownIdentityAndRejectsConflicts(t *testing.T) {
+func TestDownloadedMovieBindingReusesByCode(t *testing.T) {
 	for _, scenario := range []struct {
-		name, code, javdbID string
-		conflict            bool
+		name, code, javdbID, payloadID string
 	}{
-		{name: "pending catalogue", code: "LUXU-1899"},
-		{name: "known catalogue", code: "LUXU-1899", javdbID: "catalogue-id"},
-		{name: "known ID with older spelling", code: "OLD-001", javdbID: "catalogue-id"},
-		{name: "conflicting identity", code: "LUXU-1899", javdbID: "other-catalogue-id", conflict: true},
+		{name: "pending catalogue", code: "LUXU-1899", payloadID: "catalogue-id"},
+		{name: "known catalogue", code: "LUXU-1899", javdbID: "catalogue-id", payloadID: "catalogue-id"},
+		{name: "same code legacy id", code: "LUXU-1899", javdbID: "other-catalogue-id", payloadID: "catalogue-id"},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			lib, _, payload := libraryFixture(t)
@@ -266,26 +264,26 @@ func TestDownloadedMovieBindingPreservesKnownIdentityAndRejectsConflicts(t *test
 				create.SetJavdbID(scenario.javdbID)
 			}
 			known := create.SaveX(ctx)
-			payload.Code, payload.JavDBID = "LUXU-1899", "catalogue-id"
+			payload.Code, payload.JavDBID = scenario.code, scenario.payloadID
 			var id int
 			err := ent.WithTx(ctx, lib.database, func(tx *ent.Tx) error {
 				var err error
 				id, err = scan.IndexDownloadedMovie(ctx, tx, payload)
 				return err
 			})
-			if (err != nil) != scenario.conflict {
-				t.Fatalf("binding error = %v, conflict = %v", err, scenario.conflict)
+			if err != nil {
+				t.Fatalf("binding error = %v", err)
 			}
 			record := lib.database.Movie.Query().OnlyX(ctx)
-			if record.ID != known.ID || record.Title != known.Title {
-				t.Fatalf("binding replaced existing metadata: %#v", record)
-			}
-			if scenario.conflict {
-				if domain.ValueOrZero(record.JavdbID) != scenario.javdbID {
-					t.Fatal("binding overwrote another catalogue identity")
-				}
-			} else if id != record.ID || domain.ValueOrZero(record.JavdbID) != payload.JavDBID {
+			if record.ID != known.ID || record.Title != known.Title || id != record.ID {
 				t.Fatalf("binding did not reuse the existing movie: %#v", record)
+			}
+			wantID := scenario.javdbID
+			if wantID == "" {
+				wantID = scenario.payloadID
+			}
+			if domain.ValueOrZero(record.JavdbID) != wantID {
+				t.Fatalf("javdb identity = %q, want %q", domain.ValueOrZero(record.JavdbID), wantID)
 			}
 		})
 	}

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
 )
 
@@ -80,7 +81,7 @@ func movieReferencesFromWire(ctx context.Context, movieID, field string, source 
 				"reference_id", id, "reason", reason)
 			continue
 		}
-		result = append(result, domain.MovieReference{ID: id, Code: code, Thumbnail: item.ThumbURL})
+		result = append(result, domain.MovieReference{ID: codeid.Normalize(code), Code: code, Thumbnail: item.ThumbURL})
 	}
 	return result
 }

@@ -14406,7 +14406,7 @@ type ViewedMovieMutation struct {
 	op            Op
 	typ           string
 	id            *int
-	javdb_id      *string
+	code          *string
 	viewed_at     *time.Time
 	clearedFields map[string]struct{}
 	done          bool
@@ -14512,40 +14512,40 @@ func (m *ViewedMovieMutation) IDs(ctx context.Context) ([]int, error) {
 	}
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (m *ViewedMovieMutation) SetJavdbID(s string) {
-	m.javdb_id = &s
+// SetCode sets the "code" field.
+func (m *ViewedMovieMutation) SetCode(s string) {
+	m.code = &s
 }
 
-// JavdbID returns the value of the "javdb_id" field in the mutation.
-func (m *ViewedMovieMutation) JavdbID() (r string, exists bool) {
-	v := m.javdb_id
+// Code returns the value of the "code" field in the mutation.
+func (m *ViewedMovieMutation) Code() (r string, exists bool) {
+	v := m.code
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldJavdbID returns the old "javdb_id" field's value of the ViewedMovie entity.
+// OldCode returns the old "code" field's value of the ViewedMovie entity.
 // If the ViewedMovie object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ViewedMovieMutation) OldJavdbID(ctx context.Context) (v string, err error) {
+func (m *ViewedMovieMutation) OldCode(ctx context.Context) (v string, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldJavdbID is only allowed on UpdateOne operations")
+		return v, errors.New("OldCode is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldJavdbID requires an ID field in the mutation")
+		return v, errors.New("OldCode requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldJavdbID: %w", err)
+		return v, fmt.Errorf("querying old value for OldCode: %w", err)
 	}
-	return oldValue.JavdbID, nil
+	return oldValue.Code, nil
 }
 
-// ResetJavdbID resets all changes to the "javdb_id" field.
-func (m *ViewedMovieMutation) ResetJavdbID() {
-	m.javdb_id = nil
+// ResetCode resets all changes to the "code" field.
+func (m *ViewedMovieMutation) ResetCode() {
+	m.code = nil
 }
 
 // SetViewedAt sets the "viewed_at" field.
@@ -14619,8 +14619,8 @@ func (m *ViewedMovieMutation) Type() string {
 // AddedFields().
 func (m *ViewedMovieMutation) Fields() []string {
 	fields := make([]string, 0, 2)
-	if m.javdb_id != nil {
-		fields = append(fields, viewedmovie.FieldJavdbID)
+	if m.code != nil {
+		fields = append(fields, viewedmovie.FieldCode)
 	}
 	if m.viewed_at != nil {
 		fields = append(fields, viewedmovie.FieldViewedAt)
@@ -14633,8 +14633,8 @@ func (m *ViewedMovieMutation) Fields() []string {
 // schema.
 func (m *ViewedMovieMutation) Field(name string) (ent.Value, bool) {
 	switch name {
-	case viewedmovie.FieldJavdbID:
-		return m.JavdbID()
+	case viewedmovie.FieldCode:
+		return m.Code()
 	case viewedmovie.FieldViewedAt:
 		return m.ViewedAt()
 	}
@@ -14646,8 +14646,8 @@ func (m *ViewedMovieMutation) Field(name string) (ent.Value, bool) {
 // database failed.
 func (m *ViewedMovieMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
 	switch name {
-	case viewedmovie.FieldJavdbID:
-		return m.OldJavdbID(ctx)
+	case viewedmovie.FieldCode:
+		return m.OldCode(ctx)
 	case viewedmovie.FieldViewedAt:
 		return m.OldViewedAt(ctx)
 	}
@@ -14659,12 +14659,12 @@ func (m *ViewedMovieMutation) OldField(ctx context.Context, name string) (ent.Va
 // type.
 func (m *ViewedMovieMutation) SetField(name string, value ent.Value) error {
 	switch name {
-	case viewedmovie.FieldJavdbID:
+	case viewedmovie.FieldCode:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetJavdbID(v)
+		m.SetCode(v)
 		return nil
 	case viewedmovie.FieldViewedAt:
 		v, ok := value.(time.Time)
@@ -14722,8 +14722,8 @@ func (m *ViewedMovieMutation) ClearField(name string) error {
 // It returns an error if the field is not defined in the schema.
 func (m *ViewedMovieMutation) ResetField(name string) error {
 	switch name {
-	case viewedmovie.FieldJavdbID:
-		m.ResetJavdbID()
+	case viewedmovie.FieldCode:
+		m.ResetCode()
 		return nil
 	case viewedmovie.FieldViewedAt:
 		m.ResetViewedAt()

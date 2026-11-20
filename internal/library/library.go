@@ -250,8 +250,15 @@ func (s *Service) MatchingMovies(ctx context.Context, javdbIDs []string, codes [
 	if len(javdbIDs) == 0 && len(codes) == 0 {
 		return nil, nil
 	}
+	preds := make([]predicate.Movie, 0, 2)
+	if len(codes) > 0 {
+		preds = append(preds, movie.CodeIn(codes...))
+	}
+	if len(javdbIDs) > 0 {
+		preds = append(preds, movie.JavdbIDIn(javdbIDs...))
+	}
 	records, err := s.database.Movie.Query().Where(
-		movie.Or(movie.JavdbIDIn(javdbIDs...), movie.And(movie.JavdbIDIsNil(), movie.CodeIn(codes...))),
+		movie.Or(preds...),
 		movie.HasFilesWith(s.scope(ctx)),
 	).Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID).All(ctx)
 	if err != nil {

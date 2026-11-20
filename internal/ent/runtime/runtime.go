@@ -530,10 +530,10 @@ func init() {
 	task.DefaultResourceKey = taskDescResourceKey.Default.(string)
 	viewedmovieFields := schema.ViewedMovie{}.Fields()
 	_ = viewedmovieFields
-	// viewedmovieDescJavdbID is the schema descriptor for javdb_id field.
-	viewedmovieDescJavdbID := viewedmovieFields[0].Descriptor()
-	// viewedmovie.JavdbIDValidator is a validator for the "javdb_id" field. It is called by the builders before save.
-	viewedmovie.JavdbIDValidator = viewedmovieDescJavdbID.Validators[0].(func(string) error)
+	// viewedmovieDescCode is the schema descriptor for code field.
+	viewedmovieDescCode := viewedmovieFields[0].Descriptor()
+	// viewedmovie.CodeValidator is a validator for the "code" field. It is called by the builders before save.
+	viewedmovie.CodeValidator = viewedmovieDescCode.Validators[0].(func(string) error)
 	// viewedmovieDescViewedAt is the schema descriptor for viewed_at field.
 	viewedmovieDescViewedAt := viewedmovieFields[1].Descriptor()
 	// viewedmovie.DefaultViewedAt holds the default value on creation for the viewed_at field.
