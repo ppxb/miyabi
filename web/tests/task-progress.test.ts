@@ -48,6 +48,7 @@ test('metadata and artwork share batch progress in scan and offline notification
   const scan: ScanTask = {
     id: 1,
     type: 'scan',
+    movie_id: 1,
     status: 'running',
     progress: 0,
     created_at: '2026-10-01T09:00:00Z',

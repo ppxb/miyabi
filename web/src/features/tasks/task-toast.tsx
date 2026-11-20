@@ -58,6 +58,11 @@ export function useNotifyScanTask() {
 
 export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
   const active = isTaskActive(task)
+  // Library-wide sync/rebuild no longer shows a global "syncing" toast; only
+  // per-movie rescrapes keep the in-progress indicator.
+  if (active && task.movie_id == null) {
+    return
+  }
   const action = task.rebuild ? '重建' : '同步'
   const title = task.movie_id ? `${task.code} 重新刮削` : `媒体库${action}`
   const props = taskToastOptions(
