@@ -22,7 +22,7 @@
   - 改法：改用 `MediaImage`。（已修复：两处改用 `MediaImage`，并让 `imageURL` 透传本地 `/api/actors/` 路径）
 - [x] 🟠 ✅ **域名白名单后缀校验缺前导点**：`internal/freejavbt/client.go:245` `HasSuffix(host, "jdbstatic.com")` 放行 `evil-jdbstatic.com`。改法：`host == "jdbstatic.com" || HasSuffix(host, ".jdbstatic.com")`。（已修复：改为整域名/带前导点后缀匹配，并加 `TestMediaHostAllowlist`）
 - [x] 🟠 ✅ **不存在的 Tailwind 类 `scrollbar-none`**：`movie-detail/dialog.tsx:34`、`movie-detail/preview-viewer.tsx:113`、`library/movie-shelf.tsx:106`。改法：换成 `no-scrollbar`。（已修复：改用 `no-scrollbar`，并删除冗余的 `[&::-webkit-scrollbar]:hidden` / `[scrollbar-width:none]` 兜底）
-- [ ] 🟠 ✅ `internal/api/router.go:49-52`：`SetTrustedProxies` 错误被吞，if/else 两分支等价；配置错误时静默部分生效，影响 `ClientIP()` 与登录限流。改法：调用一次并返回错误。
+- [x] 🟠 ✅ `internal/api/router.go:49-52`：`SetTrustedProxies` 错误被吞，if/else 两分支等价；配置错误时静默部分生效，影响 `ClientIP()` 与登录限流。改法：调用一次并返回错误。（已修复：`config.validate` 校验 IP/CIDR，非法启动即报错；`router.go` 合并为一次调用，出错时记录并回退为不信任代理）
 - [ ] 🟠 `web/src/features/sources/sources-section.tsx:166`：保存失败的 `InlineError` 渲染在模态框之下，用户不可见。改法：`onError` 用 toast 或把错误传入 `SourceDialog`。
 - [ ] 🟠 `web/src/features/library/player-dialog.tsx:156-160`：`try { void seek() } catch {}` 捕获不到异步 reject。改法：`seek(...).catch(() => {})`。
 - [ ] 🟠 `web/src/features/library/player-dialog.tsx:53-55,87,118`：`sources` 为空时永远显示"加载中"；失败无重试。改法：区分 pending / error / 无源，失败用 `InlineError onRetry`。

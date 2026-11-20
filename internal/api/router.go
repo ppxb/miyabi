@@ -45,9 +45,9 @@ func NewRouter(deps Dependencies) *gin.Engine {
 		deps.Logger = slog.Default()
 	}
 
-	if len(deps.TrustedProxies) > 0 {
-		_ = router.SetTrustedProxies(deps.TrustedProxies)
-	} else {
+	if err := router.SetTrustedProxies(deps.TrustedProxies); err != nil {
+		// Config validation should prevent this; fall back to trusting no proxy.
+		deps.Logger.Error("apply trusted proxies", "error", err)
 		_ = router.SetTrustedProxies(nil)
 	}
 

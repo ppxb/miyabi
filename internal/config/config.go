@@ -104,7 +104,25 @@ func (cfg *Config) validate() error {
 	if cfg.DataDir == "" {
 		return errors.New("MIYABI_DATA_DIR must not be empty")
 	}
+	for _, proxy := range cfg.TrustedProxies {
+		if err := validateTrustedProxy(proxy); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// validateTrustedProxy accepts a bare IP or a CIDR block, matching what gin's
+// SetTrustedProxies can parse, so a bad entry fails startup instead of being
+// silently half-applied at runtime.
+func validateTrustedProxy(entry string) error {
+	if _, _, err := net.ParseCIDR(entry); err == nil {
+		return nil
+	}
+	if net.ParseIP(entry) != nil {
+		return nil
+	}
+	return fmt.Errorf("MIYABI_TRUSTED_PROXIES contains invalid IP or CIDR %q", entry)
 }
 
 func parseLogLevel(name string) (slog.Level, error) {

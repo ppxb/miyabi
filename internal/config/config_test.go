@@ -108,6 +108,8 @@ func TestLoadRejectsInvalidEnvironment(t *testing.T) {
 		{"MIYABI_DATA_DIR", ""}, {"MIYABI_DATA_DIR", "  "},
 		{"MIYABI_LOG_LEVEL", ""}, {"MIYABI_LOG_LEVEL", "  "}, {"MIYABI_LOG_LEVEL", "trace"},
 		{"MIYABI_LOG_LEVEL", "INFO+1"},
+		{"MIYABI_TRUSTED_PROXIES", "not-an-ip"},
+		{"MIYABI_TRUSTED_PROXIES", "10.0.0.0/33"},
 	} {
 		t.Run(test.key+"="+test.value, func(t *testing.T) {
 			clearConfigEnvironment(t)
@@ -164,5 +166,18 @@ func TestLoadIgnoresLegacyConfigFile(t *testing.T) {
 	}
 	if cfg, err := Load(); err != nil || cfg.Listen != ":8080" || cfg.DataDir != "./data" {
 		t.Fatalf("local config file affected environment-only startup: %+v, %v", cfg, err)
+	}
+}
+
+func TestLoadParsesTrustedProxies(t *testing.T) {
+	clearConfigEnvironment(t)
+	t.Setenv("MIYABI_TRUSTED_PROXIES", " 10.0.0.0/8 , 192.168.1.1 ,::1 ")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"10.0.0.0/8", "192.168.1.1", "::1"}
+	if !reflect.DeepEqual(cfg.TrustedProxies, want) {
+		t.Fatalf("trusted proxies = %v, want %v", cfg.TrustedProxies, want)
 	}
 }
