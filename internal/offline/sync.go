@@ -11,6 +11,7 @@ import (
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
+	"github.com/ppxb/miyabi/internal/magnet"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
@@ -65,6 +66,12 @@ func (service *Service) syncSource(ctx context.Context, source domain.LibrarySou
 		return service.recoverSource(ctx, source)
 	}
 
+	// Read the preferences once per account instead of once per task.
+	_, prefs, err := service.config(ctx)
+	if err != nil {
+		return err
+	}
+
 	wanted := make(map[string]*ent.OfflineDownload)
 	seen := make(map[string]bool)
 	var syncErrors []error
@@ -78,7 +85,7 @@ func (service *Service) syncSource(ctx context.Context, source domain.LibrarySou
 		}
 		seen[hash] = true
 		if record.Status == offlinedownload.StatusDone && record.FileID != "" {
-			if err := service.UpdateTask(ctx, sess, record, pan.OfflineTask{Status: 2, FileID: record.FileID, Hash: record.InfoHash}); err != nil {
+			if err := service.updateTask(ctx, sess, record, pan.OfflineTask{Status: 2, FileID: record.FileID, Hash: record.InfoHash}, prefs); err != nil {
 				syncErrors = append(syncErrors, err)
 			}
 			continue
@@ -102,7 +109,7 @@ func (service *Service) syncSource(ctx context.Context, source domain.LibrarySou
 				// A task we found is never missing, even if its update fails.
 				// Keep syncing other tasks and retry this one on the next poll.
 				delete(wanted, key)
-				if err := service.UpdateTask(ctx, sess, record, download); err != nil {
+				if err := service.updateTask(ctx, sess, record, download, prefs); err != nil {
 					if errors.Is(err, drive.ErrSourceChanged) || errors.Is(err, pan.ErrUnauthorized) {
 						return false, err
 					}
@@ -144,15 +151,19 @@ func (service *Service) currentMountFor(ctx context.Context, record *ent.Offline
 // UpdateTask applies a 115 offline remote task state to a local offline task.
 // The caller has already matched the remote task to the record by info hash.
 func (service *Service) UpdateTask(ctx context.Context, sess drive.Session, record *ent.OfflineDownload, remote pan.OfflineTask) error {
+	_, prefs, err := service.config(ctx)
+	if err != nil {
+		return err
+	}
+	return service.updateTask(ctx, sess, record, remote, prefs)
+}
+
+func (service *Service) updateTask(ctx context.Context, sess drive.Session, record *ent.OfflineDownload, remote pan.OfflineTask, prefs magnet.Preferences) error {
 	unlock, err := service.lockTask(ctx, record.ID)
 	if err != nil {
 		return err
 	}
 	defer unlock()
-	_, prefs, err := service.config(ctx)
-	if err != nil {
-		return err
-	}
 
 	notify := false
 	scanSource, err := service.currentMountFor(ctx, record)
