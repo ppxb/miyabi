@@ -242,7 +242,7 @@ func (c *Client) Media(ctx context.Context, target string) (domain.Media, error)
 		return domain.Media{}, domain.E(domain.KindInvalid, "无效的来源图片地址", nil)
 	}
 	host := parsed.Hostname()
-	allowed := strings.HasSuffix(host, "jdbstatic.com") || host == "666.9989641.xyz"
+	allowed := host == "jdbstatic.com" || strings.HasSuffix(host, ".jdbstatic.com") || host == "666.9989641.xyz"
 	if !allowed {
 		return domain.Media{}, domain.E(domain.KindInvalid, "图片地址不属于此来源", nil)
 	}

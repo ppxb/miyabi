@@ -90,3 +90,31 @@ func TestDetailCacheSharesOneFetch(t *testing.T) {
 		t.Fatalf("http calls = %d, want 1 (cached)", calls)
 	}
 }
+
+// TestMediaHostAllowlist ensures the image host check matches whole domains
+// rather than bare suffixes, so spoofed hosts like evil-jdbstatic.com are
+// rejected while real subdomains stay allowed.
+func TestMediaHostAllowlist(t *testing.T) {
+	client := newTestClient("img")
+	defer client.Close()
+
+	for _, target := range []string{
+		"https://jdbstatic.com/covers/a.jpg",
+		"https://c0.jdbstatic.com/covers/a.jpg",
+		"https://666.9989641.xyz/covers/a.jpg",
+	} {
+		if _, err := client.Media(context.Background(), target); err != nil {
+			t.Errorf("valid host %q rejected: %v", target, err)
+		}
+	}
+
+	for _, target := range []string{
+		"https://evil-jdbstatic.com/covers/a.jpg",
+		"https://notjdbstatic.com/covers/a.jpg",
+		"https://jdbstatic.com.evil.com/covers/a.jpg",
+	} {
+		if _, err := client.Media(context.Background(), target); err == nil {
+			t.Errorf("spoofed host %q accepted", target)
+		}
+	}
+}
