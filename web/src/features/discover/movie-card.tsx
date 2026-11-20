@@ -6,8 +6,14 @@ import { MovieStateBadge } from '@/components/movie/movie-badges'
 import { MovieDetailTrigger } from '@/features/movie-detail/detail-trigger'
 import { MovieSubscribeButton } from './movie-subscribe-button'
 
-export function DiscoverMovieCard({ movie }: { movie: DiscoverMovie }) {
-  const subscribable = movie.release_status === 'upcoming' && movie.magnets_count === 0
+export function DiscoverMovieCard({
+  movie,
+  allowSubscribe = true
+}: {
+  movie: DiscoverMovie
+  allowSubscribe?: boolean
+}) {
+  const subscribable = allowSubscribe && movie.release_status === 'upcoming' && movie.magnets_count === 0
   const title = movie.title || movie.code
   return (
     <MovieDetailTrigger

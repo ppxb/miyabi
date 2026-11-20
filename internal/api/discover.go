@@ -116,7 +116,18 @@ func discoverMovieHandler(discover CatalogueManager, metadata MetadataManager) g
 				respond(c, nil, err)
 				return
 			}
-			respond(c, catalogue.ProjectMetadataDetail(meta), nil)
+			detail := catalogue.ProjectMetadataDetail(meta)
+			// Prefer recommendations computed from already-indexed data so opening
+			// a detail never triggers extra catalogue scraping.
+			if provider, ok := discover.(interface {
+				LocalRecommendations(context.Context, string) ([]domain.MovieReference, []domain.MovieReference, bool, error)
+			}); ok {
+				if actors, related, found, recErr := provider.LocalRecommendations(c.Request.Context(), code); recErr == nil && found {
+					detail.ActorMovies = actors
+					detail.RelatedMovies = related
+				}
+			}
+			respond(c, detail, nil)
 			return
 		}
 		movie, err := discover.MovieDetail(c.Request.Context(), uri.ID)
