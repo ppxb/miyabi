@@ -927,63 +927,110 @@ func deref(v *string) string {
 	return *v
 }
 
-// EnsureProfiles backfills canonical ActorProfile rows (and Actor.profile links,
-// ActorAlias spellings) from the existing provider-scoped Actor rows. It is
-// idempotent and safe to run at startup; new actors are picked up on the next run.
+// EnsureProfiles reconciles every currently unlinked actor against existing
+// canonical profiles. It is an incremental backfill: it never creates profiles,
+// so actors for people that were never opened stay profile-less by design.
 func (s *Service) EnsureProfiles(ctx context.Context) error {
-	records, err := s.db.Actor.Query().All(ctx)
+	return s.reconcileActorProfiles(ctx, 0)
+}
+
+// EnsureMovieProfiles links the freshly scraped actors of one movie to any
+// existing canonical profile with the same normalized name. It is called after
+// each movie's metadata is saved, so newly discovered provider rows join an
+// already-known person instead of showing up as a duplicate entry.
+func (s *Service) EnsureMovieProfiles(ctx context.Context, movieID int) error {
+	return s.reconcileActorProfiles(ctx, movieID)
+}
+
+// reconcileActorProfiles links actors that have no profile yet to an existing
+// ActorProfile with the same normalized name, and fills in the missing alias.
+// movieID <= 0 reconciles all unlinked actors. Profiles are only ever created
+// lazily (detail view) or by cross-language merges, never here.
+func (s *Service) reconcileActorProfiles(ctx context.Context, movieID int) error {
+	query := s.db.Actor.Query().
+		Where(actor.Not(actor.HasProfile())).
+		Select(actor.FieldID, actor.FieldName)
+	if movieID > 0 {
+		query = s.db.Actor.Query().
+			Where(actor.HasMoviesWith(movie.IDEQ(movieID)), actor.Not(actor.HasProfile())).
+			Select(actor.FieldID, actor.FieldName)
+	}
+	actors, err := query.All(ctx)
 	if err != nil {
 		return err
 	}
-	var errs []error
-	type agg struct {
-		names   map[string]bool
-		nameZHT string
-		avatar  string
-		ids     []int
-	}
-	groups := make(map[string]*agg, len(records))
-	for _, a := range records {
+	idsByNorm := make(map[string][]int)
+	namesByNorm := make(map[string]map[string]bool)
+	for _, a := range actors {
 		norm := normalizeName(a.Name)
 		if norm == "" {
 			continue
 		}
-		g := groups[norm]
-		if g == nil {
-			g = &agg{names: make(map[string]bool)}
-			groups[norm] = g
+		idsByNorm[norm] = append(idsByNorm[norm], a.ID)
+		if namesByNorm[norm] == nil {
+			namesByNorm[norm] = make(map[string]bool)
 		}
-		g.names[a.Name] = true
-		g.ids = append(g.ids, a.ID)
-		if g.nameZHT == "" && a.NameZht != nil {
-			g.nameZHT = *a.NameZht
+		namesByNorm[norm][a.Name] = true
+	}
+	if len(idsByNorm) == 0 {
+		return nil
+	}
+	norms := make([]string, 0, len(idsByNorm))
+	for norm := range idsByNorm {
+		norms = append(norms, norm)
+	}
+	profiles, err := s.db.ActorProfile.Query().
+		Where(actorprofile.MatchKeyIn(norms...)).
+		Select(actorprofile.FieldID, actorprofile.FieldMatchKey).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+	if len(profiles) == 0 {
+		return nil
+	}
+	tx, err := s.db.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var errs []error
+	for _, p := range profiles {
+		ids := idsByNorm[p.MatchKey]
+		if len(ids) == 0 {
+			continue
 		}
-		if g.avatar == "" && a.Avatar != nil {
-			g.avatar = *a.Avatar
+		if err := tx.Actor.Update().Where(actor.IDIn(ids...)).SetProfileID(p.ID).Exec(ctx); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		existing, err := tx.ActorAlias.Query().
+			Where(actoralias.HasActorWith(actorprofile.ID(p.ID))).
+			Select(actoralias.FieldAlias).
+			All(ctx)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		have := make(map[string]bool, len(existing))
+		for _, alias := range existing {
+			have[alias.Alias] = true
+		}
+		for name := range namesByNorm[p.MatchKey] {
+			if have[name] {
+				continue
+			}
+			if _, err := tx.ActorAlias.Create().
+				SetActorID(p.ID).
+				SetAlias(name).
+				SetNormalized(p.MatchKey).
+				Save(ctx); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
-	for norm, g := range groups {
-		names := make([]string, 0, len(g.names))
-		for name := range g.names {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-		if len(names) == 0 {
-			continue
-		}
-		pid, perr := s.ensureProfile(ctx, norm, names[0], g.nameZHT, g.avatar)
-		if perr != nil {
-			errs = append(errs, perr)
-			continue
-		}
-		for _, id := range g.ids {
-			_ = s.db.Actor.UpdateOneID(id).SetProfileID(pid).Exec(ctx)
-		}
-		_, _ = s.db.ActorAlias.Delete().Where(actoralias.HasActorWith(actorprofile.ID(pid))).Exec(ctx)
-		for _, name := range names {
-			_, _ = s.db.ActorAlias.Create().
-				SetActorID(pid).SetAlias(name).SetNormalized(normalizeName(name)).Save(ctx)
-		}
+	if err := tx.Commit(); err != nil {
+		return err
 	}
 	return errors.Join(errs...)
 }

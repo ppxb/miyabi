@@ -28,6 +28,10 @@ func TestEnsureProfilesAndCatalog(t *testing.T) {
 	db.Movie.Create().SetCode("TEST-001").AddActors(a1, a2).SaveX(ctx)
 
 	svc := New(db, nil, "", nil)
+	// Simulate a profile created earlier (e.g. by opening the detail page).
+	if _, err := svc.ensureProfile(ctx, normalizeName("七ツ森 りり"), "七ツ森 りり", "", ""); err != nil {
+		t.Fatal(err)
+	}
 	if err := svc.EnsureProfiles(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -204,5 +208,49 @@ func TestFindNamesByIndexedKey(t *testing.T) {
 
 	if _, err := New(db, nil, "", nil).findNames(ctx, "missing"); err != ErrNotFound {
 		t.Fatalf("findNames(missing) err=%v, want ErrNotFound", err)
+	}
+}
+
+func TestEnsureMovieProfilesLinksNewActorToExistingProfile(t *testing.T) {
+	ctx := context.Background()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	db := store.Client
+	svc := New(db, nil, "", nil)
+
+	// An existing person already has a canonical profile (e.g. from a detail view).
+	pid, err := svc.ensureProfile(ctx, normalizeName("七ツ森 りり"), "七ツ森 りり", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	known := db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("七ツ森 りり").
+		SetNameKey(domain.ActorNameKey("七ツ森 りり")).SetProfileID(pid).SaveX(ctx)
+	movie := db.Movie.Create().SetCode("RECON-001").AddActors(known).SaveX(ctx)
+
+	// A newly scraped provider row for the same person, plus an unrelated actor.
+	fresh := db.Actor.Create().SetProvider("duga").SetSourceID("x2").SetName("七ツ森りり").
+		SetNameKey(domain.ActorNameKey("七ツ森りり")).AddMovieIDs(movie.ID).SaveX(ctx)
+	other := db.Actor.Create().SetProvider("duga").SetSourceID("y1").SetName("無関係 太郎").
+		SetNameKey(domain.ActorNameKey("無関係 太郎")).AddMovieIDs(movie.ID).SaveX(ctx)
+
+	if err := svc.EnsureMovieProfiles(ctx, movie.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	if n := db.Actor.Query().Where(actor.HasProfileWith(actorprofile.ID(pid))).CountX(ctx); n != 2 {
+		t.Fatalf("linked actors=%d, want 2 (known + fresh)", n)
+	}
+	if n := db.Actor.Query().Where(actor.IDEQ(other.ID), actor.HasProfile()).CountX(ctx); n != 0 {
+		t.Fatalf("unrelated actor should stay profile-less, got %d", n)
+	}
+	if n := db.ActorProfile.Query().CountX(ctx); n != 1 {
+		t.Fatalf("profiles=%d, want 1 (must not create new profiles)", n)
+	}
+	freshActor := db.Actor.GetX(ctx, fresh.ID)
+	if fid, err := freshActor.QueryProfile().OnlyID(ctx); err != nil || fid != pid {
+		t.Fatalf("fresh actor profile=%d,%v want %d", fid, err, pid)
 	}
 }
