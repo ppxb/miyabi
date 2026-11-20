@@ -25,6 +25,13 @@ func (d observedDiscoverer) CatalogueMagnets(ctx context.Context, id string) ([]
 	return d.Discoverer.CatalogueMagnets(ctx, id)
 }
 
+func (d observedDiscoverer) CatalogueMagnetsByCode(ctx context.Context, code string) ([]domain.Magnet, error) {
+	if err := d.before("movie", code); err != nil {
+		return nil, err
+	}
+	return d.Discoverer.CatalogueMagnetsByCode(ctx, code)
+}
+
 func (d observedDiscoverer) BrowseMovies(ctx context.Context, options domain.BrowseOptions) ([]domain.Movie, error) {
 	if err := d.before("actor", options.EntityID); err != nil {
 		return nil, err

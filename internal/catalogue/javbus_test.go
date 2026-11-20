@@ -43,7 +43,7 @@ func TestMagnetsOptionalSourceFailureDoesNotCachePartialResults(t *testing.T) {
 	defer store.Close()
 	primary := &stubProviderWithMagnets{magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "primary", Sources: []string{domain.MagnetSourceJavDB}}}}
 	supplement := &recoveringJavBusSource{}
-	service, err := NewWithClients(t.Context(), store.Client, primary, supplement, &stubLocalState{})
+	service, err := NewWithClients(t.Context(), store.Client, primary, supplement, &stubLocalState{}, primary)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestMagnetsRetriesDetailBeforeCachingSupplementedResult(t *testing.T) {
 		magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "primary", Sources: []string{domain.MagnetSourceJavDB}}},
 	}}
 	upstream := &countingJavBusHTTP{}
-	service, err := NewWithClients(t.Context(), store.Client, primary, javbus.NewForTest(true, upstream), &stubLocalState{})
+	service, err := NewWithClients(t.Context(), store.Client, primary, javbus.NewForTest(true, upstream), &stubLocalState{}, primary)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestMagnets_WithAvailableJavBus(t *testing.T) {
 	}
 	upstream := &countingJavBusHTTP{}
 	javbusClient := javbus.NewForTest(true, upstream)
-	service, err := NewWithClients(t.Context(), store.Client, provider, javbusClient, &stubLocalState{})
+	service, err := NewWithClients(t.Context(), store.Client, provider, javbusClient, &stubLocalState{}, provider)
 	if err != nil {
 		javbusClient.Close()
 		t.Fatal(err)
@@ -188,7 +188,7 @@ func TestMagnets_WithUnavailableJavBus(t *testing.T) {
 		},
 	}
 	javbusClient := javbus.NewForTest(false)
-	service, err := NewWithClients(t.Context(), store.Client, provider, javbusClient, &stubLocalState{})
+	service, err := NewWithClients(t.Context(), store.Client, provider, javbusClient, &stubLocalState{}, provider)
 	if err != nil {
 		javbusClient.Close()
 		t.Fatal(err)
@@ -202,8 +202,8 @@ func TestMagnets_WithUnavailableJavBus(t *testing.T) {
 	if len(magnets) != 1 {
 		t.Fatalf("expected 1 magnet from JavDB, got %d", len(magnets))
 	}
-	// Item 143: CatalogueDetail must NOT be queried when JavBus is not available.
-	if provider.detailCalls.Load() != 0 {
-		t.Fatalf("expected 0 detail calls when JavBus is unavailable, got %d", provider.detailCalls.Load())
+	// Sukebei is code-based, so CatalogueDetail is still queried to derive the code.
+	if provider.detailCalls.Load() != 1 {
+		t.Fatalf("expected 1 detail call when a code-based source is available, got %d", provider.detailCalls.Load())
 	}
 }

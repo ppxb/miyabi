@@ -41,7 +41,7 @@ func (service *Service) enqueueMovie(ctx context.Context, record *ent.Subscripti
 	if record.Status == subscription.StatusAdded {
 		return subscriptionItem(record), nil
 	}
-	magnets, err := service.discover.CatalogueMagnets(ctx, record.TargetID)
+	magnets, err := service.catalogueMagnets(ctx, record)
 	if err != nil {
 		return Item{}, fmt.Errorf("fetch magnets for %s: %w", record.Code, err)
 	}
@@ -56,7 +56,7 @@ func (service *Service) enqueueMovie(ctx context.Context, record *ent.Subscripti
 		service.tasks.NotifyMonitorChanged()
 		return subscriptionItem(updated), nil
 	}
-	submission, err := service.offline.Add(ctx, record.TargetID, best.Hash)
+	submission, err := service.offline.AddByCode(ctx, record.TargetID, record.Code, best.Hash)
 	if err != nil {
 		return Item{}, fmt.Errorf("submit %s to 115: %w", record.Code, err)
 	}

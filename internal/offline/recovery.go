@@ -180,7 +180,13 @@ func (s *Service) nextCandidate(ctx context.Context, record *ent.OfflineDownload
 		state.Reason = "已达磁力尝试上限"
 		return "", nil
 	}
-	magnets, err := s.catalogue.CatalogueMagnets(ctx, record.JavdbID)
+	var magnets []domain.Magnet
+	var err error
+	if record.Code != "" {
+		magnets, err = s.catalogue.CatalogueMagnetsByCode(ctx, record.Code)
+	} else {
+		magnets, err = s.catalogue.CatalogueMagnets(ctx, record.JavdbID)
+	}
 	if err != nil {
 		return "", err
 	}

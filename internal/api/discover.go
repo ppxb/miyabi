@@ -17,6 +17,7 @@ type CatalogueManager interface {
 	ResolveMovieID(context.Context, string) (string, error)
 	MovieStates(context.Context, []catalogue.MovieIdentity) ([]catalogue.MovieStateItem, error)
 	Magnets(context.Context, string) ([]catalogue.Magnet, error)
+	MagnetsByCode(context.Context, string) ([]catalogue.Magnet, error)
 	Tags(context.Context, domain.Zone) ([]domain.TagCategory, error)
 	Media(context.Context, string) (domain.Media, error)
 }
@@ -152,13 +153,29 @@ func discoverTagsHandler(discover CatalogueManager) gin.HandlerFunc {
 	}
 }
 
+type discoverMagnetsQuery struct {
+	Code string `form:"code" binding:"omitempty,max=200"`
+}
+
 func discoverMagnetsHandler(discover CatalogueManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		uri, ok := bindURI[movieURI](c)
 		if !ok {
 			return
 		}
-		magnets, err := discover.Magnets(c.Request.Context(), uri.ID)
+		query, ok := bindQuery[discoverMagnetsQuery](c)
+		if !ok {
+			return
+		}
+		// A known code lets magnets bypass the JavDB detail lookup; without it we
+		// still fall back to the movie-ID path for older clients.
+		var magnets []catalogue.Magnet
+		var err error
+		if code := codeid.Normalize(query.Code); code != "" && codeid.Valid(code) {
+			magnets, err = discover.MagnetsByCode(c.Request.Context(), code)
+		} else {
+			magnets, err = discover.Magnets(c.Request.Context(), uri.ID)
+		}
 		respond(c, magnets, err)
 	}
 }

@@ -63,7 +63,7 @@ func TestNewPersistsDeviceWithoutSelectingRoute(t *testing.T) {
 	}
 	defer store.Close()
 
-	first, err := New(t.Context(), store.Client, nil, nil, nil)
+	first, err := New(t.Context(), store.Client, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestNewPersistsDeviceWithoutSelectingRoute(t *testing.T) {
 		t.Fatalf("device UUID = %q: %v", firstDevice, err)
 	}
 
-	second, err := New(t.Context(), store.Client, nil, nil, nil)
+	second, err := New(t.Context(), store.Client, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestNewRestoresPersistedRoute(t *testing.T) {
 	if err := database.SaveSetting(t.Context(), store.Client, javdbRouteSetting, saved); err != nil {
 		t.Fatal(err)
 	}
-	service, err := New(t.Context(), store.Client, nil, nil, nil)
+	service, err := New(t.Context(), store.Client, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,7 +291,7 @@ func TestServiceMagnetsWithAggregator(t *testing.T) {
 		},
 	}
 
-	service, err := NewWithClients(t.Context(), store.Client, provider, nil, &stubLocalState{})
+	service, err := NewWithClients(t.Context(), store.Client, provider, nil, &stubLocalState{}, provider)
 	if err != nil {
 		t.Fatalf("unexpected error creating service: %v", err)
 	}
@@ -335,6 +335,31 @@ func TestServiceMagnetsWithAggregator(t *testing.T) {
 	}
 }
 
+// TestJavDBIsNotAMagnetSource pins that the JavDB client, though still used for
+// catalogue metadata, never contributes magnets after the source swap.
+func TestJavDBIsNotAMagnetSource(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	const hash = "abcdef0123456789abcdef0123456789abcdef01"
+	primary := &stubProviderWithMagnets{
+		magnets: []domain.Magnet{{Hash: hash, Name: "javdb only", Sources: []string{domain.MagnetSourceJavDB}}},
+	}
+	service, err := NewWithClients(t.Context(), store.Client, primary, nil, &stubLocalState{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+
+	magnets, err := service.Magnets(t.Context(), "movie-1")
+	if err != nil || len(magnets) != 0 {
+		t.Fatalf("JavDB must not be a magnet source: %+v %v", magnets, err)
+	}
+}
+
 type stubProviderWithRoute struct {
 	stubProviderWithMagnets
 	route javdb.RouteStatus
@@ -353,7 +378,7 @@ func TestCachedJavDBIgnoresPersistActiveRouteFailure(t *testing.T) {
 	provider := &stubProviderWithRoute{
 		route: javdb.RouteStatus{Host: "https://new-route.example"},
 	}
-	service, err := NewWithClients(t.Context(), store.Client, provider, nil, &stubLocalState{})
+	service, err := NewWithClients(t.Context(), store.Client, provider, nil, &stubLocalState{}, nil)
 	if err != nil {
 		store.Close()
 		t.Fatal(err)

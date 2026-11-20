@@ -341,7 +341,7 @@ func newPipelineFixture(t *testing.T) *pipelineFixture {
 	}
 	catalogueClient := &fakeCatalogue{ids: make(map[string]string), details: make(map[string]domain.MovieDetail), cover: fixtureJPEG(t, 600, 400)}
 	library := library.New(store.Client, d, taskSvc, images, library.Options{Pacing: func(context.Context) error { return nil }})
-	discover, err := catalogue.NewWithClients(ctx, store.Client, catalogueClient, nil, library)
+	discover, err := catalogue.NewWithClients(ctx, store.Client, catalogueClient, nil, library, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

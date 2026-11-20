@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 
@@ -39,6 +40,12 @@ func (m *mockDiscoverer) CatalogueMagnets(_ context.Context, movieID string) ([]
 	return m.magnets[movieID], m.magnetsErr
 }
 
+func (m *mockDiscoverer) CatalogueMagnetsByCode(_ context.Context, code string) ([]domain.Magnet, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.magnets[strings.TrimPrefix(code, "MOCK-")], m.magnetsErr
+}
+
 func (m *mockDiscoverer) BrowseMovies(_ context.Context, options domain.BrowseOptions) ([]domain.Movie, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -56,6 +63,13 @@ type mockOfflineAdder struct {
 }
 
 func (m *mockOfflineAdder) Add(_ context.Context, movieID, hash string) (domain.OfflineSubmission, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.submissions = append(m.submissions, submission{movieID, hash})
+	return domain.OfflineSubmission{TaskID: len(m.submissions), Code: movieID, JavDBID: movieID, Hash: hash, Status: "running"}, nil
+}
+
+func (m *mockOfflineAdder) AddByCode(_ context.Context, movieID, _ string, hash string) (domain.OfflineSubmission, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.submissions = append(m.submissions, submission{movieID, hash})

@@ -115,7 +115,7 @@ func (service *Service) dueSubscriptions(ctx context.Context, kind subscription.
 
 func (service *Service) checkMovie(ctx context.Context, record *ent.Subscription, picker *magnet.Picker, checkTime string) error {
 	now := time.Now()
-	magnets, err := service.discover.CatalogueMagnets(ctx, record.TargetID)
+	magnets, err := service.catalogueMagnets(ctx, record)
 	if err != nil {
 		return service.deferCheck(ctx, record, now, domain.E(domain.KindUpstream, "查询磁力失败："+domain.PublicMessage(err), err))
 	}
@@ -143,7 +143,7 @@ func (service *Service) checkMovie(ctx context.Context, record *ent.Subscription
 		service.tasks.NotifyMonitorChanged()
 		return nil
 	}
-	submission, err := service.offline.Add(ctx, record.TargetID, best.Hash)
+	submission, err := service.offline.AddByCode(ctx, record.TargetID, record.Code, best.Hash)
 	if err != nil {
 		return service.deferCheck(ctx, record, now, domain.E(domain.KindUpstream, "加入 115 失败："+domain.PublicMessage(err), err))
 	}

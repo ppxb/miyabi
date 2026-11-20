@@ -90,11 +90,23 @@ type Item struct {
 type Discoverer interface {
 	MovieSummary(ctx context.Context, movieID string) (domain.MovieSummary, error)
 	CatalogueMagnets(ctx context.Context, movieID string) ([]domain.Magnet, error)
+	CatalogueMagnetsByCode(ctx context.Context, code string) ([]domain.Magnet, error)
 	BrowseMovies(ctx context.Context, options domain.BrowseOptions) ([]domain.Movie, error)
 }
 
 type OfflineAdder interface {
 	Add(ctx context.Context, movieID string, hash string) (domain.OfflineSubmission, error)
+	AddByCode(ctx context.Context, movieID string, code string, hash string) (domain.OfflineSubmission, error)
+}
+
+// catalogueMagnets resolves magnets for a subscription. Movie subscriptions
+// store their code, so the lookup can avoid re-fetching JavDB detail; legacy
+// rows without a code fall back to the movie-ID path.
+func (service *Service) catalogueMagnets(ctx context.Context, record *ent.Subscription) ([]domain.Magnet, error) {
+	if record.Code != "" {
+		return service.discover.CatalogueMagnetsByCode(ctx, record.Code)
+	}
+	return service.discover.CatalogueMagnets(ctx, record.TargetID)
 }
 
 // Service manages movie and actor subscriptions: it polls JavDB on the daily

@@ -18,7 +18,7 @@ func (s unexpectedLocalState) Source() *domain.LibrarySource {
 
 func TestCatalogueMetadataDoesNotReadLocalState(t *testing.T) {
 	provider := &stubProviderWithMagnets{movies: []domain.Movie{{ID: "movie-1", Code: "SSIS-001"}}}
-	service := newService(nil, provider, nil, unexpectedLocalState{t: t}, persistedRoute{})
+	service := newService(nil, provider, nil, unexpectedLocalState{t: t}, persistedRoute{}, nil)
 	defer service.Close()
 	if movies, err := service.Search(t.Context(), "SSIS-001", domain.SearchOptions{}); err != nil || len(movies) != 1 {
 		t.Fatalf("search = %+v, %v", movies, err)

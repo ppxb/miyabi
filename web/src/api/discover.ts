@@ -186,16 +186,17 @@ export function useRecommendationMovie(id: string) {
   }
 }
 
-export function useDiscoverMagnets(id: string) {
+export function useDiscoverMagnets(id: string, code?: string) {
   return useQuery({
-    queryKey: discoverKeys.magnets(id),
+    queryKey: discoverKeys.magnets(id, code),
     queryFn: ({ signal }) =>
       apiGet<DiscoverMagnet[]>(
         `/api/discover/movies/${encodeURIComponent(id)}/magnets`,
-        undefined,
+        code ? { code } : undefined,
         signal
       ),
-    staleTime: 60_000
+    staleTime: 60_000,
+    enabled: Boolean(code)
   })
 }
 

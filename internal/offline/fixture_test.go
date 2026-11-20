@@ -263,6 +263,7 @@ func libraryBaseFixture(t testing.TB) (*Service, *drive.Drive, *ent.Client, doma
 		},
 		magnets: map[string][]domain.Magnet{
 			"fixture-movie": {{Hash: offlineHashA}, {Hash: offlineHashB}},
+			"ABP-001":       {{Hash: offlineHashA}, {Hash: offlineHashB}},
 		},
 	}
 	service := New(store.Client, cat, driveSvc, taskSvc, lib, 2*time.Minute)
@@ -296,6 +297,10 @@ type stubCatalogue struct {
 
 func (s *stubCatalogue) CatalogueMagnets(ctx context.Context, movieID string) ([]domain.Magnet, error) {
 	return s.magnets[movieID], nil
+}
+
+func (s *stubCatalogue) CatalogueMagnetsByCode(ctx context.Context, code string) ([]domain.Magnet, error) {
+	return s.magnets[code], nil
 }
 
 func (s *stubCatalogue) HasMagnet(ctx context.Context, movieID, hash string) (bool, error) {

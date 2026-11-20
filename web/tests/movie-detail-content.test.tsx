@@ -114,6 +114,6 @@ test('resolved codes load existing JavDB detail, magnets and history with the co
   } as ReturnType<typeof useResolveDiscoverMovie>)
   renderToStaticMarkup(<MovieDetailContent movie={{ code: 'ABP-123' }} />)
   expect(useDiscoverMovie).toHaveBeenCalledWith('confirmed-id')
-  expect(useDiscoverMagnets).toHaveBeenCalledWith('confirmed-id')
+  expect(useDiscoverMagnets).toHaveBeenCalledWith('confirmed-id', 'ABP-123')
   expect(useRecordMovieView).toHaveBeenCalledWith('confirmed-id')
 })

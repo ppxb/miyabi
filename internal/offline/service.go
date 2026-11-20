@@ -18,6 +18,7 @@ type Catalogue interface {
 	HasMagnet(ctx context.Context, movieID, hash string) (bool, error)
 	MovieCode(ctx context.Context, movieID string) (string, error)
 	CatalogueMagnets(ctx context.Context, movieID string) ([]domain.Magnet, error)
+	CatalogueMagnetsByCode(ctx context.Context, code string) ([]domain.Magnet, error)
 }
 
 // Library schedules scans and projects their current workflow status.

@@ -37,7 +37,7 @@ func TestRouteStateIsIndependentOfPersistence(t *testing.T) {
 			Candidates: []javdb.RouteCandidate{{Host: "https://new.example", Latency: 42 * time.Millisecond, Status: javdb.RouteAvailable}},
 		},
 	}
-	service, err := NewWithClients(ctx, store.Client, client, nil, nil)
+	service, err := NewWithClients(ctx, store.Client, client, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

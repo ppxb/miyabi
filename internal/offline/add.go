@@ -16,6 +16,13 @@ import (
 // default entry for automation without an explicit account; the API passes an
 // account explicitly through AddForAccount.
 func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.OfflineSubmission, error) {
+	return service.AddByCode(ctx, movieID, "", hash)
+}
+
+// AddByCode submits a magnet for a movie whose catalogue code is already known,
+// so validating the magnet and recording the movie never re-fetches JavDB
+// detail. An empty code keeps the movie-ID lookup path.
+func (service *Service) AddByCode(ctx context.Context, movieID, code, hash string) (domain.OfflineSubmission, error) {
 	sources, err := service.drive.Mounts(ctx)
 	if err != nil {
 		return domain.OfflineSubmission{}, err
@@ -23,25 +30,51 @@ func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.O
 	if len(sources) == 0 {
 		return domain.OfflineSubmission{}, domain.E(domain.KindInvalid, "没有已挂载的 115 账号", nil)
 	}
-	return service.AddForAccount(ctx, sources[0].AccountID, movieID, hash)
+	return service.addForAccount(ctx, sources[0].AccountID, movieID, code, hash)
 }
 
 // AddForAccount validates and records a new offline download for the given 115
 // account's mounted directory.
 func (service *Service) AddForAccount(ctx context.Context, accountID, movieID, hash string) (domain.OfflineSubmission, error) {
-	hash = strings.ToLower(hash)
+	return service.addForAccount(ctx, accountID, movieID, "", hash)
+}
+
+// resolveMagnet confirms the hash belongs to the movie and returns its code.
+// A known code skips the movie-ID lookup entirely.
+func (service *Service) resolveMagnet(ctx context.Context, movieID, codeHint, hash string) (string, error) {
+	if codeHint != "" {
+		code := codeid.Normalize(codeHint)
+		magnets, err := service.catalogue.CatalogueMagnetsByCode(ctx, code)
+		if err != nil {
+			return "", err
+		}
+		for _, magnet := range magnets {
+			if strings.EqualFold(magnet.Hash, hash) {
+				return code, nil
+			}
+		}
+		return "", ErrMagnetNotFound
+	}
 	has, err := service.catalogue.HasMagnet(ctx, movieID, hash)
 	if err != nil {
-		return domain.OfflineSubmission{}, err
+		return "", err
 	}
 	if !has {
-		return domain.OfflineSubmission{}, ErrMagnetNotFound
+		return "", ErrMagnetNotFound
 	}
 	rawCode, err := service.catalogue.MovieCode(ctx, movieID)
 	if err != nil {
+		return "", err
+	}
+	return codeid.Normalize(rawCode), nil
+}
+
+func (service *Service) addForAccount(ctx context.Context, accountID, movieID, codeHint, hash string) (domain.OfflineSubmission, error) {
+	hash = strings.ToLower(hash)
+	code, err := service.resolveMagnet(ctx, movieID, codeHint, hash)
+	if err != nil {
 		return domain.OfflineSubmission{}, err
 	}
-	code := codeid.Normalize(rawCode)
 	_, prefs, err := service.config(ctx)
 	if err != nil {
 		return domain.OfflineSubmission{}, err

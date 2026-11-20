@@ -36,6 +36,7 @@ import (
 	"github.com/ppxb/miyabi/internal/source"
 	"github.com/ppxb/miyabi/internal/strm"
 	"github.com/ppxb/miyabi/internal/subtitle"
+	"github.com/ppxb/miyabi/internal/sukebei"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -129,8 +130,16 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		_ = store.Close()
 		return nil, err
 	}
-	catalogueSvc, err := catalogue.New(ctx, store.Client, networkSvc.ProxyManager(), libSvc, javbusClient)
+	sukebeiClient, err := sukebei.New(sukebei.Options{Proxy: networkSvc.ProxyManager()})
 	if err != nil {
+		javbusClient.Close()
+		driveSvc.Close()
+		_ = store.Close()
+		return nil, fmt.Errorf("initialize Sukebei magnet source: %w", err)
+	}
+	catalogueSvc, err := catalogue.New(ctx, store.Client, networkSvc.ProxyManager(), libSvc, javbusClient, sukebeiClient)
+	if err != nil {
+		sukebeiClient.Close()
 		javbusClient.Close()
 		driveSvc.Close()
 		_ = store.Close()
@@ -155,9 +164,10 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	dugaSource := providers.NewDuga(networkSvc.ProxyManager())
 	metadataSvc, err := metadata.New(ctx, store.Client, fanzaSource, fc2Source, fc2dbSource, heyzoSource, pacopacomamaSource,
 		providers.NewJavDB(catalogueSvc), providers.NewJavBus(javbusClient, networkSvc.ProxyManager()),
-		providers.NewR18(networkSvc.ProxyManager()), providers.NewOnePondo(networkSvc.ProxyManager()),
+		providers.NewR18(networkSvc.ProxyManager()),
+		providers.NewOnePondo(networkSvc.ProxyManager()),
 		providers.NewCodeAV(networkSvc.ProxyManager()),
-		providers.NewJavDatabase(networkSvc.ProxyManager()), jav321Source, tokyohotSource, heydougaSource,
+		jav321Source, tokyohotSource, heydougaSource,
 		caribbeancomSource, caribbeancomprSource, c0930Source, h0930Source, h4610Source, tenmusumeSource, muramuraSource,
 		dahliaSource, dugaSource)
 	if err != nil {

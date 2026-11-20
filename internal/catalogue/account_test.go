@@ -16,7 +16,7 @@ func TestJavDBAccountRoundTrip(t *testing.T) {
 	}
 	defer store.Close()
 
-	service, err := New(t.Context(), store.Client, nil, nil, nil)
+	service, err := New(t.Context(), store.Client, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -40,7 +40,9 @@ function LibraryMovieDetail({ movieId }: { movieId: number }) {
       <MovieHero movie={detail.data} libraryStatus={detail.data.scrape_status} />
       <MoviePlot plot={detail.data.plot} />
       <MoviePreviews images={detail.data.preview_images} />
-      {detail.data.id ? <LibraryCatalogueExtras movieId={detail.data.id} /> : null}
+      {detail.data.id ? (
+        <LibraryCatalogueExtras movieId={detail.data.id} code={detail.data.code} />
+      ) : null}
     </div>
   )
 }
@@ -57,9 +59,9 @@ function MoviePlot({ plot }: { plot?: string }) {
 
 // Catalogue extras remain available for linked films, but cannot block or
 // replace the saved library metadata when JavDB is unavailable.
-function LibraryCatalogueExtras({ movieId }: { movieId: string }) {
+function LibraryCatalogueExtras({ movieId, code }: { movieId: string; code: string }) {
   const detail = useDiscoverMovie(movieId)
-  const magnets = useDiscoverMagnets(movieId)
+  const magnets = useDiscoverMagnets(movieId, detail.data?.code ?? code)
   useRecordMovieView(movieId)
   return (
     <>
@@ -86,12 +88,12 @@ function MovieDetailByCode({ code }: { code: string }) {
       />
     )
   }
-  return <IdentifiedMovieDetail key={identity.data.id} movieId={identity.data.id} />
+  return <IdentifiedMovieDetail key={identity.data.id} movieId={identity.data.id} code={code} />
 }
 
-function IdentifiedMovieDetail({ movieId }: { movieId: string }) {
+function IdentifiedMovieDetail({ movieId, code }: { movieId: string; code?: string }) {
   const detail = useDiscoverMovie(movieId)
-  const magnets = useDiscoverMagnets(movieId)
+  const magnets = useDiscoverMagnets(movieId, detail.data?.code ?? code)
   useRecordMovieView(movieId)
 
   if (detail.isPending) return <MovieDetailSkeleton />

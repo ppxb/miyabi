@@ -98,6 +98,10 @@ func (goldenDiscover) Magnets(context.Context, string) ([]catalogue.Magnet, erro
 	}, nil
 }
 
+func (stub goldenDiscover) MagnetsByCode(ctx context.Context, _ string) ([]catalogue.Magnet, error) {
+	return stub.Magnets(ctx, "movie-exact")
+}
+
 func (goldenDiscover) Tags(context.Context, domain.Zone) ([]domain.TagCategory, error) {
 	return []domain.TagCategory{{ID: "category-1", Name: "主題", Tags: []domain.TagOption{{ID: "tag-1", Name: "Tag"}, {ID: "tag-2", Name: "Other"}}}}, nil
 }
