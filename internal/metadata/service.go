@@ -192,7 +192,7 @@ func (s *Service) resolve(ctx context.Context, ref domain.MovieRef, skip map[str
 			return domain.MovieMetadata{}, err
 		}
 		if merged.Detail.Code != "" {
-			return attachJavDBIdentity(merged, ref.JavDBID)
+			return attachSourceIdentity(merged, "")
 		}
 		if len(failures) > 0 {
 			break
@@ -252,20 +252,14 @@ func needsSupplement(result domain.MovieMetadata) bool {
 		len(m.Actors) == 0 || m.Maker == nil || len(m.Tags) == 0 || !cover || !preview
 }
 
-func attachJavDBIdentity(result domain.MovieMetadata, knownID string) (domain.MovieMetadata, error) {
+func attachSourceIdentity(result domain.MovieMetadata, knownID string) (domain.MovieMetadata, error) {
 	for _, source := range result.Detail.Sources {
 		if source.Provider == "javdb" {
-			if knownID != "" && knownID != source.ID {
-				return domain.MovieMetadata{}, domain.E(domain.KindConflict, "JavDB 身份与已有记录不一致", nil)
-			}
 			result.Detail.ID = source.ID
 			return result, nil
 		}
 	}
 	result.Detail.ID = knownID
-	if knownID != "" {
-		result.Detail.Sources = append(result.Detail.Sources, domain.SourceID{Provider: "javdb", ID: knownID})
-	}
 	return result, nil
 }
 
@@ -284,17 +278,13 @@ func (s *Service) Fallback(ctx context.Context, ref domain.MovieRef) (domain.Mov
 	if err != nil {
 		return domain.MovieMetadata{}, err
 	}
-	return attachJavDBIdentity(result, ref.JavDBID)
+	return attachSourceIdentity(result, "")
 }
 
 func (s *Service) fetch(ctx context.Context, source Source, ref domain.MovieRef) (domain.MovieMetadata, error) {
 	code := codeid.Normalize(ref.Code)
 	ref.Code = code
 	key := source.ID() + ":" + code
-	knownJavDB := source.ID() == "javdb" && ref.JavDBID != ""
-	if knownJavDB {
-		key += ":" + ref.JavDBID
-	}
 	if ref.Refresh {
 		key += ":refresh"
 	}
@@ -315,11 +305,6 @@ func (s *Service) fetch(ctx context.Context, source Source, ref domain.MovieRef)
 			return nil, err
 		}
 		cacheMatches := !ref.Refresh && entry != nil && time.Now().Before(entry.ExpiresAt)
-		// A known ID can retrieve a film absent from search. A cached miss or a
-		// different catalogue ID must not suppress that more precise lookup.
-		if cacheMatches && knownJavDB {
-			cacheMatches = entry.Result != nil && entry.Result.Detail.ID == ref.JavDBID
-		}
 		if cacheMatches {
 			if entry.Result == nil {
 				return nil, ErrNotFound

@@ -116,7 +116,7 @@ func (s *Scanner) RescrapeMovie(ctx context.Context, id int, code string) (*ent.
 			}
 			body, err = tasks.EncodePayload(scrape.MetadataPayload{
 				Rebuild: true, Source: sess.Source(), ScanTaskID: parent.ID, MovieID: id,
-				Code: record.Code, JavDBID: "", ManualCode: record.ManualCode,
+				Code: record.Code, ManualCode: record.ManualCode,
 			})
 			if err != nil {
 				return err

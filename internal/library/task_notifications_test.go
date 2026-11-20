@@ -64,7 +64,7 @@ func TestTargetedScanWakesWorkersOnlyAfterCommit(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer tx.Rollback()
-			if _, err := service.EnqueueTargetedScan(t.Context(), tx, domain.LibrarySource{}, "folder", 1, "TEST-001", "movie"); err != nil {
+			if _, err := service.EnqueueTargetedScan(t.Context(), tx, domain.LibrarySource{}, "folder", 1, "TEST-001"); err != nil {
 				t.Fatal(err)
 			}
 			if len(work) != 0 {

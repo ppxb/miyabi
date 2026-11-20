@@ -19,33 +19,26 @@ func (service *Service) MovieStates(ctx context.Context, identities []MovieIdent
 	if len(identities) == 0 {
 		return result, nil
 	}
-	ids := make([]string, len(identities))
 	codes := make([]string, len(identities))
 	for index, item := range identities {
-		ids[index], codes[index] = item.ID, codeid.Normalize(item.Code)
+		codes[index] = codeid.Normalize(item.Code)
 		result[index] = MovieStateItem{ID: item.ID, State: MovieNotInLibrary}
 	}
 	if service.local == nil {
 		return result, nil
 	}
-	localMovies, err := service.local.MatchingMovies(ctx, ids, codes)
+	localMovies, err := service.local.MatchingMovies(ctx, codes)
 	if err != nil {
 		return nil, fmt.Errorf("query local movie states: %w", err)
 	}
-	byID, byCode := make(map[string]int), make(map[string]int)
+	byCode := make(map[string]int)
 	for _, record := range localMovies {
 		byCode[record.Code] = record.ID
-		if record.JavDBID != nil {
-			byID[*record.JavDBID] = record.ID
-		}
 	}
 	var taskIDs []any
-	for index, identity := range identities {
+	for index := range identities {
 		item := &result[index]
 		item.LibraryID = byCode[codes[index]]
-		if item.LibraryID == 0 {
-			item.LibraryID = byID[identity.ID]
-		}
 		if item.LibraryID != 0 {
 			item.State = MovieInLibrary
 		} else {

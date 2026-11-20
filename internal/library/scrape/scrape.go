@@ -29,7 +29,6 @@ type MetadataPayload struct {
 	ScanTaskID int                  `json:"scan_task_id"`
 	MovieID    int                  `json:"movie_id"`
 	Code       string               `json:"code"`
-	JavDBID    string               `json:"javdb_id,omitempty"`
 	ManualCode string               `json:"manual_code,omitempty"`
 }
 
@@ -385,7 +384,7 @@ func (service *Service) pruneDirCache(now time.Time) {
 }
 
 func (service *Service) resolveMetadata(ctx context.Context, input *Payload) error {
-	result, err := service.metadata.Resolve(ctx, domain.MovieRef{Code: input.Code, JavDBID: input.JavDBID, Refresh: input.Rebuild})
+	result, err := service.metadata.Resolve(ctx, domain.MovieRef{Code: input.Code, Refresh: input.Rebuild})
 	if err != nil {
 		return err
 	}

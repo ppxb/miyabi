@@ -327,7 +327,7 @@ func TestOfflineCompletionAndScanPagePreserveEachOthersFields(t *testing.T) {
 	}
 	parent := service.database.Task.Query().Where(task.TypeEQ("scan")).OnlyX(ctx)
 	payload := domain.ScanPayload{Source: source, OfflineTaskID: record.ID, TargetID: "download-folder",
-		Code: input.Code, JavDBID: input.Code}
+		Code: input.Code}
 	video := scan.IdentifyVideo(pan.File{ID: "video", ParentID: payload.TargetID, Name: input.Code + ".mp4", Size: 1 << 30})
 	start := make(chan struct{})
 	finished := make(chan error, 2)

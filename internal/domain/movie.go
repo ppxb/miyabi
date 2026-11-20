@@ -4,7 +4,6 @@ package domain
 type MovieRef struct {
 	Refresh bool   `json:"refresh,omitempty"`
 	Code    string `json:"code"`
-	JavDBID string `json:"javdb_id"`
 	Zone    Zone   `json:"zone,omitempty"`
 }
 
@@ -26,9 +25,8 @@ func NormalizeRating10(rating, max float64) float64 {
 
 // LocalMovie represents the identity and library ID of a movie indexed locally.
 type LocalMovie struct {
-	ID      int
-	Code    string
-	JavDBID *string
+	ID   int
+	Code string
 }
 
 // Zone is a movie category/section.

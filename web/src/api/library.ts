@@ -21,7 +21,6 @@ export type LibraryMovie = {
   id: number
   code: string
   title: string
-  javdb_id?: string
   cover?: string
   poster?: string
   fanart?: string

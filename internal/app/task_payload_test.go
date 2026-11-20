@@ -92,7 +92,7 @@ var taskBenchmarkResult any
 func BenchmarkTaskPayload(b *testing.B) {
 	input := scrape.Payload{
 		MetadataPayload: scrape.MetadataPayload{Source: domain.LibrarySource{AccountID: "100", Directory: domain.LibraryDirectory{ID: "10", Path: "/Movies"}},
-			ScanTaskID: 1, MovieID: 2, Code: "ABP-001", JavDBID: "movie"},
+			ScanTaskID: 1, MovieID: 2, Code: "ABP-001"},
 		Document:  nfo.Movie{Code: "ABP-001", Title: "Fixture title", Rating: 4.5},
 		Completed: true,
 	}

@@ -13,7 +13,6 @@ export function isOfflineTaskActive(task: OfflineSubmission) {
 export type OfflineSubmission = {
   task_id: number
   code: string
-  javdb_id: string
   library_id?: number
   account_id: string
   directory_id: string
@@ -63,7 +62,7 @@ export function useOfflineActivity() {
 export function useMovieOfflineTasks(movieID: string) {
   return useQuery({
     ...activityOptions,
-    select: activity => activity.tasks.filter(task => task.javdb_id === movieID)
+    select: activity => activity.tasks.filter(task => task.code === movieID)
   })
 }
 

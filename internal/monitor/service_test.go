@@ -66,14 +66,14 @@ func (m *mockOfflineAdder) Add(_ context.Context, movieID, hash string) (domain.
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.submissions = append(m.submissions, submission{movieID, hash})
-	return domain.OfflineSubmission{TaskID: len(m.submissions), Code: movieID, JavDBID: movieID, Hash: hash, Status: "running"}, nil
+	return domain.OfflineSubmission{TaskID: len(m.submissions), Code: movieID, Hash: hash, Status: "running"}, nil
 }
 
 func (m *mockOfflineAdder) AddByCode(_ context.Context, movieID, _ string, hash string) (domain.OfflineSubmission, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.submissions = append(m.submissions, submission{movieID, hash})
-	return domain.OfflineSubmission{TaskID: len(m.submissions), Code: movieID, JavDBID: movieID, Hash: hash, Status: "running"}, nil
+	return domain.OfflineSubmission{TaskID: len(m.submissions), Code: movieID, Hash: hash, Status: "running"}, nil
 }
 
 type fixture struct {

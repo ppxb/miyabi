@@ -248,7 +248,7 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 			input := scrape.MetadataPayload{
 				Rebuild: r.payload.Rebuild,
 				Source:  r.payload.Source, ScanTaskID: r.taskID, MovieID: record.ID,
-				Code: record.Code, JavDBID: "", ManualCode: record.ManualCode,
+				Code: record.Code, ManualCode: record.ManualCode,
 			}
 			encoded, err := tasks.EncodePayload(input)
 			if err != nil {

@@ -229,6 +229,7 @@ func TestPacopacomamaResolveKeepsJavDBEntitiesAndWorksWithoutCatalogue(t *testin
 			source := testPacopacomama(t, pacopacomamaFixtureHandler(t, &calls))
 			catalogueSource := &javdbStub{}
 			if indexed {
+				catalogueSource.resolvedID = "javdb-id"
 				catalogueSource.detail = domain.MovieDetail{Movie: domain.Movie{
 					Code: "010126_100", ID: "javdb-id", Title: "Catalogue title",
 					Actors: []domain.Actor{{ID: "catalogue-actor", Name: "Actor"}},
@@ -249,9 +250,6 @@ func TestPacopacomamaResolveKeepsJavDBEntitiesAndWorksWithoutCatalogue(t *testin
 				t.Fatalf("source not enabled by default: %+v", s.Settings())
 			}
 			ref := domain.MovieRef{Code: "PACOPACOMAMA-010126-100"}
-			if indexed {
-				ref.JavDBID = "javdb-id"
-			}
 			for range 2 {
 				m, err := s.Resolve(t.Context(), ref)
 				if err != nil || len(m.Detail.PreviewImages) != 2 || m.Images[0].Provider != "pacopacomama" {

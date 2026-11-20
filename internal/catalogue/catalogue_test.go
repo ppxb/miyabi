@@ -27,21 +27,13 @@ func (s *stubLocalState) Source() *domain.LibrarySource {
 	return s.source
 }
 
-func (s *stubLocalState) MatchingMovies(_ context.Context, ids, codes []string) ([]domain.LocalMovie, error) {
+func (s *stubLocalState) MatchingMovies(_ context.Context, codes []string) ([]domain.LocalMovie, error) {
 	var matches []domain.LocalMovie
-	idSet := make(map[string]bool)
-	for _, id := range ids {
-		idSet[id] = true
-	}
 	codeSet := make(map[string]bool)
 	for _, code := range codes {
 		codeSet[code] = true
 	}
 	for _, m := range s.movies {
-		if m.JavDBID != nil && idSet[*m.JavDBID] {
-			matches = append(matches, m)
-			continue
-		}
 		if codeSet[codeid.Normalize(m.Code)] {
 			matches = append(matches, m)
 		}
@@ -194,14 +186,12 @@ func TestMovieStatesUsesSourceIDBeforeCatalogueSpelling(t *testing.T) {
 	source := domain.LibrarySource{
 		AccountID: "100", Directory: domain.LibraryDirectory{ID: "10", Name: "Movies", Path: "/Movies"},
 	}
-	knownID := "known-id"
-	differentID := "different-id"
 	localState := &stubLocalState{
 		source: &source,
 		movies: []domain.LocalMovie{
-			{ID: 10, Code: "OLD-001", JavDBID: &knownID},
-			{ID: 11, Code: "KNB-M014", JavDBID: nil},
-			{ID: 12, Code: "GLOD-0436", JavDBID: &differentID},
+			{ID: 10, Code: "OLD-001"},
+			{ID: 11, Code: "KNB-M014"},
+			{ID: 12, Code: "GLOD-0436"},
 		},
 	}
 

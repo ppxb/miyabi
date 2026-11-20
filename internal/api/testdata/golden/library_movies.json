@@ -12,7 +12,6 @@
       "id": 7,
       "code": "ABP-123",
       "title": "Localized title",
-      "javdb_id": "movie-exact",
       "cover": "/api/library/artwork/aa.jpg",
       "poster": "/api/library/artwork/bb.jpg",
       "fanart": "/api/library/artwork/cc.jpg",

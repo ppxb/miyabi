@@ -96,7 +96,7 @@ func TestAggregatorPreparesMagnetsForPicker(t *testing.T) {
 		{Hash: inferredHash, Name: "SSIS-001-C 4K", Size: 2000, Sources: []string{"javdb"}},
 		{Hash: uncensoredHash, Name: "SSIS-001-UC 4K", Size: 3000, Sources: []string{"javdb"}},
 	}}
-	magnets, err := NewAggregator([]Source{source}, time.Second).Find(t.Context(), domain.MovieRef{JavDBID: "movie-1"})
+	magnets, err := NewAggregator([]Source{source}, time.Second).Find(t.Context(), domain.MovieRef{Code: "movie-1"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -156,7 +156,7 @@ func TestOfflineScanUsesCatalogueIdentityAndKeepsItOnRescan(t *testing.T) {
 	ctx := t.Context()
 	offline := lib.database.OfflineDownload.Create().SetHash("fixture-hash").SaveX(ctx)
 	payload.OfflineTaskID, payload.TargetID, payload.TargetPath = offline.ID, "download-folder", "/Movies/release-folder"
-	payload.Code, payload.JavDBID = "LUXU-1899", "catalogue-id"
+	payload.Code = "LUXU-1899"
 	entries := []pan.File{
 		{ID: "prefixed", ParentID: payload.TargetID, Name: "999LUXU-1899.mp4", Size: 1 << 30, SHA1: "first-video"},
 		{ID: "unnamed", ParentID: payload.TargetID, Name: "video.mp4", Size: 512 << 20, SHA1: "second-video"},
@@ -261,7 +261,7 @@ func TestDownloadedMovieBindingReusesByCode(t *testing.T) {
 			ctx := t.Context()
 			create := lib.database.Movie.Create().SetCode(scenario.code).SetTitle("Existing title")
 			known := create.SaveX(ctx)
-			payload.Code, payload.JavDBID = scenario.code, scenario.payloadID
+			payload.Code = scenario.code
 			var id int
 			err := ent.WithTx(ctx, lib.database, func(tx *ent.Tx) error {
 				var err error

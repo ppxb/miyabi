@@ -219,7 +219,7 @@ func TestOfflineActivityKeepsLatestTasksInCurrentSource(t *testing.T) {
 	}
 	current := activity.Tasks[0]
 	if current.TaskID != latest || current.TaskID == original.ID || current.Code != "ABP-002" ||
-		current.JavDBID != "ABP-002" || current.AccountID != source.AccountID ||
+		current.AccountID != source.AccountID ||
 		current.DirectoryID != source.Directory.ID || current.Phase != "downloading" {
 		t.Fatalf("latest task: %+v", current)
 	}

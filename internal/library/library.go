@@ -44,7 +44,6 @@ type Movie struct {
 	ID           int                `json:"id"`
 	Code         string             `json:"code"`
 	Title        string             `json:"title"`
-	JavDBID      *string            `json:"javdb_id,omitempty"`
 	Cover        *string            `json:"cover,omitempty"`
 	Poster       *string            `json:"poster,omitempty"`
 	Fanart       string             `json:"fanart,omitempty"`
@@ -246,11 +245,10 @@ func (s *Service) Source() *domain.LibrarySource {
 
 // MatchingMovies queries local movies matching any of the given JavDB IDs or normalized codes
 // that possess indexed files in the currently mounted library source or local library.
-func (s *Service) MatchingMovies(ctx context.Context, javdbIDs []string, codes []string) ([]domain.LocalMovie, error) {
-	if len(javdbIDs) == 0 && len(codes) == 0 {
+func (s *Service) MatchingMovies(ctx context.Context, codes []string) ([]domain.LocalMovie, error) {
+	if len(codes) == 0 {
 		return nil, nil
 	}
-	_ = javdbIDs
 	records, err := s.database.Movie.Query().Where(
 		movie.CodeIn(codes...),
 		movie.HasFilesWith(s.scope(ctx)),
@@ -305,14 +303,13 @@ func (s *Service) Finished(_ context.Context, _ *ent.Tx, job tasks.Job, _ error)
 }
 
 // EnqueueTargetedScan creates a targeted scan task inside the caller's transaction.
-func (s *Service) EnqueueTargetedScan(ctx context.Context, tx *ent.Tx, source domain.LibrarySource, targetID string, offlineTaskID int, code, javdbID string) (int, error) {
+func (s *Service) EnqueueTargetedScan(ctx context.Context, tx *ent.Tx, source domain.LibrarySource, targetID string, offlineTaskID int, code string) (int, error) {
 	encoded, err := tasks.EncodePayload(domain.ScanPayload{
 		Source:        source,
 		Scan:          domain.ScanProgress{Stage: "queued", CurrentPath: source.Directory.Path},
 		TargetID:      targetID,
 		OfflineTaskID: offlineTaskID,
 		Code:          code,
-		JavDBID:       javdbID,
 	})
 	if err != nil {
 		return 0, err

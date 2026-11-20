@@ -21,7 +21,6 @@ type Media struct {
 type OfflineSubmission struct {
 	TaskID        int        `json:"task_id"`
 	Code          string     `json:"code"`
-	JavDBID       string     `json:"javdb_id"`
 	LibraryID     int        `json:"library_id,omitempty"`
 	AccountID     string     `json:"account_id"`
 	DirectoryID   string     `json:"directory_id"`

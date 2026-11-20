@@ -11,7 +11,6 @@
     {
       "task_id": 9,
       "code": "ABP-123",
-      "javdb_id": "movie-exact",
       "library_id": 7,
       "account_id": "100",
       "directory_id": "10",
@@ -25,7 +24,6 @@
     {
       "task_id": 10,
       "code": "SONE-001",
-      "javdb_id": "related-movie-1",
       "account_id": "100",
       "directory_id": "10",
       "hash": "0000000000000000000000000000000000000002",
@@ -37,7 +35,6 @@
     {
       "task_id": 11,
       "code": "ZZZ-999",
-      "javdb_id": "movie-missing",
       "account_id": "100",
       "directory_id": "10",
       "hash": "0000000000000000000000000000000000000001",

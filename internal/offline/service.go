@@ -24,7 +24,7 @@ type Catalogue interface {
 // Library schedules scans and projects their current workflow status.
 type Library interface {
 	Workflows(context.Context, []*ent.Task) ([]domain.TaskInfo, error)
-	EnqueueTargetedScan(ctx context.Context, tx *ent.Tx, source domain.LibrarySource, targetID string, offlineTaskID int, code, javdbID string) (int, error)
+	EnqueueTargetedScan(ctx context.Context, tx *ent.Tx, source domain.LibrarySource, targetID string, offlineTaskID int, code string) (int, error)
 }
 
 // Service coordinates 115 offline download submissions, remote polling, and indexing transitions.

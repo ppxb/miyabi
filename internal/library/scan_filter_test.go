@@ -197,7 +197,7 @@ func TestFixedVideoSizeThresholdAppliesToFilenameAndOfflineIdentity(t *testing.T
 	}
 	for _, offline := range []bool{false, true} {
 		if offline {
-			payload.OfflineTaskID, payload.TargetID, payload.Code, payload.JavDBID = 1, "folder", "ABP-001", "catalogue"
+			payload.OfflineTaskID, payload.TargetID, payload.Code = 1, "folder", "ABP-001"
 		}
 		videos, err := identifyScanVideosForTest(t.Context(), lib, payload, entries)
 		if err != nil || videos["negative"].Code != "" || videos["unknown-size"].Code != "" ||

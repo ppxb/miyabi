@@ -12,7 +12,6 @@ type ScanPayload struct {
 	TargetFile    bool          `json:"target_file,omitempty"`
 	OfflineTaskID int           `json:"offline_task_id,omitempty"`
 	Code          string        `json:"code,omitempty"`
-	JavDBID       string        `json:"javdb_id,omitempty"`
 	// MetadataOnly keeps local scans from auto-completing metadata from sources.
 	MetadataOnly bool `json:"metadata_only,omitempty"`
 	// Incremental limits metadata work to still-pending movies.

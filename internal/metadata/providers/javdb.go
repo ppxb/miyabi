@@ -29,13 +29,9 @@ func (s *JavDB) Media(ctx context.Context, url string) (domain.Media, error) {
 
 func (s *JavDB) Fetch(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
 	code := codeid.Normalize(ref.Code)
-	id := ref.JavDBID
-	if id == "" {
-		resolved, err := s.catalogue.ResolveMovieID(ctx, code)
-		if err != nil {
-			return domain.MovieMetadata{}, err
-		}
-		id = resolved
+	id, err := s.catalogue.ResolveMovieID(ctx, code)
+	if err != nil {
+		return domain.MovieMetadata{}, err
 	}
 	detail := s.catalogue.CatalogueDetail
 	if ref.Refresh {

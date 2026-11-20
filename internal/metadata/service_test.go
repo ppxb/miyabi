@@ -275,31 +275,6 @@ func TestJavDBHonorsSavedSwitch(t *testing.T) {
 	}
 }
 
-func TestKnownJavDBIDCanRecoverFromCachedSearchMiss(t *testing.T) {
-	source := &sourceStub{id: "javdb"}
-	source.fetch = func(_ context.Context, code string) (domain.MovieMetadata, error) {
-		if source.calls.Load() == 1 {
-			return domain.MovieMetadata{}, ErrNotFound
-		}
-		m := completeFixture("javdb", code)
-		m.Detail.ID = "known"
-		m.Detail.Sources[0].ID = "known"
-		return m, nil
-	}
-	s := newTestService(t, source)
-	if _, err := s.Resolve(t.Context(), domain.MovieRef{Code: "ABP-123"}); !errors.Is(err, ErrNotFound) {
-		t.Fatal(err)
-	}
-	for range 2 {
-		m, err := s.Fallback(t.Context(), domain.MovieRef{Code: "ABP-123", JavDBID: "known"})
-		if err != nil || m.Detail.ID != "known" {
-			t.Fatalf("cached search miss blocked ID lookup: %+v %v", m, err)
-		}
-	}
-	if source.calls.Load() != 2 {
-		t.Fatal("known identity was not cached")
-	}
-}
 func newTestService(t *testing.T, sources ...Source) *Service {
 	t.Helper()
 	store, err := database.Open(t.Context(), t.TempDir())

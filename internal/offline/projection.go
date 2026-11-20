@@ -130,7 +130,6 @@ func (service *Service) submissions(ctx context.Context, records []*ent.OfflineD
 		*item = domain.OfflineSubmission{
 			TaskID:      record.ID,
 			Code:        record.Code,
-			JavDBID:     codeid.Normalize(record.Code),
 			AccountID:   record.AccountID,
 			DirectoryID: record.DirectoryID,
 			ScanTaskID:  record.ScanTaskID,

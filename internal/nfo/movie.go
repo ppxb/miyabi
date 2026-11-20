@@ -106,15 +106,6 @@ func FileStem(code string) string {
 	return url.QueryEscape(code)
 }
 
-func (movie Movie) JavDBID() string {
-	for _, id := range movie.IDs {
-		if id.Type == "javdb" {
-			return id.Value
-		}
-	}
-	return ""
-}
-
 func (movie Movie) Poster() string {
 	for _, thumb := range movie.Thumbs {
 		if thumb.Aspect == "poster" {

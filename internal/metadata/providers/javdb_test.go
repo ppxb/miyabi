@@ -57,10 +57,10 @@ func (s *javdbStub) RefreshCatalogueDetail(ctx context.Context, id string) (doma
 func (*javdbStub) Media(context.Context, string) (domain.Media, error) { return domain.Media{}, nil }
 
 func TestJavDBKnownIDSkipsSearchAndDoesNotMutateCatalogueCache(t *testing.T) {
-	s := &javdbStub{detail: domain.MovieDetail{Movie: domain.Movie{ID: "known", Code: "ABP-123", Title: "Title", Cover: "cover",
+	s := &javdbStub{resolvedID: "known", detail: domain.MovieDetail{Movie: domain.Movie{ID: "known", Code: "ABP-123", Title: "Title", Cover: "cover",
 		Actors: []domain.Actor{{ID: "actor", Name: "Actor"}}, Tags: []domain.Tag{{ID: "tag", Name: "Tag"}}, Maker: &domain.Maker{ID: "maker", Name: "Studio"}}}}
-	m, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "ABP-123", JavDBID: "known"})
-	if err != nil || s.queries != 0 || s.details != 1 || m.Detail.Sources[0].Provider != "javdb" || m.Detail.Actors[0].Provider != "javdb" || m.Images[0].Provider != "javdb" {
+	m, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "ABP-123"})
+	if err != nil || s.resolveCalls != 1 || s.details != 1 || m.Detail.Sources[0].Provider != "javdb" || m.Detail.Actors[0].Provider != "javdb" || m.Images[0].Provider != "javdb" {
 		t.Fatalf("result=%+v err=%v", m, err)
 	}
 	if s.detail.Actors[0].Provider != "" || s.detail.Tags[0].Provider != "" || s.detail.Maker.Provider != "" {
@@ -69,9 +69,9 @@ func TestJavDBKnownIDSkipsSearchAndDoesNotMutateCatalogueCache(t *testing.T) {
 }
 
 func TestJavDBRefreshRequestsFreshCatalogueDetail(t *testing.T) {
-	s := &javdbStub{detail: domain.MovieDetail{Movie: domain.Movie{ID: "known", Code: "IPZZ-960", Title: "JavDB title"}}}
-	m, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "IPZZ-960", JavDBID: "known", Refresh: true})
-	if err != nil || s.refreshes != 1 || s.queries != 0 || m.Detail.Title != "JavDB title" {
+	s := &javdbStub{resolvedID: "known", detail: domain.MovieDetail{Movie: domain.Movie{ID: "known", Code: "IPZZ-960", Title: "JavDB title"}}}
+	m, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "IPZZ-960", Refresh: true})
+	if err != nil || s.refreshes != 1 || s.resolveCalls != 1 || m.Detail.Title != "JavDB title" {
 		t.Fatalf("JavDB refresh skipped: %+v %v", m, err)
 	}
 }
@@ -86,7 +86,7 @@ func TestJavDBResolvesByCodeWithoutKnownID(t *testing.T) {
 
 func TestJavDBDetailCannotOverrideConfirmedNumber(t *testing.T) {
 	s := &javdbStub{detail: domain.MovieDetail{Movie: domain.Movie{ID: "known", Code: "ABP-124", Title: "Wrong movie"}}}
-	_, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "ABP-123", JavDBID: "known"})
+	_, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "ABP-123"})
 	if !errors.Is(err, metadata.ErrNotFound) {
 		t.Fatal("wrong movie accepted")
 	}

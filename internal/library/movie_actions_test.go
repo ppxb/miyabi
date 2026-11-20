@@ -258,7 +258,7 @@ func TestManualCorrectionSurvivesRebuildAndStaleTaskFailure(t *testing.T) {
 	}
 	child = lib.database.Task.Query().Where(task.TypeEQ("scrape"), task.StatusEQ(task.StatusQueued)).OnlyX(ctx)
 	input, err := tasks.DecodePayload[scrape.MetadataPayload](child.Payload)
-	if err != nil || input.Code != "IPX-123" || input.ManualCode != "IPX-123" || input.JavDBID != "" {
+	if err != nil || input.Code != "IPX-123" || input.ManualCode != "IPX-123" {
 		t.Fatalf("rebuild lost manual identity: %+v %v", input, err)
 	}
 }

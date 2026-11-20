@@ -260,7 +260,7 @@ func (service *Service) completeTask(ctx context.Context, tx *ent.Tx, record *en
 	if fileID != "" && scanID == 0 && scanSource != nil &&
 		scanSource.Directory.ID == record.DirectoryID && scanSource.AccountID == record.AccountID {
 		var err error
-		scanID, err = service.library.EnqueueTargetedScan(ctx, tx, *scanSource, fileID, record.ID, record.Code, "")
+		scanID, err = service.library.EnqueueTargetedScan(ctx, tx, *scanSource, fileID, record.ID, record.Code)
 		if err != nil {
 			return err
 		}

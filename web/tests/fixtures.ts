@@ -4,7 +4,6 @@ export function offlineSubmission(overrides: Partial<OfflineSubmission> = {}): O
   return {
     task_id: 1,
     code: 'ABP-001',
-    javdb_id: 'one',
     account_id: 'acc1',
     directory_id: 'dir1',
     hash: 'fixture-hash',

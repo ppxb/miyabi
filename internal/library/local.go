@@ -23,7 +23,6 @@ type localMetadataJob struct {
 	ScanTaskID int                  `json:"scan_task_id"`
 	MovieID    int                  `json:"movie_id"`
 	Code       string               `json:"code"`
-	JavDBID    string               `json:"javdb_id,omitempty"`
 	ManualCode string               `json:"manual_code,omitempty"`
 }
 
@@ -155,7 +154,7 @@ func (s *Service) applyLocalMetadataMode(ctx context.Context, scanTaskID int, pa
 	for _, record := range records {
 		input := localMetadataJob{
 			Source: payload.Source, ScanTaskID: scanTaskID, MovieID: record.ID,
-			Code: record.Code, JavDBID: "", ManualCode: record.ManualCode,
+			Code: record.Code, ManualCode: record.ManualCode,
 		}
 		encoded, err := tasks.EncodePayload(input)
 		if err != nil {

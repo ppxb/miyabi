@@ -258,7 +258,7 @@ func TestOfflinePageFileTrackingRollsBackWithTheIndex(t *testing.T) {
 	service, record, input, source := offlineFixture(t)
 	ctx := t.Context()
 	payload := domain.ScanPayload{Source: source, OfflineTaskID: record.ID, TargetID: "download-folder",
-		Code: input.Code, JavDBID: input.Code}
+		Code: input.Code}
 	video := scan.IdentifyVideo(pan.File{ID: "video", ParentID: "download-folder", Name: input.Code + ".mp4", Size: 1 << 30})
 	// The missing parent fails the final progress write after file tracking.
 	payload.ScanID = "rolled-back"

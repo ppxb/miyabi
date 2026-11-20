@@ -79,5 +79,5 @@ type JavBusSource interface {
 // It is implemented by library.Service to decouple catalogue from library storage.
 type LocalState interface {
 	Source() *domain.LibrarySource
-	MatchingMovies(ctx context.Context, javdbIDs []string, codes []string) ([]domain.LocalMovie, error)
+	MatchingMovies(ctx context.Context, codes []string) ([]domain.LocalMovie, error)
 }

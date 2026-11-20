@@ -118,9 +118,9 @@ func goldenTime() time.Time { return time.Date(2026, 9, 19, 12, 0, 0, 0, time.UT
 
 func (goldenLibrary) Movies(context.Context, int, int) (library.Page, error) {
 	source := goldenSource()
-	cover, poster, javdbID := "/api/library/artwork/aa.jpg", "/api/library/artwork/bb.jpg", "movie-exact"
+	cover, poster := "/api/library/artwork/aa.jpg", "/api/library/artwork/bb.jpg"
 	return library.Page{Source: &source, Total: 2, Page: 1, HasMore: false, Movies: []library.Movie{
-		{ID: 7, Code: "ABP-123", Title: "Localized title", JavDBID: &javdbID, Cover: &cover, Poster: &poster, Fanart: "/api/library/artwork/cc.jpg",
+		{ID: 7, Code: "ABP-123", Title: "Localized title", Cover: &cover, Poster: &poster, Fanart: "/api/library/artwork/cc.jpg",
 			ReleaseDate: "2026-08-01", Duration: 120, Rating: 4.5,
 			Director: &library.Entity{ID: "director-1", Name: "Director"}, Maker: &library.Entity{ID: "maker-1", Name: "Maker"},
 			Series: &library.Entity{ID: "series-1", Name: "Series"},
@@ -169,11 +169,11 @@ func (goldenOffline) ActivityForAccount(context.Context, string) (offline.Activi
 	source := goldenSource()
 	failure := "115 离线任务失败"
 	return offline.Activity{Source: &source, Tasks: []domain.OfflineSubmission{
-		{TaskID: 9, Code: "ABP-123", JavDBID: "movie-exact", LibraryID: 7, AccountID: "100", DirectoryID: "10", ScanTaskID: 2,
+		{TaskID: 9, Code: "ABP-123", LibraryID: 7, AccountID: "100", DirectoryID: "10", ScanTaskID: 2,
 			Hash: "0000000000000000000000000000000000000003", Status: string(task.StatusDone), Phase: "in_library", Progress: 100},
-		{TaskID: 10, Code: "SONE-001", JavDBID: "related-movie-1", AccountID: "100", DirectoryID: "10",
+		{TaskID: 10, Code: "SONE-001", AccountID: "100", DirectoryID: "10",
 			Hash: "0000000000000000000000000000000000000002", Status: string(task.StatusRunning), Phase: "downloading", Processing: true, Progress: 42},
-		{TaskID: 11, Code: "ZZZ-999", JavDBID: "movie-missing", AccountID: "100", DirectoryID: "10",
+		{TaskID: 11, Code: "ZZZ-999", AccountID: "100", DirectoryID: "10",
 			Hash: "0000000000000000000000000000000000000001", Status: string(task.StatusFailed), Phase: "available", Error: &failure},
 	}}, nil
 }

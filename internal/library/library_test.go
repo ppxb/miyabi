@@ -45,7 +45,7 @@ func TestLibraryListingAndMatchingShareLocalAndMountedScope(t *testing.T) {
 		if err != nil || page.Total != len(visible) || (page.Source != nil) != mounted {
 			t.Fatalf("mounted=%t page=%+v error=%v", mounted, page, err)
 		}
-		matches, err := lib.MatchingMovies(ctx, nil, codes)
+		matches, err := lib.MatchingMovies(ctx, codes)
 		if err != nil || len(matches) != len(visible) || len(page.Movies) != len(visible) {
 			t.Fatalf("mounted=%t page=%+v matches=%+v error=%v", mounted, page, matches, err)
 		}
@@ -438,7 +438,7 @@ func TestLibraryMatchingMovies(t *testing.T) {
 	lib.database.File.Create().SetFileID("f3").SetName("ABP-003.mp4").SetSize(1024).
 		SetAccountID("different-account").SetRootID("different-dir").SetMovie(filmOther).ExecX(ctx)
 
-	matches, err := lib.MatchingMovies(ctx, nil, []string{"ABP-001", "ABP-002", "ABP-999"})
+	matches, err := lib.MatchingMovies(ctx, []string{"ABP-001", "ABP-002", "ABP-999"})
 	if err != nil {
 		t.Fatal(err)
 	}

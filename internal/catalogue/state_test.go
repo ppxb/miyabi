@@ -74,7 +74,7 @@ func TestMovieStatesScopeWorkflowsToSource(t *testing.T) {
 	}
 
 	// 4. Indexed in local library -> MovieInLibrary
-	local.movies = []domain.LocalMovie{{ID: 99, Code: "ABP-001", JavDBID: &knownJavDBID}}
+	local.movies = []domain.LocalMovie{{ID: 99, Code: "ABP-001"}}
 	states, err = service.MovieStates(ctx, identities)
 	if err != nil || len(states) != 1 || states[0].State != MovieInLibrary || states[0].LibraryID != 99 {
 		t.Fatalf("expected MovieInLibrary with ID 99, got %+v (err=%v)", states, err)

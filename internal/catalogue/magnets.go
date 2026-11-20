@@ -82,7 +82,7 @@ func (service *Service) HasMagnet(ctx context.Context, movieID, hash string) (bo
 // cannot contribute and the result is returned without caching so it retries.
 func (service *Service) cachedMagnets(ctx context.Context, movieID string) ([]domain.Magnet, error) {
 	magnets, err := cachedJavDB(ctx, service, service.magnets, movieID, func(ctx context.Context) ([]domain.Magnet, error) {
-		ref := domain.MovieRef{JavDBID: movieID}
+		ref := domain.MovieRef{}
 		detailFailed := false
 		if service.sukebei != nil || (service.javbus != nil && service.javbus.Available()) {
 			if detail, err := service.CatalogueDetail(ctx, movieID); err == nil {

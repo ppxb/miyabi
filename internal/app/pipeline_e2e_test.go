@@ -257,7 +257,7 @@ func (catalogue *fakeCatalogue) MovieDetail(_ context.Context, id string) (domai
 
 func (catalogue *fakeCatalogue) Name() string { return "javdb" }
 func (catalogue *fakeCatalogue) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Magnet, error) {
-	return catalogue.Magnets(ctx, ref.JavDBID)
+	return catalogue.Magnets(ctx, ref.Code)
 }
 
 func (catalogue *fakeCatalogue) Magnets(context.Context, string) ([]domain.Magnet, error) {
@@ -718,7 +718,7 @@ type fixtureMetadata struct {
 }
 
 func (f fixtureMetadata) Resolve(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
-	id := ref.JavDBID
+	id := ""
 	if id == "" && f.resolve != nil {
 		id = f.resolve(ref.Code)
 	}

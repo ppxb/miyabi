@@ -29,7 +29,7 @@ func (s *recoveringJavBusSource) Find(_ context.Context, ref domain.MovieRef) ([
 	if s.calls == 1 {
 		return nil, errors.New("temporary JavBus failure")
 	}
-	if ref.Code != "SSIS-001" || ref.JavDBID != "movie-1" {
+	if ref.Code != "SSIS-001" {
 		return nil, errors.New("missing primary catalogue identity")
 	}
 	return []domain.Magnet{{Hash: "2222222222222222222222222222222222222222", Name: "supplement", Sources: []string{domain.MagnetSourceJavBus}}}, nil

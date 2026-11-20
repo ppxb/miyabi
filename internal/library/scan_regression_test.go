@@ -229,7 +229,7 @@ func TestScanProgressKeepsRestartContextAndScanKind(t *testing.T) {
 			payload.Scan.FilesScanned = 100
 			if targeted {
 				payload.TargetID, payload.TargetPath, payload.TargetFile = "video", "/Movies/video.mp4", true
-				payload.OfflineTaskID, payload.Code, payload.JavDBID = 123, "ABP-001", "catalogue-id"
+				payload.OfflineTaskID, payload.Code = 123, "ABP-001"
 			}
 			if err := scan.SaveScanProgress(t.Context(), lib.database.Task, queued.ID, payload); err != nil {
 				t.Fatal(err)
