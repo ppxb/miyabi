@@ -40,9 +40,6 @@ export function MovieHero({
           <h1 className="text-xl leading-snug font-bold tracking-normal sm:text-2xl">
             {movie.title || movie.code}
           </h1>
-          {movie.origin_title && movie.origin_title !== movie.title ? (
-            <p className="text-sm leading-6 text-muted-foreground">{movie.origin_title}</p>
-          ) : null}
         </div>
 
         <MovieStats movie={movie} />
