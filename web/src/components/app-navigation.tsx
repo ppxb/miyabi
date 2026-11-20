@@ -44,9 +44,7 @@ export function AppNavigation({ onNavigate }: { onNavigate?: () => void }) {
         const active =
           item.to === '/'
             ? pathname === '/'
-            : pathname === item.to ||
-              pathname.startsWith(`${item.to}/`) ||
-              (item.to === '/discover' && pathname === '/search')
+            : pathname === item.to || pathname.startsWith(`${item.to}/`)
 
         return (
           <SidebarMenuItem key={item.to}>

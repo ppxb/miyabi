@@ -113,12 +113,6 @@ export type BrowseMoviesParams = {
   limit?: number
 }
 
-export type SearchMoviesParams = {
-  query: string
-  page?: number
-  limit?: number
-}
-
 const movieDetails = createMovieDetailLoader((id, signal) =>
   apiGet<DiscoverMovieDetail>(`/api/discover/movies/${encodeURIComponent(id)}`, undefined, signal)
 )
@@ -220,27 +214,6 @@ export function useDiscoverMagnets(id: string, code?: string) {
       ),
     staleTime: 60_000,
     enabled: Boolean(code)
-  })
-}
-
-export function useSearchMovies(params: SearchMoviesParams) {
-  const query = params.query.trim()
-  return useQuery({
-    queryKey: discoverKeys.search({ ...params, query }),
-    queryFn: ({ signal }) =>
-      apiGet<DiscoverMovie[]>(
-        '/api/discover/search',
-        {
-          q: query,
-          page: params.page,
-          limit: params.limit
-        },
-        signal
-      ),
-    enabled: query.length > 0,
-    // Search depends on the JavDB account; never serve a stale login/error or
-    // result set when the page is revisited after signing in.
-    staleTime: 0
   })
 }
 
