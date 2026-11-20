@@ -3,7 +3,7 @@ import { HlsJsVideo } from '@videojs/react/media/hlsjs-video'
 import { I18nProvider } from '@videojs/react/i18n'
 import { usePlayer, Video, VideoPlayer } from '@videojs/react/video'
 import { CalendarIcon, ClockIcon, StarIcon, type LucideIcon } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
 import { useLibraryMovie } from '@/api/library'
 import type { LibraryMovieDetail } from '@/api/library'
@@ -145,52 +145,48 @@ function PlaybackSync({
   fileID?: string
   resume?: { file_id: string; position: number; duration: number }
 }) {
-  const currentTime = usePlayer(state => state.currentTime)
-  const duration = usePlayer(state => state.duration)
+  // Bare store access does not subscribe, so the continuously changing
+  // currentTime no longer re-renders this component on every frame. Only the
+  // low-frequency paused/duration values are subscribed.
+  const player = usePlayer()
   const paused = usePlayer(state => state.paused)
-  const seek = usePlayer(state => state.seek)
+  const duration = usePlayer(state => state.duration)
   const queryClient = useQueryClient()
   const resumed = useRef(false)
-  const latest = useRef({ currentTime: 0, duration: 0, paused: true })
 
-  useEffect(() => {
-    latest.current = { currentTime, duration, paused }
-  }, [currentTime, duration, paused])
+  // Single source of truth for persisting progress; reads the current player
+  // state at call time instead of a per-frame ref.
+  const saveProgress = useCallback(() => {
+    if (!fileID) return
+    const { currentTime, duration } = player.state
+    if (currentTime > 0 && duration > 0) {
+      void savePlaybackProgress(movieId, fileID, currentTime, duration).catch(() => {})
+    }
+  }, [player, movieId, fileID])
 
   useEffect(() => {
     if (resumed.current || !fileID || !resume || resume.file_id !== fileID) return
     if (resume.position <= 0 || duration <= 0) return
     resumed.current = true
-    void seek(Math.min(resume.position, Math.max(0, duration - 1))).catch(() => {})
-  }, [duration, fileID, resume, seek])
+    void player.seek(Math.min(resume.position, Math.max(0, duration - 1))).catch(() => {})
+  }, [duration, fileID, resume, player])
 
   useEffect(() => {
     if (!fileID) return
-    const save = () => {
-      const state = latest.current
-      if (state.currentTime > 0 && state.duration > 0) {
-        void savePlaybackProgress(movieId, fileID, state.currentTime, state.duration).catch(
-          () => {}
-        )
-      }
-    }
     const timer = setInterval(() => {
-      if (!latest.current.paused) save()
+      if (!player.state.paused) saveProgress()
     }, 5000)
     return () => {
       clearInterval(timer)
-      save()
+      saveProgress()
       void queryClient.invalidateQueries({ queryKey: historyKeys.all })
     }
-  }, [fileID, movieId, queryClient])
+  }, [fileID, player, saveProgress, queryClient])
 
   useEffect(() => {
-    if (!paused || !fileID) return
-    const state = latest.current
-    if (state.currentTime > 0 && state.duration > 0) {
-      void savePlaybackProgress(movieId, fileID, state.currentTime, state.duration).catch(() => {})
-    }
-  }, [paused, fileID, movieId])
+    if (!paused) return
+    saveProgress()
+  }, [paused, saveProgress])
 
   return null
 }
