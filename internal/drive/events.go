@@ -15,8 +15,9 @@ type MountEvent struct {
 type MountListener func(ctx context.Context, event MountEvent) error
 
 // SetMountListener replaces the synchronous mount callback; nil clears it.
-// The callback runs under the commit lock, but not the state lock. It must not
-// open sessions or commit through Drive. A rejected mount restores its old state.
+// The callback runs without the state lock and is not wrapped in a commit lock;
+// it must not open sessions or commit through Drive. An error is returned to the
+// caller, but any mount change made before the call is not rolled back.
 func (d *Drive) SetMountListener(listener MountListener) {
 	d.mu.Lock()
 	d.mountListener = listener

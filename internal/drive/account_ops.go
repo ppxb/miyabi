@@ -75,6 +75,8 @@ func (d *Drive) SelectDirectoryForAccount(ctx context.Context, accountID, direct
 		return domain.LibraryDirectory{}, err
 	}
 	// The library queues its scan from this event; a stored mount alone is silent.
+	// The mount above is already persisted, so a failure here is surfaced to the
+	// caller without rolling that change back.
 	if err := d.publishMount(ctx, domain.LibrarySource{AccountID: accountID, Directory: directory}); err != nil {
 		return domain.LibraryDirectory{}, err
 	}
