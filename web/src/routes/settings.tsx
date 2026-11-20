@@ -36,7 +36,7 @@ function SettingsLayout() {
       <div className="flex flex-col gap-6 md:flex-row md:gap-8">
         <nav
           aria-label="设置导航"
-          className="flex gap-1 overflow-x-auto md:w-44 md:shrink-0 md:flex-col"
+          className="no-scrollbar flex gap-1 overflow-x-auto md:w-44 md:shrink-0 md:flex-col"
         >
           {SETTINGS_NAV.map(item => {
             const active =
