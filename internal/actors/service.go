@@ -660,14 +660,21 @@ func (s *Service) fillProfileFrom(ctx context.Context, tx *ent.Tx, pid int, from
 	return update.Exec(ctx)
 }
 
-// copyProfileImages copies images from one profile to another inside the caller's
-// transaction. The caller must hold persistMu.
-func (s *Service) copyProfileImages(ctx context.Context, tx *ent.Tx, fromPid, toPid int) error {
-	images, err := tx.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(fromPid))).All(ctx)
-	if err != nil || len(images) == 0 {
-		return err
+// imageItem is one actor image to append to a profile gallery.
+type imageItem struct {
+	url      string
+	provider string
+	role     string
+}
+
+// appendImageRows inserts image items into a profile's gallery inside the
+// caller's transaction, skipping duplicates by URL and continuing the position
+// sequence. Inserts are batched. The caller must hold persistMu.
+func (s *Service) appendImageRows(ctx context.Context, tx *ent.Tx, pid int, items []imageItem) error {
+	if len(items) == 0 {
+		return nil
 	}
-	existing, err := tx.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(toPid))).All(ctx)
+	existing, err := tx.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(pid))).All(ctx)
 	if err != nil {
 		return err
 	}
@@ -679,18 +686,37 @@ func (s *Service) copyProfileImages(ctx context.Context, tx *ent.Tx, fromPid, to
 			position = im.Position + 1
 		}
 	}
-	for _, im := range images {
-		if seen[im.URL] {
+	builders := make([]*ent.ActorImageCreate, 0, len(items))
+	for _, item := range items {
+		if item.url == "" || seen[item.url] {
 			continue
 		}
-		if _, err := tx.ActorImage.Create().
-			SetActorID(toPid).SetURL(im.URL).SetProvider(im.Provider).SetRole(im.Role).SetPosition(position).Save(ctx); err != nil {
-			return err
-		}
-		seen[im.URL] = true
+		seen[item.url] = true
+		builders = append(builders, tx.ActorImage.Create().
+			SetActorID(pid).SetURL(item.url).SetProvider(item.provider).SetRole(item.role).SetPosition(position))
 		position++
 	}
-	return nil
+	if len(builders) == 0 {
+		return nil
+	}
+	return tx.ActorImage.CreateBulk(builders...).Exec(ctx)
+}
+
+// copyProfileImages copies images from one profile to another inside the caller's
+// transaction. The caller must hold persistMu.
+func (s *Service) copyProfileImages(ctx context.Context, tx *ent.Tx, fromPid, toPid int) error {
+	images, err := tx.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(fromPid))).All(ctx)
+	if err != nil {
+		return err
+	}
+	if len(images) == 0 {
+		return nil
+	}
+	items := make([]imageItem, 0, len(images))
+	for _, im := range images {
+		items = append(items, imageItem{url: im.URL, provider: im.Provider, role: im.Role})
+	}
+	return s.appendImageRows(ctx, tx, toPid, items)
 }
 
 func empty(v *string) bool { return v == nil || *v == "" }
@@ -962,33 +988,11 @@ func (s *Service) applyProfile(ctx context.Context, pid int, providerName string
 // appendProfileImages appends the provider's image URLs inside the caller's
 // transaction. The caller must hold persistMu.
 func (s *Service) appendProfileImages(ctx context.Context, tx *ent.Tx, pid int, providerName string, urls []string) error {
-	if len(urls) == 0 {
-		return nil
-	}
-	existing, err := tx.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(pid))).All(ctx)
-	if err != nil {
-		return err
-	}
-	seen := make(map[string]bool, len(existing))
-	position := 0
-	for _, im := range existing {
-		seen[im.URL] = true
-		if im.Position >= position {
-			position = im.Position + 1
-		}
-	}
+	items := make([]imageItem, 0, len(urls))
 	for _, url := range urls {
-		if url == "" || seen[url] {
-			continue
-		}
-		if _, err := tx.ActorImage.Create().
-			SetActorID(pid).SetURL(url).SetProvider(providerName).SetRole("portrait").SetPosition(position).Save(ctx); err != nil {
-			return err
-		}
-		seen[url] = true
-		position++
+		items = append(items, imageItem{url: url, provider: providerName, role: "portrait"})
 	}
-	return nil
+	return s.appendImageRows(ctx, tx, pid, items)
 }
 
 func deref(v *string) string {
