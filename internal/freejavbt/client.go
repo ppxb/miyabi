@@ -8,35 +8,54 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/metadata"
 	"github.com/ppxb/miyabi/internal/netx"
+	"golang.org/x/sync/singleflight"
 	"golang.org/x/time/rate"
 )
 
 const (
-	defaultBaseURL = "https://freejavbt.com"
-	defaultTimeout = 15 * time.Second
-	maxBodyBytes   = 8 << 20
-	userAgent      = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+	defaultBaseURL  = "https://freejavbt.com"
+	defaultTimeout  = 15 * time.Second
+	defaultCacheTTL = 5 * time.Minute
+	defaultCacheCap = 256
+	maxBodyBytes    = 8 << 20
+	userAgent       = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
 
 // Options configures a freejavbt client.
 type Options struct {
-	Timeout time.Duration
-	Proxy   *netx.ProxyManager
-	BaseURL string
-	Client  *http.Client
+	Timeout   time.Duration
+	Proxy     *netx.ProxyManager
+	BaseURL   string
+	Client    *http.Client
+	CacheTTL  time.Duration
+	CacheSize int
+}
+
+type cacheEntry struct {
+	detail  detail
+	expires time.Time
 }
 
 // Client implements both metadata.Source and magnet.Source for freejavbt.com.
+// It caches parsed detail pages so metadata and magnet lookups for the same code
+// share one HTTP request.
 type Client struct {
-	http    *http.Client
-	limiter *rate.Limiter
-	base    string
+	http      *http.Client
+	limiter   *rate.Limiter
+	base      string
+	cacheTTL  time.Duration
+	cacheSize int
+
+	mu    sync.Mutex
+	cache map[string]cacheEntry
+	group singleflight.Group
 }
 
 // New creates a freejavbt client.
@@ -49,11 +68,26 @@ func New(options Options) (*Client, error) {
 	if timeout <= 0 {
 		timeout = defaultTimeout
 	}
+	cacheTTL := options.CacheTTL
+	if cacheTTL <= 0 {
+		cacheTTL = defaultCacheTTL
+	}
+	cacheSize := options.CacheSize
+	if cacheSize <= 0 {
+		cacheSize = defaultCacheCap
+	}
 	httpClient := options.Client
 	if httpClient == nil {
 		httpClient = netx.NewSafeDownloadClient(options.Proxy, timeout)
 	}
-	return &Client{http: httpClient, limiter: rate.NewLimiter(2, 2), base: base}, nil
+	return &Client{
+		http:      httpClient,
+		limiter:   rate.NewLimiter(2, 2),
+		base:      base,
+		cacheTTL:  cacheTTL,
+		cacheSize: cacheSize,
+		cache:     make(map[string]cacheEntry),
+	}, nil
 }
 
 // ID identifies the metadata source.
@@ -104,15 +138,56 @@ func (c *Client) get(ctx context.Context, target string) ([]byte, error) {
 }
 
 func (c *Client) detail(ctx context.Context, code string) (detail, error) {
-	body, err := c.get(ctx, c.base+"/"+url.PathEscape(code))
+	if cached, ok := c.cached(code); ok {
+		return cached, nil
+	}
+	value, err, _ := c.group.Do(code, func() (any, error) {
+		if cached, ok := c.cached(code); ok {
+			return cached, nil
+		}
+		body, err := c.get(ctx, c.base+"/"+url.PathEscape(code))
+		if err != nil {
+			return detail{}, err
+		}
+		parsed := parseDetail(string(body))
+		if parsed.Title == "" || (parsed.Code != "" && !codeid.IsFormatEquivalent(parsed.Code, code)) {
+			return detail{}, metadata.ErrNotFound
+		}
+		c.store(code, parsed)
+		return parsed, nil
+	})
 	if err != nil {
 		return detail{}, err
 	}
-	parsed := parseDetail(string(body))
-	if parsed.Title == "" || (parsed.Code != "" && !codeid.IsFormatEquivalent(parsed.Code, code)) {
-		return detail{}, metadata.ErrNotFound
+	return value.(detail), nil
+}
+
+func (c *Client) cached(code string) (detail, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	entry, ok := c.cache[code]
+	if !ok || time.Now().After(entry.expires) {
+		return detail{}, false
 	}
-	return parsed, nil
+	return entry.detail, true
+}
+
+func (c *Client) store(code string, parsed detail) {
+	if c.cacheTTL <= 0 {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.cache == nil {
+		c.cache = make(map[string]cacheEntry)
+	}
+	if c.cacheSize > 0 && len(c.cache) >= c.cacheSize {
+		for key := range c.cache {
+			delete(c.cache, key)
+			break
+		}
+	}
+	c.cache[code] = cacheEntry{detail: parsed, expires: time.Now().Add(c.cacheTTL)}
 }
 
 // Fetch resolves one movie's metadata.

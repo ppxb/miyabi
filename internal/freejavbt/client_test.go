@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"golang.org/x/time/rate"
@@ -61,5 +62,31 @@ func TestFindSkipsEmptyCode(t *testing.T) {
 	magnets, err := client.Find(context.Background(), domain.MovieRef{Code: ""})
 	if err != nil || len(magnets) != 0 {
 		t.Fatalf("magnets = %v err = %v", magnets, err)
+	}
+}
+
+func TestDetailCacheSharesOneFetch(t *testing.T) {
+	calls := 0
+	client := &Client{
+		http: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			calls++
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(sampleHTML)), Header: make(http.Header)}, nil
+		})},
+		base:      defaultBaseURL,
+		limiter:   rate.NewLimiter(rate.Inf, 0),
+		cacheTTL:  time.Minute,
+		cacheSize: 16,
+		cache:     make(map[string]cacheEntry),
+	}
+	defer client.Close()
+
+	if _, err := client.Fetch(context.Background(), domain.MovieRef{Code: "SONE-001"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Find(context.Background(), domain.MovieRef{Code: "SONE-001"}); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("http calls = %d, want 1 (cached)", calls)
 	}
 }
