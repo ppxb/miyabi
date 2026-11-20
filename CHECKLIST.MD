@@ -69,7 +69,7 @@
 - [x] 🟠 ✅ `web/src/features/library/page.tsx:22` + `api/library.ts:109-115`：同接口一页请求两次。改法：共用 `libraryKeys.movies(1)` + `select` 截取。（已修复：`useRecentMovies` 改为复用 `libraryKeys.movies(1)` 缓存、queryFn 固定 `page:1, limit:LIBRARY_PAGE_SIZE`，用 `select` 截取前 `limit` 条；删除不再需要的 `libraryKeys.recent`。列表页 page1 只发一次 `/api/library/movies`。`pnpm build` 与 `pnpm test`（186 passed）通过）
 - [x] 🟠 ✅ `web/src/api/subscriptions.ts:65-71`：内联 `select` 每次渲染重建 Map；订阅页 `'all'` 与发现页 `'movie'` 双缓存。改法：模块级 select，订阅页用 `'movie'`。（已修复：`select` 提为模块级 `indexTargets`（数据不变时不再重建 Map）；订阅页 `useSubscriptionTargets('movie')`——该页只过滤 `kind==='movie'`，与发现页铃铛共用 `subscriptions/targets/movie` 缓存，去掉多余的 `'all'` 请求。`pnpm build` 与 `pnpm test`（186 passed）通过）
 - [x] 🟠 ✅ `web/src/features/library/player-dialog.tsx:140-189`：订阅 `currentTime` 导致播放中持续重渲染；保存进度逻辑重复两次。（已修复：`PlaybackSync` 改用 `usePlayer()` 无选择器取 store（**不订阅**，`currentTime` 不再触发重渲染），保存时按需读 `player.state`；仅保留低频的 `paused`/`duration` 订阅。抽出单一 `saveProgress` 供 interval / teardown / pause 三处复用，删除原先重复的保存代码与 `latest` ref。`pnpm build` 与 `pnpm test`（186 passed）通过）
-- [ ] 🟢 `web/src/api/history.ts:34-40`：缺 `keepPreviousData`，翻页闪骨架。
+- [x] 🟢 ✅ `web/src/api/history.ts:34-40`：缺 `keepPreviousData`，翻页闪骨架。（已修复：`useHistory` 增加 `placeholderData: keepPreviousData`，翻页时保留上一页数据、`isPending` 不再为 true，历史页不会闪 `MovieGridSkeleton`。`pnpm build` 与 `pnpm test`（186 passed）通过）
 - [ ] 🟢 `web/src/features/settings/scraping-section.tsx:59-66`：开关无乐观更新且保存期间整列禁用。改法：`isPending ? variables : data`。
 
 ---

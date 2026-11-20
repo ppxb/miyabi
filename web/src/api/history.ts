@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiDelete, apiGet, apiPost } from '@/api/client'
 
@@ -35,7 +35,8 @@ export function useHistory(page: number) {
   return useQuery({
     queryKey: historyKeys.page(page),
     queryFn: ({ signal }) =>
-      apiGet<WatchHistoryPage>('/api/history', { page, limit: HISTORY_PAGE_SIZE }, signal)
+      apiGet<WatchHistoryPage>('/api/history', { page, limit: HISTORY_PAGE_SIZE }, signal),
+    placeholderData: keepPreviousData
   })
 }
 
