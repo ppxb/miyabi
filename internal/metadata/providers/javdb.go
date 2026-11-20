@@ -14,6 +14,7 @@ import (
 type JavDBCatalogue interface {
 	CatalogueDetail(context.Context, string) (domain.MovieDetail, error)
 	RefreshCatalogueDetail(context.Context, string) (domain.MovieDetail, error)
+	ResolveMovieID(context.Context, string) (string, error)
 	Media(context.Context, string) (domain.Media, error)
 }
 
@@ -30,9 +31,11 @@ func (s *JavDB) Fetch(ctx context.Context, ref domain.MovieRef) (domain.MovieMet
 	code := codeid.Normalize(ref.Code)
 	id := ref.JavDBID
 	if id == "" {
-		// JavDB is a supplementary source only: resolving a code to an ID needs
-		// the authenticated search API, which this build no longer uses.
-		return domain.MovieMetadata{}, metadata.ErrNotFound
+		resolved, err := s.catalogue.ResolveMovieID(ctx, code)
+		if err != nil {
+			return domain.MovieMetadata{}, err
+		}
+		id = resolved
 	}
 	detail := s.catalogue.CatalogueDetail
 	if ref.Refresh {

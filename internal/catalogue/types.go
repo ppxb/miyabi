@@ -64,6 +64,7 @@ type JavDBClient interface {
 	MovieDetail(context.Context, string) (domain.MovieDetail, error)
 	FetchMedia(context.Context, string) (domain.Media, error)
 	Tags(context.Context, domain.Zone) ([]domain.TagCategory, error)
+	ResolveMovieID(context.Context, string) (string, error)
 	Route() (javdb.RouteStatus, bool)
 }
 

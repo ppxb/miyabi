@@ -181,6 +181,14 @@ func (service *Service) Browse(
 	return projectMovies(ctx, movies), nil
 }
 
+func (service *Service) ResolveMovieID(ctx context.Context, code string) (string, error) {
+	id, err := service.javdb.ResolveMovieID(ctx, code)
+	if err != nil {
+		return "", fmt.Errorf("resolve JavDB movie ID: %w", err)
+	}
+	return id, nil
+}
+
 func (service *Service) CatalogueDetail(ctx context.Context, movieID string) (domain.MovieDetail, error) {
 	return cachedJavDB(ctx, service, service.details, movieID, func(ctx context.Context) (domain.MovieDetail, error) {
 		detail, err := service.javdb.MovieDetail(ctx, movieID)

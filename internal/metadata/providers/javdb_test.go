@@ -15,10 +15,25 @@ type javdbStub struct {
 	search           []catalogue.Movie
 	detail           domain.MovieDetail
 	queries, details int
+	resolveCalls     int
+	resolvedID       string
+	resolveErr       error
 	err              error
 	searchByQuery    map[string][]catalogue.Movie
 	queried          []string
 	requestedID      string
+}
+
+func (s *javdbStub) ResolveMovieID(_ context.Context, code string) (string, error) {
+	s.resolveCalls++
+	s.queried = append(s.queried, code)
+	if s.resolveErr != nil {
+		return "", s.resolveErr
+	}
+	if s.resolvedID == "" {
+		return "", metadata.ErrNotFound
+	}
+	return s.resolvedID, nil
 }
 
 func (s *javdbStub) Search(_ context.Context, query string, _ domain.SearchOptions) ([]catalogue.Movie, error) {
@@ -61,11 +76,11 @@ func TestJavDBRefreshRequestsFreshCatalogueDetail(t *testing.T) {
 	}
 }
 
-func TestJavDBRequiresAKnownID(t *testing.T) {
-	s := &javdbStub{search: []catalogue.Movie{{Movie: domain.Movie{ID: "weaker", Code: "ABP-123"}}}}
-	_, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "ABP-123"})
-	if !errors.Is(err, metadata.ErrNotFound) || s.details != 0 || s.queries != 0 {
-		t.Fatalf("id-less lookup must not search: %v", err)
+func TestJavDBResolvesByCodeWithoutKnownID(t *testing.T) {
+	s := &javdbStub{resolvedID: "known", detail: domain.MovieDetail{Movie: domain.Movie{ID: "known", Code: "ABP-123", Title: "Title"}}}
+	m, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "ABP-123"})
+	if err != nil || m.Detail.ID != "known" || s.resolveCalls != 1 || s.details != 1 {
+		t.Fatalf("code resolution failed: result=%+v err=%v", m, err)
 	}
 }
 
@@ -77,21 +92,18 @@ func TestJavDBDetailCannotOverrideConfirmedNumber(t *testing.T) {
 	}
 }
 
-func TestJavDBDoesNotSearchWithoutKnownID(t *testing.T) {
-	s := &javdbStub{}
-	_, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "TUSHYRAW.26.09.27"})
-	if !errors.Is(err, metadata.ErrNotFound) || s.queries != 0 || s.details != 0 {
-		t.Fatalf("expected not found without search: %v", err)
+func TestJavDBPropagatesResolveError(t *testing.T) {
+	s := &javdbStub{resolveErr: domain.E(domain.KindConflict, "ambiguous", nil)}
+	_, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "ABP-123"})
+	if domain.KindOf(err) != domain.KindConflict {
+		t.Fatalf("resolve error not propagated: %v", err)
 	}
 }
 
 func TestJavDBRejectsAmbiguousYearVariants(t *testing.T) {
-	s := &javdbStub{search: []catalogue.Movie{
-		{Movie: domain.Movie{ID: "one", Code: "STUDIO.2026.09.27"}},
-		{Movie: domain.Movie{ID: "two", Code: "STUDIO.2026.09.27"}},
-	}}
+	s := &javdbStub{resolveErr: domain.E(domain.KindConflict, "ambiguous year spelling", nil)}
 	_, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "STUDIO.26.09.27"})
-	if !errors.Is(err, metadata.ErrNotFound) || s.queries != 0 {
-		t.Fatalf("id-less lookup must not search: %v", err)
+	if domain.KindOf(err) != domain.KindConflict {
+		t.Fatalf("ambiguity not reported: %v", err)
 	}
 }
