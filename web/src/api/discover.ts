@@ -174,15 +174,6 @@ function cardToDetail(movie: DiscoverMovie): DiscoverMovieDetail {
   }
 }
 
-export function useResolveDiscoverMovie(code: string) {
-  return useQuery({
-    queryKey: discoverKeys.resolve(code),
-    queryFn: ({ signal }) =>
-      apiGet<{ id: string }>('/api/discover/movies/resolve', { code }, signal),
-    staleTime: 5 * 60_000
-  })
-}
-
 export function useRecommendationMovie(id: string) {
   const queryClient = useQueryClient()
   const query = useQuery({ ...movieDetails.options(id), enabled: false })

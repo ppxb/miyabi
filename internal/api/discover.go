@@ -11,10 +11,8 @@ import (
 )
 
 type CatalogueManager interface {
-	Search(context.Context, string, domain.SearchOptions) ([]catalogue.Movie, error)
 	Browse(context.Context, domain.BrowseOptions) ([]catalogue.Movie, error)
 	MovieDetail(context.Context, string) (catalogue.MovieDetail, error)
-	ResolveMovieID(context.Context, string) (string, error)
 	MovieStates(context.Context, []catalogue.MovieIdentity) ([]catalogue.MovieStateItem, error)
 	Magnets(context.Context, string) ([]catalogue.Magnet, error)
 	MagnetsByCode(context.Context, string) ([]catalogue.Magnet, error)
@@ -25,12 +23,6 @@ type CatalogueManager interface {
 type ViewedManager interface {
 	ViewedMovieIDs(context.Context) ([]string, error)
 	AddViewedMovieIDs(context.Context, []string) error
-}
-
-type discoverSearchQuery struct {
-	Query string `form:"q" binding:"required"`
-	Page  int    `form:"page,default=1" binding:"min=1"`
-	Limit int    `form:"limit,default=20" binding:"min=1,max=100"`
 }
 
 type discoverBrowseQuery struct {
@@ -72,20 +64,6 @@ func discoverMovieStatesHandler(discover CatalogueManager) gin.HandlerFunc {
 
 type imageQuery struct {
 	URL string `form:"url" binding:"required,url"`
-}
-
-func discoverSearchHandler(discover CatalogueManager) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		query, ok := bindQuery[discoverSearchQuery](c)
-		if !ok {
-			return
-		}
-		movies, err := discover.Search(c.Request.Context(), query.Query, domain.SearchOptions{
-			Page:  query.Page,
-			Limit: query.Limit,
-		})
-		respond(c, movies, err)
-	}
 }
 
 func discoverBrowseHandler(discover CatalogueManager) gin.HandlerFunc {
@@ -138,26 +116,6 @@ func discoverMovieHandler(discover CatalogueManager, metadata MetadataManager) g
 		}
 		movie, err := discover.MovieDetail(c.Request.Context(), uri.ID)
 		respond(c, movie, err)
-	}
-}
-
-func discoverResolveMovieHandler(discover CatalogueManager) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		query, ok := bindQuery[struct {
-			Code string `form:"code" binding:"required,max=200"`
-		}](c)
-		if !ok {
-			return
-		}
-		code := codeid.Normalize(query.Code)
-		if code == "" {
-			respond(c, nil, domain.E(domain.KindInvalid, "影片番号不能为空", nil))
-			return
-		}
-		id, err := discover.ResolveMovieID(c.Request.Context(), code)
-		respond(c, struct {
-			ID string `json:"id"`
-		}{ID: id}, err)
 	}
 }
 

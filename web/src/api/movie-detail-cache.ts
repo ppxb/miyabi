@@ -6,7 +6,6 @@ export const discoverKeys = {
   all: ['discover'] as const,
   movies: (params?: unknown) => ['discover', 'movies', params] as const,
   movie: (id: string) => ['discover', 'movie', id] as const,
-  resolve: (code: string) => ['discover', 'resolve', code] as const,
   magnets: (id: string, code?: string) => ['discover', 'movie', id, 'magnets', code ?? ''] as const,
   search: (params?: unknown) => ['discover', 'search', params] as const,
   tags: (zone: string) => ['discover', 'tags', zone] as const

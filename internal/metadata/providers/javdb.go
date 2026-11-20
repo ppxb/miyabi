@@ -32,42 +32,9 @@ func (s *JavDB) Fetch(ctx context.Context, ref domain.MovieRef) (domain.MovieMet
 	code := codeid.Normalize(ref.Code)
 	id := ref.JavDBID
 	if id == "" {
-		var candidates []domain.Movie
-		for _, query := range codeid.Queries(code) {
-			movies, err := s.catalogue.Search(ctx, query, domain.SearchOptions{Zone: domain.ZoneAll, Page: 1, Limit: 100})
-			if err != nil {
-				return domain.MovieMetadata{}, err
-			}
-			if len(movies) >= 100 {
-				return domain.MovieMetadata{}, fmt.Errorf("JavDB 检索结果过多，无法可靠确认影片")
-			}
-			for _, movie := range movies {
-				candidates = append(candidates, movie.Movie)
-			}
-		}
-		// Do not use ResolveMovieID here: it performs weaker matching internally.
-		// The metadata service owns matching layers across all sources.
-		for _, exact := range []bool{true, false} {
-			for _, candidate := range candidates {
-				matches := codeid.IsFormatEquivalent(candidate.Code, code)
-				if exact {
-					matches = codeid.Normalize(candidate.Code) == code
-				}
-				if !matches {
-					continue
-				}
-				if id != "" && id != candidate.ID {
-					return domain.MovieMetadata{}, domain.E(domain.KindConflict, "JavDB 同番号对应多个影片", nil)
-				}
-				id = candidate.ID
-			}
-			if id != "" {
-				break
-			}
-		}
-		if id == "" {
-			return domain.MovieMetadata{}, metadata.ErrNotFound
-		}
+		// JavDB is a supplementary source only: resolving a code to an ID needs
+		// the authenticated search API, which this build no longer uses.
+		return domain.MovieMetadata{}, metadata.ErrNotFound
 	}
 	detail := s.catalogue.CatalogueDetail
 	if ref.Refresh {

@@ -3,11 +3,9 @@ package providers
 import (
 	"context"
 	"errors"
-	"slices"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/catalogue"
-	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/metadata"
 )
@@ -63,16 +61,11 @@ func TestJavDBRefreshRequestsFreshCatalogueDetail(t *testing.T) {
 	}
 }
 
-func TestJavDBFallbackDoesNotPerformItsOwnWeakerMatching(t *testing.T) {
+func TestJavDBRequiresAKnownID(t *testing.T) {
 	s := &javdbStub{search: []catalogue.Movie{{Movie: domain.Movie{ID: "weaker", Code: "ABP-123"}}}}
-	_, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "118ABP-123"})
-	if !errors.Is(err, metadata.ErrNotFound) || s.details != 0 {
-		t.Fatalf("weaker match accepted: %v", err)
-	}
-	s.search = append(s.search, catalogue.Movie{Movie: domain.Movie{ID: "other", Code: "ABP-123"}})
-	_, err = NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "ABP-123"})
-	if domain.KindOf(err) != domain.KindConflict || s.details != 0 {
-		t.Fatalf("ambiguous match accepted: %v", err)
+	_, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "ABP-123"})
+	if !errors.Is(err, metadata.ErrNotFound) || s.details != 0 || s.queries != 0 {
+		t.Fatalf("id-less lookup must not search: %v", err)
 	}
 }
 
@@ -84,50 +77,11 @@ func TestJavDBDetailCannotOverrideConfirmedNumber(t *testing.T) {
 	}
 }
 
-func TestJavDBResolvesFilenameCodesWithoutKnownID(t *testing.T) {
-	for _, tt := range []struct {
-		code, canonical, id, query, other string
-		queries                           []string
-	}{
-		{
-			code: "PACOPACOMAMA-042126-100", canonical: "042126_100", id: "AqVqkn",
-			query: "042126-100", other: "042126_101",
-			queries: []string{"PACOPACOMAMA-042126-100", "042126-100", "042126_100"},
-		},
-		{
-			code: "TUSHYRAW.26.09.27", canonical: "Tushyraw.2026.09.27", id: "XeppbV",
-			query: "TUSHYRAW.2026.09.27", other: "Tushyraw.2023.09.27",
-			queries: []string{"TUSHYRAW.26.09.27", "TUSHYRAW.2026.09.27"},
-		},
-	} {
-		t.Run(tt.code, func(t *testing.T) {
-			catalogue := &javdbStub{
-				searchByQuery: map[string][]catalogue.Movie{tt.query: {
-					{Movie: domain.Movie{ID: "unrelated", Code: tt.other}},
-					{Movie: domain.Movie{ID: tt.id, Code: tt.canonical}},
-				}},
-				detail: domain.MovieDetail{Movie: domain.Movie{ID: tt.id, Code: tt.canonical, Title: "Confirmed film"}},
-			}
-			store, err := database.Open(t.Context(), t.TempDir())
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer store.Close()
-			service, err := metadata.New(t.Context(), store.Client, NewJavDB(catalogue))
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer service.Close()
-			for range 2 {
-				m, err := service.Resolve(t.Context(), domain.MovieRef{Code: tt.code})
-				if err != nil || m.Detail.ID != tt.id || m.Detail.Code != tt.canonical || catalogue.requestedID != tt.id {
-					t.Fatalf("filename lookup failed: %+v, requested=%s, err=%v", m, catalogue.requestedID, err)
-				}
-			}
-			if !slices.Equal(catalogue.queried, tt.queries) || catalogue.details != 1 {
-				t.Fatalf("unexpected lookup order or cache miss: %v, details=%d", catalogue.queried, catalogue.details)
-			}
-		})
+func TestJavDBDoesNotSearchWithoutKnownID(t *testing.T) {
+	s := &javdbStub{}
+	_, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "TUSHYRAW.26.09.27"})
+	if !errors.Is(err, metadata.ErrNotFound) || s.queries != 0 || s.details != 0 {
+		t.Fatalf("expected not found without search: %v", err)
 	}
 }
 
@@ -137,7 +91,7 @@ func TestJavDBRejectsAmbiguousYearVariants(t *testing.T) {
 		{Movie: domain.Movie{ID: "two", Code: "STUDIO.2026.09.27"}},
 	}}
 	_, err := NewJavDB(s).Fetch(t.Context(), domain.MovieRef{Code: "STUDIO.26.09.27"})
-	if domain.KindOf(err) != domain.KindConflict || s.details != 0 {
-		t.Fatalf("ambiguous year spelling accepted: %v", err)
+	if !errors.Is(err, metadata.ErrNotFound) || s.queries != 0 {
+		t.Fatalf("id-less lookup must not search: %v", err)
 	}
 }

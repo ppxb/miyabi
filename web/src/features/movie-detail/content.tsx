@@ -1,5 +1,5 @@
 import { useRecordMovieView } from '@/api/browse-history'
-import { useDiscoverMagnets, useDiscoverMovie, useResolveDiscoverMovie } from '@/api/discover'
+import { useDiscoverMagnets, useDiscoverMovie } from '@/api/discover'
 import { useLibraryMovie } from '@/api/library'
 import { ErrorState, InlineError } from '@/components/error-state'
 import type { MovieDetailTarget } from './dialog-context'
@@ -14,7 +14,7 @@ export function MovieDetailContent({ movie }: { movie: MovieDetailTarget }) {
   return 'id' in movie ? (
     <IdentifiedMovieDetail movieId={movie.id} code={movie.code} />
   ) : (
-    <MovieDetailByCode code={movie.code} />
+    <IdentifiedMovieDetail movieId={movie.code} code={movie.code} />
   )
 }
 
@@ -58,7 +58,7 @@ function MoviePlot({ plot }: { plot?: string }) {
 }
 
 // Catalogue extras remain available for linked films, but cannot block or
-// replace the saved library metadata when JavDB is unavailable.
+// replace the saved library metadata when the catalogue is unavailable.
 function LibraryCatalogueExtras({ movieId, code }: { movieId: string; code: string }) {
   const detail = useDiscoverMovie(movieId, code)
   const magnets = useDiscoverMagnets(movieId, detail.data?.code ?? code)
@@ -74,21 +74,6 @@ function LibraryCatalogueExtras({ movieId, code }: { movieId: string; code: stri
       ) : null}
     </>
   )
-}
-
-function MovieDetailByCode({ code }: { code: string }) {
-  const identity = useResolveDiscoverMovie(code)
-  if (identity.isPending) return <MovieDetailSkeleton />
-  if (!identity.data) {
-    return (
-      <ErrorState
-        message={`未能从 JavDB 确认 ${code} 的影片详情`}
-        onRetry={() => void identity.refetch()}
-        retrying={identity.isFetching}
-      />
-    )
-  }
-  return <IdentifiedMovieDetail key={identity.data.id} movieId={identity.data.id} code={code} />
 }
 
 function IdentifiedMovieDetail({ movieId, code }: { movieId: string; code?: string }) {

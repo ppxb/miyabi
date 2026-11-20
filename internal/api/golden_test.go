@@ -236,7 +236,7 @@ func TestResponseContractsMatchGoldenFiles(t *testing.T) {
 		body               string
 	}{
 		{name: "discover_browse", method: http.MethodGet, path: "/api/discover/movies?zone=censored&page=1"},
-		{name: "discover_search", method: http.MethodGet, path: "/api/discover/search?q=ABP-123"},
+		{name: "discover_browse", method: http.MethodGet, path: "/api/discover/movies?zone=censored"},
 		{name: "discover_movie", method: http.MethodGet, path: "/api/discover/movies/movie-exact"},
 		{name: "discover_magnets", method: http.MethodGet, path: "/api/discover/movies/movie-exact/magnets"},
 		{name: "discover_movie_states", method: http.MethodPost, path: "/api/discover/movie-states",

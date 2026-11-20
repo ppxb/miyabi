@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ppxb/miyabi/internal/catalogue"
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -230,7 +229,6 @@ func TestPacopacomamaResolveKeepsJavDBEntitiesAndWorksWithoutCatalogue(t *testin
 			source := testPacopacomama(t, pacopacomamaFixtureHandler(t, &calls))
 			catalogueSource := &javdbStub{}
 			if indexed {
-				catalogueSource.search = []catalogue.Movie{{Movie: domain.Movie{Code: "010126_100", ID: "javdb-id"}}}
 				catalogueSource.detail = domain.MovieDetail{Movie: domain.Movie{
 					Code: "010126_100", ID: "javdb-id", Title: "Catalogue title",
 					Actors: []domain.Actor{{ID: "catalogue-actor", Name: "Actor"}},
@@ -250,8 +248,12 @@ func TestPacopacomamaResolveKeepsJavDBEntitiesAndWorksWithoutCatalogue(t *testin
 			if !reflect.DeepEqual(s.Settings(), []metadata.SourceSetting{{ID: "pacopacomama", Enabled: true}, {ID: "javdb", Enabled: true}}) {
 				t.Fatalf("source not enabled by default: %+v", s.Settings())
 			}
+			ref := domain.MovieRef{Code: "PACOPACOMAMA-010126-100"}
+			if indexed {
+				ref.JavDBID = "javdb-id"
+			}
 			for range 2 {
-				m, err := s.Resolve(t.Context(), domain.MovieRef{Code: "PACOPACOMAMA-010126-100"})
+				m, err := s.Resolve(t.Context(), ref)
 				if err != nil || len(m.Detail.PreviewImages) != 2 || m.Images[0].Provider != "pacopacomama" {
 					t.Fatalf("source not integrated: %+v %v", m, err)
 				}

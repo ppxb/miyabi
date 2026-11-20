@@ -30,7 +30,6 @@ type Dependencies struct {
 	Maintenance    MaintenanceManager
 	Network        NetworkManager
 	Emby           EmbyManager
-	JavDB          JavDBManager
 	Sources        SourceManager
 	Actors         ActorManager
 	Frontend       fs.FS
@@ -90,9 +89,6 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	settingsAPI.GET("/emby", embyConfigHandler(deps.Emby))
 	settingsAPI.PUT("/emby", embyUpdateHandler(deps.Emby))
 	settingsAPI.POST("/emby/test", embyTestHandler(deps.Emby))
-	settingsAPI.GET("/javdb", javdbConfigHandler(deps.JavDB))
-	settingsAPI.PUT("/javdb", javdbUpdateHandler(deps.JavDB))
-	settingsAPI.POST("/javdb/test", javdbTestHandler(deps.JavDB))
 	settingsAPI.GET("/subscription", subscriptionSettingsGetHandler(deps.Monitor))
 	settingsAPI.PUT("/subscription", subscriptionSettingsUpdateHandler(deps.Monitor))
 	settingsAPI.GET("/sources", sourceListHandler(deps.Sources))
@@ -155,10 +151,8 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.POST("/discover/movie-states", noStore(), discoverMovieStatesHandler(deps.Catalogue))
 	protected.GET("/discover/viewed", noStore(), discoverViewedHandler(deps.Library))
 	protected.POST("/discover/viewed", discoverAddViewedHandler(deps.Library))
-	protected.GET("/discover/search", discoverSearchHandler(deps.Catalogue))
 	protected.GET("/discover/tags", discoverTagsHandler(deps.Catalogue))
 	protected.GET("/discover/movies/:id", discoverMovieHandler(deps.Catalogue, deps.Metadata))
-	protected.GET("/discover/movies/resolve", discoverResolveMovieHandler(deps.Catalogue))
 	protected.GET("/discover/movies/:id/magnets", discoverMagnetsHandler(deps.Catalogue))
 	protected.POST("/discover/movies/:id/offline", offlineAddHandler(deps.Offline))
 	protected.GET("/image", imageHandler(deps.Catalogue))
