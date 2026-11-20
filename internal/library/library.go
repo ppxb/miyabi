@@ -731,7 +731,11 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 
 	preds := []predicate.Movie{movie.HasFilesWith(scope)}
 	if q := strings.TrimSpace(filter.Query); q != "" {
-		preds = append(preds, movie.Or(movie.CodeContainsFold(q), movie.TitleContainsFold(q)))
+		preds = append(preds, movie.Or(
+			movie.CodeContainsFold(q),
+			movie.TitleContainsFold(q),
+			movie.HasActorsWith(actor.NameContainsFold(q)),
+		))
 	}
 	switch filter.Source {
 	case "local":

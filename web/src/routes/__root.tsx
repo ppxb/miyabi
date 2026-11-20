@@ -11,11 +11,11 @@ export const Route = createRootRoute({
 function RootLayout() {
   return (
     <AccessGate>
-      <AppShell>
-        <MovieDetailDialogProvider>
+      <MovieDetailDialogProvider>
+        <AppShell>
           <Outlet />
-        </MovieDetailDialogProvider>
-      </AppShell>
+        </AppShell>
+      </MovieDetailDialogProvider>
     </AccessGate>
   )
 }

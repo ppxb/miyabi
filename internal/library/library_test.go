@@ -360,6 +360,10 @@ func TestLibraryBrowseFiltersSortAndOptions(t *testing.T) {
 	if err != nil || keyword.Total != 1 || keyword.Movies[0].ID != m2 {
 		t.Fatalf("keyword filter: %+v err=%v", keyword, err)
 	}
+	byActorName, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, Query: "x actor"})
+	if err != nil || byActorName.Total != 1 || byActorName.Movies[0].ID != m1 {
+		t.Fatalf("keyword by actor name: %+v err=%v", byActorName, err)
+	}
 
 	rated, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, Sort: "rating"})
 	if err != nil || len(rated.Movies) != 4 || rated.Movies[0].ID != m3 || rated.Movies[1].ID != m1 {
