@@ -56,6 +56,7 @@ type Drive struct {
 	mountListener MountListener
 
 	accountTokens       map[string]pan.Tokens
+	accountMounts       map[string]mountRecord
 	accountCredVersions map[string]uint64
 	accountAuthVersions map[string]uint64
 	accountRefresh      singleflight.Group
@@ -78,10 +79,12 @@ func NewWithClient(ctx context.Context, db *ent.Client, client Client) (*Drive, 
 		return nil, err
 	}
 	d.accountTokens = make(map[string]pan.Tokens, len(store))
+	d.accountMounts = make(map[string]mountRecord, len(store))
 	d.accountCredVersions = make(map[string]uint64, len(store))
 	d.accountAuthVersions = make(map[string]uint64, len(store))
 	for id, record := range store {
 		d.accountTokens[id] = record.Tokens
+		d.accountMounts[id] = record.Directory
 	}
 	return d, nil
 }

@@ -69,6 +69,28 @@ func (d *Drive) setAccountToken(accountID string, tokens pan.Tokens) {
 	d.accountTokens[accountID] = tokens
 }
 
+func (d *Drive) accountMount(accountID string) (mountRecord, bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	record, ok := d.accountMounts[accountID]
+	return record, ok
+}
+
+func (d *Drive) setAccountMount(accountID string, mount mountRecord) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.accountMounts == nil {
+		d.accountMounts = make(map[string]mountRecord)
+	}
+	d.accountMounts[accountID] = mount
+}
+
+func (d *Drive) clearAccountMount(accountID string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	delete(d.accountMounts, accountID)
+}
+
 func (d *Drive) accountCredVersion(accountID string) uint64 {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -121,7 +143,11 @@ func (d *Drive) saveAccountMount(ctx context.Context, accountID string, mount mo
 	record.Directory = mount
 	store[accountID] = record
 	d.bumpAccountAuthorization(accountID)
-	return database.SaveSetting(ctx, d.database, accountsSetting, store)
+	if err := database.SaveSetting(ctx, d.database, accountsSetting, store); err != nil {
+		return err
+	}
+	d.setAccountMount(accountID, mount)
+	return nil
 }
 
 func (d *Drive) removeAccount(ctx context.Context, accountID string) error {
@@ -141,7 +167,11 @@ func (d *Drive) removeAccount(ctx context.Context, accountID string) error {
 	d.setAccountToken(accountID, pan.Tokens{})
 	d.bumpAccountCredential(accountID)
 	d.bumpAccountAuthorization(accountID)
-	return database.SaveSetting(ctx, d.database, accountsSetting, store)
+	if err := database.SaveSetting(ctx, d.database, accountsSetting, store); err != nil {
+		return err
+	}
+	d.clearAccountMount(accountID)
+	return nil
 }
 
 func (d *Drive) accountRecord(ctx context.Context, accountID string) (accountRecord, error) {
@@ -153,32 +183,29 @@ func (d *Drive) accountRecord(ctx context.Context, accountID string) (accountRec
 }
 
 // Mount returns the stored library source of an account when it has one. A
-// missing mount reports ok=false with a nil error; a read failure surfaces err.
-func (d *Drive) Mount(ctx context.Context, accountID string) (domain.LibrarySource, bool, error) {
-	record, err := d.accountRecord(ctx, accountID)
-	if err != nil {
-		return domain.LibrarySource{}, false, err
-	}
-	if record.Directory.ID == "" || record.Directory.AccountID == "" {
+// missing mount reports ok=false with a nil error. The mount is served from the
+// in-memory registry (kept in sync by saveAccountMount/removeAccount) so remote
+// operations do not reload and deserialize the whole account store.
+func (d *Drive) Mount(_ context.Context, accountID string) (domain.LibrarySource, bool, error) {
+	record, ok := d.accountMount(accountID)
+	if !ok || record.ID == "" || record.AccountID == "" {
 		return domain.LibrarySource{}, false, nil
 	}
-	return record.Directory.source(), true, nil
+	return record.source(), true, nil
 }
 
 // Mounts returns every stored account's mounted library source, without
 // verifying credentials, so callers can operate each account independently.
-func (d *Drive) Mounts(ctx context.Context) ([]domain.LibrarySource, error) {
-	store, err := d.loadAccounts(ctx)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]domain.LibrarySource, 0, len(store))
-	for _, record := range store {
-		if record.Directory.ID == "" || record.Directory.AccountID == "" {
+func (d *Drive) Mounts(_ context.Context) ([]domain.LibrarySource, error) {
+	d.mu.Lock()
+	result := make([]domain.LibrarySource, 0, len(d.accountMounts))
+	for _, record := range d.accountMounts {
+		if record.ID == "" || record.AccountID == "" {
 			continue
 		}
-		result = append(result, record.Directory.source())
+		result = append(result, record.source())
 	}
+	d.mu.Unlock()
 	sort.Slice(result, func(i, j int) bool {
 		if result[i].AccountID != result[j].AccountID {
 			return result[i].AccountID < result[j].AccountID
