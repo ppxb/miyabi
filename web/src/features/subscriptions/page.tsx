@@ -42,7 +42,9 @@ export function SubscriptionsPage({
   const page = search.page ?? 1
   const actorPage = search.actorPage ?? 1
 
-  const targets = useSubscriptionTargets()
+  // This page only reads movie targets, so share the 'movie' cache with the
+  // discover page instead of fetching a separate 'all' list.
+  const targets = useSubscriptionTargets('movie')
   const movies = useSubscriptions('movie', page, SUBSCRIPTION_PAGE_SIZE, view === 'movies')
   const actors = useSubscriptions('actor', actorPage, SUBSCRIPTION_PAGE_SIZE, view === 'actors')
   const feed = useActorFeed(selectedActorID, page, SUBSCRIPTION_PAGE_SIZE, view === 'actors')
