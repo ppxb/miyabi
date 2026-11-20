@@ -61,7 +61,7 @@
 - [x] 🟢 ✅ `internal/metadata/service.go:188-189`：每拿一个结果就整体 merge，O(n²)。改法：循环后 merge 一次。（已修复：内层来源循环只 `append(results, result)`，循环结束后 `merge(results)` 一次；跨来源的「同片」冲突校验改为累计 `confirmedCode`（首个非空 code）逐条 `IsFormatEquivalent` 比对，语义等价。`go build`/`go vet`/`go test ./internal/metadata/... ./internal/library/scrape/...` 通过）
 - [x] 🟢 ✅ 正则在函数内编译：`metadata/providers/tokyohot.go:266,269`、`actors/avleague.go:175`。改法：包级变量；tokyohot 可复用 `codeAVDuration`。（已修复：`japaneseDuration` 的 PT 分支改为直接复用包级 `codeAVDurationMinutes`，不再每次现编译 `(\d+)H`/`(\d+)M`；`parseMeasurements` 的身材正则在包级 `avLeagueMeasurements` 预编译。`go build`/`go test ./internal/metadata/... ./internal/actors/...` 通过）
 - [x] 🟢 ✅ `[]byte`→`string` 多余拷贝：`actors/avleague.go:80,112`、`providers/codeav.go:91`。改法：`bytes.NewReader`。（已修复：三处 `html.Parse(strings.NewReader(string(body)))` 改为 `html.Parse(bytes.NewReader(body))`，省去 `[]byte→string` 拷贝。`go build`/`go test ./internal/actors/... ./internal/metadata/...` 通过）
-- [ ] 🟢 `internal/netx/ssrf.go:187,198`：前置 `ValidateSafeURL` 与拨号时重复 DNS 解析。
+- [x] 🟢 ✅ `internal/netx/ssrf.go:187,198`：前置 `ValidateSafeURL` 与拨号时重复 DNS 解析。（已修复·方案A：新增只做语法/字面量检查、**不解析 DNS** 的 `validateSafeURLShape`；`CheckRedirect` 按代理状态分流——配置了代理时仍用完整 `ValidateSafeURL`（代理拨号不校验目标，必须在此拦），直连时用 shape（拨号阶段已解析并直连已校验 IP）。`SafeDownload` 的预检保持完整（拿不到 proxy 状态，代理场景必需），已加注释说明。新增 `TestValidateSafeURLShapeSkipsDNS` 断言 `.invalid` 域名不做 DNS。`go build`/`go vet`/`go test ./internal/netx/... ./internal/subtitle/... ./internal/freejavbt/... ./internal/metadata/...` 通过）
 - [ ] 🟢 `internal/ent/schema/task.go:43`：索引 `(type,status)` 是 `(type,status,retry_at)` 的前缀，冗余。
 
 ### 前端

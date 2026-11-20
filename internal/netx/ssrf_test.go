@@ -73,6 +73,31 @@ func TestValidateSafeURL(t *testing.T) {
 	}
 }
 
+func TestValidateSafeURLShapeSkipsDNS(t *testing.T) {
+	rejected := []string{
+		"http://127.0.0.1/secret",
+		"http://localhost:8080/metrics",
+		"http://192.168.1.1/admin",
+		"file:///etc/passwd",
+		"ftp://example.com/file",
+		"http:///no-host",
+	}
+	for _, u := range rejected {
+		if _, err := validateSafeURLShape(u); err == nil {
+			t.Errorf("shape check should reject %s", u)
+		}
+	}
+	accepted := []string{
+		"https://93.184.216.34/subtitle.srt",
+		"https://does-not-exist.invalid/subtitle.srt", // must not touch DNS
+	}
+	for _, u := range accepted {
+		if _, err := validateSafeURLShape(u); err != nil {
+			t.Errorf("shape check should accept %s: %v", u, err)
+		}
+	}
+}
+
 func TestSafeDownload_BlocksLoopback(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
