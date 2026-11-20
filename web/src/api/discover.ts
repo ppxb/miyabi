@@ -152,7 +152,8 @@ export function useDiscoverMovie(id: string, code?: string) {
         code ? { code } : undefined,
         signal
       ),
-    staleTime: 5 * 60_000
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000
   })
   useEffect(() => {
     movieDetails.prioritize(queryClient, id)

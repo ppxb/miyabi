@@ -85,7 +85,9 @@ export function useLibraryMovie(id: number) {
   return useQuery({
     queryKey: libraryKeys.detail(id),
     queryFn: ({ signal }) =>
-      apiGet<LibraryMovieDetail>(`/api/library/movies/${id}`, undefined, signal)
+      apiGet<LibraryMovieDetail>(`/api/library/movies/${id}`, undefined, signal),
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000
   })
 }
 

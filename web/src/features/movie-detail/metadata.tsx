@@ -19,16 +19,20 @@ export function MovieMetadata({ movie }: { movie: MovieMetadataValues }) {
   const tags = movie.tags ?? []
   return (
     <dl className="space-y-3 text-sm">
-      {movie.maker ? (
-        <EntityRow label="厂牌">
+      <EntityRow label="厂牌">
+        {movie.maker ? (
           <EntityLink kind="maker" entity={movie.maker} />
-        </EntityRow>
-      ) : null}
-      {movie.series ? (
-        <EntityRow label="系列">
+        ) : (
+          <span className="text-muted-foreground">N/A</span>
+        )}
+      </EntityRow>
+      <EntityRow label="系列">
+        {movie.series ? (
           <EntityLink kind="series" entity={movie.series} />
-        </EntityRow>
-      ) : null}
+        ) : (
+          <span className="text-muted-foreground">N/A</span>
+        )}
+      </EntityRow>
       {actors.length > 0 ? (
         <EntityRow label="演员">
           {actors.map((actor, index) => (
@@ -42,11 +46,13 @@ export function MovieMetadata({ movie }: { movie: MovieMetadataValues }) {
           ))}
         </EntityRow>
       ) : null}
-      {movie.director ? (
-        <EntityRow label="导演">
+      <EntityRow label="导演">
+        {movie.director ? (
           <EntityLink kind="director" entity={movie.director} />
-        </EntityRow>
-      ) : null}
+        ) : (
+          <span className="text-muted-foreground">N/A</span>
+        )}
+      </EntityRow>
       {tags.length > 0 ? (
         <div className="flex items-start gap-4">
           <dt className="w-10 shrink-0 pt-0.5 leading-5 text-muted-foreground">标签</dt>
