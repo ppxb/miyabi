@@ -153,11 +153,7 @@ function PlaybackSync({
     if (resumed.current || !fileID || !resume || resume.file_id !== fileID) return
     if (resume.position <= 0 || duration <= 0) return
     resumed.current = true
-    try {
-      void seek(Math.min(resume.position, Math.max(0, duration - 1)))
-    } catch {
-      // Actions reject until the media attaches; the duration guard covers it.
-    }
+    void seek(Math.min(resume.position, Math.max(0, duration - 1))).catch(() => {})
   }, [duration, fileID, resume, seek])
 
   useEffect(() => {
