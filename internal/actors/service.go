@@ -185,6 +185,9 @@ type group struct {
 	sources []Source
 	movies  map[int]bool
 	ids     []int
+	// displayName and norm are derived once per group so sorting, filtering and
+	// summaries never re-copy/re-sort the name set.
+	displayName string
 }
 
 func (g *group) sortedNames() []string {
@@ -211,6 +214,47 @@ func (g *group) display() string {
 	return names[0]
 }
 
+func newGroup() *group {
+	return &group{names: make(map[string]bool), movies: make(map[int]bool)}
+}
+
+// add folds one provider-scoped Actor row into the group.
+func (g *group) add(r *ent.Actor, seenSource map[string]bool) {
+	g.names[r.Name] = true
+	g.ids = append(g.ids, r.ID)
+	if g.nameZHT == "" && r.NameZht != nil && *r.NameZht != "" {
+		g.nameZHT = *r.NameZht
+	}
+	var avatar string
+	if r.Avatar != nil {
+		avatar = *r.Avatar
+	}
+	if g.avatar == "" && avatar != "" {
+		g.avatar = avatar
+	}
+	srcKey := r.Provider + "\x00" + r.SourceID
+	if !seenSource[srcKey] {
+		seenSource[srcKey] = true
+		g.sources = append(g.sources, Source{Provider: r.Provider, SourceID: r.SourceID, Name: r.Name, Avatar: avatar})
+	}
+	for _, m := range r.Edges.Movies {
+		if m != nil {
+			g.movies[m.ID] = true
+		}
+	}
+}
+
+func (g *group) finalize() {
+	g.displayName = g.display()
+	g.norm = normalizeName(g.displayName)
+	sort.SliceStable(g.sources, func(i, j int) bool {
+		if g.sources[i].Provider != g.sources[j].Provider {
+			return g.sources[i].Provider < g.sources[j].Provider
+		}
+		return g.sources[i].SourceID < g.sources[j].SourceID
+	})
+}
+
 func (s *Service) groups(ctx context.Context) ([]*group, error) {
 	records, err := s.db.Actor.Query().
 		WithMovies(func(q *ent.MovieQuery) { q.Select(movie.FieldID) }).
@@ -234,44 +278,17 @@ func (s *Service) groups(ctx context.Context) ([]*group, error) {
 		}
 		g := byKey[key]
 		if g == nil {
-			g = &group{names: make(map[string]bool), movies: make(map[int]bool)}
+			g = newGroup()
 			byKey[key] = g
 		}
-		g.names[r.Name] = true
-		g.ids = append(g.ids, r.ID)
-		if g.nameZHT == "" && r.NameZht != nil && *r.NameZht != "" {
-			g.nameZHT = *r.NameZht
-		}
-		var avatar string
-		if r.Avatar != nil {
-			avatar = *r.Avatar
-		}
-		if g.avatar == "" && avatar != "" {
-			g.avatar = avatar
-		}
-		srcKey := r.Provider + "\x00" + r.SourceID
-		if !seenSource[srcKey] {
-			seenSource[srcKey] = true
-			g.sources = append(g.sources, Source{Provider: r.Provider, SourceID: r.SourceID, Name: r.Name, Avatar: avatar})
-		}
-		for _, m := range r.Edges.Movies {
-			if m != nil {
-				g.movies[m.ID] = true
-			}
-		}
+		g.add(r, seenSource)
 	}
 	groups := make([]*group, 0, len(byKey))
 	for _, g := range byKey {
-		g.norm = normalizeName(g.display())
-		sort.SliceStable(g.sources, func(i, j int) bool {
-			if g.sources[i].Provider != g.sources[j].Provider {
-				return g.sources[i].Provider < g.sources[j].Provider
-			}
-			return g.sources[i].SourceID < g.sources[j].SourceID
-		})
+		g.finalize()
 		groups = append(groups, g)
 	}
-	sort.Slice(groups, func(i, j int) bool { return groups[i].display() < groups[j].display() })
+	sort.Slice(groups, func(i, j int) bool { return groups[i].displayName < groups[j].displayName })
 	return groups, nil
 }
 
@@ -282,7 +299,7 @@ func (g *group) summary() Summary {
 	}
 	return Summary{
 		Key:        Key(g.norm),
-		Name:       g.display(),
+		Name:       g.displayName,
 		NameZHT:    g.nameZHT,
 		Avatar:     avatar,
 		MovieCount: len(g.movies),
@@ -343,27 +360,47 @@ func (g *group) matches(q string) bool {
 	return false
 }
 
-func (s *Service) find(ctx context.Context, key string) (*group, error) {
-	groups, err := s.groups(ctx)
+// loadGroup resolves a single group by its public key through the indexed
+// name_key column, so Detail never builds the whole catalog in memory.
+func (s *Service) loadGroup(ctx context.Context, key string) (*group, error) {
+	seed, err := s.db.Actor.Query().
+		Where(actor.NameKeyEQ(key)).
+		Select(actor.FieldName).
+		First(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	query := s.db.Actor.Query().Where(actor.NameKeyEQ(key))
+	if pid, perr := s.db.ActorProfile.Query().Where(actorprofile.MatchKeyEQ(normalizeName(seed.Name))).OnlyID(ctx); perr == nil {
+		query = s.db.Actor.Query().Where(actor.Or(actor.NameKeyEQ(key), actor.HasProfileWith(actorprofile.ID(pid))))
+	}
+	records, err := query.
+		WithMovies(func(q *ent.MovieQuery) { q.Select(movie.FieldID) }).
+		WithProfile(func(q *ent.ActorProfileQuery) { q.Select(actorprofile.FieldID) }).
+		All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	for _, g := range groups {
-		if Key(g.norm) == key {
-			return g, nil
-		}
+	g := newGroup()
+	seenSource := make(map[string]bool)
+	for _, r := range records {
+		g.add(r, seenSource)
 	}
-	return nil, ErrNotFound
+	g.finalize()
+	return g, nil
 }
 
 // Detail returns one canonical actor with aliases, images and biography.
 func (s *Service) Detail(ctx context.Context, key string) (Detail, error) {
-	g, err := s.find(ctx, key)
+	g, err := s.loadGroup(ctx, key)
 	if err != nil {
 		return Detail{}, err
 	}
 	detail := Detail{Summary: g.summary(), Names: g.sortedNames(), Aliases: []string{}}
-	display := g.display()
+	display := g.displayName
 	for _, name := range detail.Names {
 		if name != display {
 			detail.Aliases = append(detail.Aliases, name)

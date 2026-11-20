@@ -23,8 +23,8 @@ func TestEnsureProfilesAndCatalog(t *testing.T) {
 	defer store.Close()
 	db := store.Client
 
-	a1 := db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("七ツ森 りり").SaveX(ctx)
-	a2 := db.Actor.Create().SetProvider("duga").SetSourceID("x2").SetName("七ツ森りり").SaveX(ctx)
+	a1 := db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("七ツ森 りり").SetNameKey(domain.ActorNameKey("七ツ森 りり")).SaveX(ctx)
+	a2 := db.Actor.Create().SetProvider("duga").SetSourceID("x2").SetName("七ツ森りり").SetNameKey(domain.ActorNameKey("七ツ森りり")).SaveX(ctx)
 	db.Movie.Create().SetCode("TEST-001").AddActors(a1, a2).SaveX(ctx)
 
 	svc := New(db, nil, "", nil)
@@ -69,8 +69,8 @@ func TestDetailPersistsAliasesAndImages(t *testing.T) {
 	defer store.Close()
 	db := store.Client
 
-	a1 := db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("七ツ森 りり").SaveX(ctx)
-	a2 := db.Actor.Create().SetProvider("duga").SetSourceID("x2").SetName("七ツ森りり").SaveX(ctx)
+	a1 := db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("七ツ森 りり").SetNameKey(domain.ActorNameKey("七ツ森 りり")).SaveX(ctx)
+	a2 := db.Actor.Create().SetProvider("duga").SetSourceID("x2").SetName("七ツ森りり").SetNameKey(domain.ActorNameKey("七ツ森りり")).SaveX(ctx)
 	db.Movie.Create().SetCode("TEST-001").AddActors(a1, a2).SaveX(ctx)
 
 	gfDir := t.TempDir()
