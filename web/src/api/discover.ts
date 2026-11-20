@@ -148,13 +148,36 @@ export function useDiscoverMovies(params: BrowseMoviesParams) {
   })
 }
 
-export function useDiscoverMovie(id: string) {
+export function useDiscoverMovie(id: string, code?: string) {
   const queryClient = useQueryClient()
-  const query = useQuery(movieDetails.options(id))
+  const query = useQuery({
+    queryKey: discoverKeys.movie(id),
+    queryFn: ({ signal }) =>
+      apiGet<DiscoverMovieDetail>(
+        `/api/discover/movies/${encodeURIComponent(id)}`,
+        code ? { code } : undefined,
+        signal
+      ),
+    staleTime: 5 * 60_000
+  })
   useEffect(() => {
     movieDetails.prioritize(queryClient, id)
   }, [queryClient, id])
-  return query
+  // Fall back to the card already rendered in the list only when the
+  // enrichment request fails, so the dialog still opens instead of erroring.
+  const card = query.isError ? findCachedMovieCard(queryClient, id) : undefined
+  const data = query.data ?? (card ? cardToDetail(card) : undefined)
+  return { ...query, data }
+}
+
+function cardToDetail(movie: DiscoverMovie): DiscoverMovieDetail {
+  const partial = movie as Partial<DiscoverMovieDetail>
+  return {
+    ...movie,
+    zone: partial.zone ?? 'unknown',
+    actor_movies: partial.actor_movies ?? [],
+    related_movies: partial.related_movies ?? []
+  }
 }
 
 export function useResolveDiscoverMovie(code: string) {

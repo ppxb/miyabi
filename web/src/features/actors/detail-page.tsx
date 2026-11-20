@@ -137,7 +137,7 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
             ) : null}
           </div>
           {actor.aliases?.length ? (
-            <p className="text-sm text-muted-foreground">别名：{actor.aliases.join(' / ')}</p>
+            <p className="text-sm text-muted-foreground">{actor.aliases.join(' / ')}</p>
           ) : null}
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <span>{actor.movie_count} 部作品</span>
@@ -179,11 +179,7 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
       ) : (
         <MovieGridLayout>
           {films.map(movie => (
-            <LibraryMovieCard
-              key={movie.id}
-              movie={movie}
-              onPlay={() => setPlayingId(movie.id)}
-            />
+            <LibraryMovieCard key={movie.id} movie={movie} onPlay={() => setPlayingId(movie.id)} />
           ))}
         </MovieGridLayout>
       )}

@@ -11,6 +11,7 @@ import (
 type MetadataManager interface {
 	Settings() []metadata.SourceSetting
 	UpdateSettings(context.Context, []metadata.SourceSetting) error
+	ResolveExcept(context.Context, domain.MovieRef, ...string) (domain.MovieMetadata, error)
 	Image(context.Context, domain.ImageCandidate) (domain.Media, error)
 }
 

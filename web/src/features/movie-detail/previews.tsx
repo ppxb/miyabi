@@ -9,6 +9,7 @@ export function MoviePreviews({ images }: { images: PreviewImage[] }) {
   // The viewer stays mounted so its closing animation can play; the index outlives `open`.
   const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerIndex, setViewerIndex] = useState(0)
+  const items = images ?? []
 
   const openViewer = (index: number) => {
     setViewerIndex(index)
@@ -20,11 +21,11 @@ export function MoviePreviews({ images }: { images: PreviewImage[] }) {
       <h2 id="movie-previews-title" className="text-xl font-semibold tracking-normal">
         预览图
       </h2>
-      {images.length === 0 ? (
+      {items.length === 0 ? (
         <p className="text-sm text-muted-foreground">暂无预览图</p>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
-          {images.map((preview, index) => (
+          {items.map((preview, index) => (
             <button
               key={`${preview.original}:${index}`}
               type="button"
@@ -44,7 +45,7 @@ export function MoviePreviews({ images }: { images: PreviewImage[] }) {
         </div>
       )}
       <MoviePreviewViewer
-        images={images}
+        images={items}
         index={viewerIndex}
         open={viewerOpen}
         onIndexChange={setViewerIndex}

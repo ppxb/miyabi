@@ -140,6 +140,23 @@ func (s *Service) UpdateSettings(ctx context.Context, settings []SourceSetting) 
 // for catalogue identities; official sources supply artwork and missing fields.
 // A network failure never permits a weaker identity.
 func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
+	return s.resolve(ctx, ref, nil)
+}
+
+// ResolveExcept behaves like Resolve but skips the given source IDs, letting a
+// caller resolve detail without a particular provider (for example JavDB).
+func (s *Service) ResolveExcept(ctx context.Context, ref domain.MovieRef, excluded ...string) (domain.MovieMetadata, error) {
+	var skip map[string]bool
+	if len(excluded) > 0 {
+		skip = make(map[string]bool, len(excluded))
+		for _, id := range excluded {
+			skip[id] = true
+		}
+	}
+	return s.resolve(ctx, ref, skip)
+}
+
+func (s *Service) resolve(ctx context.Context, ref domain.MovieRef, skip map[string]bool) (domain.MovieMetadata, error) {
 	settings := s.Settings()
 	var failures []error
 	var failedSources []string
@@ -148,7 +165,7 @@ func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.Movi
 		var results []domain.MovieMetadata
 		var merged domain.MovieMetadata
 		for _, setting := range settings {
-			if !setting.Enabled {
+			if !setting.Enabled || skip[setting.ID] {
 				continue
 			}
 			result, err := s.resolveLayer(ctx, s.sources[setting.ID], ref, layer)

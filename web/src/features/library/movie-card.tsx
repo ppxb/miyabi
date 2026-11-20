@@ -62,7 +62,7 @@ export function LibraryMovieCard({
                   </div>
                 ) : null}
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-3 pt-8">
-                  <h3 className="line-clamp-2 text-sm leading-5 font-semibold text-white">
+                  <h3 className="truncate text-sm leading-5 font-semibold text-white" title={title}>
                     {title}
                   </h3>
                   {hideActors ? null : (

@@ -16,7 +16,7 @@ export function MovieRecommendations({
   title: string
   movies: MovieReference[]
 }) {
-  const visible = movies.slice(0, 8)
+  const visible = (movies ?? []).slice(0, 8)
 
   return (
     <section className="space-y-4">
@@ -54,7 +54,7 @@ function RecommendationCard({ movie }: { movie: MovieReference }) {
   return (
     <div ref={cardRef} className="relative h-full min-w-0">
       <MovieDetailTrigger
-        movie={{ id: movie.id }}
+        movie={{ id: movie.id, code: movie.code }}
         className="relative block h-full rounded-2xl outline-ring"
         onFocus={() => {
           if (!data && !failed) prioritize()

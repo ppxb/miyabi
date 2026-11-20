@@ -16,6 +16,8 @@ export type MovieMetadataValues = {
 }
 
 export function MovieMetadata({ movie }: { movie: MovieMetadataValues }) {
+  const actors = movie.actors ?? []
+  const tags = movie.tags ?? []
   return (
     <dl className="space-y-3 text-sm">
       {movie.maker ? (
@@ -28,9 +30,9 @@ export function MovieMetadata({ movie }: { movie: MovieMetadataValues }) {
           <EntityLink kind="series" entity={movie.series} />
         </EntityRow>
       ) : null}
-      {movie.actors.length > 0 ? (
+      {actors.length > 0 ? (
         <EntityRow label="演员">
-          {movie.actors.map((actor, index) => (
+          {actors.map((actor, index) => (
             <span
               key={`${actor.provider}:${actor.id || actor.name}:${index}`}
               className="inline-flex max-w-full items-center gap-3"
@@ -46,11 +48,11 @@ export function MovieMetadata({ movie }: { movie: MovieMetadataValues }) {
           <EntityLink kind="director" entity={movie.director} />
         </EntityRow>
       ) : null}
-      {movie.tags.length > 0 ? (
+      {tags.length > 0 ? (
         <div className="flex items-start gap-4">
           <dt className="w-10 shrink-0 pt-0.5 leading-5 text-muted-foreground">标签</dt>
           <dd className="flex min-w-0 flex-wrap gap-2">
-            {movie.tags.map((tag, index) =>
+            {tags.map((tag, index) =>
               !tag.id || tag.provider !== 'javdb' || movie.zone === 'unknown' ? (
                 <Badge
                   key={`${tag.provider}:${tag.id || tag.name}:${index}`}

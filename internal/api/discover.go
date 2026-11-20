@@ -111,10 +111,29 @@ func discoverBrowseHandler(discover CatalogueManager) gin.HandlerFunc {
 	}
 }
 
-func discoverMovieHandler(discover CatalogueManager) gin.HandlerFunc {
+type discoverMovieQuery struct {
+	Code string `form:"code" binding:"omitempty,max=200"`
+}
+
+func discoverMovieHandler(discover CatalogueManager, metadata MetadataManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		uri, ok := bindURI[movieURI](c)
 		if !ok {
+			return
+		}
+		query, ok := bindQuery[discoverMovieQuery](c)
+		if !ok {
+			return
+		}
+		// A known code resolves detail from the multi-source metadata layer with
+		// JavDB excluded, so FC2 and other titles JavDB cannot serve still load.
+		if code := codeid.Normalize(query.Code); code != "" && codeid.Valid(code) {
+			meta, err := metadata.ResolveExcept(c.Request.Context(), domain.MovieRef{Code: code, JavDBID: uri.ID}, "javdb")
+			if err != nil {
+				respond(c, nil, err)
+				return
+			}
+			respond(c, catalogue.ProjectMetadataDetail(meta), nil)
 			return
 		}
 		movie, err := discover.MovieDetail(c.Request.Context(), uri.ID)

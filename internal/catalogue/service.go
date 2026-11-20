@@ -301,6 +301,36 @@ func (service *Service) ResolveMovieID(ctx context.Context, code string) (string
 	return id, nil
 }
 
+// ProjectMetadataDetail converts resolved multi-source metadata into the discover
+// detail response, deriving release status the same way as the catalogue path.
+func ProjectMetadataDetail(meta domain.MovieMetadata) MovieDetail {
+	movie := meta.Detail.Movie
+	if movie.Actors == nil {
+		movie.Actors = []domain.Actor{}
+	}
+	if movie.Tags == nil {
+		movie.Tags = []domain.Tag{}
+	}
+	if movie.PreviewImages == nil {
+		movie.PreviewImages = []domain.PreviewImage{}
+	}
+	actorMovies := meta.Detail.ActorMovies
+	if actorMovies == nil {
+		actorMovies = []domain.MovieReference{}
+	}
+	relatedMovies := meta.Detail.RelatedMovies
+	if relatedMovies == nil {
+		relatedMovies = []domain.MovieReference{}
+	}
+	projected := projectMovies(context.Background(), []domain.Movie{movie})
+	return MovieDetail{
+		Movie:         projected[0],
+		Zone:          meta.Detail.Zone,
+		ActorMovies:   actorMovies,
+		RelatedMovies: relatedMovies,
+	}
+}
+
 func projectMovies(
 	ctx context.Context,
 	source []domain.Movie,

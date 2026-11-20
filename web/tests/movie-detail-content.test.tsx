@@ -84,7 +84,7 @@ test('library preview URLs keep their own provider route and revision', () => {
 test('known JavDB identities open details without a code lookup', () => {
   renderToStaticMarkup(<MovieDetailContent movie={{ id: 'javdb-movie' }} />)
   expect(useResolveDiscoverMovie).not.toHaveBeenCalled()
-  expect(useDiscoverMovie).toHaveBeenCalledWith('javdb-movie')
+  expect(useDiscoverMovie).toHaveBeenCalledWith('javdb-movie', undefined)
 })
 
 test('unresolved and failed code lookups never fetch magnets or record an invalid movie view', () => {
@@ -113,7 +113,7 @@ test('resolved codes load existing JavDB detail, magnets and history with the co
     data: { id: 'confirmed-id' }
   } as ReturnType<typeof useResolveDiscoverMovie>)
   renderToStaticMarkup(<MovieDetailContent movie={{ code: 'ABP-123' }} />)
-  expect(useDiscoverMovie).toHaveBeenCalledWith('confirmed-id')
+  expect(useDiscoverMovie).toHaveBeenCalledWith('confirmed-id', 'ABP-123')
   expect(useDiscoverMagnets).toHaveBeenCalledWith('confirmed-id', 'ABP-123')
   expect(useRecordMovieView).toHaveBeenCalledWith('confirmed-id')
 })
