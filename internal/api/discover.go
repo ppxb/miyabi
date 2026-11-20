@@ -117,12 +117,12 @@ func discoverMovieHandler(discover CatalogueManager, metadata MetadataManager) g
 				return
 			}
 			detail := catalogue.ProjectMetadataDetail(meta)
-			// Prefer recommendations computed from already-indexed data so opening
-			// a detail never triggers extra catalogue scraping.
+			// Recommendations come solely from already-indexed data, matched by
+			// this movie's metadata; never from the source's suggestion lists.
 			if provider, ok := discover.(interface {
-				LocalRecommendations(context.Context, string) ([]domain.MovieReference, []domain.MovieReference, bool, error)
+				LocalRecommendations(context.Context, domain.MovieMetadata) ([]domain.MovieReference, []domain.MovieReference, error)
 			}); ok {
-				if actors, related, found, recErr := provider.LocalRecommendations(c.Request.Context(), code); recErr == nil && found {
+				if actors, related, recErr := provider.LocalRecommendations(c.Request.Context(), meta); recErr == nil {
 					detail.ActorMovies = actors
 					detail.RelatedMovies = related
 				}
