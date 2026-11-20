@@ -2,14 +2,12 @@ package javdb
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/netx"
 )
 
@@ -80,7 +78,7 @@ func TestRequiresWebFallback(t *testing.T) {
 	}
 }
 
-func TestDetailFallsBackToWebAndSearchRequiresLogin(t *testing.T) {
+func TestDetailFallsBackToWeb(t *testing.T) {
 	movieHTML := webFixture(t, "web_movie.html")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v/QD3n9" {
@@ -105,16 +103,7 @@ func TestDetailFallsBackToWebAndSearchRequiresLogin(t *testing.T) {
 		"/api/v4/movies/QD3n9": webAuthRequiredEnvelope,
 	}}
 	client := clientWithTransport(transport)
-	client.SetCredentials("", "")
 	client.fingerprint = fingerprint
-
-	// Without an account, search reports a login prompt and never calls the API.
-	if _, err := client.Search(context.Background(), "SSNI-497", domain.SearchOptions{Page: 1, Limit: 20}); !errors.Is(err, ErrLoginRequired) {
-		t.Fatalf("search error = %v, want ErrLoginRequired", err)
-	}
-	if len(transport.calls) != 0 {
-		t.Fatalf("search made %d API calls, want 0", len(transport.calls))
-	}
 
 	// Detail keeps working anonymously through the public page.
 	detail, err := client.MovieDetail(context.Background(), "QD3n9")

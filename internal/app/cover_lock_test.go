@@ -128,7 +128,7 @@ func TestCoverCleanupOnlyBlocksUntilArtworkCheckpoint(t *testing.T) {
 		return info(ctx, token, id)
 	}
 	service := scrapePkg.New(fixture.store.Client, fixture.driveService,
-		coverMediaProbe{MetadataSource: fixtureMetadata{fixture.discover}, beforeMedia: func() { checkCleanup("download", false) }},
+		coverMediaProbe{MetadataSource: fixtureMetadata{fixture.discover, func(code string) string { return fixture.catalogue.ids[code] }}, beforeMedia: func() { checkCleanup("download", false) }},
 		fixture.images, fixture.tasks, scrapePkg.Dependencies{
 			ExportManager: export.NewManager(export.Config{EmbyDir: fixture.embyDir, PublicURL: "http://127.0.0.1:8080"}),
 			MediaNotifier: coverExportProbe{onUpdated: func(_ context.Context, path string) error {

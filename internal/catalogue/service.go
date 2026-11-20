@@ -167,22 +167,6 @@ func (service *Service) Close() {
 	}
 }
 
-func (service *Service) Search(
-	ctx context.Context,
-	keyword string,
-	options domain.SearchOptions,
-) ([]Movie, error) {
-	keyword = strings.TrimSpace(keyword)
-	key := fmt.Sprintf("search:%q:%#v", keyword, options)
-	movies, err := cachedJavDB(ctx, service, service.lists, key, func(ctx context.Context) ([]domain.Movie, error) {
-		return service.javdb.Search(ctx, keyword, options)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("search JavDB: %w", err)
-	}
-	return projectMovies(ctx, movies), nil
-}
-
 func (service *Service) Browse(
 	ctx context.Context,
 	options domain.BrowseOptions,
@@ -280,17 +264,6 @@ func (service *Service) Tags(ctx context.Context, zone domain.Zone) ([]domain.Ta
 		return nil, fmt.Errorf("get JavDB tags: %w", err)
 	}
 	return categories, nil
-}
-
-func (service *Service) ResolveMovieID(ctx context.Context, code string) (string, error) {
-	id, err := service.javdb.ResolveMovieID(ctx, code)
-	if err != nil {
-		return "", fmt.Errorf("resolve JavDB movie ID: %w", err)
-	}
-	if err := service.persistActiveRoute(ctx); err != nil {
-		return "", err
-	}
-	return id, nil
 }
 
 // ProjectMetadataDetail converts resolved multi-source metadata into the discover

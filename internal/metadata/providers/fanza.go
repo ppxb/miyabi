@@ -70,7 +70,7 @@ type fanzaEntity struct {
 
 type fanzaMovie struct {
 	fanzaIdentity
-	Floor, Title, Description           string
+	Floor, Title, Description          string
 	Duration                           int
 	DeliveryStartDate, MakerReleasedAt *time.Time
 	PackageImage                       struct {

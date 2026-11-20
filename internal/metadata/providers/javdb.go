@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/ppxb/miyabi/internal/catalogue"
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/metadata"
@@ -13,7 +12,6 @@ import (
 
 // The catalogue owns its clients and cache; this adapter does not close them.
 type JavDBCatalogue interface {
-	Search(context.Context, string, domain.SearchOptions) ([]catalogue.Movie, error)
 	CatalogueDetail(context.Context, string) (domain.MovieDetail, error)
 	RefreshCatalogueDetail(context.Context, string) (domain.MovieDetail, error)
 	Media(context.Context, string) (domain.Media, error)

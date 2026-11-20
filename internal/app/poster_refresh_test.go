@@ -66,7 +66,7 @@ func TestScanRefreshesOutdatedPostersOnceWithoutDownloadingCovers(t *testing.T) 
 	}
 	calls := maps.Clone(fixture.catalogue.calls)
 	notifications := 0
-	service := scrapePkg.New(fixture.store.Client, fixture.driveService, fixtureMetadata{fixture.discover}, fixture.images, fixture.tasks,
+	service := scrapePkg.New(fixture.store.Client, fixture.driveService, fixtureMetadata{fixture.discover, func(code string) string { return fixture.catalogue.ids[code] }}, fixture.images, fixture.tasks,
 		scrapePkg.Dependencies{
 			ExportManager: export.NewManager(export.Config{EmbyDir: fixture.embyDir, PublicURL: "http://127.0.0.1:8080"}),
 			MediaNotifier: coverExportProbe{onUpdated: func(_ context.Context, path string) error {

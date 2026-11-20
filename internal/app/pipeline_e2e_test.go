@@ -346,7 +346,9 @@ func newPipelineFixture(t *testing.T) *pipelineFixture {
 		t.Fatal(err)
 	}
 	embyDir := t.TempDir()
-	scrape := scrapePkg.New(store.Client, d, fixtureMetadata{discover}, images, taskSvc, scrapePkg.Dependencies{
+	scrape := scrapePkg.New(store.Client, d, fixtureMetadata{discover, func(code string) string {
+		return catalogueClient.ids[code]
+	}}, images, taskSvc, scrapePkg.Dependencies{
 		ExportManager: export.NewManager(export.Config{EmbyDir: embyDir, PublicURL: "http://127.0.0.1:8080"}),
 	})
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScan, library.Scan, library.Finished))
@@ -444,8 +446,8 @@ func TestPipelineScansScrapesAndWritesSidecarsEndToEnd(t *testing.T) {
 		}
 	}
 
-	// The catalogue was consulted exactly once per resource; the rest is cached or local.
-	if fixture.catalogue.calls["resolve"] != 1 || fixture.catalogue.calls["detail"] != 1 || fixture.catalogue.calls["media"] != 1 {
+	// The catalogue detail and artwork are each consulted once; the rest is cached or local.
+	if fixture.catalogue.calls["detail"] != 1 || fixture.catalogue.calls["media"] != 1 {
 		t.Fatalf("catalogue calls = %v", fixture.catalogue.calls)
 	}
 
@@ -710,16 +712,18 @@ func TestPipelineRemovesMovieWhenDeletedFrom115(t *testing.T) {
 }
 
 // fixtureMetadata isolates workflow recovery tests from source matching tests.
-type fixtureMetadata struct{ catalogue *catalogue.Service }
+type fixtureMetadata struct {
+	catalogue *catalogue.Service
+	resolve   func(string) string
+}
 
 func (f fixtureMetadata) Resolve(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
 	id := ref.JavDBID
-	var err error
+	if id == "" && f.resolve != nil {
+		id = f.resolve(ref.Code)
+	}
 	if id == "" {
-		id, err = f.catalogue.ResolveMovieID(ctx, ref.Code)
-		if err != nil {
-			return domain.MovieMetadata{}, err
-		}
+		return domain.MovieMetadata{}, fmt.Errorf("catalogue number %s was not found on JavDB", ref.Code)
 	}
 	detail, err := f.catalogue.CatalogueDetail(ctx, id)
 	if err != nil {

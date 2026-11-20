@@ -25,8 +25,6 @@ type Options struct {
 	DeviceUUID    string
 	Proxy         *netx.ProxyManager
 	Timeout       time.Duration
-	Username      string
-	Password      string
 }
 
 // RouteStatus describes the currently selected API route.

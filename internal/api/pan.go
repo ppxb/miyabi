@@ -130,6 +130,3 @@ func panLoginStatusHandler(pan DriveManager) gin.HandlerFunc {
 		respond(c, status, err)
 	}
 }
-
-
-

@@ -17,17 +17,16 @@ type transport struct {
 	host       string
 	client     netx.FingerprintHTTPClient
 	deviceUUID string
-	token      func() string
 }
 
 // routeTransport uses the managed client for normal API requests. Probe
 // transports remain independent and retain the proxy they were created with.
-func routeTransport(host string, client netx.FingerprintHTTPClient, options Options, token func() string) (*transport, error) {
+func routeTransport(host string, client netx.FingerprintHTTPClient, options Options) (*transport, error) {
 	host, err := normalizeHost(host)
 	if err != nil {
 		return nil, err
 	}
-	return &transport{host: host, client: client, deviceUUID: options.DeviceUUID, token: token}, nil
+	return &transport{host: host, client: client, deviceUUID: options.DeviceUUID}, nil
 }
 
 type networkError struct {
@@ -128,11 +127,6 @@ func (t *transport) newRequest(
 	request.Header.Set("connection", "keep-alive")
 	request.Header.Set("jdsignature", signature(timestamp))
 	request.Header.Set("user-agent", userAgent)
-	if t.token != nil {
-		if token := t.token(); token != "" {
-			request.Header.Set("authorization", "Bearer "+token)
-		}
-	}
 	return request, nil
 }
 

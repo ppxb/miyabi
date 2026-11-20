@@ -60,12 +60,10 @@ type MovieStateItem struct {
 // JavDBClient supplies the primary catalogue and route management.
 type JavDBClient interface {
 	Close()
-	Search(context.Context, string, domain.SearchOptions) ([]domain.Movie, error)
 	Browse(context.Context, domain.BrowseOptions) ([]domain.Movie, error)
 	MovieDetail(context.Context, string) (domain.MovieDetail, error)
 	FetchMedia(context.Context, string) (domain.Media, error)
 	Tags(context.Context, domain.Zone) ([]domain.TagCategory, error)
-	ResolveMovieID(context.Context, string) (string, error)
 	Route() (javdb.RouteStatus, bool)
 }
 
