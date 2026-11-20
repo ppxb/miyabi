@@ -1,11 +1,6 @@
-import { useEffect, useRef } from 'react'
-
 import type { DiscoverMovie, MovieReference } from '@/api/discover'
-import { useRecommendationMovie } from '@/api/discover'
-import { MovieCardSkeleton, MovieGridLayout } from '@/components/movie'
-import { Button } from '@/components/ui/button'
+import { MovieGridLayout } from '@/components/movie'
 import { DiscoverMovieCard } from '@/features/discover/movie-card'
-import { observeRecommendation } from './recommendation-visibility'
 
 export function MovieRecommendations({
   title,
@@ -22,24 +17,24 @@ export function MovieRecommendations({
       <h2 className="text-xl font-semibold tracking-normal">{title}</h2>
       <MovieGridLayout>
         {visible.map(movie => (
-          <RecommendationCard key={movie.id} movie={movie} />
+          <DiscoverMovieCard key={movie.id} movie={referenceMovie(movie)} allowSubscribe={false} />
         ))}
       </MovieGridLayout>
     </section>
   )
 }
 
-// A sparse recommendation only knows its code and thumbnail; render the same
-// explore card with the known identity until its detail arrives.
+// Recommendations arrive fully populated in the detail response, so the explore
+// card renders straight away without per-card detail requests or skeletons.
 function referenceMovie(movie: MovieReference): DiscoverMovie {
   return {
     id: movie.id,
     code: movie.code,
-    title: '',
+    title: movie.title ?? '',
     origin_title: '',
-    release_date: '',
+    release_date: movie.release_date ?? '',
     duration: 0,
-    rating: 0,
+    rating: movie.rating ?? 0,
     thumbnail: movie.thumbnail,
     cover: movie.thumbnail,
     preview_images: [],
@@ -51,37 +46,4 @@ function referenceMovie(movie: MovieReference): DiscoverMovie {
     tags: [],
     release_status: 'released'
   }
-}
-
-function RecommendationCard({ movie }: { movie: MovieReference }) {
-  const cardRef = useRef<HTMLDivElement>(null)
-  const detail = useRecommendationMovie(movie.id)
-  const { request, prioritize } = detail
-  const data = detail.movie
-  const failed = detail.isError && !detail.isFetching
-
-  useEffect(() => {
-    if (cardRef.current) return observeRecommendation(cardRef.current, request)
-  }, [request])
-
-  return (
-    <div ref={cardRef} className="relative h-full min-w-0">
-      {data || failed ? (
-        <DiscoverMovieCard movie={data ?? referenceMovie(movie)} allowSubscribe={false} />
-      ) : (
-        <MovieCardSkeleton />
-      )}
-      {!data && failed ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          className="absolute right-3 bottom-2"
-          onClick={prioritize}
-        >
-          重试
-        </Button>
-      ) : null}
-    </div>
-  )
 }

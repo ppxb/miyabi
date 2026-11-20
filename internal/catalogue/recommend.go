@@ -37,7 +37,7 @@ func (service *Service) LocalRecommendations(ctx context.Context, meta domain.Mo
 			Where(append(base, movie.HasActorsWith(actorPred))...).
 			Order(ent.Desc(movie.FieldUpdatedAt)).
 			Limit(recommendationLimit).
-			Select(movie.FieldCode, movie.FieldCover, movie.FieldPoster).
+			Select(movie.FieldCode, movie.FieldCover, movie.FieldPoster, movie.FieldTitle, movie.FieldReleaseDate, movie.FieldRating).
 			All(ctx)
 		if queryErr != nil {
 			return actorMovies, relatedMovies, queryErr
@@ -76,7 +76,7 @@ func (service *Service) LocalRecommendations(ctx context.Context, meta domain.Mo
 			Where(append(base, movie.Or(related...))...).
 			Order(ent.Desc(movie.FieldUpdatedAt)).
 			Limit(recommendationLimit).
-			Select(movie.FieldCode, movie.FieldCover, movie.FieldPoster).
+			Select(movie.FieldCode, movie.FieldCover, movie.FieldPoster, movie.FieldTitle, movie.FieldReleaseDate, movie.FieldRating).
 			All(ctx)
 		if queryErr != nil {
 			return actorMovies, relatedMovies, queryErr
@@ -129,9 +129,17 @@ func localReference(record *ent.Movie) domain.MovieReference {
 	if thumbnail == "" {
 		thumbnail = domain.ValueOrZero(record.Cover)
 	}
-	return domain.MovieReference{
+	reference := domain.MovieReference{
 		ID:        codeid.Normalize(record.Code),
 		Code:      record.Code,
 		Thumbnail: thumbnail,
+		Title:     record.Title,
 	}
+	if record.ReleaseDate != nil {
+		reference.ReleaseDate = record.ReleaseDate.Format("2006-01-02")
+	}
+	if record.Rating != nil {
+		reference.Rating = *record.Rating
+	}
+	return reference
 }

@@ -80,10 +80,15 @@ const (
 )
 
 // MovieReference is the compact recommendation returned with a movie detail.
+// MovieReference is a lightweight but renderable movie entry (library
+// recommendations and source suggestions).
 type MovieReference struct {
-	ID        string `json:"id"`
-	Code      string `json:"code"`
-	Thumbnail string `json:"thumbnail"`
+	ID          string  `json:"id"`
+	Code        string  `json:"code"`
+	Thumbnail   string  `json:"thumbnail"`
+	Title       string  `json:"title,omitempty"`
+	ReleaseDate string  `json:"release_date,omitempty"`
+	Rating      float64 `json:"rating,omitempty"`
 }
 
 // MovieDetail represents full details of a movie.
