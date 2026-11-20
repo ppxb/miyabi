@@ -105,6 +105,9 @@ func TestDetailPersistsAliasesAndImages(t *testing.T) {
 	if n := db.ActorImage.Query().CountX(ctx); n != 2 {
 		t.Fatalf("expected 2 persisted images, got %d", n)
 	}
+	if p1, p2 := pidOf(t, db, a1.ID), pidOf(t, db, a2.ID); p1 == 0 || p1 != p2 {
+		t.Fatalf("detail must link all group actors to one profile: %d, %d", p1, p2)
+	}
 
 	// A second Detail must not duplicate the persisted images.
 	if _, err := svc.Detail(ctx, key); err != nil {

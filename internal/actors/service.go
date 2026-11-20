@@ -407,15 +407,26 @@ func (s *Service) Detail(ctx context.Context, key string) (Detail, error) {
 		}
 	}
 	pid, perr := s.ensureProfile(ctx, g.norm, display, g.nameZHT, g.avatar)
-	if perr == nil {
-		for _, id := range g.ids {
-			_ = s.db.Actor.UpdateOneID(id).SetProfileID(pid).Exec(ctx)
+	if perr != nil {
+		return Detail{}, perr
+	}
+	// Link the group's actors in one batched UPDATE, skipping rows already on this
+	// profile so a repeat view performs no writes.
+	if len(g.ids) > 0 {
+		if _, err := s.db.Actor.Update().
+			Where(
+				actor.IDIn(g.ids...),
+				actor.Or(actor.Not(actor.HasProfile()), actor.HasProfileWith(actorprofile.IDNEQ(pid))),
+			).
+			SetProfileID(pid).
+			Save(ctx); err != nil {
+			return Detail{}, err
 		}
 	}
 	// Persist gfriends images (rel paths) only when none are stored yet, so a
 	// detail request doesn't hit the remote gfriends index on every visit.
 	persisted := false
-	if perr == nil && pid > 0 {
+	if pid > 0 {
 		if n, cerr := s.db.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(pid))).Count(ctx); cerr == nil && n > 0 {
 			persisted = true
 		}
@@ -423,7 +434,7 @@ func (s *Service) Detail(ctx context.Context, key string) (Detail, error) {
 	if !persisted {
 		s.persistImages(ctx, g.norm, s.imageRels(ctx, detail.Names))
 	}
-	if perr == nil {
+	if pid > 0 {
 		enrichCtx, cancelEnrich := context.WithTimeout(ctx, 20*time.Second)
 		s.enrichIfNeeded(enrichCtx, pid, display)
 		cancelEnrich()
