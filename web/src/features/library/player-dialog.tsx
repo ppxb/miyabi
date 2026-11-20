@@ -10,8 +10,10 @@ import type { LibraryMovieDetail } from '@/api/library'
 import { historyKeys } from '@/api/history'
 import { savePlaybackProgress, usePlayQualities, useStartMoviePlayback } from '@/api/play'
 import type { PlaySource } from '@/api/play'
+import { InlineError } from '@/components/error-state'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Skeleton } from '@/components/ui/skeleton'
 import { VideoSkin } from '@/components/videojs/video/skin'
 
 export function LibraryPlayerDialog({
@@ -115,10 +117,16 @@ function LibraryPlayer({ movieId }: { movieId: number }) {
               />
             </VideoPlayer>
           </I18nProvider>
+        ) : error ? (
+          <InlineError
+            onRetry={() => void playback.refetch()}
+            retrying={playback.isFetching}
+            retryLabel="重试"
+          >
+            播放地址加载失败
+          </InlineError>
         ) : (
-          <div className="text-sm text-white/70">
-            {error ? '播放地址加载失败' : '正在加载播放地址…'}
-          </div>
+          <div className="text-sm text-white/70">正在加载播放地址</div>
         )}
       </div>
       <aside className="min-w-0 shrink-0 overflow-y-auto border-t bg-background p-5 lg:w-[26rem] lg:border-t-0 lg:border-l">
@@ -191,8 +199,20 @@ function MovieInfo({ movieId, show115 = false }: { movieId: number; show115?: bo
   const detail = useLibraryMovie(movieId)
   const movie = detail.data
 
+  if (detail.isError) {
+    return (
+      <InlineError
+        onRetry={() => void detail.refetch()}
+        retrying={detail.isFetching}
+        retryLabel="重试"
+      >
+        影片信息加载失败
+      </InlineError>
+    )
+  }
+
   if (!movie) {
-    return <p className="text-sm text-muted-foreground">正在加载影片信息…</p>
+    return <MovieInfoSkeleton />
   }
 
   return (
@@ -251,6 +271,34 @@ function MovieInfo({ movieId, show115 = false }: { movieId: number; show115?: bo
           <p className="whitespace-pre-line">{movie.plot}</p>
         </InfoRow>
       ) : null}
+    </div>
+  )
+}
+
+function MovieInfoSkeleton() {
+  return (
+    <div className="space-y-4" aria-hidden>
+      <div className="space-y-2">
+        <div className="flex gap-1.5">
+          <Skeleton className="h-5 w-16" />
+          <Skeleton className="h-5 w-10" />
+        </div>
+        <Skeleton className="h-6 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
+      </div>
+      <Skeleton className="h-16 w-full" />
+      <div className="space-y-2">
+        <Skeleton className="h-3 w-12" />
+        <Skeleton className="h-4 w-40" />
+      </div>
+      <div className="space-y-2">
+        <Skeleton className="h-3 w-12" />
+        <Skeleton className="h-4 w-32" />
+      </div>
+      <div className="space-y-2">
+        <Skeleton className="h-3 w-12" />
+        <Skeleton className="h-4 w-full" />
+      </div>
     </div>
   )
 }

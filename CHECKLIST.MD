@@ -25,7 +25,7 @@
 - [x] 🟠 ✅ `internal/api/router.go:49-52`：`SetTrustedProxies` 错误被吞，if/else 两分支等价；配置错误时静默部分生效，影响 `ClientIP()` 与登录限流。改法：调用一次并返回错误。（已修复：`config.validate` 校验 IP/CIDR，非法启动即报错；`router.go` 合并为一次调用，出错时记录并回退为不信任代理）
 - [x] 🟠 `web/src/features/sources/sources-section.tsx:166`：保存失败的 `InlineError` 渲染在模态框之下，用户不可见。改法：`onError` 用 toast 或把错误传入 `SourceDialog`。（已修复：`persist` 增加 `onError` toast，移除被遮住的 `InlineError`）
 - [x] 🟠 `web/src/features/library/player-dialog.tsx:156-160`：`try { void seek() } catch {}` 捕获不到异步 reject。改法：`seek(...).catch(() => {})`。（已修复：改为 `void seek(...).catch(() => {})`）
-- [ ] 🟠 `web/src/features/library/player-dialog.tsx:53-55,87,118`：`sources` 为空时永远显示"加载中"；失败无重试。改法：区分 pending / error / 无源，失败用 `InlineError onRetry`。
+- [x] 🟠 `web/src/features/library/player-dialog.tsx:53-55,87,118`：`sources` 为空时永远显示"加载中"；失败无重试。改法：区分 pending / error / 无源，失败用 `InlineError onRetry`。（已核实：后端成功响应必带 ≥1 条 source，"成功+空源"分支不可达；已修复真实问题——播放失败改用 `InlineError onRetry`，右侧信息区失败态用 `InlineError`、加载态改骨架屏）
 - [ ] 🟠 `web/src/features/sources/sources-section.tsx:484-488,210-214`：PikPak 提示"在卡片中完成登录"，但卡片无此入口。改法：移除 pikpak 选项或改文案。
 - [ ] 🟠 `web/src/features/sources/sources-section.tsx:505-514`：删除存储源无二次确认（data-section 清理缓存有确认）。
 - [ ] 🟠 `web/src/components/app-navigation.tsx:36,57`：`onNavigate` 无人传入，移动端点击导航后侧边栏不关闭。改法：内部 `useSidebar().setOpenMobile(false)`。
