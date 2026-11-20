@@ -46,10 +46,11 @@ type Drive struct {
 	database *ent.Client
 	client   Client
 
-	mu     sync.Mutex
-	commit syncx.ContextLock
-	work   sync.WaitGroup
-	closed bool
+	mu         sync.Mutex
+	accountsMu sync.Mutex
+	commit     syncx.ContextLock
+	work       sync.WaitGroup
+	closed     bool
 
 	login         qrLogin
 	mountListener MountListener

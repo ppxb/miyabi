@@ -40,6 +40,8 @@ func (d *Drive) saveAccountTokens(ctx context.Context, accountID string, tokens 
 	if accountID == "" {
 		return nil
 	}
+	d.accountsMu.Lock()
+	defer d.accountsMu.Unlock()
 	store, err := d.loadAccounts(ctx)
 	if err != nil {
 		return err
@@ -108,6 +110,8 @@ func (d *Drive) saveAccountMount(ctx context.Context, accountID string, mount mo
 	if accountID == "" {
 		return nil
 	}
+	d.accountsMu.Lock()
+	defer d.accountsMu.Unlock()
 	store, err := d.loadAccounts(ctx)
 	if err != nil {
 		return err
@@ -123,6 +127,8 @@ func (d *Drive) removeAccount(ctx context.Context, accountID string) error {
 	if accountID == "" {
 		return nil
 	}
+	d.accountsMu.Lock()
+	defer d.accountsMu.Unlock()
 	store, err := d.loadAccounts(ctx)
 	if err != nil {
 		return err

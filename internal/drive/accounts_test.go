@@ -2,6 +2,8 @@ package drive
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -137,5 +139,44 @@ func TestRefreshExpiringAccountsSkipsFreshTokens(t *testing.T) {
 	d.refreshExpiringAccounts(ctx)
 	if called {
 		t.Fatal("fresh token should not be refreshed")
+	}
+}
+
+// TestSaveAccountTokensConcurrentPersistsAll guards the read-modify-write of the
+// shared accounts setting: concurrent saves must not drop each other's tokens.
+func TestSaveAccountTokensConcurrentPersistsAll(t *testing.T) {
+	ctx := t.Context()
+	d := newTestDrive(t, &stubClient{})
+	const n = 16
+	var wg sync.WaitGroup
+	errs := make(chan error, n)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			id := fmt.Sprintf("acct-%d", i)
+			if err := d.saveAccountTokens(ctx, id, testTokens(id)); err != nil {
+				errs <- err
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+
+	store, err := d.loadAccounts(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(store) != n {
+		t.Fatalf("persisted accounts = %d, want %d", len(store), n)
+	}
+	for i := 0; i < n; i++ {
+		id := fmt.Sprintf("acct-%d", i)
+		if got := store[id].Tokens.AccessToken; got != id+"-access" {
+			t.Fatalf("account %s access token = %q", id, got)
+		}
 	}
 }
