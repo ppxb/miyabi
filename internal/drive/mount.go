@@ -4,8 +4,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/pan"
 )
 
 // WithinSource checks whether a file info record belongs inside the mounted library source.

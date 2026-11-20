@@ -73,10 +73,10 @@ func resolveDirectoryParts(ctx context.Context, db *ent.Client, accountID, direc
 		}
 	}
 	records, err := db.File.Query().Where(file.AccountIDEQ(accountID), file.FileIDIn(ids...),
-		file.HasMovieWith(movie.Or(movie.ManualCodeNEQ(""), movie.JavdbIDNotNil(), movie.ScrapeStatusEQ(movie.ScrapeStatusDone)))).
+		file.HasMovieWith(movie.Or(movie.ManualCodeNEQ(""), movie.ScrapeStatusEQ(movie.ScrapeStatusDone)))).
 		Select(file.FieldID, file.FieldFileID, file.FieldName, file.FieldSize, file.FieldSha1, file.FieldMovieID).
 		WithMovie(func(q *ent.MovieQuery) {
-			q.Select(movie.FieldCode, movie.FieldManualCode, movie.FieldJavdbID, movie.FieldScrapeStatus)
+			q.Select(movie.FieldCode, movie.FieldManualCode, movie.FieldScrapeStatus)
 		}).All(ctx)
 	if err != nil {
 		return err
@@ -105,7 +105,7 @@ func directoryPartConflict(code string, current pan.File, previous *ent.File) bo
 	}
 	film := previous.Edges.Movie
 	confirmed := film.ManualCode != "" ||
-		((film.JavdbID != nil || film.ScrapeStatus == movie.ScrapeStatusDone) &&
+		(film.ScrapeStatus == movie.ScrapeStatusDone &&
 			previous.Name == current.Name && previous.Size == current.Size && previous.Sha1 == current.SHA1)
 	return confirmed && !codeid.IsEquivalent(film.Code, code)
 }

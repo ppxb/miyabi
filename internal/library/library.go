@@ -250,26 +250,19 @@ func (s *Service) MatchingMovies(ctx context.Context, javdbIDs []string, codes [
 	if len(javdbIDs) == 0 && len(codes) == 0 {
 		return nil, nil
 	}
-	preds := make([]predicate.Movie, 0, 2)
-	if len(codes) > 0 {
-		preds = append(preds, movie.CodeIn(codes...))
-	}
-	if len(javdbIDs) > 0 {
-		preds = append(preds, movie.JavdbIDIn(javdbIDs...))
-	}
+	_ = javdbIDs
 	records, err := s.database.Movie.Query().Where(
-		movie.Or(preds...),
+		movie.CodeIn(codes...),
 		movie.HasFilesWith(s.scope(ctx)),
-	).Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID).All(ctx)
+	).Select(movie.FieldID, movie.FieldCode).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("query matching movies: %w", err)
 	}
 	result := make([]domain.LocalMovie, len(records))
 	for i, r := range records {
 		result[i] = domain.LocalMovie{
-			ID:      r.ID,
-			Code:    r.Code,
-			JavDBID: r.JavdbID,
+			ID:   r.ID,
+			Code: r.Code,
 		}
 	}
 	return result, nil
@@ -473,7 +466,7 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 		order = append([]movie.OrderOption{cloudAddedOrder(sources)}, order...)
 	}
 	records, err := s.database.Movie.Query().Where(movie.HasFilesWith(scope)).
-		Select(movie.FieldID, movie.FieldCode, movie.FieldTitle, movie.FieldJavdbID, movie.FieldCover, movie.FieldPoster,
+		Select(movie.FieldID, movie.FieldCode, movie.FieldTitle, movie.FieldCover, movie.FieldPoster,
 			movie.FieldFanarts, movie.FieldReleaseDate, movie.FieldDuration, movie.FieldRating,
 			movie.FieldMetadata,
 			movie.FieldDirectorID, movie.FieldDirectorName, movie.FieldMakerID, movie.FieldMakerName,
@@ -507,7 +500,7 @@ func movieItem(record *ent.Movie) Movie {
 	doc := domain.ValueOrZero(record.Metadata)
 	item := Movie{
 		ID: record.ID, Code: record.Code, Title: record.Title,
-		JavDBID: record.JavdbID, Cover: record.Cover, Poster: record.Poster,
+		Cover: record.Cover, Poster: record.Poster,
 		Duration: domain.ValueOrZero(record.Duration),
 		Rating:   domain.NormalizeRating10(domain.ValueOrZero(record.Rating), doc.RatingMax),
 		Director: libraryEntity(record.DirectorID, record.DirectorName),
@@ -691,7 +684,7 @@ const highRatedThreshold = 8.0
 
 // browseScalarFields are the columns required to build a Movie without edges.
 var browseScalarFields = []string{
-	movie.FieldID, movie.FieldCode, movie.FieldTitle, movie.FieldJavdbID,
+	movie.FieldID, movie.FieldCode, movie.FieldTitle,
 	movie.FieldCover, movie.FieldPoster, movie.FieldFanarts, movie.FieldReleaseDate,
 	movie.FieldDuration, movie.FieldRating, movie.FieldMetadata,
 	movie.FieldDirectorID, movie.FieldDirectorName, movie.FieldMakerID, movie.FieldMakerName,

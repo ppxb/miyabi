@@ -26,8 +26,6 @@ const (
 	FieldManualCode = "manual_code"
 	// FieldCanonicalCode holds the string denoting the canonical_code field in the database.
 	FieldCanonicalCode = "canonical_code"
-	// FieldJavdbID holds the string denoting the javdb_id field in the database.
-	FieldJavdbID = "javdb_id"
 	// FieldTitle holds the string denoting the title field in the database.
 	FieldTitle = "title"
 	// FieldReleaseDate holds the string denoting the release_date field in the database.
@@ -104,7 +102,6 @@ var Columns = []string{
 	FieldCode,
 	FieldManualCode,
 	FieldCanonicalCode,
-	FieldJavdbID,
 	FieldTitle,
 	FieldReleaseDate,
 	FieldDuration,
@@ -225,11 +222,6 @@ func ByManualCode(opts ...sql.OrderTermOption) OrderOption {
 // ByCanonicalCode orders the results by the canonical_code field.
 func ByCanonicalCode(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCanonicalCode, opts...).ToFunc()
-}
-
-// ByJavdbID orders the results by the javdb_id field.
-func ByJavdbID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldJavdbID, opts...).ToFunc()
 }
 
 // ByTitle orders the results by the title field.

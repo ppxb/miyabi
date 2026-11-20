@@ -278,7 +278,6 @@ func offlineFixture(t testing.TB) (*Service, *ent.OfflineDownload, ent.OfflineDo
 		AccountID:   source.AccountID,
 		DirectoryID: source.Directory.ID,
 		Code:        "ABP-001",
-		JavdbID:     "fixture-movie",
 		Hash:        "fixture-hash",
 		InfoHash:    "fixture-hash",
 	}
@@ -377,7 +376,7 @@ func awaitPanCondition(t *testing.T, ready func() bool) {
 }
 
 func createDownload(db *ent.Client, input ent.OfflineDownload) *ent.OfflineDownloadCreate {
-	return db.OfflineDownload.Create().SetCode(input.Code).SetJavdbID(input.JavdbID).
+	return db.OfflineDownload.Create().SetCode(input.Code).
 		SetHash(input.Hash).SetInfoHash(input.InfoHash).SetAccountID(input.AccountID).SetDirectoryID(input.DirectoryID).
 		SetFileID(input.FileID).SetFileIds(input.FileIds).SetScanTaskID(input.ScanTaskID).SetAwaitingLocation(input.AwaitingLocation)
 }

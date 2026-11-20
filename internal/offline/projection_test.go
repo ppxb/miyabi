@@ -30,9 +30,6 @@ func TestOfflineProjectionUsesMovieIdentityAndExposesLibraryID(t *testing.T) {
 			service, record, input, source := offlineFixture(t)
 			ctx := t.Context()
 			builder := service.database.Movie.Create().SetCode(test.code)
-			if test.javdbID != "" {
-				builder.SetJavdbID(test.javdbID)
-			}
 			local := builder.SaveX(ctx)
 			service.database.File.Create().SetFileID("video").SetName("video.mp4").SetSize(1).
 				SetAccountID(source.AccountID).SetRootID(source.Directory.ID).SetMovie(local).SaveX(ctx)
@@ -198,7 +195,7 @@ func TestOfflineActivityKeepsLatestTasksInCurrentSource(t *testing.T) {
 	ctx := t.Context()
 	var latest int
 	for _, change := range []func(*ent.OfflineDownload){
-		func(payload *ent.OfflineDownload) { payload.Code = "ABP-002"; payload.JavdbID = "latest-movie" },
+		func(payload *ent.OfflineDownload) { payload.Code = "ABP-002" },
 		func(payload *ent.OfflineDownload) { payload.DirectoryID = "another-root" },
 		func(payload *ent.OfflineDownload) { payload.AccountID = "another-account" },
 	} {

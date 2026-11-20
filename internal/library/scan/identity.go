@@ -48,7 +48,7 @@ func IdentifyScanVideos(payload domain.ScanPayload, videos []Video, previous map
 			video.Code = codeid.Normalize(payload.Code)
 		case old != nil && old.AccountID == payload.Source.AccountID &&
 			old.Name == video.Name && old.Size == video.Size && old.Sha1 == video.SHA1 &&
-			old.Edges.Movie != nil && old.Edges.Movie.JavdbID != nil:
+			old.Edges.Movie != nil && old.Edges.Movie.ScrapeStatus != movie.ScrapeStatusFailed:
 			video.Code = old.Edges.Movie.Code
 		default:
 			if video.Code == "" {

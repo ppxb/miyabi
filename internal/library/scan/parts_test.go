@@ -81,12 +81,13 @@ func TestDirectoryPartsRespectExistingIdentities(t *testing.T) {
 			switch scenario {
 			case "manual", "renamed manual":
 				builder.SetManualCode("FJIN-106A")
-			case "javdb", "changed file", "other account":
-				builder.SetJavdbID("variant")
+			case "javdb":
+				builder.SetScrapeStatus(movie.ScrapeStatusDone)
+			case "changed file", "other account":
 			case "scraped":
 				builder.SetScrapeStatus(movie.ScrapeStatusDone)
 			case "known base":
-				builder.SetCode("FJIN-106").SetJavdbID("base")
+				builder.SetCode("FJIN-106")
 			case "failed":
 				builder.SetScrapeStatus(movie.ScrapeStatusFailed)
 			}

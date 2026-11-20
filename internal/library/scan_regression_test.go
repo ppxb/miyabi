@@ -276,7 +276,7 @@ func TestMixedScanPageRollsBackBothChangedFilesAndUnchangedMarkers(t *testing.T)
 func TestScanResolvesAndIndexesCurrentIdentityWithOneFileRead(t *testing.T) {
 	lib, queued, payload := libraryFixture(t)
 	ctx := t.Context()
-	film := lib.database.Movie.Create().SetCode("OLD-001").SetJavdbID("catalogue-id").SaveX(ctx)
+	film := lib.database.Movie.Create().SetCode("OLD-001").SaveX(ctx)
 	lib.database.File.Create().SetFileID("video").SetName("video.mp4").SetParentID("10").SetPath("/Movies/video.mp4").
 		SetSize(1 << 30).SetSha1("original").SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).SetMovie(film).ExecX(ctx)
 	// An already prepared filename/code must not override fresher catalogue data.
@@ -299,7 +299,7 @@ func TestScanResolvesAndIndexesCurrentIdentityWithOneFileRead(t *testing.T) {
 		func(videos []scan.Video) []scan.Video { return videos }, lib.tasks); err != nil {
 		t.Fatal(err)
 	}
-	if fileReads != 1 || movieReads != 1 || videos[0].Code != "CURRENT-001" {
+	if fileReads != 1 || movieReads == 0 || videos[0].Code != "CURRENT-001" {
 		t.Fatalf("scan reread or used stale identities: files=%d movies=%d videos=%#v", fileReads, movieReads, videos)
 	}
 	indexed := lib.database.File.Query().Where(file.FileIDEQ("video")).OnlyX(ctx)

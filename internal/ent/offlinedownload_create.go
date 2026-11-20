@@ -65,20 +65,6 @@ func (_c *OfflineDownloadCreate) SetNillableCode(v *string) *OfflineDownloadCrea
 	return _c
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (_c *OfflineDownloadCreate) SetJavdbID(v string) *OfflineDownloadCreate {
-	_c.mutation.SetJavdbID(v)
-	return _c
-}
-
-// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
-func (_c *OfflineDownloadCreate) SetNillableJavdbID(v *string) *OfflineDownloadCreate {
-	if v != nil {
-		_c.SetJavdbID(*v)
-	}
-	return _c
-}
-
 // SetHash sets the "hash" field.
 func (_c *OfflineDownloadCreate) SetHash(v string) *OfflineDownloadCreate {
 	_c.mutation.SetHash(v)
@@ -270,10 +256,6 @@ func (_c *OfflineDownloadCreate) defaults() {
 		v := offlinedownload.DefaultCode
 		_c.mutation.SetCode(v)
 	}
-	if _, ok := _c.mutation.JavdbID(); !ok {
-		v := offlinedownload.DefaultJavdbID
-		_c.mutation.SetJavdbID(v)
-	}
 	if _, ok := _c.mutation.InfoHash(); !ok {
 		v := offlinedownload.DefaultInfoHash
 		_c.mutation.SetInfoHash(v)
@@ -322,9 +304,6 @@ func (_c *OfflineDownloadCreate) check() error {
 	}
 	if _, ok := _c.mutation.Code(); !ok {
 		return &ValidationError{Name: "code", err: errors.New(`ent: missing required field "OfflineDownload.code"`)}
-	}
-	if _, ok := _c.mutation.JavdbID(); !ok {
-		return &ValidationError{Name: "javdb_id", err: errors.New(`ent: missing required field "OfflineDownload.javdb_id"`)}
 	}
 	if _, ok := _c.mutation.Hash(); !ok {
 		return &ValidationError{Name: "hash", err: errors.New(`ent: missing required field "OfflineDownload.hash"`)}
@@ -409,10 +388,6 @@ func (_c *OfflineDownloadCreate) createSpec() (*OfflineDownload, *sqlgraph.Creat
 	if value, ok := _c.mutation.Code(); ok {
 		_spec.SetField(offlinedownload.FieldCode, field.TypeString, value)
 		_node.Code = value
-	}
-	if value, ok := _c.mutation.JavdbID(); ok {
-		_spec.SetField(offlinedownload.FieldJavdbID, field.TypeString, value)
-		_node.JavdbID = value
 	}
 	if value, ok := _c.mutation.Hash(); ok {
 		_spec.SetField(offlinedownload.FieldHash, field.TypeString, value)
@@ -535,18 +510,6 @@ func (u *OfflineDownloadUpsert) SetCode(v string) *OfflineDownloadUpsert {
 // UpdateCode sets the "code" field to the value that was provided on create.
 func (u *OfflineDownloadUpsert) UpdateCode() *OfflineDownloadUpsert {
 	u.SetExcluded(offlinedownload.FieldCode)
-	return u
-}
-
-// SetJavdbID sets the "javdb_id" field.
-func (u *OfflineDownloadUpsert) SetJavdbID(v string) *OfflineDownloadUpsert {
-	u.Set(offlinedownload.FieldJavdbID, v)
-	return u
-}
-
-// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
-func (u *OfflineDownloadUpsert) UpdateJavdbID() *OfflineDownloadUpsert {
-	u.SetExcluded(offlinedownload.FieldJavdbID)
 	return u
 }
 
@@ -788,20 +751,6 @@ func (u *OfflineDownloadUpsertOne) SetCode(v string) *OfflineDownloadUpsertOne {
 func (u *OfflineDownloadUpsertOne) UpdateCode() *OfflineDownloadUpsertOne {
 	return u.Update(func(s *OfflineDownloadUpsert) {
 		s.UpdateCode()
-	})
-}
-
-// SetJavdbID sets the "javdb_id" field.
-func (u *OfflineDownloadUpsertOne) SetJavdbID(v string) *OfflineDownloadUpsertOne {
-	return u.Update(func(s *OfflineDownloadUpsert) {
-		s.SetJavdbID(v)
-	})
-}
-
-// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
-func (u *OfflineDownloadUpsertOne) UpdateJavdbID() *OfflineDownloadUpsertOne {
-	return u.Update(func(s *OfflineDownloadUpsert) {
-		s.UpdateJavdbID()
 	})
 }
 
@@ -1237,20 +1186,6 @@ func (u *OfflineDownloadUpsertBulk) SetCode(v string) *OfflineDownloadUpsertBulk
 func (u *OfflineDownloadUpsertBulk) UpdateCode() *OfflineDownloadUpsertBulk {
 	return u.Update(func(s *OfflineDownloadUpsert) {
 		s.UpdateCode()
-	})
-}
-
-// SetJavdbID sets the "javdb_id" field.
-func (u *OfflineDownloadUpsertBulk) SetJavdbID(v string) *OfflineDownloadUpsertBulk {
-	return u.Update(func(s *OfflineDownloadUpsert) {
-		s.SetJavdbID(v)
-	})
-}
-
-// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
-func (u *OfflineDownloadUpsertBulk) UpdateJavdbID() *OfflineDownloadUpsertBulk {
-	return u.Update(func(s *OfflineDownloadUpsert) {
-		s.UpdateJavdbID()
 	})
 }
 

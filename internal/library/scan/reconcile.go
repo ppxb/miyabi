@@ -189,7 +189,7 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 			query = query.Where(movie.ScrapeStatusEQ(movie.ScrapeStatusPending))
 		}
 		records, err := query.
-			Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID, movie.FieldManualCode, movie.FieldUpdatedAt).
+			Select(movie.FieldID, movie.FieldCode, movie.FieldManualCode, movie.FieldUpdatedAt).
 			Order(movie.ByID()).Limit(reconcileBatchSize).All(ctx)
 		if err != nil {
 			return fmt.Errorf("find scanned metadata jobs: %w", err)
@@ -248,7 +248,7 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 			input := scrape.MetadataPayload{
 				Rebuild: r.payload.Rebuild,
 				Source:  r.payload.Source, ScanTaskID: r.taskID, MovieID: record.ID,
-				Code: record.Code, JavDBID: domain.ValueOrZero(record.JavdbID), ManualCode: record.ManualCode,
+				Code: record.Code, JavDBID: "", ManualCode: record.ManualCode,
 			}
 			encoded, err := tasks.EncodePayload(input)
 			if err != nil {

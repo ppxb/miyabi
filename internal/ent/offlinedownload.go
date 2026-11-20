@@ -25,8 +25,6 @@ type OfflineDownload struct {
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 	// Code holds the value of the "code" field.
 	Code string `json:"code,omitempty"`
-	// JavdbID holds the value of the "javdb_id" field.
-	JavdbID string `json:"javdb_id,omitempty"`
 	// Hash holds the value of the "hash" field.
 	Hash string `json:"hash,omitempty"`
 	// InfoHash holds the value of the "info_hash" field.
@@ -65,7 +63,7 @@ func (*OfflineDownload) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case offlinedownload.FieldID, offlinedownload.FieldProgress, offlinedownload.FieldScanTaskID:
 			values[i] = new(sql.NullInt64)
-		case offlinedownload.FieldCode, offlinedownload.FieldJavdbID, offlinedownload.FieldHash, offlinedownload.FieldInfoHash, offlinedownload.FieldAccountID, offlinedownload.FieldDirectoryID, offlinedownload.FieldStatus, offlinedownload.FieldError, offlinedownload.FieldFileID:
+		case offlinedownload.FieldCode, offlinedownload.FieldHash, offlinedownload.FieldInfoHash, offlinedownload.FieldAccountID, offlinedownload.FieldDirectoryID, offlinedownload.FieldStatus, offlinedownload.FieldError, offlinedownload.FieldFileID:
 			values[i] = new(sql.NullString)
 		case offlinedownload.FieldCreatedAt, offlinedownload.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -107,12 +105,6 @@ func (_m *OfflineDownload) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field code", values[i])
 			} else if value.Valid {
 				_m.Code = value.String
-			}
-		case offlinedownload.FieldJavdbID:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field javdb_id", values[i])
-			} else if value.Valid {
-				_m.JavdbID = value.String
 			}
 		case offlinedownload.FieldHash:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -235,9 +227,6 @@ func (_m *OfflineDownload) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("code=")
 	builder.WriteString(_m.Code)
-	builder.WriteString(", ")
-	builder.WriteString("javdb_id=")
-	builder.WriteString(_m.JavdbID)
 	builder.WriteString(", ")
 	builder.WriteString("hash=")
 	builder.WriteString(_m.Hash)

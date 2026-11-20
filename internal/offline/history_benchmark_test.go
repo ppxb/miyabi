@@ -17,7 +17,7 @@ func BenchmarkOfflineActivityHistory(b *testing.B) {
 			var jobs []*ent.OfflineDownloadCreate
 			for i := range 500 {
 				input := ent.OfflineDownload{
-					Code: "ABP-001", JavdbID: "movie", Hash: fmt.Sprintf("%040d", i%50),
+					Code: "ABP-001", Hash: fmt.Sprintf("%040d", i%50),
 					InfoHash: fmt.Sprintf("%040d", i%50), AccountID: payload.AccountID,
 					DirectoryID: payload.Directory.ID,
 				}

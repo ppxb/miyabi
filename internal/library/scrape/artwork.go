@@ -11,7 +11,6 @@ import (
 	"github.com/disintegration/imaging"
 	"github.com/ppxb/miyabi/internal/domain"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
-	"github.com/ppxb/miyabi/internal/nfo"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -23,7 +22,7 @@ func (service *Service) prepareArtwork(ctx context.Context, taskID int, input *P
 		if (err != nil || !hasPreferredPosterSize(selected)) && ctx.Err() == nil && !slices.ContainsFunc(input.Document.Images, func(image domain.ImageCandidate) bool {
 			return image.Provider == "javdb" && (image.Role == "cover" || image.Role == "poster")
 		}) {
-			fallback, fallbackErr := service.metadata.Fallback(ctx, domain.MovieRef{Code: input.Code, JavDBID: input.Document.JavDBID()})
+			fallback, fallbackErr := service.metadata.Fallback(ctx, domain.MovieRef{Code: input.Code})
 			if fallbackErr != nil && err != nil {
 				return errors.Join(err, fallbackErr)
 			}
@@ -32,11 +31,6 @@ func (service *Service) prepareArtwork(ctx context.Context, taskID int, input *P
 				if imageErr == nil && (err != nil || coverPixels(fallbackImage) > coverPixels(selected)) {
 					body, selected, err = fallbackBody, fallbackImage, nil
 					input.Document.Images = append(input.Document.Images, fallback.Images...)
-					for _, source := range fallback.Detail.Sources {
-						if !slices.ContainsFunc(input.Document.IDs, func(id nfo.UniqueID) bool { return id.Type == source.Provider && id.Value == source.ID }) {
-							input.Document.IDs = append(input.Document.IDs, nfo.UniqueID{Type: source.Provider, Value: source.ID})
-						}
-					}
 				} else if err != nil {
 					return errors.Join(err, imageErr)
 				}

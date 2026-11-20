@@ -83,26 +83,6 @@ func (_u *MovieUpdate) SetNillableCanonicalCode(v *string) *MovieUpdate {
 	return _u
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (_u *MovieUpdate) SetJavdbID(v string) *MovieUpdate {
-	_u.mutation.SetJavdbID(v)
-	return _u
-}
-
-// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
-func (_u *MovieUpdate) SetNillableJavdbID(v *string) *MovieUpdate {
-	if v != nil {
-		_u.SetJavdbID(*v)
-	}
-	return _u
-}
-
-// ClearJavdbID clears the value of the "javdb_id" field.
-func (_u *MovieUpdate) ClearJavdbID() *MovieUpdate {
-	_u.mutation.ClearJavdbID()
-	return _u
-}
-
 // SetTitle sets the "title" field.
 func (_u *MovieUpdate) SetTitle(v string) *MovieUpdate {
 	_u.mutation.SetTitle(v)
@@ -631,12 +611,6 @@ func (_u *MovieUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.CanonicalCode(); ok {
 		_spec.SetField(movie.FieldCanonicalCode, field.TypeString, value)
 	}
-	if value, ok := _u.mutation.JavdbID(); ok {
-		_spec.SetField(movie.FieldJavdbID, field.TypeString, value)
-	}
-	if _u.mutation.JavdbIDCleared() {
-		_spec.ClearField(movie.FieldJavdbID, field.TypeString)
-	}
 	if value, ok := _u.mutation.Title(); ok {
 		_spec.SetField(movie.FieldTitle, field.TypeString, value)
 	}
@@ -980,26 +954,6 @@ func (_u *MovieUpdateOne) SetNillableCanonicalCode(v *string) *MovieUpdateOne {
 	if v != nil {
 		_u.SetCanonicalCode(*v)
 	}
-	return _u
-}
-
-// SetJavdbID sets the "javdb_id" field.
-func (_u *MovieUpdateOne) SetJavdbID(v string) *MovieUpdateOne {
-	_u.mutation.SetJavdbID(v)
-	return _u
-}
-
-// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
-func (_u *MovieUpdateOne) SetNillableJavdbID(v *string) *MovieUpdateOne {
-	if v != nil {
-		_u.SetJavdbID(*v)
-	}
-	return _u
-}
-
-// ClearJavdbID clears the value of the "javdb_id" field.
-func (_u *MovieUpdateOne) ClearJavdbID() *MovieUpdateOne {
-	_u.mutation.ClearJavdbID()
 	return _u
 }
 
@@ -1560,12 +1514,6 @@ func (_u *MovieUpdateOne) sqlSave(ctx context.Context) (_node *Movie, err error)
 	}
 	if value, ok := _u.mutation.CanonicalCode(); ok {
 		_spec.SetField(movie.FieldCanonicalCode, field.TypeString, value)
-	}
-	if value, ok := _u.mutation.JavdbID(); ok {
-		_spec.SetField(movie.FieldJavdbID, field.TypeString, value)
-	}
-	if _u.mutation.JavdbIDCleared() {
-		_spec.ClearField(movie.FieldJavdbID, field.TypeString)
 	}
 	if value, ok := _u.mutation.Title(); ok {
 		_spec.SetField(movie.FieldTitle, field.TypeString, value)

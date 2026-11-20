@@ -50,20 +50,6 @@ func (_u *OfflineDownloadUpdate) SetNillableCode(v *string) *OfflineDownloadUpda
 	return _u
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (_u *OfflineDownloadUpdate) SetJavdbID(v string) *OfflineDownloadUpdate {
-	_u.mutation.SetJavdbID(v)
-	return _u
-}
-
-// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
-func (_u *OfflineDownloadUpdate) SetNillableJavdbID(v *string) *OfflineDownloadUpdate {
-	if v != nil {
-		_u.SetJavdbID(*v)
-	}
-	return _u
-}
-
 // SetHash sets the "hash" field.
 func (_u *OfflineDownloadUpdate) SetHash(v string) *OfflineDownloadUpdate {
 	_u.mutation.SetHash(v)
@@ -327,9 +313,6 @@ func (_u *OfflineDownloadUpdate) sqlSave(ctx context.Context) (_node int, err er
 	if value, ok := _u.mutation.Code(); ok {
 		_spec.SetField(offlinedownload.FieldCode, field.TypeString, value)
 	}
-	if value, ok := _u.mutation.JavdbID(); ok {
-		_spec.SetField(offlinedownload.FieldJavdbID, field.TypeString, value)
-	}
 	if value, ok := _u.mutation.Hash(); ok {
 		_spec.SetField(offlinedownload.FieldHash, field.TypeString, value)
 	}
@@ -419,20 +402,6 @@ func (_u *OfflineDownloadUpdateOne) SetCode(v string) *OfflineDownloadUpdateOne 
 func (_u *OfflineDownloadUpdateOne) SetNillableCode(v *string) *OfflineDownloadUpdateOne {
 	if v != nil {
 		_u.SetCode(*v)
-	}
-	return _u
-}
-
-// SetJavdbID sets the "javdb_id" field.
-func (_u *OfflineDownloadUpdateOne) SetJavdbID(v string) *OfflineDownloadUpdateOne {
-	_u.mutation.SetJavdbID(v)
-	return _u
-}
-
-// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
-func (_u *OfflineDownloadUpdateOne) SetNillableJavdbID(v *string) *OfflineDownloadUpdateOne {
-	if v != nil {
-		_u.SetJavdbID(*v)
 	}
 	return _u
 }
@@ -729,9 +698,6 @@ func (_u *OfflineDownloadUpdateOne) sqlSave(ctx context.Context) (_node *Offline
 	}
 	if value, ok := _u.mutation.Code(); ok {
 		_spec.SetField(offlinedownload.FieldCode, field.TypeString, value)
-	}
-	if value, ok := _u.mutation.JavdbID(); ok {
-		_spec.SetField(offlinedownload.FieldJavdbID, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Hash(); ok {
 		_spec.SetField(offlinedownload.FieldHash, field.TypeString, value)

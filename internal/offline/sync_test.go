@@ -176,7 +176,7 @@ func TestOfflineCompletionWaitsForLocationAcrossRestart(t *testing.T) {
 	if count := service.database.Task.Query().Where(task.TypeEQ("scan")).CountX(ctx); count != 2 {
 		t.Fatalf("resuming completion duplicated scans: %d", count)
 	}
-	film := service.database.Movie.Create().SetCode(input.Code).SetJavdbID(input.JavdbID).SaveX(ctx)
+	film := service.database.Movie.Create().SetCode(input.Code).SaveX(ctx)
 	service.database.File.Create().SetFileID("video").SetName("video.mp4").SetSize(1).
 		SetAccountID(source.AccountID).SetRootID(source.Directory.ID).SetMovie(film).SaveX(ctx)
 	saved.FileIds = []string{"video"}
@@ -258,7 +258,7 @@ func TestOfflinePageFileTrackingRollsBackWithTheIndex(t *testing.T) {
 	service, record, input, source := offlineFixture(t)
 	ctx := t.Context()
 	payload := domain.ScanPayload{Source: source, OfflineTaskID: record.ID, TargetID: "download-folder",
-		Code: input.Code, JavDBID: input.JavdbID}
+		Code: input.Code, JavDBID: input.Code}
 	video := scan.IdentifyVideo(pan.File{ID: "video", ParentID: "download-folder", Name: input.Code + ".mp4", Size: 1 << 30})
 	// The missing parent fails the final progress write after file tracking.
 	payload.ScanID = "rolled-back"

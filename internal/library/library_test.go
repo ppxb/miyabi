@@ -425,9 +425,9 @@ func TestLibraryMatchingMovies(t *testing.T) {
 	lib, _, payload := libraryFixture(t)
 	ctx := t.Context()
 
-	film1 := lib.database.Movie.Create().SetCode("ABP-001").SetJavdbID("javdb-1").SaveX(ctx)
+	film1 := lib.database.Movie.Create().SetCode("ABP-001").SaveX(ctx)
 	film2 := lib.database.Movie.Create().SetCode("ABP-002").SaveX(ctx)
-	filmOther := lib.database.Movie.Create().SetCode("ABP-003").SetJavdbID("javdb-3").SaveX(ctx)
+	filmOther := lib.database.Movie.Create().SetCode("ABP-003").SaveX(ctx)
 
 	// Files in mounted source
 	lib.database.File.Create().SetFileID("f1").SetName("ABP-001.mp4").SetSize(1024).
@@ -438,7 +438,7 @@ func TestLibraryMatchingMovies(t *testing.T) {
 	lib.database.File.Create().SetFileID("f3").SetName("ABP-003.mp4").SetSize(1024).
 		SetAccountID("different-account").SetRootID("different-dir").SetMovie(filmOther).ExecX(ctx)
 
-	matches, err := lib.MatchingMovies(ctx, []string{"javdb-1", "javdb-3"}, []string{"ABP-002", "ABP-999"})
+	matches, err := lib.MatchingMovies(ctx, nil, []string{"ABP-001", "ABP-002", "ABP-999"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,10 +448,10 @@ func TestLibraryMatchingMovies(t *testing.T) {
 
 	found1, found2 := false, false
 	for _, m := range matches {
-		if m.ID == film1.ID && m.Code == "ABP-001" && m.JavDBID != nil && *m.JavDBID == "javdb-1" {
+		if m.ID == film1.ID && m.Code == "ABP-001" {
 			found1 = true
 		}
-		if m.ID == film2.ID && m.Code == "ABP-002" && m.JavDBID == nil {
+		if m.ID == film2.ID && m.Code == "ABP-002" {
 			found2 = true
 		}
 	}

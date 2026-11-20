@@ -48,7 +48,7 @@ func TestSavedDetailNeedsNoJavDBAndKeepsSourceIdentities(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if detail.LibraryID != film.ID || detail.ID != "" || detail.Title != doc.Title || detail.Zone != doc.Zone {
+	if detail.LibraryID != film.ID || detail.ID != doc.Code || detail.Title != doc.Title || detail.Zone != doc.Zone {
 		t.Fatalf("wrong saved detail: %+v", detail)
 	}
 	if detail.RatingSource != "fanza" || detail.RatingMax != 10 || detail.Actors[0].Provider != "fanza" || detail.Maker.Provider != "fanza" {

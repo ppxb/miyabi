@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/database"
+	"github.com/ppxb/miyabi/internal/ent/movie"
 )
 
 func TestIndexMoviesBindsEquivalentNumbers(t *testing.T) {
@@ -17,7 +18,7 @@ func TestIndexMoviesBindsEquivalentNumbers(t *testing.T) {
 
 	decorated := db.Movie.Create().SetCode("259LUXU-1899").SaveX(ctx)
 	unscraped := db.Movie.Create().SetCode("GANA-3458").SaveX(ctx)
-	scraped := db.Movie.Create().SetCode("200GANA-3458").SetJavdbID("gana").SaveX(ctx)
+	scraped := db.Movie.Create().SetCode("200GANA-3458").SetScrapeStatus(movie.ScrapeStatusDone).SaveX(ctx)
 
 	tx, err := db.Tx(ctx)
 	if err != nil {
@@ -72,7 +73,7 @@ func TestMatchMoviesPreservesRankingAndRejectsSharedFallbacks(t *testing.T) {
 	} {
 		builder := store.Client.Movie.Create().SetCode(entry.code)
 		if entry.javdbID != "" {
-			builder.SetJavdbID(entry.javdbID)
+			builder.SetScrapeStatus(movie.ScrapeStatusDone)
 		}
 		ids[entry.code] = builder.SaveX(ctx).ID
 	}

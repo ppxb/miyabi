@@ -115,7 +115,7 @@ func (service *Service) submissions(ctx context.Context, records []*ent.OfflineD
 			file.FileIDIn(fileIDs[start:min(start+500, len(fileIDs))]...)).
 			Select(file.FieldFileID, file.FieldMovieID).
 			WithMovie(func(query *ent.MovieQuery) {
-				query.Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID, movie.FieldScrapeStatus)
+				query.Select(movie.FieldID, movie.FieldCode, movie.FieldScrapeStatus)
 			}).All(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("read downloaded file index: %w", err)

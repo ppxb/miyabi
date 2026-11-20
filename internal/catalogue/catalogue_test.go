@@ -205,7 +205,7 @@ func TestMovieStatesUsesSourceIDBeforeCatalogueSpelling(t *testing.T) {
 		},
 	}
 
-	store.Client.OfflineDownload.Create().SetHash("fixture-hash").SetJavdbID("queued-id").SetCode("PREVIOUS-002").
+	store.Client.OfflineDownload.Create().SetHash("fixture-hash").SetCode("PREVIOUS-002").
 		SetAccountID(source.AccountID).SetDirectoryID(source.Directory.ID).SaveX(ctx)
 
 	service := &Service{database: store.Client, local: localState}

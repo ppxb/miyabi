@@ -69,11 +69,6 @@ func Code(v string) predicate.OfflineDownload {
 	return predicate.OfflineDownload(sql.FieldEQ(FieldCode, v))
 }
 
-// JavdbID applies equality check predicate on the "javdb_id" field. It's identical to JavdbIDEQ.
-func JavdbID(v string) predicate.OfflineDownload {
-	return predicate.OfflineDownload(sql.FieldEQ(FieldJavdbID, v))
-}
-
 // Hash applies equality check predicate on the "hash" field. It's identical to HashEQ.
 func Hash(v string) predicate.OfflineDownload {
 	return predicate.OfflineDownload(sql.FieldEQ(FieldHash, v))
@@ -262,71 +257,6 @@ func CodeEqualFold(v string) predicate.OfflineDownload {
 // CodeContainsFold applies the ContainsFold predicate on the "code" field.
 func CodeContainsFold(v string) predicate.OfflineDownload {
 	return predicate.OfflineDownload(sql.FieldContainsFold(FieldCode, v))
-}
-
-// JavdbIDEQ applies the EQ predicate on the "javdb_id" field.
-func JavdbIDEQ(v string) predicate.OfflineDownload {
-	return predicate.OfflineDownload(sql.FieldEQ(FieldJavdbID, v))
-}
-
-// JavdbIDNEQ applies the NEQ predicate on the "javdb_id" field.
-func JavdbIDNEQ(v string) predicate.OfflineDownload {
-	return predicate.OfflineDownload(sql.FieldNEQ(FieldJavdbID, v))
-}
-
-// JavdbIDIn applies the In predicate on the "javdb_id" field.
-func JavdbIDIn(vs ...string) predicate.OfflineDownload {
-	return predicate.OfflineDownload(sql.FieldIn(FieldJavdbID, vs...))
-}
-
-// JavdbIDNotIn applies the NotIn predicate on the "javdb_id" field.
-func JavdbIDNotIn(vs ...string) predicate.OfflineDownload {
-	return predicate.OfflineDownload(sql.FieldNotIn(FieldJavdbID, vs...))
-}
-
-// JavdbIDGT applies the GT predicate on the "javdb_id" field.
-func JavdbIDGT(v string) predicate.OfflineDownload {
-	return predicate.OfflineDownload(sql.FieldGT(FieldJavdbID, v))
-}
-
-// JavdbIDGTE applies the GTE predicate on the "javdb_id" field.
-func JavdbIDGTE(v string) predicate.OfflineDownload {
-	return predicate.OfflineDownload(sql.FieldGTE(FieldJavdbID, v))
-}
-
-// JavdbIDLT applies the LT predicate on the "javdb_id" field.
-func JavdbIDLT(v string) predicate.OfflineDownload {
-	return predicate.OfflineDownload(sql.FieldLT(FieldJavdbID, v))
-}
-
-// JavdbIDLTE applies the LTE predicate on the "javdb_id" field.
-func JavdbIDLTE(v string) predicate.OfflineDownload {
-	return predicate.OfflineDownload(sql.FieldLTE(FieldJavdbID, v))
-}
-
-// JavdbIDContains applies the Contains predicate on the "javdb_id" field.
-func JavdbIDContains(v string) predicate.OfflineDownload {
-	return predicate.OfflineDownload(sql.FieldContains(FieldJavdbID, v))
-}
-
-// JavdbIDHasPrefix applies the HasPrefix predicate on the "javdb_id" field.
-func JavdbIDHasPrefix(v string) predicate.OfflineDownload {
-	return predicate.OfflineDownload(sql.FieldHasPrefix(FieldJavdbID, v))
-}
-
-// JavdbIDHasSuffix applies the HasSuffix predicate on the "javdb_id" field.
-func JavdbIDHasSuffix(v string) predicate.OfflineDownload {
-	return predicate.OfflineDownload(sql.FieldHasSuffix(FieldJavdbID, v))
-}
-
-// JavdbIDEqualFold applies the EqualFold predicate on the "javdb_id" field.
-func JavdbIDEqualFold(v string) predicate.OfflineDownload {
-	return predicate.OfflineDownload(sql.FieldEqualFold(FieldJavdbID, v))
-}
-
-// JavdbIDContainsFold applies the ContainsFold predicate on the "javdb_id" field.
-func JavdbIDContainsFold(v string) predicate.OfflineDownload {
-	return predicate.OfflineDownload(sql.FieldContainsFold(FieldJavdbID, v))
 }
 
 // HashEQ applies the EQ predicate on the "hash" field.

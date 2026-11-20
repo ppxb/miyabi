@@ -22,7 +22,7 @@ func TestMovieMatchKeysAndAssociationsSurviveReopen(t *testing.T) {
 			_ = store.Close()
 		}
 	})
-	film := store.Client.Movie.Create().SetCode("259LUXU-01899").SetJavdbID("identity").
+	film := store.Client.Movie.Create().SetCode("259LUXU-01899").
 		SetTitle("Preserved metadata").SetFanarts([]string{"/fanart.jpg"}).SaveX(ctx)
 	store.Client.Movie.Create().SetCode("LUXU-1899").SaveX(ctx)
 	store.Client.File.Create().SetFileID("video").SetName("259LUXU-01899.mp4").SetSize(1024).
@@ -51,7 +51,7 @@ func TestMovieMatchKeysAndAssociationsSurviveReopen(t *testing.T) {
 		if count := store.Client.Movie.Query().Where(movie.CanonicalCodeEQ("LUXU-1899")).CountX(ctx); count != 2 {
 			t.Fatalf("reopen lost an alias or merged records: %d", count)
 		}
-		plan := queryPlan(t, store, "SELECT id, code, canonical_code, javdb_id FROM movies WHERE canonical_code IN (?, ?) ORDER BY id", "LUXU-1899", "ABC-123")
+		plan := queryPlan(t, store, "SELECT id, code, canonical_code FROM movies WHERE canonical_code IN (?, ?) ORDER BY id", "LUXU-1899", "ABC-123")
 		if !strings.Contains(plan, "SEARCH movies USING INDEX movie_canonical_code (canonical_code=?)") {
 			t.Fatalf("matching query missed the index: %s", plan)
 		}
@@ -74,7 +74,7 @@ func TestMovieMatchKeyFollowsWrites(t *testing.T) {
 			t.Fatalf("movie %d: code=%q key=%q, want code=%q key=%q", id, got.Code, got.CanonicalCode, code, key)
 		}
 	}
-	film := db.Movie.Create().SetCode("259LUXU-01899").SetJavdbID("identity").SaveX(ctx)
+	film := db.Movie.Create().SetCode("259LUXU-01899").SaveX(ctx)
 	check(film.ID, "259LUXU-01899", "LUXU-1899")
 	created := db.Movie.CreateBulk(db.Movie.Create().SetCode("ABC-00123"), db.Movie.Create().SetCode("XYZ-000")).SaveX(ctx)
 	check(created[0].ID, "ABC-00123", "ABC-123")
@@ -85,16 +85,6 @@ func TestMovieMatchKeyFollowsWrites(t *testing.T) {
 	check(film.ID, "200GANA-3458", "GANA-3458")
 	db.Movie.UpdateOneID(film.ID).SetTitle("Metadata only").ExecX(ctx)
 	check(film.ID, "200GANA-3458", "GANA-3458")
-	if err := db.Movie.Create().SetCode("FC2-1234567").SetJavdbID("identity").
-		OnConflictColumns(movie.FieldJavdbID).UpdateNewValues().Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
-	check(film.ID, "FC2-1234567", "FC2-PPV-1234567")
-	if err := db.Movie.CreateBulk(db.Movie.Create().SetCode("ABC-00001").SetJavdbID("identity")).
-		OnConflictColumns(movie.FieldJavdbID).UpdateNewValues().Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
-	check(film.ID, "ABC-00001", "ABC-1")
 	tx, err := db.Tx(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -107,9 +97,9 @@ func TestMovieMatchKeyFollowsWrites(t *testing.T) {
 	if err := tx.Rollback(); err != nil {
 		t.Fatal(err)
 	}
-	check(film.ID, "ABC-00001", "ABC-1")
+	check(film.ID, "200GANA-3458", "GANA-3458")
 	if err := db.Movie.UpdateOneID(film.ID).SetCode(created[0].Code).Exec(ctx); !ent.IsConstraintError(err) {
 		t.Fatalf("expected unique code conflict, got %v", err)
 	}
-	check(film.ID, "ABC-00001", "ABC-1")
+	check(film.ID, "200GANA-3458", "GANA-3458")
 }

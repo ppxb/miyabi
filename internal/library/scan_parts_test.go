@@ -155,7 +155,7 @@ func TestScanRetriesWholePartGroupWhenAnIdentityIsConfirmedConcurrently(t *testi
 			Path: []pan.Directory{{ID: source.Directory.ID}}}, nil
 	}
 	client.readMetadata = func(context.Context, string, string, int64) ([]byte, error) {
-		variant.Update().SetJavdbID("confirmed-variant").ExecX(ctx)
+		variant.Update().SetScrapeStatus(movie.ScrapeStatusDone).ExecX(ctx)
 		return nfo.Encode(nfo.Movie{Code: "ONSD-340"})
 	}
 	job := lib.database.Task.Query().Where(task.TypeEQ("scan")).OnlyX(ctx)

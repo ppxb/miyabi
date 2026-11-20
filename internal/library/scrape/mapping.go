@@ -28,8 +28,8 @@ func DetailNFO(detail domain.MovieDetail) nfo.Movie {
 		RatingSource: detail.RatingSource, RatingMax: detail.RatingMax,
 		FieldSources: detail.FieldSources, Previews: detail.PreviewImages, PreviewVideo: detail.PreviewVideo,
 	}
-	for i, source := range detail.Sources {
-		doc.IDs = append(doc.IDs, nfo.UniqueID{Type: source.Provider, Value: source.ID, Default: i == 0})
+	if detail.Code != "" {
+		doc.IDs = []nfo.UniqueID{{Type: "code", Value: detail.Code, Default: true}}
 	}
 	if detail.Director != nil {
 		doc.Director = nfo.Entity{Provider: detail.Director.Provider, ID: detail.Director.ID, Name: detail.Director.Name}
@@ -74,13 +74,10 @@ func MovieNFO(record *ent.Movie) (nfo.Movie, error) {
 // SaveMovieMetadata updates an ent.Movie record and associates actors and tags from an NFO document.
 func SaveMovieMetadata(ctx context.Context, tx *ent.Tx, id int, doc nfo.Movie) error {
 	update := tx.Movie.UpdateOneID(id).SetMetadata(&doc).SetTitle(doc.Title).SetScrapeStatus(movie.ScrapeStatusPending).
-		ClearActors().ClearTags().ClearJavdbID().ClearReleaseDate().ClearDuration().ClearRating().
+		ClearActors().ClearTags().ClearReleaseDate().ClearDuration().ClearRating().
 		ClearDirectorID().ClearDirectorName().ClearMakerID().ClearMakerName().ClearSeriesID().ClearSeriesName()
 	if doc.Code != "" {
 		update.SetCode(doc.Code)
-	}
-	if doc.JavDBID() != "" {
-		update.SetJavdbID(doc.JavDBID())
 	}
 	if doc.Premiered != "" {
 		date, err := time.Parse(time.DateOnly, doc.Premiered)

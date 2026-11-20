@@ -90,20 +90,6 @@ func (_c *MovieCreate) SetNillableCanonicalCode(v *string) *MovieCreate {
 	return _c
 }
 
-// SetJavdbID sets the "javdb_id" field.
-func (_c *MovieCreate) SetJavdbID(v string) *MovieCreate {
-	_c.mutation.SetJavdbID(v)
-	return _c
-}
-
-// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
-func (_c *MovieCreate) SetNillableJavdbID(v *string) *MovieCreate {
-	if v != nil {
-		_c.SetJavdbID(*v)
-	}
-	return _c
-}
-
 // SetTitle sets the "title" field.
 func (_c *MovieCreate) SetTitle(v string) *MovieCreate {
 	_c.mutation.SetTitle(v)
@@ -524,10 +510,6 @@ func (_c *MovieCreate) createSpec() (*Movie, *sqlgraph.CreateSpec) {
 		_spec.SetField(movie.FieldCanonicalCode, field.TypeString, value)
 		_node.CanonicalCode = value
 	}
-	if value, ok := _c.mutation.JavdbID(); ok {
-		_spec.SetField(movie.FieldJavdbID, field.TypeString, value)
-		_node.JavdbID = &value
-	}
 	if value, ok := _c.mutation.Title(); ok {
 		_spec.SetField(movie.FieldTitle, field.TypeString, value)
 		_node.Title = value
@@ -753,24 +735,6 @@ func (u *MovieUpsert) SetCanonicalCode(v string) *MovieUpsert {
 // UpdateCanonicalCode sets the "canonical_code" field to the value that was provided on create.
 func (u *MovieUpsert) UpdateCanonicalCode() *MovieUpsert {
 	u.SetExcluded(movie.FieldCanonicalCode)
-	return u
-}
-
-// SetJavdbID sets the "javdb_id" field.
-func (u *MovieUpsert) SetJavdbID(v string) *MovieUpsert {
-	u.Set(movie.FieldJavdbID, v)
-	return u
-}
-
-// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
-func (u *MovieUpsert) UpdateJavdbID() *MovieUpsert {
-	u.SetExcluded(movie.FieldJavdbID)
-	return u
-}
-
-// ClearJavdbID clears the value of the "javdb_id" field.
-func (u *MovieUpsert) ClearJavdbID() *MovieUpsert {
-	u.SetNull(movie.FieldJavdbID)
 	return u
 }
 
@@ -1154,27 +1118,6 @@ func (u *MovieUpsertOne) SetCanonicalCode(v string) *MovieUpsertOne {
 func (u *MovieUpsertOne) UpdateCanonicalCode() *MovieUpsertOne {
 	return u.Update(func(s *MovieUpsert) {
 		s.UpdateCanonicalCode()
-	})
-}
-
-// SetJavdbID sets the "javdb_id" field.
-func (u *MovieUpsertOne) SetJavdbID(v string) *MovieUpsertOne {
-	return u.Update(func(s *MovieUpsert) {
-		s.SetJavdbID(v)
-	})
-}
-
-// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
-func (u *MovieUpsertOne) UpdateJavdbID() *MovieUpsertOne {
-	return u.Update(func(s *MovieUpsert) {
-		s.UpdateJavdbID()
-	})
-}
-
-// ClearJavdbID clears the value of the "javdb_id" field.
-func (u *MovieUpsertOne) ClearJavdbID() *MovieUpsertOne {
-	return u.Update(func(s *MovieUpsert) {
-		s.ClearJavdbID()
 	})
 }
 
@@ -1771,27 +1714,6 @@ func (u *MovieUpsertBulk) SetCanonicalCode(v string) *MovieUpsertBulk {
 func (u *MovieUpsertBulk) UpdateCanonicalCode() *MovieUpsertBulk {
 	return u.Update(func(s *MovieUpsert) {
 		s.UpdateCanonicalCode()
-	})
-}
-
-// SetJavdbID sets the "javdb_id" field.
-func (u *MovieUpsertBulk) SetJavdbID(v string) *MovieUpsertBulk {
-	return u.Update(func(s *MovieUpsert) {
-		s.SetJavdbID(v)
-	})
-}
-
-// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
-func (u *MovieUpsertBulk) UpdateJavdbID() *MovieUpsertBulk {
-	return u.Update(func(s *MovieUpsert) {
-		s.UpdateJavdbID()
-	})
-}
-
-// ClearJavdbID clears the value of the "javdb_id" field.
-func (u *MovieUpsertBulk) ClearJavdbID() *MovieUpsertBulk {
-	return u.Update(func(s *MovieUpsert) {
-		s.ClearJavdbID()
 	})
 }
 

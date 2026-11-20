@@ -362,7 +362,7 @@ func TestSwitchKeepsHistoryVisibleAndDeduplicatesCurrentCandidate(t *testing.T) 
 	record := r.add(offlineHashA)
 	// A newer historical row must not shadow the older task after it switches.
 	r.s.database.OfflineDownload.Create().SetHash(offlineHashB).SetInfoHash(offlineHashB).
-		SetCode(record.Code).SetJavdbID(record.JavdbID).SetAccountID(record.AccountID).SetDirectoryID(record.DirectoryID).
+		SetCode(record.Code).SetAccountID(record.AccountID).SetDirectoryID(record.DirectoryID).
 		SetStatus(offlinedownload.StatusDone).SaveX(t.Context())
 	if _, err := r.s.TryNext(t.Context(), record.ID); err != nil {
 		t.Fatal(err)
@@ -411,7 +411,7 @@ func TestRecoveryUsesRemoteHashToExcludeDuplicateCandidates(t *testing.T) {
 func TestRecoveryStopsSwitchingWhenMovieWasIndexed(t *testing.T) {
 	r := newRecoveryRig(t)
 	record := r.add(offlineHashA)
-	film := r.s.database.Movie.Create().SetCode(record.Code).SetJavdbID(record.JavdbID).SaveX(t.Context())
+	film := r.s.database.Movie.Create().SetCode(record.Code).SaveX(t.Context())
 	r.s.database.File.Create().SetFileID("existing-video").SetName("existing.mp4").SetSize(1).
 		SetAccountID(record.AccountID).SetRootID(record.DirectoryID).SetMovie(film).SaveX(t.Context())
 	r.poll(30 * time.Second)

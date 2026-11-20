@@ -15,7 +15,6 @@ func (OfflineDownload) Mixin() []ent.Mixin { return []ent.Mixin{TimeMixin{}} }
 func (OfflineDownload) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("code").Default(""),
-		field.String("javdb_id").Default(""),
 		field.String("hash").NotEmpty(),
 		field.String("info_hash").Default(""),
 		field.String("account_id").Default(""),
@@ -35,6 +34,6 @@ func (OfflineDownload) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("account_id", "status", "hash"),
 		index.Fields("account_id", "directory_id", "hash", "id"),
-		index.Fields("account_id", "javdb_id", "hash", "id"),
+		index.Fields("account_id", "code", "hash", "id"),
 	}
 }

@@ -91,7 +91,7 @@ func BenchmarkIdentifyAndIndexScanPage(b *testing.B) {
 		b.Fatal(err)
 	}
 	for _, film := range lib.database.Movie.Query().AllX(b.Context()) {
-		film.Update().SetJavdbID(fmt.Sprint(film.ID)).ExecX(b.Context())
+		_ = film
 	}
 	b.ReportAllocs()
 	for b.Loop() {

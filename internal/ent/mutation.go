@@ -6469,7 +6469,6 @@ type MovieMutation struct {
 	code              *string
 	manual_code       *string
 	canonical_code    *string
-	javdb_id          *string
 	title             *string
 	release_date      *time.Time
 	duration          *int
@@ -6783,55 +6782,6 @@ func (m *MovieMutation) OldCanonicalCode(ctx context.Context) (v string, err err
 // ResetCanonicalCode resets all changes to the "canonical_code" field.
 func (m *MovieMutation) ResetCanonicalCode() {
 	m.canonical_code = nil
-}
-
-// SetJavdbID sets the "javdb_id" field.
-func (m *MovieMutation) SetJavdbID(s string) {
-	m.javdb_id = &s
-}
-
-// JavdbID returns the value of the "javdb_id" field in the mutation.
-func (m *MovieMutation) JavdbID() (r string, exists bool) {
-	v := m.javdb_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldJavdbID returns the old "javdb_id" field's value of the Movie entity.
-// If the Movie object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *MovieMutation) OldJavdbID(ctx context.Context) (v *string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldJavdbID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldJavdbID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldJavdbID: %w", err)
-	}
-	return oldValue.JavdbID, nil
-}
-
-// ClearJavdbID clears the value of the "javdb_id" field.
-func (m *MovieMutation) ClearJavdbID() {
-	m.javdb_id = nil
-	m.clearedFields[movie.FieldJavdbID] = struct{}{}
-}
-
-// JavdbIDCleared returns if the "javdb_id" field was cleared in this mutation.
-func (m *MovieMutation) JavdbIDCleared() bool {
-	_, ok := m.clearedFields[movie.FieldJavdbID]
-	return ok
-}
-
-// ResetJavdbID resets all changes to the "javdb_id" field.
-func (m *MovieMutation) ResetJavdbID() {
-	m.javdb_id = nil
-	delete(m.clearedFields, movie.FieldJavdbID)
 }
 
 // SetTitle sets the "title" field.
@@ -7886,7 +7836,7 @@ func (m *MovieMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MovieMutation) Fields() []string {
-	fields := make([]string, 0, 22)
+	fields := make([]string, 0, 21)
 	if m.created_at != nil {
 		fields = append(fields, movie.FieldCreatedAt)
 	}
@@ -7901,9 +7851,6 @@ func (m *MovieMutation) Fields() []string {
 	}
 	if m.canonical_code != nil {
 		fields = append(fields, movie.FieldCanonicalCode)
-	}
-	if m.javdb_id != nil {
-		fields = append(fields, movie.FieldJavdbID)
 	}
 	if m.title != nil {
 		fields = append(fields, movie.FieldTitle)
@@ -7971,8 +7918,6 @@ func (m *MovieMutation) Field(name string) (ent.Value, bool) {
 		return m.ManualCode()
 	case movie.FieldCanonicalCode:
 		return m.CanonicalCode()
-	case movie.FieldJavdbID:
-		return m.JavdbID()
 	case movie.FieldTitle:
 		return m.Title()
 	case movie.FieldReleaseDate:
@@ -8024,8 +7969,6 @@ func (m *MovieMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldManualCode(ctx)
 	case movie.FieldCanonicalCode:
 		return m.OldCanonicalCode(ctx)
-	case movie.FieldJavdbID:
-		return m.OldJavdbID(ctx)
 	case movie.FieldTitle:
 		return m.OldTitle(ctx)
 	case movie.FieldReleaseDate:
@@ -8101,13 +8044,6 @@ func (m *MovieMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCanonicalCode(v)
-		return nil
-	case movie.FieldJavdbID:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetJavdbID(v)
 		return nil
 	case movie.FieldTitle:
 		v, ok := value.(string)
@@ -8278,9 +8214,6 @@ func (m *MovieMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *MovieMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(movie.FieldJavdbID) {
-		fields = append(fields, movie.FieldJavdbID)
-	}
 	if m.FieldCleared(movie.FieldReleaseDate) {
 		fields = append(fields, movie.FieldReleaseDate)
 	}
@@ -8334,9 +8267,6 @@ func (m *MovieMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *MovieMutation) ClearField(name string) error {
 	switch name {
-	case movie.FieldJavdbID:
-		m.ClearJavdbID()
-		return nil
 	case movie.FieldReleaseDate:
 		m.ClearReleaseDate()
 		return nil
@@ -8398,9 +8328,6 @@ func (m *MovieMutation) ResetField(name string) error {
 		return nil
 	case movie.FieldCanonicalCode:
 		m.ResetCanonicalCode()
-		return nil
-	case movie.FieldJavdbID:
-		m.ResetJavdbID()
 		return nil
 	case movie.FieldTitle:
 		m.ResetTitle()
@@ -8625,7 +8552,6 @@ type OfflineDownloadMutation struct {
 	created_at        *time.Time
 	updated_at        *time.Time
 	code              *string
-	javdb_id          *string
 	hash              *string
 	info_hash         *string
 	account_id        *string
@@ -8851,42 +8777,6 @@ func (m *OfflineDownloadMutation) OldCode(ctx context.Context) (v string, err er
 // ResetCode resets all changes to the "code" field.
 func (m *OfflineDownloadMutation) ResetCode() {
 	m.code = nil
-}
-
-// SetJavdbID sets the "javdb_id" field.
-func (m *OfflineDownloadMutation) SetJavdbID(s string) {
-	m.javdb_id = &s
-}
-
-// JavdbID returns the value of the "javdb_id" field in the mutation.
-func (m *OfflineDownloadMutation) JavdbID() (r string, exists bool) {
-	v := m.javdb_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldJavdbID returns the old "javdb_id" field's value of the OfflineDownload entity.
-// If the OfflineDownload object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *OfflineDownloadMutation) OldJavdbID(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldJavdbID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldJavdbID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldJavdbID: %w", err)
-	}
-	return oldValue.JavdbID, nil
-}
-
-// ResetJavdbID resets all changes to the "javdb_id" field.
-func (m *OfflineDownloadMutation) ResetJavdbID() {
-	m.javdb_id = nil
 }
 
 // SetHash sets the "hash" field.
@@ -9436,7 +9326,7 @@ func (m *OfflineDownloadMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OfflineDownloadMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 15)
 	if m.created_at != nil {
 		fields = append(fields, offlinedownload.FieldCreatedAt)
 	}
@@ -9445,9 +9335,6 @@ func (m *OfflineDownloadMutation) Fields() []string {
 	}
 	if m.code != nil {
 		fields = append(fields, offlinedownload.FieldCode)
-	}
-	if m.javdb_id != nil {
-		fields = append(fields, offlinedownload.FieldJavdbID)
 	}
 	if m.hash != nil {
 		fields = append(fields, offlinedownload.FieldHash)
@@ -9499,8 +9386,6 @@ func (m *OfflineDownloadMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdatedAt()
 	case offlinedownload.FieldCode:
 		return m.Code()
-	case offlinedownload.FieldJavdbID:
-		return m.JavdbID()
 	case offlinedownload.FieldHash:
 		return m.Hash()
 	case offlinedownload.FieldInfoHash:
@@ -9540,8 +9425,6 @@ func (m *OfflineDownloadMutation) OldField(ctx context.Context, name string) (en
 		return m.OldUpdatedAt(ctx)
 	case offlinedownload.FieldCode:
 		return m.OldCode(ctx)
-	case offlinedownload.FieldJavdbID:
-		return m.OldJavdbID(ctx)
 	case offlinedownload.FieldHash:
 		return m.OldHash(ctx)
 	case offlinedownload.FieldInfoHash:
@@ -9595,13 +9478,6 @@ func (m *OfflineDownloadMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCode(v)
-		return nil
-	case offlinedownload.FieldJavdbID:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetJavdbID(v)
 		return nil
 	case offlinedownload.FieldHash:
 		v, ok := value.(string)
@@ -9786,9 +9662,6 @@ func (m *OfflineDownloadMutation) ResetField(name string) error {
 		return nil
 	case offlinedownload.FieldCode:
 		m.ResetCode()
-		return nil
-	case offlinedownload.FieldJavdbID:
-		m.ResetJavdbID()
 		return nil
 	case offlinedownload.FieldHash:
 		m.ResetHash()

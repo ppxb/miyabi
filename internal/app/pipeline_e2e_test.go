@@ -455,7 +455,7 @@ func TestPipelineScansScrapesAndWritesSidecarsEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if domain.ValueOrZero(record.JavdbID) != "movie-exact" || record.Title != "Localized title" || record.ScrapeStatus != movie.ScrapeStatusDone {
+	if record.Code != "ABP-123" || record.Title != "Localized title" || record.ScrapeStatus != movie.ScrapeStatusDone {
 		t.Fatalf("movie = %+v", record)
 	}
 	if domain.ValueOrZero(record.Duration) != 120 || domain.ValueOrZero(record.Rating) != 4.5 || record.ReleaseDate == nil || record.ReleaseDate.Format("2006-01-02") != "2026-08-01" {
@@ -490,7 +490,7 @@ func TestPipelineScansScrapesAndWritesSidecarsEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if doc.Code != "ABP-123" || doc.JavDBID() != "movie-exact" || doc.Title != "Localized title" || doc.Premiered != "2026-08-01" || doc.Zone != domain.ZoneCensored {
+	if doc.Code != "ABP-123" || doc.Title != "Localized title" || doc.Premiered != "2026-08-01" || doc.Zone != domain.ZoneCensored {
 		t.Fatalf("nfo = %+v", doc)
 	}
 	if doc.Poster() != "poster.jpg" || doc.Fanart != "fanart.jpg" || len(doc.Actors) != 2 || len(doc.Tags) != 1 || doc.Studio.Name != "Maker" {
@@ -521,7 +521,7 @@ func TestPipelineScansScrapesAndWritesSidecarsEndToEnd(t *testing.T) {
 	}
 	beforeDetail := maps.Clone(fixture.catalogue.calls)
 	detail, err := fixture.library.Movie(ctx, record.ID)
-	if err != nil || detail.Title != doc.Title || detail.ID != doc.JavDBID() || detail.Zone != doc.Zone ||
+	if err != nil || detail.Title != doc.Title || detail.ID != doc.Code || detail.Zone != doc.Zone ||
 		detail.Cover != artwork.Fanart || detail.ScrapeStatus != movie.ScrapeStatusDone || len(detail.Actors) != len(doc.Actors) {
 		t.Fatalf("saved library detail = %+v, %v", detail, err)
 	}
@@ -589,7 +589,7 @@ func TestPipelineUsesNFOCodeButScrapesCatalogueMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if record.Title != fixtureDetail().Title || domain.ValueOrZero(record.JavdbID) != fixtureDetail().ID || len(record.Edges.Actors) != len(fixtureDetail().Actors) || record.ScrapeStatus != movie.ScrapeStatusDone {
+	if record.Title != fixtureDetail().Title || record.Code != fixtureDetail().Code || len(record.Edges.Actors) != len(fixtureDetail().Actors) || record.ScrapeStatus != movie.ScrapeStatusDone {
 		t.Fatalf("movie from NFO = %+v actors %d", record, len(record.Edges.Actors))
 	}
 

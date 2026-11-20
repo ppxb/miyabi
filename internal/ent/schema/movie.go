@@ -30,10 +30,6 @@ func (Movie) Fields() []ent.Field {
 		field.String("canonical_code").
 			Default("").
 			Comment("Candidate grouping key; equivalence must still be checked against code."),
-		field.String("javdb_id").
-			Optional().
-			Nillable().
-			Unique(),
 		field.String("title").
 			Default(""),
 		field.Time("release_date").

@@ -113,9 +113,6 @@ func (service *Service) publishMovie(ctx context.Context, sess drive.Session, jo
 				update := tx.Movie.UpdateOneID(input.MovieID).SetCode(input.Code).SetMetadata(&input.Document).
 					SetCover(artwork.Thumbnail).SetPoster(artwork.Poster).SetFanarts([]string{artwork.Fanart}).
 					SetScrapeStatus(movie.ScrapeStatusDone).SetMetadataSnapshot(snapshot)
-				if id := input.Document.JavDBID(); id != "" {
-					update.SetJavdbID(id)
-				}
 				if err := update.Exec(ctx); err != nil {
 					return err
 				}

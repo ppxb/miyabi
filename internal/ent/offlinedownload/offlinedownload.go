@@ -20,8 +20,6 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// FieldCode holds the string denoting the code field in the database.
 	FieldCode = "code"
-	// FieldJavdbID holds the string denoting the javdb_id field in the database.
-	FieldJavdbID = "javdb_id"
 	// FieldHash holds the string denoting the hash field in the database.
 	FieldHash = "hash"
 	// FieldInfoHash holds the string denoting the info_hash field in the database.
@@ -56,7 +54,6 @@ var Columns = []string{
 	FieldCreatedAt,
 	FieldUpdatedAt,
 	FieldCode,
-	FieldJavdbID,
 	FieldHash,
 	FieldInfoHash,
 	FieldAccountID,
@@ -90,8 +87,6 @@ var (
 	UpdateDefaultUpdatedAt func() time.Time
 	// DefaultCode holds the default value on creation for the "code" field.
 	DefaultCode string
-	// DefaultJavdbID holds the default value on creation for the "javdb_id" field.
-	DefaultJavdbID string
 	// HashValidator is a validator for the "hash" field. It is called by the builders before save.
 	HashValidator func(string) error
 	// DefaultInfoHash holds the default value on creation for the "info_hash" field.
@@ -163,11 +158,6 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByCode orders the results by the code field.
 func ByCode(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCode, opts...).ToFunc()
-}
-
-// ByJavdbID orders the results by the javdb_id field.
-func ByJavdbID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldJavdbID, opts...).ToFunc()
 }
 
 // ByHash orders the results by the hash field.

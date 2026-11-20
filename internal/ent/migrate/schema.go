@@ -216,7 +216,6 @@ var (
 		{Name: "code", Type: field.TypeString, Unique: true},
 		{Name: "manual_code", Type: field.TypeString, Default: ""},
 		{Name: "canonical_code", Type: field.TypeString, Default: ""},
-		{Name: "javdb_id", Type: field.TypeString, Unique: true, Nullable: true},
 		{Name: "title", Type: field.TypeString, Default: ""},
 		{Name: "release_date", Type: field.TypeTime, Nullable: true},
 		{Name: "duration", Type: field.TypeInt, Nullable: true},
@@ -258,7 +257,6 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "code", Type: field.TypeString, Default: ""},
-		{Name: "javdb_id", Type: field.TypeString, Default: ""},
 		{Name: "hash", Type: field.TypeString},
 		{Name: "info_hash", Type: field.TypeString, Default: ""},
 		{Name: "account_id", Type: field.TypeString, Default: ""},
@@ -281,17 +279,17 @@ var (
 			{
 				Name:    "offlinedownload_account_id_status_hash",
 				Unique:  false,
-				Columns: []*schema.Column{OfflineDownloadsColumns[7], OfflineDownloadsColumns[9], OfflineDownloadsColumns[5]},
+				Columns: []*schema.Column{OfflineDownloadsColumns[6], OfflineDownloadsColumns[8], OfflineDownloadsColumns[4]},
 			},
 			{
 				Name:    "offlinedownload_account_id_directory_id_hash_id",
 				Unique:  false,
-				Columns: []*schema.Column{OfflineDownloadsColumns[7], OfflineDownloadsColumns[8], OfflineDownloadsColumns[5], OfflineDownloadsColumns[0]},
+				Columns: []*schema.Column{OfflineDownloadsColumns[6], OfflineDownloadsColumns[7], OfflineDownloadsColumns[4], OfflineDownloadsColumns[0]},
 			},
 			{
-				Name:    "offlinedownload_account_id_javdb_id_hash_id",
+				Name:    "offlinedownload_account_id_code_hash_id",
 				Unique:  false,
-				Columns: []*schema.Column{OfflineDownloadsColumns[7], OfflineDownloadsColumns[4], OfflineDownloadsColumns[5], OfflineDownloadsColumns[0]},
+				Columns: []*schema.Column{OfflineDownloadsColumns[6], OfflineDownloadsColumns[3], OfflineDownloadsColumns[4], OfflineDownloadsColumns[0]},
 			},
 		},
 	}

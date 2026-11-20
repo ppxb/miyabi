@@ -38,7 +38,7 @@ func (r *scanRun) processPageTx(ctx context.Context, tx *ent.Tx, directoryPath s
 			Select(file.FieldID, file.FieldFileID, file.FieldName, file.FieldParentID, file.FieldSize,
 				file.FieldSha1, file.FieldPickCode, file.FieldAccountID, file.FieldRootID, file.FieldPath, file.FieldMovieID).
 			WithMovie(func(q *ent.MovieQuery) {
-				q.Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID, movie.FieldManualCode, movie.FieldScrapeStatus)
+				q.Select(movie.FieldID, movie.FieldCode, movie.FieldManualCode, movie.FieldScrapeStatus)
 			}).All(ctx)
 		if err != nil {
 			return fmt.Errorf("load previous file associations: %w", err)
@@ -68,7 +68,7 @@ func (r *scanRun) processPageTx(ctx context.Context, tx *ent.Tx, directoryPath s
 		}
 		for _, entry := range previous {
 			// A scraped record with the exact number already outranks every equivalent match.
-			if film := entry.Edges.Movie; film != nil && film.JavdbID != nil {
+			if film := entry.Edges.Movie; film != nil && film.ScrapeStatus == movie.ScrapeStatusDone {
 				if _, needed := codes[film.Code]; needed {
 					codes[film.Code] = film.ID
 				}
@@ -210,21 +210,12 @@ func (r *scanRun) notifyAfterCommit(tx *ent.Tx, change tasks.Change, queued bool
 // IndexDownloadedMovie binds a completed download target to a movie record with its known JavDB ID.
 func IndexDownloadedMovie(ctx context.Context, tx *ent.Tx, payload domain.ScanPayload) (int, error) {
 	code := codeid.Normalize(payload.Code)
-	create := tx.Movie.Create().SetCode(code)
-	if payload.JavDBID != "" {
-		create.SetJavdbID(payload.JavDBID)
-	}
-	if err := create.OnConflict().Ignore().Exec(ctx); err != nil {
+	if err := tx.Movie.Create().SetCode(code).OnConflict().Ignore().Exec(ctx); err != nil {
 		return 0, fmt.Errorf("index downloaded movie: %w", err)
 	}
 	record, err := tx.Movie.Query().Where(movie.CodeEQ(code)).Only(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("resolve downloaded movie association: %w", err)
-	}
-	if record.JavdbID == nil && payload.JavDBID != "" {
-		if err := tx.Movie.UpdateOneID(record.ID).SetJavdbID(payload.JavDBID).Exec(ctx); err != nil {
-			return 0, fmt.Errorf("save downloaded movie identity: %w", err)
-		}
 	}
 	return record.ID, nil
 }

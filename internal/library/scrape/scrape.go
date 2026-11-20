@@ -222,9 +222,6 @@ func (service *Service) prepareMetadata(ctx context.Context, sess drive.Session,
 			input.PosterVersion = record.MetadataSnapshot.PosterVersion
 		}
 	} else {
-		if id := domain.ValueOrZero(record.JavdbID); id != "" {
-			input.JavDBID = id
-		}
 		if err := service.resolveMetadata(ctx, input); err != nil {
 			return err
 		}

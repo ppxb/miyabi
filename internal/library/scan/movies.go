@@ -50,7 +50,7 @@ func loadMovieMatcher(ctx context.Context, tx *ent.Tx, codes []string, associate
 		}
 	}
 	records, err := tx.Movie.Query().Where(movie.Or(movie.CanonicalCodeIn(keys...), movie.IDIn(associatedIDs...))).
-		Select(movie.FieldID, movie.FieldCode, movie.FieldCanonicalCode, movie.FieldJavdbID, movie.FieldManualCode, movie.FieldScrapeStatus).All(ctx)
+		Select(movie.FieldID, movie.FieldCode, movie.FieldCanonicalCode, movie.FieldManualCode, movie.FieldScrapeStatus).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load equivalent movies: %w", err)
 	}
@@ -90,7 +90,7 @@ func (matcher movieMatcher) remove(record *ent.Movie) {
 // movieRank orders equivalent records: scraped first, then the exact number.
 func movieRank(record *ent.Movie, code string) int {
 	rank := 0
-	if record.JavdbID != nil {
+	if record.ScrapeStatus == movie.ScrapeStatusDone {
 		rank += 2
 	}
 	if record.Code == code {

@@ -27,7 +27,7 @@ func TestScanCombinesPartsPreservesMetadataAndRetainsUnmatchedFiles(t *testing.T
 	lib, queued, payload := libraryFixture(t)
 	ctx := t.Context()
 	metadata, err := lib.database.Movie.Create().SetCode("ABP-001").SetTitle("Existing title").
-		SetJavdbID("fixture").SetScrapeStatus(movie.ScrapeStatusDone).Save(ctx)
+		SetScrapeStatus(movie.ScrapeStatusDone).Save(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestScanCombinesPartsPreservesMetadataAndRetainsUnmatchedFiles(t *testing.T
 		t.Fatalf("renamed video = %#v, error = %v", renamed, err)
 	}
 	remaining, err := lib.database.Movie.Get(ctx, metadata.ID)
-	if err != nil || remaining.JavdbID == nil || *remaining.JavdbID != "fixture" {
+	if err != nil || remaining.Code != "ABP-001" {
 		t.Fatalf("remaining metadata = %#v, error = %v", remaining, err)
 	}
 }
@@ -103,7 +103,7 @@ func TestScanCombinesCatalogueAliasesAndReplacesFailedLegacyIndex(t *testing.T) 
 	lib.database.File.Create().SetFileID("prefixed").SetName("259LUXU-1899.mp4").SetSize(1 << 30).
 		SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).SetMovie(legacy).SaveX(ctx)
 	known := lib.database.Movie.Create().SetCode("LUXU-1899").SetTitle("Catalogue title").
-		SetJavdbID("catalogue-id").SetScrapeStatus(movie.ScrapeStatusDone).SaveX(ctx)
+		SetScrapeStatus(movie.ScrapeStatusDone).SaveX(ctx)
 	videos := []scan.Video{
 		fixtureVideo("prefixed", "259LUXU-1899.mp4"),
 		fixtureVideo("catalogue", "LUXU-1899-CD2.mkv"),
@@ -146,7 +146,7 @@ func TestMetadataCanonicalizesLegacyAliasBeforeRescan(t *testing.T) {
 		t.Fatal(err)
 	}
 	record := lib.database.Movie.Query().OnlyX(ctx)
-	if record.ID != legacy.ID || record.Code != doc.Code || record.Title != doc.Title || domain.ValueOrZero(record.JavdbID) != doc.JavDBID() {
+	if record.ID != legacy.ID || record.Code != doc.Code || record.Title != doc.Title {
 		t.Fatalf("metadata normalization changed the movie identity on rescan: %#v", record)
 	}
 }
@@ -177,7 +177,7 @@ func TestOfflineScanUsesCatalogueIdentityAndKeepsItOnRescan(t *testing.T) {
 		t.Fatal(err)
 	}
 	record := lib.database.Movie.Query().OnlyX(ctx)
-	if record.Code != payload.Code || domain.ValueOrZero(record.JavdbID) != payload.JavDBID {
+	if record.Code != payload.Code {
 		t.Fatalf("download identity was not persisted: %#v", record)
 	}
 	if err := reconcileScan(ctx, lib, queued.ID, "download", &payload); err != nil {
@@ -190,7 +190,7 @@ func TestOfflineScanUsesCatalogueIdentityAndKeepsItOnRescan(t *testing.T) {
 	}
 	metadata := lib.database.Task.Query().Where(task.TypeEQ("scrape")).OnlyX(ctx)
 	input, err := tasks.DecodePayload[scrapePkg.MetadataPayload](metadata.Payload)
-	if err != nil || input.MovieID != record.ID || input.JavDBID != payload.JavDBID {
+	if err != nil || input.MovieID != record.ID || input.Code != payload.Code {
 		t.Fatalf("metadata job lost the known JavDB ID: %#v, %v", input, err)
 	}
 	full := domain.ScanPayload{Source: payload.Source}
@@ -217,7 +217,7 @@ func TestOfflineScanUsesCatalogueIdentityAndKeepsItOnRescan(t *testing.T) {
 func TestRescanRestoresOnlyUnchangedFilesFromTheSameAccount(t *testing.T) {
 	lib, _, payload := libraryFixture(t)
 	ctx := t.Context()
-	known := lib.database.Movie.Create().SetCode("LUXU-1899").SetJavdbID("catalogue-id").SaveX(ctx)
+	known := lib.database.Movie.Create().SetCode("LUXU-1899").SetScrapeStatus(movie.ScrapeStatusDone).SaveX(ctx)
 	lib.database.File.Create().SetFileID("video").SetName("999LUXU-1899.mp4").SetSize(1 << 30).SetSha1("original").
 		SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).SetMovie(known).SaveX(ctx)
 	for _, scenario := range []struct {
@@ -260,9 +260,6 @@ func TestDownloadedMovieBindingReusesByCode(t *testing.T) {
 			lib, _, payload := libraryFixture(t)
 			ctx := t.Context()
 			create := lib.database.Movie.Create().SetCode(scenario.code).SetTitle("Existing title")
-			if scenario.javdbID != "" {
-				create.SetJavdbID(scenario.javdbID)
-			}
 			known := create.SaveX(ctx)
 			payload.Code, payload.JavDBID = scenario.code, scenario.payloadID
 			var id int
@@ -277,13 +274,6 @@ func TestDownloadedMovieBindingReusesByCode(t *testing.T) {
 			record := lib.database.Movie.Query().OnlyX(ctx)
 			if record.ID != known.ID || record.Title != known.Title || id != record.ID {
 				t.Fatalf("binding did not reuse the existing movie: %#v", record)
-			}
-			wantID := scenario.javdbID
-			if wantID == "" {
-				wantID = scenario.payloadID
-			}
-			if domain.ValueOrZero(record.JavdbID) != wantID {
-				t.Fatalf("javdb identity = %q, want %q", domain.ValueOrZero(record.JavdbID), wantID)
 			}
 		})
 	}

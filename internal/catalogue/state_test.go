@@ -30,7 +30,7 @@ func TestMovieStatesScopeWorkflowsToSource(t *testing.T) {
 	// Create an active download in the mounted source.
 	record, err := store.Client.OfflineDownload.Create().
 		SetHash("fixture-hash").SetAccountID(source.AccountID).SetDirectoryID(source.Directory.ID).
-		SetCode("ABP-001").SetJavdbID(knownJavDBID).Save(ctx)
+		SetCode("ABP-001").Save(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,10 +106,10 @@ func TestMovieStatesCountsDownloadsAcrossAccounts(t *testing.T) {
 
 	store.Client.OfflineDownload.Create().SetHash("other-account-hash").
 		SetAccountID("other-account").SetDirectoryID(source.Directory.ID).
-		SetJavdbID("other-acc-movie").SetCode("ABP-101").SaveX(ctx)
+		SetCode("ABP-101").SaveX(ctx)
 	store.Client.OfflineDownload.Create().SetHash("other-directory-hash").
 		SetAccountID(source.AccountID).SetDirectoryID("other-dir").
-		SetJavdbID("other-dir-movie").SetCode("ABP-102").SaveX(ctx)
+		SetCode("ABP-102").SaveX(ctx)
 
 	states, err := service.MovieStates(ctx, []MovieIdentity{
 		{ID: "other-acc-movie", Code: "ABP-101"},

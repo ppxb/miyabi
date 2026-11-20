@@ -147,7 +147,7 @@ func (s *Service) applyLocalMetadataMode(ctx context.Context, scanTaskID int, pa
 	}
 	records, err := s.database.Movie.Query().
 		Where(movie.IDIn(movieIDs...)).
-		Select(movie.FieldID, movie.FieldCode, movie.FieldJavdbID, movie.FieldManualCode).
+		Select(movie.FieldID, movie.FieldCode, movie.FieldManualCode).
 		All(ctx)
 	if err != nil {
 		return err
@@ -155,7 +155,7 @@ func (s *Service) applyLocalMetadataMode(ctx context.Context, scanTaskID int, pa
 	for _, record := range records {
 		input := localMetadataJob{
 			Source: payload.Source, ScanTaskID: scanTaskID, MovieID: record.ID,
-			Code: record.Code, JavDBID: domain.ValueOrZero(record.JavdbID), ManualCode: record.ManualCode,
+			Code: record.Code, JavDBID: "", ManualCode: record.ManualCode,
 		}
 		encoded, err := tasks.EncodePayload(input)
 		if err != nil {
