@@ -59,6 +59,9 @@ func (Movie) Fields() []ent.Field {
 		field.Float("rating").
 			Optional().
 			Nillable(),
+		field.Float("rating10").
+			Default(0).
+			Comment("Normalized 10-point rating derived from rating and metadata rating_max."),
 		field.String("cover").
 			Optional().
 			Nillable(),
@@ -79,11 +82,13 @@ func (Movie) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("canonical_code"),
 		index.Fields("created_at", "id"),
+		index.Fields("rating10", "id"),
 	}
 }
 
-// Keep the lookup key in the same write as code, including bulk creates and
-// metadata updates, without making each caller maintain a derived field.
+// Keep the lookup key and the normalized rating in the same write as their
+// source fields, including bulk creates and metadata updates, without making
+// each caller maintain a derived field.
 func (Movie) Hooks() []ent.Hook {
 	return []ent.Hook{func(next ent.Mutator) ent.Mutator {
 		return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
@@ -92,9 +97,37 @@ func (Movie) Hooks() []ent.Hook {
 					return nil, err
 				}
 			}
+			if err := deriveRating10(m); err != nil {
+				return nil, err
+			}
 			return next.Mutate(ctx, m)
 		})
 	}}
+}
+
+// deriveRating10 keeps the stored normalized rating (rating10) in sync whenever
+// the raw rating or the metadata (which carries rating_max) is written. When the
+// raw rating is written without metadata it falls back to the 5-point default,
+// matching how an absent metadata snapshot is normalized elsewhere.
+func deriveRating10(m ent.Mutation) error {
+	if meta, ok := m.Field("metadata"); ok {
+		var max, rating float64
+		doc, _ := meta.(*nfo.Movie)
+		if doc != nil {
+			max = doc.RatingMax
+		}
+		if raw, ok := m.Field("rating"); ok {
+			rating, _ = raw.(float64)
+		} else if doc != nil {
+			rating = doc.Rating
+		}
+		return m.SetField("rating10", domain.NormalizeRating10(rating, max))
+	}
+	if raw, ok := m.Field("rating"); ok {
+		rating, _ := raw.(float64)
+		return m.SetField("rating10", domain.NormalizeRating10(rating, 0))
+	}
+	return nil
 }
 
 func (Movie) Edges() []ent.Edge {

@@ -465,7 +465,7 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 	records, err := s.database.Movie.Query().Where(movie.HasFilesWith(scope)).
 		Select(movie.FieldID, movie.FieldCode, movie.FieldTitle, movie.FieldCover, movie.FieldPoster,
 			movie.FieldFanarts, movie.FieldReleaseDate, movie.FieldDuration, movie.FieldRating,
-			movie.FieldMetadata,
+			movie.FieldRating10,
 			movie.FieldDirectorID, movie.FieldDirectorName, movie.FieldMakerID, movie.FieldMakerName,
 			movie.FieldSeriesID, movie.FieldSeriesName,
 			movie.FieldScrapeStatus).
@@ -494,12 +494,11 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 }
 
 func movieItem(record *ent.Movie) Movie {
-	doc := domain.ValueOrZero(record.Metadata)
 	item := Movie{
 		ID: record.ID, Code: record.Code, Title: record.Title,
 		Cover: record.Cover, Poster: record.Poster,
 		Duration: domain.ValueOrZero(record.Duration),
-		Rating:   domain.NormalizeRating10(domain.ValueOrZero(record.Rating), doc.RatingMax),
+		Rating:   record.Rating10,
 		Director: libraryEntity(record.DirectorID, record.DirectorName),
 		Maker:    libraryEntity(record.MakerID, record.MakerName), Series: libraryEntity(record.SeriesID, record.SeriesName),
 		Actors: make([]Entity, 0, len(record.Edges.Actors)),
@@ -683,7 +682,7 @@ const highRatedThreshold = 8.0
 var browseScalarFields = []string{
 	movie.FieldID, movie.FieldCode, movie.FieldTitle,
 	movie.FieldCover, movie.FieldPoster, movie.FieldFanarts, movie.FieldReleaseDate,
-	movie.FieldDuration, movie.FieldRating, movie.FieldMetadata,
+	movie.FieldDuration, movie.FieldRating, movie.FieldRating10,
 	movie.FieldDirectorID, movie.FieldDirectorName, movie.FieldMakerID, movie.FieldMakerName,
 	movie.FieldSeriesID, movie.FieldSeriesName, movie.FieldScrapeStatus,
 }
@@ -778,57 +777,16 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 		preds = append(preds, movie.SeriesNameIn(names...))
 	}
 
-	query := s.database.Movie.Query().Where(preds...)
-	if filter.Sort == "recent" {
-		order := []movie.OrderOption{ent.Desc(movie.FieldCreatedAt), ent.Desc(movie.FieldID)}
-		if cloudScope != nil {
-			order = append([]movie.OrderOption{cloudAddedOrder(sources)}, order...)
-		}
-		query = query.Order(order...)
-	}
-	records, err := query.Select(browseScalarFields...).All(ctx)
-	if err != nil {
-		return result, fmt.Errorf("browse library movies: %w", err)
-	}
-
-	items := make([]Movie, 0, len(records))
-	for _, record := range records {
-		items = append(items, movieItem(record))
-	}
 	if filter.HighRated {
-		kept := items[:0]
-		for _, item := range items {
-			if item.Rating >= highRatedThreshold {
-				kept = append(kept, item)
-			}
-		}
-		items = kept
-	}
-	switch filter.Sort {
-	case "rating":
-		sort.SliceStable(items, func(i, j int) bool {
-			if items[i].Rating != items[j].Rating {
-				return items[i].Rating > items[j].Rating
-			}
-			return items[i].ID > items[j].ID
-		})
-	case "release":
-		sort.SliceStable(items, func(i, j int) bool {
-			if items[i].ReleaseDate != items[j].ReleaseDate {
-				if items[i].ReleaseDate == "" {
-					return false
-				}
-				if items[j].ReleaseDate == "" {
-					return true
-				}
-				return items[i].ReleaseDate > items[j].ReleaseDate
-			}
-			return items[i].ID > items[j].ID
-		})
+		preds = append(preds, movie.Rating10GTE(highRatedThreshold))
 	}
 
-	result.Total = len(items)
-	lastPage := (result.Total + filter.Limit - 1) / filter.Limit
+	total, err := s.database.Movie.Query().Where(preds...).Count(ctx)
+	if err != nil {
+		return result, fmt.Errorf("count library movies: %w", err)
+	}
+	result.Total = total
+	lastPage := (total + filter.Limit - 1) / filter.Limit
 	if lastPage < 1 {
 		lastPage = 1
 	}
@@ -837,56 +795,45 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 	}
 	result.Page = filter.Page
 	start := (filter.Page - 1) * filter.Limit
-	end := start + filter.Limit
-	if end > len(items) {
-		end = len(items)
-	}
-	result.Movies = items[start:end]
-	if err := s.hydrateMovieEdges(ctx, result.Movies); err != nil {
-		return result, err
-	}
-	if err := s.markCloudSources(ctx, result.Movies, cloudScope); err != nil {
-		return result, err
-	}
-	if err := s.markSubtitleStatus(ctx, result.Movies); err != nil {
-		return result, err
-	}
-	result.HasMore = end < len(items)
-	return result, nil
-}
 
-// hydrateMovieEdges loads actors and tags for the given page-only movies.
-func (s *Service) hydrateMovieEdges(ctx context.Context, movies []Movie) error {
-	if len(movies) == 0 {
-		return nil
-	}
-	ids := make([]int, len(movies))
-	for i := range movies {
-		ids[i] = movies[i].ID
-	}
-	records, err := s.database.Movie.Query().
-		Where(movie.IDIn(ids...)).
+	query := s.database.Movie.Query().Where(preds...).
 		Select(browseScalarFields...).
 		WithActors(func(query *ent.ActorQuery) {
 			query.Select(actor.FieldID, actor.FieldProvider, actor.FieldSourceID, actor.FieldName).Order(ent.Asc(actor.FieldName), ent.Asc(actor.FieldID))
 		}).
 		WithTags(func(query *ent.TagQuery) {
 			query.Select(tag.FieldID, tag.FieldProvider, tag.FieldSourceID, tag.FieldName).Order(ent.Asc(tag.FieldName), ent.Asc(tag.FieldID))
-		}).
-		All(ctx)
-	if err != nil {
-		return fmt.Errorf("load library movie edges: %w", err)
-	}
-	byID := make(map[int]Movie, len(records))
-	for _, record := range records {
-		byID[record.ID] = movieItem(record)
-	}
-	for i := range movies {
-		if hydrated, ok := byID[movies[i].ID]; ok {
-			movies[i] = hydrated
+		})
+	switch filter.Sort {
+	case "rating":
+		query = query.Order(ent.Desc(movie.FieldRating10), ent.Desc(movie.FieldID))
+	case "release":
+		query = query.Order(ent.Desc(movie.FieldReleaseDate), ent.Desc(movie.FieldID))
+	default:
+		order := []movie.OrderOption{ent.Desc(movie.FieldCreatedAt), ent.Desc(movie.FieldID)}
+		if cloudScope != nil {
+			order = append([]movie.OrderOption{cloudAddedOrder(sources)}, order...)
 		}
+		query = query.Order(order...)
 	}
-	return nil
+	records, err := query.Offset(start).Limit(filter.Limit).All(ctx)
+	if err != nil {
+		return result, fmt.Errorf("browse library movies: %w", err)
+	}
+
+	items := make([]Movie, 0, len(records))
+	for _, record := range records {
+		items = append(items, movieItem(record))
+	}
+	result.Movies = items
+	if err := s.markCloudSources(ctx, result.Movies, cloudScope); err != nil {
+		return result, err
+	}
+	if err := s.markSubtitleStatus(ctx, result.Movies); err != nil {
+		return result, err
+	}
+	result.HasMore = start+len(items) < total
+	return result, nil
 }
 
 // FilterOptions lists the tags, actors, makers and series present in the library

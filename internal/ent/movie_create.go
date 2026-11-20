@@ -230,6 +230,20 @@ func (_c *MovieCreate) SetNillableRating(v *float64) *MovieCreate {
 	return _c
 }
 
+// SetRating10 sets the "rating10" field.
+func (_c *MovieCreate) SetRating10(v float64) *MovieCreate {
+	_c.mutation.SetRating10(v)
+	return _c
+}
+
+// SetNillableRating10 sets the "rating10" field if the given value is not nil.
+func (_c *MovieCreate) SetNillableRating10(v *float64) *MovieCreate {
+	if v != nil {
+		_c.SetRating10(*v)
+	}
+	return _c
+}
+
 // SetCover sets the "cover" field.
 func (_c *MovieCreate) SetCover(v string) *MovieCreate {
 	_c.mutation.SetCover(v)
@@ -413,6 +427,10 @@ func (_c *MovieCreate) defaults() error {
 		v := movie.DefaultTitle
 		_c.mutation.SetTitle(v)
 	}
+	if _, ok := _c.mutation.Rating10(); !ok {
+		v := movie.DefaultRating10
+		_c.mutation.SetRating10(v)
+	}
 	if _, ok := _c.mutation.Fanarts(); !ok {
 		if movie.DefaultFanarts == nil {
 			return fmt.Errorf("ent: uninitialized movie.DefaultFanarts (forgotten import ent/runtime?)")
@@ -451,6 +469,9 @@ func (_c *MovieCreate) check() error {
 	}
 	if _, ok := _c.mutation.Title(); !ok {
 		return &ValidationError{Name: "title", err: errors.New(`ent: missing required field "Movie.title"`)}
+	}
+	if _, ok := _c.mutation.Rating10(); !ok {
+		return &ValidationError{Name: "rating10", err: errors.New(`ent: missing required field "Movie.rating10"`)}
 	}
 	if _, ok := _c.mutation.Fanarts(); !ok {
 		return &ValidationError{Name: "fanarts", err: errors.New(`ent: missing required field "Movie.fanarts"`)}
@@ -549,6 +570,10 @@ func (_c *MovieCreate) createSpec() (*Movie, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Rating(); ok {
 		_spec.SetField(movie.FieldRating, field.TypeFloat64, value)
 		_node.Rating = &value
+	}
+	if value, ok := _c.mutation.Rating10(); ok {
+		_spec.SetField(movie.FieldRating10, field.TypeFloat64, value)
+		_node.Rating10 = value
 	}
 	if value, ok := _c.mutation.Cover(); ok {
 		_spec.SetField(movie.FieldCover, field.TypeString, value)
@@ -921,6 +946,24 @@ func (u *MovieUpsert) AddRating(v float64) *MovieUpsert {
 // ClearRating clears the value of the "rating" field.
 func (u *MovieUpsert) ClearRating() *MovieUpsert {
 	u.SetNull(movie.FieldRating)
+	return u
+}
+
+// SetRating10 sets the "rating10" field.
+func (u *MovieUpsert) SetRating10(v float64) *MovieUpsert {
+	u.Set(movie.FieldRating10, v)
+	return u
+}
+
+// UpdateRating10 sets the "rating10" field to the value that was provided on create.
+func (u *MovieUpsert) UpdateRating10() *MovieUpsert {
+	u.SetExcluded(movie.FieldRating10)
+	return u
+}
+
+// AddRating10 adds v to the "rating10" field.
+func (u *MovieUpsert) AddRating10(v float64) *MovieUpsert {
+	u.Add(movie.FieldRating10, v)
 	return u
 }
 
@@ -1335,6 +1378,27 @@ func (u *MovieUpsertOne) UpdateRating() *MovieUpsertOne {
 func (u *MovieUpsertOne) ClearRating() *MovieUpsertOne {
 	return u.Update(func(s *MovieUpsert) {
 		s.ClearRating()
+	})
+}
+
+// SetRating10 sets the "rating10" field.
+func (u *MovieUpsertOne) SetRating10(v float64) *MovieUpsertOne {
+	return u.Update(func(s *MovieUpsert) {
+		s.SetRating10(v)
+	})
+}
+
+// AddRating10 adds v to the "rating10" field.
+func (u *MovieUpsertOne) AddRating10(v float64) *MovieUpsertOne {
+	return u.Update(func(s *MovieUpsert) {
+		s.AddRating10(v)
+	})
+}
+
+// UpdateRating10 sets the "rating10" field to the value that was provided on create.
+func (u *MovieUpsertOne) UpdateRating10() *MovieUpsertOne {
+	return u.Update(func(s *MovieUpsert) {
+		s.UpdateRating10()
 	})
 }
 
@@ -1931,6 +1995,27 @@ func (u *MovieUpsertBulk) UpdateRating() *MovieUpsertBulk {
 func (u *MovieUpsertBulk) ClearRating() *MovieUpsertBulk {
 	return u.Update(func(s *MovieUpsert) {
 		s.ClearRating()
+	})
+}
+
+// SetRating10 sets the "rating10" field.
+func (u *MovieUpsertBulk) SetRating10(v float64) *MovieUpsertBulk {
+	return u.Update(func(s *MovieUpsert) {
+		s.SetRating10(v)
+	})
+}
+
+// AddRating10 adds v to the "rating10" field.
+func (u *MovieUpsertBulk) AddRating10(v float64) *MovieUpsertBulk {
+	return u.Update(func(s *MovieUpsert) {
+		s.AddRating10(v)
+	})
+}
+
+// UpdateRating10 sets the "rating10" field to the value that was provided on create.
+func (u *MovieUpsertBulk) UpdateRating10() *MovieUpsertBulk {
+	return u.Update(func(s *MovieUpsert) {
+		s.UpdateRating10()
 	})
 }
 

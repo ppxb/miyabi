@@ -50,6 +50,8 @@ type Movie struct {
 	SeriesName *string `json:"series_name,omitempty"`
 	// Rating holds the value of the "rating" field.
 	Rating *float64 `json:"rating,omitempty"`
+	// Normalized 10-point rating derived from rating and metadata rating_max.
+	Rating10 float64 `json:"rating10,omitempty"`
 	// Cover holds the value of the "cover" field.
 	Cover *string `json:"cover,omitempty"`
 	// Poster holds the value of the "poster" field.
@@ -126,7 +128,7 @@ func (*Movie) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case movie.FieldFanarts, movie.FieldMetadata, movie.FieldMetadataSnapshot:
 			values[i] = new([]byte)
-		case movie.FieldRating:
+		case movie.FieldRating, movie.FieldRating10:
 			values[i] = new(sql.NullFloat64)
 		case movie.FieldID, movie.FieldDuration:
 			values[i] = new(sql.NullInt64)
@@ -253,6 +255,12 @@ func (_m *Movie) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Rating = new(float64)
 				*_m.Rating = value.Float64
+			}
+		case movie.FieldRating10:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field rating10", values[i])
+			} else if value.Valid {
+				_m.Rating10 = value.Float64
 			}
 		case movie.FieldCover:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -416,6 +424,9 @@ func (_m *Movie) String() string {
 		builder.WriteString("rating=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("rating10=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Rating10))
 	builder.WriteString(", ")
 	if v := _m.Cover; v != nil {
 		builder.WriteString("cover=")

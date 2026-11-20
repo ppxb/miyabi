@@ -278,8 +278,12 @@ func init() {
 	movieDescTitle := movieFields[3].Descriptor()
 	// movie.DefaultTitle holds the default value on creation for the title field.
 	movie.DefaultTitle = movieDescTitle.Default.(string)
+	// movieDescRating10 is the schema descriptor for rating10 field.
+	movieDescRating10 := movieFields[13].Descriptor()
+	// movie.DefaultRating10 holds the default value on creation for the rating10 field.
+	movie.DefaultRating10 = movieDescRating10.Default.(float64)
 	// movieDescFanarts is the schema descriptor for fanarts field.
-	movieDescFanarts := movieFields[15].Descriptor()
+	movieDescFanarts := movieFields[16].Descriptor()
 	// movie.DefaultFanarts holds the default value on creation for the fanarts field.
 	movie.DefaultFanarts = movieDescFanarts.Default.(func() []string)
 	offlinedownloadMixin := schema.OfflineDownload{}.Mixin()

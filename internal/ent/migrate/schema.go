@@ -237,6 +237,7 @@ var (
 		{Name: "series_id", Type: field.TypeString, Nullable: true},
 		{Name: "series_name", Type: field.TypeString, Nullable: true},
 		{Name: "rating", Type: field.TypeFloat64, Nullable: true},
+		{Name: "rating10", Type: field.TypeFloat64, Default: 0},
 		{Name: "cover", Type: field.TypeString, Nullable: true},
 		{Name: "poster", Type: field.TypeString, Nullable: true},
 		{Name: "fanarts", Type: field.TypeJSON},
@@ -259,6 +260,11 @@ var (
 				Name:    "movie_created_at_id",
 				Unique:  false,
 				Columns: []*schema.Column{MoviesColumns[1], MoviesColumns[0]},
+			},
+			{
+				Name:    "movie_rating10_id",
+				Unique:  false,
+				Columns: []*schema.Column{MoviesColumns[16], MoviesColumns[0]},
 			},
 		},
 	}

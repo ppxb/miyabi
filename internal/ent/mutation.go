@@ -6535,6 +6535,8 @@ type MovieMutation struct {
 	series_name       *string
 	rating            *float64
 	addrating         *float64
+	rating10          *float64
+	addrating10       *float64
 	cover             *string
 	poster            *string
 	fanarts           *[]string
@@ -7357,6 +7359,62 @@ func (m *MovieMutation) ResetRating() {
 	delete(m.clearedFields, movie.FieldRating)
 }
 
+// SetRating10 sets the "rating10" field.
+func (m *MovieMutation) SetRating10(f float64) {
+	m.rating10 = &f
+	m.addrating10 = nil
+}
+
+// Rating10 returns the value of the "rating10" field in the mutation.
+func (m *MovieMutation) Rating10() (r float64, exists bool) {
+	v := m.rating10
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRating10 returns the old "rating10" field's value of the Movie entity.
+// If the Movie object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MovieMutation) OldRating10(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRating10 is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRating10 requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRating10: %w", err)
+	}
+	return oldValue.Rating10, nil
+}
+
+// AddRating10 adds f to the "rating10" field.
+func (m *MovieMutation) AddRating10(f float64) {
+	if m.addrating10 != nil {
+		*m.addrating10 += f
+	} else {
+		m.addrating10 = &f
+	}
+}
+
+// AddedRating10 returns the value that was added to the "rating10" field in this mutation.
+func (m *MovieMutation) AddedRating10() (r float64, exists bool) {
+	v := m.addrating10
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRating10 resets all changes to the "rating10" field.
+func (m *MovieMutation) ResetRating10() {
+	m.rating10 = nil
+	m.addrating10 = nil
+}
+
 // SetCover sets the "cover" field.
 func (m *MovieMutation) SetCover(s string) {
 	m.cover = &s
@@ -7890,7 +7948,7 @@ func (m *MovieMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MovieMutation) Fields() []string {
-	fields := make([]string, 0, 21)
+	fields := make([]string, 0, 22)
 	if m.created_at != nil {
 		fields = append(fields, movie.FieldCreatedAt)
 	}
@@ -7935,6 +7993,9 @@ func (m *MovieMutation) Fields() []string {
 	}
 	if m.rating != nil {
 		fields = append(fields, movie.FieldRating)
+	}
+	if m.rating10 != nil {
+		fields = append(fields, movie.FieldRating10)
 	}
 	if m.cover != nil {
 		fields = append(fields, movie.FieldCover)
@@ -7992,6 +8053,8 @@ func (m *MovieMutation) Field(name string) (ent.Value, bool) {
 		return m.SeriesName()
 	case movie.FieldRating:
 		return m.Rating()
+	case movie.FieldRating10:
+		return m.Rating10()
 	case movie.FieldCover:
 		return m.Cover()
 	case movie.FieldPoster:
@@ -8043,6 +8106,8 @@ func (m *MovieMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldSeriesName(ctx)
 	case movie.FieldRating:
 		return m.OldRating(ctx)
+	case movie.FieldRating10:
+		return m.OldRating10(ctx)
 	case movie.FieldCover:
 		return m.OldCover(ctx)
 	case movie.FieldPoster:
@@ -8169,6 +8234,13 @@ func (m *MovieMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetRating(v)
 		return nil
+	case movie.FieldRating10:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRating10(v)
+		return nil
 	case movie.FieldCover:
 		v, ok := value.(string)
 		if !ok {
@@ -8225,6 +8297,9 @@ func (m *MovieMutation) AddedFields() []string {
 	if m.addrating != nil {
 		fields = append(fields, movie.FieldRating)
 	}
+	if m.addrating10 != nil {
+		fields = append(fields, movie.FieldRating10)
+	}
 	return fields
 }
 
@@ -8237,6 +8312,8 @@ func (m *MovieMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedDuration()
 	case movie.FieldRating:
 		return m.AddedRating()
+	case movie.FieldRating10:
+		return m.AddedRating10()
 	}
 	return nil, false
 }
@@ -8259,6 +8336,13 @@ func (m *MovieMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddRating(v)
+		return nil
+	case movie.FieldRating10:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRating10(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Movie numeric field %s", name)
@@ -8412,6 +8496,9 @@ func (m *MovieMutation) ResetField(name string) error {
 		return nil
 	case movie.FieldRating:
 		m.ResetRating()
+		return nil
+	case movie.FieldRating10:
+		m.ResetRating10()
 		return nil
 	case movie.FieldCover:
 		m.ResetCover()

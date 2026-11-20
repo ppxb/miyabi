@@ -130,6 +130,11 @@ func Rating(v float64) predicate.Movie {
 	return predicate.Movie(sql.FieldEQ(FieldRating, v))
 }
 
+// Rating10 applies equality check predicate on the "rating10" field. It's identical to Rating10EQ.
+func Rating10(v float64) predicate.Movie {
+	return predicate.Movie(sql.FieldEQ(FieldRating10, v))
+}
+
 // Cover applies equality check predicate on the "cover" field. It's identical to CoverEQ.
 func Cover(v string) predicate.Movie {
 	return predicate.Movie(sql.FieldEQ(FieldCover, v))
@@ -1078,6 +1083,46 @@ func RatingIsNil() predicate.Movie {
 // RatingNotNil applies the NotNil predicate on the "rating" field.
 func RatingNotNil() predicate.Movie {
 	return predicate.Movie(sql.FieldNotNull(FieldRating))
+}
+
+// Rating10EQ applies the EQ predicate on the "rating10" field.
+func Rating10EQ(v float64) predicate.Movie {
+	return predicate.Movie(sql.FieldEQ(FieldRating10, v))
+}
+
+// Rating10NEQ applies the NEQ predicate on the "rating10" field.
+func Rating10NEQ(v float64) predicate.Movie {
+	return predicate.Movie(sql.FieldNEQ(FieldRating10, v))
+}
+
+// Rating10In applies the In predicate on the "rating10" field.
+func Rating10In(vs ...float64) predicate.Movie {
+	return predicate.Movie(sql.FieldIn(FieldRating10, vs...))
+}
+
+// Rating10NotIn applies the NotIn predicate on the "rating10" field.
+func Rating10NotIn(vs ...float64) predicate.Movie {
+	return predicate.Movie(sql.FieldNotIn(FieldRating10, vs...))
+}
+
+// Rating10GT applies the GT predicate on the "rating10" field.
+func Rating10GT(v float64) predicate.Movie {
+	return predicate.Movie(sql.FieldGT(FieldRating10, v))
+}
+
+// Rating10GTE applies the GTE predicate on the "rating10" field.
+func Rating10GTE(v float64) predicate.Movie {
+	return predicate.Movie(sql.FieldGTE(FieldRating10, v))
+}
+
+// Rating10LT applies the LT predicate on the "rating10" field.
+func Rating10LT(v float64) predicate.Movie {
+	return predicate.Movie(sql.FieldLT(FieldRating10, v))
+}
+
+// Rating10LTE applies the LTE predicate on the "rating10" field.
+func Rating10LTE(v float64) predicate.Movie {
+	return predicate.Movie(sql.FieldLTE(FieldRating10, v))
 }
 
 // CoverEQ applies the EQ predicate on the "cover" field.
