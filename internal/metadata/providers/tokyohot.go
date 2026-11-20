@@ -262,14 +262,7 @@ func splitNames(s string) []string {
 func japaneseDuration(v string) int {
 	v = strings.TrimSpace(v)
 	if strings.HasPrefix(strings.ToUpper(v), "PT") {
-		total := 0
-		if h := regexp.MustCompile(`(\d+)H`).FindStringSubmatch(v); h != nil {
-			total += integer(h[1]) * 60
-		}
-		if m := regexp.MustCompile(`(\d+)M`).FindStringSubmatch(v); m != nil {
-			total += integer(m[1])
-		}
-		return total
+		return codeAVDurationMinutes(v)
 	}
 	if strings.Contains(v, ":") {
 		total := 0

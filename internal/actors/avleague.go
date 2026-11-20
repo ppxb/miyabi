@@ -172,7 +172,7 @@ func parseMeasurements(s string) (measurements, cup string) {
 		}
 		switch strings.TrimSpace(key) {
 		case "B":
-			if ss := regexp.MustCompile(`(\d+)（([A-Z])）`).FindStringSubmatch(data); len(ss) == 3 {
+			if ss := avLeagueMeasurements.FindStringSubmatch(data); len(ss) == 3 {
 				b, _ = strconv.Atoi(ss[1])
 				cup = ss[2]
 			}
@@ -187,6 +187,8 @@ func parseMeasurements(s string) (measurements, cup string) {
 	}
 	return measurements, cup
 }
+
+var avLeagueMeasurements = regexp.MustCompile(`(\d+)（([A-Z])）`)
 
 var avLeagueDate = regexp.MustCompile(`^(\d{4})年(\d{1,2})月(\d{1,2})日`)
 
