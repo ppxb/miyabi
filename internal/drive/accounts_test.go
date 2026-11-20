@@ -29,8 +29,8 @@ func TestAccountRegistryAndMount(t *testing.T) {
 	if err := d.saveAccountMount(ctx, "A", mount); err != nil {
 		t.Fatal(err)
 	}
-	if source, ok := d.Mount(ctx, "A"); !ok || source.Directory.ID != "10" || source.AccountID != "A" {
-		t.Fatalf("mount = %+v, ok = %t", source, ok)
+	if source, ok, err := d.Mount(ctx, "A"); err != nil || !ok || source.Directory.ID != "10" || source.AccountID != "A" {
+		t.Fatalf("mount = %+v, ok = %t, err = %v", source, ok, err)
 	}
 
 	if err := d.removeAccount(ctx, "A"); err != nil {
@@ -39,7 +39,9 @@ func TestAccountRegistryAndMount(t *testing.T) {
 	if d.accountToken("A").AccessToken != "" {
 		t.Fatal("account token was not cleared")
 	}
-	if _, ok := d.Mount(ctx, "A"); ok {
+	if _, ok, err := d.Mount(ctx, "A"); err != nil {
+		t.Fatal(err)
+	} else if ok {
 		t.Fatal("account mount was not cleared")
 	}
 }

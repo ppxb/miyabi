@@ -48,7 +48,7 @@ type LocalTarget struct {
 
 // MountProvider resolves a 115 account's mounted directory.
 type MountProvider interface {
-	Mount(context.Context, string) (domain.LibrarySource, bool)
+	Mount(context.Context, string) (domain.LibrarySource, bool, error)
 }
 
 func New(client *ent.Client) *Service {
@@ -115,7 +115,7 @@ func (s *Service) triggerScans(ctx context.Context, sources []Source) {
 			if accountID == "" || s.mounts == nil {
 				continue
 			}
-			if mount, ok := s.mounts.Mount(ctx, accountID); ok && s.onScan != nil {
+			if mount, ok, err := s.mounts.Mount(ctx, accountID); err == nil && ok && s.onScan != nil {
 				_ = s.onScan(ctx, mount)
 			}
 		}
@@ -137,7 +137,11 @@ func (s *Service) LibrarySources(ctx context.Context) ([]domain.LibrarySource, e
 		if accountID == "" {
 			continue
 		}
-		if mount, ok := s.mounts.Mount(ctx, accountID); ok {
+		mount, ok, err := s.mounts.Mount(ctx, accountID)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
 			result = append(result, mount)
 		}
 	}

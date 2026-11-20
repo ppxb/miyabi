@@ -11,9 +11,9 @@ import (
 
 func TestSelectAndClearDirectoryPerAccount(t *testing.T) {
 	d, _ := mountedTestDrive(t)
-	source, ok := d.Mount(t.Context(), testSource.AccountID)
-	if !ok || source != testSource {
-		t.Fatalf("mount = %+v ok=%t", source, ok)
+	source, ok, err := d.Mount(t.Context(), testSource.AccountID)
+	if err != nil || !ok || source != testSource {
+		t.Fatalf("mount = %+v ok=%t err=%v", source, ok, err)
 	}
 	mounts, err := d.Mounts(t.Context())
 	if err != nil || len(mounts) != 1 || mounts[0] != testSource {
@@ -22,7 +22,9 @@ func TestSelectAndClearDirectoryPerAccount(t *testing.T) {
 	if err := d.ClearDirectoryForAccount(t.Context(), testSource.AccountID); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := d.Mount(t.Context(), testSource.AccountID); ok {
+	if _, ok, err := d.Mount(t.Context(), testSource.AccountID); err != nil {
+		t.Fatal(err)
+	} else if ok {
 		t.Fatal("clear kept the mount")
 	}
 	if mounts, err := d.Mounts(t.Context()); err != nil || len(mounts) != 0 {
@@ -57,10 +59,10 @@ func TestSelectDirectoryForAccountIndependent(t *testing.T) {
 	}
 	selectTestDirectory(t, d, client, "A", domain.LibraryDirectory{ID: "10", Name: "A", Path: "/A"})
 	selectTestDirectory(t, d, client, "B", domain.LibraryDirectory{ID: "20", Name: "B", Path: "/B"})
-	if source, ok := d.Mount(t.Context(), "A"); !ok || source.Directory.ID != "10" {
-		t.Fatalf("account A mount = %+v ok=%t", source, ok)
+	if source, ok, err := d.Mount(t.Context(), "A"); err != nil || !ok || source.Directory.ID != "10" {
+		t.Fatalf("account A mount = %+v ok=%t err=%v", source, ok, err)
 	}
-	if source, ok := d.Mount(t.Context(), "B"); !ok || source.Directory.ID != "20" {
-		t.Fatalf("account B mount = %+v ok=%t", source, ok)
+	if source, ok, err := d.Mount(t.Context(), "B"); err != nil || !ok || source.Directory.ID != "20" {
+		t.Fatalf("account B mount = %+v ok=%t err=%v", source, ok, err)
 	}
 }

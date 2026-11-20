@@ -130,12 +130,15 @@ func (service *Service) syncSource(ctx context.Context, source domain.LibrarySou
 // currentMountFor returns the account's currently stored mount when it still
 // matches the download's directory, so a targeted scan is only queued while the
 // task's own source is mounted.
-func (service *Service) currentMountFor(ctx context.Context, record *ent.OfflineDownload) *domain.LibrarySource {
-	source, ok := service.drive.Mount(ctx, record.AccountID)
-	if !ok || source.Directory.ID != record.DirectoryID {
-		return nil
+func (service *Service) currentMountFor(ctx context.Context, record *ent.OfflineDownload) (*domain.LibrarySource, error) {
+	source, ok, err := service.drive.Mount(ctx, record.AccountID)
+	if err != nil {
+		return nil, err
 	}
-	return &source
+	if !ok || source.Directory.ID != record.DirectoryID {
+		return nil, nil
+	}
+	return &source, nil
 }
 
 // UpdateTask applies a 115 offline remote task state to a local offline task.
@@ -152,7 +155,10 @@ func (service *Service) UpdateTask(ctx context.Context, sess drive.Session, reco
 	}
 
 	notify := false
-	scanSource := service.currentMountFor(ctx, record)
+	scanSource, err := service.currentMountFor(ctx, record)
+	if err != nil {
+		return err
+	}
 	err = sess.CommitAccount(ctx, func(tx *ent.Tx) error {
 		current, err := tx.OfflineDownload.Get(ctx, record.ID)
 		if err != nil {

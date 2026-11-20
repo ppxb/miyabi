@@ -30,7 +30,10 @@ func (s *accountSession) checkSource(ctx context.Context) error {
 	if s.drive.accountAuthVersion(s.accountID) != s.authVersion {
 		return ErrSourceChanged
 	}
-	source, ok := s.drive.Mount(ctx, s.accountID)
+	source, ok, err := s.drive.Mount(ctx, s.accountID)
+	if err != nil {
+		return err
+	}
 	if !ok || source.Directory.ID != s.source.Directory.ID {
 		return ErrSourceChanged
 	}

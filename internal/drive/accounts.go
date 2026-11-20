@@ -151,13 +151,17 @@ func (d *Drive) accountRecord(ctx context.Context, accountID string) (accountRec
 	return store[accountID], nil
 }
 
-// Mount returns the stored library source of an account when it has one.
-func (d *Drive) Mount(ctx context.Context, accountID string) (domain.LibrarySource, bool) {
+// Mount returns the stored library source of an account when it has one. A
+// missing mount reports ok=false with a nil error; a read failure surfaces err.
+func (d *Drive) Mount(ctx context.Context, accountID string) (domain.LibrarySource, bool, error) {
 	record, err := d.accountRecord(ctx, accountID)
-	if err != nil || record.Directory.ID == "" || record.Directory.AccountID == "" {
-		return domain.LibrarySource{}, false
+	if err != nil {
+		return domain.LibrarySource{}, false, err
 	}
-	return record.Directory.source(), true
+	if record.Directory.ID == "" || record.Directory.AccountID == "" {
+		return domain.LibrarySource{}, false, nil
+	}
+	return record.Directory.source(), true, nil
 }
 
 // Mounts returns every stored account's mounted library source, without

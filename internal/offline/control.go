@@ -37,7 +37,10 @@ func (s *Service) advance(ctx context.Context, id int, requested string) (domain
 	if err != nil {
 		return domain.OfflineSubmission{}, err
 	}
-	sourceValue, ok := s.drive.Mount(ctx, record.AccountID)
+	sourceValue, ok, err := s.drive.Mount(ctx, record.AccountID)
+	if err != nil {
+		return domain.OfflineSubmission{}, err
+	}
 	if !ok || sourceValue.Directory.ID != record.DirectoryID {
 		return domain.OfflineSubmission{}, drive.ErrSourceChanged
 	}
@@ -148,8 +151,12 @@ func (s *Service) removeCurrent(ctx context.Context, sess drive.Session, record 
 		return err
 	}
 	if found && remote.Status == 2 {
+		mount, err := s.currentMountFor(ctx, record)
+		if err != nil {
+			return err
+		}
 		return sess.Commit(ctx, func(tx *ent.Tx) error {
-			return s.completeTask(ctx, tx, record, remote.FileID, s.currentMountFor(ctx, record))
+			return s.completeTask(ctx, tx, record, remote.FileID, mount)
 		})
 	}
 	if found && remote.Status != 0 && remote.Status != 1 && remote.Status != -1 {
@@ -254,13 +261,21 @@ func (s *Service) recordSubmission(ctx context.Context, sess drive.Session, reco
 	state.RetryAt, state.Failures = time.Time{}, 0
 	state.Attempts[len(state.Attempts)-1].InfoHash = strings.ToLower(remote.Hash)
 	state.ObservedAt, state.ProgressAt, state.Progress, state.RemoteStatus = s.now(), s.now(), rawProgress(remote), remote.Status
+	var mount *domain.LibrarySource
+	if remote.Status == 2 {
+		m, err := s.currentMountFor(ctx, record)
+		if err != nil {
+			return err
+		}
+		mount = m
+	}
 	return s.drive.Commit(ctx, func(tx *ent.Tx) error {
 		if err := tx.OfflineDownload.UpdateOneID(record.ID).SetInfoHash(remote.Hash).SetRecovery(state).SetProgress(remote.Progress).ClearError().Exec(ctx); err != nil {
 			return err
 		}
 		if remote.Status == 2 {
 			record.Recovery = state
-			return s.completeTask(ctx, tx, record, remote.FileID, s.currentMountFor(ctx, record))
+			return s.completeTask(ctx, tx, record, remote.FileID, mount)
 		}
 		return nil
 	})

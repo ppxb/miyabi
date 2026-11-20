@@ -140,7 +140,10 @@ func (relay *Relay) sessionForFile(ctx context.Context, fileID string) (drive.Se
 		}
 		return nil, domain.LibrarySource{}, "", fmt.Errorf("read indexed video: %w", err)
 	}
-	source, ok := relay.drive.Mount(ctx, record.AccountID)
+	source, ok, err := relay.drive.Mount(ctx, record.AccountID)
+	if err != nil {
+		return nil, domain.LibrarySource{}, "", err
+	}
 	if !ok || source.Directory.ID != record.RootID {
 		return nil, domain.LibrarySource{}, "", drive.ErrSourceChanged
 	}

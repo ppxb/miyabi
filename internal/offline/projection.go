@@ -52,7 +52,10 @@ func (service *Service) ActivityForAccount(ctx context.Context, accountID string
 	if accountID == "" {
 		return service.Activity(ctx)
 	}
-	source, ok := service.drive.Mount(ctx, accountID)
+	source, ok, err := service.drive.Mount(ctx, accountID)
+	if err != nil {
+		return Activity{}, err
+	}
 	if !ok {
 		return Activity{Tasks: []domain.OfflineSubmission{}}, nil
 	}

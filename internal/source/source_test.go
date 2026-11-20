@@ -98,9 +98,9 @@ type fakeMounts struct {
 	mounts map[string]domain.LibrarySource
 }
 
-func (f fakeMounts) Mount(_ context.Context, accountID string) (domain.LibrarySource, bool) {
+func (f fakeMounts) Mount(_ context.Context, accountID string) (domain.LibrarySource, bool, error) {
 	source, ok := f.mounts[accountID]
-	return source, ok
+	return source, ok, nil
 }
 
 func TestLibrarySources(t *testing.T) {

@@ -72,7 +72,10 @@ func (service *Service) addForAccount(ctx context.Context, accountID, movieID, c
 	if accountID == "" {
 		return domain.OfflineSubmission{}, domain.E(domain.KindInvalid, "请选择 115 账号", nil)
 	}
-	source, ok := service.drive.Mount(ctx, accountID)
+	source, ok, err := service.drive.Mount(ctx, accountID)
+	if err != nil {
+		return domain.OfflineSubmission{}, err
+	}
 	if !ok {
 		return domain.OfflineSubmission{}, domain.E(domain.KindInvalid, "所选 115 账号未挂载媒体目录", nil)
 	}
