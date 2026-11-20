@@ -56,6 +56,10 @@ func init() {
 	actorDescName := actorFields[2].Descriptor()
 	// actor.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	actor.NameValidator = actorDescName.Validators[0].(func(string) error)
+	// actorDescNameKey is the schema descriptor for name_key field.
+	actorDescNameKey := actorFields[6].Descriptor()
+	// actor.DefaultNameKey holds the default value on creation for the name_key field.
+	actor.DefaultNameKey = actorDescNameKey.Default.(string)
 	actoraliasMixin := schema.ActorAlias{}.Mixin()
 	actoraliasMixinFields0 := actoraliasMixin[0].Fields()
 	_ = actoraliasMixinFields0

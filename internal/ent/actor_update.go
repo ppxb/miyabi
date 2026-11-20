@@ -132,6 +132,20 @@ func (_u *ActorUpdate) ClearAvatar() *ActorUpdate {
 	return _u
 }
 
+// SetNameKey sets the "name_key" field.
+func (_u *ActorUpdate) SetNameKey(v string) *ActorUpdate {
+	_u.mutation.SetNameKey(v)
+	return _u
+}
+
+// SetNillableNameKey sets the "name_key" field if the given value is not nil.
+func (_u *ActorUpdate) SetNillableNameKey(v *string) *ActorUpdate {
+	if v != nil {
+		_u.SetNameKey(*v)
+	}
+	return _u
+}
+
 // AddMovieIDs adds the "movies" edge to the Movie entity by IDs.
 func (_u *ActorUpdate) AddMovieIDs(ids ...int) *ActorUpdate {
 	_u.mutation.AddMovieIDs(ids...)
@@ -297,6 +311,9 @@ func (_u *ActorUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.AvatarCleared() {
 		_spec.ClearField(actor.FieldAvatar, field.TypeString)
+	}
+	if value, ok := _u.mutation.NameKey(); ok {
+		_spec.SetField(actor.FieldNameKey, field.TypeString, value)
 	}
 	if _u.mutation.MoviesCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -491,6 +508,20 @@ func (_u *ActorUpdateOne) SetNillableAvatar(v *string) *ActorUpdateOne {
 // ClearAvatar clears the value of the "avatar" field.
 func (_u *ActorUpdateOne) ClearAvatar() *ActorUpdateOne {
 	_u.mutation.ClearAvatar()
+	return _u
+}
+
+// SetNameKey sets the "name_key" field.
+func (_u *ActorUpdateOne) SetNameKey(v string) *ActorUpdateOne {
+	_u.mutation.SetNameKey(v)
+	return _u
+}
+
+// SetNillableNameKey sets the "name_key" field if the given value is not nil.
+func (_u *ActorUpdateOne) SetNillableNameKey(v *string) *ActorUpdateOne {
+	if v != nil {
+		_u.SetNameKey(*v)
+	}
 	return _u
 }
 
@@ -689,6 +720,9 @@ func (_u *ActorUpdateOne) sqlSave(ctx context.Context) (_node *Actor, err error)
 	}
 	if _u.mutation.AvatarCleared() {
 		_spec.ClearField(actor.FieldAvatar, field.TypeString)
+	}
+	if value, ok := _u.mutation.NameKey(); ok {
+		_spec.SetField(actor.FieldNameKey, field.TypeString, value)
 	}
 	if _u.mutation.MoviesCleared() {
 		edge := &sqlgraph.EdgeSpec{

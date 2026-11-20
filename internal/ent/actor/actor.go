@@ -31,6 +31,8 @@ const (
 	FieldGender = "gender"
 	// FieldAvatar holds the string denoting the avatar field in the database.
 	FieldAvatar = "avatar"
+	// FieldNameKey holds the string denoting the name_key field in the database.
+	FieldNameKey = "name_key"
 	// EdgeMovies holds the string denoting the movies edge name in mutations.
 	EdgeMovies = "movies"
 	// EdgeProfile holds the string denoting the profile edge name in mutations.
@@ -62,6 +64,7 @@ var Columns = []string{
 	FieldNameZht,
 	FieldGender,
 	FieldAvatar,
+	FieldNameKey,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "actors"
@@ -104,6 +107,8 @@ var (
 	SourceIDValidator func(string) error
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
+	// DefaultNameKey holds the default value on creation for the "name_key" field.
+	DefaultNameKey string
 )
 
 // Gender defines the type for the "gender" enum field.
@@ -179,6 +184,11 @@ func ByGender(opts ...sql.OrderTermOption) OrderOption {
 // ByAvatar orders the results by the avatar field.
 func ByAvatar(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAvatar, opts...).ToFunc()
+}
+
+// ByNameKey orders the results by the name_key field.
+func ByNameKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNameKey, opts...).ToFunc()
 }
 
 // ByMoviesCount orders the results by movies count.

@@ -19,6 +19,7 @@ var (
 		{Name: "name_zht", Type: field.TypeString, Nullable: true},
 		{Name: "gender", Type: field.TypeEnum, Enums: []string{"female", "male", "unknown"}, Default: "unknown"},
 		{Name: "avatar", Type: field.TypeString, Nullable: true},
+		{Name: "name_key", Type: field.TypeString, Default: ""},
 		{Name: "actor_profile", Type: field.TypeInt, Nullable: true},
 	}
 	// ActorsTable holds the schema information for the "actors" table.
@@ -29,7 +30,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "actors_actor_profiles_profile",
-				Columns:    []*schema.Column{ActorsColumns[9]},
+				Columns:    []*schema.Column{ActorsColumns[10]},
 				RefColumns: []*schema.Column{ActorProfilesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -39,6 +40,16 @@ var (
 				Name:    "actor_provider_source_id",
 				Unique:  true,
 				Columns: []*schema.Column{ActorsColumns[3], ActorsColumns[4]},
+			},
+			{
+				Name:    "actor_name_key",
+				Unique:  false,
+				Columns: []*schema.Column{ActorsColumns[9]},
+			},
+			{
+				Name:    "actor_actor_profile",
+				Unique:  false,
+				Columns: []*schema.Column{ActorsColumns[10]},
 			},
 		},
 	}

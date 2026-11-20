@@ -125,6 +125,7 @@ func SaveMovieMetadata(ctx context.Context, tx *ent.Tx, id int, doc nfo.Movie) e
 			gender = actor.GenderUnknown
 		}
 		actors = append(actors, tx.Actor.Create().SetProvider(person.Provider).SetSourceID(person.ID).SetName(person.Name).
+			SetNameKey(domain.ActorNameKey(person.Name)).
 			SetNameZht(person.NameZHT).SetGender(gender).SetAvatar(person.Thumb))
 		actorPredicates = append(actorPredicates, actor.And(actor.ProviderEQ(person.Provider), actor.SourceIDEQ(person.ID)))
 	}

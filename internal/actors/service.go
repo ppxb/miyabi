@@ -20,6 +20,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/atomicfile"
 	"github.com/ppxb/miyabi/internal/database"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/actoralias"
@@ -173,13 +174,7 @@ func Key(norm string) string {
 
 // normalizeName lowercases and drops all whitespace so "... りり" == "...りり".
 func normalizeName(name string) string {
-	name = strings.ToLower(strings.TrimSpace(name))
-	return strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) {
-			return -1
-		}
-		return r
-	}, name)
+	return domain.NormalizeActorName(name)
 }
 
 type group struct {
@@ -637,32 +632,43 @@ func (s *Service) imageRels(ctx context.Context, names []string) []string {
 	return rels
 }
 
-// findNames resolves a key to the group's names using a lightweight name-only
-// query (no movie edges), for image serving.
+// findNames resolves a key to the group's names via the indexed name_key column,
+// so avatar serving stays O(log n) instead of scanning every actor.
 func (s *Service) findNames(ctx context.Context, key string) ([]string, error) {
 	records, err := s.db.Actor.Query().
+		Where(actor.NameKeyEQ(key)).
 		Select(actor.FieldName).
-		WithProfile(func(q *ent.ActorProfileQuery) { q.Select(actorprofile.FieldMatchKey) }).
 		All(ctx)
 	if err != nil {
 		return nil, err
 	}
 	seen := make(map[string]bool)
 	var names []string
+	add := func(name string) {
+		if name == "" || seen[name] {
+			return
+		}
+		seen[name] = true
+		names = append(names, name)
+	}
 	for _, r := range records {
-		norm := normalizeName(r.Name)
-		if norm == "" || seen[r.Name] {
-			continue
+		add(r.Name)
+	}
+	// Also include provider rows merged into the same canonical profile (e.g. a
+	// Latin alias of a CJK actor), matching the previous profile-aware lookup.
+	if len(records) > 0 {
+		norm := normalizeName(records[0].Name)
+		if pid, perr := s.db.ActorProfile.Query().Where(actorprofile.MatchKeyEQ(norm)).OnlyID(ctx); perr == nil {
+			linked, lerr := s.db.Actor.Query().
+				Where(actor.HasProfileWith(actorprofile.ID(pid))).
+				Select(actor.FieldName).
+				All(ctx)
+			if lerr == nil {
+				for _, r := range linked {
+					add(r.Name)
+				}
+			}
 		}
-		match := Key(norm) == key
-		if !match && r.Edges.Profile != nil && Key(r.Edges.Profile.MatchKey) == key {
-			match = true
-		}
-		if !match {
-			continue
-		}
-		seen[r.Name] = true
-		names = append(names, r.Name)
 	}
 	if len(names) == 0 {
 		return nil, ErrNotFound

@@ -30,6 +30,9 @@ func (Actor) Fields() []ent.Field {
 		field.String("avatar").
 			Optional().
 			Nillable(),
+		field.String("name_key").
+			Default("").
+			Comment("sha1 of the normalized name; indexed for O(log n) avatar lookups."),
 	}
 }
 
@@ -43,5 +46,9 @@ func (Actor) Edges() []ent.Edge {
 }
 
 func (Actor) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("provider", "source_id").Unique()}
+	return []ent.Index{
+		index.Fields("provider", "source_id").Unique(),
+		index.Fields("name_key"),
+		index.Edges("profile"),
+	}
 }

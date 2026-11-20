@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/database"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/actorprofile"
@@ -177,5 +178,31 @@ func TestMergeMovieCrossLanguageSkipsMultiCast(t *testing.T) {
 	}
 	if n != 0 {
 		t.Fatalf("merged=%d, want 0 (ambiguous multi-cast)", n)
+	}
+}
+
+func TestFindNamesByIndexedKey(t *testing.T) {
+	ctx := context.Background()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	db := store.Client
+
+	key := domain.ActorNameKey("七ツ森 りり")
+	db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("七ツ森 りり").SetNameKey(key).SaveX(ctx)
+	db.Actor.Create().SetProvider("duga").SetSourceID("x2").SetName("七ツ森りり").SetNameKey(domain.ActorNameKey("七ツ森りり")).SaveX(ctx)
+
+	names, err := New(db, nil, "", nil).findNames(ctx, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 2 || names[0] != "七ツ森 りり" || names[1] != "七ツ森りり" {
+		t.Fatalf("findNames=%v, want both normalized spellings", names)
+	}
+
+	if _, err := New(db, nil, "", nil).findNames(ctx, "missing"); err != ErrNotFound {
+		t.Fatalf("findNames(missing) err=%v, want ErrNotFound", err)
 	}
 }

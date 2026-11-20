@@ -34,6 +34,8 @@ type Actor struct {
 	Gender actor.Gender `json:"gender,omitempty"`
 	// Avatar holds the value of the "avatar" field.
 	Avatar *string `json:"avatar,omitempty"`
+	// sha1 of the normalized name; indexed for O(log n) avatar lookups.
+	NameKey string `json:"name_key,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the ActorQuery when eager-loading is set.
 	Edges         ActorEdges `json:"edges"`
@@ -79,7 +81,7 @@ func (*Actor) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case actor.FieldID:
 			values[i] = new(sql.NullInt64)
-		case actor.FieldProvider, actor.FieldSourceID, actor.FieldName, actor.FieldNameZht, actor.FieldGender, actor.FieldAvatar:
+		case actor.FieldProvider, actor.FieldSourceID, actor.FieldName, actor.FieldNameZht, actor.FieldGender, actor.FieldAvatar, actor.FieldNameKey:
 			values[i] = new(sql.NullString)
 		case actor.FieldCreatedAt, actor.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -155,6 +157,12 @@ func (_m *Actor) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Avatar = new(string)
 				*_m.Avatar = value.String
+			}
+		case actor.FieldNameKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field name_key", values[i])
+			} else if value.Valid {
+				_m.NameKey = value.String
 			}
 		case actor.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -236,6 +244,9 @@ func (_m *Actor) String() string {
 		builder.WriteString("avatar=")
 		builder.WriteString(*v)
 	}
+	builder.WriteString(", ")
+	builder.WriteString("name_key=")
+	builder.WriteString(_m.NameKey)
 	builder.WriteByte(')')
 	return builder.String()
 }
