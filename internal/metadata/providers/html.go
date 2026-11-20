@@ -42,10 +42,25 @@ func nodes(n *html.Node, match func(*html.Node) bool) []*html.Node {
 	return result
 }
 func first(n *html.Node, match func(*html.Node) bool) *html.Node {
-	for _, found := range nodes(n, match) {
-		return found
+	var found *html.Node
+	var walk func(*html.Node) bool
+	walk = func(node *html.Node) bool {
+		if node == nil {
+			return false
+		}
+		if node.Type == html.ElementNode && match(node) {
+			found = node
+			return true
+		}
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			if walk(child) {
+				return true
+			}
+		}
+		return false
 	}
-	return nil
+	walk(n)
+	return found
 }
 func tag(n *html.Node, name string) *html.Node {
 	return first(n, func(n *html.Node) bool { return n.Data == name })
