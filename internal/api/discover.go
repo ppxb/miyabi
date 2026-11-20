@@ -103,9 +103,14 @@ func discoverMovieHandler(discover CatalogueManager, metadata MetadataManager) g
 		if !ok {
 			return
 		}
-		// A known code resolves detail from the multi-source metadata layer with
-		// JavDB excluded, so FC2 and other titles JavDB cannot serve still load.
-		if code := codeid.Normalize(query.Code); code != "" && codeid.Valid(code) {
+		// The discover identity is the normalized code. Detail resolves from the
+		// multi-source metadata layer with JavDB excluded, using the explicit
+		// code when supplied and falling back to the path id otherwise.
+		code := codeid.Normalize(query.Code)
+		if code == "" {
+			code = codeid.Normalize(uri.ID)
+		}
+		if code != "" && codeid.Valid(code) {
 			meta, err := metadata.ResolveExcept(c.Request.Context(), domain.MovieRef{Code: code}, "javdb")
 			if err != nil {
 				respond(c, nil, err)
