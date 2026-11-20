@@ -110,7 +110,7 @@ export function MoviePreviewViewer({
 
         <div
           ref={stripRef}
-          className="flex shrink-0 scrollbar-none overflow-x-auto px-4 pt-4 pb-6 [&::-webkit-scrollbar]:hidden"
+          className="flex shrink-0 no-scrollbar overflow-x-auto px-4 pt-4 pb-6"
         >
           {/* Centered while the thumbnails fit, still scrollable once they do not. */}
           <div className="mx-auto flex items-center gap-2">

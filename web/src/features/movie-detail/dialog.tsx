@@ -31,7 +31,7 @@ export function MovieDetailDialogProvider({ children }: PropsWithChildren) {
           <DialogTitle className="sr-only">影片详情</DialogTitle>
           <div
             key={movie && movieDetailKey(movie)}
-            className="min-h-0 flex-1 scroll-fade scrollbar-none overflow-y-auto overscroll-contain p-4 sm:p-6 [&::-webkit-scrollbar]:hidden"
+            className="min-h-0 flex-1 scroll-fade no-scrollbar overflow-y-auto overscroll-contain p-4 sm:p-6"
           >
             <Suspense fallback={<MovieDetailSkeleton />}>
               {movie ? <MovieDetailContent movie={movie} /> : null}
