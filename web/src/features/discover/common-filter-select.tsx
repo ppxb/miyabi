@@ -17,9 +17,14 @@ export function CommonFilterSelect({
   value: string
   onValueChange: (value: string) => void
 }) {
+  const items = [
+    { value: 'all', label: '全部条件' },
+    ...options.map(option => ({ value: option.id, label: option.name }))
+  ]
   return (
     <Select
       value={value || 'all'}
+      items={items}
       onValueChange={next => onValueChange(next === 'all' ? '' : (next ?? ''))}
     >
       <SelectTrigger className="w-full sm:w-48">

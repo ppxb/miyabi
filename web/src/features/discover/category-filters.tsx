@@ -33,11 +33,17 @@ export function CategoryFilters({
   )
   const selectedCategory = categories.find(item => item.id === categoryID) ?? categories[0]
   const effectiveCategoryID = selectedCategory?.id ?? ''
+  const categoryItems = categories.map(item => ({ value: item.id, label: item.name }))
+  const tagItems = [
+    { value: 'all', label: '全部标签' },
+    ...(selectedCategory?.tags ?? []).map(tag => ({ value: tag.id, label: tag.name }))
+  ]
 
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
       <Select
         value={zone}
+        items={zones}
         onValueChange={value =>
           updateCategory({ zone: (value ?? '') as Zone, categoryID: '', tagID: '', main: '' })
         }
@@ -74,6 +80,7 @@ export function CategoryFilters({
         <>
           <Select
             value={effectiveCategoryID}
+            items={categoryItems}
             onValueChange={value => updateCategory({ categoryID: value ?? '', tagID: '' })}
           >
             <SelectTrigger className="w-full sm:w-48">
@@ -91,6 +98,7 @@ export function CategoryFilters({
           </Select>
           <Select
             value={tagID || 'all'}
+            items={tagItems}
             onValueChange={value =>
               updateCategory({
                 categoryID: effectiveCategoryID,

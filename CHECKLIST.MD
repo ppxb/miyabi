@@ -9,7 +9,7 @@
 
 ## P0 · 功能 Bug（优先修复）
 
-- [ ] 🔴 ✅ **Select 显示原始 value 而非中文标签**：base-ui `SelectValue` 无 children 且 Root 未传 `items` 时直接显示 value。
+- [x] 🔴 ✅ **Select 显示原始 value 而非中文标签**：base-ui `SelectValue` 无 children 且 Root 未传 `items` 时直接显示 value。（已修复：各 Select 传 `items`）
   - `web/src/features/discover/category-filters.tsx:39`（分区）、`:75`（分类）、`:92`（标签）
   - `web/src/features/discover/common-filter-select.tsx:21`
   - `web/src/features/settings/subscription-section.tsx:93`、`:114`、`:133`
