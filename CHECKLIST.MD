@@ -62,7 +62,7 @@
 - [x] 🟢 ✅ 正则在函数内编译：`metadata/providers/tokyohot.go:266,269`、`actors/avleague.go:175`。改法：包级变量；tokyohot 可复用 `codeAVDuration`。（已修复：`japaneseDuration` 的 PT 分支改为直接复用包级 `codeAVDurationMinutes`，不再每次现编译 `(\d+)H`/`(\d+)M`；`parseMeasurements` 的身材正则在包级 `avLeagueMeasurements` 预编译。`go build`/`go test ./internal/metadata/... ./internal/actors/...` 通过）
 - [x] 🟢 ✅ `[]byte`→`string` 多余拷贝：`actors/avleague.go:80,112`、`providers/codeav.go:91`。改法：`bytes.NewReader`。（已修复：三处 `html.Parse(strings.NewReader(string(body)))` 改为 `html.Parse(bytes.NewReader(body))`，省去 `[]byte→string` 拷贝。`go build`/`go test ./internal/actors/... ./internal/metadata/...` 通过）
 - [x] 🟢 ✅ `internal/netx/ssrf.go:187,198`：前置 `ValidateSafeURL` 与拨号时重复 DNS 解析。（已修复·方案A：新增只做语法/字面量检查、**不解析 DNS** 的 `validateSafeURLShape`；`CheckRedirect` 按代理状态分流——配置了代理时仍用完整 `ValidateSafeURL`（代理拨号不校验目标，必须在此拦），直连时用 shape（拨号阶段已解析并直连已校验 IP）。`SafeDownload` 的预检保持完整（拿不到 proxy 状态，代理场景必需），已加注释说明。新增 `TestValidateSafeURLShapeSkipsDNS` 断言 `.invalid` 域名不做 DNS。`go build`/`go vet`/`go test ./internal/netx/... ./internal/subtitle/... ./internal/freejavbt/... ./internal/metadata/...` 通过）
-- [ ] 🟢 `internal/ent/schema/task.go:43`：索引 `(type,status)` 是 `(type,status,retry_at)` 的前缀，冗余。
+- [x] 🟢 ✅（核实为非问题，保留。`internal/ent/schema/task.go:43`：索引 `(type,status)` 虽是 `(type,status,retry_at)` 的前缀，但**并不冗余**——`tasks.Queue.Claim` 以 `ORDER BY id` 领取任务，依赖该索引的隐式 rowid 顺序避免排序；`(type,status,retry_at)` 是给 `NextRetry` 按 `retry_at` 排序用的。`internal/database/task_indexes_test.go` 亦断言 batch claim 命中 `task_type_status` 且无 TEMP B-TREE，删掉会导致该测试失败与领任务退化。故保持现状，不改 schema。）
 
 ### 前端
 - [ ] 🟠 ✅ `web/src/features/tasks/task-events.tsx:45,138`：`revisions` 为 effect 局部变量且 onerror 清空，每次重连全量刷新四类查询。改法：`useRef` 跨重连保留（⚠️ 先确认后端 revision 重启是否归零）。
