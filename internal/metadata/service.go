@@ -165,7 +165,7 @@ func (s *Service) resolve(ctx context.Context, ref domain.MovieRef, skip map[str
 	answered := false
 	for _, layer := range codeid.Layers(ref.Code) {
 		var results []domain.MovieMetadata
-		var merged domain.MovieMetadata
+		var confirmedCode string
 		for _, setting := range settings {
 			if !setting.Enabled || skip[setting.ID] {
 				continue
@@ -182,10 +182,17 @@ func (s *Service) resolve(ctx context.Context, ref domain.MovieRef, skip map[str
 				}
 				continue
 			}
-			if merged.Detail.Code != "" && !codeid.IsFormatEquivalent(merged.Detail.Code, result.Detail.Code) {
-				return domain.MovieMetadata{}, domain.E(domain.KindConflict, "来源匹配到了不同影片，无法自动合并", nil)
+			if code := result.Detail.Code; code != "" {
+				if confirmedCode == "" {
+					confirmedCode = code
+				} else if !codeid.IsFormatEquivalent(confirmedCode, code) {
+					return domain.MovieMetadata{}, domain.E(domain.KindConflict, "来源匹配到了不同影片，无法自动合并", nil)
+				}
 			}
 			results = append(results, result)
+		}
+		var merged domain.MovieMetadata
+		if len(results) > 0 {
 			merged = merge(results)
 		}
 		if err := ctx.Err(); err != nil {
