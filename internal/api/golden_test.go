@@ -161,6 +161,8 @@ func (goldenTasks) Revisions() tasks.TaskRevisions {
 	return tasks.TaskRevisions{Library: 4, Offline: 2, Monitor: 3}
 }
 
+func (goldenTasks) Instance() string { return "golden" }
+
 type goldenOffline struct {
 	OfflineManager
 }

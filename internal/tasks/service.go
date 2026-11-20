@@ -20,6 +20,7 @@ func (s *Service) Registry() *Registry { return s.registry }
 func (s *Service) Subscribe() (<-chan struct{}, func())     { return s.bus.Subscribe() }
 func (s *Service) SubscribePool() (<-chan struct{}, func()) { return s.bus.SubscribePool() }
 func (s *Service) Revisions() TaskRevisions                 { return s.bus.Revisions() }
+func (s *Service) Instance() string                         { return s.bus.Instance() }
 func (s *Service) Version() uint64                          { return s.bus.Version() }
 func (s *Service) NotifyUI()                                { s.bus.NotifyUI() }
 func (s *Service) WakePool()                                { s.bus.WakePool() }

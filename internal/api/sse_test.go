@@ -56,6 +56,8 @@ func (stub *sseTaskStub) Revisions() tasks.TaskRevisions {
 	return stub.revisions
 }
 
+func (stub *sseTaskStub) Instance() string { return "sse-test" }
+
 func (stub *sseTaskStub) publish(progress int) {
 	stub.mu.Lock()
 	stub.progress = progress
@@ -139,9 +141,12 @@ func TestTaskEventsStreamsSnapshotsAndRevisionsUntilTheClientLeaves(t *testing.T
 		if changes.name != "changes" {
 			t.Fatalf("event = %+v, want changes", changes)
 		}
-		var revisions tasks.TaskRevisions
-		if err := json.Unmarshal([]byte(changes.data), &revisions); err != nil || revisions.Library != revision {
-			t.Fatalf("changes payload = %s (%v), want library revision %d", changes.data, err, revision)
+		var payload struct {
+			tasks.TaskRevisions
+			Instance string `json:"instance"`
+		}
+		if err := json.Unmarshal([]byte(changes.data), &payload); err != nil || payload.Library != revision || payload.Instance != "sse-test" {
+			t.Fatalf("changes payload = %s (%v), want library revision %d and instance sse-test", changes.data, err, revision)
 		}
 	}
 	// The stream opens with a snapshot even when nothing changed yet.
@@ -189,3 +194,5 @@ func (*sseFailingTasks) List(context.Context) ([]domain.TaskInfo, error) {
 }
 
 func (*sseFailingTasks) Revisions() tasks.TaskRevisions { return tasks.TaskRevisions{} }
+
+func (*sseFailingTasks) Instance() string { return "" }

@@ -11,6 +11,7 @@ import (
 
 type TaskManager interface {
 	Revisions() tasks.TaskRevisions
+	Instance() string
 	List(context.Context) ([]domain.TaskInfo, error)
 	Retry(context.Context, int) (domain.TaskInfo, error)
 	SetLibraryPaused(context.Context, bool) error

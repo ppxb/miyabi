@@ -23,7 +23,7 @@ func taskEventsHandler(tasks TaskManager) gin.HandlerFunc {
 		c.Header("Connection", "keep-alive")
 		c.Header("X-Accel-Buffering", "no")
 		c.SSEvent("tasks", snapshot)
-		c.SSEvent("changes", tasks.Revisions())
+		c.SSEvent("changes", taskChangesEvent(tasks))
 		c.Writer.Flush()
 		heartbeat := time.NewTicker(15 * time.Second)
 		defer heartbeat.Stop()
@@ -40,9 +40,21 @@ func taskEventsHandler(tasks TaskManager) gin.HandlerFunc {
 					return false
 				}
 				c.SSEvent("tasks", snapshot)
-				c.SSEvent("changes", tasks.Revisions())
+				c.SSEvent("changes", taskChangesEvent(tasks))
 			}
 			return true
 		})
 	}
+}
+
+// taskChangesEvent carries the business revisions plus the process instance so
+// clients can tell a real change from a restart that reset the counters.
+func taskChangesEvent(manager TaskManager) any {
+	revisions := manager.Revisions()
+	return struct {
+		Library  uint64 `json:"library"`
+		Offline  uint64 `json:"offline"`
+		Monitor  uint64 `json:"monitor"`
+		Instance string `json:"instance"`
+	}{revisions.Library, revisions.Offline, revisions.Monitor, manager.Instance()}
 }

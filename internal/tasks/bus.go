@@ -1,6 +1,10 @@
 package tasks
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+	"time"
+)
 
 // Revisions are monotonic change counters broadcast to SSE clients so the
 // frontend can decide which queries to refetch.
@@ -22,6 +26,7 @@ const (
 // Bus separates queued-work wakeups from task and business updates for SSE.
 type Bus struct {
 	mu          sync.Mutex
+	instance    string
 	version     uint64
 	revisions   TaskRevisions
 	subscribers map[chan struct{}]struct{}
@@ -29,8 +34,16 @@ type Bus struct {
 }
 
 func NewBus() *Bus {
-	return &Bus{subscribers: make(map[chan struct{}]struct{}), workers: make(map[chan struct{}]struct{})}
+	return &Bus{
+		instance:    fmt.Sprintf("%d", time.Now().UnixNano()),
+		subscribers: make(map[chan struct{}]struct{}),
+		workers:     make(map[chan struct{}]struct{}),
+	}
 }
+
+// Instance identifies this process. Revisions reset to zero on restart, so SSE
+// clients use a changed instance to re-baseline instead of missing updates.
+func (b *Bus) Instance() string { return b.instance }
 
 // Subscribe registers an SSE listener. Notifications are coalesced.
 func (b *Bus) Subscribe() (<-chan struct{}, func()) {
