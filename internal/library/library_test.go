@@ -412,6 +412,62 @@ func TestLibraryBrowseFiltersSortAndOptions(t *testing.T) {
 	}
 }
 
+func TestLibraryTopRatedSortsAndTruncates(t *testing.T) {
+	lib, _, payload := libraryFixture(t)
+	ctx := t.Context()
+	db := lib.database
+
+	create := func(code string, rating float64) int {
+		film := db.Movie.Create().SetCode(code).SetRating(rating).SaveX(ctx)
+		db.File.Create().SetFileID(code).SetName(code + ".mp4").SetSize(1).
+			SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).
+			SetMovieID(film.ID).ExecX(ctx)
+		return film.ID
+	}
+	m1 := create("TOP-001", 4.5) // 9.0
+	m2 := create("TOP-002", 5.0) // 10.0
+	m3 := create("TOP-003", 3.6) // 7.2
+	create("TOP-004", 0)         // rated 0 -> excluded
+	m5 := create("TOP-005", 4.5) // 9.0, newer id wins the tie
+	// Rated but with no file in scope -> excluded.
+	db.Movie.Create().SetCode("TOP-006").SetRating(5.0).SaveX(ctx)
+
+	top, err := lib.TopRated(ctx, 10)
+	if err != nil {
+		t.Fatalf("top rated: %v", err)
+	}
+	if got, want := topRatedIDs(top), []int{m2, m5, m1, m3}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("top rated order = %v, want %v", got, want)
+	}
+	wantRatings := map[int]float64{
+		m1: domain.NormalizeRating10(4.5, 0),
+		m2: domain.NormalizeRating10(5.0, 0),
+		m3: domain.NormalizeRating10(3.6, 0),
+		m5: domain.NormalizeRating10(4.5, 0),
+	}
+	for _, item := range top {
+		if want := wantRatings[item.ID]; item.Rating != want {
+			t.Fatalf("movie %d rating = %v, want %v", item.ID, item.Rating, want)
+		}
+	}
+
+	limited, err := lib.TopRated(ctx, 2)
+	if err != nil {
+		t.Fatalf("top rated limited: %v", err)
+	}
+	if got, want := topRatedIDs(limited), []int{m2, m5}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("top rated limit 2 = %v, want %v", got, want)
+	}
+}
+
+func topRatedIDs(movies []Movie) []int {
+	out := make([]int, len(movies))
+	for i, item := range movies {
+		out[i] = item.ID
+	}
+	return out
+}
+
 func containsID(values []int, target int) bool {
 	for _, value := range values {
 		if value == target {

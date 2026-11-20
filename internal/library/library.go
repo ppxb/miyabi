@@ -3,7 +3,6 @@ package library
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -532,6 +531,9 @@ func (s *Service) TopRated(ctx context.Context, limit int) ([]Movie, error) {
 	cloudScope := cloudFileScope(sources)
 	records, err := s.database.Movie.Query().
 		Where(movie.HasFilesWith(scope), movie.RatingNotNil(), movie.RatingGT(0)).
+		Select(browseScalarFields...).
+		Order(ent.Desc(movie.FieldRating10), ent.Desc(movie.FieldID)).
+		Limit(limit).
 		WithActors(func(query *ent.ActorQuery) {
 			query.Select(actor.FieldID, actor.FieldProvider, actor.FieldSourceID, actor.FieldName).Order(ent.Asc(actor.FieldName), ent.Asc(actor.FieldID))
 		}).
@@ -550,15 +552,6 @@ func (s *Service) TopRated(ctx context.Context, limit int) ([]Movie, error) {
 	}
 	if err := s.markSubtitleStatus(ctx, items); err != nil {
 		return nil, err
-	}
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].Rating != items[j].Rating {
-			return items[i].Rating > items[j].Rating
-		}
-		return items[i].ID > items[j].ID
-	})
-	if len(items) > limit {
-		items = items[:limit]
 	}
 	return items, nil
 }
