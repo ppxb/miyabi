@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
+	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -17,6 +19,10 @@ import (
 )
 
 var ErrCacheBusy = domain.E(domain.KindBusy, "封面正在处理或缓存正在清理，请稍后重试", nil)
+
+// retainedTTL bounds how stale the display-only "unused" cache stats may be.
+// Pruning never uses this cache; ClearCache always recomputes references.
+const retainedTTL = 30 * time.Minute
 
 type Info struct {
 	DataDirectory     string                `json:"data_directory"`
@@ -35,6 +41,11 @@ type Service struct {
 	db        *ent.Client
 	images    *mediaimage.Cache
 	scrape    ArtworkLocker
+
+	mu         sync.Mutex
+	retained   map[string]bool
+	retainedAt time.Time
+	now        func() time.Time
 }
 
 func New(directory string, db *ent.Client, images *mediaimage.Cache, scrapeSvc ArtworkLocker) (*Service, error) {
@@ -42,15 +53,40 @@ func New(directory string, db *ent.Client, images *mediaimage.Cache, scrapeSvc A
 	if err != nil {
 		return nil, fmt.Errorf("resolve data directory: %w", err)
 	}
-	return &Service{directory: absolute, db: db, images: images, scrape: scrapeSvc}, nil
+	return &Service{directory: absolute, db: db, images: images, scrape: scrapeSvc, now: time.Now}, nil
 }
 
 func (service *Service) Info(ctx context.Context) (Info, error) {
-	retained, err := service.retainedArtwork(ctx)
+	retained, err := service.cachedRetainedArtwork(ctx)
 	if err != nil {
 		return Info{}, err
 	}
 	return service.info(ctx, retained)
+}
+
+// cachedRetainedArtwork reuses the last reference snapshot for a short window so
+// repeatedly opening the settings page does not rescan the whole movie table.
+func (service *Service) cachedRetainedArtwork(ctx context.Context) (map[string]bool, error) {
+	service.mu.Lock()
+	if service.retained != nil && service.now().Sub(service.retainedAt) < retainedTTL {
+		cached := service.retained
+		service.mu.Unlock()
+		return cached, nil
+	}
+	service.mu.Unlock()
+	retained, err := service.retainedArtwork(ctx)
+	if err != nil {
+		return nil, err
+	}
+	service.storeRetained(retained)
+	return retained, nil
+}
+
+func (service *Service) storeRetained(retained map[string]bool) {
+	service.mu.Lock()
+	service.retained = retained
+	service.retainedAt = service.now()
+	service.mu.Unlock()
 }
 
 func (service *Service) ClearCache(ctx context.Context) (Info, error) {
@@ -69,6 +105,7 @@ func (service *Service) ClearCache(ctx context.Context) (Info, error) {
 	if err := service.images.Prune(ctx, retained); err != nil {
 		return Info{}, err
 	}
+	service.storeRetained(retained)
 	return service.info(ctx, retained)
 }
 
