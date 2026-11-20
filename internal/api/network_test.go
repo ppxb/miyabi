@@ -68,7 +68,6 @@ func TestNetworkTestEndpoint(t *testing.T) {
 	stub := &networkStub{
 		config: netx.ProxyConfig{Enabled: true, URL: "http://127.0.0.1:7890"},
 		testResult: network.TestResult{
-			JavDB:  network.ProbeResult{Available: true, LatencyMS: 120},
 			JavBus: network.ProbeResult{Available: false, Error: "timeout"},
 		},
 	}
@@ -84,9 +83,6 @@ func TestNetworkTestEndpoint(t *testing.T) {
 
 	if err := json.Unmarshal(post.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
-	}
-	if !result.JavDB.Available || result.JavDB.LatencyMS != 120 {
-		t.Fatalf("unexpected JavDB result: %+v", result.JavDB)
 	}
 	if result.JavBus.Available || result.JavBus.Error != "timeout" {
 		t.Fatalf("unexpected JavBus result: %+v", result.JavBus)

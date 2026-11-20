@@ -7,8 +7,7 @@ type ProbeResult struct {
 	Error     string `json:"error,omitempty"`
 }
 
-// TestResult contains probe results for both JavDB and JavBus.
+// TestResult contains probe results for the JavBus target.
 type TestResult struct {
-	JavDB  ProbeResult `json:"javdb"`
 	JavBus ProbeResult `json:"javbus"`
 }

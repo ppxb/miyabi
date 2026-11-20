@@ -151,11 +151,9 @@ export function NetworkSection() {
   )
 }
 
-function showProbeResult({ javdb, javbus }: NetworkTestResponse) {
-  const description = `JavDB ${describeProbe(javdb)}，JavBus ${describeProbe(javbus)}`
-  const available = Number(javdb.available) + Number(javbus.available)
-  if (available === 2) toast.success('代理连接正常', { description })
-  else if (available === 1) toast.warning('部分站点无法连接', { description })
+function showProbeResult({ javbus }: NetworkTestResponse) {
+  const description = `JavBus ${describeProbe(javbus)}`
+  if (javbus.available) toast.success('代理连接正常', { description })
   else toast.error('代理连接失败', { description })
 }
 

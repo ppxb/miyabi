@@ -14,7 +14,6 @@ export type NetworkProbeResult = {
 }
 
 export type NetworkTestResponse = {
-  javdb: NetworkProbeResult
   javbus: NetworkProbeResult
 }
 

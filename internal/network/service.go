@@ -10,7 +10,6 @@ import (
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/javbus"
-	"github.com/ppxb/miyabi/internal/javdb"
 	"github.com/ppxb/miyabi/internal/netx"
 )
 
@@ -62,7 +61,7 @@ func (service *Service) UpdateNetwork(ctx context.Context, config netx.ProxyConf
 	return nil
 }
 
-// TestNetwork probes JavDB and JavBus concurrently through the candidate configuration without persisting it.
+// TestNetwork probes JavBus through the candidate configuration without persisting it.
 func (service *Service) TestNetwork(ctx context.Context, config netx.ProxyConfig) (TestResult, error) {
 	_, proxy, err := netx.Normalize(config)
 	if err != nil {
@@ -82,8 +81,7 @@ func (service *Service) TestNetwork(ctx context.Context, config netx.ProxyConfig
 		}
 		*target = ProbeResult{Available: true, LatencyMS: latency.Milliseconds()}
 	}
-	wait.Add(2)
-	go probe(&response.JavDB, javdb.Probe)
+	wait.Add(1)
 	go probe(&response.JavBus, javbus.Probe)
 	wait.Wait()
 	return response, nil
