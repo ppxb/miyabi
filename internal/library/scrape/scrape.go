@@ -246,7 +246,9 @@ func (service *Service) prepareMetadata(ctx context.Context, sess drive.Session,
 		service.notifier.NotifyLibraryChanged()
 	}
 	if service.merger != nil {
-		_, _ = service.merger.MergeMovieCrossLanguage(ctx, input.MovieID)
+		if _, err := service.merger.MergeMovieCrossLanguage(ctx, input.MovieID); err != nil {
+			slog.WarnContext(ctx, "merge cross-language actors failed", "movie_id", input.MovieID, "error", err)
+		}
 		if err := service.merger.EnsureMovieProfiles(ctx, input.MovieID); err != nil {
 			slog.WarnContext(ctx, "reconcile actor profiles failed", "movie_id", input.MovieID, "error", err)
 		}

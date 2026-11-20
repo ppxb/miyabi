@@ -537,55 +537,87 @@ func (s *Service) MergeMovieCrossLanguage(ctx context.Context, movieID int) (int
 }
 
 func (s *Service) mergeActorPair(ctx context.Context, ja, en actorSig) error {
+	// Serialize with the other actor-image writers. Lock order is persistMu -> db tx
+	// everywhere, so taking the mutex before opening the transaction avoids a
+	// lock-order inversion (SQLite's BEGIN IMMEDIATE grabs the write lock eagerly).
+	s.persistMu.Lock()
+	defer s.persistMu.Unlock()
+
+	tx, err := s.db.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	canonical := ja.profileID
 	if canonical == 0 {
-		pid, err := s.ensureProfile(ctx, normalizeName(ja.name), ja.name, "", "")
+		pid, err := s.ensureProfileTx(ctx, tx, normalizeName(ja.name), ja.name, "", "")
 		if err != nil {
 			return err
 		}
 		canonical = pid
-		_ = s.db.Actor.UpdateOneID(ja.id).SetProfileID(canonical).Exec(ctx)
+		if err := tx.Actor.UpdateOneID(ja.id).SetProfileID(canonical).Exec(ctx); err != nil {
+			return err
+		}
 	}
 	enPid := en.profileID
 	if enPid == 0 {
-		pid, err := s.ensureProfile(ctx, normalizeName(en.name), en.name, "", "")
+		pid, err := s.ensureProfileTx(ctx, tx, normalizeName(en.name), en.name, "", "")
 		if err != nil {
 			return err
 		}
 		enPid = pid
 	}
 	if enPid != 0 && enPid != canonical {
-		_, _ = s.db.Actor.Update().
+		if _, err := tx.Actor.Update().
 			Where(actor.HasProfileWith(actorprofile.ID(enPid))).
 			SetProfileID(canonical).
-			Save(ctx)
-		if ep, err := s.db.ActorProfile.Query().Where(actorprofile.ID(enPid)).Only(ctx); err == nil {
-			s.fillProfileFrom(ctx, canonical, ep)
-			s.copyProfileImages(ctx, enPid, canonical)
+			Save(ctx); err != nil {
+			return err
+		}
+		ep, err := tx.ActorProfile.Query().Where(actorprofile.ID(enPid)).Only(ctx)
+		if err != nil && !ent.IsNotFound(err) {
+			return err
+		}
+		if err == nil {
+			if err := s.fillProfileFrom(ctx, tx, canonical, ep); err != nil {
+				return err
+			}
+			if err := s.copyProfileImages(ctx, tx, enPid, canonical); err != nil {
+				return err
+			}
 		}
 	}
 	// Ensure the English actor row itself points at the canonical profile.
-	_ = s.db.Actor.UpdateOneID(en.id).SetProfileID(canonical).Exec(ctx)
+	if err := tx.Actor.UpdateOneID(en.id).SetProfileID(canonical).Exec(ctx); err != nil {
+		return err
+	}
 	normEn := normalizeName(en.name)
 	if normEn != "" && normEn != normalizeName(ja.name) {
-		if exists, _ := s.db.ActorAlias.Query().Where(
+		exists, err := tx.ActorAlias.Query().Where(
 			actoralias.HasActorWith(actorprofile.ID(canonical)),
 			actoralias.NormalizedEQ(normEn),
-		).Exist(ctx); !exists {
-			_, _ = s.db.ActorAlias.Create().
-				SetAlias(en.name).SetNormalized(normEn).SetActorID(canonical).Save(ctx)
+		).Exist(ctx)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			if _, err := tx.ActorAlias.Create().
+				SetAlias(en.name).SetNormalized(normEn).SetActorID(canonical).Save(ctx); err != nil {
+				return err
+			}
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 // fillProfileFrom copies non-empty biography fields into pid where pid is empty.
-func (s *Service) fillProfileFrom(ctx context.Context, pid int, from *ent.ActorProfile) {
-	cur, err := s.db.ActorProfile.Query().Where(actorprofile.ID(pid)).Only(ctx)
+func (s *Service) fillProfileFrom(ctx context.Context, tx *ent.Tx, pid int, from *ent.ActorProfile) error {
+	cur, err := tx.ActorProfile.Query().Where(actorprofile.ID(pid)).Only(ctx)
 	if err != nil {
-		return
+		return err
 	}
-	update := s.db.ActorProfile.UpdateOneID(pid)
+	update := tx.ActorProfile.UpdateOneID(pid)
 	if empty(cur.Summary) && !empty(from.Summary) {
 		update.SetSummary(*from.Summary)
 	}
@@ -625,17 +657,20 @@ func (s *Service) fillProfileFrom(ctx context.Context, pid int, from *ent.ActorP
 	if empty(cur.Avatar) && !empty(from.Avatar) {
 		update.SetAvatar(*from.Avatar)
 	}
-	_ = update.Exec(ctx)
+	return update.Exec(ctx)
 }
 
-func (s *Service) copyProfileImages(ctx context.Context, fromPid, toPid int) {
-	images, err := s.db.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(fromPid))).All(ctx)
+// copyProfileImages copies images from one profile to another inside the caller's
+// transaction. The caller must hold persistMu.
+func (s *Service) copyProfileImages(ctx context.Context, tx *ent.Tx, fromPid, toPid int) error {
+	images, err := tx.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(fromPid))).All(ctx)
 	if err != nil || len(images) == 0 {
-		return
+		return err
 	}
-	s.persistMu.Lock()
-	defer s.persistMu.Unlock()
-	existing, _ := s.db.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(toPid))).All(ctx)
+	existing, err := tx.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(toPid))).All(ctx)
+	if err != nil {
+		return err
+	}
 	seen := make(map[string]bool, len(existing))
 	position := 0
 	for _, im := range existing {
@@ -648,11 +683,14 @@ func (s *Service) copyProfileImages(ctx context.Context, fromPid, toPid int) {
 		if seen[im.URL] {
 			continue
 		}
-		_, _ = s.db.ActorImage.Create().
-			SetActorID(toPid).SetURL(im.URL).SetProvider(im.Provider).SetRole(im.Role).SetPosition(position).Save(ctx)
+		if _, err := tx.ActorImage.Create().
+			SetActorID(toPid).SetURL(im.URL).SetProvider(im.Provider).SetRole(im.Role).SetPosition(position).Save(ctx); err != nil {
+			return err
+		}
 		seen[im.URL] = true
 		position++
 	}
+	return nil
 }
 
 func empty(v *string) bool { return v == nil || *v == "" }
@@ -857,14 +895,28 @@ func (s *Service) enrichProfile(ctx context.Context, pid int, display string) er
 		if profile == nil {
 			continue
 		}
-		s.applyProfile(ctx, pid, provider.Name(), profile)
+		if err := s.applyProfile(ctx, pid, provider.Name(), profile); err != nil {
+			return err
+		}
 		return nil
 	}
 	return nil
 }
 
-func (s *Service) applyProfile(ctx context.Context, pid int, providerName string, p *Profile) {
-	update := s.db.ActorProfile.UpdateOneID(pid)
+// applyProfile writes the provider-sourced biography and images atomically.
+// It takes persistMu before the transaction to keep the global lock order
+// (persistMu -> db tx) consistent with the other image writers.
+func (s *Service) applyProfile(ctx context.Context, pid int, providerName string, p *Profile) error {
+	s.persistMu.Lock()
+	defer s.persistMu.Unlock()
+
+	tx, err := s.db.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	update := tx.ActorProfile.UpdateOneID(pid)
 	if p.Summary != "" {
 		update.SetSummary(p.Summary)
 	}
@@ -898,19 +950,24 @@ func (s *Service) applyProfile(ctx context.Context, pid int, providerName string
 	if p.SourceURL != "" {
 		update.SetSourceURL(p.SourceURL)
 	}
-	_ = update.Exec(ctx)
-	s.appendProfileImages(ctx, pid, providerName, p.Images)
+	if err := update.Exec(ctx); err != nil {
+		return err
+	}
+	if err := s.appendProfileImages(ctx, tx, pid, providerName, p.Images); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
-func (s *Service) appendProfileImages(ctx context.Context, pid int, providerName string, urls []string) {
+// appendProfileImages appends the provider's image URLs inside the caller's
+// transaction. The caller must hold persistMu.
+func (s *Service) appendProfileImages(ctx context.Context, tx *ent.Tx, pid int, providerName string, urls []string) error {
 	if len(urls) == 0 {
-		return
+		return nil
 	}
-	s.persistMu.Lock()
-	defer s.persistMu.Unlock()
-	existing, err := s.db.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(pid))).All(ctx)
+	existing, err := tx.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(pid))).All(ctx)
 	if err != nil {
-		return
+		return err
 	}
 	seen := make(map[string]bool, len(existing))
 	position := 0
@@ -924,11 +981,14 @@ func (s *Service) appendProfileImages(ctx context.Context, pid int, providerName
 		if url == "" || seen[url] {
 			continue
 		}
-		_, _ = s.db.ActorImage.Create().
-			SetActorID(pid).SetURL(url).SetProvider(providerName).SetRole("portrait").SetPosition(position).Save(ctx)
+		if _, err := tx.ActorImage.Create().
+			SetActorID(pid).SetURL(url).SetProvider(providerName).SetRole("portrait").SetPosition(position).Save(ctx); err != nil {
+			return err
+		}
 		seen[url] = true
 		position++
 	}
+	return nil
 }
 
 func deref(v *string) string {
@@ -1051,6 +1111,25 @@ func (s *Service) ensureProfile(ctx context.Context, norm, name, nameZHT, avatar
 		return id, nil
 	}
 	builder := s.db.ActorProfile.Create().SetMatchKey(norm).SetName(name)
+	if nameZHT != "" {
+		builder.SetNameZht(nameZHT)
+	}
+	if avatar != "" {
+		builder.SetAvatar(avatar)
+	}
+	profile, err := builder.Save(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return profile.ID, nil
+}
+
+// ensureProfileTx is ensureProfile bound to the caller's transaction.
+func (s *Service) ensureProfileTx(ctx context.Context, tx *ent.Tx, norm, name, nameZHT, avatar string) (int, error) {
+	if id, err := tx.ActorProfile.Query().Where(actorprofile.MatchKeyEQ(norm)).OnlyID(ctx); err == nil {
+		return id, nil
+	}
+	builder := tx.ActorProfile.Create().SetMatchKey(norm).SetName(name)
 	if nameZHT != "" {
 		builder.SetNameZht(nameZHT)
 	}
