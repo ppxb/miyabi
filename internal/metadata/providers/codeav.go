@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"regexp"
@@ -88,7 +89,7 @@ type codeAVMovie struct {
 }
 
 func parseCodeAVHTML(body []byte, code string) (domain.MovieMetadata, error) {
-	root, err := html.Parse(strings.NewReader(string(body)))
+	root, err := html.Parse(bytes.NewReader(body))
 	if err != nil {
 		return domain.MovieMetadata{}, metadata.ErrNotFound
 	}

@@ -1,6 +1,7 @@
 package actors
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -77,7 +78,7 @@ func (a *AVLeague) searchID(ctx context.Context, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	doc, err := html.Parse(strings.NewReader(string(body)))
+	doc, err := html.Parse(bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
@@ -109,7 +110,7 @@ func (a *AVLeague) fetch(ctx context.Context, id string) (*Profile, error) {
 	if err != nil {
 		return nil, err
 	}
-	doc, err := html.Parse(strings.NewReader(string(body)))
+	doc, err := html.Parse(bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
