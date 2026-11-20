@@ -2,7 +2,7 @@ import { CalendarIcon, ClockIcon, StarIcon, type LucideIcon } from 'lucide-react
 
 import type { DiscoverMovie, DiscoverMovieDetail } from '@/api/discover'
 import type { LibraryMovieDetail } from '@/api/library'
-import { MovieResourceBadges, MovieStateBadge } from '@/components/movie/movie-badges'
+import { MovieStateBadge } from '@/components/movie/movie-badges'
 import { MovieCover } from '@/components/movie/movie-cover'
 import { Badge } from '@/components/ui/badge'
 import { MovieMetadata } from './metadata'
@@ -46,12 +46,6 @@ export function MovieHero({
         </div>
 
         <MovieStats movie={movie} />
-
-        {!libraryStatus && 'release_status' in movie ? (
-          <div className="flex flex-wrap gap-2">
-            <MovieResourceBadges movie={movie} />
-          </div>
-        ) : null}
 
         <MovieMetadata movie={movie} />
       </div>
