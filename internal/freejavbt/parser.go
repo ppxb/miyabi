@@ -24,15 +24,17 @@ type magnetEntry struct {
 
 // detail is the parsed movie page.
 type detail struct {
-	Code        string
-	Title       string
-	ReleaseDate string
-	Duration    int
-	Actors      []string
-	Tags        []string
-	Cover       string
-	Previews    []domain.PreviewImage
-	Magnets     []magnetEntry
+	Code          string
+	Title         string
+	ReleaseDate   string
+	Duration      int
+	Actors        []string
+	Tags          []string
+	Cover         string
+	Previews      []domain.PreviewImage
+	Magnets       []magnetEntry
+	ActorMovies   []domain.MovieReference
+	RelatedMovies []domain.MovieReference
 }
 
 var (
@@ -55,6 +57,9 @@ var (
 	durRe   = regexp.MustCompile(`影片時長(\d+)分鐘`)
 	actorRe = regexp.MustCompile(`主演女優是([^，]+)`)
 	tagsRe  = regexp.MustCompile(`主題為([^。]+)`)
+
+	cardRe = regexp.MustCompile(`(?is)<a href="https://freejavbt\.com/([A-Z0-9-]+)">(.*?)</a>`)
+	imgRe  = regexp.MustCompile(`(?i)data-src="([^"]+)"`)
 )
 
 // parseDetail extracts the metadata and magnet rows from a freejavbt movie page.
@@ -81,10 +86,11 @@ func parseDetail(html string) detail {
 	result.Actors = splitList(trimField(actorRe, description))
 	result.Tags = splitList(trimField(tagsRe, description))
 
-	if cover := coverRe.FindString(html); cover != "" {
-		result.Cover = cover
-	} else if match := ogImageRe.FindStringSubmatch(html); match != nil {
+	if match := ogImageRe.FindStringSubmatch(html); match != nil {
 		result.Cover = strings.TrimSpace(match[1])
+	}
+	if result.Cover == "" {
+		result.Cover = coverRe.FindString(html)
 	}
 
 	seen := make(map[string]bool)
@@ -131,7 +137,46 @@ func parseDetail(html string) detail {
 		}
 		result.Magnets = append(result.Magnets, entry)
 	}
+	result.ActorMovies = parseRefs(section(html, "同女優作品"))
+	result.RelatedMovies = parseRefs(section(html, "同主題作品"))
 	return result
+}
+
+// section returns the HTML between a section heading (h2) and the next h2.
+func section(html, heading string) string {
+	marker := heading + "</h2>"
+	index := strings.Index(html, marker)
+	if index < 0 {
+		return ""
+	}
+	rest := html[index+len(marker):]
+	if cut := strings.Index(strings.ToLower(rest), "<h2"); cut >= 0 {
+		rest = rest[:cut]
+	}
+	return rest
+}
+
+// parseRefs extracts movie references from a related-works grid.
+func parseRefs(section string) []domain.MovieReference {
+	const limit = 12
+	refs := make([]domain.MovieReference, 0, limit)
+	seen := make(map[string]bool)
+	for _, match := range cardRe.FindAllStringSubmatch(section, -1) {
+		code := match[1]
+		if code == "" || seen[code] {
+			continue
+		}
+		seen[code] = true
+		thumbnail := ""
+		if image := imgRe.FindStringSubmatch(match[2]); image != nil {
+			thumbnail = image[1]
+		}
+		refs = append(refs, domain.MovieReference{ID: code, Code: code, Thumbnail: thumbnail})
+		if len(refs) >= limit {
+			break
+		}
+	}
+	return refs
 }
 
 func trimField(pattern *regexp.Regexp, text string) string {

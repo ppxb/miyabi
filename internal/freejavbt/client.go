@@ -149,6 +149,8 @@ func (c *Client) Fetch(ctx context.Context, ref domain.MovieRef) (domain.MovieMe
 		}
 	}
 	result := domain.MovieMetadata{Detail: domain.MovieDetail{Movie: movie, Zone: domain.ZoneUnknown}}
+	result.Detail.ActorMovies = parsed.ActorMovies
+	result.Detail.RelatedMovies = parsed.RelatedMovies
 	if parsed.Cover != "" {
 		result.Images = append(result.Images, domain.ImageCandidate{Provider: "freejavbt", URL: parsed.Cover, Role: "cover"})
 	}

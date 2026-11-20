@@ -50,6 +50,14 @@ func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 		provider := m.Sources[0].Provider
 		out := &result.Detail
 		out.Sources = append(out.Sources, m.Sources...)
+		// Related-work panels come from whichever source renders them; JavDB first
+		// when present, otherwise a supplementary source such as freejavbt.
+		if len(out.ActorMovies) == 0 && len(m.ActorMovies) > 0 {
+			out.ActorMovies = m.ActorMovies
+		}
+		if len(out.RelatedMovies) == 0 && len(m.RelatedMovies) > 0 {
+			out.RelatedMovies = m.RelatedMovies
+		}
 		text := func(name string, dest *string, value string) {
 			if *dest == "" && value != "" {
 				*dest = value
