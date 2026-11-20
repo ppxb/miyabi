@@ -78,6 +78,6 @@ type JavBusSource interface {
 // LocalState supplies the mounted library source and matches local movies.
 // It is implemented by library.Service to decouple catalogue from library storage.
 type LocalState interface {
-	Source() *domain.LibrarySource
+	Source(ctx context.Context) *domain.LibrarySource
 	MatchingMovies(ctx context.Context, codes []string) ([]domain.LocalMovie, error)
 }

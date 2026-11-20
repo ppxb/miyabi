@@ -1,6 +1,7 @@
 package catalogue
 
 import (
+	"context"
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/domain"
@@ -11,7 +12,7 @@ type unexpectedLocalState struct {
 	t *testing.T
 }
 
-func (s unexpectedLocalState) Source() *domain.LibrarySource {
+func (s unexpectedLocalState) Source(context.Context) *domain.LibrarySource {
 	s.t.Fatal("catalogue metadata requested local state")
 	return nil
 }

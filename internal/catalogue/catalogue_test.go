@@ -23,7 +23,7 @@ type stubLocalState struct {
 	movies []domain.LocalMovie
 }
 
-func (s *stubLocalState) Source() *domain.LibrarySource {
+func (s *stubLocalState) Source(context.Context) *domain.LibrarySource {
 	return s.source
 }
 

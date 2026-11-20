@@ -24,7 +24,7 @@ import (
 func TestScanPausesAtDirectoryCheckpointAndResumesRemainingWork(t *testing.T) {
 	lib, client := panConcurrencyFixture(t)
 	ctx := t.Context()
-	source := *lib.Source()
+	source := *lib.drive.Source()
 	rootCalls, childCalls := 0, 0
 	client.list = func(ctx context.Context, _, directoryID string, offset, limit int) (pan.FilePage, error) {
 		if directoryID == source.Directory.ID {

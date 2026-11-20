@@ -229,19 +229,6 @@ func (s *Service) enqueueAllScans(ctx context.Context, rebuild bool) (domain.Tas
 	return first, queued, nil
 }
 
-// Source returns one mounted library source (the first by account id), used only
-// for display. All accounts are first-class; no account is privileged.
-func (s *Service) Source() *domain.LibrarySource {
-	if s.drive == nil {
-		return nil
-	}
-	mounts, err := s.drive.Mounts(context.Background())
-	if err != nil || len(mounts) == 0 {
-		return nil
-	}
-	return &mounts[0]
-}
-
 // MatchingMovies queries local movies matching any of the given JavDB IDs or normalized codes
 // that possess indexed files in the currently mounted library source or local library.
 func (s *Service) MatchingMovies(ctx context.Context, codes []string) ([]domain.LocalMovie, error) {
@@ -386,8 +373,27 @@ func (s *Service) scope(ctx context.Context) predicate.File {
 // cloudSources aggregates every mounted 115 account plus configured sources so
 // the library lists movies across all accounts, not just one primary mount.
 func (s *Service) cloudSources(ctx context.Context) []domain.LibrarySource {
+	return s.mergeSources(ctx, s.mountList(ctx))
+}
+
+// mountList loads every mounted 115 account's library source once, tolerating
+// errors like the aggregate helpers do.
+func (s *Service) mountList(ctx context.Context) []domain.LibrarySource {
+	if s.drive == nil {
+		return nil
+	}
+	mounts, err := s.drive.Mounts(ctx)
+	if err != nil {
+		return nil
+	}
+	return mounts
+}
+
+// mergeSources combines already-loaded mounted sources with configured sources,
+// de-duplicated by account and directory.
+func (s *Service) mergeSources(ctx context.Context, mounts []domain.LibrarySource) []domain.LibrarySource {
 	seen := make(map[string]bool)
-	result := make([]domain.LibrarySource, 0)
+	result := make([]domain.LibrarySource, 0, len(mounts))
 	add := func(src domain.LibrarySource) {
 		if src.Directory.ID == "" {
 			return
@@ -399,12 +405,8 @@ func (s *Service) cloudSources(ctx context.Context) []domain.LibrarySource {
 		seen[key] = true
 		result = append(result, src)
 	}
-	if s.drive != nil {
-		if mounts, err := s.drive.Mounts(ctx); err == nil {
-			for _, mount := range mounts {
-				add(mount)
-			}
-		}
+	for _, mount := range mounts {
+		add(mount)
 	}
 	if s.sources != nil {
 		if list, err := s.sources(ctx); err == nil {
@@ -414,6 +416,20 @@ func (s *Service) cloudSources(ctx context.Context) []domain.LibrarySource {
 		}
 	}
 	return result
+}
+
+// firstSource returns the first mounted source for display, or nil.
+func firstSource(mounts []domain.LibrarySource) *domain.LibrarySource {
+	if len(mounts) == 0 {
+		return nil
+	}
+	return &mounts[0]
+}
+
+// Source returns one mounted library source (the first by account id). It
+// satisfies catalogue.LocalState; request paths load mounts once via mountList.
+func (s *Service) Source(ctx context.Context) *domain.LibrarySource {
+	return firstSource(s.mountList(ctx))
 }
 
 func fileScope(sources []domain.LibrarySource) predicate.File {
@@ -441,8 +457,9 @@ func cloudFileScope(sources []domain.LibrarySource) predicate.File {
 }
 
 func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
-	result := Page{Movies: []Movie{}, Page: page, Source: s.Source()}
-	sources := s.cloudSources(ctx)
+	mounts := s.mountList(ctx)
+	sources := s.mergeSources(ctx, mounts)
+	result := Page{Movies: []Movie{}, Page: page, Source: firstSource(mounts)}
 	scope := fileScope(sources)
 	cloudScope := cloudFileScope(sources)
 	var err error
@@ -713,8 +730,9 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 	}
 	filter.Sort = normalizeSort(filter.Sort)
 	filter.Source = normalizeSource(filter.Source)
-	result := Page{Movies: []Movie{}, Page: filter.Page, Source: s.Source()}
-	sources := s.cloudSources(ctx)
+	mounts := s.mountList(ctx)
+	sources := s.mergeSources(ctx, mounts)
+	result := Page{Movies: []Movie{}, Page: filter.Page, Source: firstSource(mounts)}
 	scope := fileScope(sources)
 	cloudScope := cloudFileScope(sources)
 
