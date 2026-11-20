@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -432,7 +433,9 @@ func (s *Service) Detail(ctx context.Context, key string) (Detail, error) {
 		}
 	}
 	if !persisted {
-		s.persistImages(ctx, g.norm, s.imageRels(ctx, detail.Names))
+		if err := s.persistImages(ctx, g.norm, s.imageRels(ctx, detail.Names)); err != nil {
+			slog.WarnContext(ctx, "persist gfriends actor images failed", "actor", g.norm, "error", err)
+		}
 	}
 	if pid > 0 {
 		enrichCtx, cancelEnrich := context.WithTimeout(ctx, 20*time.Second)
@@ -1147,19 +1150,41 @@ func (s *Service) ensureProfileTx(ctx context.Context, tx *ent.Tx, norm, name, n
 	return profile.ID, nil
 }
 
-// persistImages writes the actor's gfriends image paths to ActorImage rows once.
-func (s *Service) persistImages(ctx context.Context, norm string, rels []string) {
+// persistImages seeds the actor's gfriends image paths once, only when the
+// profile has no images yet. It runs in a transaction so a partial failure does
+// not leave an incomplete gallery that future calls would skip.
+func (s *Service) persistImages(ctx context.Context, norm string, rels []string) error {
+	if len(rels) == 0 {
+		return nil
+	}
 	s.persistMu.Lock()
 	defer s.persistMu.Unlock()
+
 	pid, err := s.db.ActorProfile.Query().Where(actorprofile.MatchKeyEQ(norm)).OnlyID(ctx)
-	if err != nil || len(rels) == 0 {
-		return
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil
+		}
+		return err
 	}
-	if count, cerr := s.db.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(pid))).Count(ctx); cerr == nil && count > 0 {
-		return
+	count, err := s.db.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(pid))).Count(ctx)
+	if err != nil {
+		return err
 	}
-	for position, rel := range rels {
-		_, _ = s.db.ActorImage.Create().
-			SetActorID(pid).SetURL(rel).SetProvider("gfriends").SetRole("portrait").SetPosition(position).Save(ctx)
+	if count > 0 {
+		return nil
 	}
+	tx, err := s.db.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	items := make([]imageItem, 0, len(rels))
+	for _, rel := range rels {
+		items = append(items, imageItem{url: rel, provider: "gfriends", role: "portrait"})
+	}
+	if err := s.appendImageRows(ctx, tx, pid, items); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
