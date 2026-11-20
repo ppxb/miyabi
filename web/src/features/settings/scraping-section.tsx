@@ -34,7 +34,8 @@ const descriptions: Record<string, string> = {
   duga: 'DUGA 商店目录，补充封面、预览图、演职员与标签（番号较通用，可按需关闭）',
   r18dev: '官方镜像目录，补充影片资料与封面',
   onepondo: '一本道官方资料与封面（仅日期式番号匹配时使用）',
-  codeav: '大型社区数据库，番号直达详情，资料与 DMM 图片较完整'
+  codeav: '大型社区数据库，番号直达详情，资料与 DMM 图片较完整',
+  freejavbt: '备用来源，番号直达详情，补充影片资料与磁力链接（需代理）'
 }
 
 export function ScrapingSection() {

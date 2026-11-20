@@ -94,6 +94,8 @@ func sourceOrder(id string) int {
 		return -1
 	case "javdb":
 		return 1
+	case "freejavbt":
+		return 2
 	default:
 		return 0
 	}

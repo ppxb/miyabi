@@ -20,6 +20,7 @@ import (
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/emby"
 	"github.com/ppxb/miyabi/internal/export"
+	"github.com/ppxb/miyabi/internal/freejavbt"
 	"github.com/ppxb/miyabi/internal/gfriends"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/javbus"
@@ -137,8 +138,17 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		_ = store.Close()
 		return nil, fmt.Errorf("initialize Sukebei magnet source: %w", err)
 	}
-	catalogueSvc, err := catalogue.New(ctx, store.Client, networkSvc.ProxyManager(), libSvc, javbusClient, sukebeiClient)
+	freejavbtClient, err := freejavbt.New(freejavbt.Options{Proxy: networkSvc.ProxyManager()})
 	if err != nil {
+		sukebeiClient.Close()
+		javbusClient.Close()
+		driveSvc.Close()
+		_ = store.Close()
+		return nil, fmt.Errorf("initialize freejavbt source: %w", err)
+	}
+	catalogueSvc, err := catalogue.New(ctx, store.Client, networkSvc.ProxyManager(), libSvc, javbusClient, sukebeiClient, freejavbtClient)
+	if err != nil {
+		freejavbtClient.Close()
 		sukebeiClient.Close()
 		javbusClient.Close()
 		driveSvc.Close()
@@ -169,7 +179,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		providers.NewCodeAV(networkSvc.ProxyManager()),
 		jav321Source, tokyohotSource, heydougaSource,
 		caribbeancomSource, caribbeancomprSource, c0930Source, h0930Source, h4610Source, tenmusumeSource, muramuraSource,
-		dahliaSource, dugaSource)
+		dahliaSource, dugaSource, freejavbtClient)
 	if err != nil {
 		fanzaSource.Close()
 		fc2Source.Close()
@@ -188,6 +198,7 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		muramuraSource.Close()
 		dahliaSource.Close()
 		dugaSource.Close()
+		freejavbtClient.Close()
 		catalogueSvc.Close()
 		driveSvc.Close()
 		_ = store.Close()

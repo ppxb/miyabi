@@ -29,12 +29,13 @@ type persistedRoute struct {
 
 // Service combines JavDB catalogue data with Miyabi's local library and workflow state.
 type Service struct {
-	database   *ent.Client
-	local      LocalState
-	javdb      JavDBClient
-	javbus     JavBusSource
-	sukebei    magnet.Source
-	aggregator *magnet.Aggregator
+	database     *ent.Client
+	local        LocalState
+	javdb        JavDBClient
+	javbus       JavBusSource
+	sukebei      magnet.Source
+	extraMagnets []magnet.Source
+	aggregator   *magnet.Aggregator
 
 	proxy   *netx.ProxyManager
 	lists   *responseCache[[]domain.Movie]
@@ -61,6 +62,7 @@ func New(
 	local LocalState,
 	supplement JavBusSource,
 	sukebei magnet.Source,
+	extraMagnets ...magnet.Source,
 ) (*Service, error) {
 	deviceUUID, found, err := database.LoadSetting[string](ctx, db, javdbDeviceSetting)
 	if err != nil {
@@ -96,7 +98,7 @@ func New(
 		return nil, err
 	}
 
-	service := newService(db, client, supplement, local, route, sukebei)
+	service := newService(db, client, supplement, local, route, sukebei, extraMagnets...)
 	service.proxy = proxy
 	service.javdbAccount = client
 	service.javdbConfig = account
@@ -113,6 +115,7 @@ func NewWithClients(
 	supplement JavBusSource,
 	local LocalState,
 	sukebei magnet.Source,
+	extraMagnets ...magnet.Source,
 ) (*Service, error) {
 	route, _, err := database.LoadSetting[persistedRoute](ctx, db, javdbRouteSetting)
 	if err != nil {
@@ -122,7 +125,7 @@ func NewWithClients(
 	if err != nil {
 		return nil, err
 	}
-	service := newService(db, primary, supplement, local, route, sukebei)
+	service := newService(db, primary, supplement, local, route, sukebei, extraMagnets...)
 	service.javdbConfig = account
 	if accountClient, ok := primary.(*javdb.Client); ok {
 		service.javdbAccount = accountClient
@@ -139,20 +142,26 @@ const (
 	magnetsCacheSize, magnetsCacheTTL = 64, time.Minute
 )
 
-func newService(database *ent.Client, primary JavDBClient, supplement JavBusSource, local LocalState, route persistedRoute, sukebei magnet.Source) *Service {
-	// JavDB is intentionally absent: magnets come from JavBus and Sukebei only.
-	sources := make([]magnet.Source, 0, 2)
+func newService(database *ent.Client, primary JavDBClient, supplement JavBusSource, local LocalState, route persistedRoute, sukebei magnet.Source, extraMagnets ...magnet.Source) *Service {
+	// JavDB is intentionally absent: magnets come from the supplementary sources only.
+	sources := make([]magnet.Source, 0, 2+len(extraMagnets))
 	if supplement != nil {
 		sources = append(sources, supplement)
 	}
 	if sukebei != nil {
 		sources = append(sources, sukebei)
 	}
+	for _, extra := range extraMagnets {
+		if extra != nil {
+			sources = append(sources, extra)
+		}
+	}
 	return &Service{
 		database:       database,
 		javdb:          primary,
 		javbus:         supplement,
 		sukebei:        sukebei,
+		extraMagnets:   extraMagnets,
 		aggregator:     magnet.NewAggregator(sources, 0),
 		lists:          newResponseCache[[]domain.Movie](listCacheSize, listCacheTTL),
 		details:        newResponseCache[domain.MovieDetail](detailCacheSize, detailCacheTTL),
@@ -170,6 +179,11 @@ func (service *Service) Close() {
 	}
 	if service.sukebei != nil {
 		if closer, ok := service.sukebei.(interface{ Close() }); ok {
+			closer.Close()
+		}
+	}
+	for _, extra := range service.extraMagnets {
+		if closer, ok := extra.(interface{ Close() }); ok {
 			closer.Close()
 		}
 	}

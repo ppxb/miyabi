@@ -27,7 +27,8 @@ export const sourceNames: Record<string, string> = {
   duga: 'DUGA',
   r18dev: 'r18.dev',
   onepondo: '一本道',
-  codeav: 'CodeAV'
+  codeav: 'CodeAV',
+  freejavbt: 'FreeJavBT'
 }
 
 export function useScrapingSources() {
