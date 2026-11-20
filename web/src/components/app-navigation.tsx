@@ -33,9 +33,9 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
   { label: '设置', icon: SettingsIcon, to: '/settings' }
 ]
 
-export function AppNavigation({ onNavigate }: { onNavigate?: () => void }) {
+export function AppNavigation() {
   const pathname = useLocation({ select: location => location.pathname })
-  const { state, isMobile } = useSidebar()
+  const { state, isMobile, setOpenMobile } = useSidebar()
   const collapsed = state === 'collapsed' && !isMobile
 
   return (
@@ -54,7 +54,7 @@ export function AppNavigation({ onNavigate }: { onNavigate?: () => void }) {
                   to={item.to}
                   activeOptions={{ exact: item.to === '/', includeSearch: false }}
                   aria-current={active ? 'page' : undefined}
-                  onClick={onNavigate}
+                  onClick={() => setOpenMobile(false)}
                 />
               }
               isActive={active}

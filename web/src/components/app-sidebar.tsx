@@ -9,16 +9,18 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
-  SidebarMenuItem
+  SidebarMenuItem,
+  useSidebar
 } from '@/components/ui/sidebar'
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
+  const { setOpenMobile } = useSidebar()
   return (
     <Sidebar {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton render={<Link to="/" />}>
+            <SidebarMenuButton render={<Link to="/" onClick={() => setOpenMobile(false)} />}>
               <span className="text-base font-semibold">Miyabi</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
