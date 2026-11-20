@@ -65,7 +65,11 @@ export function ActorsCatalogPage() {
                 className="group flex flex-col items-center gap-2 rounded-2xl p-3 text-center transition-colors hover:bg-muted"
               >
                 <Avatar className="size-32">
-                  <AvatarImage src={displayAvatar(actor.avatar)} alt={actor.name} />
+                  <AvatarImage
+                    src={displayAvatar(actor.avatar)}
+                    alt={actor.name}
+                    loading="eager"
+                  />
                   <AvatarFallback>{actor.name.slice(0, 1)}</AvatarFallback>
                 </Avatar>
                 <span className="line-clamp-1 text-sm font-medium">{actor.name}</span>
