@@ -3,7 +3,6 @@ package providers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -50,37 +49,8 @@ func (s *OnePondo) Fetch(ctx context.Context, ref domain.MovieRef) (domain.Movie
 }
 
 func parseOnePondoJSON(body []byte, code string) (domain.MovieMetadata, error) {
-	var doc map[string]any
-	if err := json.Unmarshal(body, &doc); err != nil {
-		return domain.MovieMetadata{}, fmt.Errorf("parse 1pondo response: %w", err)
-	}
-	title := firstText(doc, "Title", "TitleEn")
-	cover := firstText(doc, "ThumbHigh", "ThumbUltra", "MovieThumb", "ThumbLow")
-	movie := domain.Movie{
-		Code:        code,
-		Title:       title,
-		ReleaseDate: releaseDate(firstText(doc, "Release")),
-		// 1pondo reports duration in seconds; the domain stores minutes.
-		Duration: intFromAny(firstValue(doc, "Duration")) / 60,
-		Cover:    cover,
-		Sources:  []domain.SourceID{{Provider: "onepondo", ID: code}},
-	}
-	movie.Thumbnail = movie.Cover
-	for _, name := range stringValues(firstValue(doc, "ActressesJa", "ActressesEn")) {
-		movie.Actors = append(movie.Actors, domain.Actor{Provider: "onepondo", ID: name, Name: name})
-	}
-	for _, name := range stringValues(firstValue(doc, "UCNAME", "UCNAMEEn")) {
-		movie.Tags = append(movie.Tags, domain.Tag{Provider: "onepondo", ID: name, Name: name})
-	}
-	if series := firstText(doc, "Series", "SeriesEn"); series != "" {
-		movie.Series = &domain.Series{Provider: "onepondo", ID: series, Name: series}
-	}
-
-	result := domain.MovieMetadata{Detail: domain.MovieDetail{Movie: movie}}
-	if movie.Cover != "" {
-		result.Images = append(result.Images, domain.ImageCandidate{Provider: "onepondo", URL: movie.Cover, Role: "cover"})
-	}
-	return result, nil
+	movieID := strings.ReplaceAll(strings.TrimPrefix(code, "1PONDO-"), "-", "_")
+	return parsePondoMovieJSON(body, code, movieID, "onepondo", 2470)
 }
 
 func firstValue(doc map[string]any, keys ...string) any {

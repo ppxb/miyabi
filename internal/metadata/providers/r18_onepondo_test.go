@@ -1,10 +1,13 @@
 package providers
 
 import (
+	"errors"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/ppxb/miyabi/internal/metadata"
 )
 
 func TestR18ContentIDs(t *testing.T) {
@@ -83,5 +86,19 @@ func TestParseOnePondoFixture(t *testing.T) {
 	}
 	if len(result.Images) != 1 || result.Images[0].Role != "cover" {
 		t.Fatalf("images = %+v", result.Images)
+	}
+}
+
+// TestParseOnePondoRejectsMismatchedResponse guards the shared identity checks:
+// a wrong site, wrong movie or empty title must be treated as not found.
+func TestParseOnePondoRejectsMismatchedResponse(t *testing.T) {
+	for _, body := range []string{
+		`{"MovieID":"050826_001","SiteID":2471,"Title":"x"}`,
+		`{"MovieID":"999999_999","SiteID":2470,"Title":"x"}`,
+		`{"MovieID":"050826_001","SiteID":2470}`,
+	} {
+		if _, err := parseOnePondoJSON([]byte(body), "1PONDO-050826-001"); !errors.Is(err, metadata.ErrNotFound) {
+			t.Fatalf("body %s accepted: %v", body, err)
+		}
 	}
 }

@@ -32,7 +32,7 @@
 - [x] 🟠 `internal/drive/events.go:18-19` vs `account_ops.go:74-78`：注释承诺"commit 锁下运行、失败回滚"，代码未实现。改法：实现或修正注释。（已修正注释：明确回调不在 commit 锁下、失败不会回滚已持久化的 mount）
 - [x] 🟠 `internal/drive/accounts.go:149-155`：`Mount` 把数据库错误吞成"未挂载"。改法：签名返回 `error`。（已修复：`Mount` 改为返回 `(source, bool, error)`，区分「未挂载」与「读库失败」；同步更新 7 处调用方、`source.MountProvider` 接口与测试）
 - [x] 🟠 `internal/drive/accounts.go:181-215`：`Accounts()` 失败项丢失 `AccountID`，前端无法定位掉线账号；`refreshExpiringAccounts` 吞错无日志。（已修复：`AccountStatus` 增 `AccountID` 并经 `/api/pan/accounts` 透出；`refreshExpiringAccounts`/`Accounts` 刷新失败补 `slog.Warn` 日志）
-- [ ] 🟠 `internal/metadata/providers/onepondo.go:52-84`：缺 `MovieID/SiteID` 校验，空 title 不返回 `ErrNotFound`。改法：复用 `parsePondoMovieJSON`。
+- [x] 🟠 `internal/metadata/providers/onepondo.go:52-84`：缺 `MovieID/SiteID` 校验，空 title 不返回 `ErrNotFound`。改法：复用 `parsePondoMovieJSON`。（已修复：`parseOnePondoJSON` 改为薄封装复用 `parsePondoMovieJSON`（movieID + SiteID 2470），并加负向测试）
 - [ ] 🟠 `internal/javdb/media.go:32`：图片下载无响应体上限。
 - [ ] 🟢 `internal/freejavbt/client.go:148`：singleflight 使用首个调用者 ctx，其取消会连带其他调用者失败。
 - [ ] 🟢 `internal/freejavbt/client.go:264`：`err == metadata.ErrNotFound` 应为 `errors.Is`。
