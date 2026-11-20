@@ -31,7 +31,7 @@ func (d *Drive) AccountStatusFor(ctx context.Context, accountID string) (Account
 	if err != nil {
 		return AccountStatus{}, fmt.Errorf("get 115 account: %w", err)
 	}
-	status := AccountStatus{Connected: true, Account: &account}
+	status := AccountStatus{AccountID: account.ID, Connected: true, Account: &account}
 	if record, err := d.accountRecord(ctx, accountID); err == nil && record.Directory.ID != "" && record.Directory.AccountID == account.ID {
 		directory := record.Directory.LibraryDirectory
 		status.Directory = &directory

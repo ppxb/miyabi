@@ -16,6 +16,7 @@ const (
 
 // AccountStatus describes one 115 account and its mounted library directory.
 type AccountStatus struct {
+	AccountID string                   `json:"account_id,omitempty"`
 	Connected bool                     `json:"connected"`
 	Account   *pan.Account             `json:"account,omitempty"`
 	Directory *domain.LibraryDirectory `json:"directory,omitempty"`

@@ -2,6 +2,7 @@ package drive
 
 import (
 	"context"
+	"log/slog"
 	"sort"
 	"time"
 
@@ -204,17 +205,18 @@ func (d *Drive) Accounts(ctx context.Context) ([]AccountStatus, error) {
 		record := store[id]
 		if tokensNeedRefresh(record.Tokens) {
 			if err := d.refreshAccountTokens(ctx, id); err != nil {
-				result = append(result, AccountStatus{Connected: false})
+				slog.Warn("refresh 115 account tokens", "account", id, "error", err)
+				result = append(result, AccountStatus{AccountID: id, Connected: false})
 				continue
 			}
 			record.Tokens = d.accountToken(id)
 		}
 		account, err := d.client.Account(ctx, record.Tokens.AccessToken)
 		if err != nil {
-			result = append(result, AccountStatus{Connected: false})
+			result = append(result, AccountStatus{AccountID: id, Connected: false})
 			continue
 		}
-		status := AccountStatus{Connected: true, Account: &account}
+		status := AccountStatus{AccountID: id, Connected: true, Account: &account}
 		if record.Directory.ID != "" && record.Directory.AccountID == account.ID {
 			directory := record.Directory.LibraryDirectory
 			status.Directory = &directory
@@ -263,11 +265,14 @@ func (d *Drive) StartAccountRefresh(ctx context.Context) {
 func (d *Drive) refreshExpiringAccounts(ctx context.Context) {
 	store, err := d.loadAccounts(ctx)
 	if err != nil {
+		slog.Warn("load 115 accounts for refresh", "error", err)
 		return
 	}
 	for id, record := range store {
 		if tokensNeedRefresh(record.Tokens) {
-			_ = d.refreshAccountTokens(ctx, id)
+			if err := d.refreshAccountTokens(ctx, id); err != nil {
+				slog.Warn("refresh 115 account tokens", "account", id, "error", err)
+			}
 		}
 	}
 }
