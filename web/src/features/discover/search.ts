@@ -1,9 +1,9 @@
-import type { JavDBZone } from '@/api/discover'
+import type { Zone } from '@/api/discover'
 import { parseSearchPage } from '@/lib/search-schema'
 import { DISCOVER_ZONES } from './constants'
 
 export type DiscoverView = 'released' | 'upcoming' | 'category'
-export type CategoryFilters = { zone: JavDBZone; categoryID: string; tagID: string; main: string }
+export type CategoryFilters = { zone: Zone; categoryID: string; tagID: string; main: string }
 export type DiscoverSearch = Partial<CategoryFilters> & {
   view?: DiscoverView
   releasedPage?: number
@@ -41,7 +41,7 @@ export function validateDiscoverSearch(search: Record<string, unknown>): Discove
     releasedPage: parseSearchPage(search.releasedPage),
     upcomingPage: parseSearchPage(search.upcomingPage),
     categoryPage: parseSearchPage(search.categoryPage),
-    zone: zone && zone !== 'censored' ? (zone as JavDBZone) : undefined,
+    zone: zone && zone !== 'censored' ? (zone as Zone) : undefined,
     categoryID: categoryID || undefined,
     tagID: tag || undefined,
     ...validateMainSearch(search)

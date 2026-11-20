@@ -1,4 +1,4 @@
-import type { JavDBZone } from '@/api/discover'
+import type { Zone } from '@/api/discover'
 import { useDiscoverTags } from '@/api/discover'
 import { InlineError } from '@/components/error-state'
 import {
@@ -39,7 +39,7 @@ export function CategoryFilters({
       <Select
         value={zone}
         onValueChange={value =>
-          updateCategory({ zone: (value ?? '') as JavDBZone, categoryID: '', tagID: '', main: '' })
+          updateCategory({ zone: (value ?? '') as Zone, categoryID: '', tagID: '', main: '' })
         }
       >
         <SelectTrigger className="w-full sm:w-32">

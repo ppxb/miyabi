@@ -33,10 +33,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { formatSize } from '@/lib/format'
 import { notifyOfflineTask, notifyTaskError } from '@/features/tasks/task-toast'
-import { MovieSubscriptionAction } from './subscription-action'
 import { MovieMagnetsSkeleton } from './skeleton'
 
-const sourceLabels: Record<string, string> = { javdb: 'JavDB', javbus: 'JavBus' }
+const sourceLabels: Record<string, string> = { javbus: 'JavBus' }
 
 const phaseLabels: Record<OfflineSubmission['phase'], string> = {
   available: '一键加入 115',
@@ -107,7 +106,7 @@ export function MovieMagnets({
           磁力加载失败
         </InlineError>
       ) : query.data.length === 0 ? (
-        <MovieSubscriptionAction movieID={movieID} />
+        <p className="text-sm text-muted-foreground">暂无可用磁力。</p>
       ) : (
         <div className="space-y-4">
           {query.data.map(magnet => (

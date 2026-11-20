@@ -10,8 +10,8 @@ import {
 } from './movie-detail-cache'
 
 export type ReleaseStatus = 'unknown' | 'released' | 'upcoming'
-export type JavDBZone = 'censored' | 'uncensored' | 'western' | 'fc2' | 'anime'
-export type JavDBEntityType = 'actor' | 'series' | 'maker' | 'director'
+export type Zone = 'censored' | 'uncensored' | 'western' | 'fc2' | 'anime'
+export type EntityType = 'actor' | 'series' | 'maker' | 'director'
 
 export type MovieReference = {
   id: string
@@ -74,7 +74,7 @@ export type DiscoverMovie = {
 }
 
 export type DiscoverMovieDetail = DiscoverMovie & {
-  zone: JavDBZone | 'unknown'
+  zone: Zone | 'unknown'
   actor_movies: MovieReference[]
   related_movies: MovieReference[]
 }
@@ -100,8 +100,8 @@ export type TagCategory = {
 }
 
 export type BrowseMoviesParams = {
-  zone?: JavDBZone
-  entityType?: JavDBEntityType
+  zone?: Zone
+  entityType?: EntityType
   entityID?: string
   main?: string[]
   tagIds?: string[]
@@ -208,7 +208,7 @@ export function useDiscoverMagnets(id: string, code?: string) {
   })
 }
 
-export function useDiscoverTags(zone: JavDBZone) {
+export function useDiscoverTags(zone: Zone) {
   return useQuery({
     queryKey: discoverKeys.tags(zone),
     queryFn: ({ signal }) => apiGet<TagCategory[]>('/api/discover/tags', { zone }, signal),

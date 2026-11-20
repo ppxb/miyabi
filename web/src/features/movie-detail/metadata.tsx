@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import type { JavDBEntityType, JavDBZone } from '@/api/discover'
+import type { EntityType, Zone } from '@/api/discover'
 import { Badge } from '@/components/ui/badge'
 
 type MetadataEntity = { provider?: string; id?: string; name: string }
@@ -11,7 +11,7 @@ export type MovieMetadataValues = {
   director?: MetadataEntity
   actors: MetadataEntity[]
   tags: MetadataEntity[]
-  zone?: JavDBZone | 'unknown'
+  zone?: Zone | 'unknown'
 }
 
 export function MovieMetadata({ movie }: { movie: MovieMetadataValues }) {
@@ -67,7 +67,7 @@ export function MovieMetadata({ movie }: { movie: MovieMetadataValues }) {
   )
 }
 
-function EntityLink({ entity }: { kind?: JavDBEntityType; entity: MetadataEntity }) {
+function EntityLink({ entity }: { kind?: EntityType; entity: MetadataEntity }) {
   return <span className="max-w-full break-words">{entity.name}</span>
 }
 

@@ -1,8 +1,8 @@
-import type { JavDBZone } from '@/api/discover'
+import type { Zone } from '@/api/discover'
 
 export const DISCOVER_PAGE_SIZE = 20
 
-export const DISCOVER_ZONES: Array<{ value: JavDBZone; label: string }> = [
+export const DISCOVER_ZONES: Array<{ value: Zone; label: string }> = [
   { value: 'censored', label: '有码' },
   { value: 'uncensored', label: '无码' },
   { value: 'fc2', label: 'FC2' },
