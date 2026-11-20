@@ -13,12 +13,17 @@ import (
 	"github.com/ppxb/miyabi/internal/netx"
 )
 
+// mediaMaxBodyBytes caps CDN image downloads so a huge or hostile response
+// cannot exhaust memory; images are small and 4 MiB matches the API limit.
+const mediaMaxBodyBytes = 4 << 20
+
 func newMediaClient(options Options) *resty.Client {
 	restyOptions := netx.RestyOptions{Timeout: options.Timeout}
 	client := netx.NewRestyClient(options.Proxy, restyOptions)
 	return client.
 		SetHeader("User-Agent", userAgent).
-		SetRedirectPolicy(resty.NoRedirectPolicy())
+		SetRedirectPolicy(resty.NoRedirectPolicy()).
+		SetResponseBodyLimit(mediaMaxBodyBytes)
 }
 
 // FetchMedia downloads and decodes a CDN image independently of API route

@@ -59,6 +59,24 @@ func TestDecodeImagePayloadRejectsNonImages(t *testing.T) {
 	}
 }
 
+func TestFetchMediaRejectsOversizedResponse(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(bytes.Repeat([]byte{0x78}, mediaMaxBodyBytes+1))
+	}))
+	t.Cleanup(server.Close)
+	client, err := New(Options{DeviceUUID: "00000000-0000-4000-8000-000000000001"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(client.Close)
+	client.media.SetTransport(server.Client().Transport)
+
+	if _, err := client.FetchMedia(t.Context(), server.URL+"/cover.jpg"); err == nil {
+		t.Fatal("oversized image response was accepted")
+	}
+}
+
 func TestFetchMediaUsesImageTransportWithoutAPIRoute(t *testing.T) {
 	for _, status := range []int{http.StatusOK, http.StatusNotFound} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
