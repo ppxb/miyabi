@@ -91,6 +91,18 @@ func (d *Drive) clearAccountMount(accountID string) {
 	delete(d.accountMounts, accountID)
 }
 
+// syncAccountMounts replaces the in-memory mount registry with the given stored
+// accounts, so periodic refreshes pick up any external/manual DB edit.
+func (d *Drive) syncAccountMounts(store accountStore) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	next := make(map[string]mountRecord, len(store))
+	for id, record := range store {
+		next[id] = record.Directory
+	}
+	d.accountMounts = next
+}
+
 func (d *Drive) accountCredVersion(accountID string) uint64 {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -174,12 +186,12 @@ func (d *Drive) removeAccount(ctx context.Context, accountID string) error {
 	return nil
 }
 
-func (d *Drive) accountRecord(ctx context.Context, accountID string) (accountRecord, error) {
-	store, err := d.loadAccounts(ctx)
-	if err != nil {
-		return accountRecord{}, err
-	}
-	return store[accountID], nil
+// accountRecord builds one account record from the in-memory registry. Tokens
+// and mounts are loaded at construction and kept in sync by the write paths, so
+// callers such as OpenSource/accountSessionFor no longer reload the whole store.
+func (d *Drive) accountRecord(_ context.Context, accountID string) (accountRecord, error) {
+	mount, _ := d.accountMount(accountID)
+	return accountRecord{Tokens: d.accountToken(accountID), Directory: mount}, nil
 }
 
 // Mount returns the stored library source of an account when it has one. A
@@ -221,6 +233,7 @@ func (d *Drive) Accounts(ctx context.Context) ([]AccountStatus, error) {
 	if err != nil {
 		return nil, err
 	}
+	d.syncAccountMounts(store)
 	ids := make([]string, 0, len(store))
 	for id := range store {
 		ids = append(ids, id)
@@ -295,6 +308,7 @@ func (d *Drive) refreshExpiringAccounts(ctx context.Context) {
 		slog.Warn("load 115 accounts for refresh", "error", err)
 		return
 	}
+	d.syncAccountMounts(store)
 	for id, record := range store {
 		if tokensNeedRefresh(record.Tokens) {
 			if err := d.refreshAccountTokens(ctx, id); err != nil {
