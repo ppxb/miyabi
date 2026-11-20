@@ -106,6 +106,7 @@ export function SourcesSection() {
   const [draft, setDraft] = useState<StorageSource | null>(null)
   const [draftKey, setDraftKey] = useState(0)
   const [open, setOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<StorageSource | null>(null)
 
   const persist = (next: StorageSource[], onSuccess?: () => void) =>
     save.mutate(next, {
@@ -195,8 +196,49 @@ export function SourcesSection() {
           saving={save.isPending}
           onOpenChange={setOpen}
           onSubmit={submit}
-          onDelete={() => remove(draft.id)}
+          onDelete={() => setDeleteTarget(draft)}
         />
+      ) : null}
+
+      {deleteTarget ? (
+        <Dialog
+          open
+          onOpenChange={next => {
+            if (!next && !save.isPending) setDeleteTarget(null)
+          }}
+        >
+          <DialogContent showCloseButton={!save.isPending}>
+            <DialogHeader>
+              <DialogTitle>删除存储源？</DialogTitle>
+              <DialogDescription>
+                将移除存储源「{deleteTarget.name || '未命名'}
+                」，其挂载绑定也会一并清除，此操作不可撤销。
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={save.isPending}
+                onClick={() => setDeleteTarget(null)}
+              >
+                取消
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={save.isPending}
+                onClick={() => {
+                  const id = deleteTarget.id
+                  setDeleteTarget(null)
+                  remove(id)
+                }}
+              >
+                确认删除
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       ) : null}
     </SettingsSection>
   )

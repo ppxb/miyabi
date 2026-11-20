@@ -27,7 +27,7 @@
 - [x] 🟠 `web/src/features/library/player-dialog.tsx:156-160`：`try { void seek() } catch {}` 捕获不到异步 reject。改法：`seek(...).catch(() => {})`。（已修复：改为 `void seek(...).catch(() => {})`）
 - [x] 🟠 `web/src/features/library/player-dialog.tsx:53-55,87,118`：`sources` 为空时永远显示"加载中"；失败无重试。改法：区分 pending / error / 无源，失败用 `InlineError onRetry`。（已核实：后端成功响应必带 ≥1 条 source，"成功+空源"分支不可达；已修复真实问题——播放失败改用 `InlineError onRetry`，右侧信息区失败态用 `InlineError`、加载态改骨架屏）
 - [ ] 🟠 `web/src/features/sources/sources-section.tsx:484-488,210-214`：PikPak 提示"在卡片中完成登录"，但卡片无此入口。改法：移除 pikpak 选项或改文案。
-- [ ] 🟠 `web/src/features/sources/sources-section.tsx:505-514`：删除存储源无二次确认（data-section 清理缓存有确认）。
+- [x] 🟠 `web/src/features/sources/sources-section.tsx:505-514`：删除存储源无二次确认（data-section 清理缓存有确认）。（已修复：删除前弹出二次确认对话框）
 - [ ] 🟠 `web/src/components/app-navigation.tsx:36,57`：`onNavigate` 无人传入，移动端点击导航后侧边栏不关闭。改法：内部 `useSidebar().setOpenMobile(false)`。
 - [ ] 🟠 `internal/drive/events.go:18-19` vs `account_ops.go:74-78`：注释承诺"commit 锁下运行、失败回滚"，代码未实现。改法：实现或修正注释。
 - [ ] 🟠 `internal/drive/accounts.go:149-155`：`Mount` 把数据库错误吞成"未挂载"。改法：签名返回 `error`。
