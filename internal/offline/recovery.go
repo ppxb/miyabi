@@ -219,7 +219,7 @@ func (s *Service) deferAction(ctx context.Context, record *ent.OfflineDownload, 
 	defer cancel()
 	current, err := s.database.OfflineDownload.Get(ctx, record.ID)
 	if err != nil {
-		return err
+		return errors.Join(cause, err)
 	}
 	if current.Recovery != nil {
 		state = recovery(current, state.Preferences)

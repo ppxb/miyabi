@@ -3,6 +3,7 @@ package freejavbt
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -145,7 +146,10 @@ func (c *Client) detail(ctx context.Context, code string) (detail, error) {
 		if cached, ok := c.cached(code); ok {
 			return cached, nil
 		}
-		body, err := c.get(ctx, c.base+"/"+url.PathEscape(code))
+		// The flight is shared by every caller for this code, so it must not be
+		// cancelled by whichever caller happened to start it. The HTTP client's
+		// timeout still bounds the request.
+		body, err := c.get(context.WithoutCancel(ctx), c.base+"/"+url.PathEscape(code))
 		if err != nil {
 			return detail{}, err
 		}
@@ -261,7 +265,7 @@ func (c *Client) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Magnet
 	}
 	parsed, err := c.detail(ctx, code)
 	if err != nil {
-		if err == metadata.ErrNotFound {
+		if errors.Is(err, metadata.ErrNotFound) {
 			return nil, nil
 		}
 		return nil, err

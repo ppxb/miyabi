@@ -117,9 +117,6 @@ export function NetworkSection() {
               placeholder="http://127.0.0.1:7890"
               disabled={disabled}
               onChange={e => setUserInput(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleSave()
-              }}
             />
           </SettingRow>
 

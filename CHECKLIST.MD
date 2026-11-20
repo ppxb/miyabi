@@ -34,10 +34,10 @@
 - [x] 🟠 `internal/drive/accounts.go:181-215`：`Accounts()` 失败项丢失 `AccountID`，前端无法定位掉线账号；`refreshExpiringAccounts` 吞错无日志。（已修复：`AccountStatus` 增 `AccountID` 并经 `/api/pan/accounts` 透出；`refreshExpiringAccounts`/`Accounts` 刷新失败补 `slog.Warn` 日志）
 - [x] 🟠 `internal/metadata/providers/onepondo.go:52-84`：缺 `MovieID/SiteID` 校验，空 title 不返回 `ErrNotFound`。改法：复用 `parsePondoMovieJSON`。（已修复：`parseOnePondoJSON` 改为薄封装复用 `parsePondoMovieJSON`（movieID + SiteID 2470），并加负向测试）
 - [x] 🟠 `internal/javdb/media.go:32`：图片下载无响应体上限。（已修复：media 客户端 `SetResponseBodyLimit(4 MiB)`，超限返回错误；补超限测试）
-- [ ] 🟢 `internal/freejavbt/client.go:148`：singleflight 使用首个调用者 ctx，其取消会连带其他调用者失败。
-- [ ] 🟢 `internal/freejavbt/client.go:264`：`err == metadata.ErrNotFound` 应为 `errors.Is`。
-- [ ] 🟢 `internal/offline/recovery.go:217-221`：`deferAction` 数据库出错时丢失原始 `cause`。改法：`errors.Join(cause, err)`。
-- [ ] 🟢 `web/src/features/settings/network-section.tsx:120-122`：回车保存绕过 `isDirty`；Emby 不响应回车。改法：统一用 `<form onSubmit>`。
+- [x] 🟢 `internal/freejavbt/client.go:148`：singleflight 使用首个调用者 ctx，其取消会连带其他调用者失败。（已修复：flight 内改用 `context.WithoutCancel(ctx)`，由 HTTP 客户端超时兜底）
+- [x] 🟢 `internal/freejavbt/client.go:264`：`err == metadata.ErrNotFound` 应为 `errors.Is`。（已修复：改用 `errors.Is`）
+- [x] 🟢 `internal/offline/recovery.go:217-221`：`deferAction` 数据库出错时丢失原始 `cause`。改法：`errors.Join(cause, err)`。（已修复：`return errors.Join(cause, err)`）
+- [x] 🟢 `web/src/features/settings/network-section.tsx:120-122`：回车保存绕过 `isDirty`；Emby 不响应回车。改法：统一用 `<form onSubmit>`。（已修复：按“只允许按钮保存”，移除网络代理输入框的回车保存；Emby 本就只有按钮保存）
 
 ---
 
