@@ -36,7 +36,7 @@ func (r *scanRun) processPageTx(ctx context.Context, tx *ent.Tx, directoryPath s
 		}
 		previous, err := tx.File.Query().Where(file.FileIDIn(ids...)).
 			Select(file.FieldID, file.FieldFileID, file.FieldName, file.FieldParentID, file.FieldSize,
-				file.FieldSha1, file.FieldPickCode, file.FieldAccountID, file.FieldRootID, file.FieldPath, file.FieldMovieID).
+				file.FieldSha1, file.FieldPickCode, file.FieldUploadTime, file.FieldAccountID, file.FieldRootID, file.FieldPath, file.FieldMovieID).
 			WithMovie(func(q *ent.MovieQuery) {
 				q.Select(movie.FieldID, movie.FieldCode, movie.FieldManualCode, movie.FieldScrapeStatus)
 			}).All(ctx)
