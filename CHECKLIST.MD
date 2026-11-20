@@ -13,7 +13,7 @@
   - `web/src/features/discover/category-filters.tsx:39`（分区）、`:75`（分类）、`:92`（标签）
   - `web/src/features/discover/common-filter-select.tsx:21`
   - `web/src/features/settings/subscription-section.tsx:93`、`:114`、`:133`
-  - 改法：Root 传 `items={options}`（`{value,label}[]` 或 `{[value]: label}`）；`movies/filter-bar.tsx` 的 `sortLabel/sourceLabel` 可同法简化。
+  - 改法：Root 传 `items={options}`（`{value,label}[]` 或 `{[value]: label}`）；`movies/filter-bar.tsx` 的 `sortLabel/sourceLabel` 已同法简化。
 - [ ] 🔴 ✅ **扫描"文件未变"判断恒失败**：`internal/library/scan/persist.go:38` Select 漏 `file.FieldUploadTime`，`:105` 却比较 `old.UploadTime`，导致每页全量 upsert + 每页 `NotifyLibraryChanged`。改法：Select 补该字段。
 - [ ] 🔴 ✅ **115 账号设置读改写无锁/无事务**：`internal/drive/accounts.go:39`（`saveAccountTokens`）、`:107`（`saveAccountMount`）、`:122`（`removeAccount`）并发时互相覆盖，重启后可能读回旧 refresh token。改法：加 `accountsMu` 包住整段读改写，或 `ent.WithTx`。
 - [ ] 🔴 ✅ **NSFW 模式被原生 `<img>` 绕过**：

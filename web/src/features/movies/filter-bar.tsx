@@ -47,8 +47,6 @@ export function MovieFilterBar({
 
   const sortValue = value.sort ?? 'recent'
   const sourceValue = value.source ?? 'all'
-  const sortLabel = SORT_OPTIONS.find(option => option.value === sortValue)?.label ?? '最近加入'
-  const sourceLabel = SOURCE_OPTIONS.find(option => option.value === sourceValue)?.label ?? '全部来源'
 
   const hasFilters =
     Boolean(value.q) ||
@@ -73,13 +71,14 @@ export function MovieFilterBar({
       />
 
       <Select
+        items={SORT_OPTIONS}
         value={sortValue}
         onValueChange={next =>
           onChange({ ...value, sort: (next ?? 'recent') as MoviesFilter['sort'] })
         }
       >
         <SelectTrigger className="w-32">
-          <SelectValue>{sortLabel}</SelectValue>
+          <SelectValue />
         </SelectTrigger>
         <SelectContent align="start">
           <SelectGroup>
@@ -93,6 +92,7 @@ export function MovieFilterBar({
       </Select>
 
       <Select
+        items={SOURCE_OPTIONS}
         value={sourceValue}
         onValueChange={next =>
           onChange({
@@ -102,7 +102,7 @@ export function MovieFilterBar({
         }
       >
         <SelectTrigger className="w-28">
-          <SelectValue>{sourceLabel}</SelectValue>
+          <SelectValue />
         </SelectTrigger>
         <SelectContent align="start">
           <SelectGroup>
