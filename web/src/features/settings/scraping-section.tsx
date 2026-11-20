@@ -41,7 +41,9 @@ const descriptions: Record<string, string> = {
 export function ScrapingSection() {
   const query = useScrapingSources()
   const update = useUpdateScrapingSources()
-  const sources = query.data ?? []
+  // Show the submitted state while the save is in flight so the toggle reacts
+  // immediately instead of waiting for the refetch.
+  const sources = (update.isPending ? update.variables : query.data) ?? []
   return (
     <SettingsSection icon={<ScanSearchIcon className="size-4" />} title="影片刮削">
       <p className="text-xs text-muted-foreground">
@@ -58,7 +60,6 @@ export function ScrapingSection() {
           <div className="flex items-center gap-2">
             <Switch
               checked={source.enabled}
-              disabled={update.isPending}
               onCheckedChange={enabled =>
                 update.mutate(
                   sources.map(item => (item.id === source.id ? { ...item, enabled } : item))
@@ -91,7 +92,7 @@ const actorDescriptions: Record<string, string> = {
 export function ActorSourcesSection() {
   const query = useActorSources()
   const update = useUpdateActorSources()
-  const sources = query.data ?? []
+  const sources = (update.isPending ? update.variables : query.data) ?? []
   return (
     <SettingsSection icon={<UserRoundIcon className="size-4" />} title="演员数据源">
       <p className="text-xs text-muted-foreground">
@@ -108,7 +109,6 @@ export function ActorSourcesSection() {
           <div className="flex items-center gap-2">
             <Switch
               checked={source.enabled}
-              disabled={update.isPending}
               onCheckedChange={enabled =>
                 update.mutate(
                   sources.map(item => (item.id === source.id ? { ...item, enabled } : item))
