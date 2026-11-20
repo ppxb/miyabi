@@ -41,7 +41,7 @@ func TestMagnetsOptionalSourceFailureDoesNotCachePartialResults(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	primary := &stubProviderWithMagnets{magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "primary", Sources: []string{domain.MagnetSourceJavDB}}}}
+	primary := &stubProviderWithMagnets{magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "primary", Sources: []string{"javdb"}}}}
 	supplement := &recoveringJavBusSource{}
 	service, err := NewWithClients(t.Context(), store.Client, primary, supplement, &stubLocalState{}, primary)
 	if err != nil {
@@ -87,7 +87,7 @@ func TestMagnetsRetriesDetailBeforeCachingSupplementedResult(t *testing.T) {
 	}
 	defer store.Close()
 	primary := &recoveringDetailProvider{stubProviderWithMagnets: stubProviderWithMagnets{
-		magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "primary", Sources: []string{domain.MagnetSourceJavDB}}},
+		magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "primary", Sources: []string{"javdb"}}},
 	}}
 	upstream := &countingJavBusHTTP{}
 	service, err := NewWithClients(t.Context(), store.Client, primary, javbus.NewForTest(true, upstream), &stubLocalState{}, primary)
@@ -134,7 +134,7 @@ func TestMagnets_WithAvailableJavBus(t *testing.T) {
 
 	provider := &detailCountingProvider{
 		stubProviderWithMagnets: stubProviderWithMagnets{
-			magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "SSIS-001", Sources: []string{domain.MagnetSourceJavDB}}},
+			magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "SSIS-001", Sources: []string{"javdb"}}},
 		},
 	}
 	upstream := &countingJavBusHTTP{}
@@ -184,7 +184,7 @@ func TestMagnets_WithUnavailableJavBus(t *testing.T) {
 
 	provider := &detailCountingProvider{
 		stubProviderWithMagnets: stubProviderWithMagnets{
-			magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "SSIS-001", Sources: []string{domain.MagnetSourceJavDB}}},
+			magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "SSIS-001", Sources: []string{"javdb"}}},
 		},
 	}
 	javbusClient := javbus.NewForTest(false)

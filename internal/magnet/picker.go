@@ -136,7 +136,7 @@ func (p *Picker) Pick(magnets []domain.Magnet) (domain.Magnet, bool) {
 		return domain.Magnet{}, false
 	}
 
-	// Ties: larger, more files, JavDB-listed, then most recently added.
+	// Ties: larger, more files, then most recently added.
 	slices.SortStableFunc(passed, func(a, b candidate) int {
 		if a.score != b.score {
 			return cmp.Compare(b.score, a.score)
@@ -157,21 +157,13 @@ func weighted(full int, verified, inferred bool) int {
 	}
 }
 
-// compareMagnets orders by size, file count, JavDB presence and newest date.
+// compareMagnets orders by size, file count and newest date.
 func compareMagnets(a, b domain.Magnet) int {
 	if a.Size != b.Size {
 		return cmp.Compare(b.Size, a.Size)
 	}
 	if a.FilesCount != b.FilesCount {
 		return cmp.Compare(b.FilesCount, a.FilesCount)
-	}
-	aJavDB := slices.Contains(a.Sources, domain.MagnetSourceJavDB)
-	bJavDB := slices.Contains(b.Sources, domain.MagnetSourceJavDB)
-	if aJavDB != bJavDB {
-		if aJavDB {
-			return -1
-		}
-		return 1
 	}
 	return cmp.Compare(b.CreatedAt, a.CreatedAt)
 }

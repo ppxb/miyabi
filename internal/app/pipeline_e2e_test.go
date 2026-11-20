@@ -255,7 +255,7 @@ func (catalogue *fakeCatalogue) MovieDetail(_ context.Context, id string) (domai
 	return detail, nil
 }
 
-func (catalogue *fakeCatalogue) Name() string { return domain.MagnetSourceJavDB }
+func (catalogue *fakeCatalogue) Name() string { return "javdb" }
 func (catalogue *fakeCatalogue) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Magnet, error) {
 	return catalogue.Magnets(ctx, ref.JavDBID)
 }

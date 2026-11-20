@@ -57,9 +57,8 @@ type MovieStateItem struct {
 	State     MovieState `json:"state"`
 }
 
-// JavDBClient supplies the primary catalogue, route management and magnets.
+// JavDBClient supplies the primary catalogue and route management.
 type JavDBClient interface {
-	magnet.Source
 	Close()
 	Search(context.Context, string, domain.SearchOptions) ([]domain.Movie, error)
 	Browse(context.Context, domain.BrowseOptions) ([]domain.Movie, error)

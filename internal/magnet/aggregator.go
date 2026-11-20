@@ -126,8 +126,8 @@ func (a *Aggregator) FindDetailed(ctx context.Context, ref domain.MovieRef) ([]d
 }
 
 // mergeMagnet folds a second record of the same infohash into existing:
-// sources accumulate with JavDB first, flags OR together, size and file count
-// take the maximum, the JavDB name wins, and the earliest date is kept.
+// sources accumulate, flags OR together, size and file count take the maximum,
+// the first non-empty name wins, and the earliest date is kept.
 func mergeMagnet(existing *domain.Magnet, incoming domain.Magnet, source string) {
 	existing.Sources = mergeSources(existing.Sources, append([]string{source}, incoming.Sources...))
 	existing.HasSubtitle = existing.HasSubtitle || incoming.HasSubtitle
@@ -135,10 +135,7 @@ func mergeMagnet(existing *domain.Magnet, incoming domain.Magnet, source string)
 	existing.Size = max(existing.Size, incoming.Size)
 	existing.FilesCount = max(existing.FilesCount, incoming.FilesCount)
 
-	fromJavDB := source == domain.MagnetSourceJavDB || slices.Contains(incoming.Sources, domain.MagnetSourceJavDB)
-	if fromJavDB && incoming.Name != "" {
-		existing.Name = incoming.Name
-	} else if existing.Name == "" {
+	if existing.Name == "" {
 		existing.Name = incoming.Name
 	}
 
@@ -157,11 +154,7 @@ func mergeSources(existing, incoming []string) []string {
 		if source == "" || slices.Contains(existing, source) {
 			continue
 		}
-		if source == domain.MagnetSourceJavDB {
-			existing = append([]string{source}, existing...)
-		} else {
-			existing = append(existing, source)
-		}
+		existing = append(existing, source)
 	}
 	return existing
 }

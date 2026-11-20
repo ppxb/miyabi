@@ -36,9 +36,9 @@ func TestPickerScoringTiersAndInferredWeights(t *testing.T) {
 func TestPickerVerifiedSubtitleSurvivesInferredTags(t *testing.T) {
 	p := NewPicker(DefaultPreferences())
 	verified4K := domain.Magnet{Hash: "a", Name: "SSIS-001-UC 4K", HasSubtitle: true, HD: true,
-		Tags: []string{domain.MagnetTagSubtitle, domain.MagnetTagHD, domain.MagnetTag4K, domain.MagnetTagUncensored}, Inferred: true, Sources: []string{domain.MagnetSourceJavDB}, Size: 1000}
+		Tags: []string{domain.MagnetTagSubtitle, domain.MagnetTagHD, domain.MagnetTag4K, domain.MagnetTagUncensored}, Inferred: true, Sources: []string{"javdb"}, Size: 1000}
 	verifiedPlain := domain.Magnet{Hash: "b", Name: "SSIS-001", HasSubtitle: true, HD: true,
-		Tags: []string{domain.MagnetTagSubtitle, domain.MagnetTagHD}, Sources: []string{domain.MagnetSourceJavDB}, Size: 500}
+		Tags: []string{domain.MagnetTagSubtitle, domain.MagnetTagHD}, Sources: []string{"javdb"}, Size: 500}
 	best, ok := p.Pick([]domain.Magnet{verifiedPlain, verified4K})
 	if !ok || best.Hash != "a" {
 		t.Fatalf("expected the larger verified magnet a, got %s", best.Hash)
@@ -65,8 +65,8 @@ func TestPickerTieBreaking(t *testing.T) {
 
 	javbus, javdb := base, base
 	javbus.Hash, javbus.Size, javbus.Sources = "b1", 1000, []string{domain.MagnetSourceJavBus}
-	javdb.Hash, javdb.Size, javdb.Sources = "d1", 1000, []string{domain.MagnetSourceJavDB}
-	if best, _ := p.Pick([]domain.Magnet{javbus, javdb}); best.Hash != "d1" {
-		t.Fatalf("JavDB-listed magnet must win, got %s", best.Hash)
+	javdb.Hash, javdb.Size, javdb.Sources = "d1", 1000, []string{"javdb"}
+	if best, _ := p.Pick([]domain.Magnet{javbus, javdb}); best.Hash != "b1" {
+		t.Fatalf("source label must not bias ties, got %s", best.Hash)
 	}
 }

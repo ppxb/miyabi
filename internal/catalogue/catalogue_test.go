@@ -286,7 +286,7 @@ func TestServiceMagnetsWithAggregator(t *testing.T) {
 			{
 				Hash:    hash,
 				Name:    "duplicate from primary source",
-				Sources: []string{domain.MagnetSourceJavDB},
+				Sources: []string{"javdb"},
 			},
 		},
 	}
@@ -346,7 +346,7 @@ func TestJavDBIsNotAMagnetSource(t *testing.T) {
 
 	const hash = "abcdef0123456789abcdef0123456789abcdef01"
 	primary := &stubProviderWithMagnets{
-		magnets: []domain.Magnet{{Hash: hash, Name: "javdb only", Sources: []string{domain.MagnetSourceJavDB}}},
+		magnets: []domain.Magnet{{Hash: hash, Name: "javdb only", Sources: []string{"javdb"}}},
 	}
 	service, err := NewWithClients(t.Context(), store.Client, primary, nil, &stubLocalState{}, nil)
 	if err != nil {
