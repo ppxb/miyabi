@@ -66,7 +66,7 @@
 
 ### 前端
 - [x] 🟠 ✅ `web/src/features/tasks/task-events.tsx:45,138`：`revisions` 为 effect 局部变量且 onerror 清空，每次重连全量刷新四类查询。改法：`useRef` 跨重连保留（⚠️ 先确认后端 revision 重启是否归零）。（已修复·方案B：确认后端 revision 是内存计数、**重启归零**（`tasks/bus.go`）。后端 `Bus` 增加 `instance` 进程标识，SSE `changes` 事件带上 `instance` 字段（`TaskRevisions` 结构不变，仅 SSE payload 增加该字段）；前端把 `revisions` 改为 `useRef` 跨重连保留、`onerror` 不再清空，仅在 `instance` 变化（服务重启）时重置基线全刷一次，否则只刷真正变化的类别。`go build`/`go vet`/`go test ./internal/tasks/... ./internal/api/...` 与 `pnpm build`（vite+tsc）均通过）
-- [ ] 🟠 `web/src/features/library/page.tsx:22` + `api/library.ts:109-115`：同接口一页请求两次。改法：共用 `libraryKeys.movies(1)` + `select` 截取。
+- [x] 🟠 ✅ `web/src/features/library/page.tsx:22` + `api/library.ts:109-115`：同接口一页请求两次。改法：共用 `libraryKeys.movies(1)` + `select` 截取。（已修复：`useRecentMovies` 改为复用 `libraryKeys.movies(1)` 缓存、queryFn 固定 `page:1, limit:LIBRARY_PAGE_SIZE`，用 `select` 截取前 `limit` 条；删除不再需要的 `libraryKeys.recent`。列表页 page1 只发一次 `/api/library/movies`。`pnpm build` 与 `pnpm test`（186 passed）通过）
 - [ ] 🟠 `web/src/api/subscriptions.ts:65-71`：内联 `select` 每次渲染重建 Map；订阅页 `'all'` 与发现页 `'movie'` 双缓存。改法：模块级 select，订阅页用 `'movie'`。
 - [ ] 🟠 `web/src/features/library/player-dialog.tsx:140-189`：订阅 `currentTime` 导致播放中持续重渲染；保存进度逻辑重复两次。
 - [ ] 🟢 `web/src/api/history.ts:34-40`：缺 `keepPreviousData`，翻页闪骨架。

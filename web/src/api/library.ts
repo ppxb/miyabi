@@ -70,7 +70,6 @@ export const libraryKeys = {
   all: ['library'] as const,
   detail: (id: number) => ['library', 'detail', id] as const,
   movies: (page: number) => ['library', 'movies', page] as const,
-  recent: (limit: number) => ['library', 'recent', limit] as const,
   browse: (params: BrowseLibraryParams) => ['library', 'browse', params] as const,
   filterOptions: ['library', 'filter-options'] as const
 }
@@ -106,11 +105,18 @@ export function useTopRatedMovies(limit = 12) {
   })
 }
 
+// Reuses the first library page (same cache entry as useLibraryMovies(1)) and
+// slices the newest few locally, so the library page issues the page-1 request
+// only once instead of a second time with a smaller limit.
 export function useRecentMovies(limit = 12) {
   return useQuery({
-    queryKey: libraryKeys.recent(limit),
+    queryKey: libraryKeys.movies(1),
     queryFn: ({ signal }) =>
-      apiGet<LibraryPage>('/api/library/movies', { page: 1, limit }, signal)
+      apiGet<LibraryPage>('/api/library/movies', { page: 1, limit: LIBRARY_PAGE_SIZE }, signal),
+    select: (page: LibraryPage): LibraryPage => ({
+      ...page,
+      movies: page.movies.slice(0, limit)
+    })
   })
 }
 

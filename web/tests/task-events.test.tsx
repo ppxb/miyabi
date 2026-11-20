@@ -202,22 +202,28 @@ test('an older HTTP fallback cannot overwrite a reconnected SSE snapshot', async
   expect(f.client.getQueryData(taskKeys.all)).toEqual([done])
 })
 
-test('initial and reconnected revisions still reconcile business data', async () => {
+test('initial revisions reconcile once, same-instance reconnects stay quiet, and a restart reconciles again', async () => {
   const f = fixture()
   const keys = [movieStateKeys.all, offlineKeys.all, libraryKeys.all, subscriptionKeys.all]
   for (const key of keys) f.client.setQueryData(key, [])
-  const revisions = { library: 0, offline: 0, monitor: 0 }
+  const revisions = { library: 0, offline: 0, monitor: 0, instance: 'server-a' }
   await f.events.send('changes', revisions)
   await vi.advanceTimersByTimeAsync(0)
   for (const key of keys) {
     expect(f.client.getQueryState(key)?.isInvalidated).toBe(true)
     f.client.setQueryData(key, [])
   }
+  // Same revisions and same instance: nothing changed, so nothing is refetched.
   await f.events.send('changes', revisions)
   await vi.advanceTimersByTimeAsync(0)
   for (const key of keys) expect(f.client.getQueryState(key)?.isInvalidated).toBe(false)
+  // Reconnecting to the same instance with unchanged revisions stays quiet.
   f.reconnect()
   await f.events.send('changes', revisions)
+  await vi.advanceTimersByTimeAsync(0)
+  for (const key of keys) expect(f.client.getQueryState(key)?.isInvalidated).toBe(false)
+  // A restarted server (new instance) reset its counters, so the client re-baselines and refetches.
+  await f.events.send('changes', { library: 0, offline: 0, monitor: 0, instance: 'server-b' })
   await vi.advanceTimersByTimeAsync(0)
   for (const key of keys) expect(f.client.getQueryState(key)?.isInvalidated).toBe(true)
 })
