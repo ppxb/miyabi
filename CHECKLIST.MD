@@ -124,7 +124,7 @@
 - [x] 🟠 `internal/api/discover.go:122-128`：匿名接口运行时断言 + 吞错。改法：加入 `CatalogueManager` 接口。（已把 `LocalRecommendations` 加入 `CatalogueManager` 并直接调用，移除匿名接口断言；错误改为 `c.Error` 记录、不再吞掉，推荐仍为 best-effort）
 - [x] 🟠 `internal/network/service.go:65-87`：单任务 goroutine + WaitGroup。（已整体取消网络代理"测试连接"环节：删 `TestNetwork`、`networkProbeTimeout`、`TestResult/ProbeResult`、`NetworkManager.TestNetwork`、`POST /network/test` 路由与相关后端测试，前端删 `useTestNetwork` 与测试按钮；`javbus/probe.go` 一并移除）
 - [x] 🟠 `internal/app/app.go:129-259`：手写出错清理链。改法：`cleanup []func()` + defer 逆序。（已改为资源创建成功后 `cleanup = append(...)`，`New` 命名返回 + defer 逆序关闭；删除约 10 处手工关闭链，成功路径不触发关闭）
-- [ ] 🟠 `web/src/api/library.ts:190-205`、`api/offline.ts:77-96,106-123`：条件 `setQueryData` 写三遍且紧接 invalidate。
+- [x] 🟠 `web/src/api/library.ts:190-205`、`api/offline.ts:77-96,106-123`：条件 `setQueryData` 写三遍且紧接 invalidate。（已把三处"守卫式乐观合并"收敛为 `query-refresh.ts` 的 `updateIfCurrent` helper；保留原并发语义与 invalidate，测试保持通过）
 - [ ] 🟢 `web/src/api/emby.ts:42-59`、`api/network.ts:36-53`：乐观更新 + 回滚 + 立即 invalidate，回滚冗余。
 - [ ] 🟢 `web/src/api/tasks.ts:87,96`：直接 `toast.error(error.message)`，绕过全局 `meta.errorTitle` / `UNAUTHORIZED` 静默 / `describeApiError`。
 - [ ] 🟢 `web/src/features/access-gate/access-gate.tsx:72`：用 `error.message` 而非 `describeApiError`。

@@ -9,7 +9,7 @@ import {
 import { apiGet, apiPost } from '@/api/client'
 import type { DiscoverMovieDetail } from '@/api/discover'
 import { movieStateKeys } from '@/api/movie-states'
-import { refreshQueries } from '@/api/query-refresh'
+import { refreshQueries, updateIfCurrent } from '@/api/query-refresh'
 import { panKeys, type PanAccountStatus } from '@/api/pan'
 import { taskKeys, type LibrarySource, type ScanTask, type Task } from '@/api/tasks'
 
@@ -203,9 +203,7 @@ function cacheScanTask(queryClient: QueryClient, task: ScanTask, previous: Task[
       account.directory?.id !== task.source.directory.id)
   )
     return
-  const state = queryClient.getQueryState(taskKeys.all)
-  if ((state?.fetchStatus ?? 'idle') !== 'idle' || state?.data !== previous) return
-  queryClient.setQueryData<Task[]>(taskKeys.all, tasks => [
+  updateIfCurrent(queryClient, taskKeys.all, previous, tasks => [
     task,
     ...(tasks ?? []).filter(item => item.id !== task.id)
   ])

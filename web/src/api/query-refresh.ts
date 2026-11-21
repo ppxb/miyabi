@@ -48,3 +48,17 @@ export function cancelQueryRefresh(client: QueryClient, queryKey: QueryKey) {
   if (pending) pending.cancelled = true
   return client.cancelQueries({ queryKey })
 }
+
+// Apply an optimistic cache update from a mutation response only when the cache
+// still matches the snapshot captured before the mutation. A concurrent read or
+// SSE refresh (fetchStatus !== 'idle' or newer data) supersedes the response.
+export function updateIfCurrent<T>(
+  client: QueryClient,
+  queryKey: QueryKey,
+  previous: T | undefined,
+  update: (current: T | undefined) => T | undefined
+): void {
+  const state = client.getQueryState(queryKey)
+  if ((state?.fetchStatus ?? 'idle') !== 'idle' || state?.data !== previous) return
+  client.setQueryData<T>(queryKey, update)
+}

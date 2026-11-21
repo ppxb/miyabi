@@ -2,7 +2,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/r
 
 import { apiGet, apiPost } from '@/api/client'
 import { movieStateKeys } from '@/api/movie-states'
-import { refreshQueries } from '@/api/query-refresh'
+import { refreshQueries, updateIfCurrent } from '@/api/query-refresh'
 import type { LibrarySource } from '@/api/tasks'
 import { sameSource } from '@/lib/source'
 
@@ -76,23 +76,20 @@ export function useAddOffline(movieID: string) {
       }),
     onMutate: () => queryClient.getQueryData<OfflineActivity>(offlineKeys.activity),
     onSuccess: (submission, _vars, previous) => {
-      const state = queryClient.getQueryState(offlineKeys.activity)
       // Merge the new task unless a read/SSE refresh already superseded it.
-      if ((state?.fetchStatus ?? 'idle') === 'idle' && state?.data === previous) {
-        queryClient.setQueryData<OfflineActivity>(offlineKeys.activity, activity =>
-          activity
-            ? {
-                ...activity,
-                tasks: [
-                  submission,
-                  ...activity.tasks.filter(
-                    task => task.task_id !== submission.task_id && task.hash !== submission.hash
-                  )
-                ]
-              }
-            : activity
-        )
-      }
+      updateIfCurrent(queryClient, offlineKeys.activity, previous, activity =>
+        activity
+          ? {
+              ...activity,
+              tasks: [
+                submission,
+                ...activity.tasks.filter(
+                  task => task.task_id !== submission.task_id && task.hash !== submission.hash
+                )
+              ]
+            }
+          : activity
+      )
       void refreshQueries(queryClient, movieStateKeys.all, offlineKeys.all)
     }
   })
@@ -105,19 +102,16 @@ export function useOfflineControl(action: 'cancel' | 'next') {
       apiPost<OfflineSubmission>(`/api/offline/tasks/${taskID}/${action}`),
     onMutate: () => queryClient.getQueryData<OfflineActivity>(offlineKeys.activity),
     onSuccess: (submission, _taskID, previous) => {
-      const state = queryClient.getQueryState(offlineKeys.activity)
-      if ((state?.fetchStatus ?? 'idle') === 'idle' && state?.data === previous) {
-        queryClient.setQueryData<OfflineActivity>(offlineKeys.activity, activity =>
-          activity && sameSource(activity.source, submission)
-            ? {
-                ...activity,
-                tasks: activity.tasks.map(task =>
-                  task.task_id === submission.task_id ? submission : task
-                )
-              }
-            : activity
-        )
-      }
+      updateIfCurrent(queryClient, offlineKeys.activity, previous, activity =>
+        activity && sameSource(activity.source, submission)
+          ? {
+              ...activity,
+              tasks: activity.tasks.map(task =>
+                task.task_id === submission.task_id ? submission : task
+              )
+            }
+          : activity
+      )
       void refreshQueries(queryClient, movieStateKeys.all)
     },
     onSettled: () => refreshQueries(queryClient, offlineKeys.all),
