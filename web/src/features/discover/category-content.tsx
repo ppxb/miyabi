@@ -1,9 +1,9 @@
-import { useDiscoverTags } from '@/api/discover'
 import type { CategoryFilters as CategoryValues } from './search'
 import { BrowseResults } from './browse-results'
-import { CategoryFilters, MAIN_CATEGORY, UNSUPPORTED_CATEGORIES } from './category-filters'
+import { CategoryFilters } from './category-filters'
 import { categoryBrowseParams } from './category-params'
 import { DISCOVER_PAGE_SIZE as PAGE_SIZE } from './constants'
+import { useCategoryTaxonomy } from './use-category-taxonomy'
 
 export function CategoryContent({
   category,
@@ -17,11 +17,7 @@ export function CategoryContent({
   onPageChange: (page: number) => void
 }) {
   const { zone, categoryID } = category
-  const taxonomy = useDiscoverTags(zone)
-  const categories = (taxonomy.data ?? []).filter(
-    item => item.id !== MAIN_CATEGORY && !UNSUPPORTED_CATEGORIES.has(item.id)
-  )
-  const selectedCategory = categories.find(item => item.id === categoryID) ?? categories[0]
+  const { selectedCategory } = useCategoryTaxonomy(zone, categoryID)
 
   return (
     <div className="space-y-6">

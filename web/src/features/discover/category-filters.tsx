@@ -1,5 +1,4 @@
 import type { Zone } from '@/api/discover'
-import { useDiscoverTags } from '@/api/discover'
 import { InlineError } from '@/components/error-state'
 import {
   Select,
@@ -13,10 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { CategoryFilters as CategoryValues } from './search'
 import { CommonFilterSelect } from './common-filter-select'
 import { DISCOVER_ZONES as zones } from './constants'
-
-export const MAIN_CATEGORY = 'main'
-// Month requires a year; duration has no slot in the upstream filter mask.
-export const UNSUPPORTED_CATEGORIES = new Set(['month', 'duration'])
+import { useCategoryTaxonomy } from './use-category-taxonomy'
 
 export function CategoryFilters({
   category,
@@ -26,12 +22,10 @@ export function CategoryFilters({
   updateCategory: (filters: Partial<CategoryValues>) => void
 }) {
   const { zone, categoryID, tagID, main } = category
-  const taxonomy = useDiscoverTags(zone)
-  const mainOptions = taxonomy.data?.find(item => item.id === MAIN_CATEGORY)?.tags ?? []
-  const categories = (taxonomy.data ?? []).filter(
-    item => item.id !== MAIN_CATEGORY && !UNSUPPORTED_CATEGORIES.has(item.id)
+  const { taxonomy, mainOptions, categories, selectedCategory } = useCategoryTaxonomy(
+    zone,
+    categoryID
   )
-  const selectedCategory = categories.find(item => item.id === categoryID) ?? categories[0]
   const effectiveCategoryID = selectedCategory?.id ?? ''
   const categoryItems = categories.map(item => ({ value: item.id, label: item.name }))
   const tagItems = [
