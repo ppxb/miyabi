@@ -76,7 +76,4 @@ func TestMergeSupplementsMissingJavDBFieldsAndPreviews(t *testing.T) {
 		len(got.Detail.PreviewImages) != 1 || got.Detail.FieldSources["title"] != "javdb" || got.Detail.FieldSources["tags"] != "fanza" {
 		t.Fatalf("missing metadata not supplemented: %+v", got)
 	}
-	if needsSupplement(got) {
-		t.Fatal("complete metadata triggered another query")
-	}
 }

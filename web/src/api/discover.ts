@@ -1,13 +1,7 @@
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useSyncExternalStore } from 'react'
 
 import { apiGet } from './client'
-import {
-  createMovieDetailLoader,
-  discoverKeys,
-  findCachedMovieCard,
-  subscribeMovieCard
-} from './movie-detail-cache'
+import { discoverKeys, findCachedMovieCard } from './movie-detail-cache'
 
 export type ReleaseStatus = 'unknown' | 'released' | 'upcoming'
 export type Zone = 'censored' | 'uncensored' | 'western' | 'fc2' | 'anime'
@@ -116,10 +110,6 @@ export type BrowseMoviesParams = {
   limit?: number
 }
 
-const movieDetails = createMovieDetailLoader((id, signal) =>
-  apiGet<DiscoverMovieDetail>(`/api/discover/movies/${encodeURIComponent(id)}`, undefined, signal)
-)
-
 export function useDiscoverMovies(params: BrowseMoviesParams) {
   return useQuery({
     queryKey: discoverKeys.movies(params),
@@ -158,9 +148,6 @@ export function useDiscoverMovie(id: string, code?: string) {
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000
   })
-  useEffect(() => {
-    movieDetails.prioritize(queryClient, id)
-  }, [queryClient, id])
   // Fall back to the card already rendered in the list only when the
   // enrichment request fails, so the dialog still opens instead of erroring.
   const card = query.isError ? findCachedMovieCard(queryClient, id) : undefined
@@ -175,26 +162,6 @@ function cardToDetail(movie: DiscoverMovie): DiscoverMovieDetail {
     zone: partial.zone ?? 'unknown',
     actor_movies: partial.actor_movies ?? [],
     related_movies: partial.related_movies ?? []
-  }
-}
-
-export function useRecommendationMovie(id: string) {
-  const queryClient = useQueryClient()
-  const query = useQuery({ ...movieDetails.options(id), enabled: false })
-  const subscribe = useCallback(
-    (notify: () => void) => subscribeMovieCard(queryClient, id, notify),
-    [queryClient, id]
-  )
-  const snapshot = useCallback(() => findCachedMovieCard(queryClient, id), [queryClient, id])
-  const movie = useSyncExternalStore(subscribe, snapshot, snapshot)
-  const request = useCallback(() => movieDetails.request(queryClient, id), [queryClient, id])
-  const prioritize = useCallback(() => movieDetails.prefetch(queryClient, id), [queryClient, id])
-  return {
-    movie,
-    isError: query.isError,
-    isFetching: query.isFetching,
-    request,
-    prioritize
   }
 }
 

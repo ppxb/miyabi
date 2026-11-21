@@ -246,19 +246,6 @@ func (s *Service) resolveLayer(ctx context.Context, source Source, ref domain.Mo
 	return matched, nil
 }
 
-// Optional series, director and rating may legitimately be absent.
-// They do not force another supplementary source request.
-func needsSupplement(result domain.MovieMetadata) bool {
-	m := result.Detail
-	cover, preview := false, false
-	for _, candidate := range result.Images {
-		cover = cover || candidate.Role == "cover" || candidate.Role == "poster"
-		preview = preview || candidate.Role == "preview"
-	}
-	return m.Title == "" || m.ReleaseDate == "" || m.Duration == 0 ||
-		len(m.Actors) == 0 || m.Maker == nil || len(m.Tags) == 0 || !cover || !preview
-}
-
 func attachSourceIdentity(result domain.MovieMetadata, knownID string) (domain.MovieMetadata, error) {
 	for _, source := range result.Detail.Sources {
 		if source.Provider == "javdb" {

@@ -27,8 +27,6 @@ const (
 	indexRetryDelay  = 5 * time.Minute
 	// Filetree.json is about 6.2 MiB as of October 2026; allow room for growth.
 	maxIndexBytes = 32 << 20
-	// rawContentBase serves a repository file for direct reference.
-	rawContentBase = "https://raw.githubusercontent.com/gfriends/gfriends/master/"
 )
 
 // mirrors serve the same repository; the CDN is tried before GitHub.
@@ -339,18 +337,6 @@ func (c *Client) Images(ctx context.Context, name string) ([]string, error) {
 	}
 	sort.Strings(out)
 	return out, nil
-}
-
-// FetchImage downloads the actor's index-th image (0-based) as bytes.
-func (c *Client) FetchImage(ctx context.Context, name string, index int) ([]byte, error) {
-	rels, err := c.Images(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	if index < 0 || index >= len(rels) {
-		return nil, os.ErrNotExist
-	}
-	return c.FetchRel(ctx, rels[index])
 }
 
 // FetchRel downloads one repository path (as returned by Images) as bytes.

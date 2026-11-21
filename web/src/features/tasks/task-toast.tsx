@@ -74,11 +74,7 @@ export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
   if (active) {
     // Sonner's loading type hides the close button; long tasks remain dismissible.
     toast.info(
-      options.waiting
-        ? '正在连接任务服务'
-        : task.movie_id
-          ? `正在重新刮削 ${task.code}`
-          : `正在${action}媒体库`,
+      options.waiting ? '正在连接任务服务' : `正在重新刮削 ${task.code}`,
       {
         ...props,
         icon:

@@ -95,7 +95,6 @@ type Discoverer interface {
 }
 
 type OfflineAdder interface {
-	Add(ctx context.Context, movieID string, hash string) (domain.OfflineSubmission, error)
 	AddByCode(ctx context.Context, movieID string, code string, hash string) (domain.OfflineSubmission, error)
 }
 

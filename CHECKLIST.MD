@@ -85,20 +85,20 @@
 - [x] `internal/metadata/providers/javdatabase.go`（已移入回收站，确认不再需要；连带移走 `javdatabase_test.go` 与 `testdata/javdatabase_ssis-001.html`；`go build ./...`/`go vet ./internal/metadata/providers/` 通过）
 
 ### 函数 / 字段 / 常量
-- [ ] ✅ `web/src/api/discover.ts:181-199` `useRecommendationMovie`；`api/movie-detail-cache.ts:48-177` `subscribeMovieCard`/`createMovieDetailLoader`；`useDiscoverMovie` 中 `prioritize` effect；`discoverKeys.search`
-- [ ] `web/src/api/play.ts:8-13,40-69` `usePlayFiles`/`usePlayback`/`PlayFiles`；释放会话 effect 抽 `useReleasePlaySession`
-- [ ] `web/src/api/pan.ts:67-68` `fileLists`、`panKeys.files`
-- [ ] `web/src/features/tasks/task-notification-diff.ts:1-14` 重复的 `isScanTask/isTaskActive/isOfflineTaskActive`
-- [ ] `web/src/features/tasks/task-toast.tsx:79-81` 不可达分支
-- [ ] `web/src/features/tasks/task-progress-state.ts:6-13` 从未显示的 `stages[].label`
-- [ ] `internal/offline/recovery.go:83-101` `Service.Recover`
-- [ ] `internal/offline/service.go:18-20` 接口未用方法 → `catalogue.HasMagnet`（`magnets.go:67`）、`MovieCode`（`service.go:225`）；`monitor.OfflineAdder.Add` → `offline.Service.Add`
-- [ ] `internal/catalogue/types.go:81` `LocalState.Source()`
-- [ ] `internal/gfriends/client.go:31` `rawContentBase`、`:410-419` `FetchImage`；`:234-245` 改用 `escapeContentRel`
-- [ ] `internal/metadata/service.go:244` `needsSupplement`；`:255-264` `attachSourceIdentity` 简化
-- [ ] `internal/catalogue/service.go:40` `proxy`、`internal/database/sqlite.go:21` `db` 只写不读
-- [ ] `internal/domain/movie.go:47` `SearchOptions`；`tasks/payload.go:35` `SetPayloadField`、`netx.ProxyManager.Update`（仅测试用）
-- [ ] `internal/api/error.go:83` 不可达分支；`:112` 硬编码文案比较
+- [x] ✅ `web/src/api/discover.ts:181-199` `useRecommendationMovie`；`api/movie-detail-cache.ts:48-177` `subscribeMovieCard`/`createMovieDetailLoader`；`useDiscoverMovie` 中 `prioritize` effect；`discoverKeys.search`（已清理：删除 `useRecommendationMovie`、`useDiscoverMovie` 的 prioritize effect、模块级 `movieDetails`(`createMovieDetailLoader`)、`subscribeMovieCard`、`discoverKeys.search`；`movie-detail-cache.ts` 仅保留 `findCachedMovieCard`；`movie-detail.test.ts` 裁剪为 3 个卡片缓存用例。`tsc` + `vitest`（173 passed）通过）
+- [x] `web/src/api/play.ts:8-13,40-69` `usePlayFiles`/`usePlayback`/`PlayFiles`；释放会话 effect 抽 `useReleasePlaySession`（已删 `PlayFiles`/`usePlayFiles`/`usePlayback`；`usePlayQualities`/`useStartMoviePlayback` 未动；`useReleasePlaySession` 属重构建议，未做）
+- [x] `web/src/api/pan.ts:67-68` `fileLists`、`panKeys.files`（已删 `fileLists`；`panKeys.files` 经核实被 `web/tests/query-errors.test.ts:90` 使用，保留）
+- [x] `web/src/features/tasks/task-notification-diff.ts:1-14` 重复的 `isScanTask/isTaskActive/isOfflineTaskActive`（已改为复用 `@/api/tasks`、`@/api/offline`，仅保留本地 `isBatchTask`）
+- [x] `web/src/features/tasks/task-toast.tsx:79-81` 不可达分支（已简化：active 分支恒有 `movie_id`，删除不可达的 `正在${action}媒体库` 分支）
+- [ ] `web/src/features/tasks/task-progress-state.ts:6-13` 从未显示的 `stages[].label`（复核成立；涉及 `TaskProgress` 取 label 兜底的重构，待办）
+- [x] `internal/offline/recovery.go:83-101` `Service.Recover`（已删除；`recoverSource` 仍由 `sync.go:66,132` 使用，保留）
+- [x] `internal/offline/service.go:18-20` 接口未用方法 → `catalogue.HasMagnet`（`magnets.go:67`）、`MovieCode`（`service.go:225`）；`monitor.OfflineAdder.Add` → `offline.Service.Add`（已从接口删除 `HasMagnet`/`MovieCode` 与 `OfflineAdder.Add`；实现与测试保留）
+- [x] `internal/catalogue/types.go:81` `LocalState.Source()`（已从接口删除；包内 0 调用）
+- [x] `internal/gfriends/client.go:31` `rawContentBase`、`:410-419` `FetchImage`；`:234-245` 改用 `escapeContentRel`（已删 `rawContentBase` 与 `Client.FetchImage`；`escapeContentRel` 已在 `FetchRel` 使用）
+- [ ] `internal/metadata/service.go:244` `needsSupplement`；`:255-264` `attachSourceIdentity` 简化（已删 `needsSupplement` 及测试断言；`attachSourceIdentity` 简化待办）
+- [x] `internal/catalogue/service.go:40` `proxy`、`internal/database/sqlite.go:21` `db` 只写不读（已删 `Service.proxy` 字段及赋值；`Store.db` 被数据库测试读取，保留）
+- [x] `internal/domain/movie.go:47` `SearchOptions`；`tasks/payload.go:35` `SetPayloadField`、`netx.ProxyManager.Update`（仅测试用）（复核成立但【评估后保留，不改】：三项均仅测试引用、无生产调用；删除需改多份测试并削减 `ProxyManager` 等公共 API 覆盖，运行收益为 0，属过度清理）
+- [ ] `internal/api/error.go:83` 不可达分支；`:112` 硬编码文案比较（复核：`:112` 成立；`:83` 仅 `fs.ErrNotExist` 半支不可达，`ent.IsNotFound` 待确认，待办）
 
 ### 未被传入的 props
 - [ ] `components/movie/movie-card.tsx` `coverLoading`、`onCoverReady`；探索/库卡片多余的 `titleTooltip={false}`

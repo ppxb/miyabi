@@ -64,7 +64,6 @@ export const panKeys = {
   accountFiles: (accountID: string, directoryID: string, page: number) =>
     ['pan', 'accounts', accountID, 'files', directoryID, page] as const,
   login: (id: string) => ['pan', 'login', id] as const,
-  fileLists: ['pan', 'files'] as const,
   files: (accountID: string, directoryID: string, page: number) =>
     ['pan', 'files', accountID, directoryID, page] as const
 }

@@ -37,7 +37,6 @@ type Service struct {
 	extraMagnets []magnet.Source
 	aggregator   *magnet.Aggregator
 
-	proxy   *netx.ProxyManager
 	lists   *responseCache[[]domain.Movie]
 	details *responseCache[domain.MovieDetail]
 	tags    *responseCache[[]domain.TagCategory]
@@ -88,7 +87,6 @@ func New(
 	}
 
 	service := newService(db, client, supplement, local, route, sukebei, extraMagnets...)
-	service.proxy = proxy
 	return service, nil
 }
 
