@@ -1,10 +1,10 @@
 import { getPageNumbers } from '@/lib/pagination'
-import { Button } from '@/components/ui/button'
 import {
   Pagination,
   PaginationContent,
   PaginationEllipsis,
   PaginationItem,
+  PaginationLink,
   PaginationNext,
   PaginationPrevious
 } from '@/components/ui/pagination'
@@ -33,17 +33,13 @@ export function ListPagination({
     const active = item === page
     return (
       <PaginationItem key={item}>
-        <Button
-          type="button"
-          variant={active ? 'outline' : 'ghost'}
-          size="icon"
-          aria-current={active ? 'page' : undefined}
-          data-active={active}
+        <PaginationLink
+          isActive={active}
           disabled={disabled}
           onClick={active ? undefined : () => changePage(item)}
         >
           {item}
-        </Button>
+        </PaginationLink>
       </PaginationItem>
     )
   }
