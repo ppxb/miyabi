@@ -68,11 +68,20 @@ func (a *Aggregator) FindDetailed(ctx context.Context, ref domain.MovieRef) ([]d
 
 	var failures []error
 	var skipped int
+	var blocked int
 	merged := make(map[string]*domain.Magnet)
 	var order []string
 	for _, res := range results {
 		if errors.Is(res.err, ErrSkipped) {
 			skipped++
+			continue
+		}
+		// A source answering with a bot challenge has no usable content; treat it
+		// as an empty result instead of a failure so the movie shows "no magnets".
+		if errors.Is(res.err, domain.ErrBlocked) {
+			slog.WarnContext(ctx, "magnet source blocked by challenge; treating as no result",
+				"source", res.source, "code", ref.Code)
+			blocked++
 			continue
 		}
 		if res.err != nil {
@@ -91,7 +100,7 @@ func (a *Aggregator) FindDetailed(ctx context.Context, ref domain.MovieRef) ([]d
 		}
 	}
 
-	activeSources := len(a.sources) - skipped
+	activeSources := len(a.sources) - skipped - blocked
 	if activeSources > 0 && len(failures) == activeSources {
 		return nil, false, domain.E(domain.KindUpstream, "所有磁力来源均不可用", errors.Join(failures...))
 	}
@@ -122,7 +131,7 @@ func (a *Aggregator) FindDetailed(ctx context.Context, ref domain.MovieRef) ([]d
 		}
 		return compareMagnets(a, b)
 	})
-	return result, len(failures) > 0, nil
+	return result, len(failures) > 0 || blocked > 0, nil
 }
 
 // mergeMagnet folds a second record of the same infohash into existing:

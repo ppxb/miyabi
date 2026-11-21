@@ -19,6 +19,8 @@ type CatalogueManager interface {
 	Tags(context.Context, domain.Zone) ([]domain.TagCategory, error)
 	Media(context.Context, string) (domain.Media, error)
 	LocalRecommendations(context.Context, domain.MovieMetadata) ([]domain.MovieReference, []domain.MovieReference, error)
+	MagnetSourceSettings() []catalogue.MagnetSourceSetting
+	UpdateMagnetSourceSettings(context.Context, []catalogue.MagnetSourceSetting) error
 }
 
 type ViewedManager interface {

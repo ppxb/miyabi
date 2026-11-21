@@ -58,7 +58,12 @@ function SubmitLabel({
   )
 }
 
-const sourceLabels: Record<string, string> = { javbus: 'JavBus' }
+const sourceLabels: Record<string, string> = {
+  javbus: 'JavBus',
+  sukebei: 'Sukebei',
+  projectjav: 'ProjectJav',
+  freejavbt: 'FreeJavBT'
+}
 
 const phaseLabels: Record<OfflineSubmission['phase'], string> = {
   available: '一键加入 115',

@@ -208,3 +208,14 @@ func TestAggregatorAllSourcesSkipped(t *testing.T) {
 		t.Fatalf("expected 0 results and nil err when all skipped, got results=%d err=%v", len(results), err)
 	}
 }
+
+func TestAggregatorAllSourcesBlockedReturnsEmpty(t *testing.T) {
+	sources := []Source{
+		&stubSource{name: domain.MagnetSourceJavBus, err: domain.Blocked("challenge")},
+		&stubSource{name: domain.MagnetSourceSukebei, err: domain.Blocked("challenge")},
+	}
+	results, partial, err := NewAggregator(sources, time.Second).FindDetailed(t.Context(), domain.MovieRef{Code: "SSIS-001"})
+	if err != nil || len(results) != 0 || !partial {
+		t.Fatalf("expected 0 results, partial=true, nil err; got results=%d partial=%v err=%v", len(results), partial, err)
+	}
+}

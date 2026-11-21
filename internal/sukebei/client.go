@@ -147,6 +147,10 @@ func (c *Client) search(ctx context.Context, code string) ([]byte, error) {
 		return nil, domain.E(domain.KindUpstream, "Sukebei 请求失败", err)
 	}
 	defer response.Body.Close()
+	if response.StatusCode == 403 || response.StatusCode == 503 {
+		_, _ = io.CopyN(io.Discard, response.Body, 4096)
+		return nil, domain.Blocked(fmt.Sprintf("Sukebei 返回状态 %d", response.StatusCode))
+	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		_, _ = io.CopyN(io.Discard, response.Body, 4096)
 		return nil, domain.E(domain.KindUpstream, fmt.Sprintf("Sukebei 返回状态 %d", response.StatusCode), nil)
@@ -156,7 +160,7 @@ func (c *Client) search(ctx context.Context, code string) ([]byte, error) {
 		return nil, domain.E(domain.KindUpstream, "读取 Sukebei 响应失败", err)
 	}
 	if isChallenge(body) {
-		return nil, domain.E(domain.KindUpstream, "Sukebei 遇到 Cloudflare 挑战", nil)
+		return nil, domain.Blocked("Sukebei 遇到 Cloudflare 挑战")
 	}
 	return body, nil
 }

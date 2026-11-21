@@ -37,6 +37,10 @@ type Service struct {
 	extraMagnets []magnet.Source
 	aggregator   *magnet.Aggregator
 
+	magnetMu       sync.RWMutex
+	magnetToggles  map[string]*magnet.Toggle
+	magnetSettings []MagnetSourceSetting
+
 	lists   *responseCache[[]domain.Movie]
 	details *responseCache[domain.MovieDetail]
 	tags    *responseCache[[]domain.TagCategory]
@@ -87,6 +91,9 @@ func New(
 	}
 
 	service := newService(db, client, supplement, local, route, sukebei, extraMagnets...)
+	if err := service.restoreMagnetSettings(ctx); err != nil {
+		return nil, err
+	}
 	return service, nil
 }
 
@@ -107,6 +114,9 @@ func NewWithClients(
 		return nil, err
 	}
 	service := newService(db, primary, supplement, local, route, sukebei, extraMagnets...)
+	if err := service.restoreMagnetSettings(ctx); err != nil {
+		return nil, err
+	}
 	return service, nil
 }
 
@@ -133,13 +143,16 @@ func newService(database *ent.Client, primary JavDBClient, supplement JavBusSour
 			sources = append(sources, extra)
 		}
 	}
+	toggled, toggles, magnetSettings := applyMagnetToggles(sources)
 	return &Service{
 		database:       database,
 		javdb:          primary,
 		javbus:         supplement,
 		sukebei:        sukebei,
 		extraMagnets:   extraMagnets,
-		aggregator:     magnet.NewAggregator(sources, 0),
+		magnetToggles:  toggles,
+		magnetSettings: magnetSettings,
+		aggregator:     magnet.NewAggregator(toggled, 0),
 		lists:          newResponseCache[[]domain.Movie](listCacheSize, listCacheTTL),
 		details:        newResponseCache[domain.MovieDetail](detailCacheSize, detailCacheTTL),
 		tags:           newResponseCache[[]domain.TagCategory](tagsCacheSize, tagsCacheTTL),

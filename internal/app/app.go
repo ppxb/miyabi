@@ -34,6 +34,7 @@ import (
 	"github.com/ppxb/miyabi/internal/netx"
 	"github.com/ppxb/miyabi/internal/offline"
 	"github.com/ppxb/miyabi/internal/playback"
+	"github.com/ppxb/miyabi/internal/projectjav"
 	"github.com/ppxb/miyabi/internal/source"
 	"github.com/ppxb/miyabi/internal/strm"
 	"github.com/ppxb/miyabi/internal/subtitle"
@@ -147,7 +148,12 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 		return nil, fmt.Errorf("initialize freejavbt source: %w", err)
 	}
 	cleanup = append(cleanup, freejavbtClient.Close)
-	catalogueSvc, err := catalogue.New(ctx, store.Client, networkSvc.ProxyManager(), libSvc, javbusClient, sukebeiClient, freejavbtClient)
+	projectjavClient, err := projectjav.New(projectjav.Options{Proxy: networkSvc.ProxyManager()})
+	if err != nil {
+		return nil, fmt.Errorf("initialize ProjectJav magnet source: %w", err)
+	}
+	cleanup = append(cleanup, projectjavClient.Close)
+	catalogueSvc, err := catalogue.New(ctx, store.Client, networkSvc.ProxyManager(), libSvc, javbusClient, sukebeiClient, freejavbtClient, projectjavClient)
 	if err != nil {
 		return nil, fmt.Errorf("initialize catalogue service: %w", err)
 	}

@@ -160,7 +160,7 @@ func (c *Client) MoviePage(ctx context.Context, code string) (string, error) {
 	if resp.StatusCode == 301 || resp.StatusCode == 302 {
 		location := resp.Header.Get("Location")
 		if strings.Contains(location, "driver-verify") {
-			return "", domain.E(domain.KindUpstream, "JavBus driver verify required", nil)
+			return "", domain.Blocked("JavBus driver verify required")
 		}
 		return "", domain.E(domain.KindUpstream, fmt.Sprintf("JavBus unexpected redirect to %s", location), nil)
 	}
@@ -196,7 +196,7 @@ func (c *Client) fetchMagnets(ctx context.Context, code, gid, uc, img string) ([
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 301 || resp.StatusCode == 302 {
-		return nil, domain.E(domain.KindUpstream, "JavBus driver verify required", nil)
+		return nil, domain.Blocked("JavBus driver verify required")
 	}
 
 	body, err := readResponse(resp.Body, "ajax magnets")
@@ -245,10 +245,10 @@ func readResponse(body io.Reader, operation string) (string, error) {
 
 func (c *Client) validateResponse(status int, body string) error {
 	if isCloudflareChallenge(body) || status == 403 || status == 503 {
-		return domain.E(domain.KindUpstream, "JavBus Cloudflare challenge encountered", nil)
+		return domain.Blocked("JavBus Cloudflare challenge encountered")
 	}
 	if isDriverVerify(body) {
-		return domain.E(domain.KindUpstream, "JavBus driver verify required", nil)
+		return domain.Blocked("JavBus driver verify required")
 	}
 	if status < 200 || status >= 300 {
 		return domain.E(domain.KindUpstream, fmt.Sprintf("JavBus returned unexpected status %d", status), nil)

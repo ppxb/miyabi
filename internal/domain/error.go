@@ -65,6 +65,23 @@ func E(kind Kind, message string, cause error) *Error {
 	}
 }
 
+// ErrBlocked marks an upstream response that is a bot challenge (a Cloudflare
+// interstitial or driver verification) rather than real content. Magnet
+// aggregation treats it as "no result" so a blocked source does not turn an
+// otherwise empty magnet list into an error.
+var ErrBlocked = errors.New("source blocked by bot challenge")
+
+// BlockedError is an upstream-classified error matching ErrBlocked while
+// keeping its own user-facing message (and KindUpstream classification).
+type BlockedError struct{ Message string }
+
+func (e *BlockedError) Error() string        { return e.Message }
+func (e *BlockedError) DomainKind() Kind     { return KindUpstream }
+func (e *BlockedError) Is(target error) bool { return target == ErrBlocked }
+
+// Blocked builds an upstream error for a bot challenge.
+func Blocked(message string) error { return &BlockedError{Message: message} }
+
 func (e *Error) Error() string {
 	if e == nil {
 		return ""
