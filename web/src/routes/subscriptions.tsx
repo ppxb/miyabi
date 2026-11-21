@@ -2,17 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { SubscriptionsPage } from '@/features/subscriptions/page'
 import { validateSubscriptionsSearch } from '@/features/subscriptions/search'
-import { AppPage } from '@/components/app-page'
-import { ErrorState } from '@/components/error-state'
 
 export const Route = createFileRoute('/subscriptions')({
   validateSearch: validateSubscriptionsSearch,
-  component: SubscriptionsRoute,
-  errorComponent: () => (
-    <AppPage>
-      <ErrorState message="订阅页筛选条件无效" />
-    </AppPage>
-  )
+  component: SubscriptionsRoute
 })
 
 function SubscriptionsRoute() {

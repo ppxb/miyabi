@@ -199,7 +199,7 @@
 - [x] `recommendations.tsx`、`history/page.tsx` 伪造整条 movie → 卡片 props 收窄：`LibraryMovieCard` 用 `LibraryMovieCardData`、`DiscoverMovieCard` 用 `DiscoverMovieCardData`，`referenceMovie` 只造所需字段，`HistoryCard` 适配器删除、`LibraryMovieActions` 收窄为 `Pick<LibraryMovie,'id'|'code'>`。
 - [ ] `subscription-card.tsx:20-26,129-133` 两张状态表合并
 - [x] `task-notification-diff.ts` 抽 `shouldNotify({ active, old, id, dismissed, announced, initialized, extra })`，scan / batch / offline 三处循环统一守卫。
-- [ ] 4 个路由重复 errorComponent（`discover/history/index/subscriptions`）→ `router.tsx` `defaultErrorComponent`
+- [x] 路由重复 errorComponent（实际 6 处：`discover/movies/actors.index/index/subscriptions/history`）→ 统一到 `router.tsx` 的 `defaultErrorComponent`（用 `error.message`，兜底「页面加载失败」），各路由已移除。
 - [ ] `custom-quality-menu.tsx` 与 `quality-menu.tsx` 约 70 行 class 重复
 
 ### 后端

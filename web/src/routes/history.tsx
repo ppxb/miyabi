@@ -1,7 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-import { AppPage } from '@/components/app-page'
-import { ErrorState } from '@/components/error-state'
 import { HistoryPage } from '@/features/history/page'
 import { parseSearchPage } from '@/lib/search-schema'
 
@@ -10,12 +8,7 @@ export const Route = createFileRoute('/history')({
     const page = parseSearchPage(search.page)
     return page ? { page } : {}
   },
-  component: HistoryRoute,
-  errorComponent: () => (
-    <AppPage>
-      <ErrorState message="观看历史页码无效" />
-    </AppPage>
-  )
+  component: HistoryRoute
 })
 
 function HistoryRoute() {
