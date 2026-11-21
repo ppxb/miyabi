@@ -3,7 +3,15 @@ import { HlsJsVideo } from '@videojs/react/media/hlsjs-video'
 import { I18nProvider } from '@videojs/react/i18n'
 import { usePlayer, Video, VideoPlayer } from '@videojs/react/video'
 import { CalendarIcon, ClockIcon, StarIcon, type LucideIcon } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject
+} from 'react'
 
 import { libraryKeys, useLibraryMovie } from '@/api/library'
 import type { LibraryMovieDetail } from '@/api/library'
@@ -60,11 +68,10 @@ function LibraryPlayer({
     !!playback.data?.file_id && qualitiesRequested
   )
   const [qualitySource, setQualitySource] = useState<PlaySource>()
-  const source = useMemo(() => {
-    if (qualitySource) return qualitySource
-    const sources = playback.data?.sources ?? []
-    return sources.find(item => item.label.startsWith('原画')) ?? sources[0]
-  }, [playback.data, qualitySource])
+  const source =
+    qualitySource ??
+    playback.data?.sources?.find(item => item.label.startsWith('原画')) ??
+    playback.data?.sources?.[0]
   const qualityOptions = useMemo(() => {
     const options = [{ value: 'direct', label: '原画' }]
     for (const item of qualities.data?.sources ?? []) {
@@ -92,12 +99,6 @@ function LibraryPlayer({
 
   const title = detail.data?.title || detail.data?.code || '播放'
   const hls = source?.type.includes('mpegurl') ?? false
-  const skinStyle = {
-    aspectRatio: '16 / 9',
-    width: '100%',
-    fontFamily: 'var(--font-sans)',
-    '--media-font-family': 'var(--font-sans)'
-  } as CSSProperties
 
   return (
     <>
@@ -111,7 +112,7 @@ function LibraryPlayer({
           <I18nProvider locale="zh-CN">
             <VideoPlayer title={title}>
               <VideoSkin
-                style={skinStyle}
+                className="aspect-video w-full [font-family:var(--font-sans)] [--media-font-family:var(--font-sans)]"
                 qualityOptions={qualityOptions}
                 qualityValue={qualityValue}
                 onQualityChange={handleQualityChange}
@@ -151,7 +152,7 @@ function LibraryPlayer({
         )}
       </div>
       <aside className="min-w-0 shrink-0 overflow-y-auto border-t bg-background p-5 lg:w-[26rem] lg:border-t-0 lg:border-l">
-        <MovieInfo movieId={movieId} show115={detail.data?.source === '115'} />
+        <MovieInfo movieId={movieId} />
       </aside>
     </>
   )
@@ -214,7 +215,7 @@ function PlaybackSync({
   return null
 }
 
-function MovieInfo({ movieId, show115 = false }: { movieId: number; show115?: boolean }) {
+function MovieInfo({ movieId }: { movieId: number }) {
   const detail = useLibraryMovie(movieId)
   const movie = detail.data
 
@@ -239,7 +240,7 @@ function MovieInfo({ movieId, show115 = false }: { movieId: number; show115?: bo
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant="frosted">{movie.code}</Badge>
-          {show115 ? <Badge variant="frosted">115</Badge> : null}
+          {movie.source === '115' ? <Badge variant="frosted">115</Badge> : null}
           {movie.has_subtitle ? <Badge variant="frosted">中文</Badge> : null}
         </div>
         <h2 className="text-xl leading-snug font-bold">{movie.title || movie.code}</h2>
