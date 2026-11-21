@@ -8,5 +8,5 @@ export function movieDetailKey(movie: MovieDetailTarget) {
 }
 
 export const MovieDetailDialogContext = createContext<
-  ((movie: MovieDetailTarget, trigger: HTMLDivElement) => void) | null
+  ((movie: MovieDetailTarget) => void) | null
 >(null)

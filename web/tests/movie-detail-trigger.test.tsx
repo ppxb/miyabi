@@ -49,7 +49,7 @@ test('movie cards open the dialog without rendering a navigation link', () => {
   const event = click()
   props.onClick?.(event)
   assert.equal(event.defaultPrevented, true)
-  assert.deepEqual(openMovie.mock.calls, [[{ id: 'movie-1' }, event.currentTarget]])
+  assert.deepEqual(openMovie.mock.calls, [[{ id: 'movie-1' }]])
 })
 
 test('card actions and selection can consume a click without opening details', () => {
@@ -112,7 +112,7 @@ test('recommendations prioritize their request before opening in the dialog', ()
   const { openMovie, props } = renderTrigger({ movie: { id: 'recommended' }, onClick: prioritize })
   const event = click()
   props.onClick?.(event)
-  assert.deepEqual(openMovie.mock.calls, [[{ id: 'recommended' }, event.currentTarget]])
+  assert.deepEqual(openMovie.mock.calls, [[{ id: 'recommended' }]])
   assert.ok(prioritize.mock.invocationCallOrder[0]! < openMovie.mock.invocationCallOrder[0]!)
 })
 

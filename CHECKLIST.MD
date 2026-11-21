@@ -101,17 +101,17 @@
 - [x] `internal/api/error.go:83` 不可达分支；`:112` 硬编码文案比较（已处理：`:83` 删除不可达的 `errors.Is(err, fs.ErrNotExist)` 分支——`domain.KindOf` 已把 `fs.ErrNotExist` 映射为 `KindNotFound`；`:112` 改为 `status==404 && ent.IsNotFound(err)` 时用 `domain.PublicMessage(domain.E(domain.KindNotFound,"",nil))` 取规范文案，去掉字面量比较。`go build`/`go vet`/`go test ./internal/api/...` 通过）
 
 ### 未被传入的 props
-- [ ] `components/movie/movie-card.tsx` `coverLoading`、`onCoverReady`；探索/库卡片多余的 `titleTooltip={false}`
-- [ ] `components/movie/movie-cover.tsx` `loading`、`onReady`
-- [ ] `components/media-image.tsx:13,43-45` `onReady` + effect
-- [ ] `components/movie/movie-grid-skeleton.tsx:7` `compact`
-- [ ] `components/page-header.tsx:9` `inlineActions`；`components/app-page.tsx:9` `contentClassName`
-- [ ] `features/library/movie-card.tsx:11-15` `busy`、`playIcon`、`hideActors`（连带 `movie-actions` 的 `disabled`）
-- [ ] `features/library/scan-button.tsx` `available`、`onStarted`
-- [ ] `features/discover/results.tsx` `searching`（恒 false）、`errorMessage`
-- [ ] `features/movie-detail/metadata.tsx:76` `EntityLink` 的 `kind`（且名不副实，渲染 span）
-- [ ] `features/movie-detail/dialog-context.ts:11` `openMovie` 的 `_trigger`（含 `app-search.tsx:218` 的 `document.createElement('div')`）
-- [ ] `api/subscriptions.ts:156` `useRemoveSubscription` 的 `kind`
+- [x] `components/movie/movie-card.tsx` `coverLoading`、`onCoverReady`；探索/库卡片多余的 `titleTooltip={false}`（已删 `coverLoading`/`onCoverReady` 及 `MovieCover` 传参；两处 `titleTooltip={false}` 也删除（两卡片均 `hideContent`，本来无效））
+- [x] `components/movie/movie-cover.tsx` `loading`、`onReady`（`onReady` 已删；`loading` 保留——`movie-detail/hero.tsx:20` 用 `loading="eager"`）
+- [x] `components/media-image.tsx:13,43-45` `onReady` + effect（已删 `onReady` 属性与对应 `useEffect`）
+- [x] `components/movie/movie-grid-skeleton.tsx:7` `compact`（复核为已使用：history/actors/movies 页均传 `compact`，保留）
+- [x] `components/page-header.tsx:9` `inlineActions`；`components/app-page.tsx:9` `contentClassName`（`inlineActions` 已被 history/library 页使用，保留；`contentClassName` 无调用方，已删）
+- [x] `features/library/movie-card.tsx:11-15` `busy`、`playIcon`、`hideActors`（连带 `movie-actions` 的 `disabled`）（全部调用点均未传；已删这些 props 与对应分支，`LibraryMovieActions` 去掉 `disabled`）
+- [ ] `features/library/scan-button.tsx` `available`、`onStarted`（复核：生产调用传的是常量 `available` 与空实现 `onStarted`，非“未传”；评估后保留，改动收益低）
+- [x] `features/discover/results.tsx` `searching`（恒 false）、`errorMessage`（唯一调用传 `searching={false}`、从不传 `errorMessage`；已删两个 props 并固定文案）
+- [x] `features/movie-detail/metadata.tsx:76` `EntityLink` 的 `kind`（调用处传了 `kind` 但函数未用；已删 `kind` 参数与各调用点，仍渲染 `span`）
+- [x] `features/movie-detail/dialog-context.ts:11` `openMovie` 的 `_trigger`（含 `app-search.tsx:218` 的 `document.createElement('div')`）（已删 `trigger` 参数、`detail-trigger`/`app-search` 的第二实参与 `createElement('div')`，同步改测试断言）
+- [x] `api/subscriptions.ts:156` `useRemoveSubscription` 的 `kind`（输入类型仅保留 `{ id }`；调用方传对象多余字段不影响）
 
 ---
 

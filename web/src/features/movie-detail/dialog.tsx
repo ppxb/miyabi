@@ -13,7 +13,7 @@ export function MovieDetailDialogProvider({ children }: PropsWithChildren) {
   const router = useRouter()
   const [movie, setMovie] = useState<MovieDetailTarget>()
   const [open, setOpen] = useState(false)
-  const openMovie = useCallback((target: MovieDetailTarget, _trigger: HTMLDivElement) => {
+  const openMovie = useCallback((target: MovieDetailTarget) => {
     setMovie(target)
     setOpen(true)
   }, [])

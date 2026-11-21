@@ -8,18 +8,12 @@ import { LibraryMovieActions } from './movie-actions'
 
 export function LibraryMovieCard({
   movie,
-  busy = false,
   onPlay,
-  progress,
-  playIcon = true,
-  hideActors = false
+  progress
 }: {
   movie: LibraryMovie
-  busy?: boolean
   onPlay?: () => void
   progress?: number
-  playIcon?: boolean
-  hideActors?: boolean
 }) {
   const title = movie.title || movie.code
   const actors = (movie.actors ?? [])
@@ -43,7 +37,6 @@ export function LibraryMovieCard({
         >
           <MovieCard
             movie={movie}
-            titleTooltip={false}
             hideContent
             state={
               movie.source === '115' || movie.has_subtitle || movie.finished ? (
@@ -66,9 +59,7 @@ export function LibraryMovieCard({
                   <h3 className="truncate text-sm leading-5 font-semibold text-white" title={title}>
                     {title}
                   </h3>
-                  {hideActors ? null : (
-                    <p className="mt-0.5 line-clamp-1 text-xs text-white/75">{actors || 'N/A'}</p>
-                  )}
+                  <p className="mt-0.5 line-clamp-1 text-xs text-white/75">{actors || 'N/A'}</p>
                   {progress !== undefined ? (
                     <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/25">
                       <div
@@ -81,16 +72,14 @@ export function LibraryMovieCard({
               </>
             }
           />
-          {playIcon ? (
-            <span className="pointer-events-none absolute inset-0 grid place-items-center opacity-0 transition-opacity group-hover:opacity-100">
-              <span className="grid size-12 place-items-center rounded-full bg-black/55 text-white backdrop-blur-sm">
-                <PlayIcon className="size-6 fill-current" />
-              </span>
+          <span className="pointer-events-none absolute inset-0 grid place-items-center opacity-0 transition-opacity group-hover:opacity-100">
+            <span className="grid size-12 place-items-center rounded-full bg-black/55 text-white backdrop-blur-sm">
+              <PlayIcon className="size-6 fill-current" />
             </span>
-          ) : null}
+          </span>
         </div>
       </ContextMenuTrigger>
-      <LibraryMovieActions movie={movie} disabled={busy} />
+      <LibraryMovieActions movie={movie} />
     </ContextMenu>
   )
 }

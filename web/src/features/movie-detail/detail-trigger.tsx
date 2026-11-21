@@ -28,7 +28,7 @@ export function MovieDetailTrigger({
         onClick?.(event)
         if (event.defaultPrevented) return
         event.preventDefault()
-        openMovie(movie, event.currentTarget)
+        openMovie(movie)
       }}
       onKeyDown={event => {
         onKeyDown?.(event)

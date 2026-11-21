@@ -11,8 +11,6 @@ export function DiscoverResults({
   loading,
   fetching,
   error,
-  errorMessage,
-  searching,
   page,
   onPageChange,
   onRetry
@@ -21,8 +19,6 @@ export function DiscoverResults({
   loading: boolean
   fetching: boolean
   error: boolean
-  errorMessage?: string
-  searching: boolean
   page: number
   onPageChange: (page: number) => void
   onRetry: () => void
@@ -30,7 +26,7 @@ export function DiscoverResults({
   if (error) {
     return (
       <ErrorState
-        message={errorMessage ?? '数据加载失败，请检查网络或代理设置'}
+        message="数据加载失败，请检查网络或代理设置"
         onRetry={onRetry}
         retrying={fetching}
       />
@@ -40,7 +36,7 @@ export function DiscoverResults({
   return (
     <div className="flex flex-col gap-6">
       {movies.length === 0 && page === 1 ? (
-        <EmptyState title={searching ? '没有搜索结果' : '暂无内容'} />
+        <EmptyState title="暂无内容" />
       ) : (
         <>
           <MovieGrid movies={movies} />

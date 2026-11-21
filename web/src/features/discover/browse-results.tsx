@@ -16,7 +16,6 @@ export function BrowseResults({
       loading={movies.isPending}
       fetching={movies.isFetching}
       error={movies.isError}
-      searching={false}
       page={params.page}
       onPageChange={onPageChange}
       onRetry={() => movies.refetch()}

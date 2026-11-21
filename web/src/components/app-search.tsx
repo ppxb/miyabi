@@ -209,7 +209,7 @@ export function SearchDialog({
         image: movie.cover || movie.poster,
         kind: 'movie',
         run: () => {
-          openMovie?.({ libraryId: movie.id }, document.createElement('div'))
+          openMovie?.({ libraryId: movie.id })
         }
       })
     }

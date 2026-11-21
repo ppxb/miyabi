@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import type { EntityType, Zone } from '@/api/discover'
+import type { Zone } from '@/api/discover'
 import { Badge } from '@/components/ui/badge'
 
 type MetadataEntity = { provider?: string; id?: string; name: string }
@@ -21,14 +21,14 @@ export function MovieMetadata({ movie }: { movie: MovieMetadataValues }) {
     <dl className="space-y-3 text-sm">
       <EntityRow label="厂牌">
         {movie.maker ? (
-          <EntityLink kind="maker" entity={movie.maker} />
+          <EntityLink entity={movie.maker} />
         ) : (
           <span className="text-muted-foreground">N/A</span>
         )}
       </EntityRow>
       <EntityRow label="系列">
         {movie.series ? (
-          <EntityLink kind="series" entity={movie.series} />
+          <EntityLink entity={movie.series} />
         ) : (
           <span className="text-muted-foreground">N/A</span>
         )}
@@ -41,14 +41,14 @@ export function MovieMetadata({ movie }: { movie: MovieMetadataValues }) {
               className="inline-flex max-w-full items-center gap-3"
             >
               {index > 0 ? <span className="text-muted-foreground">/</span> : null}
-              <EntityLink kind="actor" entity={actor} />
+              <EntityLink entity={actor} />
             </span>
           ))}
         </EntityRow>
       ) : null}
       <EntityRow label="导演">
         {movie.director ? (
-          <EntityLink kind="director" entity={movie.director} />
+          <EntityLink entity={movie.director} />
         ) : (
           <span className="text-muted-foreground">N/A</span>
         )}
@@ -73,7 +73,7 @@ export function MovieMetadata({ movie }: { movie: MovieMetadataValues }) {
   )
 }
 
-function EntityLink({ entity }: { kind?: EntityType; entity: MetadataEntity }) {
+function EntityLink({ entity }: { entity: MetadataEntity }) {
   return <span className="max-w-full break-words">{entity.name}</span>
 }
 

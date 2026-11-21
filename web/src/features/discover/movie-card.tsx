@@ -22,7 +22,6 @@ export function DiscoverMovieCard({
     >
       <MovieCard
         movie={movie}
-        titleTooltip={false}
         hideContent
         state={<MovieStateBadge movie={movie} />}
         coverOverlay={

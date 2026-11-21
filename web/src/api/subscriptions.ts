@@ -157,7 +157,7 @@ export function useUpdateSubscription() {
 export function useRemoveSubscription() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (item: { id: number; kind?: SubscriptionKind }) =>
+    mutationFn: (item: { id: number }) =>
       apiDelete<null>(`/api/subscriptions/${item.id}`),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
