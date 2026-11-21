@@ -189,7 +189,7 @@
 - [x] 横向列表项宽度：抽 `features/library/movie-shelf-section.tsx` 的 `MovieShelfItem` + `MovieShelfSection`；`continue-watching`/`recent-shelf`/`top-rated-shelf` 复用。`recent`/`top-rated` 的展示逻辑已由 `MovieShelfSection` 合并，二者仅剩「取 hook + 渲染」薄封装；`continue-watching` 同时去掉了伪造整条 `LibraryMovie`。
 - [x] 演员头像 URL：三处重复 helper 删除，调用处直接 `avatar ? imageURL(avatar) : undefined`（`imageURL` 已内置 `/api/actors/` 直通，无需再判）。
 - [x] `scraping-section.tsx`：抽出 `SourceToggleList`（sources/names/descriptions + pending/error/retry + onToggle），`ScrapingSection` 与 `ActorSourcesSection` 仅剩取 hook + 传参。
-- [ ] `subscription-section.tsx:93-151` 三段 Select → `PreferenceSelect`
+- [x] `subscription-section.tsx` 三段 Select → 抽出 `PreferenceSelect({ value, options, disabled, onChange })`，字幕/高清/无码各自只传项与字段。
 - [ ] `network-section.tsx:126-141` ≈ `emby-section.tsx:253-268` 按钮组 → `SettingsActions`
 - [ ] `media-sync-section.tsx:15-18` ≈ `tasks-section.tsx:11-14` → `useActiveScan()`
 - [ ] 分类过滤：`discover/category-content.tsx:20-24` ≈ `category-filters.tsx:29-35` → `useCategoryTaxonomy`

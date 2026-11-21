@@ -32,6 +32,38 @@ const uncensoredOptions = [
   { value: 'exclude', label: '排除' }
 ] as const
 
+function PreferenceSelect({
+  value,
+  options,
+  disabled,
+  onChange
+}: {
+  value: string
+  options: ReadonlyArray<{ value: string; label: string }>
+  disabled?: boolean
+  onChange: (value: string) => void
+}) {
+  return (
+    <Select
+      value={value}
+      items={[...options]}
+      disabled={disabled}
+      onValueChange={next => onChange(next ?? '')}
+    >
+      <SelectTrigger className="w-32">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map(option => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
 export function SubscriptionSection() {
   const settings = useSubscriptionSettings()
   const update = useUpdateSubscriptionSettings()
@@ -90,67 +122,30 @@ export function SubscriptionSection() {
       </SettingRow>
 
       <SettingRow title="字幕" description="订阅与换源共用；「必须」时只选择符合字幕条件的磁力">
-        <Select
+        <PreferenceSelect
           value={config?.preferences.subtitle ?? 'preferred'}
-          items={levelOptions}
+          options={levelOptions}
           disabled={disabled}
-          onValueChange={value =>
-            save({}, { subtitle: (value ?? '') as MagnetPreferences['subtitle'] })
-          }
-        >
-          <SelectTrigger className="w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {levelOptions.map(option => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={value => save({}, { subtitle: value as MagnetPreferences['subtitle'] })}
+        />
       </SettingRow>
 
       <SettingRow title="高清" description="「必须」时只接受站方标注高清或名称含 4K 的磁力">
-        <Select
+        <PreferenceSelect
           value={config?.preferences.hd ?? 'preferred'}
-          items={levelOptions}
+          options={levelOptions}
           disabled={disabled}
-          onValueChange={value => save({}, { hd: (value ?? '') as MagnetPreferences['hd'] })}
-        >
-          <SelectTrigger className="w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {levelOptions.map(option => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={value => save({}, { hd: value as MagnetPreferences['hd'] })}
+        />
       </SettingRow>
 
       <SettingRow title="无码 / 破解" description="「排除」时过滤掉无码、破解、流出资源">
-        <Select
+        <PreferenceSelect
           value={config?.preferences.uncensored ?? 'any'}
-          items={uncensoredOptions}
+          options={uncensoredOptions}
           disabled={disabled}
-          onValueChange={value =>
-            save({}, { uncensored: (value ?? '') as MagnetPreferences['uncensored'] })
-          }
-        >
-          <SelectTrigger className="w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {uncensoredOptions.map(option => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={value => save({}, { uncensored: value as MagnetPreferences['uncensored'] })}
+        />
       </SettingRow>
 
       {settings.isError ? (
