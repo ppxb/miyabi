@@ -26,6 +26,7 @@ export function MediaSyncSection() {
         }
       >
         <Button
+          size="sm"
           disabled={sync.isPending}
           onClick={() =>
             sync.mutate(undefined, {

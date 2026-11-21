@@ -7,6 +7,7 @@ import { type NetworkConfig, useNetworkConfig, useUpdateNetworkConfig } from '@/
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { SettingRow, SettingsActions, SettingsSection } from './shared'
 
@@ -25,6 +26,7 @@ export function NetworkSection() {
 
   return (
     <SettingsSection icon={<GlobeIcon className="size-4" />} title="网络代理">
+      {network.isPending ? <Skeleton className="h-4 w-40" /> : null}
       {network.data ? (
         <NetworkForm
           key={resetToken}
@@ -34,7 +36,7 @@ export function NetworkSection() {
       ) : null}
 
       {network.isError ? (
-        <InlineError>
+        <InlineError onRetry={() => void network.refetch()} retrying={network.isFetching}>
           后端服务暂不可用，无法读取网络设置。请检查后端服务状态后刷新重试。
         </InlineError>
       ) : null}

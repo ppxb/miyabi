@@ -248,7 +248,7 @@
 - [x] `settings/network-section.tsx:72`：关闭代理时保存 `normalizeProxyInput(form.url)`（未保存的输入），与 emby 的 `{ ...config, enabled: false }` 不一致。（已修复：关闭时改为保存 `{ ...config, enabled: false }`，保留已持久化的 URL）
 - [x] `settings/scraping-section.tsx:48-68`：`SourceToggleList` 9 个参数，两调用处 pending/error/retry/toggle 仍逐字重复。改法：传 `{ query, update, names, descriptions, errorText }`，内部处理乐观值/重试/切换。（已修复：`SourceToggleList` 改为接收 `query/update/names/descriptions/errorText`，内部处理乐观值、重试与切换，两调用处只传 hook）
 - [x] `tasks/task-notification-diff.ts:61-80`：`shouldNotify` 7 参数，`dismissed/announced/initialized` 三处原样透传，指纹比较重复三遍。改法：`diffTaskNotifications` 内闭包 `notify(id, active, old, fp, extra?)`。（已修复：删除模块级 `shouldNotify`，改为 `diffTaskNotifications` 内闭包 `shouldNotify(id, active, old, extra?)`，三处调用收敛；`vitest` 通过）
-- [x] ~~settings 各 section 仍不统一：加载态（emby/network 渲染 `null`、scraping/tasks `Skeleton`、subscription 渲染禁用控件）、错误态（仅部分有 `onRetry`）、按钮尺寸（`sm` 与默认混用）~~ **暂不处理**：跨多个 section 的交互/视觉统一属设计决策，需单独评估与视觉复核，避免一次性大改引入回归。
+- [x] settings 各 section 仍不统一：加载态（emby/network 渲染 `null`、scraping/tasks `Skeleton`、subscription 渲染禁用控件）、错误态（仅部分有 `onRetry`）、按钮尺寸（`sm` 与默认混用）。（已统一：emby/network/subscription 加载态改 `Skeleton`、错误态统一 `InlineError onRetry`；media-sync 同步按钮改 `size="sm"`；与 tasks/scraping/magnet-sources/data 现有范式一致）
 
 ### 🟢 低
 

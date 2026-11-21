@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { SettingRow, SettingsSection } from './shared'
 
@@ -85,6 +86,7 @@ export function SubscriptionSection() {
 
   return (
     <SettingsSection icon={<BellIcon className="size-4" />} title="订阅与下载">
+      {settings.isPending ? <Skeleton className="h-4 w-40" /> : null}
       <SettingRow
         title="影片默认自动入库"
         description="新订阅的影片出现符合偏好的磁力后自动加入 115"
@@ -149,7 +151,9 @@ export function SubscriptionSection() {
       </SettingRow>
 
       {settings.isError ? (
-        <InlineError>后端服务暂不可用，无法读取订阅与下载设置。</InlineError>
+        <InlineError onRetry={() => void settings.refetch()} retrying={settings.isFetching}>
+          后端服务暂不可用，无法读取订阅与下载设置。
+        </InlineError>
       ) : null}
     </SettingsSection>
   )

@@ -7,6 +7,7 @@ import { type EmbyConfig, useEmbyConfig, useTestEmbyConfig, useUpdateEmbyConfig 
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { SettingRow, SettingsActions, SettingsSection } from './shared'
 
@@ -36,6 +37,7 @@ export function EmbySection() {
 
   return (
     <SettingsSection icon={<TvMinimalIcon className="size-4" />} title="Emby">
+      {emby.isPending ? <Skeleton className="h-4 w-40" /> : null}
       {emby.data ? (
         <EmbyForm
           key={resetToken}
@@ -44,7 +46,11 @@ export function EmbySection() {
         />
       ) : null}
 
-      {emby.isError ? <InlineError>后端服务暂不可用，无法读取 Emby 配置。</InlineError> : null}
+      {emby.isError ? (
+        <InlineError onRetry={() => void emby.refetch()} retrying={emby.isFetching}>
+          后端服务暂不可用，无法读取 Emby 配置。
+        </InlineError>
+      ) : null}
     </SettingsSection>
   )
 }
