@@ -71,7 +71,7 @@ func TestAddActorRequiresWorksPage(t *testing.T) {
 
 func TestCheckMovieWithoutAutoDownloadWaitsUntilTomorrow(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
-	item, _ := f.service.AddMovie(ctx, "m1", AddMovieOptions{AutoDownload: ptr(false)})
+	item, _ := f.service.AddMovie(ctx, "m1", AddMovieOptions{AutoDownload: new(false)})
 	f.discover.magnets["m1"] = []domain.Magnet{{Hash: "h1", Name: "MOCK-m1", HasSubtitle: true}}
 	if err := f.service.Check(ctx); err != nil {
 		t.Fatal(err)
@@ -81,7 +81,7 @@ func TestCheckMovieWithoutAutoDownloadWaitsUntilTomorrow(t *testing.T) {
 		t.Fatalf("manual subscriptions remember the pick and wait for tomorrow: %#v submissions=%d", record, len(f.offline.submissions))
 	}
 
-	if _, err := f.service.Update(ctx, item.ID, UpdateOptions{AutoDownload: ptr(true)}); err != nil {
+	if _, err := f.service.Update(ctx, item.ID, UpdateOptions{AutoDownload: new(true)}); err != nil {
 		t.Fatal(err)
 	}
 	f.forceDue(t, item.ID)

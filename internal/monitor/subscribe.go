@@ -26,7 +26,7 @@ func (service *Service) AddMovie(ctx context.Context, movieID string, opts AddMo
 	if err != nil {
 		return Item{}, err
 	}
-	return service.addMovie(ctx, summary, opts)
+	return service.createMovie(ctx, summary, opts)
 }
 
 // addMovie is AddMovie with the summary already known, which spares actor
@@ -35,6 +35,10 @@ func (service *Service) addMovie(ctx context.Context, summary domain.MovieSummar
 	if item, found, err := service.existingMovie(ctx, summary.ID, opts); err != nil || found {
 		return item, err
 	}
+	return service.createMovie(ctx, summary, opts)
+}
+
+func (service *Service) createMovie(ctx context.Context, summary domain.MovieSummary, opts AddMovieOptions) (Item, error) {
 	var autoDownload bool
 	if opts.AutoDownload != nil {
 		autoDownload = *opts.AutoDownload
@@ -131,5 +135,3 @@ func (service *Service) Remove(ctx context.Context, id int) error {
 	service.tasks.NotifyMonitorChanged()
 	return nil
 }
-
-func ptr[T any](value T) *T { return &value }

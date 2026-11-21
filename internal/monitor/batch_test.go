@@ -15,7 +15,7 @@ import (
 
 func TestEnqueueSingle(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
-	item, err := f.service.AddMovie(ctx, "m1", AddMovieOptions{AutoDownload: ptr(false)})
+	item, err := f.service.AddMovie(ctx, "m1", AddMovieOptions{AutoDownload: new(false)})
 	if err != nil {
 		t.Fatal(err)
 	}

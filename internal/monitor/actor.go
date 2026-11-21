@@ -29,7 +29,7 @@ func (service *Service) existingActor(ctx context.Context, actorID string) (Item
 	if existing.Status != subscription.StatusPaused {
 		return subscriptionItem(existing), true, nil
 	}
-	item, err := service.Update(ctx, existing.ID, UpdateOptions{Status: ptr(string(subscription.StatusActive))})
+	item, err := service.Update(ctx, existing.ID, UpdateOptions{Status: new(string(subscription.StatusActive))})
 	return item, true, err
 }
 

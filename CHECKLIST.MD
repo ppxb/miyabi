@@ -137,7 +137,7 @@
 - [x] 🟢 `web/src/components/videojs/video/menus/settings-menu.tsx:19-32`：`qualityOptions.length > 0` 恒真、多余默认值。（已收紧 `settings-menu`/`controls`/`skin` 三处：`qualityOptions/qualityValue/onQualityChange` 改为必填，移除 `length>0` 守卫、`?? (()=>{})`、`= []`/`= ''`/`= {}` 默认值，`CustomQualityMenu` 常驻）
 - [x] 🟢 `web/src/features/library/player-dialog.tsx:51-62`：轻量计算的 `useMemo`；`:125` 多余 `show115`；`:76-81` `skinStyle` 可用 className。（已把 `source` 的轻量 `useMemo` 改为普通表达式；`MovieInfo` 去掉 `show115` prop、内部改用 `movie.source === '115'`；`skinStyle` 改为 `VideoSkin` 的 className（`aspect-video w-full` + 字体 CSS 变量）；移除 `CSSProperties` 导入）
 - [x] 🟢 `internal/offline`：`config.go:22,24` 重复 `Normalized()`；`sync.go:36`、`recovery.go:97` 可直接 `return errors.Join(errs...)`；`add.go:135-145` 冗余 return。（已改：`config.go` 的 `Normalized()` 只算一次并复用；`sync.go` 改为直接 `return errors.Join(errs...)`；`add.go` 闭包内改为 `return err`；`recovery.go:97` 行号已过时、无该模式，未改）
-- [ ] 🟢 `internal/monitor/subscribe.go:22/35`：`existingMovie` 重复查询；`:135` `ptr` 可用 `new(v)`（Go 1.26+）。
+- [x] 🟢 `internal/monitor/subscribe.go:22/35`：`existingMovie` 重复查询；`:135` `ptr` 可用 `new(v)`（Go 1.26+）。（已抽出无存在性检查的 `createMovie`，`AddMovie` 检查后直接 createMovie、`addMovie` 保留检查供 actor/测试调用，新增路径不再重复查询；`ptr` 辅助函数删除改用 `new(expr)`，同步更新 actor.go 与测试）
 
 ---
 

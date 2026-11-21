@@ -108,11 +108,11 @@ func TestMovieSubscriptionLifecycle(t *testing.T) {
 	if list, err := f.service.List(ctx, "movie", 1, 10); err != nil || len(list) != 1 {
 		t.Fatalf("List: %d %v", len(list), err)
 	}
-	updated, err := f.service.Update(ctx, item.ID, UpdateOptions{AutoDownload: ptr(false)})
+	updated, err := f.service.Update(ctx, item.ID, UpdateOptions{AutoDownload: new(false)})
 	if err != nil || updated.AutoDownload {
 		t.Fatalf("Update: %#v %v", updated, err)
 	}
-	if _, err := f.service.Update(ctx, item.ID, UpdateOptions{Status: ptr("paused")}); !domain.IsKind(err, domain.KindInvalid) {
+	if _, err := f.service.Update(ctx, item.ID, UpdateOptions{Status: new("paused")}); !domain.IsKind(err, domain.KindInvalid) {
 		t.Fatalf("pausing a movie subscription must be rejected as invalid, got %v", err)
 	}
 	if err := f.service.Remove(ctx, item.ID); err != nil {
@@ -130,7 +130,7 @@ func TestReAddingFinishedSubscriptionOnlyResetsForUsers(t *testing.T) {
 	if added, err := f.service.EnqueueSingle(ctx, item.ID); err != nil || added.Status != subscription.StatusAdded {
 		t.Fatalf("EnqueueSingle: %#v %v", added, err)
 	}
-	spawned, err := f.service.addMovie(ctx, domain.MovieSummary{ID: "m1"}, AddMovieOptions{OriginID: ptr(99)})
+	spawned, err := f.service.addMovie(ctx, domain.MovieSummary{ID: "m1"}, AddMovieOptions{OriginID: new(99)})
 	if err != nil || spawned.ID != item.ID || spawned.Status != subscription.StatusAdded {
 		t.Fatalf("an actor-spawned add must leave an added subscription alone: %#v %v", spawned, err)
 	}
