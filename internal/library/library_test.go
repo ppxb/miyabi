@@ -116,7 +116,7 @@ func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 	// covers sidecar subtitle names. All are batched per page, so the count is
 	// constant regardless of the number of cards. Mounts and scope come from the
 	// in-memory account registry, so the page issues no settings read.
-	wantQueries := map[string]int{"*ent.FileQuery": 3, "*ent.SubtitleQuery": 1, "*ent.MovieQuery": 1, "*ent.TagQuery": 1, "*ent.ActorQuery": 1}
+	wantQueries := map[string]int{"*ent.FileQuery": 3, "*ent.SubtitleQuery": 1, "*ent.WatchHistoryQuery": 1, "*ent.MovieQuery": 1, "*ent.TagQuery": 1, "*ent.ActorQuery": 1}
 	if !reflect.DeepEqual(queries, wantQueries) {
 		t.Fatalf("library cards made redundant queries: %#v", queries)
 	}

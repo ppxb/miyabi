@@ -19,8 +19,6 @@ export function Container({ children, className, ...props }: ContainerProps) {
         'media-skin',
         '@container/media-root relative isolate block h-full w-full overflow-clip rounded-media-player bg-media-background',
         'font-media text-media leading-normal subpixel-antialiased [--spacing:var(--media-spacing)]',
-        'outline-2 -outline-offset-4 outline-transparent transition-[outline-offset,outline-color] duration-media-fast ease-out',
-        'focus-visible:outline-offset-2 focus-visible:outline-media-ring',
         'after:pointer-events-none after:absolute after:inset-0 after:z-10 after:rounded-[inherit]',
         'after:border after:border-(--media-frame-border) [&:fullscreen]:after:hidden',
         className

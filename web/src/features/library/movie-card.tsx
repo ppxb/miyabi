@@ -46,10 +46,11 @@ export function LibraryMovieCard({
             titleTooltip={false}
             hideContent
             state={
-              movie.source === '115' || movie.has_subtitle ? (
+              movie.source === '115' || movie.has_subtitle || movie.finished ? (
                 <>
                   {movie.source === '115' ? <Badge variant="frosted">115</Badge> : null}
                   {movie.has_subtitle ? <Badge variant="frosted">中文</Badge> : null}
+                  {movie.finished ? <Badge variant="success">已看完</Badge> : null}
                 </>
               ) : undefined
             }

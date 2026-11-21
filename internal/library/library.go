@@ -19,6 +19,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/ent/tag"
 	"github.com/ppxb/miyabi/internal/ent/task"
+	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scan"
@@ -38,6 +39,8 @@ type Tag struct {
 	SourceID string `json:"source_id"`
 	Name     string `json:"name"`
 }
+
+const finishedProgressRatio = 0.95
 
 type Movie struct {
 	ID           int                `json:"id"`
@@ -60,6 +63,8 @@ type Movie struct {
 	// HasSubtitle marks movies whose file or indexed subtitle names indicate a
 	// Chinese-subtitle release.
 	HasSubtitle bool `json:"has_subtitle"`
+	// Finished marks movies whose saved playback position reached the end.
+	Finished bool `json:"finished,omitempty"`
 }
 
 type Page struct {
@@ -505,6 +510,9 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 	if err := s.markSubtitleStatus(ctx, result.Movies); err != nil {
 		return result, err
 	}
+	if err := s.markWatchState(ctx, result.Movies); err != nil {
+		return result, err
+	}
 	result.HasMore = (page-1)*limit+len(result.Movies) < result.Total
 	return result, nil
 }
@@ -568,6 +576,9 @@ func (s *Service) TopRated(ctx context.Context, limit int) ([]Movie, error) {
 		return nil, err
 	}
 	if err := s.markSubtitleStatus(ctx, items); err != nil {
+		return nil, err
+	}
+	if err := s.markWatchState(ctx, items); err != nil {
 		return nil, err
 	}
 	return items, nil
@@ -637,6 +648,34 @@ func (s *Service) markSubtitleStatus(ctx context.Context, movies []Movie) error 
 		if subtitlemeta.HasChineseSubtitle(track.Name) {
 			if item, ok := index[track.MovieID]; ok {
 				item.HasSubtitle = true
+			}
+		}
+	}
+	return nil
+}
+
+// markWatchState flags movies whose saved playback position reached the end,
+// matching the resume filter used by the "continue watching" shelf.
+func (s *Service) markWatchState(ctx context.Context, movies []Movie) error {
+	if len(movies) == 0 {
+		return nil
+	}
+	ids := make([]int, len(movies))
+	index := make(map[int]*Movie, len(movies))
+	for i := range movies {
+		ids[i] = movies[i].ID
+		index[movies[i].ID] = &movies[i]
+	}
+	records, err := s.database.WatchHistory.Query().
+		Where(watchhistory.MovieIDIn(ids...)).
+		Select(watchhistory.FieldMovieID, watchhistory.FieldPosition, watchhistory.FieldDuration).All(ctx)
+	if err != nil {
+		return fmt.Errorf("read library watch history: %w", err)
+	}
+	for _, record := range records {
+		if record.Duration > 0 && record.Position/record.Duration >= finishedProgressRatio {
+			if item, ok := index[record.MovieID]; ok {
+				item.Finished = true
 			}
 		}
 	}
@@ -841,6 +880,9 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 		return result, err
 	}
 	if err := s.markSubtitleStatus(ctx, result.Movies); err != nil {
+		return result, err
+	}
+	if err := s.markWatchState(ctx, result.Movies); err != nil {
 		return result, err
 	}
 	result.HasMore = start+len(items) < total

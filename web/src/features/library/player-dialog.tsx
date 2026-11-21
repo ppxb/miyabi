@@ -5,7 +5,7 @@ import { usePlayer, Video, VideoPlayer } from '@videojs/react/video'
 import { CalendarIcon, ClockIcon, StarIcon, type LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 
-import { useLibraryMovie } from '@/api/library'
+import { libraryKeys, useLibraryMovie } from '@/api/library'
 import type { LibraryMovieDetail } from '@/api/library'
 import { historyKeys } from '@/api/history'
 import { savePlaybackProgress, usePlayQualities, useStartMoviePlayback } from '@/api/play'
@@ -201,6 +201,8 @@ function PlaybackSync({
       clearInterval(timer)
       saveProgress()
       void queryClient.invalidateQueries({ queryKey: historyKeys.all })
+      // The finished badge on library cards is derived from saved progress.
+      void queryClient.invalidateQueries({ queryKey: libraryKeys.all })
     }
   }, [fileID, player, saveProgress, queryClient])
 
