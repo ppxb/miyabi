@@ -224,12 +224,12 @@
 
 ### 🔴 高（回归 / 数据一致性）
 
-- [ ] ✅ `internal/api/error.go:111`：**自定义 404 文案被覆盖（本轮回归）**。基线仅在文案为「内部服务错误」时替换；现改为 `ent.IsNotFound(err)`，其 `errors.As` 会穿透 `domain.E` 包装，`library/detail.go:118`「影片不在当前媒体库中」、`strm/relay.go:139`「视频索引不存在…」均被改写为「资源不存在」。改法：条件改为 `domain.KindOf(err) == domain.KindUnexpected && ent.IsNotFound(err)`，文案直接写字面量。
-- [ ] ✅ `internal/ent/schema/actor.go:33`：**`name_key` 无存量回填**。仅 `scrape/mapping.go:128` 在新刮削时写入，而 `loadGroup`(`actors/service.go:368`)/`findNames`(`:754`) 只按 `NameKeyEQ` 查询；老库未重刮前演员详情/头像 404。（`rating10` 不回填为既定约定，`name_key` 未说明。）改法：启动后幂等回填 `name_key=''` 的行，或参照 `canonical_code` 用 hook 派生。
-- [ ] ✅ `internal/drive/accounts.go:228`、`:298`：**mount 内存缓存可被旧快照覆盖**。`Accounts()`/`refreshExpiringAccounts` 不持 `accountsMu` 即 `loadAccounts`，随后 `syncAccountMounts(store)` 整表替换；与 `saveAccountMount` 并发时会回滚新 mount。改法：load+sync 放进 `accountsMu`，或去掉周期 sync 只由写路径维护。
-- [ ] ✅ `internal/actors/service.go:1076-1114`：**`reconcileActorProfiles` 出错仍 `tx.Commit()`**，部分提交，事务形同虚设；循环内逐 profile 查别名（N+1）+ 逐条 `Create`。改法：出错立即 `return err` 回滚；别名一次 `HasActorWith(IDIn(...))` 查全 + `CreateBulk`。
-- [ ] ✅ `web/src/features/movies/filter-bar.tsx:44-53`、`actors/catalog-page.tsx:31-38`：**搜索框吞末尾空格（本轮回归）**。防抖后 trim 写入 URL，渲染期同步又把 trim 值写回输入框；输入 "abc " 停顿 300ms 空格消失。改法：仅当 `value.q !== query.trim()` 时回写。
-- [ ] ✅ `web/src/features/discover/page.tsx:48`：**切 Tab 短暂显示上一个 Tab 的结果（本轮回归）**。P4 删除了 `<BrowseResults key={view}>`，但 `useDiscoverMovies` 带 `keepPreviousData`（`api/discover.ts:117`）。改法：恢复 `key={view}` 或 `isPlaceholderData` 时显示骨架。
+- [x] ✅ `internal/api/error.go:111`：**自定义 404 文案被覆盖（本轮回归）**。基线仅在文案为「内部服务错误」时替换；现改为 `ent.IsNotFound(err)`，其 `errors.As` 会穿透 `domain.E` 包装，`library/detail.go:118`「影片不在当前媒体库中」、`strm/relay.go:139`「视频索引不存在…」均被改写为「资源不存在」。改法：条件改为 `domain.KindOf(err) == domain.KindUnexpected && ent.IsNotFound(err)`，文案直接写字面量。（已修复：仅 `KindUnexpected + ent.IsNotFound` 时用「资源不存在」，domain 分类的 NotFound 保留自定义文案；新增两条回归测试）
+- [x] ✅ ~~`internal/ent/schema/actor.go:33`：**`name_key` 无存量回填**~~ **按决定不处理**：项目明确不兼容老数据库，老库需重建/重刮（与 `rating10` 不回填为同一约定）；新库由刮削写入路径生成 `name_key`，无需启动回填。
+- [x] ✅ `internal/drive/accounts.go:228`、`:298`：**mount 内存缓存可被旧快照覆盖**。`Accounts()`/`refreshExpiringAccounts` 不持 `accountsMu` 即 `loadAccounts`，随后 `syncAccountMounts(store)` 整表替换；与 `saveAccountMount` 并发时会回滚新 mount。改法：load+sync 放进 `accountsMu`，或去掉周期 sync 只由写路径维护。（已修复：抽出 `loadAccountsAndMounts`，在 `accountsMu` 内完成 load+sync，两处调用改用之；`go build`/`go test ./internal/drive/` 通过）
+- [x] ✅ `internal/actors/service.go:1076-1114`：**`reconcileActorProfiles` 出错仍 `tx.Commit()`**，部分提交，事务形同虚设；循环内逐 profile 查别名（N+1）+ 逐条 `Create`。改法：出错立即 `return err` 回滚；别名一次 `HasActorWith(IDIn(...))` 查全 + `CreateBulk`。（已修复：事务内任一错误立即 `return err` 由 defer 回滚；别名改为一次 `WithActor` 批量查询 + `CreateBulk`；`go build`/`go test ./internal/actors/` 通过）
+- [x] ✅ `web/src/features/movies/filter-bar.tsx:44-53`、`actors/catalog-page.tsx:31-38`：**搜索框吞末尾空格（本轮回归）**。防抖后 trim 写入 URL，渲染期同步又把 trim 值写回输入框；输入 "abc " 停顿 300ms 空格消失。改法：仅当 `value.q !== query.trim()` 时回写。（已修复：URL 值与输入 trim 相同（自身回显）时只更新 `syncedQ`、不回写 `query`；`tsc`/`oxlint`/`oxfmt`/`vitest` 通过）
+- [x] ✅ `web/src/features/discover/page.tsx:48`：**切 Tab 短暂显示上一个 Tab 的结果（本轮回归）**。P4 删除了 `<BrowseResults key={view}>`，但 `useDiscoverMovies` 带 `keepPreviousData`（`api/discover.ts:117`）。改法：恢复 `key={view}` 或 `isPlaceholderData` 时显示骨架。（已修复：恢复 `key={view}`，切换 released/upcoming 时重新挂载、显示加载骨架）
 
 ### 🟠 中
 

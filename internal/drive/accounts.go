@@ -99,6 +99,21 @@ func (d *Drive) syncAccountMounts(store accountStore) {
 	d.accountMounts = next
 }
 
+// loadAccountsAndMounts reloads the account store and refreshes the in-memory
+// mount registry under accountsMu. Holding the write lock across both steps
+// prevents a concurrent saveAccountMount from having its newer mount overwritten
+// by the stale snapshot this call just loaded.
+func (d *Drive) loadAccountsAndMounts(ctx context.Context) (accountStore, error) {
+	d.accountsMu.Lock()
+	defer d.accountsMu.Unlock()
+	store, err := d.loadAccounts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	d.syncAccountMounts(store)
+	return store, nil
+}
+
 func (d *Drive) accountCredVersion(accountID string) uint64 {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -225,11 +240,10 @@ func (d *Drive) Mounts(_ context.Context) ([]domain.LibrarySource, error) {
 
 // Accounts lists every stored 115 account and its mounted directory.
 func (d *Drive) Accounts(ctx context.Context) ([]AccountStatus, error) {
-	store, err := d.loadAccounts(ctx)
+	store, err := d.loadAccountsAndMounts(ctx)
 	if err != nil {
 		return nil, err
 	}
-	d.syncAccountMounts(store)
 	ids := slices.Sorted(maps.Keys(store))
 
 	result := make([]AccountStatus, 0, len(ids))
@@ -295,12 +309,11 @@ func (d *Drive) StartAccountRefresh(ctx context.Context) {
 }
 
 func (d *Drive) refreshExpiringAccounts(ctx context.Context) {
-	store, err := d.loadAccounts(ctx)
+	store, err := d.loadAccountsAndMounts(ctx)
 	if err != nil {
 		slog.Warn("load 115 accounts for refresh", "error", err)
 		return
 	}
-	d.syncAccountMounts(store)
 	for id, record := range store {
 		if tokensNeedRefresh(record.Tokens) {
 			if err := d.refreshAccountTokens(ctx, id); err != nil {

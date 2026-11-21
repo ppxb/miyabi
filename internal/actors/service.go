@@ -1072,45 +1072,58 @@ func (s *Service) reconcileActorProfiles(ctx context.Context, movieID int) error
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	var errs []error
+
+	profileIDs := make([]int, 0, len(profiles))
+	for _, p := range profiles {
+		profileIDs = append(profileIDs, p.ID)
+	}
+	aliases, err := tx.ActorAlias.Query().
+		Where(actoralias.HasActorWith(actorprofile.IDIn(profileIDs...))).
+		WithActor(func(q *ent.ActorProfileQuery) { q.Select(actorprofile.FieldID) }).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+	have := make(map[int]map[string]bool, len(profiles))
+	for _, alias := range aliases {
+		if alias.Edges.Actor == nil {
+			continue
+		}
+		pid := alias.Edges.Actor.ID
+		if have[pid] == nil {
+			have[pid] = make(map[string]bool)
+		}
+		have[pid][alias.Alias] = true
+	}
+
+	var bulk []*ent.ActorAliasCreate
 	for _, p := range profiles {
 		ids := idsByNorm[p.MatchKey]
 		if len(ids) == 0 {
 			continue
 		}
 		if err := tx.Actor.Update().Where(actor.IDIn(ids...)).SetProfileID(p.ID).Exec(ctx); err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		existing, err := tx.ActorAlias.Query().
-			Where(actoralias.HasActorWith(actorprofile.ID(p.ID))).
-			Select(actoralias.FieldAlias).
-			All(ctx)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		have := make(map[string]bool, len(existing))
-		for _, alias := range existing {
-			have[alias.Alias] = true
+			return err
 		}
 		for name := range namesByNorm[p.MatchKey] {
-			if have[name] {
+			if have[p.ID][name] {
 				continue
 			}
-			if _, err := tx.ActorAlias.Create().
+			bulk = append(bulk, tx.ActorAlias.Create().
 				SetActorID(p.ID).
 				SetAlias(name).
-				SetNormalized(p.MatchKey).
-				Save(ctx); err != nil {
-				errs = append(errs, err)
-			}
+				SetNormalized(p.MatchKey))
+		}
+	}
+	if len(bulk) > 0 {
+		if err := tx.ActorAlias.CreateBulk(bulk...).Exec(ctx); err != nil {
+			return err
 		}
 	}
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	return errors.Join(errs...)
+	return nil
 }
 
 func (s *Service) ensureProfile(ctx context.Context, norm, name, nameZHT, avatar string) (int, error) {

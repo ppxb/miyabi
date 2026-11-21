@@ -39,11 +39,15 @@ export function MovieFilterBar({
   const [query, setQuery] = useState(value.q ?? '')
   const [syncedQ, setSyncedQ] = useState(value.q ?? '')
 
-  // Reflect external URL changes (back/forward) into the input. Adjusting state
-  // during render (guarded) avoids a setState-in-effect loop.
-  if ((value.q ?? '') !== syncedQ) {
-    setSyncedQ(value.q ?? '')
-    setQuery(value.q ?? '')
+  // Reflect external URL changes (back/forward) into the input, but never erase
+  // what the user is still typing: skip the write when the URL value merely
+  // echoes our own trimmed submission ("abc " -> "abc").
+  const externalQ = value.q ?? ''
+  if (externalQ !== syncedQ) {
+    setSyncedQ(externalQ)
+    if (externalQ !== query.trim()) {
+      setQuery(externalQ)
+    }
   }
 
   useEffect(() => {
