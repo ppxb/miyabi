@@ -259,7 +259,7 @@
 - [x] `components/list-pagination.tsx:36-46` 重写了 `PaginationLink`（后者已 0 调用）；`data-active` 无样式使用。（已修复：`ui/pagination.tsx` 的 `PaginationLink` 改为与 `PaginationPrevious/Next` 一致的按钮形态（接收 Button props + `isActive`），去掉无用的 `data-active` 与 `<a>`/`nativeButton` 渲染；`ListPagination` 页码改用 `PaginationLink`；`tsc`/`oxlint`/`oxfmt`/`vitest` 通过）
 - [x] `components/stat-list.tsx:13-16,37` `StatListSkeleton` 复制容器 class。（已修复：容器与单项 class 提为模块常量 `listClass`/`itemClass`，`StatList` 与 `StatListSkeleton` 共用；`tsc`/`oxlint`/`oxfmt` 通过）
 - [x] `library/page.tsx:22,26` 仍手写 `filter(isScanTask)` + `find(isTaskActive)`，未用 `useActiveScan`。（已修复：改用 `useActiveScan()` 取 `tasks/scans/active`，`active` 即进度任务；`latestScan` 基于 `scans` 查找，语义不变；`tsc`/`oxlint`/`oxfmt`/`vitest` 通过）
-- [ ] `ensureProfileTx`（`actors/service.go:1135`）≈ `ensureProfile`；`domain.ActorNameKey` 与 `actors.Key` 重复 sha1。
+- [x] `ensureProfileTx`（`actors/service.go:1135`）≈ `ensureProfile`；`domain.ActorNameKey` 与 `actors.Key` 重复 sha1。（已修复：合并为单个包级 `ensureProfile(ctx, db *ent.Client, ...)`，事务内传 `tx.Client()`；删除 `actors.Key`，URL key 统一用 `domain.ActorNameKey`（归一化幂等，结果不变，且与 `name_key` 列同源）；同步测试；`go build`/`go vet`/`go test ./internal/actors/... ./internal/api/...` 通过）
 
 样式 / shadcn
 - [ ] `components/movie/movie-cover-overlay.tsx:18` `bg-gradient-to-t` 为 v3 名（v4 `bg-linear-to-t`）；discover/library 卡片副标题样式不一（`text-[11px] text-white/60` vs `text-xs text-white/75`），`MovieCoverCaption` 可接收 `subtitle` 统一。

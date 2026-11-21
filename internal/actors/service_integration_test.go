@@ -29,7 +29,7 @@ func TestEnsureProfilesAndCatalog(t *testing.T) {
 
 	svc := New(db, nil, "", nil)
 	// Simulate a profile created earlier (e.g. by opening the detail page).
-	if _, err := svc.ensureProfile(ctx, normalizeName("七ツ森 りり"), "七ツ森 りり", "", ""); err != nil {
+	if _, err := ensureProfile(ctx, svc.db, normalizeName("七ツ森 りり"), "七ツ森 りり", "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := svc.EnsureProfiles(ctx); err != nil {
@@ -225,7 +225,7 @@ func TestEnsureMovieProfilesLinksNewActorToExistingProfile(t *testing.T) {
 	svc := New(db, nil, "", nil)
 
 	// An existing person already has a canonical profile (e.g. from a detail view).
-	pid, err := svc.ensureProfile(ctx, normalizeName("七ツ森 りり"), "七ツ森 りり", "", "")
+	pid, err := ensureProfile(ctx, svc.db, normalizeName("七ツ森 りり"), "七ツ森 りり", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

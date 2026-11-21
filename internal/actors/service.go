@@ -167,12 +167,6 @@ func (s *Service) sourceEnabled(ctx context.Context, id string) bool {
 	return true
 }
 
-// Key returns a stable URL key for a normalized name.
-func Key(norm string) string {
-	sum := sha1.Sum([]byte(norm))
-	return hex.EncodeToString(sum[:])
-}
-
 // normalizeName lowercases and drops all whitespace so "... りり" == "...りり".
 func normalizeName(name string) string {
 	return domain.NormalizeActorName(name)
@@ -294,7 +288,8 @@ func (s *Service) groups(ctx context.Context) ([]*group, error) {
 }
 
 func (g *group) summary() Summary {
-	key := Key(g.norm)
+	// Same key as the indexed Actor.name_key column, so URLs resolve via findNames.
+	key := domain.ActorNameKey(g.norm)
 	return Summary{
 		Key:        key,
 		Name:       g.displayName,
@@ -420,7 +415,7 @@ func (s *Service) Detail(ctx context.Context, key string) (Detail, error) {
 			detail.Aliases = append(detail.Aliases, name)
 		}
 	}
-	pid, perr := s.ensureProfile(ctx, g.norm, display, g.nameZHT, g.avatar)
+	pid, perr := ensureProfile(ctx, s.db, g.norm, display, g.nameZHT, g.avatar)
 	if perr != nil {
 		return Detail{}, perr
 	}
@@ -567,7 +562,7 @@ func (s *Service) mergeActorPair(ctx context.Context, ja, en actorSig) error {
 
 	canonical := ja.profileID
 	if canonical == 0 {
-		pid, err := s.ensureProfileTx(ctx, tx, normalizeName(ja.name), ja.name, "", "")
+		pid, err := ensureProfile(ctx, tx.Client(), normalizeName(ja.name), ja.name, "", "")
 		if err != nil {
 			return err
 		}
@@ -578,7 +573,7 @@ func (s *Service) mergeActorPair(ctx context.Context, ja, en actorSig) error {
 	}
 	enPid := en.profileID
 	if enPid == 0 {
-		pid, err := s.ensureProfileTx(ctx, tx, normalizeName(en.name), en.name, "", "")
+		pid, err := ensureProfile(ctx, tx.Client(), normalizeName(en.name), en.name, "", "")
 		if err != nil {
 			return err
 		}
@@ -1177,30 +1172,13 @@ func (s *Service) reconcileActorProfiles(ctx context.Context, movieID int) error
 	return nil
 }
 
-func (s *Service) ensureProfile(ctx context.Context, norm, name, nameZHT, avatar string) (int, error) {
-	if id, err := s.db.ActorProfile.Query().Where(actorprofile.MatchKeyEQ(norm)).OnlyID(ctx); err == nil {
+// ensureProfile returns the canonical profile for norm, creating it when absent.
+// Pass tx.Client() to run inside a transaction.
+func ensureProfile(ctx context.Context, db *ent.Client, norm, name, nameZHT, avatar string) (int, error) {
+	if id, err := db.ActorProfile.Query().Where(actorprofile.MatchKeyEQ(norm)).OnlyID(ctx); err == nil {
 		return id, nil
 	}
-	builder := s.db.ActorProfile.Create().SetMatchKey(norm).SetName(name)
-	if nameZHT != "" {
-		builder.SetNameZht(nameZHT)
-	}
-	if avatar != "" {
-		builder.SetAvatar(avatar)
-	}
-	profile, err := builder.Save(ctx)
-	if err != nil {
-		return 0, err
-	}
-	return profile.ID, nil
-}
-
-// ensureProfileTx is ensureProfile bound to the caller's transaction.
-func (s *Service) ensureProfileTx(ctx context.Context, tx *ent.Tx, norm, name, nameZHT, avatar string) (int, error) {
-	if id, err := tx.ActorProfile.Query().Where(actorprofile.MatchKeyEQ(norm)).OnlyID(ctx); err == nil {
-		return id, nil
-	}
-	builder := tx.ActorProfile.Create().SetMatchKey(norm).SetName(name)
+	builder := db.ActorProfile.Create().SetMatchKey(norm).SetName(name)
 	if nameZHT != "" {
 		builder.SetNameZht(nameZHT)
 	}

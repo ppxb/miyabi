@@ -1,6 +1,10 @@
 package actors
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/ppxb/miyabi/internal/domain"
+)
 
 func TestNormalizeMergesWhitespaceAndCase(t *testing.T) {
 	cases := map[string]string{
@@ -17,13 +21,13 @@ func TestNormalizeMergesWhitespaceAndCase(t *testing.T) {
 }
 
 func TestKeyStableForEquivalentNames(t *testing.T) {
-	if Key(normalizeName("七ツ森 りり")) != Key(normalizeName("七ツ森りり")) {
+	if domain.ActorNameKey(normalizeName("七ツ森 りり")) != domain.ActorNameKey(normalizeName("七ツ森りり")) {
 		t.Fatal("spacing variant should map to same key")
 	}
-	if Key(normalizeName("Actor")) == Key(normalizeName("Other")) {
+	if domain.ActorNameKey(normalizeName("Actor")) == domain.ActorNameKey(normalizeName("Other")) {
 		t.Fatal("different names must differ")
 	}
-	if len(Key("x")) != 40 {
-		t.Fatalf("key should be sha1 hex (40 chars), got %d", len(Key("x")))
+	if len(domain.ActorNameKey("x")) != 40 {
+		t.Fatalf("key should be sha1 hex (40 chars), got %d", len(domain.ActorNameKey("x")))
 	}
 }
