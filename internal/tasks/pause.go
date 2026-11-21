@@ -2,12 +2,11 @@ package tasks
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"slices"
 
+	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/ent/setting"
 )
 
 const libraryPauseKey = "tasks.library_paused"
@@ -16,16 +15,14 @@ const libraryPauseKey = "tasks.library_paused"
 var ErrPaused = errors.New("library processing paused")
 
 func LibraryPaused(ctx context.Context, db *ent.Client) (bool, error) {
-	value, err := db.Setting.Query().Where(setting.KeyEQ(libraryPauseKey)).Only(ctx)
-	if ent.IsNotFound(err) {
-		return false, nil
-	}
+	value, found, err := database.LoadSetting[bool](ctx, db, libraryPauseKey)
 	if err != nil {
 		return false, err
 	}
-	var paused bool
-	err = json.Unmarshal(value.Value, &paused)
-	return paused, err
+	if !found {
+		return false, nil
+	}
+	return value, nil
 }
 
 func Checkpoint(ctx context.Context, db *ent.Client) error {
@@ -44,9 +41,7 @@ func (s *Service) SetLibraryPaused(ctx context.Context, paused bool) error {
 		return err
 	}
 	defer s.queue.Unlock()
-	value, _ := json.Marshal(paused)
-	if err := s.queue.database.Setting.Create().SetKey(libraryPauseKey).SetValue(value).
-		OnConflictColumns(setting.FieldKey).UpdateNewValues().Exec(ctx); err != nil {
+	if err := database.SaveSetting(ctx, s.queue.database, libraryPauseKey, paused); err != nil {
 		return err
 	}
 	s.NotifyUI()
