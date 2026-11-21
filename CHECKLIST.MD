@@ -184,7 +184,7 @@
 ## P6 · 可复用 / 可抽取
 
 ### 前端
-- [x] 卡片封面浮层（评分角标 + 渐变标题）：抽出 `components/movie/movie-cover-overlay.tsx` 的 `MovieRatingPill` / `MovieCoverCaption`，`discover/movie-card` 与 `library/movie-card` 复用；同时移除探索卡已废弃的订阅分支（`allowSubscribe`/`subscribable`/`MovieSubscribeButton`）——`features/discover/movie-subscribe-button.tsx` 现已无引用，归 P2 走「移到回收站」。
+- [x] 卡片封面浮层（评分角标 + 渐变标题）：抽出 `components/movie/movie-cover-overlay.tsx` 的 `MovieRatingPill` / `MovieCoverCaption`，`discover/movie-card` 与 `library/movie-card` 复用；同时移除探索卡已废弃的订阅分支（`allowSubscribe`/`subscribable`/`MovieSubscribeButton`）——`features/discover/movie-subscribe-button.tsx` 已无引用，已移出项目到 `backups/removed-20261121-1350/`（可恢复）。
 - [ ] 统计条：`movie-detail/hero.tsx:77-90`、`actors/detail-page.tsx:55-68`、`movie-detail/skeleton.tsx:21` → `StatList`
 - [ ] 横向列表项宽度：`continue-watching.tsx:33`、`recent-shelf.tsx:14`、`top-rated-shelf.tsx:14` → `MovieShelfItem`；recent/top-rated 可合并
 - [ ] 演员头像 URL：`app-search.tsx:59-62`、`actors/catalog-page.tsx:16-19`、`actors/detail-page.tsx:27-30` → 并入 `imageURL`
