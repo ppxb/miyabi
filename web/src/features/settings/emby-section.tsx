@@ -8,13 +8,11 @@ import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { combineServerUrl, splitServerUrl } from './emby-url'
 import { SettingRow, SettingsSection } from './shared'
 
 interface EmbyFormData {
   enabled: boolean
-  host: string
-  port: string
+  server_url: string
   api_key: string
   media_path: string
   sync_actors: boolean
@@ -22,11 +20,9 @@ interface EmbyFormData {
 }
 
 function configToFormData(config?: EmbyConfig | null): EmbyFormData {
-  const { host, port } = splitServerUrl(config?.server_url ?? '')
   return {
     enabled: config?.enabled ?? false,
-    host,
-    port,
+    server_url: config?.server_url ?? '',
     api_key: config?.api_key ?? '',
     media_path: config?.media_path ?? '',
     sync_actors: config?.sync_actors ?? true,
@@ -49,8 +45,7 @@ export function EmbySection() {
     Boolean(config) &&
     form !== null &&
     (current.enabled !== initial.enabled ||
-      current.host !== initial.host ||
-      current.port !== initial.port ||
+      current.server_url !== initial.server_url ||
       current.api_key !== initial.api_key ||
       current.media_path !== initial.media_path ||
       current.public_url !== initial.public_url ||
@@ -92,24 +87,11 @@ export function EmbySection() {
     )
   }
 
-  function handleHostBlur() {
-    const raw = current.host.trim()
-    if (!raw) return
-    const { host, port } = splitServerUrl(raw)
-    if (host !== raw) {
-      setForm(prev => ({
-        ...(prev ?? initial),
-        host,
-        port
-      }))
-    }
-  }
-
   function handleTest() {
-    const trimmedHost = current.host.trim()
+    const trimmedServerUrl = current.server_url.trim()
     const trimmedKey = current.api_key.trim()
 
-    if (!trimmedHost) {
+    if (!trimmedServerUrl) {
       toast.error('请填写 Emby 服务器地址')
       return
     }
@@ -118,10 +100,8 @@ export function EmbySection() {
       return
     }
 
-    const serverUrl = combineServerUrl(trimmedHost, current.port)
-
     testConfig.mutate(
-      { server_url: serverUrl, api_key: trimmedKey },
+      { server_url: trimmedServerUrl, api_key: trimmedKey },
       {
         onSuccess: data => {
           toast.success('Emby 连接成功', {
@@ -136,11 +116,11 @@ export function EmbySection() {
   }
 
   function handleSave() {
-    const trimmedHost = current.host.trim()
+    const trimmedServerUrl = current.server_url.trim()
     const trimmedKey = current.api_key.trim()
 
     if (current.enabled) {
-      if (!trimmedHost) {
+      if (!trimmedServerUrl) {
         toast.error('启用 Emby 集成时必须填写服务器地址')
         return
       }
@@ -150,11 +130,9 @@ export function EmbySection() {
       }
     }
 
-    const serverUrl = combineServerUrl(trimmedHost, current.port)
-
     const payload: EmbyConfig = {
       enabled: current.enabled,
-      server_url: serverUrl,
+      server_url: trimmedServerUrl,
       api_key: trimmedKey,
       media_path: current.media_path.trim(),
       sync_actors: current.sync_actors,
@@ -196,23 +174,13 @@ export function EmbySection() {
             />
           </SettingRow>
 
-          <SettingRow title="服务器地址" description="Emby 服务的 IP 或域名">
+          <SettingRow title="服务器地址" description="Emby 服务的完整地址，含协议与端口">
             <Input
               autoFocus={form?.enabled === true && !initial.enabled}
-              value={current.host}
-              placeholder="http://192.168.1.100"
+              value={current.server_url}
+              placeholder="http://192.168.1.100:8096"
               disabled={disabled}
-              onChange={e => updateField('host', e.target.value)}
-              onBlur={handleHostBlur}
-            />
-          </SettingRow>
-
-          <SettingRow title="端口" description="Emby 服务端口，默认 8096">
-            <Input
-              value={current.port}
-              placeholder="8096"
-              disabled={disabled}
-              onChange={e => updateField('port', e.target.value)}
+              onChange={e => updateField('server_url', e.target.value)}
             />
           </SettingRow>
 
