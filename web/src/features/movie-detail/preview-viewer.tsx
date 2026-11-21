@@ -87,7 +87,7 @@ export function MoviePreviewViewer({
       <DialogContent
         showCloseButton={false}
         onKeyDown={handleKeyDown}
-        className="dark inset-0 flex max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none bg-transparent p-0 text-foreground ring-0 sm:max-w-none"
+        className="dark inset-0 flex max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none bg-background/70 p-0 text-foreground ring-0 backdrop-blur-2xl sm:max-w-none"
       >
         <div className="flex shrink-0 justify-end px-4 pt-4">
           <Button variant="ghost" size="icon" onClick={onClose}>
