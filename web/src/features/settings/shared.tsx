@@ -61,3 +61,8 @@ export function SettingRow({
     </Field>
   )
 }
+
+/** Right-aligned action row for a settings section's buttons. */
+export function SettingsActions({ children }: { children: ReactNode }) {
+  return <div className="flex items-center justify-end gap-2">{children}</div>
+}

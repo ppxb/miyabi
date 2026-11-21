@@ -8,7 +8,7 @@ import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { SettingRow, SettingsSection } from './shared'
+import { SettingRow, SettingsActions, SettingsSection } from './shared'
 
 interface NetworkFormData {
   enabled: boolean
@@ -127,12 +127,12 @@ function NetworkForm({ config, onSaved }: { config: NetworkConfig; onSaved: () =
             />
           </SettingRow>
 
-          <div className="flex items-center justify-end gap-2">
+          <SettingsActions>
             <Button type="button" size="sm" disabled={disabled || !isDirty} onClick={handleSave}>
               <LoaderCircleIcon className={updateConfig.isPending ? 'animate-spin' : 'invisible'} />
               保存
             </Button>
-          </div>
+          </SettingsActions>
         </>
       ) : null}
     </>

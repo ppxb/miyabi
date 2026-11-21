@@ -190,7 +190,7 @@
 - [x] 演员头像 URL：三处重复 helper 删除，调用处直接 `avatar ? imageURL(avatar) : undefined`（`imageURL` 已内置 `/api/actors/` 直通，无需再判）。
 - [x] `scraping-section.tsx`：抽出 `SourceToggleList`（sources/names/descriptions + pending/error/retry + onToggle），`ScrapingSection` 与 `ActorSourcesSection` 仅剩取 hook + 传参。
 - [x] `subscription-section.tsx` 三段 Select → 抽出 `PreferenceSelect({ value, options, disabled, onChange })`，字幕/高清/无码各自只传项与字段。
-- [ ] `network-section.tsx:126-141` ≈ `emby-section.tsx:253-268` 按钮组 → `SettingsActions`
+- [x] `settings/shared.tsx` 新增 `SettingsActions`（右对齐按钮行容器），`network-section` 与 `emby-section` 的保存/测试按钮组复用。
 - [ ] `media-sync-section.tsx:15-18` ≈ `tasks-section.tsx:11-14` → `useActiveScan()`
 - [ ] 分类过滤：`discover/category-content.tsx:20-24` ≈ `category-filters.tsx:29-35` → `useCategoryTaxonomy`
 - [ ] `discover/results.tsx` + `browse-results.tsx` 合并

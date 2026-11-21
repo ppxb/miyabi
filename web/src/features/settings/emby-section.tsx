@@ -8,7 +8,7 @@ import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { SettingRow, SettingsSection } from './shared'
+import { SettingRow, SettingsActions, SettingsSection } from './shared'
 
 interface EmbyFormData {
   enabled: boolean
@@ -225,7 +225,7 @@ function EmbyForm({ config, onSaved }: { config: EmbyConfig; onSaved: () => void
             />
           </SettingRow>
 
-          <div className="flex items-center justify-end gap-2">
+          <SettingsActions>
             <Button
               type="button"
               variant="outline"
@@ -240,7 +240,7 @@ function EmbyForm({ config, onSaved }: { config: EmbyConfig; onSaved: () => void
               <LoaderCircleIcon className={updateConfig.isPending ? 'animate-spin' : 'invisible'} />
               保存
             </Button>
-          </div>
+          </SettingsActions>
         </>
       ) : null}
     </>
