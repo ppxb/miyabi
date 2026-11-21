@@ -41,20 +41,18 @@ export function updateEmbyConfigOptions(queryClient: QueryClient) {
     mutationFn: (config: EmbyConfig) => apiPut<EmbyConfig>('/api/settings/emby', config),
     onMutate: async next => {
       await queryClient.cancelQueries({ queryKey: embyKeys.config })
-      const previous = queryClient.getQueryData<EmbyConfig>(embyKeys.config)
-      queryClient.setQueryData<EmbyConfig>(embyKeys.config, {
+      queryClient.setQueryData<EmbyConfig>(embyKeys.config, previous => ({
         ...previous,
         ...next,
         local_dir: next.local_dir || previous?.local_dir
-      })
-      return { previous }
+      }))
     },
     onSuccess: next => {
       queryClient.setQueryData(embyKeys.config, next)
     },
-    onError: (_error, _next, context) => {
-      if (context?.previous) queryClient.setQueryData(embyKeys.config, context.previous)
-      // The backend can save settings before reporting a scan enqueue failure.
+    onError: () => {
+      // The backend can save settings before reporting a scan enqueue failure,
+      // so reconcile with the server instead of restoring a stale snapshot.
       void queryClient.invalidateQueries({ queryKey: embyKeys.config })
     }
   })

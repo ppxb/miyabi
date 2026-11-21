@@ -42,20 +42,23 @@ test('Emby saves optimistically preserve the output directory and apply the serv
   assert.equal(client.getQueryState(embyKeys.config)?.isInvalidated, false)
 })
 
-test('failed Emby saves restore cached settings and invalidate for partially saved responses', async () => {
+test('failed Emby saves invalidate cached settings for reconciliation', async () => {
   const { client, mutation } = fixture()
   const response = Promise.withResolvers<Response>()
   vi.stubGlobal(
     'fetch',
     vi.fn(() => response.promise)
   )
-  const pending = mutation.execute({ ...previous, enabled: false })
+  const optimistic = { ...previous, enabled: false }
+  const pending = mutation.execute(optimistic)
   const rejected = assert.rejects(pending)
   await setImmediate()
   assert.equal(client.getQueryData<EmbyConfig>(embyKeys.config)?.enabled, false)
   response.resolve(Response.json({ error: 'scan enqueue failed' }, { status: 503 }))
   await rejected
-  assert.deepEqual(client.getQueryData(embyKeys.config), previous)
+  // The cache keeps the optimistic values (no stale rollback) and is marked
+  // invalid so the next read reconciles with the server's partially saved state.
+  assert.deepEqual(client.getQueryData(embyKeys.config), optimistic)
   assert.equal(client.getQueryState(embyKeys.config)?.isInvalidated, true)
 })
 
