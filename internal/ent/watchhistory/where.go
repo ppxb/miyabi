@@ -264,6 +264,16 @@ func DurationLTE(v float64) predicate.WatchHistory {
 	return predicate.WatchHistory(sql.FieldLTE(FieldDuration, v))
 }
 
+// SettingsIsNil applies the IsNil predicate on the "settings" field.
+func SettingsIsNil() predicate.WatchHistory {
+	return predicate.WatchHistory(sql.FieldIsNull(FieldSettings))
+}
+
+// SettingsNotNil applies the NotNil predicate on the "settings" field.
+func SettingsNotNil() predicate.WatchHistory {
+	return predicate.WatchHistory(sql.FieldNotNull(FieldSettings))
+}
+
 // WatchedAtEQ applies the EQ predicate on the "watched_at" field.
 func WatchedAtEQ(v time.Time) predicate.WatchHistory {
 	return predicate.WatchHistory(sql.FieldEQ(FieldWatchedAt, v))

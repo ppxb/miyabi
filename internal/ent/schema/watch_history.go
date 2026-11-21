@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"encoding/json"
 	"time"
 
 	"entgo.io/ent"
@@ -19,6 +20,10 @@ func (WatchHistory) Fields() []ent.Field {
 		field.String("file_id").Default(""),
 		field.Float("position").Default(0),
 		field.Float("duration").Default(0),
+		// settings is a single extensible JSON blob for all per-movie playback
+		// preferences (speed, rendition, and later subtitles/audio tracks ...), so
+		// adding a new preference needs no schema change.
+		field.JSON("settings", json.RawMessage{}).Optional(),
 		field.Time("watched_at").Default(time.Now),
 	}
 }

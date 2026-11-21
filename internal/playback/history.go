@@ -2,6 +2,7 @@ package playback
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"time"
@@ -22,7 +23,7 @@ const HistoryPageSize = 20
 func (service *Service) Resume(ctx context.Context, movieID int) (*domain.WatchResume, error) {
 	record, err := service.database.WatchHistory.Query().
 		Where(watchhistory.MovieIDEQ(movieID)).
-		Select(watchhistory.FieldFileID, watchhistory.FieldPosition, watchhistory.FieldDuration).
+		Select(watchhistory.FieldFileID, watchhistory.FieldPosition, watchhistory.FieldDuration, watchhistory.FieldSettings).
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -30,11 +31,35 @@ func (service *Service) Resume(ctx context.Context, movieID int) (*domain.WatchR
 		}
 		return nil, fmt.Errorf("read watch history: %w", err)
 	}
-	return &domain.WatchResume{FileID: record.FileID, Position: record.Position, Duration: record.Duration}, nil
+	settings, err := decodePlaybackSettings(record.Settings)
+	if err != nil {
+		return nil, err
+	}
+	return &domain.WatchResume{
+		FileID:   record.FileID,
+		Position: record.Position,
+		Duration: record.Duration,
+		Settings: settings,
+	}, nil
 }
 
-// SaveProgress validates the file and upserts the movie's playback progress.
-func (service *Service) SaveProgress(ctx context.Context, movieID int, fileID string, position, duration float64) error {
+// decodePlaybackSettings unmarshals the JSON settings blob, returning nil when
+// it is absent so callers fall back to defaults.
+func decodePlaybackSettings(raw json.RawMessage) (*domain.PlaybackSettings, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	var settings domain.PlaybackSettings
+	if err := json.Unmarshal(raw, &settings); err != nil {
+		return nil, fmt.Errorf("decode playback settings: %w", err)
+	}
+	return &settings, nil
+}
+
+// SaveProgress validates the file and upserts the movie's playback progress and
+// the extensible playback settings (speed, rendition, ...). A nil settings keeps
+// whatever was stored before.
+func (service *Service) SaveProgress(ctx context.Context, movieID int, fileID string, position, duration float64, settings *domain.PlaybackSettings) error {
 	if movieID <= 0 || fileID == "" || position < 0 || duration <= 0 ||
 		math.IsNaN(position) || math.IsInf(position, 0) || math.IsNaN(duration) || math.IsInf(duration, 0) {
 		return domain.E(domain.KindInvalid, "观看进度无效", nil)
@@ -49,15 +74,65 @@ func (service *Service) SaveProgress(ctx context.Context, movieID int, fileID st
 	}
 	position = math.Min(position, duration)
 	now := time.Now().UTC()
-	if err := service.database.WatchHistory.Create().
-		SetMovieID(movieID).SetFileID(fileID).SetPosition(position).SetDuration(duration).SetWatchedAt(now).
-		OnConflictColumns(watchhistory.FieldMovieID).
+	var rawSettings json.RawMessage
+	if settings != nil {
+		existing, err := service.existingSettings(ctx, movieID)
+		if err != nil {
+			return err
+		}
+		encoded, err := json.Marshal(mergePlaybackSettings(existing, settings))
+		if err != nil {
+			return fmt.Errorf("encode playback settings: %w", err)
+		}
+		rawSettings = encoded
+	}
+	create := service.database.WatchHistory.Create().
+		SetMovieID(movieID).SetFileID(fileID).SetPosition(position).SetDuration(duration).SetWatchedAt(now)
+	if rawSettings != nil {
+		create.SetSettings(rawSettings)
+	}
+	if err := create.OnConflictColumns(watchhistory.FieldMovieID).
 		Update(func(update *ent.WatchHistoryUpsert) {
 			update.SetFileID(fileID).SetPosition(position).SetDuration(duration).SetWatchedAt(now)
+			if rawSettings != nil {
+				update.SetSettings(rawSettings)
+			}
 		}).Exec(ctx); err != nil {
 		return fmt.Errorf("save watch progress: %w", err)
 	}
 	return nil
+}
+
+// existingSettings reads the stored settings blob for a movie, if any.
+func (service *Service) existingSettings(ctx context.Context, movieID int) (*domain.PlaybackSettings, error) {
+	record, err := service.database.WatchHistory.Query().
+		Where(watchhistory.MovieIDEQ(movieID)).
+		Select(watchhistory.FieldSettings).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read playback settings: %w", err)
+	}
+	return decodePlaybackSettings(record.Settings)
+}
+
+// mergePlaybackSettings overlays the provided fields onto the stored ones so a
+// partial update never clears a preference it did not mention. This keeps the
+// single settings blob additive as new preferences (audio tracks, subtitles,
+// ...) are introduced.
+func mergePlaybackSettings(base, incoming *domain.PlaybackSettings) *domain.PlaybackSettings {
+	if base == nil {
+		return incoming
+	}
+	merged := *base
+	if incoming.Rate > 0 {
+		merged.Rate = incoming.Rate
+	}
+	if incoming.Quality != "" {
+		merged.Quality = incoming.Quality
+	}
+	return &merged
 }
 
 // History lists watched movies newest first.

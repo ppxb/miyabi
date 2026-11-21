@@ -21,6 +21,8 @@ const (
 	FieldPosition = "position"
 	// FieldDuration holds the string denoting the duration field in the database.
 	FieldDuration = "duration"
+	// FieldSettings holds the string denoting the settings field in the database.
+	FieldSettings = "settings"
 	// FieldWatchedAt holds the string denoting the watched_at field in the database.
 	FieldWatchedAt = "watched_at"
 	// Table holds the table name of the watchhistory in the database.
@@ -34,6 +36,7 @@ var Columns = []string{
 	FieldFileID,
 	FieldPosition,
 	FieldDuration,
+	FieldSettings,
 	FieldWatchedAt,
 }
 

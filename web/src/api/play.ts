@@ -7,21 +7,42 @@ export type PlayFile = { id: string; name: string; path: string; size: number }
 
 export type PlaySource = { src: string; type: string; label: string }
 
+// Unified, extensible per-movie playback preferences. Future preferences
+// (subtitles, audio tracks, ...) are just new fields here.
+export type PlaybackSettings = {
+  rate?: number
+  quality?: string
+}
+
+export type PlaybackResume = {
+  file_id: string
+  position: number
+  duration: number
+  settings?: PlaybackSettings
+}
+
 export type Playback = {
   id: string
   file_id: string
   sources: PlaySource[]
   source: { account_id: string; directory: { id: string; name: string; path: string } }
-  resume?: { file_id: string; position: number; duration: number }
+  resume?: PlaybackResume
 }
 
 export function savePlaybackProgress(
   movieID: number,
   fileID: string,
   position: number,
-  duration: number
+  duration: number,
+  settings?: PlaybackSettings
 ) {
-  return apiPost('/api/play/progress', { movie_id: movieID, file_id: fileID, position, duration })
+  return apiPost('/api/play/progress', {
+    movie_id: movieID,
+    file_id: fileID,
+    position,
+    duration,
+    settings
+  })
 }
 
 const options = {

@@ -17,7 +17,7 @@ type PlayManager interface {
 	StartHLS(context.Context, string, string) (playback.Playback, error)
 	Stream(context.Context, string, int, string, http.Header) (*http.Response, error)
 	Release(string)
-	SaveProgress(context.Context, int, string, float64, float64) error
+	SaveProgress(context.Context, int, string, float64, float64, *domain.PlaybackSettings) error
 	History(context.Context, int) (domain.WatchHistoryPage, error)
 	RemoveHistory(context.Context, []int) (int, error)
 	ClearHistory(context.Context) (int, error)
@@ -39,15 +39,16 @@ func playQualitiesHandler(play PlayManager) gin.HandlerFunc {
 func playProgressHandler(play PlayManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		request, ok := bindJSON[struct {
-			MovieID  int     `json:"movie_id" binding:"min=1"`
-			FileID   string  `json:"file_id" binding:"required,max=128"`
-			Position float64 `json:"position" binding:"gte=0"`
-			Duration float64 `json:"duration" binding:"gt=0"`
+			MovieID  int                      `json:"movie_id" binding:"min=1"`
+			FileID   string                   `json:"file_id" binding:"required,max=128"`
+			Position float64                  `json:"position" binding:"gte=0"`
+			Duration float64                  `json:"duration" binding:"gt=0"`
+			Settings *domain.PlaybackSettings `json:"settings"`
 		}](c)
 		if !ok {
 			return
 		}
-		respond(c, nil, play.SaveProgress(c.Request.Context(), request.MovieID, request.FileID, request.Position, request.Duration))
+		respond(c, nil, play.SaveProgress(c.Request.Context(), request.MovieID, request.FileID, request.Position, request.Duration, request.Settings))
 	}
 }
 

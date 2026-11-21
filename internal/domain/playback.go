@@ -10,11 +10,21 @@ type LibraryFile struct {
 	Size int64  `json:"size"`
 }
 
-// WatchResume is the last saved playback position of a movie.
+// PlaybackSettings holds per-movie playback preferences in one extensible blob.
+// New preferences (subtitles, audio tracks, ...) become new fields here without
+// a schema change, since it is persisted as JSON on the watch-history record.
+type PlaybackSettings struct {
+	Rate    float64 `json:"rate,omitempty"`
+	Quality string  `json:"quality,omitempty"`
+}
+
+// WatchResume is the last saved playback position of a movie together with its
+// saved playback preferences, so reopening restores speed, rendition and so on.
 type WatchResume struct {
-	FileID   string  `json:"file_id"`
-	Position float64 `json:"position"`
-	Duration float64 `json:"duration"`
+	FileID   string            `json:"file_id"`
+	Position float64           `json:"position"`
+	Duration float64           `json:"duration"`
+	Settings *PlaybackSettings `json:"settings,omitempty"`
 }
 
 type WatchHistoryItem struct {

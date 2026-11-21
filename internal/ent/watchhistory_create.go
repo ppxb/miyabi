@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"time"
@@ -67,6 +68,12 @@ func (_c *WatchHistoryCreate) SetNillableDuration(v *float64) *WatchHistoryCreat
 	if v != nil {
 		_c.SetDuration(*v)
 	}
+	return _c
+}
+
+// SetSettings sets the "settings" field.
+func (_c *WatchHistoryCreate) SetSettings(v jsontext.Value) *WatchHistoryCreate {
+	_c.mutation.SetSettings(v)
 	return _c
 }
 
@@ -202,6 +209,10 @@ func (_c *WatchHistoryCreate) createSpec() (*WatchHistory, *sqlgraph.CreateSpec)
 		_spec.SetField(watchhistory.FieldDuration, field.TypeFloat64, value)
 		_node.Duration = value
 	}
+	if value, ok := _c.mutation.Settings(); ok {
+		_spec.SetField(watchhistory.FieldSettings, field.TypeJSON, value)
+		_node.Settings = value
+	}
 	if value, ok := _c.mutation.WatchedAt(); ok {
 		_spec.SetField(watchhistory.FieldWatchedAt, field.TypeTime, value)
 		_node.WatchedAt = value
@@ -321,6 +332,24 @@ func (u *WatchHistoryUpsert) UpdateDuration() *WatchHistoryUpsert {
 // AddDuration adds v to the "duration" field.
 func (u *WatchHistoryUpsert) AddDuration(v float64) *WatchHistoryUpsert {
 	u.Add(watchhistory.FieldDuration, v)
+	return u
+}
+
+// SetSettings sets the "settings" field.
+func (u *WatchHistoryUpsert) SetSettings(v jsontext.Value) *WatchHistoryUpsert {
+	u.Set(watchhistory.FieldSettings, v)
+	return u
+}
+
+// UpdateSettings sets the "settings" field to the value that was provided on create.
+func (u *WatchHistoryUpsert) UpdateSettings() *WatchHistoryUpsert {
+	u.SetExcluded(watchhistory.FieldSettings)
+	return u
+}
+
+// ClearSettings clears the value of the "settings" field.
+func (u *WatchHistoryUpsert) ClearSettings() *WatchHistoryUpsert {
+	u.SetNull(watchhistory.FieldSettings)
 	return u
 }
 
@@ -450,6 +479,27 @@ func (u *WatchHistoryUpsertOne) AddDuration(v float64) *WatchHistoryUpsertOne {
 func (u *WatchHistoryUpsertOne) UpdateDuration() *WatchHistoryUpsertOne {
 	return u.Update(func(s *WatchHistoryUpsert) {
 		s.UpdateDuration()
+	})
+}
+
+// SetSettings sets the "settings" field.
+func (u *WatchHistoryUpsertOne) SetSettings(v jsontext.Value) *WatchHistoryUpsertOne {
+	return u.Update(func(s *WatchHistoryUpsert) {
+		s.SetSettings(v)
+	})
+}
+
+// UpdateSettings sets the "settings" field to the value that was provided on create.
+func (u *WatchHistoryUpsertOne) UpdateSettings() *WatchHistoryUpsertOne {
+	return u.Update(func(s *WatchHistoryUpsert) {
+		s.UpdateSettings()
+	})
+}
+
+// ClearSettings clears the value of the "settings" field.
+func (u *WatchHistoryUpsertOne) ClearSettings() *WatchHistoryUpsertOne {
+	return u.Update(func(s *WatchHistoryUpsert) {
+		s.ClearSettings()
 	})
 }
 
@@ -745,6 +795,27 @@ func (u *WatchHistoryUpsertBulk) AddDuration(v float64) *WatchHistoryUpsertBulk 
 func (u *WatchHistoryUpsertBulk) UpdateDuration() *WatchHistoryUpsertBulk {
 	return u.Update(func(s *WatchHistoryUpsert) {
 		s.UpdateDuration()
+	})
+}
+
+// SetSettings sets the "settings" field.
+func (u *WatchHistoryUpsertBulk) SetSettings(v jsontext.Value) *WatchHistoryUpsertBulk {
+	return u.Update(func(s *WatchHistoryUpsert) {
+		s.SetSettings(v)
+	})
+}
+
+// UpdateSettings sets the "settings" field to the value that was provided on create.
+func (u *WatchHistoryUpsertBulk) UpdateSettings() *WatchHistoryUpsertBulk {
+	return u.Update(func(s *WatchHistoryUpsert) {
+		s.UpdateSettings()
+	})
+}
+
+// ClearSettings clears the value of the "settings" field.
+func (u *WatchHistoryUpsertBulk) ClearSettings() *WatchHistoryUpsertBulk {
+	return u.Update(func(s *WatchHistoryUpsert) {
+		s.ClearSettings()
 	})
 }
 

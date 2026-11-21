@@ -561,7 +561,7 @@ func init() {
 	// watchhistory.DefaultDuration holds the default value on creation for the duration field.
 	watchhistory.DefaultDuration = watchhistoryDescDuration.Default.(float64)
 	// watchhistoryDescWatchedAt is the schema descriptor for watched_at field.
-	watchhistoryDescWatchedAt := watchhistoryFields[4].Descriptor()
+	watchhistoryDescWatchedAt := watchhistoryFields[5].Descriptor()
 	// watchhistory.DefaultWatchedAt holds the default value on creation for the watched_at field.
 	watchhistory.DefaultWatchedAt = watchhistoryDescWatchedAt.Default.(func() time.Time)
 }

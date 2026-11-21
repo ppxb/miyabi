@@ -3,6 +3,8 @@
 package ent
 
 import (
+	"encoding/json"
+	"encoding/json/jsontext"
 	"fmt"
 	"strings"
 	"time"
@@ -25,6 +27,8 @@ type WatchHistory struct {
 	Position float64 `json:"position,omitempty"`
 	// Duration holds the value of the "duration" field.
 	Duration float64 `json:"duration,omitempty"`
+	// Settings holds the value of the "settings" field.
+	Settings jsontext.Value `json:"settings,omitempty"`
 	// WatchedAt holds the value of the "watched_at" field.
 	WatchedAt    time.Time `json:"watched_at,omitempty"`
 	selectValues sql.SelectValues
@@ -35,6 +39,8 @@ func (*WatchHistory) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case watchhistory.FieldSettings:
+			values[i] = new([]byte)
 		case watchhistory.FieldPosition, watchhistory.FieldDuration:
 			values[i] = new(sql.NullFloat64)
 		case watchhistory.FieldID, watchhistory.FieldMovieID:
@@ -87,6 +93,14 @@ func (_m *WatchHistory) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field duration", values[i])
 			} else if value.Valid {
 				_m.Duration = value.Float64
+			}
+		case watchhistory.FieldSettings:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field settings", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.Settings); err != nil {
+					return fmt.Errorf("unmarshal field settings: %w", err)
+				}
 			}
 		case watchhistory.FieldWatchedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -141,6 +155,9 @@ func (_m *WatchHistory) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("duration=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Duration))
+	builder.WriteString(", ")
+	builder.WriteString("settings=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Settings))
 	builder.WriteString(", ")
 	builder.WriteString("watched_at=")
 	builder.WriteString(_m.WatchedAt.Format(time.ANSIC))

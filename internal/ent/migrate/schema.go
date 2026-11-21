@@ -491,6 +491,7 @@ var (
 		{Name: "file_id", Type: field.TypeString, Default: ""},
 		{Name: "position", Type: field.TypeFloat64, Default: 0},
 		{Name: "duration", Type: field.TypeFloat64, Default: 0},
+		{Name: "settings", Type: field.TypeJSON, Nullable: true},
 		{Name: "watched_at", Type: field.TypeTime},
 	}
 	// WatchHistoriesTable holds the schema information for the "watch_histories" table.
@@ -502,7 +503,7 @@ var (
 			{
 				Name:    "watchhistory_watched_at_id",
 				Unique:  false,
-				Columns: []*schema.Column{WatchHistoriesColumns[5], WatchHistoriesColumns[0]},
+				Columns: []*schema.Column{WatchHistoriesColumns[6], WatchHistoriesColumns[0]},
 			},
 		},
 	}

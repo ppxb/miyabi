@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ppxb/miyabi/internal/database"
+	"github.com/ppxb/miyabi/internal/domain"
 )
 
 func TestWatchHistorySaveResumeAndClear(t *testing.T) {
@@ -23,20 +24,33 @@ func TestWatchHistorySaveResumeAndClear(t *testing.T) {
 	if resume, err := service.Resume(ctx, film.ID); err != nil || resume != nil {
 		t.Fatalf("initial resume = %+v, %v", resume, err)
 	}
-	if err := service.SaveProgress(ctx, film.ID, "f1", 120, 3600); err != nil {
+	if err := service.SaveProgress(ctx, film.ID, "f1", 120, 3600, &domain.PlaybackSettings{Rate: 2, Quality: "1080p"}); err != nil {
 		t.Fatal(err)
 	}
 	resume, err := service.Resume(ctx, film.ID)
-	if err != nil || resume == nil || resume.FileID != "f1" || resume.Position != 120 || resume.Duration != 3600 {
+	if err != nil || resume == nil || resume.FileID != "f1" || resume.Position != 120 || resume.Duration != 3600 ||
+		resume.Settings == nil || resume.Settings.Rate != 2 || resume.Settings.Quality != "1080p" {
 		t.Fatalf("resume = %+v, %v", resume, err)
 	}
-	// Position is clamped to duration.
-	if err := service.SaveProgress(ctx, film.ID, "f1", 4000, 3600); err != nil {
+	// Position is clamped to duration; a partial settings update (rate only)
+	// must not clear the previously saved rendition.
+	if err := service.SaveProgress(ctx, film.ID, "f1", 4000, 3600, &domain.PlaybackSettings{Rate: 1}); err != nil {
 		t.Fatal(err)
 	}
 	resume, _ = service.Resume(ctx, film.ID)
 	if resume == nil || resume.Position != 3600 {
 		t.Fatalf("clamped resume = %+v", resume)
+	}
+	if resume.Settings == nil || resume.Settings.Rate != 1 || resume.Settings.Quality != "1080p" {
+		t.Fatalf("partial update should merge, got %+v", resume.Settings)
+	}
+	// A nil settings save keeps the stored preferences untouched.
+	if err := service.SaveProgress(ctx, film.ID, "f1", 4000, 3600, nil); err != nil {
+		t.Fatal(err)
+	}
+	resume, _ = service.Resume(ctx, film.ID)
+	if resume == nil || resume.Settings == nil || resume.Settings.Rate != 1 || resume.Settings.Quality != "1080p" {
+		t.Fatalf("nil settings should preserve, got %+v", resume.Settings)
 	}
 
 	page, err := service.History(ctx, 1)

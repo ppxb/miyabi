@@ -14797,21 +14797,23 @@ func (m *ViewedMovieMutation) ResetEdge(name string) error {
 // WatchHistoryMutation represents an operation that mutates the WatchHistory nodes in the graph.
 type WatchHistoryMutation struct {
 	config
-	op            Op
-	typ           string
-	id            *int
-	movie_id      *int
-	addmovie_id   *int
-	file_id       *string
-	position      *float64
-	addposition   *float64
-	duration      *float64
-	addduration   *float64
-	watched_at    *time.Time
-	clearedFields map[string]struct{}
-	done          bool
-	oldValue      func(context.Context) (*WatchHistory, error)
-	predicates    []predicate.WatchHistory
+	op             Op
+	typ            string
+	id             *int
+	movie_id       *int
+	addmovie_id    *int
+	file_id        *string
+	position       *float64
+	addposition    *float64
+	duration       *float64
+	addduration    *float64
+	settings       *jsontext.Value
+	appendsettings jsontext.Value
+	watched_at     *time.Time
+	clearedFields  map[string]struct{}
+	done           bool
+	oldValue       func(context.Context) (*WatchHistory, error)
+	predicates     []predicate.WatchHistory
 }
 
 var _ ent.Mutation = (*WatchHistoryMutation)(nil)
@@ -15116,6 +15118,71 @@ func (m *WatchHistoryMutation) ResetDuration() {
 	m.addduration = nil
 }
 
+// SetSettings sets the "settings" field.
+func (m *WatchHistoryMutation) SetSettings(j jsontext.Value) {
+	m.settings = &j
+	m.appendsettings = nil
+}
+
+// Settings returns the value of the "settings" field in the mutation.
+func (m *WatchHistoryMutation) Settings() (r jsontext.Value, exists bool) {
+	v := m.settings
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSettings returns the old "settings" field's value of the WatchHistory entity.
+// If the WatchHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WatchHistoryMutation) OldSettings(ctx context.Context) (v jsontext.Value, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSettings is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSettings requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSettings: %w", err)
+	}
+	return oldValue.Settings, nil
+}
+
+// AppendSettings adds j to the "settings" field.
+func (m *WatchHistoryMutation) AppendSettings(j jsontext.Value) {
+	m.appendsettings = append(m.appendsettings, j...)
+}
+
+// AppendedSettings returns the list of values that were appended to the "settings" field in this mutation.
+func (m *WatchHistoryMutation) AppendedSettings() (jsontext.Value, bool) {
+	if len(m.appendsettings) == 0 {
+		return nil, false
+	}
+	return m.appendsettings, true
+}
+
+// ClearSettings clears the value of the "settings" field.
+func (m *WatchHistoryMutation) ClearSettings() {
+	m.settings = nil
+	m.appendsettings = nil
+	m.clearedFields[watchhistory.FieldSettings] = struct{}{}
+}
+
+// SettingsCleared returns if the "settings" field was cleared in this mutation.
+func (m *WatchHistoryMutation) SettingsCleared() bool {
+	_, ok := m.clearedFields[watchhistory.FieldSettings]
+	return ok
+}
+
+// ResetSettings resets all changes to the "settings" field.
+func (m *WatchHistoryMutation) ResetSettings() {
+	m.settings = nil
+	m.appendsettings = nil
+	delete(m.clearedFields, watchhistory.FieldSettings)
+}
+
 // SetWatchedAt sets the "watched_at" field.
 func (m *WatchHistoryMutation) SetWatchedAt(t time.Time) {
 	m.watched_at = &t
@@ -15186,7 +15253,7 @@ func (m *WatchHistoryMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *WatchHistoryMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.movie_id != nil {
 		fields = append(fields, watchhistory.FieldMovieID)
 	}
@@ -15198,6 +15265,9 @@ func (m *WatchHistoryMutation) Fields() []string {
 	}
 	if m.duration != nil {
 		fields = append(fields, watchhistory.FieldDuration)
+	}
+	if m.settings != nil {
+		fields = append(fields, watchhistory.FieldSettings)
 	}
 	if m.watched_at != nil {
 		fields = append(fields, watchhistory.FieldWatchedAt)
@@ -15218,6 +15288,8 @@ func (m *WatchHistoryMutation) Field(name string) (ent.Value, bool) {
 		return m.Position()
 	case watchhistory.FieldDuration:
 		return m.Duration()
+	case watchhistory.FieldSettings:
+		return m.Settings()
 	case watchhistory.FieldWatchedAt:
 		return m.WatchedAt()
 	}
@@ -15237,6 +15309,8 @@ func (m *WatchHistoryMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldPosition(ctx)
 	case watchhistory.FieldDuration:
 		return m.OldDuration(ctx)
+	case watchhistory.FieldSettings:
+		return m.OldSettings(ctx)
 	case watchhistory.FieldWatchedAt:
 		return m.OldWatchedAt(ctx)
 	}
@@ -15275,6 +15349,13 @@ func (m *WatchHistoryMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetDuration(v)
+		return nil
+	case watchhistory.FieldSettings:
+		v, ok := value.(jsontext.Value)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSettings(v)
 		return nil
 	case watchhistory.FieldWatchedAt:
 		v, ok := value.(time.Time)
@@ -15351,7 +15432,11 @@ func (m *WatchHistoryMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *WatchHistoryMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(watchhistory.FieldSettings) {
+		fields = append(fields, watchhistory.FieldSettings)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -15364,6 +15449,11 @@ func (m *WatchHistoryMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *WatchHistoryMutation) ClearField(name string) error {
+	switch name {
+	case watchhistory.FieldSettings:
+		m.ClearSettings()
+		return nil
+	}
 	return fmt.Errorf("unknown WatchHistory nullable field %s", name)
 }
 
@@ -15382,6 +15472,9 @@ func (m *WatchHistoryMutation) ResetField(name string) error {
 		return nil
 	case watchhistory.FieldDuration:
 		m.ResetDuration()
+		return nil
+	case watchhistory.FieldSettings:
+		m.ResetSettings()
 		return nil
 	case watchhistory.FieldWatchedAt:
 		m.ResetWatchedAt()
