@@ -57,6 +57,28 @@ export function batchFingerprint(task: BatchTask): string {
   return `${task.status}|${task.progress}|${task.error ?? ''}|${task.batch.processed}|${task.batch.failed}|${task.updated_at}|${!!task.can_retry}`
 }
 
+/** Whether a changed entry should raise a toast (active or terminal transition). */
+function shouldNotify({
+  active,
+  old,
+  id,
+  dismissed,
+  announced,
+  initialized,
+  extra = false
+}: {
+  active: boolean
+  old?: NotificationEntry
+  id: string
+  dismissed: Set<string>
+  announced: Set<string>
+  initialized: boolean
+  extra?: boolean
+}) {
+  if (active) return !dismissed.has(id)
+  return !!old?.active || extra || announced.has(id) || (!old && initialized)
+}
+
 export function diffTaskNotifications(ctx: DiffContext): DiffResult {
   const actions: NotificationAction[] = []
   const dismissIDs: string[] = []
@@ -79,15 +101,19 @@ export function diffTaskNotifications(ctx: DiffContext): DiffResult {
     nextEntries.set(id, entry)
 
     const old = ctx.previous.get(id)
-    if (old?.fingerprint !== fp) {
+    if (
+      old?.fingerprint !== fp &&
+      shouldNotify({
+        active,
+        old,
+        id,
+        dismissed: ctx.dismissed,
+        announced: ctx.announced,
+        initialized: ctx.initialized
+      })
+    ) {
       // A retry may finish between polls; refresh its visible terminal result too.
-      if (
-        active
-          ? !ctx.dismissed.has(id)
-          : old?.active || ctx.announced.has(id) || (!old && ctx.initialized)
-      ) {
-        actions.push({ type: 'notify_scan', id, task, waiting: waitingForScan })
-      }
+      actions.push({ type: 'notify_scan', id, task, waiting: waitingForScan })
     }
   }
 
@@ -99,14 +125,18 @@ export function diffTaskNotifications(ctx: DiffContext): DiffResult {
     nextEntries.set(id, entry)
 
     const old = ctx.previous.get(id)
-    if (old?.fingerprint !== fp) {
-      if (
-        active
-          ? !ctx.dismissed.has(id)
-          : old?.active || ctx.announced.has(id) || (!old && ctx.initialized)
-      ) {
-        actions.push({ type: 'notify_batch', id, task, waiting: waitingForScan })
-      }
+    if (
+      old?.fingerprint !== fp &&
+      shouldNotify({
+        active,
+        old,
+        id,
+        dismissed: ctx.dismissed,
+        announced: ctx.announced,
+        initialized: ctx.initialized
+      })
+    ) {
+      actions.push({ type: 'notify_batch', id, task, waiting: waitingForScan })
     }
   }
 
@@ -127,17 +157,19 @@ export function diffTaskNotifications(ctx: DiffContext): DiffResult {
     nextEntries.set(id, entry)
 
     const old = ctx.previous.get(id)
-    if (old?.fingerprint !== fp) {
-      if (
-        active
-          ? !ctx.dismissed.has(id)
-          : old?.active ||
-            (old && retryable && !old.retryable) ||
-            ctx.announced.has(id) ||
-            (!old && ctx.initialized)
-      ) {
-        actions.push({ type: 'notify_offline', id, task, scan, waiting: waitingForOffline })
-      }
+    if (
+      old?.fingerprint !== fp &&
+      shouldNotify({
+        active,
+        old,
+        id,
+        dismissed: ctx.dismissed,
+        announced: ctx.announced,
+        initialized: ctx.initialized,
+        extra: !!(old && retryable && !old.retryable)
+      })
+    ) {
+      actions.push({ type: 'notify_offline', id, task, scan, waiting: waitingForOffline })
     }
 
     if (!active && task.phase !== 'in_library' && old?.inLibrary) {
