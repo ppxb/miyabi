@@ -7,8 +7,8 @@ import { Switch } from '@/components/ui/switch'
 import { SettingRow, SettingsSection } from './shared'
 
 const descriptions: Record<string, string> = {
-  sukebei: 'Nyaa Sukebei 种子站，按番号搜索磁力（需代理）',
-  projectjav: 'ProjectJav 种子站，搜索结果页内嵌磁力链接（需代理）'
+  sukebei: 'Nyaa Sukebei 种子站',
+  projectjav: 'ProjectJav 种子站'
 }
 
 export function MagnetSourcesSection() {
@@ -21,7 +21,7 @@ export function MagnetSourcesSection() {
     <SettingsSection
       icon={<MagnetIcon className="size-4" />}
       title="磁力链来源"
-      description="控制详情页聚合哪些磁力来源；关闭后该来源不再查询。注意需要开启代理。"
+      description="以下来源补充影片磁力链接（需要代理）。"
     >
       {query.isPending ? <Skeleton className="h-4 w-40" /> : null}
       {sources.map(source => (

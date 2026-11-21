@@ -1,9 +1,10 @@
-import { ChevronLeftIcon, ChevronRightIcon, FolderIcon, LoaderCircleIcon } from 'lucide-react'
+import { ChevronLeftIcon, ChevronRightIcon, FolderIcon } from 'lucide-react'
 import { useState, type ReactElement, type ReactNode } from 'react'
 
 import { usePanAccountFiles, useSelectPanAccountDirectory, type PanDirectory } from '@/api/pan'
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import {
   Dialog,
   DialogContent,
@@ -86,7 +87,7 @@ function DirectoryPicker({
           <Button
             type="button"
             variant="ghost"
-            size="icon-sm"
+            size="icon"
             disabled={location.page === 1 || files.isFetching || select.isPending}
             onClick={() => navigate(location.id, location.page - 1)}
           >
@@ -95,7 +96,7 @@ function DirectoryPicker({
           <Button
             type="button"
             variant="ghost"
-            size="icon-sm"
+            size="icon"
             disabled={
               !files.data?.has_more || files.isError || files.isFetching || select.isPending
             }
@@ -113,9 +114,9 @@ function DirectoryPicker({
           onClick={() => select.mutate(location.id, { onSuccess: onSelected })}
         >
           {select.isPending ? (
-            <LoaderCircleIcon className="size-4 animate-spin" />
+            <Spinner data-icon="inline-start" />
           ) : (
-            <FolderIcon className="size-4" />
+            <FolderIcon data-icon="inline-start" />
           )}
           {mounted ? '当前已挂载' : '挂载当前目录'}
         </Button>

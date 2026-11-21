@@ -111,7 +111,7 @@ test('rebuild control submits a full rebuild and both controls disable during pr
   const buttons = (tree: ReturnType<typeof LibraryScanButton>) => elements(tree!.props.children)
   const controls = buttons(LibraryScanButton(props))
   expect(
-    controls.map(button => elements(button.props.children as ReactNode).at(-1)?.props.children)
+    controls.map(button => Children.toArray(button.props.children as ReactNode).at(-1))
   ).toEqual(['同步媒体库', '重建媒体库'])
   ;(controls[1]!.props.onClick as () => void)()
   expect(mutate.mock.calls[0]![0]).toBe(true)

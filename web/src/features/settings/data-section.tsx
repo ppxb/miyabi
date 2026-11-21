@@ -1,7 +1,8 @@
-import { DatabaseIcon, LoaderCircleIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react'
+import { DatabaseIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
+import { describeApiError } from '@/api/client'
 import { useClearCache, useDataInfo } from '@/api/data'
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
@@ -14,8 +15,8 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Spinner } from '@/components/ui/spinner'
 import { formatSize } from '@/lib/format'
-import { cn } from 'cn'
 import { SettingRow, SettingsSection } from './shared'
 
 const numberFormat = new Intl.NumberFormat('zh-CN')
@@ -44,13 +45,8 @@ export function DataSection() {
     <SettingsSection icon={<DatabaseIcon className="size-4" />} title="数据与缓存">
       <SettingRow
         title="数据目录"
-        description={
-          info.isPending ? (
-            <Skeleton className="h-4 w-56 max-w-full" />
-          ) : (
-            (info.data?.data_directory ?? '无法读取数据目录')
-          )
-        }
+        description={info.data?.data_directory ?? '无法读取数据目录'}
+        descriptionLoading={info.isPending}
       >
         <Button
           type="button"
@@ -60,7 +56,7 @@ export function DataSection() {
           disabled={info.isFetching || clearCache.isPending}
           onClick={() => void info.refetch()}
         >
-          <RefreshCwIcon className={cn('size-4', info.isFetching && 'animate-spin')} />
+          {info.isFetching ? <Spinner /> : <RefreshCwIcon />}
         </Button>
       </SettingRow>
       <SettingRow title="数据库" description="包含媒体库索引、应用设置以及日志">
@@ -83,13 +79,16 @@ export function DataSection() {
         <Button
           type="button"
           variant="destructive"
-          size="sm"
           disabled={
             clearCache.isPending || info.isError || !cache || cache.unused_entry_count === 0
           }
           onClick={openConfirmation}
         >
-          {clearCache.isPending ? <LoaderCircleIcon className="animate-spin" /> : <Trash2Icon />}
+          {clearCache.isPending ? (
+            <Spinner data-icon="inline-start" />
+          ) : (
+            <Trash2Icon data-icon="inline-start" />
+          )}
           清理未使用缓存
         </Button>
       </SettingRow>
@@ -111,7 +110,9 @@ export function DataSection() {
               仅删除未被影片或未完成任务引用的图片。媒体库封面和 115 网盘文件会保留。
             </DialogDescription>
           </DialogHeader>
-          {clearCache.error ? <InlineError>{clearCache.error.message}</InlineError> : null}
+          {clearCache.error ? (
+            <InlineError>{describeApiError(clearCache.error)}</InlineError>
+          ) : null}
           <DialogFooter>
             <Button
               type="button"
@@ -128,9 +129,9 @@ export function DataSection() {
               onClick={clearUnusedCache}
             >
               {clearCache.isPending ? (
-                <LoaderCircleIcon className="animate-spin" />
+                <Spinner data-icon="inline-start" />
               ) : (
-                <Trash2Icon />
+                <Trash2Icon data-icon="inline-start" />
               )}
               确认清理
             </Button>

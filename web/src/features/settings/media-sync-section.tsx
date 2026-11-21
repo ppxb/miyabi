@@ -1,9 +1,10 @@
-import { LoaderCircleIcon, RefreshCwIcon, ScanSearchIcon } from 'lucide-react'
+import { RefreshCwIcon, ScanSearchIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { describeApiError } from '@/api/client'
 import { useLibraryPending, useSyncLibrary } from '@/api/library'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { LibraryScanButton } from '@/features/library/scan-button'
 import { useTaskConnection } from '@/features/tasks/task-events'
 import { useActiveScan } from '@/features/tasks/use-active-scan'
@@ -26,7 +27,6 @@ export function MediaSyncSection() {
         }
       >
         <Button
-          size="sm"
           disabled={sync.isPending}
           onClick={() =>
             sync.mutate(undefined, {
@@ -35,7 +35,11 @@ export function MediaSyncSection() {
             })
           }
         >
-          {sync.isPending ? <LoaderCircleIcon className="animate-spin" /> : <RefreshCwIcon />}
+          {sync.isPending ? (
+            <Spinner data-icon="inline-start" />
+          ) : (
+            <RefreshCwIcon data-icon="inline-start" />
+          )}
           同步新增文件
         </Button>
       </SettingRow>

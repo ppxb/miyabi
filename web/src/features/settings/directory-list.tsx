@@ -1,8 +1,9 @@
-import { ChevronRightIcon, FileIcon, FolderIcon, LoaderCircleIcon } from 'lucide-react'
+import { ChevronRightIcon, FileIcon, FolderIcon } from 'lucide-react'
 
 import type { usePanAccountFiles } from '@/api/pan'
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 
 type DirectoryListProps = {
   files: ReturnType<typeof usePanAccountFiles>
@@ -15,7 +16,7 @@ export function DirectoryList({ files, disabled = false, onNavigate }: Directory
     <div className="h-64 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border p-1">
       {files.isPending ? (
         <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
-          <LoaderCircleIcon className="size-4 animate-spin" />
+          <Spinner />
           正在读取目录…
         </div>
       ) : files.isError ? (

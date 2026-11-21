@@ -14,10 +14,7 @@ export function TasksSection() {
 
   return (
     <SettingsSection icon={<ListChecksIcon className="size-4" />} title="任务">
-      <SettingRow
-        title="媒体库进度"
-        description="查看同步与重建进度，暂停会作用于所有扫描与刮削任务并保留进度"
-      >
+      <SettingRow title="媒体库进度" description="管理同步与重建进度">
         {active ? <LibraryPauseButton paused={!!active.paused} /> : null}
       </SettingRow>
       {tasks.isPending ? <Skeleton className="h-4 w-40" /> : null}

@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2Icon, LoaderCircleIcon, QrCodeIcon, RefreshCwIcon } from 'lucide-react'
+import { CheckCircle2Icon, QrCodeIcon, RefreshCwIcon } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { toast } from 'sonner'
 
@@ -11,6 +11,7 @@ import {
   type PanLoginSession
 } from '@/api/pan'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import {
   Dialog,
   DialogContent,
@@ -136,7 +137,7 @@ function LoginContent({
     <div className="flex flex-col items-center gap-5">
       <div className="flex aspect-square w-full max-w-64 items-center justify-center overflow-hidden rounded-2xl border bg-muted">
         {pending ? (
-          <LoaderCircleIcon className="size-8 animate-spin text-muted-foreground" />
+          <Spinner className="size-8 text-muted-foreground" />
         ) : showQR ? (
           <img
             src={session.qr_code}

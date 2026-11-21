@@ -25,7 +25,7 @@ export function LibraryScanButton({
   const startScan = useStartLibraryScan()
   const notifyScan = useNotifyScanTask()
   // Keep the mutation observer mounted while pagination replaces the visible control.
-  if (loading) return <Skeleton className="h-8 w-20 rounded-lg sm:w-60" />
+  if (loading) return <Skeleton className="h-8 w-60 rounded-lg" />
   if (!available) return null
 
   return (
@@ -40,7 +40,6 @@ export function LibraryScanButton({
           <Button
             key={String(rebuild)}
             variant={rebuild ? 'outline' : 'default'}
-            className="w-9 px-0 sm:w-auto sm:px-3"
             disabled={scanning || startScan.isPending}
             onClick={() =>
               startScan.mutate(rebuild, {
@@ -58,12 +57,14 @@ export function LibraryScanButton({
               })
             }
           >
-            {busy ? <Spinner /> : rebuild ? (
-              <RotateCcwIcon className="size-4" />
+            {busy ? (
+              <Spinner data-icon="inline-start" />
+            ) : rebuild ? (
+              <RotateCcwIcon data-icon="inline-start" />
             ) : (
-              <ScanLineIcon className="size-4" />
+              <ScanLineIcon data-icon="inline-start" />
             )}
-            <span className="hidden sm:inline">{label}</span>
+            {label}
           </Button>
         )
       })}

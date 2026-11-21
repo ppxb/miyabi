@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { GlobeIcon } from 'lucide-react'
+import { GlobeIcon, SaveIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { describeApiError } from '@/api/client'
@@ -125,11 +125,12 @@ function NetworkForm({ config, onSaved }: { config: NetworkConfig; onSaved: () =
           </SettingRow>
 
           <SettingsActions>
-            <Button type="button" size="sm" disabled={disabled || !isDirty} onClick={handleSave}>
-              <Spinner
-                data-icon="inline-start"
-                className={updateConfig.isPending ? undefined : 'invisible'}
-              />
+            <Button type="button" disabled={disabled || !isDirty} onClick={handleSave}>
+              {updateConfig.isPending ? (
+                <Spinner data-icon="inline-start" />
+              ) : (
+                <SaveIcon data-icon="inline-start" />
+              )}
               保存
             </Button>
           </SettingsActions>

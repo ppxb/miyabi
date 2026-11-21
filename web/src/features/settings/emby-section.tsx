@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { RefreshCwIcon, TvMinimalIcon } from 'lucide-react'
+import { RefreshCwIcon, SaveIcon, TvMinimalIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { describeApiError } from '@/api/client'
@@ -164,11 +164,7 @@ function EmbyForm({ config, onSaved }: { config: EmbyConfig; onSaved: () => void
 
   return (
     <>
-      <SettingRow
-        title="启用 Emby"
-        description="媒体扫描与刮削完成后，主动通知 Emby 增量刷新"
-        inline
-      >
+      <SettingRow title="启用 Emby" description="连接和管理 Emby" inline>
         <Switch checked={form.enabled} disabled={disabled} onCheckedChange={handleToggle} />
       </SettingRow>
 
@@ -234,18 +230,22 @@ function EmbyForm({ config, onSaved }: { config: EmbyConfig; onSaved: () => void
             <Button
               type="button"
               variant="outline"
-              size="sm"
               disabled={disabled || testConfig.isPending}
               onClick={handleTest}
             >
-              <RefreshCwIcon className={testConfig.isPending ? 'animate-spin' : undefined} />
+              {testConfig.isPending ? (
+                <Spinner data-icon="inline-start" />
+              ) : (
+                <RefreshCwIcon data-icon="inline-start" />
+              )}
               测试连接
             </Button>
-            <Button type="button" size="sm" disabled={disabled || !isDirty} onClick={handleSave}>
-              <Spinner
-                data-icon="inline-start"
-                className={updateConfig.isPending ? undefined : 'invisible'}
-              />
+            <Button type="button" disabled={disabled || !isDirty} onClick={handleSave}>
+              {updateConfig.isPending ? (
+                <Spinner data-icon="inline-start" />
+              ) : (
+                <SaveIcon data-icon="inline-start" />
+              )}
               保存
             </Button>
           </SettingsActions>

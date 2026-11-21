@@ -8,6 +8,7 @@ import {
   FieldGroup,
   FieldTitle
 } from '@/components/ui/field'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from 'cn'
 
 export function SettingsCard({ children }: { children: ReactNode }) {
@@ -47,12 +48,16 @@ export function SettingRow({
   title,
   description,
   children,
-  inline = false
+  inline = false,
+  descriptionLoading = false
 }: {
   title: string
   description: ReactNode
   children: ReactNode
   inline?: boolean
+  /** Show a skeleton instead of the description (it renders in a <p>, so a
+   * block Skeleton can't be passed as the description itself). */
+  descriptionLoading?: boolean
 }) {
   return (
     <Field
@@ -61,7 +66,11 @@ export function SettingRow({
     >
       <FieldContent>
         <FieldTitle>{title}</FieldTitle>
-        <FieldDescription className="wrap-break-word">{description}</FieldDescription>
+        {descriptionLoading ? (
+          <Skeleton className="h-4 w-56 max-w-full" />
+        ) : (
+          <FieldDescription className="wrap-break-word">{description}</FieldDescription>
+        )}
       </FieldContent>
       <div className="max-w-full shrink-0">{children}</div>
     </Field>
