@@ -108,10 +108,11 @@ func errorMiddleware(logger *slog.Logger) gin.HandlerFunc {
 
 		status, _ := mapErrorStatus(err)
 		message := domain.PublicMessage(err)
-		if status == http.StatusNotFound && ent.IsNotFound(err) {
-			// ent.NotFound has no domain kind, so PublicMessage would expose the
-			// generic internal text; use the canonical NotFound message instead.
-			message = domain.PublicMessage(domain.E(domain.KindNotFound, "", nil))
+		if domain.KindOf(err) == domain.KindUnexpected && ent.IsNotFound(err) {
+			// A bare ent.NotFound has no domain kind, so PublicMessage would expose
+			// the generic internal text; use the canonical NotFound message instead.
+			// Domain-classified NotFound errors keep their own custom message.
+			message = "资源不存在"
 		}
 
 		body := gin.H{"error": message}

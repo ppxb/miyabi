@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
+	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/javdb"
 	"github.com/ppxb/miyabi/internal/maintenance"
 	"github.com/ppxb/miyabi/internal/netx"
@@ -60,6 +61,8 @@ func TestErrorMiddlewareMapsDomainErrorsToStatusAndMessage(t *testing.T) {
 		{name: "invalid proxy", err: proxyValidationError(), status: http.StatusBadRequest, message: "代理配置无效: 代理地址必须包含协议（如 http://）与主机地址"},
 		{name: "cache busy", err: maintenance.ErrCacheBusy, status: http.StatusConflict, message: maintenance.ErrCacheBusy.PublicMessage()},
 		{name: "file missing", err: fmt.Errorf("影片文件不存在，请重新扫描: %w", fs.ErrNotExist), status: http.StatusNotFound, message: "影片文件不存在，请重新扫描: file does not exist"},
+		{name: "custom not found message preserved", err: domain.E(domain.KindNotFound, "影片不在当前媒体库中", &ent.NotFoundError{}), status: http.StatusNotFound, message: "影片不在当前媒体库中"},
+		{name: "bare ent not found uses canonical message", err: fmt.Errorf("load movie: %w", &ent.NotFoundError{}), status: http.StatusNotFound, message: "资源不存在"},
 		{name: "pan unauthorized", err: fmt.Errorf("list: %w", pan.ErrUnauthorized), status: http.StatusUnauthorized, message: pan.ErrUnauthorized.PublicMessage(), code: "PAN_UNAUTHORIZED"},
 		{name: "source changed", err: fmt.Errorf("submit: %w", drive.ErrSourceChanged), status: http.StatusConflict, message: drive.ErrSourceChanged.PublicMessage(), code: "PAN_SOURCE_CHANGED"},
 		{name: "access password", err: ErrAccessPassword, status: http.StatusUnauthorized, message: ErrAccessPassword.PublicMessage()},
