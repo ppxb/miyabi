@@ -63,15 +63,16 @@ function MovieStats({
   if (movie.duration > 0) {
     stats.push({ label: '片长', value: `${movie.duration} 分钟`, icon: ClockIcon })
   }
-  if (movie.rating > 0) {
-    stats.push({
-      label: '评分',
-      value: movie.rating_max
-        ? `${movie.rating.toFixed(1)} / ${movie.rating_max}`
-        : movie.rating.toFixed(1),
-      icon: StarIcon
-    })
-  }
+  stats.push({
+    label: '评分',
+    value:
+      movie.rating > 0
+        ? movie.rating_max
+          ? `${movie.rating.toFixed(1)} / ${movie.rating_max}`
+          : movie.rating.toFixed(1)
+        : '暂无评分',
+    icon: StarIcon
+  })
   if (stats.length === 0) return null
 
   return <StatList stats={stats} />
