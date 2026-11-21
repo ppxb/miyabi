@@ -15,7 +15,6 @@ import (
 
 	http "github.com/bogdanfinn/fhttp"
 	"github.com/ppxb/miyabi/internal/domain"
-	"github.com/ppxb/miyabi/internal/magnet"
 	"github.com/ppxb/miyabi/internal/netx"
 )
 
@@ -188,15 +187,13 @@ func TestClientContextErrorsDoNotDisableSource(t *testing.T) {
 						t.Fatal(err)
 					}
 					defer client.Close()
-					// Exercise production availability handling without background probes.
-					client.isTest = false
 					_, err = client.Find(ctx, domain.MovieRef{Code: "SSIS-001"})
 					want := context.DeadlineExceeded
 					if canceled {
 						want = context.Canceled
 					}
-					if err != want || !client.Available() || mock.getCallCount(requestPath) != 1 {
-						t.Fatalf("err=%v available=%t calls=%d", err, client.Available(), mock.getCallCount(requestPath))
+					if err != want || mock.getCallCount(requestPath) != 1 {
+						t.Fatalf("err=%v calls=%d", err, mock.getCallCount(requestPath))
 					}
 				})
 			})
@@ -366,30 +363,7 @@ func TestClient_AvailabilityAndSkipping(t *testing.T) {
 	}
 	defer client.Close()
 
-	if !client.Available() {
-		t.Fatal("expected testClient to start as available")
-	}
-
-	// Flip available to false; Find must return magnet.ErrSkipped with 0 calls made.
-	client.setAvailable(false)
-	if client.Available() {
-		t.Fatal("expected Available() to be false")
-	}
-
-	magnets, err := client.Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
-	if !errors.Is(err, magnet.ErrSkipped) {
-		t.Fatalf("expected ErrSkipped when unavailable, got %v", err)
-	}
-	if len(magnets) != 0 {
-		t.Fatalf("expected nil magnets, got %d", len(magnets))
-	}
-	if len(mock.calls) != 0 {
-		t.Fatalf("expected zero HTTP requests when skipped, got %v", mock.calls)
-	}
-
-	// Restore availability; requests proceed.
-	client.setAvailable(true)
-	if !client.Available() {
-		t.Fatal("expected Available() to be true")
-	}
+	// JavBus is an ordinary magnet source: requests always proceed, failures are
+	// reported as upstream errors (aggregator marks the result partial).
+	_, _ = client.Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
 }

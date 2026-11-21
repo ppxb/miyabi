@@ -182,24 +182,16 @@ func (c *Client) proxyURL() *url.URL {
 // watchProxy rebuilds the active transport whenever the proxy changes and
 // re-measures candidates through the new proxy.
 func (c *Client) watchProxy() {
-	for {
-		select {
-		case <-c.routeContext.Done():
+	c.fingerprint.Watch(c.routeContext.Done(), func() {
+		state, err := c.reinstall()
+		if err != nil {
+			slog.WarnContext(c.routeContext, "JavDB transport keeps previous proxy after change", "error", err)
 			return
-		case _, ok := <-c.fingerprint.Changes():
-			if !ok {
-				return
-			}
-			state, err := c.reinstall()
-			if err != nil {
-				slog.WarnContext(c.routeContext, "JavDB transport keeps previous proxy after change", "error", err)
-				continue
-			}
-			if state != nil {
-				go func() { _, _ = c.reselect(c.routeContext) }()
-			}
 		}
-	}
+		if state != nil {
+			go func() { _, _ = c.reselect(c.routeContext) }()
+		}
+	})
 }
 
 // reinstall refreshes the shared fingerprint client and publishes a new route

@@ -85,23 +85,9 @@ func (*Client) Name() string { return domain.MagnetSourceSukebei }
 
 // watchProxy rebuilds the transport when the proxy changes.
 func (c *Client) watchProxy(fingerprint *netx.ProxiedFingerprintClient) {
-	changes := fingerprint.Changes()
-	if changes == nil {
-		return
-	}
-	for {
-		select {
-		case <-c.done:
-			return
-		case _, ok := <-changes:
-			if !ok {
-				return
-			}
-			if err := fingerprint.Refresh(); err != nil {
-				continue
-			}
-		}
-	}
+	fingerprint.Watch(c.done, func() {
+		_ = fingerprint.Refresh()
+	})
 }
 
 // Find returns the Sukebei magnets whose title carries the requested code.

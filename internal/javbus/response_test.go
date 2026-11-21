@@ -67,10 +67,8 @@ func TestClientResponseSemantics(t *testing.T) {
 				}
 				mock.handlers["/SSIS-001"] = handler
 				mock.handlers["/ajax/uncledatoolsbyajax.php"] = handler
-				client := NewForTest(true, mock)
+				client := NewForTest(mock)
 				defer client.Close()
-				// Use production availability handling without background probes.
-				client.isTest = false
 				var err error
 				wantErr := tc.detailErr
 				if stage == "detail" {
@@ -89,9 +87,6 @@ func TestClientResponseSemantics(t *testing.T) {
 					}
 				} else if err == nil || err.Error() != wantErr || !domain.IsKind(err, domain.KindUpstream) {
 					t.Errorf("error = %v, want upstream error %q", err, wantErr)
-				}
-				if wantAvailable := wantErr != challengeErr; client.Available() != wantAvailable {
-					t.Errorf("available = %t, want %t", client.Available(), wantAvailable)
 				}
 				if !body.closed {
 					t.Error("response body was not closed")
@@ -113,7 +108,7 @@ func TestClientResponseReadLimit(t *testing.T) {
 			}
 			mock.handlers["/SSIS-001"] = handler
 			mock.handlers["/ajax/uncledatoolsbyajax.php"] = handler
-			client := NewForTest(true, mock)
+			client := NewForTest(mock)
 			defer client.Close()
 			var err error
 			if stage == "detail" {
@@ -147,9 +142,8 @@ func TestClientRequestAndReadErrors(t *testing.T) {
 				}
 				mock.handlers["/SSIS-001"] = handler
 				mock.handlers["/ajax/uncledatoolsbyajax.php"] = handler
-				client := NewForTest(true, mock)
+				client := NewForTest(mock)
 				defer client.Close()
-				client.isTest = false
 				var err error
 				if stage == "detail" {
 					_, err = client.MoviePage(t.Context(), "SSIS-001")
@@ -163,8 +157,8 @@ func TestClientRequestAndReadErrors(t *testing.T) {
 				if !errors.Is(err, cause) || !domain.IsKind(err, domain.KindUpstream) || domain.PublicMessage(err) != wantMessage {
 					t.Errorf("error = %v, want upstream error %q wrapping cause", err, wantMessage)
 				}
-				if client.Available() != (failure == "read") || body.closed != (failure == "read") {
-					t.Errorf("available = %t, closed = %t", client.Available(), body.closed)
+				if body.closed != (failure == "read") {
+					t.Errorf("closed = %t", body.closed)
 				}
 			})
 		}
@@ -174,7 +168,7 @@ func TestClientRequestAndReadErrors(t *testing.T) {
 func TestClientSharedRequestLimit(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		mock := newMockHTTPClient()
-		client := NewForTest(true, mock)
+		client := NewForTest(mock)
 		defer client.Close()
 		client.limiter = rate.NewLimiter(1, 1)
 		start := time.Now()
@@ -190,8 +184,8 @@ func TestClientSharedRequestLimit(t *testing.T) {
 			cancel()
 		}()
 		_, err := client.MoviePage(ctx, "SSIS-001")
-		if !errors.Is(err, context.Canceled) || mock.getCallCount("/SSIS-001") != 1 || !client.Available() {
-			t.Fatalf("error = %v, detail calls = %d, available = %t", err, mock.getCallCount("/SSIS-001"), client.Available())
+		if !errors.Is(err, context.Canceled) || mock.getCallCount("/SSIS-001") != 1 {
+			t.Fatalf("error = %v, detail calls = %d", err, mock.getCallCount("/SSIS-001"))
 		}
 	})
 }

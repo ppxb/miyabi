@@ -71,7 +71,6 @@ type JavDBClient interface {
 // JavBusSource supplements magnets without providing catalogue metadata.
 type JavBusSource interface {
 	magnet.Source
-	Available() bool
 	Close()
 }
 

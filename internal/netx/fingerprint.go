@@ -96,3 +96,23 @@ func (c *ProxiedFingerprintClient) Close() {
 		c.unsubscribe()
 	}
 }
+
+// Watch invokes onSignal for each proxy change until stop fires or the
+// subscription ends. onSignal owns any client-specific Refresh/rebuild.
+func (c *ProxiedFingerprintClient) Watch(stop <-chan struct{}, onSignal func()) {
+	changes := c.Changes()
+	if changes == nil {
+		return
+	}
+	for {
+		select {
+		case <-stop:
+			return
+		case _, ok := <-changes:
+			if !ok {
+				return
+			}
+			onSignal()
+		}
+	}
+}

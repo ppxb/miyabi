@@ -205,7 +205,7 @@
 ### 后端
 - [x] ~~HTML DOM helper 四份 → 共享 `htmlx` 包~~：**暂不处理（C，人工决定）**。真实为 3 套 helper（`actors/html.go`、`metadata/providers/html.go`、`javdb/web.go`）+ `absoluteURL`（`actors/avleague.go`），调用点近 ~400，且 `text()` 三者语义分叉（providers 跳过隐藏节点、javdb 不折叠空白），统一回归风险高、收益低；如需再抽走 B 方案（仅抽机械 helper，保留各自 `text`）。
 - [x] Cloudflare 挑战检测：新增 `netx.IsCloudflareChallenge(body []byte)`（3 个标志），`javbus`/`sukebei` 薄封装转调，`freejavbt`/`javdb` 的 inline 判断改用之（顺带补上 `challenge-platform`，更稳健）。
-- [ ] 代理变更监听三份：`javbus/client.go:321-343`、`sukebei/client.go:88-106`、`javdb/client.go:184-203` → `ProxiedFingerprintClient.Watch`
+- [x] 代理变更监听：新增 `netx.ProxiedFingerprintClient.Watch(stop, onSignal)`，`javbus`/`sukebei`/`javdb` 统一使用。**并按决定移除 javbus 的探活/可用性机制**（`Available/setAvailable/probe/runHealthLoop`），`Find` 不再因「不可用」跳过、失败按普通源交由 aggregator 标记 partial；`JavBusSource` 接口去掉 `Available()`，`catalogue` 不再据此判断。
 - [ ] HTTP 模板：`freejavbt/client.go:105-138` ≈ `metadata/providers/http.go:71-125`
 - [ ] Pondo 系 provider：`onepondo.go`、`tenmusume.go`、`muramura.go` → 表驱动 `pondoSite`
 - [ ] 115 离线状态码魔法数字 `0/1/2/-1`：`offline/sync.go:172`、`submit.go:31`、`control.go:233`、`recovery.go` → `pan` 包具名常量

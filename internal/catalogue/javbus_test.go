@@ -21,9 +21,8 @@ type detailCountingProvider struct {
 
 type recoveringJavBusSource struct{ calls int }
 
-func (*recoveringJavBusSource) Name() string    { return domain.MagnetSourceJavBus }
-func (*recoveringJavBusSource) Available() bool { return true }
-func (*recoveringJavBusSource) Close()          {}
+func (*recoveringJavBusSource) Name() string { return domain.MagnetSourceJavBus }
+func (*recoveringJavBusSource) Close()       {}
 func (s *recoveringJavBusSource) Find(_ context.Context, ref domain.MovieRef) ([]domain.Magnet, error) {
 	s.calls++
 	if s.calls == 1 {
@@ -90,7 +89,7 @@ func TestMagnetsRetriesDetailBeforeCachingSupplementedResult(t *testing.T) {
 		magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "primary", Sources: []string{"javdb"}}},
 	}}
 	upstream := &countingJavBusHTTP{}
-	service, err := NewWithClients(t.Context(), store.Client, primary, javbus.NewForTest(true, upstream), &stubLocalState{}, primary)
+	service, err := NewWithClients(t.Context(), store.Client, primary, javbus.NewForTest(upstream), &stubLocalState{}, primary)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +137,7 @@ func TestMagnets_WithAvailableJavBus(t *testing.T) {
 		},
 	}
 	upstream := &countingJavBusHTTP{}
-	javbusClient := javbus.NewForTest(true, upstream)
+	javbusClient := javbus.NewForTest(upstream)
 	service, err := NewWithClients(t.Context(), store.Client, provider, javbusClient, &stubLocalState{}, provider)
 	if err != nil {
 		javbusClient.Close()
@@ -187,7 +186,7 @@ func TestMagnets_WithUnavailableJavBus(t *testing.T) {
 			magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "SSIS-001", Sources: []string{"javdb"}}},
 		},
 	}
-	javbusClient := javbus.NewForTest(false)
+	javbusClient := javbus.NewForTest()
 	service, err := NewWithClients(t.Context(), store.Client, provider, javbusClient, &stubLocalState{}, provider)
 	if err != nil {
 		javbusClient.Close()
