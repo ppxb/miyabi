@@ -141,10 +141,7 @@ func (service *Service) addForAccount(ctx context.Context, accountID, movieID, c
 			SetCode(code).SetHash(hash).SetInfoHash(hash).SetRecovery(state).
 			SetAccountID(source.AccountID).SetDirectoryID(directory.ID).
 			Save(submitContext)
-		if err != nil {
-			return err
-		}
-		return nil
+		return err
 	}); err != nil {
 		return domain.OfflineSubmission{}, fmt.Errorf("record 115 offline download: %w", err)
 	}

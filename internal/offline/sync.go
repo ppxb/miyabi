@@ -34,10 +34,7 @@ func (service *Service) Sync(ctx context.Context) error {
 			errs = append(errs, err)
 		}
 	}
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func (service *Service) syncSource(ctx context.Context, source domain.LibrarySource) error {

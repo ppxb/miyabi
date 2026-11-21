@@ -18,8 +18,9 @@ func (s *Service) config(ctx context.Context) (download.Config, magnet.Preferenc
 	if value.Download != nil {
 		cfg = *value.Download
 	}
+	prefs := value.Preferences.Normalized()
 	if err == nil {
-		err = value.Preferences.Normalized().Validate()
+		err = prefs.Validate()
 	}
-	return cfg, value.Preferences.Normalized(), err
+	return cfg, prefs, err
 }
