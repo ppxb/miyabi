@@ -130,7 +130,7 @@
 - [x] 🟢 `web/src/features/access-gate/access-gate.tsx:72`：用 `error.message` 而非 `describeApiError`。（已改为 `describeApiError(login.error)`，非 ApiError 回退统一文案）
 - [x] 🟢 `web/src/components/media-image.tsx:72-77`：`typeof image.decode` 检测多余；decode 失败误标 error。（已去掉 `typeof` 检测，直接 `await image.decode()`；decode 失败不再置 error，仍标记 ready）
 - [x] 🟢 `web/src/components/list-pagination.tsx:29`：`nextPage === page` 防御多余。（已删除该守卫；实际调用点只会传 `item !== page` / `page±1`）
-- [ ] 🟢 `web/src/components/app-shell.tsx:65-77`：主题类型断言 + `?? 'system'` 多余；暗色显示 Sun 图标语义不符。
+- [x] 🟢 `web/src/components/app-shell.tsx:65-77`：主题类型断言 + `?? 'system'` 多余；暗色显示 Sun 图标语义不符。（已删第 65 行 `as ThemeName | undefined` 断言与 `?? 'system'`，并移除随之多余的类型别名；第 66 行 `?? 'system'` 因 `noUncheckedIndexedAccess` 必须保留；暗色显示 Sun 属正确"切换到亮色"动作语义，未改）
 - [ ] 🟢 前端多余空值判断：`app-search.tsx:73`、`library/movie-card.tsx:25`、`library/continue-watching.tsx:15`、`actors/detail-page.tsx:38-39,102`、`discover/movie-subscribe-button.tsx:20`、`player-dialog.tsx:21-25,48`、`subscriptions/page.tsx:100-104`
 - [ ] 🟢 后端多余 nil 检查：`catalogue/state.go:27,48`、`catalogue/recommend.go:23`、`api/router.go:44`、`api/movie.go:207`、`app/app.go:392-415`、`drive/accounts.go:63,88,101`、`freejavbt/client.go:176,181,196`
 - [ ] 🟢 `web/src/features/sources/sources-section.tsx:56-99`：`KIND_OPTIONS` 大半字段死数据 + `?? KIND_OPTIONS[0]!` 兜底。

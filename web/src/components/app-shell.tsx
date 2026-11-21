@@ -13,7 +13,6 @@ import { TaskNotifications } from '@/features/tasks/task-notifications'
 import { useTheme } from '@/stores/theme'
 
 const THEME_CYCLE = ['light', 'dark', 'system'] as const
-type ThemeName = (typeof THEME_CYCLE)[number]
 
 export function AppShell({ children }: PropsWithChildren) {
   const [searchOpen, setSearchOpen] = useState(false)
@@ -62,7 +61,7 @@ function AppHeader({ onOpenSearch }: { onOpenSearch: () => void }) {
 
 function ThemeSwitcher() {
   const { theme, setTheme } = useTheme()
-  const current = (theme as ThemeName | undefined) ?? 'system'
+  const current = theme
   const nextTheme = THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length] ?? 'system'
 
   return (
