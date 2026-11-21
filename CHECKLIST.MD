@@ -255,7 +255,7 @@
 组件重复 / 复用
 - [x] `library/player-dialog.tsx:465-486` `MovieStats` 手写一份 `StatList`（缺 `sm:text-base`）；评分格式化与 `movie-detail/hero.tsx` 重复。（已复用 `StatList`；评分格式化文案仍各写一处，属可接受的小重复）
 - [x] `library/player-dialog.tsx:79` 用 JS `useScrollFade`，`movie-detail/dialog.tsx:34` 用 shadcn `scroll-fade` 工具类，二选一。（已统一为 `useScrollFade`：`movie-detail/dialog.tsx`、`app-sidebar.tsx` 均改用 hook，与 `player-dialog`/`app-search` 一致；移除 `scroll-fade`/`scroll-fade-y` 类）
-- [ ] `history/page.tsx:59-76` 与 `library/continue-watching.tsx:15-29` 「历史条目→卡片」重复且进度算法不一致（前者 clamp+round）。改法：抽 `historyToCard(item)`。
+- [x] `history/page.tsx:59-76` 与 `library/continue-watching.tsx:15-29` 「历史条目→卡片」重复且进度算法不一致（前者 clamp+round）。改法：抽 `historyToCard(item)`。（已修复：新增 `features/library/history-card.ts` 的 `historyToCard`，两处复用；进度统一为 clamp 0-100 + round；`tsc`/`oxlint`/`oxfmt`/`vitest` 通过）
 - [ ] `components/list-pagination.tsx:36-46` 重写了 `PaginationLink`（后者已 0 调用）；`data-active` 无样式使用。
 - [ ] `components/stat-list.tsx:13-16,37` `StatListSkeleton` 复制容器 class。
 - [ ] `library/page.tsx:22,26` 仍手写 `filter(isScanTask)` + `find(isTaskActive)`，未用 `useActiveScan`。
