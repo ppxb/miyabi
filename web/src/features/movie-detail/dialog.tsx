@@ -1,5 +1,14 @@
+import { useScrollFade } from '@animate-ui/react/primitives/effects/scroll-fade'
 import { useRouter } from '@tanstack/react-router'
-import { lazy, Suspense, useCallback, useEffect, useState, type PropsWithChildren } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PropsWithChildren
+} from 'react'
 
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { MovieDetailDialogContext, movieDetailKey, type MovieDetailTarget } from './dialog-context'
@@ -8,6 +17,20 @@ import { MovieDetailSkeleton } from './skeleton'
 const MovieDetailContent = lazy(() =>
   import('./content').then(module => ({ default: module.MovieDetailContent }))
 )
+
+/** Scrollable detail body with the shared animated scroll fade. */
+function DetailScrollBody({ children }: PropsWithChildren) {
+  const ref = useRef<HTMLDivElement>(null)
+  useScrollFade(ref)
+  return (
+    <div
+      ref={ref}
+      className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6"
+    >
+      {children}
+    </div>
+  )
+}
 
 export function MovieDetailDialogProvider({ children }: PropsWithChildren) {
   const router = useRouter()
@@ -29,14 +52,11 @@ export function MovieDetailDialogProvider({ children }: PropsWithChildren) {
           className="flex h-[min(56rem,calc(100dvh-2rem))] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl"
         >
           <DialogTitle className="sr-only">影片详情</DialogTitle>
-          <div
-            key={movie && movieDetailKey(movie)}
-            className="min-h-0 flex-1 scroll-fade no-scrollbar overflow-y-auto overscroll-contain p-4 sm:p-6"
-          >
+          <DetailScrollBody key={movie && movieDetailKey(movie)}>
             <Suspense fallback={<MovieDetailSkeleton />}>
               {movie ? <MovieDetailContent movie={movie} /> : null}
             </Suspense>
-          </div>
+          </DetailScrollBody>
         </DialogContent>
       </Dialog>
     </MovieDetailDialogContext>

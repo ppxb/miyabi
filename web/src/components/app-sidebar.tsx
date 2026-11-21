@@ -1,4 +1,6 @@
+import { useScrollFade } from '@animate-ui/react/primitives/effects/scroll-fade'
 import { Link } from '@tanstack/react-router'
+import { useRef } from 'react'
 
 import { AppNavigation } from '@/components/app-navigation'
 import {
@@ -15,6 +17,8 @@ import {
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const { setOpenMobile } = useSidebar()
+  const contentRef = useRef<HTMLDivElement>(null)
+  useScrollFade(contentRef)
   return (
     <Sidebar {...props}>
       <SidebarHeader>
@@ -26,7 +30,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent className="scroll-fade-y">
+      <SidebarContent ref={contentRef}>
         <SidebarGroup>
           <SidebarGroupContent>
             <AppNavigation />
