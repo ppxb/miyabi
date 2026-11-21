@@ -7,9 +7,6 @@ func TestIsCloudflareInterstitialIgnoresDetectionScript(t *testing.T) {
 	if IsCloudflareInterstitial(normal) {
 		t.Fatal("normal page referencing the challenge-platform script must not be a challenge")
 	}
-	if !IsCloudflareChallenge(normal) {
-		t.Fatal("expected the legacy loose check to still match challenge-platform")
-	}
 }
 
 func TestIsCloudflareInterstitialDetectsRealChallenges(t *testing.T) {

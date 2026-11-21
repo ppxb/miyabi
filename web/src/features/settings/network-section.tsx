@@ -69,7 +69,7 @@ function NetworkForm({ config, onSaved }: { config: NetworkConfig; onSaved: () =
 
     updateField('enabled', false)
     updateConfig.mutate(
-      { enabled: false, url: normalizeProxyInput(form.url) },
+      { ...config, enabled: false },
       {
         onSuccess: () => {
           toast.success('已关闭网络代理')

@@ -159,16 +159,10 @@ func (c *Client) search(ctx context.Context, code string) ([]byte, error) {
 	if err != nil {
 		return nil, domain.E(domain.KindUpstream, "读取 Sukebei 响应失败", err)
 	}
-	if isChallenge(body) {
+	if netx.IsCloudflareInterstitial(body) {
 		return nil, domain.Blocked("Sukebei 遇到 Cloudflare 挑战")
 	}
 	return body, nil
-}
-
-// isChallenge reports whether the body is a Cloudflare interstitial rather than
-// the RSS feed, so a challenge is not misreported as a parse failure.
-func isChallenge(body []byte) bool {
-	return netx.IsCloudflareChallenge(body)
 }
 
 // Close releases the transport and stops proxy watching. Safe to call twice.

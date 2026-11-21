@@ -85,7 +85,7 @@ func (c *Client) fetchWebHTML(ctx context.Context, path string, params url.Value
 	if len(body) > webMaxBody {
 		return nil, &networkError{err: fmt.Errorf("JavDB web response exceeded %d bytes", webMaxBody)}
 	}
-	if netx.IsCloudflareChallenge(body) {
+	if netx.IsCloudflareInterstitial(body) {
 		return nil, &networkError{err: errors.New("JavDB web challenge encountered")}
 	}
 	return body, nil

@@ -79,9 +79,6 @@ func (service *Service) addForAccount(ctx context.Context, accountID, movieID, c
 	if err != nil {
 		return domain.OfflineSubmission{}, err
 	}
-	// Prewarm the metadata cache now so the later library scrape can reuse these
-	// source results instead of re-querying the networks.
-	defer service.warmMetadata(code)
 	_, prefs, err := service.config(ctx)
 	if err != nil {
 		return domain.OfflineSubmission{}, err
@@ -171,6 +168,9 @@ func (service *Service) addForAccount(ctx context.Context, accountID, movieID, c
 		return domain.OfflineSubmission{}, service.deferAction(submitContext, created, state, err)
 	}
 
+	// Prewarm the metadata cache only after a successful submission, so failed
+	// attempts do not trigger a wasted metadata scrape.
+	service.warmMetadata(code)
 	service.tasks.NotifyOfflineChanged()
 	created, err = service.database.OfflineDownload.Get(submitContext, created.ID)
 	if err != nil {

@@ -1,5 +1,6 @@
 import {
   keepPreviousData,
+  queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
@@ -91,12 +92,16 @@ export function useLibraryMovie(id: number) {
   })
 }
 
-export function useLibraryMovies(page: number) {
-  return useQuery({
+function libraryMoviesOptions(page: number) {
+  return queryOptions({
     queryKey: libraryKeys.movies(page),
     queryFn: ({ signal }) =>
       apiGet<LibraryPage>('/api/library/movies', { page, limit: LIBRARY_PAGE_SIZE }, signal)
   })
+}
+
+export function useLibraryMovies(page: number) {
+  return useQuery(libraryMoviesOptions(page))
 }
 
 export function useTopRatedMovies(limit = 12) {
@@ -109,16 +114,15 @@ export function useTopRatedMovies(limit = 12) {
 // Reuses the first library page (same cache entry as useLibraryMovies(1)) and
 // slices the newest few locally, so the library page issues the page-1 request
 // only once instead of a second time with a smaller limit.
-export function useRecentMovies(limit = 12) {
-  return useQuery({
-    queryKey: libraryKeys.movies(1),
-    queryFn: ({ signal }) =>
-      apiGet<LibraryPage>('/api/library/movies', { page: 1, limit: LIBRARY_PAGE_SIZE }, signal),
-    select: (page: LibraryPage): LibraryPage => ({
-      ...page,
-      movies: page.movies.slice(0, limit)
-    })
-  })
+const recentMovieLimit = 12
+
+const selectRecentMovies = (page: LibraryPage): LibraryPage => ({
+  ...page,
+  movies: page.movies.slice(0, recentMovieLimit)
+})
+
+export function useRecentMovies() {
+  return useQuery({ ...libraryMoviesOptions(1), select: selectRecentMovies })
 }
 
 export function useBrowseLibraryMovies(params: BrowseLibraryParams) {

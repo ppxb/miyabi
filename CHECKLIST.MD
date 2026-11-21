@@ -234,18 +234,18 @@
 ### 🟠 中
 
 后端
-- [ ] `magnet/aggregator.go`：JavBus 移除探活后不可达时拖累结果。（`613fcad` 已部分修复：CF/driver-verify 改返回 `domain.Blocked`，聚合按「无结果」处理；**连接失败/超时仍计为 failure**，每次仍等满超时。）改法：连接类错误同样映射为 `ErrSkipped`/`Blocked`，或加短冷却。
-- [ ] ✅ `netx/cloudflare.go`：`IsCloudflareChallenge` 的 `challenge-platform` 特征可能误判正常页面。（`d96c790` 新增 `IsCloudflareInterstitial`，仅 freejavbt/projectjav 改用；`javdb/web.go:88`、`sukebei/client.go:171`、`javbus/parser.go:62` 仍用旧函数，**两套判定并存**。）改法：评估后统一为一个函数，删除另一套。
-- [ ] ✅ `offline/add.go:84`：`defer service.warmMetadata(code)` 在报错返回路径也执行，白白刮削。改法：仅在提交成功后显式调用；`SetMetadata`（`app.go`）可改为 `offline.New` 构造参数。
-- [ ] `offline/sync.go:166`：`updateTask` 每条任务仍调用 `currentMountFor`→`drive.Mount`；本轮只把 prefs 提到循环外。改法：`syncSource` 中算一次 mount 传入。
+- [x] ~~`magnet/aggregator.go`：JavBus 移除探活后不可达时拖累结果~~ **评估后暂不处理（见 D6）**。（`613fcad` 已部分修复：CF/driver-verify 改返回 `domain.Blocked`，聚合按「无结果」处理；连接失败/超时仍计为 failure。是否把连接错误也降级为「无结果」需产品决定，且更合理的方案是 D6 的聚合层熔断/冷却，避免掩盖真实网络故障。）
+- [x] ✅ `netx/cloudflare.go`：`IsCloudflareChallenge` 的 `challenge-platform` 特征可能误判正常页面。（`d96c790` 新增 `IsCloudflareInterstitial`，仅 freejavbt/projectjav 改用；`javdb/web.go:88`、`sukebei/client.go:171`、`javbus/parser.go:62` 仍用旧函数，**两套判定并存**。）改法：评估后统一为一个函数，删除另一套。（已修复：删除 `IsCloudflareChallenge`，`javdb`/`sukebei`/`javbus` 全部改用 `IsCloudflareInterstitial`，仅保留单一判定；同步更新 javbus 测试用例）
+- [x] ✅ `offline/add.go:84`：`defer service.warmMetadata(code)` 在报错返回路径也执行，白白刮削。改法：仅在提交成功后显式调用；`SetMetadata`（`app.go`）可改为 `offline.New` 构造参数。（已修复：移除 `defer`，改为 `recordSubmission` 成功后再预热）
+- [x] ~~`offline/sync.go:166`：`updateTask` 每条任务仍调用 `currentMountFor`→`drive.Mount`；本轮只把 prefs 提到循环外~~ **评估后不处理**：`drive.Mount` 已改为内存缓存（P1 修复后为 O(1)，非读库），且完成时需重新读取挂载以检测「轮询期间挂载被替换」（`TestOfflineSyncRespectsSourceChangesDuringRemotePolling` 依赖此语义）；改成循环外算一次会破坏该正确性。
 - [ ] `drive/accounts.go:188,197`：`accountRecord`/`Mount` 改读内存后 error 恒为 nil、ctx 未用，约 10 处调用方多写无效 `if err != nil`。改法：签名改回 `(LibrarySource, bool)`。
 - [ ] `actors/service.go:378` 与 `:776`：`loadGroup`/`findNames` 按 `MatchKeyEQ(normalizeName(seed.Name))` 反查 profile 逻辑重复，后者吞 `perr/lerr`。改法：seed 查询 `WithProfile` 带出外键，抽同一 helper 并返回错误。
 - [ ] `ent/schema/watch_history.go:26`：`settings` 用 `json.RawMessage` + `playback/history.go:48` 手写编解码，读改写无事务。改法：`field.JSON("settings", &domain.PlaybackSettings{})`。
 
 前端
-- [ ] `features/movies/page.tsx:28,41`：`moviesFilterFromSearch(search)` 每次渲染新建对象，`useCallback([filters])` 失效、筛选栏防抖计时器被重置。改法：`useMemo(..., [search])`。
-- [ ] `api/library.ts:94-99,112-121`：`useRecentMovies` 与 `useLibraryMovies(1)` 共用 `libraryKeys.movies(1)` 却各写一份 queryFn；内联 `select` 每次渲染重算。改法：抽 `libraryMoviesOptions(page)`（`queryOptions`），select 提为模块级。
-- [ ] `settings/network-section.tsx:72`：关闭代理时保存 `normalizeProxyInput(form.url)`（未保存的输入），与 emby 的 `{ ...config, enabled: false }` 不一致。
+- [x] `features/movies/page.tsx:28,41`：`moviesFilterFromSearch(search)` 每次渲染新建对象，`useCallback([filters])` 失效、筛选栏防抖计时器被重置。改法：`useMemo(..., [search])`。（已修复：`filters` 改用 `useMemo([search])`）
+- [x] `api/library.ts:94-99,112-121`：`useRecentMovies` 与 `useLibraryMovies(1)` 共用 `libraryKeys.movies(1)` 却各写一份 queryFn；内联 `select` 每次渲染重算。改法：抽 `libraryMoviesOptions(page)`（`queryOptions`），select 提为模块级。（已修复：抽出 `libraryMoviesOptions(page)`；`selectRecentMovies` 提为模块级，`useRecentMovies()` 复用同一 query 选项）
+- [x] `settings/network-section.tsx:72`：关闭代理时保存 `normalizeProxyInput(form.url)`（未保存的输入），与 emby 的 `{ ...config, enabled: false }` 不一致。（已修复：关闭时改为保存 `{ ...config, enabled: false }`，保留已持久化的 URL）
 - [ ] `settings/scraping-section.tsx:48-68`：`SourceToggleList` 9 个参数，两调用处 pending/error/retry/toggle 仍逐字重复。改法：传 `{ query, update, names, descriptions, errorText }`，内部处理乐观值/重试/切换。
 - [ ] `tasks/task-notification-diff.ts:61-80`：`shouldNotify` 7 参数，`dismissed/announced/initialized` 三处原样透传，指纹比较重复三遍。改法：`diffTaskNotifications` 内闭包 `notify(id, active, old, fp, extra?)`。
 - [ ] settings 各 section 仍不统一：加载态（emby/network 渲染 `null`、scraping/tasks `Skeleton`、subscription 渲染禁用控件）、错误态（仅部分有 `onRetry`）、按钮尺寸（`sm` 与默认混用，如 `media-sync-section.tsx:28`）。改法：统一 Skeleton + `InlineError onRetry` + 单一按钮尺寸。

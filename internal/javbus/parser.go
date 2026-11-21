@@ -59,7 +59,7 @@ func isDriverVerify(content string) bool {
 }
 
 func isCloudflareChallenge(content string) bool {
-	return netx.IsCloudflareChallenge([]byte(content))
+	return netx.IsCloudflareInterstitial([]byte(content))
 }
 
 func parseMagnetsHTML(body string) ([]domain.Magnet, error) {
