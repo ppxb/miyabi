@@ -35,6 +35,29 @@ import { formatSize } from '@/lib/format'
 import { notifyOfflineTask, notifyTaskError } from '@/features/tasks/task-toast'
 import { MovieMagnetsSkeleton } from './skeleton'
 
+function SubmitLabel({
+  pending,
+  submitted,
+  label
+}: {
+  pending: boolean
+  submitted: boolean
+  label: string
+}) {
+  return (
+    <>
+      {pending ? (
+        <LoaderCircleIcon className="animate-spin" />
+      ) : submitted ? (
+        <CheckIcon />
+      ) : (
+        <CloudDownloadIcon />
+      )}
+      {label}
+    </>
+  )
+}
+
 const sourceLabels: Record<string, string> = { javbus: 'JavBus' }
 
 const phaseLabels: Record<OfflineSubmission['phase'], string> = {
@@ -165,6 +188,7 @@ function MagnetCard({
 
   const error = !add.isPending ? task?.error : undefined
   const disabled = busy || statusError || submitted || accounts.length === 0
+  const pendingSubmit = busy || (task ? isOfflineTaskActive(task) : false)
   const submit = (accountID: string) =>
     add.mutate(
       { accountID, hash: magnet.hash },
@@ -228,14 +252,7 @@ function MagnetCard({
                 <DropdownMenuTrigger
                   render={<Button type="button" size="sm" disabled={disabled} />}
                 >
-                  {busy || (task && isOfflineTaskActive(task)) ? (
-                    <LoaderCircleIcon className="animate-spin" />
-                  ) : submitted ? (
-                    <CheckIcon />
-                  ) : (
-                    <CloudDownloadIcon />
-                  )}
-                  {label}
+                  <SubmitLabel pending={pendingSubmit} submitted={submitted} label={label} />
                   <ChevronDownIcon className="size-3.5 opacity-70" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-44">
@@ -259,14 +276,7 @@ function MagnetCard({
                 disabled={disabled}
                 onClick={() => submit(accounts[0]!.id)}
               >
-                {busy || (task && isOfflineTaskActive(task)) ? (
-                  <LoaderCircleIcon className="animate-spin" />
-                ) : submitted ? (
-                  <CheckIcon />
-                ) : (
-                  <CloudDownloadIcon />
-                )}
-                {label}
+                <SubmitLabel pending={pendingSubmit} submitted={submitted} label={label} />
               </Button>
             ) : null}
           </div>

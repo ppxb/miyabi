@@ -195,7 +195,7 @@
 - [x] 分类过滤：`MAIN_CATEGORY`/`UNSUPPORTED_CATEGORIES` 移入 `discover/constants.ts`，新增 `discover/use-category-taxonomy.ts` 的 `useCategoryTaxonomy(zone, categoryID?)`，`category-content`、`category-filters` 复用。
 - [x] `discover/results.tsx` + `browse-results.tsx` 合并为单个 `BrowseResults`（query + 展示），`results.tsx` 已移出项目到 `backups/removed-20261121-1430/`。
 - [x] `movie-detail/content.tsx` 两分支后半段抽 `CatalogueSections`（容器 + InlineError + Hero + Plot + Previews，`children` 放各自追加段）。
-- [ ] `movie-detail/magnets.tsx:231-239` ≈ `:262-269` 按钮内容
+- [x] `movie-detail/magnets.tsx` 提交按钮内容（pending/submitted 图标 + label）抽 `SubmitLabel`，单账号按钮与多账号下拉触发器复用。
 - [x] `recommendations.tsx`、`history/page.tsx` 伪造整条 movie → 卡片 props 收窄：`LibraryMovieCard` 用 `LibraryMovieCardData`、`DiscoverMovieCard` 用 `DiscoverMovieCardData`，`referenceMovie` 只造所需字段，`HistoryCard` 适配器删除、`LibraryMovieActions` 收窄为 `Pick<LibraryMovie,'id'|'code'>`。
 - [ ] `subscription-card.tsx:20-26,129-133` 两张状态表合并
 - [ ] `task-notification-diff.ts:78-118` scan / batch 循环 → `shouldNotify`
