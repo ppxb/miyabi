@@ -211,7 +211,7 @@
 - [x] 115 离线状态码魔法数字 `0/1/2/-1`：`pan` 包新增 `OfflineStatusWaiting/Running/Done/Failed`，`offline` 的 `sync/submit/control/recovery/projection` 非测试代码全部改用常量（测试保留字面量）。
 - [x] handler 分页解析：`api/movie.go`(libraryBrowse) 与 `api/actors.go`(actorList) 改用 `bindQuery`（`form:"page,default=1"` 等），删除 `queryInt`；`api/task.go` 两个 handler 改用 `accepted`。（`api/pan.go:51` 原本已是 `respond`，无需改。）
 - [x] `tasks/pause.go`：`LibraryPaused` 改用 `database.LoadSetting[bool]`、`SetLibraryPaused` 改用 `database.SaveSetting`（移除手写 query/upsert 与 `encoding/json`/`setting` 导入）。
-- [ ] `pan/client.go:135` `parseRetryAfter` → `domain.ParseRetryAfter`
+- [x] `pan` 的本地 `parseRetryAfter` 删除，`client.go`/`metadata.go` 三处改用 `domain.ParseRetryAfter(header, time.Now())`（移除 `strconv`/`strings` 导入）。
 - [ ] `drive/accounts.go:171,190` `sort.*` → `slices.SortFunc` / `slices.Sorted(maps.Keys())`
 
 ---

@@ -110,7 +110,7 @@ func (client *Client) readMetadataURL(ctx context.Context, address string, limit
 	}
 	defer download.Body.Close()
 	if download.StatusCode < 200 || download.StatusCode >= 300 {
-		return nil, &domain.HTTPError{Source: "115 metadata", StatusCode: download.StatusCode, RetryAfter: parseRetryAfter(download.Header.Get("Retry-After"))}
+		return nil, &domain.HTTPError{Source: "115 metadata", StatusCode: download.StatusCode, RetryAfter: domain.ParseRetryAfter(download.Header.Get("Retry-After"), time.Now())}
 	}
 	body, err := io.ReadAll(io.LimitReader(download.Body, limit+1))
 	if err != nil {

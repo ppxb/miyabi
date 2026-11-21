@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -102,7 +100,7 @@ func (t *panTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		cancel()
 	}
 	if err == nil && resp != nil {
-		if wait := parseRetryAfter(resp.Header.Get("Retry-After")); wait > 0 {
+		if wait := domain.ParseRetryAfter(resp.Header.Get("Retry-After"), time.Now()); wait > 0 {
 			t.mu.Lock()
 			until := time.Now().Add(wait)
 			if until.After(t.retryAfter) {
@@ -130,23 +128,6 @@ func (b *timedResponseBody) Read(p []byte) (int, error) {
 func (b *timedResponseBody) Close() error {
 	defer b.cancel()
 	return b.ReadCloser.Close()
-}
-
-func parseRetryAfter(header string) time.Duration {
-	header = strings.TrimSpace(header)
-	if header == "" {
-		return 0
-	}
-	if seconds, err := strconv.Atoi(header); err == nil && seconds > 0 {
-		return time.Duration(seconds) * time.Second
-	}
-	if t, err := http.ParseTime(header); err == nil {
-		wait := time.Until(t)
-		if wait > 0 {
-			return wait
-		}
-	}
-	return 0
 }
 
 // New creates a 115 client. 115 is always reached directly: routing it through
@@ -209,7 +190,7 @@ func (client *Client) request(request *resty.Request, method, endpoint string) (
 		return nil, ErrUnauthorized
 	}
 	if !response.IsSuccess() {
-		return nil, &domain.HTTPError{Source: "115", StatusCode: response.StatusCode(), RetryAfter: parseRetryAfter(response.Header().Get("Retry-After"))}
+		return nil, &domain.HTTPError{Source: "115", StatusCode: response.StatusCode(), RetryAfter: domain.ParseRetryAfter(response.Header().Get("Retry-After"), time.Now())}
 	}
 	return response, nil
 }
