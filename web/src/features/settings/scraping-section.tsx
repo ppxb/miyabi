@@ -39,6 +39,60 @@ const descriptions: Record<string, string> = {
   freejavbt: '备用来源，番号直达详情，补充影片资料与磁力链接（需代理）'
 }
 
+const actorDescriptions: Record<string, string> = {
+  'av-league': '演员档案来源：生日、身高、三围、罩杯、血型、出身、出道日与图集（需代理）',
+  gfriends: '演员图片图集来源（头像与多图墙）'
+}
+
+/** Shared list of source on/off toggles with loading and error states. */
+function SourceToggleList({
+  sources,
+  names,
+  descriptions,
+  pending,
+  error,
+  retrying,
+  onRetry,
+  onToggle,
+  errorText
+}: {
+  sources: Array<{ id: string; enabled: boolean }>
+  names: Record<string, string>
+  descriptions: Record<string, string>
+  pending: boolean
+  error: boolean
+  retrying: boolean
+  onRetry: () => void
+  onToggle: (id: string, enabled: boolean) => void
+  errorText: string
+}) {
+  return (
+    <>
+      {pending ? <Skeleton className="h-4 w-40" /> : null}
+      {sources.map(source => (
+        <SettingRow
+          key={source.id}
+          title={names[source.id] ?? source.id}
+          description={descriptions[source.id]}
+          inline
+        >
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={source.enabled}
+              onCheckedChange={enabled => onToggle(source.id, enabled)}
+            />
+          </div>
+        </SettingRow>
+      ))}
+      {error ? (
+        <InlineError onRetry={onRetry} retrying={retrying}>
+          {errorText}
+        </InlineError>
+      ) : null}
+    </>
+  )
+}
+
 export function ScrapingSection() {
   const query = useScrapingSources()
   const update = useUpdateScrapingSources()
@@ -51,44 +105,24 @@ export function ScrapingSection() {
       title="影片刮削"
       description="以下来源补充图片及缺失资料。开启后对新刮削生效。注意需要开启代理。"
     >
-      {query.isPending ? <Skeleton className="h-4 w-40" /> : null}
-      {sources.map(source => (
-        <SettingRow
-          key={source.id}
-          title={sourceNames[source.id] ?? source.id}
-          description={descriptions[source.id]}
-          inline
-        >
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={source.enabled}
-              onCheckedChange={enabled =>
-                update.mutate(
-                  sources.map(item => (item.id === source.id ? { ...item, enabled } : item))
-                )
-              }
-            />
-          </div>
-        </SettingRow>
-      ))}
-      {query.isError || update.isError ? (
-        <InlineError
-          onRetry={() => {
-            if (query.isError) void query.refetch()
-            else if (update.variables) update.mutate(update.variables)
-          }}
-          retrying={query.isFetching || update.isPending}
-        >
-          来源设置读取或保存失败，请重试。
-        </InlineError>
-      ) : null}
+      <SourceToggleList
+        sources={sources}
+        names={sourceNames}
+        descriptions={descriptions}
+        pending={query.isPending}
+        error={query.isError || update.isError}
+        retrying={query.isFetching || update.isPending}
+        onRetry={() => {
+          if (query.isError) void query.refetch()
+          else if (update.variables) update.mutate(update.variables)
+        }}
+        onToggle={(id, enabled) =>
+          update.mutate(sources.map(item => (item.id === id ? { ...item, enabled } : item)))
+        }
+        errorText="来源设置读取或保存失败，请重试。"
+      />
     </SettingsSection>
   )
-}
-
-const actorDescriptions: Record<string, string> = {
-  'av-league': '演员档案来源：生日、身高、三围、罩杯、血型、出身、出道日与图集（需代理）',
-  gfriends: '演员图片图集来源（头像与多图墙）'
 }
 
 export function ActorSourcesSection() {
@@ -101,37 +135,22 @@ export function ActorSourcesSection() {
       title="演员数据源"
       description="以下来源用于补充演员档案与图片；关闭后对应数据不再抓取或展示。"
     >
-      {query.isPending ? <Skeleton className="h-4 w-40" /> : null}
-      {sources.map(source => (
-        <SettingRow
-          key={source.id}
-          title={actorSourceNames[source.id] ?? source.id}
-          description={actorDescriptions[source.id]}
-          inline
-        >
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={source.enabled}
-              onCheckedChange={enabled =>
-                update.mutate(
-                  sources.map(item => (item.id === source.id ? { ...item, enabled } : item))
-                )
-              }
-            />
-          </div>
-        </SettingRow>
-      ))}
-      {query.isError || update.isError ? (
-        <InlineError
-          onRetry={() => {
-            if (query.isError) void query.refetch()
-            else if (update.variables) update.mutate(update.variables)
-          }}
-          retrying={query.isFetching || update.isPending}
-        >
-          演员来源设置读取或保存失败，请重试。
-        </InlineError>
-      ) : null}
+      <SourceToggleList
+        sources={sources}
+        names={actorSourceNames}
+        descriptions={actorDescriptions}
+        pending={query.isPending}
+        error={query.isError || update.isError}
+        retrying={query.isFetching || update.isPending}
+        onRetry={() => {
+          if (query.isError) void query.refetch()
+          else if (update.variables) update.mutate(update.variables)
+        }}
+        onToggle={(id, enabled) =>
+          update.mutate(sources.map(item => (item.id === id ? { ...item, enabled } : item)))
+        }
+        errorText="演员来源设置读取或保存失败，请重试。"
+      />
     </SettingsSection>
   )
 }
