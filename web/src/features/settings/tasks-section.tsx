@@ -1,18 +1,16 @@
 import { ListChecksIcon } from 'lucide-react'
 
-import { isScanTask, isTaskActive, useTasks } from '@/api/tasks'
 import { InlineError } from '@/components/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SettingRow, SettingsSection } from '@/features/settings/shared'
 import { LibraryPauseButton } from '@/features/tasks/library-pause-button'
 import { ScanProgressView } from '@/features/tasks/scan-progress'
 import { useTaskConnection } from '@/features/tasks/task-events'
+import { useActiveScan } from '@/features/tasks/use-active-scan'
 
 export function TasksSection() {
-  const tasks = useTasks()
+  const { tasks, scans, active } = useActiveScan()
   const connection = useTaskConnection()
-  const scans = tasks.data?.filter(isScanTask)
-  const activeScan = scans?.find(isTaskActive)
 
   return (
     <SettingsSection icon={<ListChecksIcon className="size-4" />} title="任务">
@@ -20,7 +18,7 @@ export function TasksSection() {
         title="媒体库进度"
         description="查看同步与重建进度，暂停会作用于所有扫描与刮削任务并保留进度"
       >
-        {activeScan ? <LibraryPauseButton paused={!!activeScan.paused} /> : null}
+        {active ? <LibraryPauseButton paused={!!active.paused} /> : null}
       </SettingRow>
       {tasks.isPending ? <Skeleton className="h-4 w-40" /> : null}
       {tasks.isError ? (
