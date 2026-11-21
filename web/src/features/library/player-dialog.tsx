@@ -3,7 +3,7 @@ import { HlsJsVideo } from '@videojs/react/media/hlsjs-video'
 import { I18nProvider } from '@videojs/react/i18n'
 import { usePlayer, Video, VideoPlayer } from '@videojs/react/video'
 import { CalendarIcon, ClockIcon, StarIcon, type LucideIcon } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 
 import { useLibraryMovie } from '@/api/library'
 import type { LibraryMovieDetail } from '@/api/library'
@@ -24,6 +24,7 @@ export function LibraryPlayerDialog({
   onClose: () => void
 }) {
   const [open, setOpen] = useState(true)
+  const surfaceRef = useRef<HTMLDivElement>(null)
   if (movieId === null) return null
   return (
     <Dialog
@@ -34,14 +35,23 @@ export function LibraryPlayerDialog({
         if (!next) onClose()
       }}
     >
-      <DialogContent className="flex h-[min(54rem,calc(100dvh-2rem))] w-[calc(100%-2rem)] max-w-[96rem] flex-col gap-0 overflow-hidden p-0 sm:max-w-[96rem] lg:flex-row">
-        <LibraryPlayer movieId={movieId} />
+      <DialogContent
+        initialFocus={() => surfaceRef.current}
+        className="flex h-[min(54rem,calc(100dvh-2rem))] w-[calc(100%-2rem)] max-w-[96rem] flex-col gap-0 overflow-hidden p-0 sm:max-w-[96rem] lg:flex-row"
+      >
+        <LibraryPlayer movieId={movieId} surfaceRef={surfaceRef} />
       </DialogContent>
     </Dialog>
   )
 }
 
-function LibraryPlayer({ movieId }: { movieId: number }) {
+function LibraryPlayer({
+  movieId,
+  surfaceRef
+}: {
+  movieId: number
+  surfaceRef: RefObject<HTMLDivElement | null>
+}) {
   const detail = useLibraryMovie(movieId)
   const playback = useStartMoviePlayback(movieId)
   const [qualitiesRequested, setQualitiesRequested] = useState(false)
@@ -73,6 +83,13 @@ function LibraryPlayer({ movieId }: { movieId: number }) {
   }
   const error = playback.isError
 
+  // The player mounts only after the playback source resolves; move focus onto
+  // it so keyboard shortcuts work immediately instead of staying on the dialog.
+  useEffect(() => {
+    if (!source || error) return
+    surfaceRef.current?.querySelector<HTMLElement>('.media-skin')?.focus({ preventScroll: true })
+  }, [source, error, surfaceRef])
+
   const title = detail.data?.title || detail.data?.code || '播放'
   const hls = source?.type.includes('mpegurl') ?? false
   const skinStyle = {
@@ -85,7 +102,11 @@ function LibraryPlayer({ movieId }: { movieId: number }) {
   return (
     <>
       <DialogTitle className="sr-only">{title}</DialogTitle>
-      <div className="relative flex min-w-0 flex-1 items-center justify-center bg-black">
+      <div
+        ref={surfaceRef}
+        tabIndex={-1}
+        className="relative flex min-w-0 flex-1 items-center justify-center bg-black outline-none"
+      >
         {source && !error ? (
           <I18nProvider locale="zh-CN">
             <VideoPlayer title={title}>
