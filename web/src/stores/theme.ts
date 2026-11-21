@@ -55,6 +55,12 @@ export function useTheme() {
   )
   const resolvedTheme = theme === 'system' ? (systemDark ? 'dark' : 'light') : theme
 
+  return { theme, setTheme, resolvedTheme }
+}
+
+export function ThemeSync() {
+  const { theme, resolvedTheme } = useTheme()
+
   useEffect(() => {
     const root = document.documentElement
     root.setAttribute('data-theme-mode', theme)
@@ -65,5 +71,5 @@ export function useTheme() {
     requestAnimationFrame(() => root.classList.remove('disable-transitions'))
   }, [theme, resolvedTheme])
 
-  return { theme, setTheme, resolvedTheme }
+  return null
 }

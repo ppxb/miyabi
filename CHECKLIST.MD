@@ -119,7 +119,7 @@
 
 - [x] 🟠 `web/src/features/settings/emby-url.ts` + `emby-section.tsx:95-106`：后端单一 URL，前端拆 host/port 再拼。改法：单输入框。（已合并为单个 `server_url` 输入框，删除 `emby-url.ts` 的 split/combine 及测试、`handleHostBlur`）
 - [x] 🟠 `web/src/features/settings/emby-section.tsx:43-61`、`network-section.tsx:26-34`：表单草稿两套写法，含渲染期 `setState`。改法：数据就绪后挂载表单 + `key` 重置。（已拆出 `EmbyForm`/`NetworkForm` 子组件，数据就绪后挂载、保存成功以 `resetToken` 作 `key` 重置；删除渲染期 `setForm(null)` 与 null 哨兵；顺带修复保存/测试按钮宽度抖动）
-- [ ] 🟠 `web/src/stores/theme.ts:58-66`：DOM 副作用在被 3 处调用的 hook 中重复执行；登录页不同步系统主题。改法：单点 `ThemeSync`。
+- [x] 🟠 `web/src/stores/theme.ts:58-66`：DOM 副作用在被 3 处调用的 hook 中重复执行；登录页不同步系统主题。改法：单点 `ThemeSync`。（已抽出 `ThemeSync` 组件并在 `__root` 的 `AccessGate` 之外挂载一次，`useTheme` 改为纯读取；登录页可同步系统主题，重复副作用消除）
 - [ ] 🟢 `web/src/stores/theme.ts:26-46`：SPA 中的 SSR 守卫。
 - [ ] 🟠 `internal/api/discover.go:122-128`：匿名接口运行时断言 + 吞错。改法：加入 `CatalogueManager` 接口。
 - [ ] 🟠 `internal/network/service.go:65-87`：单任务 goroutine + WaitGroup。
