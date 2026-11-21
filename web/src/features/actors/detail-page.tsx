@@ -27,11 +27,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { LibraryMovieCard } from '@/features/library/movie-card'
 import { LazyLibraryPlayerDialog } from '@/features/library/player-dialog-lazy'
 
-function displayAvatar(src?: string) {
-  if (!src) return undefined
-  return src.startsWith('/api/actors/') ? src : imageURL(src)
-}
-
 function ActorStats({ actor }: { actor: ReturnType<typeof useActorDetail>['data'] }) {
   if (!actor) return null
   const stats: Array<{ label: string; value: string; icon: LucideIcon }> = []
@@ -108,7 +103,7 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <Avatar className="size-32">
-          <AvatarImage src={displayAvatar(actor.avatar)} alt={actor.name} loading="eager" />
+          <AvatarImage src={actor.avatar ? imageURL(actor.avatar) : undefined} alt={actor.name} loading="eager" />
           <AvatarFallback>{actor.name.slice(0, 1)}</AvatarFallback>
         </Avatar>
         <div className="flex flex-col gap-2">

@@ -57,11 +57,6 @@ function useDebounced(value: string, delay: number) {
   return debounced
 }
 
-function avatarURL(avatar?: string) {
-  if (!avatar) return undefined
-  return avatar.startsWith('/api/actors/') ? avatar : imageURL(avatar)
-}
-
 function movieDetails(movie: LibraryPage['movies'][number], hasTitle: boolean) {
   return [
     hasTitle ? movie.code : '',
@@ -123,7 +118,7 @@ function ResultRow({ item }: { item: SearchItem }) {
     <span className="flex w-full min-w-0 items-center gap-3">
       {isActor ? (
         <Avatar className="size-10 shrink-0">
-          <AvatarImage src={avatarURL(item.image)} alt={item.label} />
+          <AvatarImage src={item.image ? imageURL(item.image) : undefined} alt={item.label} />
           <AvatarFallback>
             <UserIcon className="size-4 text-muted-foreground" />
           </AvatarFallback>

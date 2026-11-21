@@ -14,11 +14,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 const PAGE_SIZE = 40
 
-function displayAvatar(src?: string) {
-  if (!src) return undefined
-  return src.startsWith('/api/actors/') ? src : imageURL(src)
-}
-
 export function ActorsCatalogPage({
   q,
   page,
@@ -91,7 +86,7 @@ export function ActorsCatalogPage({
               >
                 <Avatar className="size-32">
                   <AvatarImage
-                    src={displayAvatar(actor.avatar)}
+                    src={actor.avatar ? imageURL(actor.avatar) : undefined}
                     alt={actor.name}
                     loading="eager"
                   />
