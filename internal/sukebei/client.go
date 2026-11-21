@@ -1,7 +1,6 @@
 package sukebei
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -179,9 +178,7 @@ func (c *Client) search(ctx context.Context, code string) ([]byte, error) {
 // isChallenge reports whether the body is a Cloudflare interstitial rather than
 // the RSS feed, so a challenge is not misreported as a parse failure.
 func isChallenge(body []byte) bool {
-	return bytes.Contains(body, []byte("Just a moment...")) ||
-		bytes.Contains(body, []byte("Attention Required! | Cloudflare")) ||
-		bytes.Contains(body, []byte("challenge-platform"))
+	return netx.IsCloudflareChallenge(body)
 }
 
 // Close releases the transport and stops proxy watching. Safe to call twice.

@@ -13,6 +13,7 @@ import (
 
 	http "github.com/bogdanfinn/fhttp"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/netx"
 	"golang.org/x/net/html"
 )
 
@@ -84,7 +85,7 @@ func (c *Client) fetchWebHTML(ctx context.Context, path string, params url.Value
 	if len(body) > webMaxBody {
 		return nil, &networkError{err: fmt.Errorf("JavDB web response exceeded %d bytes", webMaxBody)}
 	}
-	if bytes.Contains(body, []byte("Just a moment...")) || bytes.Contains(body, []byte("Attention Required! | Cloudflare")) {
+	if netx.IsCloudflareChallenge(body) {
 		return nil, &networkError{err: errors.New("JavDB web challenge encountered")}
 	}
 	return body, nil

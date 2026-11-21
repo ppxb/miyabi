@@ -1,7 +1,6 @@
 package freejavbt
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -132,7 +131,7 @@ func (c *Client) get(ctx context.Context, target string) ([]byte, error) {
 	if len(body) > maxBodyBytes {
 		return nil, fmt.Errorf("freejavbt 响应超过 %d 字节", maxBodyBytes)
 	}
-	if bytes.Contains(body, []byte("Just a moment...")) || bytes.Contains(body, []byte("Attention Required! | Cloudflare")) {
+	if netx.IsCloudflareChallenge(body) {
 		return nil, domain.E(domain.KindUpstream, "freejavbt 遇到 Cloudflare 挑战", nil)
 	}
 	return body, nil

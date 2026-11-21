@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/netx"
 	"golang.org/x/net/html"
 )
 
@@ -58,9 +59,7 @@ func isDriverVerify(content string) bool {
 }
 
 func isCloudflareChallenge(content string) bool {
-	return strings.Contains(content, "Just a moment...") ||
-		strings.Contains(content, "Attention Required! | Cloudflare") ||
-		strings.Contains(content, "challenge-platform")
+	return netx.IsCloudflareChallenge([]byte(content))
 }
 
 func parseMagnetsHTML(body string) ([]domain.Magnet, error) {

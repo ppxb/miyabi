@@ -204,7 +204,7 @@
 
 ### 后端
 - [x] ~~HTML DOM helper 四份 → 共享 `htmlx` 包~~：**暂不处理（C，人工决定）**。真实为 3 套 helper（`actors/html.go`、`metadata/providers/html.go`、`javdb/web.go`）+ `absoluteURL`（`actors/avleague.go`），调用点近 ~400，且 `text()` 三者语义分叉（providers 跳过隐藏节点、javdb 不折叠空白），统一回归风险高、收益低；如需再抽走 B 方案（仅抽机械 helper，保留各自 `text`）。
-- [ ] Cloudflare 挑战检测四份且标志串不一致：`javbus/parser.go:60-64`、`sukebei/client.go:181-185`、`freejavbt/client.go:134`、`javdb/web.go:87` → `netx.IsCloudflareChallenge`
+- [x] Cloudflare 挑战检测：新增 `netx.IsCloudflareChallenge(body []byte)`（3 个标志），`javbus`/`sukebei` 薄封装转调，`freejavbt`/`javdb` 的 inline 判断改用之（顺带补上 `challenge-platform`，更稳健）。
 - [ ] 代理变更监听三份：`javbus/client.go:321-343`、`sukebei/client.go:88-106`、`javdb/client.go:184-203` → `ProxiedFingerprintClient.Watch`
 - [ ] HTTP 模板：`freejavbt/client.go:105-138` ≈ `metadata/providers/http.go:71-125`
 - [ ] Pondo 系 provider：`onepondo.go`、`tenmusume.go`、`muramura.go` → 表驱动 `pondoSite`
