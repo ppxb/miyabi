@@ -25,7 +25,7 @@ export function MovieCard({
   const title = movie.title || movie.code
   const heading = <h3 className="truncate text-sm leading-5 font-semibold">{title}</h3>
   return (
-    <Card size="sm" className="h-full gap-0 overflow-hidden py-0">
+    <Card size="sm" className="h-full gap-0 py-0">
       <div className="relative flex aspect-3/2 items-center justify-center overflow-hidden bg-muted">
         <div className="absolute inset-0">
           <MovieCover source={movie.cover ?? ''} />

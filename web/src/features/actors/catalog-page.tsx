@@ -39,7 +39,7 @@ export function ActorsCatalogPage() {
     <AppPage>
       <PageHeader title="演员" description="按演员浏览作品" />
       <Input
-        className="h-8 w-full sm:w-60"
+        className="w-full sm:w-60"
         placeholder="搜索演员名称"
         value={query}
         onChange={event => setQuery(event.target.value)}

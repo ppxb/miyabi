@@ -14,7 +14,7 @@ export function MovieRecommendations({
 
   return (
     <section className="space-y-4">
-      <h2 className="text-xl font-semibold tracking-normal">{title}</h2>
+      <h2 className="text-xl font-semibold">{title}</h2>
       <MovieGridLayout>
         {visible.map(movie => (
           <DiscoverMovieCard key={movie.id} movie={referenceMovie(movie)} allowSubscribe={false} />

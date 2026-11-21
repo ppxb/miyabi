@@ -40,7 +40,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
 function AppHeader({ onOpenSearch }: { onOpenSearch: () => void }) {
   return (
-    <header className="sticky top-0 z-50 flex h-12 shrink-0 items-center gap-2 overflow-hidden rounded-t-[inherit] border-b bg-background/50 px-4 backdrop-blur-md transition-[width,height] ease-linear lg:px-6">
+    <header className="sticky top-0 z-50 flex h-12 shrink-0 items-center gap-2 overflow-hidden rounded-t-[inherit] border-b bg-background/50 px-4 backdrop-blur-md lg:px-6">
       <div className="flex shrink-0 items-center gap-1 lg:gap-2">
         <SidebarTrigger className="-ml-1" />
         <Separator

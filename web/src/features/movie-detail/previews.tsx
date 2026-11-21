@@ -18,7 +18,7 @@ export function MoviePreviews({ images }: { images: PreviewImage[] }) {
 
   return (
     <section className="space-y-4">
-      <h2 id="movie-previews-title" className="text-xl font-semibold tracking-normal">
+      <h2 id="movie-previews-title" className="text-xl font-semibold">
         预览图
       </h2>
       {items.length === 0 ? (

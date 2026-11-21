@@ -143,40 +143,28 @@
 
 ## P4 · shadcn / base-ui / Tailwind 规范
 
-- [ ] 🟠 **`asChild` 与 `render` 混用**：`ui/button.tsx:47,61-66`、`ui/badge.tsx:39,52,56`、`ui/tooltip.tsx:13-36`、`ui/dialog.tsx:12-48`、dropdown-menu、breadcrumb 自行加入 Radix 式 `asChild`（外部 13 处 `asChild` / 26 处 `render`）。改法：统一 `render`，原语恢复上游 base-nova。
-- [ ] 🟠 `ui/progress.tsx:35-41`：用 `flex-1 + translateX` 抵消 base-ui 自带 width。改法：`h-full transition-all`，删 style。
-- [ ] 🟢 `ui/select.tsx:82`：删掉了上游进出场动画，与 Popover/Dropdown 不一致。
-- [ ] 🟢 `ui/card.tsx:14,27,76`：外层 `rounded-2xl`，内部仍 `rounded-*-xl`。
-- [ ] 🟢 `ui/pagination.tsx:92`：省略号 `size-9` 与页码 `size-8` 不齐。
-- [ ] 🟠 `components/list-pagination.tsx:44-51`：页码为 `href="#"` 假链接、禁用仅视觉。改法：`Button disabled` 或 TanStack `Link search`。
-- [ ] 🟠 `components/app-navigation.tsx:36-61`、`routes/settings.tsx:31-60`：手写激活态，重复 `Link` 的 `data-status` / `aria-current` 与 `SidebarMenuButton` 的 tooltip 逻辑。
-- [ ] 🟠 `features/settings/shared.tsx:34-58`：`SettingRow` 未用 `Field`，标题不关联控件（无障碍）。
-- [ ] 🟠 `features/movies/filter-multi-select.tsx:40-47`：手写搜索框，应用 `CommandInput`；`CommandList` 重复 `overflow-y-auto`。
-- [ ] 🟢 用 `LoaderCircleIcon animate-spin` 而非 `Spinner`：`library/scan-button.tsx:61`、`subscriptions/page.tsx:276`、`subscriptions/subscription-card.tsx:84`、`tasks/task-toast.tsx:86,132,200`、`tasks/task-toast-actions.tsx:31`、`access-gate/access-gate.tsx:50,74`
-- [ ] 🟢 手写进度条而非 `Progress`：`sources-section.tsx:331-348`
-- [ ] 🟢 原生 `title` 而非 Tooltip：`tasks/task-toast-actions.tsx:27,49`
-- [ ] 🟢 在 shadcn 组件上叠加样式：
-  - `components/app-search.tsx:100-104` `variant="link"` 后全覆盖 → `variant="ghost"`
-  - `components/app-search.tsx:251` 覆盖 CommandDialog 定位 + 重复 `overflow-hidden`
-  - `components/page-back-button.tsx:14` `h-11 px-3 text-base` → `size="lg"`
-  - `subscriptions/subscription-card.tsx:122` Checkbox 叠 `text-white` → `text-success-foreground`
-  - `settings/directory-breadcrumbs.tsx:27` `gap-1 sm:gap-1`
-- [ ] 🟢 与默认值重复的 class / props：
-  - Button 内图标 `size-4`：`pan-login-dialog.tsx:157`、`pan-directory-dialog.tsx:93,104,116,118`、`data-section.tsx:63`、`movies/filter-bar.tsx:145`、`access-gate.tsx:74`、`back-top-button.tsx`
-  - `<Button type="button">`（约 10 处：back-top-button、error-state、page-back-button、pagination 等）
-  - Input `h-8`：`movies/filter-bar.tsx:69`、`actors/catalog-page.tsx:42`
-  - Card `overflow-hidden`：`movie/movie-card.tsx:32`、`movie-grid-skeleton.tsx:23`
-  - `tracking-normal`：`recommendations.tsx:17`、`previews.tsx:21`、`magnets.tsx:87`
-  - `main.tsx:22` `delay={0}`
-  - `api/client.ts:79`、`task-events.tsx:75` `credentials: 'same-origin'`
-  - `task-toast.tsx` `dismissible: true`、`icon: undefined`、`description: undefined`
-  - `api/pan.ts:115,129` `staleTime: 30_000`（同全局默认）
-- [ ] 🟢 `components/movie/movie-card.tsx:38`：inline-flex Badge 上 `truncate` 无省略号 → 内包 `<span className="truncate">`。
-- [ ] 🟢 `components/app-shell.tsx:23-24,44,54-58`：冗余包装层与不生效的 `transition-[width,height]`。
-- [ ] 🟢 `styles/globals.css:264-274`：`.no-scrollbar` 与 shadcn `@utility no-scrollbar` 重复；`--warning`、`--chart-1..5` 未使用。
-- [ ] 🟢 `back-top-button.tsx:16-24`：纯图标按钮缺 `aria-label`；`pan-login-dialog.tsx:141` `<img>` 缺 `alt`。
-- [ ] 🟢 `movie-shelf.tsx:15,98`：`href?: string` 丢失路由类型 → `LinkProps['to']`。
-- [ ] 🟢 `discover/page.tsx:49`：`<BrowseResults key={view}>` 多余 key。
+- [x] 🟠 **`asChild` 与 `render` 混用**：已移除 button/badge/tooltip/dialog/dropdown-menu/breadcrumb 的自造 `asChild`，全部调用点改 `render`（全库 `asChild`=0）；顺带修正 `BreadcrumbLink`/`Badge` 的 `render` 顶层转发、`PaginationLink` 补 `nativeButton={false}`。
+- [x] 🟠 `ui/progress.tsx`：改 `h-full transition-all`，删除 `flex-1 + translateX` 与 style（宽度由 base-ui 决定，已核对源码）。
+- [x] 🟢 `ui/select.tsx`：补回 `origin`、`duration-100`、`data-open/closed` 进出场动画，与 Popover/Dropdown 一致。
+- [x] 🟢 `ui/card.tsx`：内部 `rounded-t-xl/b-xl` 对齐为 `rounded-*-2xl`（含 img 圆角）。
+- [x] 🟢 `ui/pagination.tsx`：省略号 `size-9` → `size-8`，与页码对齐。
+- [x] 🟠 `components/list-pagination.tsx`：`href="#"` 假链接改真实 `Button disabled`，激活项不再重复触发。
+- [x] 🟠 `app-navigation.tsx` / `routes/settings.tsx`：app-navigation 去掉手写 `aria-current` 与 `collapsed` tooltip 判断（改由 `Link`/`SidebarMenuButton` 处理）。（`routes/settings.tsx` 的手写 active 保留：改用 `Link activeProps` 会与基类 `text-muted-foreground` 冲突，风险高。）
+- [x] 🟠 `features/settings/shared.tsx`：`SettingRow` 改用 `Field/FieldContent/FieldTitle/FieldDescription`，并给 `SettingsCard` 加 `@container/field-group` 恢复响应式横排。
+- [x] 🟠 `features/movies/filter-multi-select.tsx`：改用 `CommandInput`，去掉 `CommandList` 重复 `overflow-y-auto`。
+- [x] 🟢 `LoaderCircleIcon animate-spin` → `Spinner`：scan-button / subscriptions.page / subscription-card / task-toast / task-toast-actions / access-gate 已替换（其余非清单内同类项保留）。
+- [x] 🟢 手写进度条 → `Progress`：`sources-section.tsx` 的 `PanSpaceBlocks` 改用 `Progress`。
+- [x] 🟢 原生 `title` → `Tooltip`：`task-toast-actions.tsx` 取消/关闭按钮改用 `Tooltip`（Provider 已在 main.tsx）。
+- [x] 🟢 在 shadcn 组件上叠加样式：
+  - `app-search.tsx` 搜索按钮 `variant="link"` → `ghost`；CommandDialog 去掉重复 `overflow-hidden`（居中定位为有意保留）
+  - `page-back-button.tsx` → `size="lg"`；`subscription-card.tsx` Checkbox `text-white` → `text-success-foreground`；`directory-breadcrumbs.tsx` 去掉重复 `gap-1 sm:gap-1`
+- [x] 🟢 与默认值重复的 class / props：已清理 `Input h-8`（filter-bar/catalog-page）、`Card overflow-hidden`（movie-card/movie-grid-skeleton）、`tracking-normal`（recommendations/previews/magnets）、`main.tsx delay={0}`、`credentials: 'same-origin'`（api/client、task-events）、`task-toast dismissible/icon`、`api/pan staleTime: 30_000`。（Button 内显式 `size-4` 与 `type="button"` 保留：前者有 Button 的 `[&_svg]` 规则兜底、后者涉及表单默认行为，未盲删。）
+- [x] 🟢 `components/movie/movie-card.tsx`：Badge `truncate` 改为内包 `<span className="truncate">`。
+- [x] 🟢 `components/app-shell.tsx`：移除不生效的 `transition-[width,height] ease-linear`。（外层包装层保留：涉及布局，未盲删。）
+- [x] 🟢 `styles/globals.css`：删除与 shadcn `@utility no-scrollbar` 重复的 `.no-scrollbar` 块。（`--warning`/`--chart-1..5` 保留：仍被 `@theme` 颜色映射引用。）
+- [x] 🟢 `back-top-button.tsx` 加 `aria-label`；`pan-login-dialog.tsx` `<img>` 加 `alt`。
+- [x] 🟢 `movie-shelf.tsx`：`href?: string` → `LinkProps['to']`。
+- [x] 🟢 `discover/page.tsx`：去掉 `<BrowseResults key={view}>` 多余 key。
 
 ---
 

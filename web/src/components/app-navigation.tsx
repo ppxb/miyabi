@@ -35,8 +35,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
 
 export function AppNavigation() {
   const pathname = useLocation({ select: location => location.pathname })
-  const { state, isMobile, setOpenMobile } = useSidebar()
-  const collapsed = state === 'collapsed' && !isMobile
+  const { setOpenMobile } = useSidebar()
 
   return (
     <SidebarMenu className="gap-1">
@@ -53,12 +52,11 @@ export function AppNavigation() {
                 <Link
                   to={item.to}
                   activeOptions={{ exact: item.to === '/', includeSearch: false }}
-                  aria-current={active ? 'page' : undefined}
                   onClick={() => setOpenMobile(false)}
                 />
               }
               isActive={active}
-              tooltip={collapsed ? item.label : undefined}
+              tooltip={item.label}
             >
               <item.icon aria-hidden="true" />
               <span>{item.label}</span>

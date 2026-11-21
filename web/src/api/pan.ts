@@ -110,8 +110,7 @@ export function usePanLoginStatus(id: string) {
 export function usePanAccounts() {
   return useQuery({
     queryKey: panKeys.accounts,
-    queryFn: ({ signal }) => apiGet<PanAccountStatus[]>('/api/pan/accounts', undefined, signal),
-    staleTime: 30_000
+    queryFn: ({ signal }) => apiGet<PanAccountStatus[]>('/api/pan/accounts', undefined, signal)
   })
 }
 
@@ -124,8 +123,7 @@ export function usePanAccountStatus(accountID: string) {
         undefined,
         signal
       ),
-    enabled: accountID !== '',
-    staleTime: 30_000
+    enabled: accountID !== ''
   })
 }
 

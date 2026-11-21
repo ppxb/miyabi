@@ -49,6 +49,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
+import { Progress } from '@/components/ui/progress'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { PanDirectoryDialog } from '@/features/settings/pan-directory-dialog'
@@ -354,14 +355,10 @@ function PanSourceCard({
 function PanSpaceBlocks({ space }: { space: PanAccount['space'] }) {
   const total = space.total.bytes > 0 ? space.total.bytes : space.used.bytes + space.remaining.bytes
   const usedPercent = total > 0 ? (space.used.bytes / total) * 100 : 0
-  const remainingPercent = total > 0 ? 100 - usedPercent : 0
 
   return (
     <div className="space-y-1">
-      <div className="flex h-2 w-full gap-1">
-        <div className="bg-info" style={{ width: `${usedPercent}%` }} />
-        <div className="bg-muted-foreground/30" style={{ width: `${remainingPercent}%` }} />
-      </div>
+      <Progress value={usedPercent} variant="info" className="h-2" />
       <div className="flex justify-between gap-2 text-xs text-muted-foreground">
         <span>已用 {space.used.formatted}</span>
         <span>可用 {space.remaining.formatted}</span>

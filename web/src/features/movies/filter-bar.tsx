@@ -64,7 +64,7 @@ export function MovieFilterBar({
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
       <Input
-        className="h-8 w-full sm:w-60"
+        className="w-full sm:w-60"
         placeholder="搜索番号或标题"
         value={query}
         onChange={event => setQuery(event.target.value)}

@@ -74,8 +74,7 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
       probeTimer = setTimeout(() => controller.abort(), 5000)
       try {
         const response = await fetch('/api/tasks/events', {
-          signal: controller.signal,
-          credentials: 'same-origin'
+          signal: controller.signal
         })
         if (disposed) return
         controller.signal.throwIfAborted()

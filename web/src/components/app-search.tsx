@@ -242,7 +242,7 @@ export function SearchDialog({
       onOpenChange={handleOpenChange}
       title="搜索"
       description="搜索本地影片与演员"
-      className="top-1/2 max-h-[90vh] -translate-y-1/2 overflow-hidden sm:max-w-3xl"
+      className="top-1/2 max-h-[90vh] -translate-y-1/2 sm:max-w-3xl"
     >
       <Command shouldFilter={false}>
         <CommandInput

@@ -33,9 +33,7 @@ function taskToastOptions(
   return {
     id,
     duration: active ? Infinity : 8000,
-    dismissible: true,
     closeButton: false,
-    icon: undefined,
     onDismiss: options.onDismiss,
     action: <TaskToastActions id={id} retryTaskID={retryTaskID} cancelTaskID={cancelTaskID} />
   }

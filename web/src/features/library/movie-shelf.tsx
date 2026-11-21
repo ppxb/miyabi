@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router'
+import { Link, type LinkProps } from '@tanstack/react-router'
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
@@ -12,7 +12,7 @@ export function MovieShelf({
 }: {
   title: string
   itemCount: number
-  href?: string
+  href?: LinkProps['to']
   children: ReactNode
 }) {
   if (itemCount === 0) return null
@@ -31,7 +31,7 @@ function MovieShelfContent({
 }: {
   title: string
   itemCount: number
-  href?: string
+  href?: LinkProps['to']
   children: ReactNode
 }) {
   const listRef = useRef<HTMLDivElement>(null)

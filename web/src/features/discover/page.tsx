@@ -46,7 +46,6 @@ export function DiscoverPage() {
           />
         ) : (
           <BrowseResults
-            key={view}
             params={{
               page,
               limit: PAGE_SIZE,

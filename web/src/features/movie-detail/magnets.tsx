@@ -84,7 +84,7 @@ export function MovieMagnets({
 
   return (
     <section className="space-y-4">
-      <h2 className="text-xl font-semibold tracking-normal">磁力链</h2>
+      <h2 className="text-xl font-semibold">磁力链</h2>
       {hasAccounts && accounts.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           请先到{' '}
