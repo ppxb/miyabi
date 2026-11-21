@@ -167,7 +167,7 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
         <div className="flex flex-col gap-2">
           <h2 className="text-xl font-semibold">图集</h2>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-            {Array.from({ length: actor.image_count }).map((_, index) => (
+            {Array.from({ length: Math.min(actor.image_count, 12) }).map((_, index) => (
               <div key={index} className="aspect-3/4 w-full overflow-hidden rounded-lg">
                 <MediaImage
                   source={`/api/actors/${actor.key}/image/${index}`}
