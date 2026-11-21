@@ -63,9 +63,6 @@ func (d *Drive) accountToken(accountID string) pan.Tokens {
 func (d *Drive) setAccountToken(accountID string, tokens pan.Tokens) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if d.accountTokens == nil {
-		d.accountTokens = make(map[string]pan.Tokens)
-	}
 	d.accountTokens[accountID] = tokens
 }
 
@@ -79,9 +76,6 @@ func (d *Drive) accountMount(accountID string) (mountRecord, bool) {
 func (d *Drive) setAccountMount(accountID string, mount mountRecord) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if d.accountMounts == nil {
-		d.accountMounts = make(map[string]mountRecord)
-	}
 	d.accountMounts[accountID] = mount
 }
 

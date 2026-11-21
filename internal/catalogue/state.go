@@ -45,7 +45,7 @@ func (service *Service) MovieStates(ctx context.Context, identities []MovieIdent
 			taskIDs = append(taskIDs, codes[index])
 		}
 	}
-	if len(taskIDs) == 0 || service.database == nil {
+	if len(taskIDs) == 0 {
 		return result, nil
 	}
 

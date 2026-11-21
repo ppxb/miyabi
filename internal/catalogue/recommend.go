@@ -20,9 +20,6 @@ const recommendationLimit = 12
 // needed and only locally-known titles are ever recommended.
 func (service *Service) LocalRecommendations(ctx context.Context, meta domain.MovieMetadata) (actorMovies, relatedMovies []domain.MovieReference, err error) {
 	actorMovies, relatedMovies = []domain.MovieReference{}, []domain.MovieReference{}
-	if service.database == nil {
-		return actorMovies, relatedMovies, nil
-	}
 	detail := meta.Detail
 	excludeCode := codeid.Normalize(detail.Code)
 	seen := map[string]bool{excludeCode: true}

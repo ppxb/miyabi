@@ -182,9 +182,6 @@ func (c *Client) store(code string, parsed detail) {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.cache == nil {
-		c.cache = make(map[string]cacheEntry)
-	}
 	if c.cacheSize > 0 && len(c.cache) >= c.cacheSize {
 		for key := range c.cache {
 			delete(c.cache, key)

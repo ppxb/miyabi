@@ -366,26 +366,11 @@ func (a *App) Run(ctx context.Context) error {
 
 // Close releases resources held by the application.
 func (a *App) Close() error {
-	if a.embySvc != nil {
-		a.embySvc.Close()
-	}
-	if a.scrape != nil {
-		a.scrape.Close()
-	}
-	if a.metadata != nil {
-		a.metadata.Close()
-	}
-	if a.catalogue != nil {
-		a.catalogue.Close()
-	}
-	if a.play != nil {
-		a.play.Close()
-	}
-	if a.driveSvc != nil {
-		a.driveSvc.Close()
-	}
-	if a.store != nil {
-		return a.store.Close()
-	}
-	return nil
+	a.embySvc.Close()
+	a.scrape.Close()
+	a.metadata.Close()
+	a.catalogue.Close()
+	a.play.Close()
+	a.driveSvc.Close()
+	return a.store.Close()
 }
