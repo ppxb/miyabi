@@ -73,7 +73,6 @@ function MovieStats({
         : '暂无评分',
     icon: StarIcon
   })
-  if (stats.length === 0) return null
 
   return <StatList stats={stats} />
 }

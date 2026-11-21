@@ -20,6 +20,7 @@ import { historyKeys } from '@/api/history'
 import { savePlaybackProgress, usePlayQualities, useStartMoviePlayback } from '@/api/play'
 import type { PlaybackResume } from '@/api/play'
 import { InlineError } from '@/components/error-state'
+import { StatList } from '@/components/stat-list'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -41,12 +42,11 @@ export function LibraryPlayerDialog({
   movieId,
   onClose
 }: {
-  movieId: number | null
+  movieId: number
   onClose: () => void
 }) {
   const [open, setOpen] = useState(true)
   const surfaceRef = useRef<HTMLDivElement>(null)
-  if (movieId === null) return null
   return (
     <Dialog
       open={open}
@@ -480,24 +480,8 @@ function MovieStats({ movie }: { movie: LibraryMovieDetail }) {
         : '暂无评分',
     icon: StarIcon
   })
-  if (stats.length === 0) return null
 
-  return (
-    <dl className="flex flex-wrap divide-x divide-border/60 rounded-2xl bg-muted py-1 ring-1 ring-border dark:bg-card/60 dark:ring-0">
-      {stats.map(stat => (
-        <div
-          key={stat.label}
-          className="flex min-w-0 flex-1 flex-col items-center gap-2 p-3 sm:p-4"
-        >
-          <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <stat.icon className="size-4" />
-            {stat.label}
-          </dt>
-          <dd className="text-sm font-semibold whitespace-nowrap tabular-nums">{stat.value}</dd>
-        </div>
-      ))}
-    </dl>
-  )
+  return <StatList stats={stats} />
 }
 
 function InfoRow({ label, children }: { label: string; children: ReactNode }) {

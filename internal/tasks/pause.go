@@ -15,12 +15,9 @@ const libraryPauseKey = "tasks.library_paused"
 var ErrPaused = errors.New("library processing paused")
 
 func LibraryPaused(ctx context.Context, db *ent.Client) (bool, error) {
-	value, found, err := database.LoadSetting[bool](ctx, db, libraryPauseKey)
+	value, _, err := database.LoadSetting[bool](ctx, db, libraryPauseKey)
 	if err != nil {
 		return false, err
-	}
-	if !found {
-		return false, nil
 	}
 	return value, nil
 }

@@ -257,9 +257,6 @@ func (c *Client) validateResponse(status int, body string) error {
 }
 
 func (c *Client) runProxyWatch() {
-	if c.fingerprint == nil {
-		return
-	}
 	c.fingerprint.Watch(c.ctx.Done(), func() {
 		if err := c.fingerprint.Refresh(); err != nil {
 			slog.WarnContext(c.ctx, "JavBus transport keeps previous proxy after change", "error", err)

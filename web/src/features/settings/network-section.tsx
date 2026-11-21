@@ -64,11 +64,6 @@ function NetworkForm({ config, onSaved }: { config: NetworkConfig; onSaved: () =
       return
     }
 
-    if (!config.enabled) {
-      updateField('enabled', false)
-      return
-    }
-
     updateField('enabled', false)
     updateConfig.mutate(
       { ...config, enabled: false },
@@ -120,8 +115,7 @@ function NetworkForm({ config, onSaved }: { config: NetworkConfig; onSaved: () =
           <SettingRow title="代理地址" description="支持 HTTP、HTTPS 与 SOCKS5 代理协议">
             <Input
               ref={inputRef}
-              autoFocus={form.enabled && !initial.enabled}
-              type="text"
+              autoFocus={!initial.enabled}
               value={form.url}
               placeholder="http://127.0.0.1:7890"
               disabled={disabled}

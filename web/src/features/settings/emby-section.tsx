@@ -132,15 +132,13 @@ function EmbyForm({ config, onSaved }: { config: EmbyConfig; onSaved: () => void
     const trimmedServerUrl = form.server_url.trim()
     const trimmedKey = form.api_key.trim()
 
-    if (form.enabled) {
-      if (!trimmedServerUrl) {
-        toast.error('启用 Emby 集成时必须填写服务器地址')
-        return
-      }
-      if (!trimmedKey) {
-        toast.error('启用 Emby 集成时必须填写 API Key')
-        return
-      }
+    if (!trimmedServerUrl) {
+      toast.error('请填写服务器地址')
+      return
+    }
+    if (!trimmedKey) {
+      toast.error('请填写 API Key')
+      return
     }
 
     const payload: EmbyConfig = {

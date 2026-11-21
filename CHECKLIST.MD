@@ -253,7 +253,7 @@
 ### 🟢 低
 
 组件重复 / 复用
-- [ ] `library/player-dialog.tsx:465-486` `MovieStats` 手写一份 `StatList`（缺 `sm:text-base`）；评分格式化与 `movie-detail/hero.tsx` 重复。
+- [x] `library/player-dialog.tsx:465-486` `MovieStats` 手写一份 `StatList`（缺 `sm:text-base`）；评分格式化与 `movie-detail/hero.tsx` 重复。（已复用 `StatList`；评分格式化文案仍各写一处，属可接受的小重复）
 - [ ] `library/player-dialog.tsx:79` 用 JS `useScrollFade`，`movie-detail/dialog.tsx:34` 用 shadcn `scroll-fade` 工具类，二选一。
 - [ ] `history/page.tsx:59-76` 与 `library/continue-watching.tsx:15-29` 「历史条目→卡片」重复且进度算法不一致（前者 clamp+round）。改法：抽 `historyToCard(item)`。
 - [ ] `components/list-pagination.tsx:36-46` 重写了 `PaginationLink`（后者已 0 调用）；`data-active` 无样式使用。
@@ -266,19 +266,19 @@
 - [ ] `settings/shared.tsx:10` 手写 `@container/field-group`，应用 `FieldGroup`；`:52` 视口断点 `sm:gap-6` 与容器查询混用；`:56` 覆盖 `FieldDescription` 默认样式。
 - [ ] `components/app-search.tsx:126-133` 外层 `span` 包 `MediaImage` 的 `div`（非法嵌套）、`bg-muted` 重复；`image` 为空分支可交给 `MediaImage` 占位。
 - [ ] `settings/emby-section.tsx:240`、`network-section.tsx:132` 常驻 `LoaderCircleIcon invisible` 占位，与全站 `Spinner` 不一致。
-- [ ] `settings/scraping-section.tsx:79-84` 单个 `Switch` 外多余 `div`。
+- [x] `settings/scraping-section.tsx:79-84` 单个 `Switch` 外多余 `div`。（已随 `SourceToggleList` 重构移除多余包裹）
 - [ ] 待确认：`components/page-back-button.tsx` 改 `size="lg"` 后由 `h-11 text-base` 变为 `h-9 text-sm`，是否有意。
 - [ ] 待确认：`videojs/ui/container.tsx:22` 删除 `focus-visible:outline-media-ring` 改 `outline-none`，键盘用户无焦点提示；可改为 `focus({ preventScroll: true, focusVisible: false })`。
 
 死代码 / 过度防御
-- [ ] `player-dialog.tsx:483`、`hero.tsx:76` `stats.length === 0` 恒假（评分恒 push）。
-- [ ] `player-dialog.tsx:49` `movieId === null` 多余（调用方均经 `LazyLibraryPlayerDialog` 过滤）。
-- [ ] `discover/browse-results.tsx:27` `!movies.data` 多余。
-- [ ] `discover/category-filters.tsx:104`、`common-filter-select.tsx:31` placeholder 永不显示（value 恒有 `'all'`）。
-- [ ] `emby-section.tsx:129` `if (form.enabled)` 恒真；`network-section.tsx:99` 不可达分支；`:121-122` `form.enabled &&`、`type="text"` 多余。
+- [x] `player-dialog.tsx:483`、`hero.tsx:76` `stats.length === 0` 恒假（评分恒 push）。（已删除两处恒假守卫）
+- [x] `player-dialog.tsx:49` `movieId === null` 多余（调用方均经 `LazyLibraryPlayerDialog` 过滤）。（已删除，`LibraryPlayerDialog` 的 `movieId` 改为 `number`）
+- [x] `discover/browse-results.tsx:27` `!movies.data` 多余。（已改为 `movies.isPending`）
+- [x] `discover/category-filters.tsx:104`、`common-filter-select.tsx:31` placeholder 永不显示（value 恒有 `'all'`）。（已移除两处 placeholder）
+- [x] `emby-section.tsx:129` `if (form.enabled)` 恒真；`network-section.tsx:99` 不可达分支；`:121-122` `form.enabled &&`、`type="text"` 多余。（已清理：emby 去掉恒真判断；network 去掉不可达分支、冗余 autoFocus 条件与 `type="text"`）
 - [ ] `sources-section.tsx:185,188,200,208` 确认后先关弹窗，`save.isPending` 守卫不可达；`:392-397` 重新拼回 `option` 对象。
 - [ ] `tasks/task-events.tsx:39,127-130` `instanceRef` 多余（instance 已随 revisions 存入 ref）；`task-toast.tsx:61-83` `active` 恒 false、`description: undefined` 多余。
-- [ ] `components/ui/progress.tsx:19,38` `percent` 变量仅剩判空用途；`app-shell.tsx:64` `const current = theme` 无意义别名。
+- [x] `components/ui/progress.tsx:19,38` `percent` 变量仅剩判空用途；`app-shell.tsx:64` `const current = theme` 无意义别名。（已改用 `value == null` 判定并删除别名）
 - [ ] `tasks/pause.go:21-25` `!found` 分支冗余；`javbus/client.go:257` `fingerprint == nil` 不可能；`api/router.go:50` TrustedProxies 回退已被 `config.validate` 覆盖。
 - [ ] `subscription-section.tsx:49` `items={[...options]}` 每次渲染复制；`:51` `next ?? ''` 写空串；三处 `as MagnetPreferences[...]`。改法：`PreferenceSelect<T extends string>` 泛型。
 

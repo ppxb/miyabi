@@ -28,7 +28,7 @@ export function CommonFilterSelect({
       onValueChange={next => onValueChange(next === 'all' ? '' : (next ?? ''))}
     >
       <SelectTrigger className="w-full sm:w-48">
-        <SelectValue placeholder="全部条件" />
+        <SelectValue />
       </SelectTrigger>
       <SelectContent align="start">
         <SelectGroup>

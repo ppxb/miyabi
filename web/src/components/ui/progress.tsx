@@ -16,8 +16,6 @@ function Progress({
 }: ProgressPrimitive.Root.Props & {
   variant?: keyof typeof indicatorColors
 }) {
-  const percent = value == null ? null : (value / max) * 100
-
   return (
     <ProgressPrimitive.Root
       data-slot="progress"
@@ -35,7 +33,7 @@ function Progress({
           className={cn(
             'h-full transition-all',
             indicatorColors[variant],
-            percent === null &&
+            value == null &&
               'w-1/3 flex-none animate-[progress-indeterminate_1.5s_ease-in-out_infinite]'
           )}
         />

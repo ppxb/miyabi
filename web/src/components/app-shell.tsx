@@ -61,8 +61,7 @@ function AppHeader({ onOpenSearch }: { onOpenSearch: () => void }) {
 
 function ThemeSwitcher() {
   const { theme, setTheme } = useTheme()
-  const current = theme
-  const nextTheme = THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length] ?? 'system'
+  const nextTheme = THEME_CYCLE[(THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length] ?? 'system'
 
   return (
     <Tooltip>
@@ -76,7 +75,7 @@ function ThemeSwitcher() {
           />
         }
       >
-        {current === 'system' ? <MonitorIcon /> : current === 'dark' ? <SunIcon /> : <MoonIcon />}
+        {theme === 'system' ? <MonitorIcon /> : theme === 'dark' ? <SunIcon /> : <MoonIcon />}
       </TooltipTrigger>
       <TooltipContent side="bottom" sideOffset={8}>
         切换主题

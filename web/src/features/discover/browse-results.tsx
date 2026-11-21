@@ -24,7 +24,7 @@ export function BrowseResults({
       />
     )
   }
-  if (movies.isPending || !movies.data) {
+  if (movies.isPending) {
     return <MovieGridSkeleton count={DISCOVER_PAGE_SIZE} />
   }
   const items = movies.data

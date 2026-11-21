@@ -101,7 +101,7 @@ export function CategoryFilters({
             }
           >
             <SelectTrigger className="w-full sm:w-56">
-              <SelectValue placeholder="全部标签" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent align="start">
               <SelectGroup>
