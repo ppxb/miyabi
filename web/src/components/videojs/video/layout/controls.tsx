@@ -14,9 +14,9 @@ import { VideoSettingsMenu } from '../menus/settings-menu'
 
 export interface DefaultVideoControlsProps {
   renderThumbnail?: NonNullable<ComponentProps<typeof TimeSlider>>['renderThumbnail']
-  qualityOptions?: import('@/components/videojs/ui/custom-quality-menu').QualityChoice[]
-  qualityValue?: string
-  onQualityChange?: (value: string) => void
+  qualityOptions: import('@/components/videojs/ui/custom-quality-menu').QualityChoice[]
+  qualityValue: string
+  onQualityChange: (value: string) => void
   onSettingsOpen?: () => void
 }
 
@@ -26,7 +26,7 @@ export function DefaultVideoControls({
   qualityValue,
   onQualityChange,
   onSettingsOpen
-}: DefaultVideoControlsProps = {}) {
+}: DefaultVideoControlsProps) {
   return (
     <Controls.Root>
       <BufferingIndicator className={'group/buffering contents'}>

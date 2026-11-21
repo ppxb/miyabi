@@ -22,9 +22,9 @@ export interface VideoSkinProps extends Omit<
   children?: ReactNode
   renderPoster?: NonNullable<ComponentProps<typeof Poster>>['renderImage']
   renderThumbnail?: NonNullable<ComponentProps<typeof DefaultVideoControls>>['renderThumbnail']
-  qualityOptions?: NonNullable<ComponentProps<typeof DefaultVideoControls>>['qualityOptions']
-  qualityValue?: string
-  onQualityChange?: (value: string) => void
+  qualityOptions: NonNullable<ComponentProps<typeof DefaultVideoControls>>['qualityOptions']
+  qualityValue: string
+  onQualityChange: (value: string) => void
   onSettingsOpen?: () => void
 }
 
@@ -38,7 +38,7 @@ export function VideoSkin({
   onQualityChange,
   onSettingsOpen,
   ...props
-}: VideoSkinProps = {}) {
+}: VideoSkinProps) {
   return (
     <Container
       className={cn('pointer-fine:not-data-controls-visible:cursor-none', className)}

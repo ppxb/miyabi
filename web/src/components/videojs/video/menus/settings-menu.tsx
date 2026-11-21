@@ -10,26 +10,24 @@ export type VideoSettingsMenuProps = Omit<
   NonNullable<ComponentProps<typeof SettingsMenu>>,
   'children'
 > & {
-  qualityOptions?: QualityChoice[]
-  qualityValue?: string
-  onQualityChange?: (value: string) => void
+  qualityOptions: QualityChoice[]
+  qualityValue: string
+  onQualityChange: (value: string) => void
 }
 
 export function VideoSettingsMenu({
-  qualityOptions = [],
-  qualityValue = '',
+  qualityOptions,
+  qualityValue,
   onQualityChange,
   ...props
-}: VideoSettingsMenuProps = {}) {
+}: VideoSettingsMenuProps) {
   return (
     <SettingsMenu {...props}>
-      {qualityOptions.length > 0 ? (
-        <CustomQualityMenu
-          options={qualityOptions}
-          value={qualityValue}
-          onValueChange={onQualityChange ?? (() => {})}
-        />
-      ) : null}
+      <CustomQualityMenu
+        options={qualityOptions}
+        value={qualityValue}
+        onValueChange={onQualityChange}
+      />
       <AudioTrackMenu />
       <PlaybackRateSubmenu />
       <CaptionsSubmenu />
