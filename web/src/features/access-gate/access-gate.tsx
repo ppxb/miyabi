@@ -2,6 +2,7 @@ import { LoaderCircleIcon } from 'lucide-react'
 import { useEffect, useState, type FormEvent, type PropsWithChildren } from 'react'
 
 import { useAccessGateConfig, useAccessGateLogin } from '@/api/auth'
+import { describeApiError } from '@/api/client'
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -69,7 +70,7 @@ export function AccessGate({ children }: PropsWithChildren) {
                 disabled={login.isPending}
                 onChange={event => setPassword(event.target.value)}
               />
-              {login.error ? <InlineError>{login.error.message}</InlineError> : null}
+              {login.error ? <InlineError>{describeApiError(login.error)}</InlineError> : null}
               <Button type="submit" className="w-full" disabled={!password || login.isPending}>
                 {login.isPending ? <LoaderCircleIcon className="size-4 animate-spin" /> : null}
                 进入
