@@ -4,7 +4,6 @@
 package projectjav
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -136,28 +135,10 @@ func (c *Client) search(ctx context.Context, code string) ([]byte, error) {
 	if err != nil {
 		return nil, domain.E(domain.KindUpstream, "读取 ProjectJav 响应失败", err)
 	}
-	if isChallenge(body) {
+	if netx.IsCloudflareInterstitial(body) {
 		return nil, domain.Blocked("ProjectJav 遇到 Cloudflare 挑战")
 	}
 	return body, nil
-}
-
-// isChallenge reports a real Cloudflare interstitial. ProjectJav's normal pages
-// reference the "challenge-platform" script, so netx.IsCloudflareChallenge would
-// false-positive; match only unmistakable challenge markers instead.
-func isChallenge(body []byte) bool {
-	lower := bytes.ToLower(body)
-	for _, marker := range [][]byte{
-		[]byte("just a moment"),
-		[]byte("attention required! | cloudflare"),
-		[]byte("cf-challenge"),
-		[]byte("__cf_chl"),
-	} {
-		if bytes.Contains(lower, marker) {
-			return true
-		}
-	}
-	return false
 }
 
 // Close releases the transport and stops proxy watching. Safe to call twice.

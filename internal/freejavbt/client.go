@@ -134,7 +134,7 @@ func (c *Client) get(ctx context.Context, target string) ([]byte, error) {
 	if len(body) > maxBodyBytes {
 		return nil, fmt.Errorf("freejavbt 响应超过 %d 字节", maxBodyBytes)
 	}
-	if netx.IsCloudflareChallenge(body) {
+	if netx.IsCloudflareInterstitial(body) {
 		return nil, domain.Blocked("freejavbt 遇到 Cloudflare 挑战")
 	}
 	return body, nil
