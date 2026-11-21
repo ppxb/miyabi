@@ -67,16 +67,25 @@ type App struct {
 
 // New initializes all services, database connections, and registers task handlers.
 // cfg must be initialized by config.Load or supplied with explicit configuration.
-func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
+func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 	ctx := context.Background()
+	var cleanup []func()
+	defer func() {
+		if err != nil {
+			for i := len(cleanup) - 1; i >= 0; i-- {
+				cleanup[i]()
+			}
+		}
+	}()
+
 	store, err := database.Open(ctx, cfg.DataDir)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
+	cleanup = append(cleanup, func() { _ = store.Close() })
 
 	networkSvc, err := network.New(ctx, store.Client)
 	if err != nil {
-		_ = store.Close()
 		return nil, fmt.Errorf("initialize network service: %w", err)
 	}
 
@@ -85,15 +94,13 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	sourceSvc := source.New(store.Client)
 	driveSvc, err := drive.New(ctx, store.Client)
 	if err != nil {
-		_ = store.Close()
 		return nil, fmt.Errorf("initialize drive service: %w", err)
 	}
+	cleanup = append(cleanup, driveSvc.Close)
 	driveSvc.StartAccountRefresh(ctx)
 
 	images, err := mediaimage.NewCache(cfg.DataDir)
 	if err != nil {
-		driveSvc.Close()
-		_ = store.Close()
 		return nil, fmt.Errorf("initialize images cache: %w", err)
 	}
 
@@ -127,34 +134,24 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	})
 	javbusClient, err := javbus.New(javbus.Options{Proxy: networkSvc.ProxyManager()})
 	if err != nil {
-		driveSvc.Close()
-		_ = store.Close()
 		return nil, err
 	}
+	cleanup = append(cleanup, javbusClient.Close)
 	sukebeiClient, err := sukebei.New(sukebei.Options{Proxy: networkSvc.ProxyManager()})
 	if err != nil {
-		javbusClient.Close()
-		driveSvc.Close()
-		_ = store.Close()
 		return nil, fmt.Errorf("initialize Sukebei magnet source: %w", err)
 	}
+	cleanup = append(cleanup, sukebeiClient.Close)
 	freejavbtClient, err := freejavbt.New(freejavbt.Options{Proxy: networkSvc.ProxyManager()})
 	if err != nil {
-		sukebeiClient.Close()
-		javbusClient.Close()
-		driveSvc.Close()
-		_ = store.Close()
 		return nil, fmt.Errorf("initialize freejavbt source: %w", err)
 	}
+	cleanup = append(cleanup, freejavbtClient.Close)
 	catalogueSvc, err := catalogue.New(ctx, store.Client, networkSvc.ProxyManager(), libSvc, javbusClient, sukebeiClient, freejavbtClient)
 	if err != nil {
-		freejavbtClient.Close()
-		sukebeiClient.Close()
-		javbusClient.Close()
-		driveSvc.Close()
-		_ = store.Close()
 		return nil, fmt.Errorf("initialize catalogue service: %w", err)
 	}
+	cleanup = append(cleanup, catalogueSvc.Close)
 	fc2Source := providers.NewFC2(networkSvc.ProxyManager())
 	fc2dbSource := providers.NewFC2DB(networkSvc.ProxyManager())
 	fanzaSource := providers.NewFANZA(networkSvc.ProxyManager())
@@ -172,6 +169,13 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 	muramuraSource := providers.NewMuraMura(networkSvc.ProxyManager())
 	dahliaSource := providers.NewDahlia(networkSvc.ProxyManager())
 	dugaSource := providers.NewDuga(networkSvc.ProxyManager())
+	cleanup = append(cleanup,
+		fc2Source.Close, fc2dbSource.Close, fanzaSource.Close, heyzoSource.Close,
+		pacopacomamaSource.Close, jav321Source.Close, tokyohotSource.Close, heydougaSource.Close,
+		caribbeancomSource.Close, caribbeancomprSource.Close, c0930Source.Close, h0930Source.Close,
+		h4610Source.Close, tenmusumeSource.Close, muramuraSource.Close, dahliaSource.Close,
+		dugaSource.Close,
+	)
 	metadataSvc, err := metadata.New(ctx, store.Client, fanzaSource, fc2Source, fc2dbSource, heyzoSource, pacopacomamaSource,
 		providers.NewJavDB(catalogueSvc), providers.NewJavBus(javbusClient, networkSvc.ProxyManager()),
 		providers.NewR18(networkSvc.ProxyManager()),
@@ -181,29 +185,9 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		caribbeancomSource, caribbeancomprSource, c0930Source, h0930Source, h4610Source, tenmusumeSource, muramuraSource,
 		dahliaSource, dugaSource, freejavbtClient)
 	if err != nil {
-		fanzaSource.Close()
-		fc2Source.Close()
-		fc2dbSource.Close()
-		heyzoSource.Close()
-		pacopacomamaSource.Close()
-		jav321Source.Close()
-		tokyohotSource.Close()
-		heydougaSource.Close()
-		caribbeancomSource.Close()
-		caribbeancomprSource.Close()
-		c0930Source.Close()
-		h0930Source.Close()
-		h4610Source.Close()
-		tenmusumeSource.Close()
-		muramuraSource.Close()
-		dahliaSource.Close()
-		dugaSource.Close()
-		freejavbtClient.Close()
-		catalogueSvc.Close()
-		driveSvc.Close()
-		_ = store.Close()
 		return nil, err
 	}
+	cleanup = append(cleanup, metadataSvc.Close)
 
 	offlineSvc := offline.New(store.Client, catalogueSvc, driveSvc, taskSvc, libSvc, offlineSubmitTimeout)
 	monitorSvc := monitor.New(store.Client, catalogueSvc, offlineSvc, taskSvc)
@@ -235,26 +219,18 @@ func New(cfg *config.Config, logger *slog.Logger) (*App, error) {
 		ScheduleLocalScan: libSvc.ScheduleLocalScan,
 	})
 	if err != nil {
-		metadataSvc.Close()
-		catalogueSvc.Close()
-		driveSvc.Close()
-		_ = store.Close()
 		return nil, fmt.Errorf("initialize emby service: %w", err)
 	}
+	cleanup = append(cleanup, embySvc.Close)
 	// This is the only cycle: library -> Emby -> catalogue -> library.
 	// Bind it before starting task pools or accepting requests.
 	libSvc.SetMediaNotifier(embySvc)
 	scrapeSvc := scrape.New(store.Client, driveSvc, metadataSvc, images, taskSvc, scrape.Dependencies{
 		ExportManager: exportMgr, MediaNotifier: embySvc, Subtitles: subtitleSvc, Merger: actorsSvc,
 	})
+	cleanup = append(cleanup, scrapeSvc.Close)
 	maintenanceSvc, err := maintenance.New(cfg.DataDir, store.Client, images, scrapeSvc)
 	if err != nil {
-		scrapeSvc.Close()
-		embySvc.Close()
-		metadataSvc.Close()
-		catalogueSvc.Close()
-		driveSvc.Close()
-		_ = store.Close()
 		return nil, fmt.Errorf("initialize maintenance service: %w", err)
 	}
 
