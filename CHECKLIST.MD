@@ -276,11 +276,11 @@
 - [x] `discover/browse-results.tsx:27` `!movies.data` 多余。（已改为 `movies.isPending`）
 - [x] `discover/category-filters.tsx:104`、`common-filter-select.tsx:31` placeholder 永不显示（value 恒有 `'all'`）。（已移除两处 placeholder）
 - [x] `emby-section.tsx:129` `if (form.enabled)` 恒真；`network-section.tsx:99` 不可达分支；`:121-122` `form.enabled &&`、`type="text"` 多余。（已清理：emby 去掉恒真判断；network 去掉不可达分支、冗余 autoFocus 条件与 `type="text"`）
-- [ ] `sources-section.tsx:185,188,200,208` 确认后先关弹窗，`save.isPending` 守卫不可达；`:392-397` 重新拼回 `option` 对象。
-- [ ] `tasks/task-events.tsx:39,127-130` `instanceRef` 多余（instance 已随 revisions 存入 ref）；`task-toast.tsx:61-83` `active` 恒 false、`description: undefined` 多余。
+- [x] `sources-section.tsx:185,188,200,208` 确认后先关弹窗，`save.isPending` 守卫不可达；`:392-397` 重新拼回 `option` 对象。（已修复：删除确认框去掉 4 处不可达的 `save.isPending` 守卫（编辑弹窗保存中删除按钮已禁用，确认后先关框再删）；删除重新拼出的 `option` 对象，直接用 `KIND_LABELS[kind]`/`LOCAL_PATH`，路径字段写 `path`）
+- [x] `tasks/task-events.tsx:39,127-130` `instanceRef` 多余（instance 已随 revisions 存入 ref）；`task-toast.tsx:61-83` `active` 恒 false、`description: undefined` 多余。（已修复：删除 `instanceRef`，改为 `stored?.instance === next.instance ? stored : undefined` 判定重启；`task-toast` 删除恒 false 的 `active`。**更正**：`description: undefined` 并非冗余——sonner 对同 id toast 做属性合并，它用于清掉重试前失败 toast 的描述，保留并补注释）
 - [x] `components/ui/progress.tsx:19,38` `percent` 变量仅剩判空用途；`app-shell.tsx:64` `const current = theme` 无意义别名。（已改用 `value == null` 判定并删除别名）
-- [ ] `tasks/pause.go:21-25` `!found` 分支冗余；`javbus/client.go:257` `fingerprint == nil` 不可能；`api/router.go:50` TrustedProxies 回退已被 `config.validate` 覆盖。
-- [ ] `subscription-section.tsx:49` `items={[...options]}` 每次渲染复制；`:51` `next ?? ''` 写空串；三处 `as MagnetPreferences[...]`。改法：`PreferenceSelect<T extends string>` 泛型。
+- [x] `tasks/pause.go:21-25` `!found` 分支冗余；`javbus/client.go:257` `fingerprint == nil` 不可能；`api/router.go:50` TrustedProxies 回退已被 `config.validate` 覆盖。（已处理：`pause.go` 的 `!found` 分支、`javbus` 的 `fingerprint == nil` 此前已移除。**更正**：`router.go` 的回退并不冗余——gin `prepareTrustedCIDRs` 出错时返回已解析的部分列表并设为可信代理，`SetTrustedProxies(nil)` 用于避免半截配置生效，保留不改）
+- [x] `subscription-section.tsx:49` `items={[...options]}` 每次渲染复制；`:51` `next ?? ''` 写空串；三处 `as MagnetPreferences[...]`。改法：`PreferenceSelect<T extends string>` 泛型。（已修复：`PreferenceSelect<T extends string>` 泛型；`items` 直接传只读数组不再复制；`null` 时不触发 `onChange`；三处 `as MagnetPreferences[...]` 移除）
 
 薄封装 / 过度设计
 - [ ] `library/recent-shelf.tsx`、`top-rated-shelf.tsx` 各两行、唯一调用方，可内联用 `MovieShelfSection`（可选）。

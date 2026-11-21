@@ -36,7 +36,6 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
   // Kept across reconnects so a reconnect only refetches the groups that
   // actually changed. The server instance detects a restart (revisions reset).
   const revisionsRef = useRef<TaskRevisions | undefined>(undefined)
-  const instanceRef = useRef<string | undefined>(undefined)
   const reconnect = useCallback(() => {
     setConnection('connecting')
     setAttempt(value => value + 1)
@@ -124,11 +123,8 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
       waitForActivity()
       // Revisions reset to zero when the server restarts. A changed instance
       // means the stored counters are stale, so re-baseline (refetch all).
-      if (instanceRef.current !== undefined && instanceRef.current !== next.instance) {
-        revisionsRef.current = undefined
-      }
-      instanceRef.current = next.instance
-      const prev = revisionsRef.current
+      const stored = revisionsRef.current
+      const prev = stored?.instance === next.instance ? stored : undefined
       const keys: QueryKey[] = []
       const libraryChanged = prev?.library !== next.library
       if (libraryChanged) keys.push(libraryKeys.all)

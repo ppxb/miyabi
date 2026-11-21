@@ -33,23 +33,25 @@ const uncensoredOptions = [
   { value: 'exclude', label: '排除' }
 ] as const
 
-function PreferenceSelect({
+function PreferenceSelect<T extends string>({
   value,
   options,
   disabled,
   onChange
 }: {
-  value: string
-  options: ReadonlyArray<{ value: string; label: string }>
+  value: T
+  options: ReadonlyArray<{ value: T; label: string }>
   disabled?: boolean
-  onChange: (value: string) => void
+  onChange: (value: T) => void
 }) {
   return (
     <Select
       value={value}
-      items={[...options]}
+      items={options}
       disabled={disabled}
-      onValueChange={next => onChange(next ?? '')}
+      onValueChange={next => {
+        if (next !== null) onChange(next)
+      }}
     >
       <SelectTrigger className="w-32">
         <SelectValue />
@@ -128,7 +130,7 @@ export function SubscriptionSection() {
           value={config?.preferences.subtitle ?? 'preferred'}
           options={levelOptions}
           disabled={disabled}
-          onChange={value => save({}, { subtitle: value as MagnetPreferences['subtitle'] })}
+          onChange={value => save({}, { subtitle: value })}
         />
       </SettingRow>
 
@@ -137,7 +139,7 @@ export function SubscriptionSection() {
           value={config?.preferences.hd ?? 'preferred'}
           options={levelOptions}
           disabled={disabled}
-          onChange={value => save({}, { hd: value as MagnetPreferences['hd'] })}
+          onChange={value => save({}, { hd: value })}
         />
       </SettingRow>
 
@@ -146,7 +148,7 @@ export function SubscriptionSection() {
           value={config?.preferences.uncensored ?? 'any'}
           options={uncensoredOptions}
           disabled={disabled}
-          onChange={value => save({}, { uncensored: value as MagnetPreferences['uncensored'] })}
+          onChange={value => save({}, { uncensored: value })}
         />
       </SettingRow>
 

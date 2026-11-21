@@ -182,10 +182,10 @@ export function SourcesSection() {
         <Dialog
           open
           onOpenChange={next => {
-            if (!next && !save.isPending) setDeleteTarget(null)
+            if (!next) setDeleteTarget(null)
           }}
         >
-          <DialogContent showCloseButton={!save.isPending}>
+          <DialogContent>
             <DialogHeader>
               <DialogTitle>删除存储源？</DialogTitle>
               <DialogDescription>
@@ -194,18 +194,12 @@ export function SourcesSection() {
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={save.isPending}
-                onClick={() => setDeleteTarget(null)}
-              >
+              <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>
                 取消
               </Button>
               <Button
                 type="button"
                 variant="destructive"
-                disabled={save.isPending}
                 onClick={() => {
                   const id = deleteTarget.id
                   setDeleteTarget(null)
@@ -389,12 +383,6 @@ function SourceDialog({
   const [enabled, setEnabled] = useState(source.enabled)
   const [nameError, setNameError] = useState<string | null>(null)
   const [pathError, setPathError] = useState<string | null>(null)
-  const option = {
-    label: KIND_LABELS[kind],
-    pathKey: 'path',
-    pathLabel: LOCAL_PATH.label,
-    placeholder: LOCAL_PATH.placeholder
-  }
   const needsPath = kind === 'local'
 
   function submit() {
@@ -414,7 +402,7 @@ function SourceDialog({
       name: name.trim(),
       enabled,
       config: needsPath
-        ? { ...source.config, [option.pathKey]: path.trim(), scrape_mode: scrapeMode }
+        ? { ...source.config, path: path.trim(), scrape_mode: scrapeMode }
         : { ...source.config }
     })
   }
@@ -460,7 +448,7 @@ function SourceDialog({
             <FieldLabel>类型</FieldLabel>
             <Select value={kind} onValueChange={value => setKind(value as SourceKind)}>
               <SelectTrigger>
-                <SelectValue>{option.label}</SelectValue>
+                <SelectValue>{KIND_LABELS[kind]}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {KIND_ORDER.map(value => (
@@ -475,13 +463,13 @@ function SourceDialog({
           {needsPath ? (
             <>
               <Field data-invalid={Boolean(pathError)}>
-                <FieldLabel htmlFor="source-path">{option.pathLabel}</FieldLabel>
+                <FieldLabel htmlFor="source-path">{LOCAL_PATH.label}</FieldLabel>
                 <Input
                   id="source-path"
                   value={path}
                   disabled={saving}
                   aria-invalid={Boolean(pathError)}
-                  placeholder={option.placeholder}
+                  placeholder={LOCAL_PATH.placeholder}
                   onChange={event => {
                     setPath(event.target.value)
                     setPathError(null)

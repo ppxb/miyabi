@@ -55,17 +55,14 @@ export function useNotifyScanTask() {
 }
 
 export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
-  const active = isTaskActive(task)
   // In-progress scans use the library ring indicator instead of a toast;
   // only terminal results (completed/failed) surface a notification.
-  if (active) {
-    return
-  }
+  if (isTaskActive(task)) return
   const action = task.rebuild ? '重建' : '同步'
   const title = task.movie_id ? `${task.code} 重新刮削` : `媒体库${action}`
   const props = taskToastOptions(
     scanToastID(task.id),
-    active,
+    false,
     options,
     task.can_retry ? task.id : undefined
   )
@@ -80,6 +77,8 @@ export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
   } else {
     toast.success(`${title}完成`, {
       ...props,
+      // sonner merges updates into a same-id toast; clear a prior failure's
+      // description (e.g. after a retry succeeds).
       description: undefined
     })
   }
