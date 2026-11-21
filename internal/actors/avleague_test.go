@@ -2,8 +2,10 @@ package actors
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -31,6 +33,32 @@ func TestAvLeagueImagesSkipsPlaceholders(t *testing.T) {
 	images := avLeagueImages(doc, "https://www.av-league.com/")
 	if len(images) != 1 || images[0] != "https://www.av-league.com/image/act/1/1-0.webp" {
 		t.Fatalf("images = %v", images)
+	}
+}
+
+func TestAvLeagueImagesCollectsWorkCapturesCapped(t *testing.T) {
+	var page strings.Builder
+	page.WriteString(`<html><body><div class="i-pic-box"><div class="i-pic"><img src="/image/act/1/1-0.webp"></div></div>`)
+	page.WriteString(`<img src="/image/cap_4/100/100-0.jpg"><img src="/image/cap_4/100/100-0.jpg"><img src="/img/logo.png">`)
+	for i := range 30 {
+		fmt.Fprintf(&page, `<div class="detail-work-media"><img src="/image/cap_4/%d/%d-0.jpg"></div>`, 200+i, 200+i)
+	}
+	page.WriteString(`</body></html>`)
+	doc, _ := html.Parse(strings.NewReader(page.String()))
+
+	images := avLeagueImages(doc, "https://www.av-league.com/")
+	if len(images) != avLeagueMaxImages {
+		t.Fatalf("len(images) = %d, want %d", len(images), avLeagueMaxImages)
+	}
+	want := []string{
+		"https://www.av-league.com/image/act/1/1-0.webp",
+		"https://www.av-league.com/image/cap_4/100/100-0.jpg",
+		"https://www.av-league.com/image/cap_4/200/200-0.jpg",
+	}
+	for i, u := range want {
+		if images[i] != u {
+			t.Fatalf("images[%d] = %q, want %q", i, images[i], u)
+		}
 	}
 }
 

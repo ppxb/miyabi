@@ -294,21 +294,16 @@ func (s *Service) groups(ctx context.Context) ([]*group, error) {
 }
 
 func (g *group) summary() Summary {
-	avatar := g.avatar
-	if avatar == "" {
-		avatar = avatarPath(Key(g.norm))
-	}
+	key := Key(g.norm)
 	return Summary{
-		Key:        Key(g.norm),
+		Key:        key,
 		Name:       g.displayName,
 		NameZHT:    g.nameZHT,
-		Avatar:     avatar,
+		Avatar:     "/api/actors/" + key + "/avatar",
 		MovieCount: len(g.movies),
 		Sources:    g.sources,
 	}
 }
-
-func avatarPath(key string) string { return "/api/actors/" + key + "/image/0" }
 
 // Catalog lists canonical actors, optionally filtered by a name substring.
 func (s *Service) Catalog(ctx context.Context, query string, page, limit int) (Page, error) {
@@ -835,6 +830,40 @@ func (s *Service) FetchImage(ctx context.Context, key string, index int) ([]byte
 	return s.loadImage(ctx, sources[index])
 }
 
+// FetchAvatar returns the round avatar: the first gfriends image when there is
+// one, else the avatar scraped with the actor's movies. av-league photos are
+// gallery-only and never used here.
+func (s *Service) FetchAvatar(ctx context.Context, key string) ([]byte, error) {
+	names, err := s.findNames(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	if s.sourceEnabled(ctx, "gfriends") {
+		for _, src := range s.imageSources(ctx, normalizeName(names[0]), names) {
+			if src.provider != "gfriends" {
+				continue
+			}
+			data, err := s.loadImage(ctx, src)
+			if err == nil {
+				return data, nil
+			}
+			slog.WarnContext(ctx, "load gfriends actor avatar failed", "key", key, "error", err)
+			break
+		}
+	}
+	scraped, err := s.db.Actor.Query().
+		Where(actor.NameIn(names...), actor.AvatarNEQ("")).
+		Select(actor.FieldAvatar).
+		First(ctx)
+	if ent.IsNotFound(err) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s.loadImage(ctx, imageSource{provider: "scraped", ref: *scraped.Avatar})
+}
+
 type imageSource struct {
 	provider string
 	ref      string
@@ -1015,7 +1044,7 @@ func (s *Service) applyProfile(ctx context.Context, pid int, providerName string
 func (s *Service) appendProfileImages(ctx context.Context, tx *ent.Tx, pid int, providerName string, urls []string) error {
 	items := make([]imageItem, 0, len(urls))
 	for _, url := range urls {
-		items = append(items, imageItem{url: url, provider: providerName, role: "portrait"})
+		items = append(items, imageItem{url: url, provider: providerName, role: "gallery"})
 	}
 	return s.appendImageRows(ctx, tx, pid, items)
 }

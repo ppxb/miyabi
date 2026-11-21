@@ -200,11 +200,16 @@ func japaneseDate(s string) string {
 	return ""
 }
 
+// avLeagueMaxImages caps the gallery so a prolific actress doesn't flood it.
+const avLeagueMaxImages = 20
+
+// avLeagueImages collects the gallery: the profile photo(s) in .i-pic-box, then
+// the work captures (/image/cap_*) in page order, deduplicated and capped.
 func avLeagueImages(doc *html.Node, base string) []string {
 	seen := make(map[string]bool)
 	var images []string
 	add := func(ref string) {
-		if ref == "" || strings.HasPrefix(ref, "data:") {
+		if len(images) >= avLeagueMaxImages || ref == "" || strings.HasPrefix(ref, "data:") {
 			return
 		}
 		u := absoluteURL(base, ref)
@@ -221,8 +226,10 @@ func avLeagueImages(doc *html.Node, base string) []string {
 			}
 		}
 	}
-	for _, meta := range nodes(doc, func(n *html.Node) bool { return n.Data == "meta" && attr(n, "property") == "og:image" }) {
-		add(attr(meta, "content"))
+	for _, img := range nodes(doc, func(n *html.Node) bool {
+		return n.Data == "img" && strings.Contains(attr(n, "src"), "/image/cap_")
+	}) {
+		add(attr(img, "src"))
 	}
 	return images
 }

@@ -17,6 +17,7 @@ type ActorManager interface {
 	Catalog(context.Context, string, int, int) (actors.Page, error)
 	Detail(context.Context, string) (actors.Detail, error)
 	FetchImage(context.Context, string, int) ([]byte, error)
+	FetchAvatar(context.Context, string) ([]byte, error)
 	Settings(context.Context) ([]actors.SourceSetting, error)
 	UpdateSettings(context.Context, []actors.SourceSetting) error
 }
@@ -103,15 +104,32 @@ func actorImageHandler(manager ActorManager) gin.HandlerFunc {
 			return
 		}
 		data, err := manager.FetchImage(c.Request.Context(), uri.Key, uri.Index)
-		if err != nil {
-			if errors.Is(err, actors.ErrNotFound) {
-				c.Status(http.StatusNotFound)
-				return
-			}
-			c.Error(err)
+		writeActorImage(c, data, err)
+	}
+}
+
+func actorAvatarHandler(manager ActorManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[struct {
+			Key string `uri:"key" binding:"required,len=40,hexadecimal"`
+		}](c)
+		if !ok {
 			return
 		}
-		c.Header("Cache-Control", "private, max-age=86400")
-		c.Data(http.StatusOK, http.DetectContentType(data), data)
+		data, err := manager.FetchAvatar(c.Request.Context(), uri.Key)
+		writeActorImage(c, data, err)
 	}
+}
+
+func writeActorImage(c *gin.Context, data []byte, err error) {
+	if err != nil {
+		if errors.Is(err, actors.ErrNotFound) {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		c.Error(err)
+		return
+	}
+	c.Header("Cache-Control", "private, max-age=86400")
+	c.Data(http.StatusOK, http.DetectContentType(data), data)
 }

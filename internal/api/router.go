@@ -112,6 +112,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	{
 		actorsAPI.GET("", actorListHandler(deps.Actors))
 		actorsAPI.GET("/:key", actorDetailHandler(deps.Actors, deps.Library))
+		actorsAPI.GET("/:key/avatar", actorAvatarHandler(deps.Actors))
 		actorsAPI.GET("/:key/image/:index", actorImageHandler(deps.Actors))
 	}
 
