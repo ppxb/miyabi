@@ -212,7 +212,7 @@
 - [x] handler 分页解析：`api/movie.go`(libraryBrowse) 与 `api/actors.go`(actorList) 改用 `bindQuery`（`form:"page,default=1"` 等），删除 `queryInt`；`api/task.go` 两个 handler 改用 `accepted`。（`api/pan.go:51` 原本已是 `respond`，无需改。）
 - [x] `tasks/pause.go`：`LibraryPaused` 改用 `database.LoadSetting[bool]`、`SetLibraryPaused` 改用 `database.SaveSetting`（移除手写 query/upsert 与 `encoding/json`/`setting` 导入）。
 - [x] `pan` 的本地 `parseRetryAfter` 删除，`client.go`/`metadata.go` 三处改用 `domain.ParseRetryAfter(header, time.Now())`（移除 `strconv`/`strings` 导入）。
-- [ ] `drive/accounts.go:171,190` `sort.*` → `slices.SortFunc` / `slices.Sorted(maps.Keys())`
+- [x] `drive/accounts.go`：`sort.Slice` → `slices.SortFunc`（`cmp.Compare`），「取 map 键 + `sort.Strings`」→ `slices.Sorted(maps.Keys(store))`；移除 `sort` 导入。
 
 ---
 

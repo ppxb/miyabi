@@ -1,9 +1,11 @@
 package drive
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
-	"sort"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/ppxb/miyabi/internal/database"
@@ -212,11 +214,11 @@ func (d *Drive) Mounts(_ context.Context) ([]domain.LibrarySource, error) {
 		result = append(result, record.source())
 	}
 	d.mu.Unlock()
-	sort.Slice(result, func(i, j int) bool {
-		if result[i].AccountID != result[j].AccountID {
-			return result[i].AccountID < result[j].AccountID
+	slices.SortFunc(result, func(a, b domain.LibrarySource) int {
+		if a.AccountID != b.AccountID {
+			return cmp.Compare(a.AccountID, b.AccountID)
 		}
-		return result[i].Directory.ID < result[j].Directory.ID
+		return cmp.Compare(a.Directory.ID, b.Directory.ID)
 	})
 	return result, nil
 }
@@ -228,11 +230,7 @@ func (d *Drive) Accounts(ctx context.Context) ([]AccountStatus, error) {
 		return nil, err
 	}
 	d.syncAccountMounts(store)
-	ids := make([]string, 0, len(store))
-	for id := range store {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
+	ids := slices.Sorted(maps.Keys(store))
 
 	result := make([]AccountStatus, 0, len(ids))
 	for _, id := range ids {
