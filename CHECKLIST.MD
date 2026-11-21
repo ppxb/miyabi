@@ -209,7 +209,7 @@
 - [x] ~~HTTP 模板：`freejavbt/client.go` ≈ `metadata/providers/http.go`~~：**暂不处理（C，人工决定）**。二者形似但策略差异大（providers 有 `HTTPError`+`Retry-After`→冷却与 `admit` 准入、Cookie、16MiB；freejavbt 为 `KindUpstream` 直接报错、另有 Cloudflare 检测），合并需把错误/冷却/头/CF/限额全参数化，回归风险高、收益低。
 - [x] Pondo 系 provider：采用 B 方案——保留三个具体类型（及测试），抽出共享 `fetchPondoJSON(ctx, client, base, code, providerID, siteID, stripPrefix)`，`onepondo`/`tenmusume`/`muramura` 的 `Fetch` 各自仅传站点参数；解析仍复用 `parsePondoMovieJSON`。
 - [x] 115 离线状态码魔法数字 `0/1/2/-1`：`pan` 包新增 `OfflineStatusWaiting/Running/Done/Failed`，`offline` 的 `sync/submit/control/recovery/projection` 非测试代码全部改用常量（测试保留字面量）。
-- [ ] handler 分页解析：`api/movie.go:84-91`、`api/actors.go:48-57` `queryInt` → `bindQuery`；`api/task.go:32,56`、`api/pan.go:51` → `accepted`/`respond`
+- [x] handler 分页解析：`api/movie.go`(libraryBrowse) 与 `api/actors.go`(actorList) 改用 `bindQuery`（`form:"page,default=1"` 等），删除 `queryInt`；`api/task.go` 两个 handler 改用 `accepted`。（`api/pan.go:51` 原本已是 `respond`，无需改。）
 - [ ] `tasks/pause.go:18-49` → `database.LoadSetting/SaveSetting`
 - [ ] `pan/client.go:135` `parseRetryAfter` → `domain.ParseRetryAfter`
 - [ ] `drive/accounts.go:171,190` `sort.*` → `slices.SortFunc` / `slices.Sorted(maps.Keys())`

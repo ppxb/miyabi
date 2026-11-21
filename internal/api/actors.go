@@ -45,17 +45,14 @@ func actorSourceUpdateHandler(manager ActorManager) gin.HandlerFunc {
 
 func actorListHandler(manager ActorManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		page, err := queryInt(c, "page", 1, 1, 1<<31-1)
-		if err != nil {
-			c.Error(badRequest(err))
+		query, ok := bindQuery[struct {
+			Page  int `form:"page,default=1" binding:"min=1"`
+			Limit int `form:"limit,default=24" binding:"min=1,max=100"`
+		}](c)
+		if !ok {
 			return
 		}
-		limit, err := queryInt(c, "limit", 24, 1, 100)
-		if err != nil {
-			c.Error(badRequest(err))
-			return
-		}
-		result, err := manager.Catalog(c.Request.Context(), c.Query("q"), page, limit)
+		result, err := manager.Catalog(c.Request.Context(), c.Query("q"), query.Page, query.Limit)
 		respond(c, result, err)
 	}
 }

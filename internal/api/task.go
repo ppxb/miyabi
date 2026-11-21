@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -30,7 +29,7 @@ func taskLibraryControlHandler(manager TaskManager) gin.HandlerFunc {
 			respond(c, nil, err)
 			return
 		}
-		c.JSON(http.StatusAccepted, gin.H{"paused": *input.Paused})
+		accepted(c, gin.H{"paused": *input.Paused}, nil)
 	}
 }
 
@@ -50,10 +49,6 @@ func taskRetryHandler(manager TaskManager) gin.HandlerFunc {
 			return
 		}
 		result, err := manager.Retry(c.Request.Context(), uri.ID)
-		if err != nil {
-			respond(c, nil, err)
-			return
-		}
-		c.JSON(http.StatusAccepted, result)
+		accepted(c, result, err)
 	}
 }

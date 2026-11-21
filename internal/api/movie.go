@@ -2,9 +2,7 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -81,14 +79,11 @@ func libraryTopRatedHandler(library LibraryManager) gin.HandlerFunc {
 
 func libraryBrowseHandler(library LibraryManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		page, err := queryInt(c, "page", 1, 1, 1<<31-1)
-		if err != nil {
-			c.Error(badRequest(err))
-			return
-		}
-		limit, err := queryInt(c, "limit", 20, 1, 100)
-		if err != nil {
-			c.Error(badRequest(err))
+		query, ok := bindQuery[struct {
+			Page  int `form:"page,default=1" binding:"min=1"`
+			Limit int `form:"limit,default=20" binding:"min=1,max=100"`
+		}](c)
+		if !ok {
 			return
 		}
 		filter := lib.BrowseFilter{
@@ -100,8 +95,8 @@ func libraryBrowseHandler(library LibraryManager) gin.HandlerFunc {
 			ActorNames:  c.QueryArray("actor"),
 			MakerNames:  c.QueryArray("maker"),
 			SeriesNames: c.QueryArray("series"),
-			Page:        page,
-			Limit:       limit,
+			Page:        query.Page,
+			Limit:       query.Limit,
 		}
 		movies, err := library.BrowseMovies(c.Request.Context(), filter)
 		respond(c, movies, err)
@@ -113,18 +108,6 @@ func libraryFilterOptionsHandler(library LibraryManager) gin.HandlerFunc {
 		options, err := library.FilterOptions(c.Request.Context())
 		respond(c, options, err)
 	}
-}
-
-func queryInt(c *gin.Context, key string, fallback, min, max int) (int, error) {
-	raw := c.Query(key)
-	if raw == "" {
-		return fallback, nil
-	}
-	value, err := strconv.Atoi(raw)
-	if err != nil || value < min || value > max {
-		return 0, fmt.Errorf("%s 参数无效", key)
-	}
-	return value, nil
 }
 
 func libraryMovieHandler(library LibraryManager) gin.HandlerFunc {
