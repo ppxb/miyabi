@@ -1,8 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { LoaderCircleIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import type { OfflineSubmission } from '@/api/offline'
+import { Spinner } from '@/components/ui/spinner'
 import {
   isScanTask,
   isTaskActive,
@@ -105,9 +105,7 @@ export function notifyOfflineTask(
     toast.info(task.code, {
       ...props,
       icon:
-        options.waiting || (task.phase !== 'downloading' && scan?.paused) ? undefined : (
-          <LoaderCircleIcon className="size-4 animate-spin" />
-        ),
+        options.waiting || (task.phase !== 'downloading' && scan?.paused) ? undefined : <Spinner />,
       description: options.waiting ? (
         '等待进度同步'
       ) : (
@@ -174,7 +172,7 @@ export function notifyBatchTask(task: BatchTask, options: TaskToastOptions = {})
   if (active) {
     toast.info('正在批量入库', {
       ...props,
-      icon: options.waiting ? undefined : <LoaderCircleIcon className="size-4 animate-spin" />,
+      icon: options.waiting ? undefined : <Spinner />,
       description: options.waiting ? '等待进度同步' : `${processed} / ${total} 部，${summary}`
     })
   } else if (task.status === 'failed') {

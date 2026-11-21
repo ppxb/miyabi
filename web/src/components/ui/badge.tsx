@@ -1,4 +1,3 @@
-import * as React from 'react'
 import { mergeProps } from '@base-ui/react/merge-props'
 import { useRender } from '@base-ui/react/use-render'
 import { cva, type VariantProps } from 'class-variance-authority'
@@ -36,24 +35,18 @@ const badgeVariants = cva(
 function Badge({
   className,
   variant = 'outline',
-  asChild = false,
-  children,
   render,
   ...props
-}: useRender.ComponentProps<'span'> &
-  VariantProps<typeof badgeVariants> & {
-    asChild?: boolean
-  }) {
+}: useRender.ComponentProps<'span'> & VariantProps<typeof badgeVariants>) {
   return useRender({
     defaultTagName: 'span',
     props: mergeProps<'span'>(
       {
-        className: cn(badgeVariants({ variant }), className),
-        children: asChild ? null : children
+        className: cn(badgeVariants({ variant }), className)
       },
       props
     ),
-    render: asChild ? (children as React.ReactElement) : render,
+    render,
     state: {
       slot: 'badge',
       variant

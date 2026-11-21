@@ -24,13 +24,11 @@ export function OverflowTooltip({ children, content }: OverflowTooltipProps) {
   return (
     <Tooltip open={open} onOpenChange={handleOpenChange}>
       <TooltipTrigger
-        asChild
+        render={children}
         ref={element => {
           triggerRef.current = element
         }}
-      >
-        {children}
-      </TooltipTrigger>
+      />
       <TooltipContent>{content}</TooltipContent>
     </Tooltip>
   )

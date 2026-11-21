@@ -35,14 +35,20 @@ type PaginationLinkProps = {
 
 function PaginationLink({ className, isActive, size = 'icon', ...props }: PaginationLinkProps) {
   return (
-    <Button asChild variant={isActive ? 'outline' : 'ghost'} size={size} className={cn(className)}>
-      <a
-        aria-current={isActive ? 'page' : undefined}
-        data-slot="pagination-link"
-        data-active={isActive}
-        {...props}
-      />
-    </Button>
+    <Button
+      render={
+        <a
+          aria-current={isActive ? 'page' : undefined}
+          data-slot="pagination-link"
+          data-active={isActive}
+          {...props}
+        />
+      }
+      nativeButton={false}
+      variant={isActive ? 'outline' : 'ghost'}
+      size={size}
+      className={cn(className)}
+    />
   )
 }
 
@@ -89,7 +95,7 @@ function PaginationEllipsis({ className, ...props }: React.ComponentProps<'span'
     <span
       data-slot="pagination-ellipsis"
       className={cn(
-        "flex size-9 items-center justify-center [&_svg:not([class*='size-'])]:size-4",
+        "flex size-8 items-center justify-center [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}

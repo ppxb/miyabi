@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2Icon, LoaderCircleIcon, QrCodeIcon, RefreshCwIcon } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { toast } from 'sonner'
 
 import {
@@ -52,7 +52,7 @@ export function PanLoginDialog({
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogTrigger render={children as ReactElement} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>登录 115 网盘</DialogTitle>
@@ -142,6 +142,7 @@ function LoginContent({
             src={session.qr_code}
             width={256}
             height={256}
+            alt="登录二维码"
             className="size-full bg-white object-contain p-3"
           />
         ) : (

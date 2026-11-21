@@ -24,15 +24,15 @@ export function DirectoryBreadcrumbs({
 }: DirectoryBreadcrumbsProps) {
   return (
     <Breadcrumb className="min-w-0">
-      <BreadcrumbList className="gap-1 sm:gap-1">
+      <BreadcrumbList className="gap-1">
         <BreadcrumbItem>
           {currentID === '0' ? (
             <BreadcrumbPage>全部文件</BreadcrumbPage>
           ) : (
-            <BreadcrumbLink asChild>
-              <button type="button" disabled={disabled} onClick={() => onNavigate('0')}>
-                全部文件
-              </button>
+            <BreadcrumbLink
+              render={<button type="button" disabled={disabled} onClick={() => onNavigate('0')} />}
+            >
+              全部文件
             </BreadcrumbLink>
           )}
         </BreadcrumbItem>
@@ -47,15 +47,17 @@ export function DirectoryBreadcrumbs({
                     {directory.name}
                   </BreadcrumbPage>
                 ) : (
-                  <BreadcrumbLink asChild>
-                    <button
-                      type="button"
-                      className="max-w-40 min-w-0 truncate"
-                      disabled={disabled}
-                      onClick={() => onNavigate(directory.id)}
-                    >
-                      {directory.name}
-                    </button>
+                  <BreadcrumbLink
+                    render={
+                      <button
+                        type="button"
+                        className="max-w-40 min-w-0 truncate"
+                        disabled={disabled}
+                        onClick={() => onNavigate(directory.id)}
+                      />
+                    }
+                  >
+                    {directory.name}
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>

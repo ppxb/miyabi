@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { Command as CommandPrimitive } from 'cmdk'
-import { ChevronsUpDownIcon, SearchIcon } from 'lucide-react'
+import { ChevronsUpDownIcon } from 'lucide-react'
 
 import type { LibraryFilterOption } from '@/api/library'
 import { Button } from '@/components/ui/button'
-import { Command, CommandEmpty, CommandItem, CommandList } from '@/components/ui/command'
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 export function FilterMultiSelect({
@@ -37,14 +36,8 @@ export function FilterMultiSelect({
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-0">
         <Command className="p-0">
-          <div className="flex items-center gap-2 border-b border-border px-3">
-            <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
-            <CommandPrimitive.Input
-              placeholder={`搜索${label}`}
-              className="h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-          </div>
-          <CommandList className="max-h-64 overflow-y-auto p-1">
+          <CommandInput placeholder={`搜索${label}`} />
+          <CommandList className="max-h-64 p-1">
             <CommandEmpty>无匹配项</CommandEmpty>
             {options.map(option => (
               <CommandItem

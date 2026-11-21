@@ -57,43 +57,45 @@ export function ActorChip({
         </div>
       </Button>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="flex items-center">
-            <Switch
-              size="sm"
-              checked={actor.auto_download}
-              disabled={busy}
-              onCheckedChange={checked => update.mutate({ id: actor.id, auto_download: checked })}
-            />
-          </span>
+        <TooltipTrigger render={<span className="flex items-center" />}>
+          <Switch
+            size="sm"
+            checked={actor.auto_download}
+            disabled={busy}
+            onCheckedChange={checked => update.mutate({ id: actor.id, auto_download: checked })}
+          />
         </TooltipTrigger>
         <TooltipContent>{actor.auto_download ? '新作自动入库' : '新作仅提醒'}</TooltipContent>
       </Tooltip>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            disabled={busy}
-            onClick={() => update.mutate({ id: actor.id, status: paused ? 'active' : 'paused' })}
-          >
-            {paused ? <PlayIcon /> : <PauseIcon />}
-          </Button>
+        <TooltipTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              disabled={busy}
+              onClick={() => update.mutate({ id: actor.id, status: paused ? 'active' : 'paused' })}
+            />
+          }
+        >
+          {paused ? <PlayIcon /> : <PauseIcon />}
         </TooltipTrigger>
         <TooltipContent>{paused ? '恢复检查' : '暂停检查'}</TooltipContent>
       </Tooltip>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            disabled={busy}
-            onClick={() => remove.mutate(actor, { onSuccess: onRemoved })}
-          >
-            <Trash2Icon />
-          </Button>
+        <TooltipTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              disabled={busy}
+              onClick={() => remove.mutate(actor, { onSuccess: onRemoved })}
+            />
+          }
+        >
+          <Trash2Icon />
         </TooltipTrigger>
         <TooltipContent>取消订阅</TooltipContent>
       </Tooltip>

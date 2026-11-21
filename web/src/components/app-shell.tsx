@@ -66,15 +66,17 @@ function ThemeSwitcher() {
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon-sm"
-          aria-label="切换主题"
-          onClick={() => setTheme(nextTheme)}
-        >
-          {current === 'system' ? <MonitorIcon /> : current === 'dark' ? <SunIcon /> : <MoonIcon />}
-        </Button>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="切换主题"
+            onClick={() => setTheme(nextTheme)}
+          />
+        }
+      >
+        {current === 'system' ? <MonitorIcon /> : current === 'dark' ? <SunIcon /> : <MoonIcon />}
       </TooltipTrigger>
       <TooltipContent side="bottom" sideOffset={8}>
         切换主题

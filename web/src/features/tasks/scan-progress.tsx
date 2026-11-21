@@ -33,9 +33,7 @@ export function ScanProgressView({ task }: { task: ScanTask }) {
           </Button>
         ) : (
           <Tooltip>
-            <TooltipTrigger asChild>
-              <p className="shrink-0 text-xs">{status}</p>
-            </TooltipTrigger>
+            <TooltipTrigger render={<p className="shrink-0 text-xs" />}>{status}</TooltipTrigger>
             <TooltipContent>{task.error || summary}</TooltipContent>
           </Tooltip>
         )}

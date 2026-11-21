@@ -23,25 +23,27 @@ export function MovieSubscribeButton({ movie }: { movie: DiscoverMovie }) {
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant={canSubscribe ? 'outline' : 'default'}
-          size="icon-sm"
-          disabled={isPending || add.isPending}
-          className={canSubscribe ? 'bg-background/85 backdrop-blur' : undefined}
-          onClick={handleClick}
-        >
-          {add.isPending ? (
-            <LoaderCircleIcon className="animate-spin" />
-          ) : added ? (
-            <CircleCheckIcon />
-          ) : waiting ? (
-            <BellRingIcon />
-          ) : (
-            <BellPlusIcon />
-          )}
-        </Button>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            variant={canSubscribe ? 'outline' : 'default'}
+            size="icon-sm"
+            disabled={isPending || add.isPending}
+            className={canSubscribe ? 'bg-background/85 backdrop-blur' : undefined}
+            onClick={handleClick}
+          />
+        }
+      >
+        {add.isPending ? (
+          <LoaderCircleIcon className="animate-spin" />
+        ) : added ? (
+          <CircleCheckIcon />
+        ) : waiting ? (
+          <BellRingIcon />
+        ) : (
+          <BellPlusIcon />
+        )}
       </TooltipTrigger>
       <TooltipContent side="left">
         {waiting

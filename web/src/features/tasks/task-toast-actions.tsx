@@ -1,9 +1,10 @@
-import { SquareIcon, LoaderCircleIcon, XIcon } from 'lucide-react'
+import { SquareIcon, XIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useRetryTask } from '@/api/tasks'
 import { useOfflineControl } from '@/api/offline'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 
 export function TaskToastActions({
   id,
@@ -28,7 +29,7 @@ export function TaskToastActions({
           disabled={cancel.isPending}
           onClick={() => cancel.mutate(cancelTaskID)}
         >
-          {cancel.isPending ? <LoaderCircleIcon className="animate-spin" /> : <SquareIcon />}
+          {cancel.isPending ? <Spinner /> : <SquareIcon />}
         </Button>
       )}
       {retryTaskID !== undefined && (

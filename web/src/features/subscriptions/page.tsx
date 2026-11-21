@@ -1,4 +1,5 @@
-import { CloudDownloadIcon, LoaderCircleIcon, XIcon } from 'lucide-react'
+import { CloudDownloadIcon, XIcon } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { describeApiError } from '@/api/client'
@@ -274,11 +275,7 @@ export function SubscriptionsPage({
               }
               onClick={handleEnqueue}
             >
-              {batch.isPending ? (
-                <LoaderCircleIcon className="animate-spin" />
-              ) : (
-                <CloudDownloadIcon />
-              )}
+              {batch.isPending ? <Spinner /> : <CloudDownloadIcon />}
               确认入库
             </Button>
           </DialogFooter>

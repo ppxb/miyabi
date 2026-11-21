@@ -1,4 +1,5 @@
-import { LoaderCircleIcon, RotateCcwIcon, ScanLineIcon } from 'lucide-react'
+import { RotateCcwIcon, ScanLineIcon } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner'
 
 import { describeApiError } from '@/api/client'
 import { useStartLibraryScan } from '@/api/library'
@@ -57,9 +58,7 @@ export function LibraryScanButton({
               })
             }
           >
-            {busy ? (
-              <LoaderCircleIcon className="size-4 animate-spin" />
-            ) : rebuild ? (
+            {busy ? <Spinner /> : rebuild ? (
               <RotateCcwIcon className="size-4" />
             ) : (
               <ScanLineIcon className="size-4" />

@@ -1,4 +1,4 @@
-import { LoaderCircleIcon } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner'
 import { useEffect, useState, type FormEvent, type PropsWithChildren } from 'react'
 
 import { useAccessGateConfig, useAccessGateLogin } from '@/api/auth'
@@ -48,7 +48,7 @@ export function AccessGate({ children }: PropsWithChildren) {
         <CardContent>
           {config.isPending ? (
             <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-              <LoaderCircleIcon className="size-4 animate-spin" />
+              <Spinner />
               正在检查访问配置
             </div>
           ) : config.isError ? (
@@ -72,7 +72,7 @@ export function AccessGate({ children }: PropsWithChildren) {
               />
               {login.error ? <InlineError>{describeApiError(login.error)}</InlineError> : null}
               <Button type="submit" className="w-full" disabled={!password || login.isPending}>
-                {login.isPending ? <LoaderCircleIcon className="size-4 animate-spin" /> : null}
+                {login.isPending ? <Spinner /> : null}
                 进入
               </Button>
             </form>

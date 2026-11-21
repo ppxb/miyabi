@@ -24,12 +24,15 @@ export function LibraryProgress({ task }: { task?: ScanTask }) {
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <div
-          role="status"
-          aria-label={label}
-          className="relative inline-flex size-11 shrink-0 items-center justify-center"
-        >
+      <TooltipTrigger
+        render={
+          <div
+            role="status"
+            aria-label={label}
+            className="relative inline-flex size-11 shrink-0 items-center justify-center"
+          />
+        }
+      >
           <svg
             viewBox="0 0 44 44"
             className="size-11 -rotate-90"
@@ -56,7 +59,6 @@ export function LibraryProgress({ task }: { task?: ScanTask }) {
             />
           </svg>
           <span className="absolute text-[10px] font-medium tabular-nums">{bounded}%</span>
-        </div>
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>

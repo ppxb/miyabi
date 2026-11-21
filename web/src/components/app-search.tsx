@@ -96,8 +96,8 @@ export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
   return (
     <Button
       onClick={onOpen}
-      variant="link"
-      className="px-0! font-normal text-muted-foreground hover:no-underline"
+      variant="ghost"
+      className="font-normal text-muted-foreground"
     >
       <SearchIcon data-icon="inline-start" />
       搜索

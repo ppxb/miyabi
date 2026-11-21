@@ -31,8 +31,8 @@ export function MovieCard({
           <MovieCover source={movie.cover ?? ''} />
         </div>
         <div className="absolute top-2 left-2 flex max-w-[calc(100%-3.5rem)] flex-wrap gap-1.5">
-          <Badge variant="frosted" className="max-w-full truncate">
-            {movie.code}
+          <Badge variant="frosted" className="max-w-full">
+            <span className="truncate">{movie.code}</span>
           </Badge>
           {state}
         </div>

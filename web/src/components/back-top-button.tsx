@@ -17,6 +17,7 @@ export function BackTopButton() {
       type="button"
       variant="outline"
       size="icon-lg"
+      aria-label="回到顶部"
       className="fixed right-6 bottom-32 z-40 bg-background/80 backdrop-blur"
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
     >

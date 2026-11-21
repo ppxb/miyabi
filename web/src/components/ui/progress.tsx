@@ -33,12 +33,11 @@ function Progress({
         <ProgressPrimitive.Indicator
           data-slot="progress-indicator"
           className={cn(
-            'size-full flex-1 transition-transform',
+            'h-full transition-all',
             indicatorColors[variant],
             percent === null &&
               'w-1/3 flex-none animate-[progress-indeterminate_1.5s_ease-in-out_infinite]'
           )}
-          style={percent === null ? undefined : { transform: `translateX(-${100 - percent}%)` }}
         />
       </ProgressPrimitive.Track>
     </ProgressPrimitive.Root>

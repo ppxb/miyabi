@@ -1,11 +1,10 @@
-import { cn } from 'cn'
 import { getPageNumbers } from '@/lib/pagination'
+import { Button } from '@/components/ui/button'
 import {
   Pagination,
   PaginationContent,
   PaginationEllipsis,
   PaginationItem,
-  PaginationLink,
   PaginationNext,
   PaginationPrevious
 } from '@/components/ui/pagination'
@@ -31,26 +30,20 @@ export function ListPagination({
   }
 
   function renderPage(item: number) {
-    if (item === page) {
-      return (
-        <PaginationItem key={item}>
-          <PaginationLink isActive>{item}</PaginationLink>
-        </PaginationItem>
-      )
-    }
+    const active = item === page
     return (
       <PaginationItem key={item}>
-        <PaginationLink
-          href="#"
-          tabIndex={disabled ? -1 : undefined}
-          className={cn(disabled && 'pointer-events-none opacity-50')}
-          onClick={e => {
-            e.preventDefault()
-            changePage(item)
-          }}
+        <Button
+          type="button"
+          variant={active ? 'outline' : 'ghost'}
+          size="icon"
+          aria-current={active ? 'page' : undefined}
+          data-active={active}
+          disabled={disabled}
+          onClick={active ? undefined : () => changePage(item)}
         >
           {item}
-        </PaginationLink>
+        </Button>
       </PaginationItem>
     )
   }
