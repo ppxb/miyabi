@@ -141,6 +141,14 @@ export function DefaultVideoControls({
               <TimeSlider
                 className={'min-w-0! media-max-4xs:hidden'}
                 renderThumbnail={renderThumbnail}
+                // A pointer drag leaves focus on the slider thumb, which swallows the
+                // arrow keys (1s step + preventDefault) so the ±10s hotkeys never fire;
+                // hand focus back to the player once the pointer is released.
+                onPointerUp={event =>
+                  event.currentTarget
+                    .closest<HTMLElement>('.media-skin')
+                    ?.focus({ preventScroll: true })
+                }
               />
               <Time.Value
                 className={cn(
