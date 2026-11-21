@@ -126,7 +126,7 @@
 - [x] 🟠 `internal/app/app.go:129-259`：手写出错清理链。改法：`cleanup []func()` + defer 逆序。（已改为资源创建成功后 `cleanup = append(...)`，`New` 命名返回 + defer 逆序关闭；删除约 10 处手工关闭链，成功路径不触发关闭）
 - [x] 🟠 `web/src/api/library.ts:190-205`、`api/offline.ts:77-96,106-123`：条件 `setQueryData` 写三遍且紧接 invalidate。（已把三处"守卫式乐观合并"收敛为 `query-refresh.ts` 的 `updateIfCurrent` helper；保留原并发语义与 invalidate，测试保持通过）
 - [x] 🟢 `web/src/api/emby.ts:42-59`、`api/network.ts:36-53`：乐观更新 + 回滚 + 立即 invalidate，回滚冗余。（已删除 emby/network 的 `onError` 回滚，仅保留 `invalidateQueries` 由重取对账；`onMutate` 改为 updater 不再返回 `previous` 快照；同步更新 `emby-settings` 测试）
-- [ ] 🟢 `web/src/api/tasks.ts:87,96`：直接 `toast.error(error.message)`，绕过全局 `meta.errorTitle` / `UNAUTHORIZED` 静默 / `describeApiError`。
+- [x] 🟢 `web/src/api/tasks.ts:87,96`：直接 `toast.error(error.message)`，绕过全局 `meta.errorTitle` / `UNAUTHORIZED` 静默 / `describeApiError`。（已改用 `meta: { errorTitle: '重试失败' / '操作失败' }` 交给全局 MutationCache 统一处理：`describeApiError`、`UNAUTHORIZED` 静默、PAN 失效提示；移除直接 toast 与 `error.message`）
 - [ ] 🟢 `web/src/features/access-gate/access-gate.tsx:72`：用 `error.message` 而非 `describeApiError`。
 - [ ] 🟢 `web/src/components/media-image.tsx:72-77`：`typeof image.decode` 检测多余；decode 失败误标 error。
 - [ ] 🟢 `web/src/components/list-pagination.tsx:29`：`nextPage === page` 防御多余。

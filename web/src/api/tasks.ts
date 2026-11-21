@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 
 import { apiGet, apiPost, apiPut } from '@/api/client'
 import { offlineKeys } from '@/api/offline'
@@ -84,7 +83,7 @@ export function useRetryTask() {
   return useMutation({
     mutationFn: (id: number) => apiPost<Task>(`/api/tasks/${id}/retry`),
     onSuccess: () => refreshQueries(queryClient, taskKeys.all, offlineKeys.all),
-    onError: error => toast.error('重试失败', { description: error.message })
+    meta: { errorTitle: '重试失败' }
   })
 }
 
@@ -93,7 +92,7 @@ export function useSetLibraryPaused() {
   return useMutation({
     mutationFn: (paused: boolean) => apiPut('/api/tasks/library-control', { paused }),
     onSuccess: () => refreshQueries(queryClient, taskKeys.all),
-    onError: error => toast.error('操作失败', { description: error.message })
+    meta: { errorTitle: '操作失败' }
   })
 }
 
