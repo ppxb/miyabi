@@ -55,39 +55,16 @@ import { PanDirectoryDialog } from '@/features/settings/pan-directory-dialog'
 import { PanLoginDialog } from '@/features/settings/pan-login-dialog'
 import { SettingsSection } from '@/features/settings/shared'
 
-const KIND_OPTIONS: {
-  value: SourceKind
-  label: string
-  pathKey: string
-  pathLabel: string
-  placeholder: string
-}[] = [
-  {
-    value: 'local',
-    label: '本地目录',
-    pathKey: 'path',
-    pathLabel: '目录路径',
-    placeholder: '/mnt/media'
-  },
-  {
-    value: '115',
-    label: '115 网盘',
-    pathKey: 'directory',
-    pathLabel: '媒体目录',
-    placeholder: '/媒体/影片'
-  },
-  {
-    value: 'pikpak',
-    label: 'PikPak',
-    pathKey: 'path',
-    pathLabel: '目录路径',
-    placeholder: '/media'
-  }
-]
-
-function kindOf(kind: SourceKind) {
-  return KIND_OPTIONS.find(option => option.value === kind) ?? KIND_OPTIONS[0]!
+const KIND_LABELS: Record<SourceKind, string> = {
+  local: '本地目录',
+  '115': '115 网盘',
+  pikpak: 'PikPak'
 }
+
+const KIND_ORDER: SourceKind[] = ['local', '115', 'pikpak']
+
+// Only local directories need a manually entered path.
+const LOCAL_PATH = { label: '目录路径', placeholder: '/mnt/media' } as const
 
 function sourcePath(source: StorageSource) {
   return source.config?.path ?? source.config?.directory ?? ''
@@ -269,7 +246,7 @@ function EditAction({ onEdit }: { onEdit: () => void }) {
 }
 
 function PlainSourceCard({ source, onEdit }: { source: StorageSource; onEdit: () => void }) {
-  const label = kindOf(source.kind).label
+  const label = KIND_LABELS[source.kind]
   const path = sourcePath(source)
 
   return (
@@ -415,7 +392,12 @@ function SourceDialog({
   const [enabled, setEnabled] = useState(source.enabled)
   const [nameError, setNameError] = useState<string | null>(null)
   const [pathError, setPathError] = useState<string | null>(null)
-  const option = kindOf(kind)
+  const option = {
+    label: KIND_LABELS[kind],
+    pathKey: 'path',
+    pathLabel: LOCAL_PATH.label,
+    placeholder: LOCAL_PATH.placeholder
+  }
   const needsPath = kind === 'local'
 
   function submit() {
@@ -484,9 +466,9 @@ function SourceDialog({
                 <SelectValue>{option.label}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {KIND_OPTIONS.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                {KIND_ORDER.map(value => (
+                  <SelectItem key={value} value={value}>
+                    {KIND_LABELS[value]}
                   </SelectItem>
                 ))}
               </SelectContent>
