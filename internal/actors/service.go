@@ -361,6 +361,22 @@ func (g *group) matches(q string) bool {
 	return false
 }
 
+// linkedProfileID returns the canonical profile id matching a raw actor name, or
+// 0 when none exists. A database error is returned instead of being swallowed.
+func (s *Service) linkedProfileID(ctx context.Context, name string) (int, error) {
+	if name == "" {
+		return 0, nil
+	}
+	pid, err := s.db.ActorProfile.Query().Where(actorprofile.MatchKeyEQ(normalizeName(name))).OnlyID(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return pid, nil
+}
+
 // loadGroup resolves a single group by its public key through the indexed
 // name_key column, so Detail never builds the whole catalog in memory.
 func (s *Service) loadGroup(ctx context.Context, key string) (*group, error) {
@@ -375,7 +391,9 @@ func (s *Service) loadGroup(ctx context.Context, key string) (*group, error) {
 		return nil, err
 	}
 	query := s.db.Actor.Query().Where(actor.NameKeyEQ(key))
-	if pid, perr := s.db.ActorProfile.Query().Where(actorprofile.MatchKeyEQ(normalizeName(seed.Name))).OnlyID(ctx); perr == nil {
+	if pid, perr := s.linkedProfileID(ctx, seed.Name); perr != nil {
+		return nil, perr
+	} else if pid > 0 {
 		query = s.db.Actor.Query().Where(actor.Or(actor.NameKeyEQ(key), actor.HasProfileWith(actorprofile.ID(pid))))
 	}
 	records, err := query.
@@ -772,16 +790,20 @@ func (s *Service) findNames(ctx context.Context, key string) ([]string, error) {
 	// Also include provider rows merged into the same canonical profile (e.g. a
 	// Latin alias of a CJK actor), matching the previous profile-aware lookup.
 	if len(records) > 0 {
-		norm := normalizeName(records[0].Name)
-		if pid, perr := s.db.ActorProfile.Query().Where(actorprofile.MatchKeyEQ(norm)).OnlyID(ctx); perr == nil {
+		pid, perr := s.linkedProfileID(ctx, records[0].Name)
+		if perr != nil {
+			return nil, perr
+		}
+		if pid > 0 {
 			linked, lerr := s.db.Actor.Query().
 				Where(actor.HasProfileWith(actorprofile.ID(pid))).
 				Select(actor.FieldName).
 				All(ctx)
-			if lerr == nil {
-				for _, r := range linked {
-					add(r.Name)
-				}
+			if lerr != nil {
+				return nil, lerr
+			}
+			for _, r := range linked {
+				add(r.Name)
 			}
 		}
 	}

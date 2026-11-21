@@ -44,31 +44,41 @@ const actorDescriptions: Record<string, string> = {
   gfriends: '演员图片图集来源（头像与多图墙）'
 }
 
-/** Shared list of source on/off toggles with loading and error states. */
+type ToggleSource = { id: string; enabled: boolean }
+type ToggleQuery = {
+  data?: ToggleSource[]
+  isPending: boolean
+  isError: boolean
+  isFetching: boolean
+  refetch: () => void
+}
+type ToggleUpdate = {
+  isPending: boolean
+  isError: boolean
+  variables?: ToggleSource[]
+  mutate: (next: ToggleSource[]) => void
+}
+
+/** Source on/off toggles with loading, optimistic state and retry handling. */
 function SourceToggleList({
-  sources,
+  query,
+  update,
   names,
   descriptions,
-  pending,
-  error,
-  retrying,
-  onRetry,
-  onToggle,
   errorText
 }: {
-  sources: Array<{ id: string; enabled: boolean }>
+  query: ToggleQuery
+  update: ToggleUpdate
   names: Record<string, string>
   descriptions: Record<string, string>
-  pending: boolean
-  error: boolean
-  retrying: boolean
-  onRetry: () => void
-  onToggle: (id: string, enabled: boolean) => void
   errorText: string
 }) {
+  // Show the submitted state while the save is in flight so the toggle reacts
+  // immediately instead of waiting for the refetch.
+  const sources = (update.isPending ? update.variables : query.data) ?? []
   return (
     <>
-      {pending ? <Skeleton className="h-4 w-40" /> : null}
+      {query.isPending ? <Skeleton className="h-4 w-40" /> : null}
       {sources.map(source => (
         <SettingRow
           key={source.id}
@@ -76,16 +86,24 @@ function SourceToggleList({
           description={descriptions[source.id]}
           inline
         >
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={source.enabled}
-              onCheckedChange={enabled => onToggle(source.id, enabled)}
-            />
-          </div>
+          <Switch
+            checked={source.enabled}
+            onCheckedChange={enabled =>
+              update.mutate(
+                sources.map(item => (item.id === source.id ? { ...item, enabled } : item))
+              )
+            }
+          />
         </SettingRow>
       ))}
-      {error ? (
-        <InlineError onRetry={onRetry} retrying={retrying}>
+      {query.isError || update.isError ? (
+        <InlineError
+          onRetry={() => {
+            if (query.isError) void query.refetch()
+            else if (update.variables) update.mutate(update.variables)
+          }}
+          retrying={query.isFetching || update.isPending}
+        >
           {errorText}
         </InlineError>
       ) : null}
@@ -96,9 +114,6 @@ function SourceToggleList({
 export function ScrapingSection() {
   const query = useScrapingSources()
   const update = useUpdateScrapingSources()
-  // Show the submitted state while the save is in flight so the toggle reacts
-  // immediately instead of waiting for the refetch.
-  const sources = (update.isPending ? update.variables : query.data) ?? []
   return (
     <SettingsSection
       icon={<ScanSearchIcon className="size-4" />}
@@ -106,19 +121,10 @@ export function ScrapingSection() {
       description="以下来源补充图片及缺失资料。开启后对新刮削生效。注意需要开启代理。"
     >
       <SourceToggleList
-        sources={sources}
+        query={query}
+        update={update}
         names={sourceNames}
         descriptions={descriptions}
-        pending={query.isPending}
-        error={query.isError || update.isError}
-        retrying={query.isFetching || update.isPending}
-        onRetry={() => {
-          if (query.isError) void query.refetch()
-          else if (update.variables) update.mutate(update.variables)
-        }}
-        onToggle={(id, enabled) =>
-          update.mutate(sources.map(item => (item.id === id ? { ...item, enabled } : item)))
-        }
         errorText="来源设置读取或保存失败，请重试。"
       />
     </SettingsSection>
@@ -128,7 +134,6 @@ export function ScrapingSection() {
 export function ActorSourcesSection() {
   const query = useActorSources()
   const update = useUpdateActorSources()
-  const sources = (update.isPending ? update.variables : query.data) ?? []
   return (
     <SettingsSection
       icon={<UserRoundIcon className="size-4" />}
@@ -136,19 +141,10 @@ export function ActorSourcesSection() {
       description="以下来源用于补充演员档案与图片；关闭后对应数据不再抓取或展示。"
     >
       <SourceToggleList
-        sources={sources}
+        query={query}
+        update={update}
         names={actorSourceNames}
         descriptions={actorDescriptions}
-        pending={query.isPending}
-        error={query.isError || update.isError}
-        retrying={query.isFetching || update.isPending}
-        onRetry={() => {
-          if (query.isError) void query.refetch()
-          else if (update.variables) update.mutate(update.variables)
-        }}
-        onToggle={(id, enabled) =>
-          update.mutate(sources.map(item => (item.id === id ? { ...item, enabled } : item)))
-        }
         errorText="演员来源设置读取或保存失败，请重试。"
       />
     </SettingsSection>
