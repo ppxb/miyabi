@@ -137,13 +137,11 @@ for (const action of ['rescrape', 'scan', 'rebuild'] as const) {
     })
   }
 
-  test(`${action}: a new task still has immediate feedback before its snapshot arrives`, () => {
+  test(`${action}: a new task no longer shows an in-progress toast`, () => {
     const f = submission(action)
     f.complete()
-    expect(toast.info).toHaveBeenCalledOnce()
-    expect(vi.mocked(toast.info).mock.calls[0]![1]).toMatchObject({
-      id: 'scan:254',
-      duration: Infinity
-    })
+    expect(toast.info).not.toHaveBeenCalled()
+    expect(toast.success).not.toHaveBeenCalled()
+    expect(toast.error).not.toHaveBeenCalled()
   })
 }

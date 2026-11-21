@@ -44,7 +44,7 @@ test('invalid numeric progress cannot escape its current stage or produce NaN', 
   assert.equal(taskProgressState('downloading', true, 120).value, 20)
 })
 
-test('metadata and artwork share batch progress in scan and offline notifications', () => {
+test('metadata and artwork share batch progress in offline notifications; in-progress scans stay silent', () => {
   const scan: ScanTask = {
     id: 1,
     type: 'scan',
@@ -79,7 +79,7 @@ test('metadata and artwork share batch progress in scan and offline notification
     ['scraping', 2],
     ['artwork', 3]
   ] as const
-  for (const isOffline of [false, true]) {
+  for (const isOffline of [true]) {
     let previous = 0
     for (const [stage, completed] of sequence) {
       scan.scan.stage = stage
@@ -121,4 +121,9 @@ test('metadata and artwork share batch progress in scan and offline notification
     scan.status = 'running'
     scan.scan.metadata_retrying = 0
   }
+
+  // In-progress scans rely on the library ring indicator instead of a toast.
+  vi.mocked(toast.info).mockClear()
+  notifyScanTask(scan)
+  assert.equal(vi.mocked(toast.info).mock.calls.length, 0)
 })

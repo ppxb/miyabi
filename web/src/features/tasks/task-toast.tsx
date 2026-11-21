@@ -58,9 +58,9 @@ export function useNotifyScanTask() {
 
 export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
   const active = isTaskActive(task)
-  // Library-wide sync/rebuild no longer shows a global "syncing" toast; only
-  // per-movie rescrapes keep the in-progress indicator.
-  if (active && task.movie_id == null) {
+  // In-progress scans use the library ring indicator instead of a toast;
+  // only terminal results (completed/failed) surface a notification.
+  if (active) {
     return
   }
   const action = task.rebuild ? '重建' : '同步'
@@ -71,26 +71,7 @@ export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
     options,
     task.can_retry ? task.id : undefined
   )
-  if (active) {
-    // Sonner's loading type hides the close button; long tasks remain dismissible.
-    toast.info(
-      options.waiting ? '正在连接任务服务' : `正在重新刮削 ${task.code}`,
-      {
-        ...props,
-        icon:
-          options.waiting || task.paused ? undefined : (
-            <LoaderCircleIcon className="size-4 animate-spin" />
-          ),
-        description: (
-          <TaskProgress
-            current={scanStage(task)}
-            label={scanStatus(task)}
-            progress={task.scan.metadata_total > 0 ? task.progress : undefined}
-          />
-        )
-      }
-    )
-  } else if (task.status === 'failed') {
+  if (task.status === 'failed') {
     toast.error(task.scan.metadata_failed && !task.movie_id ? `${title}结束` : `${title}失败`, {
       ...props,
       description:
