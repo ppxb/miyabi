@@ -77,12 +77,12 @@
 ## P2 · 死代码 / 冗余（移至回收站，勿 rm）
 
 ### 整文件
-- [ ] ✅ `web/src/features/movie-detail/recommendation-visibility.ts`（同步修改 `web/tests/movie-detail.test.ts`）
-- [ ] `web/src/features/settings/pan-account.tsx`（或在 `PanSourceCard` 中复用它）
-- [ ] `web/src/features/library/movie-status.tsx`
-- [ ] `web/src/components/videojs/ui/airplay-button.tsx`、`cast-button.tsx`、`pip-button.tsx`、`quality-menu.tsx`
-- [ ] `web/src/components/videojs/styles/audio/base.css`（⚠️ `audio/theme.css` 有引用，保留）
-- [ ] `internal/metadata/providers/javdatabase.go`（未注册；或在 `app.go` 注册）
+- [x] ✅ `web/src/features/movie-detail/recommendation-visibility.ts`（已移入回收站；同步删除 `web/tests/movie-detail.test.ts` 中 `observeRecommendation` 的 import 与该 helper 的单测，其余 15 个用例保留；`tsc`/`vitest` 通过）
+- [x] `web/src/features/settings/pan-account.tsx`（已移入回收站；导出的 `PanAccountInfo`/`PanStorageUsage` 全仓 0 引用，`PanSourceCard` 为 `sources-section.tsx` 自带实现、未复用它）
+- [x] `web/src/features/library/movie-status.tsx`（已移入回收站；`LibraryMovieStatus` 0 引用）
+- [x] `web/src/components/videojs/ui/airplay-button.tsx`、`cast-button.tsx`、`pip-button.tsx`、`quality-menu.tsx`（已移入回收站；四个均无 import、`ui/` 无 index barrel，实际使用的是 `custom-quality-menu`）
+- [x] `web/src/components/videojs/styles/audio/base.css`（已移入回收站；全 web 搜 `audio/base` 0 命中，各组件直接 `import '../styles/audio/theme.css'`；**保留 `audio/theme.css`**）
+- [x] `internal/metadata/providers/javdatabase.go`（已移入回收站，确认不再需要；连带移走 `javdatabase_test.go` 与 `testdata/javdatabase_ssis-001.html`；`go build ./...`/`go vet ./internal/metadata/providers/` 通过）
 
 ### 函数 / 字段 / 常量
 - [ ] ✅ `web/src/api/discover.ts:181-199` `useRecommendationMovie`；`api/movie-detail-cache.ts:48-177` `subscribeMovieCard`/`createMovieDetailLoader`；`useDiscoverMovie` 中 `prioritize` effect；`discoverKeys.search`
