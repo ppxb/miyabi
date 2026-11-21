@@ -17,7 +17,7 @@ export function MovieSubscribeButton({ movie }: { movie: DiscoverMovie }) {
   function handleClick(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
     event.stopPropagation()
-    if (!canSubscribe || add.isPending) return
+    if (!canSubscribe) return
     add.mutate({ kind: 'movie', target_id: movie.id })
   }
 

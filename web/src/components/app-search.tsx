@@ -67,7 +67,7 @@ function movieDetails(movie: LibraryPage['movies'][number], hasTitle: boolean) {
     hasTitle ? movie.code : '',
     movie.release_date ?? '',
     movie.duration > 0 ? `${movie.duration} 分钟` : '',
-    (movie.actors ?? [])
+    movie.actors
       .map(actor => actor.name)
       .filter(Boolean)
       .join(' / ')

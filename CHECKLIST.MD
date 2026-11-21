@@ -131,7 +131,7 @@
 - [x] 🟢 `web/src/components/media-image.tsx:72-77`：`typeof image.decode` 检测多余；decode 失败误标 error。（已去掉 `typeof` 检测，直接 `await image.decode()`；decode 失败不再置 error，仍标记 ready）
 - [x] 🟢 `web/src/components/list-pagination.tsx:29`：`nextPage === page` 防御多余。（已删除该守卫；实际调用点只会传 `item !== page` / `page±1`）
 - [x] 🟢 `web/src/components/app-shell.tsx:65-77`：主题类型断言 + `?? 'system'` 多余；暗色显示 Sun 图标语义不符。（已删第 65 行 `as ThemeName | undefined` 断言与 `?? 'system'`，并移除随之多余的类型别名；第 66 行 `?? 'system'` 因 `noUncheckedIndexedAccess` 必须保留；暗色显示 Sun 属正确"切换到亮色"动作语义，未改）
-- [ ] 🟢 前端多余空值判断：`app-search.tsx:73`、`library/movie-card.tsx:25`、`library/continue-watching.tsx:15`、`actors/detail-page.tsx:38-39,102`、`discover/movie-subscribe-button.tsx:20`、`player-dialog.tsx:21-25,48`、`subscriptions/page.tsx:100-104`
+- [x] 🟢 前端多余空值判断：`app-search.tsx:73`、`library/movie-card.tsx:25`、`library/continue-watching.tsx:15`、`actors/detail-page.tsx:38-39,102`、`discover/movie-subscribe-button.tsx:20`、`player-dialog.tsx:21-25,48`、`subscriptions/page.tsx:100-104`（已删 4 处确证多余：app-search / movie-card 的 `movie.actors ?? []`、continue-watching 的 `duration>0?`（filter 已保证）、movie-subscribe 中与按钮 disabled 重复的 `add.isPending`；其余经评估为必要类型/重入守卫，保留，故行号引用已漂移）
 - [ ] 🟢 后端多余 nil 检查：`catalogue/state.go:27,48`、`catalogue/recommend.go:23`、`api/router.go:44`、`api/movie.go:207`、`app/app.go:392-415`、`drive/accounts.go:63,88,101`、`freejavbt/client.go:176,181,196`
 - [ ] 🟢 `web/src/features/sources/sources-section.tsx:56-99`：`KIND_OPTIONS` 大半字段死数据 + `?? KIND_OPTIONS[0]!` 兜底。
 - [ ] 🟢 `web/src/components/videojs/video/menus/settings-menu.tsx:19-32`：`qualityOptions.length > 0` 恒真、多余默认值。

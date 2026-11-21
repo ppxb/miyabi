@@ -12,7 +12,7 @@ export function ContinueWatching({ onPlay }: { onPlay: (movieID: number) => void
   return (
     <MovieShelf title="正在观看" itemCount={items.length} href="/history">
       {items.map(item => {
-        const percent = item.duration > 0 ? (item.position / item.duration) * 100 : 0
+        const percent = (item.position / item.duration) * 100
         const movie: LibraryMovie = {
           id: item.movie_id,
           code: item.code,

@@ -16,7 +16,7 @@ export function LibraryMovieCard({
   progress?: number
 }) {
   const title = movie.title || movie.code
-  const actors = (movie.actors ?? [])
+  const actors = movie.actors
     .map(actor => actor.name)
     .filter(Boolean)
     .join(' / ')
