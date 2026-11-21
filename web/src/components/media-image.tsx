@@ -64,11 +64,12 @@ function MediaImageContent({
               const image = event.currentTarget
               onImageLoad?.(image)
               try {
-                if (typeof image.decode === 'function') await image.decode()
-                setStatus('ready')
+                await image.decode()
               } catch {
-                setStatus('error')
+                // onLoad already confirmed the image is displayable; a decode
+                // failure must not be treated as a load error.
               }
+              setStatus('ready')
             }}
             onError={() => setStatus('error')}
           />
