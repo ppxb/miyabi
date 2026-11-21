@@ -10,6 +10,7 @@ import { ListPagination } from '@/components/list-pagination'
 import { PageHeader } from '@/components/page-header'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const PAGE_SIZE = 40
 
@@ -18,20 +19,35 @@ function displayAvatar(src?: string) {
   return src.startsWith('/api/actors/') ? src : imageURL(src)
 }
 
-export function ActorsCatalogPage() {
-  const [query, setQuery] = useState('')
-  const [debounced, setDebounced] = useState('')
-  const [page, setPage] = useState(1)
+export function ActorsCatalogPage({
+  q,
+  page,
+  onSearchChange
+}: {
+  q?: string
+  page: number
+  onSearchChange: (next: { q?: string; page?: number }) => void
+}) {
+  const [query, setQuery] = useState(q ?? '')
+  const [syncedQ, setSyncedQ] = useState(q ?? '')
+
+  // Reflect external URL changes (back/forward) into the input. Adjusting state
+  // during render (guarded) avoids a setState-in-effect loop.
+  if ((q ?? '') !== syncedQ) {
+    setSyncedQ(q ?? '')
+    setQuery(q ?? '')
+  }
 
   useEffect(() => {
+    const current = q ?? ''
+    if (query.trim() === current) return
     const timer = setTimeout(() => {
-      setDebounced(query)
-      setPage(1)
+      onSearchChange({ q: query.trim() || undefined, page: undefined })
     }, 300)
     return () => clearTimeout(timer)
-  }, [query])
+  }, [query, q, onSearchChange])
 
-  const catalog = useActorCatalog({ q: debounced, page, limit: PAGE_SIZE })
+  const catalog = useActorCatalog({ q: q ?? '', page, limit: PAGE_SIZE })
   const items = catalog.data?.actors ?? []
   const totalPages = Math.max(1, Math.ceil((catalog.data?.total ?? 0) / PAGE_SIZE))
 
@@ -39,13 +55,22 @@ export function ActorsCatalogPage() {
     <AppPage>
       <PageHeader title="演员" description="按演员浏览作品" />
       <Input
+        aria-label="搜索演员名称"
         className="w-full sm:w-60"
         placeholder="搜索演员名称"
         value={query}
         onChange={event => setQuery(event.target.value)}
       />
       {catalog.isPending ? (
-        <p className="text-sm text-muted-foreground">正在读取演员</p>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          {Array.from({ length: 10 }).map((_, index) => (
+            <div key={index} className="flex flex-col items-center gap-2 p-3">
+              <Skeleton className="size-32 rounded-full" />
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-3 w-12" />
+            </div>
+          ))}
+        </div>
       ) : catalog.isError ? (
         <ErrorState
           message="无法读取演员，请检查后端服务后重试"
@@ -82,7 +107,9 @@ export function ActorsCatalogPage() {
             totalPages={totalPages}
             hasMore={catalog.data?.has_more ?? false}
             disabled={catalog.isFetching}
-            onPageChange={setPage}
+            onPageChange={next =>
+              onSearchChange({ q: q?.trim() || undefined, page: next > 1 ? next : undefined })
+            }
           />
         </>
       )}

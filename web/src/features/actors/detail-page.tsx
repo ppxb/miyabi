@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { lazy, Suspense, useState } from 'react'
+import { useState } from 'react'
 import {
   ArrowLeftIcon,
   CakeIcon,
@@ -24,17 +24,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { LibraryMovieCard } from '@/features/library/movie-card'
+import { LazyLibraryPlayerDialog } from '@/features/library/player-dialog-lazy'
 
 function displayAvatar(src?: string) {
   if (!src) return undefined
   return src.startsWith('/api/actors/') ? src : imageURL(src)
 }
-
-const LibraryPlayerDialog = lazy(() =>
-  import('@/features/library/player-dialog').then(module => ({
-    default: module.LibraryPlayerDialog
-  }))
-)
 
 function ActorStats({ actor }: { actor: ReturnType<typeof useActorDetail>['data'] }) {
   if (!actor) return null
@@ -78,7 +73,7 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
       <AppPage>
         <Skeleton className="h-4 w-24" />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <Skeleton className="size-48 rounded-full" />
+          <Skeleton className="size-32 rounded-full" />
           <div className="flex flex-col gap-2">
             <Skeleton className="h-10 w-56" />
             <Skeleton className="h-4 w-32" />
@@ -92,7 +87,7 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
         </div>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
           {Array.from({ length: 6 }).map((_, index) => (
-            <Skeleton key={index} className="aspect-[3/4] w-full rounded-lg" />
+            <Skeleton key={index} className="aspect-3/4 w-full rounded-lg" />
           ))}
         </div>
         <Skeleton className="h-6 w-24" />
@@ -162,7 +157,7 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
           <h2 className="text-xl font-semibold">图片</h2>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
             {Array.from({ length: Math.min(actor.image_count, 12) }).map((_, index) => (
-              <div key={index} className="aspect-[3/4] w-full overflow-hidden rounded-lg">
+              <div key={index} className="aspect-3/4 w-full overflow-hidden rounded-lg">
                 <MediaImage
                   source={`/api/actors/${actor.key}/image/${index}`}
                   className="object-cover"
@@ -184,11 +179,7 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
         </MovieGridLayout>
       )}
 
-      {playingId !== null ? (
-        <Suspense fallback={null}>
-          <LibraryPlayerDialog movieId={playingId} onClose={() => setPlayingId(null)} />
-        </Suspense>
-      ) : null}
+      <LazyLibraryPlayerDialog movieId={playingId} onClose={() => setPlayingId(null)} />
     </AppPage>
   )
 }

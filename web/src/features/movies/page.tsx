@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import { useBrowseLibraryMovies, useLibraryFilterOptions } from '@/api/library'
 import { AppPage } from '@/components/app-page'
@@ -9,30 +9,41 @@ import { MovieGridLayout } from '@/components/movie/movie-grid-layout'
 import { MovieGridSkeleton } from '@/components/movie/movie-grid-skeleton'
 import { PageHeader } from '@/components/page-header'
 import { LibraryMovieCard } from '@/features/library/movie-card'
+import { LazyLibraryPlayerDialog } from '@/features/library/player-dialog-lazy'
 import { MovieFilterBar } from '@/features/movies/filter-bar'
+import { moviesFilterFromSearch, moviesSearchFromFilter, type MoviesSearch } from '@/features/movies/search'
 import type { MoviesFilter } from '@/features/movies/types'
 
 const PAGE_SIZE = 20
 
-const LibraryPlayerDialog = lazy(() =>
-  import('@/features/library/player-dialog').then(module => ({
-    default: module.LibraryPlayerDialog
-  }))
-)
-
-export function MoviesPage() {
-  const [filters, setFilters] = useState<MoviesFilter>({ sort: 'recent' })
-  const [page, setPage] = useState(1)
+export function MoviesPage({
+  search,
+  onSearchChange
+}: {
+  search: MoviesSearch
+  onSearchChange: (next: MoviesSearch) => void
+}) {
   const [playingId, setPlayingId] = useState<number | null>(null)
   const options = useLibraryFilterOptions()
+  const filters = moviesFilterFromSearch(search)
+  const page = search.page ?? 1
   const movies = useBrowseLibraryMovies({ ...filters, page, limit: PAGE_SIZE })
   const items = movies.data?.movies ?? []
   const totalPages = Math.max(1, Math.ceil((movies.data?.total ?? 0) / PAGE_SIZE))
 
-  const handleFiltersChange = useCallback((next: MoviesFilter) => {
-    setFilters(next)
-    setPage(1)
-  }, [])
+  const handleFiltersChange = useCallback(
+    (next: MoviesFilter) => {
+      onSearchChange({ ...moviesSearchFromFilter(next), page: undefined })
+    },
+    [onSearchChange]
+  )
+
+  const handlePageChange = useCallback(
+    (next: number) => {
+      onSearchChange({ ...moviesSearchFromFilter(filters), page: next > 1 ? next : undefined })
+    },
+    [filters, onSearchChange]
+  )
 
   return (
     <AppPage>
@@ -66,16 +77,12 @@ export function MoviesPage() {
             totalPages={totalPages}
             hasMore={movies.data?.has_more ?? false}
             disabled={movies.isFetching}
-            onPageChange={setPage}
+            onPageChange={handlePageChange}
           />
         </>
       )}
 
-      {playingId !== null ? (
-        <Suspense fallback={null}>
-          <LibraryPlayerDialog movieId={playingId} onClose={() => setPlayingId(null)} />
-        </Suspense>
-      ) : null}
+      <LazyLibraryPlayerDialog movieId={playingId} onClose={() => setPlayingId(null)} />
     </AppPage>
   )
 }

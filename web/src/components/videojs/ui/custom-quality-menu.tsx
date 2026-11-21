@@ -1,6 +1,6 @@
 'use client'
 
-import { Hd } from 'lucide-react'
+import { QualityIcon } from '@videojs/react/icons'
 import { Menu } from '@videojs/react'
 
 import { MenuChevron } from '@/components/videojs/ui/menu-chevron'
@@ -41,7 +41,7 @@ export function CustomQualityMenu({
           'media-anchored:media-highlighted:bg-transparent'
         )}
       >
-        <Hd
+        <QualityIcon
           className={cn(
             'shrink-0 text-media-muted-foreground drop-shadow-media-icon',
             'size-media-icon',

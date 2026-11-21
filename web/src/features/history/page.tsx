@@ -24,7 +24,7 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { LibraryMovieCard } from '@/features/library/movie-card'
-import { LibraryPlayerDialog } from '@/features/library/player-dialog'
+import { LazyLibraryPlayerDialog } from '@/features/library/player-dialog-lazy'
 
 export function HistoryPage({
   page,
@@ -105,9 +105,7 @@ export function HistoryPage({
         </DialogContent>
       </Dialog>
 
-      {playingId !== null ? (
-        <LibraryPlayerDialog movieId={playingId} onClose={() => setPlayingId(null)} />
-      ) : null}
+      <LazyLibraryPlayerDialog movieId={playingId} onClose={() => setPlayingId(null)} />
     </AppPage>
   )
 }

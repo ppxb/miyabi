@@ -2,8 +2,8 @@ import {
   isOfflineTaskActive,
   type OfflineActivity,
   type OfflineSubmission
-} from '../../api/offline'
-import { isScanTask, isTaskActive, type BatchTask, type ScanTask, type Task } from '../../api/tasks'
+} from '@/api/offline'
+import { isScanTask, isTaskActive, type BatchTask, type ScanTask, type Task } from '@/api/tasks'
 
 function isBatchTask(task: Task): task is BatchTask {
   return task.type === 'subscription_batch'

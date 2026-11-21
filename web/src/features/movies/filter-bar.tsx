@@ -37,11 +37,19 @@ export function MovieFilterBar({
   onChange: (next: MoviesFilter) => void
 }) {
   const [query, setQuery] = useState(value.q ?? '')
+  const [syncedQ, setSyncedQ] = useState(value.q ?? '')
+
+  // Reflect external URL changes (back/forward) into the input. Adjusting state
+  // during render (guarded) avoids a setState-in-effect loop.
+  if ((value.q ?? '') !== syncedQ) {
+    setSyncedQ(value.q ?? '')
+    setQuery(value.q ?? '')
+  }
 
   useEffect(() => {
     const current = value.q ?? ''
-    if (query === current) return
-    const timer = setTimeout(() => onChange({ ...value, q: query || undefined }), 300)
+    if (query.trim() === current) return
+    const timer = setTimeout(() => onChange({ ...value, q: query.trim() || undefined }), 300)
     return () => clearTimeout(timer)
   }, [query, value, onChange])
 
@@ -64,6 +72,7 @@ export function MovieFilterBar({
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
       <Input
+        aria-label="搜索番号或标题"
         className="w-full sm:w-60"
         placeholder="搜索番号或标题"
         value={query}

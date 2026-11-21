@@ -64,9 +64,9 @@ export function CategoryFilters({
 
       {taxonomy.isLoading ? (
         <>
-          <Skeleton className="h-9 w-full rounded-full sm:w-48" />
-          <Skeleton className="h-9 w-full rounded-full sm:w-56" />
-          <Skeleton className="h-9 w-full rounded-full sm:w-48" />
+          <Skeleton className="h-8 w-full rounded-lg sm:w-48" />
+          <Skeleton className="h-8 w-full rounded-lg sm:w-56" />
+          <Skeleton className="h-8 w-full rounded-lg sm:w-48" />
         </>
       ) : taxonomy.isError ? (
         <InlineError

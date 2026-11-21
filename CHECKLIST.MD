@@ -170,14 +170,14 @@
 
 ## P5 · UI 风格统一
 
-- [ ] 🟠 **settings 各 section 不一致**：加载（Skeleton / 文字 / 无）、错误（toast / InlineError）、按钮尺寸（`sm` / 默认）与位置（右上 / 右下）。约定：查询失败 InlineError、变更失败 toast、加载 Skeleton；抽 `SettingsActions`；`SettingsSection` 增加 `description` prop（替代 `scraping-section.tsx:47-49,97-99` 游离 `<p>`）。
-- [ ] 🟠 **状态色对比度不足**：`styles/globals.css:174-180` `downloading`（白/cyan-400 ≈1.8:1）、`success`（白/emerald-500 ≈2.5:1）；`--color-info:20` 未走语义变量。
-- [ ] 🟠 **筛选与分页状态未进 URL**：`features/movies/page.tsx:24-25`、`features/actors/catalog-page.tsx:22-24`（discover/history 已用 `validateSearch`）。
-- [ ] 🟢 **骨架尺寸与真实控件不符**：`discover/category-filters.tsx:61-63`（`h-9 rounded-full` vs `h-8 rounded-lg`）、`library/scan-button.tsx:27`（同）、`actors/detail-page.tsx:80`（`size-48` vs `size-32`）。
-- [ ] 🟢 `actors/catalog-page.tsx:48`：加载仅文字，其他列表为骨架。
-- [ ] 🟢 写法不统一：`aspect-[3/4]`（`actors/detail-page.tsx:94,169`）vs `aspect-3/2`；`preview-zoom.ts:1`、`task-notification-diff.ts` 相对路径 vs `@/`；`movie-subscribe-button.tsx:26` `asChild` vs `magnets.tsx` `render`；`custom-quality-menu.tsx` lucide `Hd` 图标混入 videojs 图标集。
-- [ ] 🟢 进度口径不一致：`library/library-progress.tsx:10-20` 自算 vs `task.progress` + `scanCount()`。
-- [ ] 🟢 `LibraryPlayerDialog` 在 history 直接导入，movies/actors 懒加载且各写一份。
+- [x] 🟠 **settings 各 section 不一致**：`SettingsSection` 增加 `description` prop 并在 `scraping-section` 使用（去掉游离 `<p>`）；`tasks-section`/`scraping-section` 的「正在读取…」文字统一为 `Skeleton`；错误态本就以 `InlineError` 为主。（按钮尺寸/位置未逐一强统一；`SettingsActions` 未抽，避免引入暂时无人使用的抽象。）
+- [x] 🟠 **状态色对比度不足**：`globals.css` 新增语义 `--info` 并把 `--color-info` 改为引用它；`--success` 提到 `emerald-600`、`--downloading` 提到 `cyan-700` 以提升白字对比度。（如需严格 WCAG AA 4.5:1，可继续加深到 `-700/-800`，建议视觉复核。）
+- [x] 🟠 **筛选与分页状态未进 URL**：`/movies` 与 `/actors/` 增加 `validateSearch`，`MoviesPage`/`ActorsCatalogPage` 改为由路由 search 驱动（新增 `features/movies/search.ts`；列表筛选以逗号串编码）。`discover/history/subscriptions` 原本已用 `validateSearch`。
+- [x] 🟢 **骨架尺寸与真实控件不符**：`discover/category-filters` 骨架改 `h-8 rounded-lg`；`library/scan-button` 骨架改 `h-8 rounded-lg`；`actors/detail-page` 骨架头像 `size-48`→`size-32`。
+- [x] 🟢 `actors/catalog-page.tsx`：加载仅文字改为头像骨架网格。
+- [x] 🟢 写法不统一：`aspect-[3/4]`→`aspect-3/4`（`actors/detail-page`）；`preview-zoom.ts`、`task-notification-diff.ts` 相对路径改 `@/`；`custom-quality-menu` lucide `Hd` 改 videojs `QualityIcon`。（`movie-subscribe-button asChild` 已在 P4 统一为 `render`。）
+- [ ] 🟢 进度口径不一致：`library/library-progress.tsx` 仍自算百分比（其实按 `scan.metadata_*`/`directories_*`/`task.progress` 兜底，与 `scanCount()` 文案口径不同）。保留：两者语义不同（圆形进度 vs 任务文案），强合并会改变现有展示，建议单独评估。
+- [x] 🟢 `LibraryPlayerDialog` 引入方式统一：新增 `features/library/player-dialog-lazy.tsx` 共享懒加载封装，`history/library/movies/actors` 统一使用。
 
 ---
 

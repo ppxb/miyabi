@@ -9,6 +9,7 @@ import {
   useUpdateScrapingSources
 } from '@/api/metadata'
 import { InlineError } from '@/components/error-state'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { SettingRow, SettingsSection } from './shared'
 
@@ -45,11 +46,12 @@ export function ScrapingSection() {
   // immediately instead of waiting for the refetch.
   const sources = (update.isPending ? update.variables : query.data) ?? []
   return (
-    <SettingsSection icon={<ScanSearchIcon className="size-4" />} title="影片刮削">
-      <p className="text-xs text-muted-foreground">
-        以下来源补充图片及缺失资料。开启后对新刮削生效。注意需要开启代理。
-      </p>
-      {query.isPending ? <p className="text-sm text-muted-foreground">正在读取来源</p> : null}
+    <SettingsSection
+      icon={<ScanSearchIcon className="size-4" />}
+      title="影片刮削"
+      description="以下来源补充图片及缺失资料。开启后对新刮削生效。注意需要开启代理。"
+    >
+      {query.isPending ? <Skeleton className="h-4 w-40" /> : null}
       {sources.map(source => (
         <SettingRow
           key={source.id}
@@ -94,11 +96,12 @@ export function ActorSourcesSection() {
   const update = useUpdateActorSources()
   const sources = (update.isPending ? update.variables : query.data) ?? []
   return (
-    <SettingsSection icon={<UserRoundIcon className="size-4" />} title="演员数据源">
-      <p className="text-xs text-muted-foreground">
-        以下来源用于补充演员档案与图片；关闭后对应数据不再抓取或展示。
-      </p>
-      {query.isPending ? <p className="text-sm text-muted-foreground">正在读取来源</p> : null}
+    <SettingsSection
+      icon={<UserRoundIcon className="size-4" />}
+      title="演员数据源"
+      description="以下来源用于补充演员档案与图片；关闭后对应数据不再抓取或展示。"
+    >
+      {query.isPending ? <Skeleton className="h-4 w-40" /> : null}
       {sources.map(source => (
         <SettingRow
           key={source.id}

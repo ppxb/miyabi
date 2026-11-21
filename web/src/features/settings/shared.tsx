@@ -15,10 +15,12 @@ export function SettingsCard({ children }: { children: ReactNode }) {
 export function SettingsSection({
   icon,
   title,
+  description,
   children
 }: {
   icon: ReactNode
   title: string
+  description?: ReactNode
   children: ReactNode
 }) {
   return (
@@ -27,6 +29,7 @@ export function SettingsSection({
         <span className="text-muted-foreground">{icon}</span>
         {title}
       </h2>
+      {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
       {children}
     </section>
   )

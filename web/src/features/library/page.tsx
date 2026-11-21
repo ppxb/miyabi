@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { useState } from 'react'
 
 import { useLibraryMovies } from '@/api/library'
 import { isScanTask, isTaskActive, useTasks } from '@/api/tasks'
@@ -8,15 +8,10 @@ import { ErrorState, InlineError } from '@/components/error-state'
 import { PageHeader } from '@/components/page-header'
 import { ContinueWatching } from '@/features/library/continue-watching'
 import { LibraryProgress } from '@/features/library/library-progress'
+import { LazyLibraryPlayerDialog } from '@/features/library/player-dialog-lazy'
 import { RecentlyAddedShelf } from '@/features/library/recent-shelf'
 import { TopRatedShelf } from '@/features/library/top-rated-shelf'
 import { useTaskConnection } from '@/features/tasks/task-events'
-
-const LibraryPlayerDialog = lazy(() =>
-  import('@/features/library/player-dialog').then(module => ({
-    default: module.LibraryPlayerDialog
-  }))
-)
 
 export function LibraryPage() {
   const library = useLibraryMovies(1)
@@ -74,11 +69,7 @@ export function LibraryPage() {
         </>
       )}
 
-      {playingId !== null ? (
-        <Suspense fallback={null}>
-          <LibraryPlayerDialog movieId={playingId} onClose={() => setPlayingId(null)} />
-        </Suspense>
-      ) : null}
+      <LazyLibraryPlayerDialog movieId={playingId} onClose={() => setPlayingId(null)} />
     </AppPage>
   )
 }

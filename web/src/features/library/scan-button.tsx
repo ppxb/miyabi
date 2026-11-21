@@ -25,7 +25,7 @@ export function LibraryScanButton({
   const startScan = useStartLibraryScan()
   const notifyScan = useNotifyScanTask()
   // Keep the mutation observer mounted while pagination replaces the visible control.
-  if (loading) return <Skeleton className="h-9 w-20 rounded-4xl sm:w-60" />
+  if (loading) return <Skeleton className="h-8 w-20 rounded-lg sm:w-60" />
   if (!available) return null
 
   return (

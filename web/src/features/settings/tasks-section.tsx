@@ -2,6 +2,7 @@ import { ListChecksIcon } from 'lucide-react'
 
 import { isScanTask, isTaskActive, useTasks } from '@/api/tasks'
 import { InlineError } from '@/components/error-state'
+import { Skeleton } from '@/components/ui/skeleton'
 import { SettingRow, SettingsSection } from '@/features/settings/shared'
 import { LibraryPauseButton } from '@/features/tasks/library-pause-button'
 import { ScanProgressView } from '@/features/tasks/scan-progress'
@@ -21,7 +22,7 @@ export function TasksSection() {
       >
         {activeScan ? <LibraryPauseButton paused={!!activeScan.paused} /> : null}
       </SettingRow>
-      {tasks.isPending ? <p className="text-xs text-muted-foreground">正在读取任务…</p> : null}
+      {tasks.isPending ? <Skeleton className="h-4 w-40" /> : null}
       {tasks.isError ? (
         <InlineError
           onRetry={connection.reconnect}
