@@ -1,12 +1,12 @@
 package schema
 
 import (
-	"encoding/json"
 	"time"
 
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/ppxb/miyabi/internal/domain"
 )
 
 // WatchHistory stores playback progress per library movie.
@@ -23,7 +23,7 @@ func (WatchHistory) Fields() []ent.Field {
 		// settings is a single extensible JSON blob for all per-movie playback
 		// preferences (speed, rendition, and later subtitles/audio tracks ...), so
 		// adding a new preference needs no schema change.
-		field.JSON("settings", json.RawMessage{}).Optional(),
+		field.JSON("settings", &domain.PlaybackSettings{}).Optional(),
 		field.Time("watched_at").Default(time.Now),
 	}
 }

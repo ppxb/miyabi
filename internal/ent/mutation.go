@@ -14797,23 +14797,22 @@ func (m *ViewedMovieMutation) ResetEdge(name string) error {
 // WatchHistoryMutation represents an operation that mutates the WatchHistory nodes in the graph.
 type WatchHistoryMutation struct {
 	config
-	op             Op
-	typ            string
-	id             *int
-	movie_id       *int
-	addmovie_id    *int
-	file_id        *string
-	position       *float64
-	addposition    *float64
-	duration       *float64
-	addduration    *float64
-	settings       *jsontext.Value
-	appendsettings jsontext.Value
-	watched_at     *time.Time
-	clearedFields  map[string]struct{}
-	done           bool
-	oldValue       func(context.Context) (*WatchHistory, error)
-	predicates     []predicate.WatchHistory
+	op            Op
+	typ           string
+	id            *int
+	movie_id      *int
+	addmovie_id   *int
+	file_id       *string
+	position      *float64
+	addposition   *float64
+	duration      *float64
+	addduration   *float64
+	settings      **domain.PlaybackSettings
+	watched_at    *time.Time
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*WatchHistory, error)
+	predicates    []predicate.WatchHistory
 }
 
 var _ ent.Mutation = (*WatchHistoryMutation)(nil)
@@ -15119,13 +15118,12 @@ func (m *WatchHistoryMutation) ResetDuration() {
 }
 
 // SetSettings sets the "settings" field.
-func (m *WatchHistoryMutation) SetSettings(j jsontext.Value) {
-	m.settings = &j
-	m.appendsettings = nil
+func (m *WatchHistoryMutation) SetSettings(ds *domain.PlaybackSettings) {
+	m.settings = &ds
 }
 
 // Settings returns the value of the "settings" field in the mutation.
-func (m *WatchHistoryMutation) Settings() (r jsontext.Value, exists bool) {
+func (m *WatchHistoryMutation) Settings() (r *domain.PlaybackSettings, exists bool) {
 	v := m.settings
 	if v == nil {
 		return
@@ -15136,7 +15134,7 @@ func (m *WatchHistoryMutation) Settings() (r jsontext.Value, exists bool) {
 // OldSettings returns the old "settings" field's value of the WatchHistory entity.
 // If the WatchHistory object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *WatchHistoryMutation) OldSettings(ctx context.Context) (v jsontext.Value, err error) {
+func (m *WatchHistoryMutation) OldSettings(ctx context.Context) (v *domain.PlaybackSettings, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldSettings is only allowed on UpdateOne operations")
 	}
@@ -15150,23 +15148,9 @@ func (m *WatchHistoryMutation) OldSettings(ctx context.Context) (v jsontext.Valu
 	return oldValue.Settings, nil
 }
 
-// AppendSettings adds j to the "settings" field.
-func (m *WatchHistoryMutation) AppendSettings(j jsontext.Value) {
-	m.appendsettings = append(m.appendsettings, j...)
-}
-
-// AppendedSettings returns the list of values that were appended to the "settings" field in this mutation.
-func (m *WatchHistoryMutation) AppendedSettings() (jsontext.Value, bool) {
-	if len(m.appendsettings) == 0 {
-		return nil, false
-	}
-	return m.appendsettings, true
-}
-
 // ClearSettings clears the value of the "settings" field.
 func (m *WatchHistoryMutation) ClearSettings() {
 	m.settings = nil
-	m.appendsettings = nil
 	m.clearedFields[watchhistory.FieldSettings] = struct{}{}
 }
 
@@ -15179,7 +15163,6 @@ func (m *WatchHistoryMutation) SettingsCleared() bool {
 // ResetSettings resets all changes to the "settings" field.
 func (m *WatchHistoryMutation) ResetSettings() {
 	m.settings = nil
-	m.appendsettings = nil
 	delete(m.clearedFields, watchhistory.FieldSettings)
 }
 
@@ -15351,7 +15334,7 @@ func (m *WatchHistoryMutation) SetField(name string, value ent.Value) error {
 		m.SetDuration(v)
 		return nil
 	case watchhistory.FieldSettings:
-		v, ok := value.(jsontext.Value)
+		v, ok := value.(*domain.PlaybackSettings)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

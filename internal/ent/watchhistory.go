@@ -4,13 +4,13 @@ package ent
 
 import (
 	"encoding/json"
-	"encoding/json/jsontext"
 	"fmt"
 	"strings"
 	"time"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
 
@@ -28,7 +28,7 @@ type WatchHistory struct {
 	// Duration holds the value of the "duration" field.
 	Duration float64 `json:"duration,omitempty"`
 	// Settings holds the value of the "settings" field.
-	Settings jsontext.Value `json:"settings,omitempty"`
+	Settings *domain.PlaybackSettings `json:"settings,omitempty"`
 	// WatchedAt holds the value of the "watched_at" field.
 	WatchedAt    time.Time `json:"watched_at,omitempty"`
 	selectValues sql.SelectValues

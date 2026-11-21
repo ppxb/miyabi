@@ -4,15 +4,14 @@ package ent
 
 import (
 	"context"
-	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
-	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
@@ -108,14 +107,8 @@ func (_u *WatchHistoryUpdate) AddDuration(v float64) *WatchHistoryUpdate {
 }
 
 // SetSettings sets the "settings" field.
-func (_u *WatchHistoryUpdate) SetSettings(v jsontext.Value) *WatchHistoryUpdate {
+func (_u *WatchHistoryUpdate) SetSettings(v *domain.PlaybackSettings) *WatchHistoryUpdate {
 	_u.mutation.SetSettings(v)
-	return _u
-}
-
-// AppendSettings appends value to the "settings" field.
-func (_u *WatchHistoryUpdate) AppendSettings(v jsontext.Value) *WatchHistoryUpdate {
-	_u.mutation.AppendSettings(v)
 	return _u
 }
 
@@ -216,11 +209,6 @@ func (_u *WatchHistoryUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if value, ok := _u.mutation.Settings(); ok {
 		_spec.SetField(watchhistory.FieldSettings, field.TypeJSON, value)
-	}
-	if value, ok := _u.mutation.AppendedSettings(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, watchhistory.FieldSettings, value)
-		})
 	}
 	if _u.mutation.SettingsCleared() {
 		_spec.ClearField(watchhistory.FieldSettings, field.TypeJSON)
@@ -326,14 +314,8 @@ func (_u *WatchHistoryUpdateOne) AddDuration(v float64) *WatchHistoryUpdateOne {
 }
 
 // SetSettings sets the "settings" field.
-func (_u *WatchHistoryUpdateOne) SetSettings(v jsontext.Value) *WatchHistoryUpdateOne {
+func (_u *WatchHistoryUpdateOne) SetSettings(v *domain.PlaybackSettings) *WatchHistoryUpdateOne {
 	_u.mutation.SetSettings(v)
-	return _u
-}
-
-// AppendSettings appends value to the "settings" field.
-func (_u *WatchHistoryUpdateOne) AppendSettings(v jsontext.Value) *WatchHistoryUpdateOne {
-	_u.mutation.AppendSettings(v)
 	return _u
 }
 
@@ -464,11 +446,6 @@ func (_u *WatchHistoryUpdateOne) sqlSave(ctx context.Context) (_node *WatchHisto
 	}
 	if value, ok := _u.mutation.Settings(); ok {
 		_spec.SetField(watchhistory.FieldSettings, field.TypeJSON, value)
-	}
-	if value, ok := _u.mutation.AppendedSettings(); ok {
-		_spec.AddModifier(func(u *sql.UpdateBuilder) {
-			sqljson.Append(u, watchhistory.FieldSettings, value)
-		})
 	}
 	if _u.mutation.SettingsCleared() {
 		_spec.ClearField(watchhistory.FieldSettings, field.TypeJSON)

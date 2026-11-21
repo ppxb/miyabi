@@ -4,7 +4,6 @@ package ent
 
 import (
 	"context"
-	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
 
@@ -72,7 +72,7 @@ func (_c *WatchHistoryCreate) SetNillableDuration(v *float64) *WatchHistoryCreat
 }
 
 // SetSettings sets the "settings" field.
-func (_c *WatchHistoryCreate) SetSettings(v jsontext.Value) *WatchHistoryCreate {
+func (_c *WatchHistoryCreate) SetSettings(v *domain.PlaybackSettings) *WatchHistoryCreate {
 	_c.mutation.SetSettings(v)
 	return _c
 }
@@ -336,7 +336,7 @@ func (u *WatchHistoryUpsert) AddDuration(v float64) *WatchHistoryUpsert {
 }
 
 // SetSettings sets the "settings" field.
-func (u *WatchHistoryUpsert) SetSettings(v jsontext.Value) *WatchHistoryUpsert {
+func (u *WatchHistoryUpsert) SetSettings(v *domain.PlaybackSettings) *WatchHistoryUpsert {
 	u.Set(watchhistory.FieldSettings, v)
 	return u
 }
@@ -483,7 +483,7 @@ func (u *WatchHistoryUpsertOne) UpdateDuration() *WatchHistoryUpsertOne {
 }
 
 // SetSettings sets the "settings" field.
-func (u *WatchHistoryUpsertOne) SetSettings(v jsontext.Value) *WatchHistoryUpsertOne {
+func (u *WatchHistoryUpsertOne) SetSettings(v *domain.PlaybackSettings) *WatchHistoryUpsertOne {
 	return u.Update(func(s *WatchHistoryUpsert) {
 		s.SetSettings(v)
 	})
@@ -799,7 +799,7 @@ func (u *WatchHistoryUpsertBulk) UpdateDuration() *WatchHistoryUpsertBulk {
 }
 
 // SetSettings sets the "settings" field.
-func (u *WatchHistoryUpsertBulk) SetSettings(v jsontext.Value) *WatchHistoryUpsertBulk {
+func (u *WatchHistoryUpsertBulk) SetSettings(v *domain.PlaybackSettings) *WatchHistoryUpsertBulk {
 	return u.Update(func(s *WatchHistoryUpsert) {
 		s.SetSettings(v)
 	})

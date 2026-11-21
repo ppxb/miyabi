@@ -240,7 +240,7 @@
 - [x] ~~`offline/sync.go:166`：`updateTask` 每条任务仍调用 `currentMountFor`→`drive.Mount`；本轮只把 prefs 提到循环外~~ **评估后不处理**：`drive.Mount` 已改为内存缓存（P1 修复后为 O(1)，非读库），且完成时需重新读取挂载以检测「轮询期间挂载被替换」（`TestOfflineSyncRespectsSourceChangesDuringRemotePolling` 依赖此语义）；改成循环外算一次会破坏该正确性。
 - [x] ~~`drive/accounts.go:188,197`：`accountRecord`/`Mount` 改读内存后 error 恒为 nil、ctx 未用，约 10 处调用方多写无效 `if err != nil`~~ **评估后保留**：`Mount` 是跨包接口（`source.MountProvider` 等）且调用点 10+；保留 error 返回便于未来缓存未命中/回源读库，删除收益低、改动面大。
 - [x] `actors/service.go:378` 与 `:776`：`loadGroup`/`findNames` 按 `MatchKeyEQ(normalizeName(seed.Name))` 反查 profile 逻辑重复，后者吞 `perr/lerr`。改法：seed 查询 `WithProfile` 带出外键，抽同一 helper 并返回错误。（已修复：新增 `linkedProfileID` 统一反查并返回错误；`loadGroup`/`findNames` 复用，`findNames` 不再吞错）
-- [x] ~~`ent/schema/watch_history.go:26`：`settings` 用 `json.RawMessage` + `playback/history.go:48` 手写编解码，读改写无事务~~ **暂不处理**：改 typed `field.JSON(&domain.PlaybackSettings{})` 需 ent 代码生成与迁移；且真正的并发合并问题需事务/JSON 合并解决，单独评估。
+- [x] `ent/schema/watch_history.go:26`：`settings` 用 `json.RawMessage` + `playback/history.go:48` 手写编解码，读改写无事务。改法：`field.JSON("settings", &domain.PlaybackSettings{})`。（已修复：schema 改为 typed JSON；`domain.PlaybackSettings` 实现 `driver.Valuer`/`sql.Scanner`；`Resume`/`existingSettings` 不再手写编解码；`SaveProgress` 的“读旧值+合并+upsert”放入同一事务。`go build`/`go test ./internal/playback ./internal/api ./internal/database ./internal/library` 通过）
 
 前端
 - [x] `features/movies/page.tsx:28,41`：`moviesFilterFromSearch(search)` 每次渲染新建对象，`useCallback([filters])` 失效、筛选栏防抖计时器被重置。改法：`useMemo(..., [search])`。（已修复：`filters` 改用 `useMemo([search])`）
