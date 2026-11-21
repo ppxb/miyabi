@@ -122,15 +122,21 @@ func tagPredicate(tags []domain.Tag) predicate.Tag {
 }
 
 func localReference(record *ent.Movie) domain.MovieReference {
+	// The cover is the artwork the movie cards render (the same field the
+	// library list shows); the poster is only a fallback when no cover exists.
+	cover := domain.ValueOrZero(record.Cover)
 	thumbnail := domain.ValueOrZero(record.Poster)
 	if thumbnail == "" {
-		thumbnail = domain.ValueOrZero(record.Cover)
+		thumbnail = cover
+	}
+	if cover == "" {
+		cover = thumbnail
 	}
 	reference := domain.MovieReference{
 		ID:        codeid.Normalize(record.Code),
 		Code:      record.Code,
 		Thumbnail: thumbnail,
-		Cover:     thumbnail,
+		Cover:     cover,
 		Title:     record.Title,
 	}
 	if record.ReleaseDate != nil {
