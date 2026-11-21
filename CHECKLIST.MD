@@ -200,7 +200,7 @@
 - [ ] `subscription-card.tsx:20-26,129-133` 两张状态表合并
 - [x] `task-notification-diff.ts` 抽 `shouldNotify({ active, old, id, dismissed, announced, initialized, extra })`，scan / batch / offline 三处循环统一守卫。
 - [x] 路由重复 errorComponent（实际 6 处：`discover/movies/actors.index/index/subscriptions/history`）→ 统一到 `router.tsx` 的 `defaultErrorComponent`（用 `error.message`，兜底「页面加载失败」），各路由已移除。
-- [ ] `custom-quality-menu.tsx` 与 `quality-menu.tsx` 约 70 行 class 重复
+- [x] ~~`custom-quality-menu.tsx` 与 `quality-menu.tsx` 约 70 行 class 重复~~：`quality-menu.tsx` 不存在；相关 class 重复此前已清理，无需再抽常量。
 
 ### 后端
 - [ ] HTML DOM helper 四份：`actors/html.go:11-86`、`metadata/providers/html.go:13-102`、`javdb/web.go:343-408`、`javbus/parser.go:269`（含 `absoluteURL`/`absolute`）→ 共享 `htmlx` 包
