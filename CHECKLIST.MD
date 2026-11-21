@@ -257,7 +257,7 @@
 - [x] `library/player-dialog.tsx:79` 用 JS `useScrollFade`，`movie-detail/dialog.tsx:34` 用 shadcn `scroll-fade` 工具类，二选一。（已统一为 `useScrollFade`：`movie-detail/dialog.tsx`、`app-sidebar.tsx` 均改用 hook，与 `player-dialog`/`app-search` 一致；移除 `scroll-fade`/`scroll-fade-y` 类）
 - [x] `history/page.tsx:59-76` 与 `library/continue-watching.tsx:15-29` 「历史条目→卡片」重复且进度算法不一致（前者 clamp+round）。改法：抽 `historyToCard(item)`。（已修复：新增 `features/library/history-card.ts` 的 `historyToCard`，两处复用；进度统一为 clamp 0-100 + round；`tsc`/`oxlint`/`oxfmt`/`vitest` 通过）
 - [x] `components/list-pagination.tsx:36-46` 重写了 `PaginationLink`（后者已 0 调用）；`data-active` 无样式使用。（已修复：`ui/pagination.tsx` 的 `PaginationLink` 改为与 `PaginationPrevious/Next` 一致的按钮形态（接收 Button props + `isActive`），去掉无用的 `data-active` 与 `<a>`/`nativeButton` 渲染；`ListPagination` 页码改用 `PaginationLink`；`tsc`/`oxlint`/`oxfmt`/`vitest` 通过）
-- [ ] `components/stat-list.tsx:13-16,37` `StatListSkeleton` 复制容器 class。
+- [x] `components/stat-list.tsx:13-16,37` `StatListSkeleton` 复制容器 class。（已修复：容器与单项 class 提为模块常量 `listClass`/`itemClass`，`StatList` 与 `StatListSkeleton` 共用；`tsc`/`oxlint`/`oxfmt` 通过）
 - [ ] `library/page.tsx:22,26` 仍手写 `filter(isScanTask)` + `find(isTaskActive)`，未用 `useActiveScan`。
 - [ ] `ensureProfileTx`（`actors/service.go:1135`）≈ `ensureProfile`；`domain.ActorNameKey` 与 `actors.Key` 重复 sha1。
 
