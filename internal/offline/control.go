@@ -150,7 +150,7 @@ func (s *Service) removeCurrent(ctx context.Context, sess drive.Session, record 
 	if err != nil {
 		return err
 	}
-	if found && remote.Status == 2 {
+	if found && remote.Status == pan.OfflineStatusDone {
 		mount, err := s.currentMountFor(ctx, record)
 		if err != nil {
 			return err
@@ -159,7 +159,7 @@ func (s *Service) removeCurrent(ctx context.Context, sess drive.Session, record 
 			return s.completeTask(ctx, tx, record, remote.FileID, mount)
 		})
 	}
-	if found && remote.Status != 0 && remote.Status != 1 && remote.Status != -1 {
+	if found && remote.Status != pan.OfflineStatusWaiting && remote.Status != pan.OfflineStatusRunning && remote.Status != pan.OfflineStatusFailed {
 		return fmt.Errorf("115 returned unknown offline status %d", remote.Status)
 	}
 	if state.Action == actionSwitch && !state.RemovalStarted {
@@ -167,7 +167,7 @@ func (s *Service) removeCurrent(ctx context.Context, sess drive.Session, record 
 			return domain.E(domain.KindConflict, "115 中未找到原任务，请确认下载结果后重试", nil)
 		}
 		// A fresh observation always wins over an earlier stall decision.
-		if !state.Manual && remote.Status != -1 && (remote.ProgressUnknown || rawProgress(remote) > state.Progress || remote.Status == 0) {
+		if !state.Manual && remote.Status != pan.OfflineStatusFailed && (remote.ProgressUnknown || rawProgress(remote) > state.Progress || remote.Status == pan.OfflineStatusWaiting) {
 			state.Action, state.NextHash, state.Reason = "", "", ""
 			state.Stalled = false
 			state.ProgressAt, state.ObservedAt, state.Progress = s.now(), s.now(), rawProgress(remote)
@@ -237,7 +237,7 @@ func (s *Service) resumeSubmission(ctx context.Context, sess drive.Session, reco
 		if err != nil {
 			return err
 		}
-		if found && (remote.Status == 0 || remote.Status == 1 || remote.Status == 2) {
+		if found && (remote.Status == pan.OfflineStatusWaiting || remote.Status == pan.OfflineStatusRunning || remote.Status == pan.OfflineStatusDone) {
 			if remote.DirectoryID != record.DirectoryID {
 				return domain.E(domain.KindConflict, "115 任务位于其他目录", nil)
 			}
@@ -262,7 +262,7 @@ func (s *Service) recordSubmission(ctx context.Context, sess drive.Session, reco
 	state.Attempts[len(state.Attempts)-1].InfoHash = strings.ToLower(remote.Hash)
 	state.ObservedAt, state.ProgressAt, state.Progress, state.RemoteStatus = s.now(), s.now(), rawProgress(remote), remote.Status
 	var mount *domain.LibrarySource
-	if remote.Status == 2 {
+	if remote.Status == pan.OfflineStatusDone {
 		m, err := s.currentMountFor(ctx, record)
 		if err != nil {
 			return err
@@ -273,7 +273,7 @@ func (s *Service) recordSubmission(ctx context.Context, sess drive.Session, reco
 		if err := tx.OfflineDownload.UpdateOneID(record.ID).SetInfoHash(remote.Hash).SetRecovery(state).SetProgress(remote.Progress).ClearError().Exec(ctx); err != nil {
 			return err
 		}
-		if remote.Status == 2 {
+		if remote.Status == pan.OfflineStatusDone {
 			record.Recovery = state
 			return s.completeTask(ctx, tx, record, remote.FileID, mount)
 		}

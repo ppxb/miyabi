@@ -28,13 +28,13 @@ func (service *Service) submit(ctx context.Context, sess drive.Session, hash str
 		return pan.OfflineTask{}, err
 	}
 	source := sess.Source()
-	if remote.Status == 0 || remote.Status == 1 {
+	if remote.Status == pan.OfflineStatusWaiting || remote.Status == pan.OfflineStatusRunning {
 		if remote.DirectoryID != source.Directory.ID {
 			return pan.OfflineTask{}, domain.E(domain.KindConflict, "115 已有该磁力的下载任务，目标目录与当前媒体目录不一致", nil)
 		}
 		return remote, nil
 	}
-	if remote.Status != 2 && remote.Status != -1 {
+	if remote.Status != pan.OfflineStatusDone && remote.Status != pan.OfflineStatusFailed {
 		return pan.OfflineTask{}, fmt.Errorf("115 returned unknown offline status %d", remote.Status)
 	}
 	if remote.FileID == "" {
@@ -45,7 +45,7 @@ func (service *Service) submit(ctx context.Context, sess drive.Session, hash str
 		return pan.OfflineTask{}, err
 	}
 	if present {
-		if remote.Status == -1 {
+		if remote.Status == pan.OfflineStatusFailed {
 			return pan.OfflineTask{}, domain.E(domain.KindConflict, "115 任务失败但目录内仍有视频，请先在 115 客户端确认完整性", nil)
 		}
 		return remote, nil

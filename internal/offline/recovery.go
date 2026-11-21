@@ -14,6 +14,7 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/domain/download"
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 	"github.com/ppxb/miyabi/internal/magnet"
@@ -105,8 +106,8 @@ func (s *Service) recoverSource(ctx context.Context, source domain.LibrarySource
 		if state.Exhausted {
 			continue
 		}
-		failed := record.Status == offlinedownload.StatusFailed && state.RemoteStatus == -1
-		stalled := record.Status == offlinedownload.StatusRunning && state.RemoteStatus == 1 &&
+		failed := record.Status == offlinedownload.StatusFailed && state.RemoteStatus == pan.OfflineStatusFailed
+		stalled := record.Status == offlinedownload.StatusRunning && state.RemoteStatus == pan.OfflineStatusRunning &&
 			!state.ProgressAt.IsZero() && s.now().Sub(state.ObservedAt) <= observationGap &&
 			s.now().Sub(state.ProgressAt) >= s.policy.timeout(state.Progress)
 		if !failed && !stalled {
@@ -140,7 +141,7 @@ func (s *Service) markStalled(ctx context.Context, id int) error {
 		return nil
 	}
 	state := recovery(record, record.Recovery.Preferences)
-	if state.Action != "" || state.Stalled || state.RemoteStatus != 1 || s.now().Sub(state.ObservedAt) > observationGap || s.now().Sub(state.ProgressAt) < s.policy.timeout(state.Progress) {
+	if state.Action != "" || state.Stalled || state.RemoteStatus != pan.OfflineStatusRunning || s.now().Sub(state.ObservedAt) > observationGap || s.now().Sub(state.ProgressAt) < s.policy.timeout(state.Progress) {
 		return nil
 	}
 	state.Stalled = true

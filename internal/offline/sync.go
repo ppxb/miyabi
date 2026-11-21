@@ -82,7 +82,7 @@ func (service *Service) syncSource(ctx context.Context, source domain.LibrarySou
 		}
 		seen[hash] = true
 		if record.Status == offlinedownload.StatusDone && record.FileID != "" {
-			if err := service.updateTask(ctx, sess, record, pan.OfflineTask{Status: 2, FileID: record.FileID, Hash: record.InfoHash}, prefs); err != nil {
+			if err := service.updateTask(ctx, sess, record, pan.OfflineTask{Status: pan.OfflineStatusDone, FileID: record.FileID, Hash: record.InfoHash}, prefs); err != nil {
 				syncErrors = append(syncErrors, err)
 			}
 			continue
@@ -175,7 +175,7 @@ func (service *Service) updateTask(ctx context.Context, sess drive.Session, reco
 		// A remote page may have started loading before another completion
 		// committed. Never regress terminal state or overwrite indexed files.
 		if current.Hash != record.Hash || current.InfoHash != record.InfoHash ||
-			current.Status == offlinedownload.StatusCancelled || current.Status == offlinedownload.StatusFailed || current.Status == offlinedownload.StatusDone && remote.Status != 2 {
+			current.Status == offlinedownload.StatusCancelled || current.Status == offlinedownload.StatusFailed || current.Status == offlinedownload.StatusDone && remote.Status != pan.OfflineStatusDone {
 			return nil
 		}
 		if current.Recovery != nil && current.Recovery.Action != "" {
@@ -183,15 +183,15 @@ func (service *Service) updateTask(ctx context.Context, sess drive.Session, reco
 		}
 		status := offlinedownload.StatusRunning
 		switch remote.Status {
-		case 0, 1:
-		case 2:
+		case pan.OfflineStatusWaiting, pan.OfflineStatusRunning:
+		case pan.OfflineStatusDone:
 			if current.Status == offlinedownload.StatusDone && (current.ScanTaskID != 0 ||
 				current.FileID == "" && remote.FileID == "") {
 				return nil
 			}
 			notify = true
 			return service.completeTask(ctx, tx, current, remote.FileID, scanSource)
-		case -1:
+		case pan.OfflineStatusFailed:
 			status = offlinedownload.StatusFailed
 		default:
 			return fmt.Errorf("115 returned unknown offline status %d", remote.Status)
@@ -285,7 +285,7 @@ func (service *Service) completeTask(ctx context.Context, tx *ent.Tx, record *en
 		state := recovery(record, record.Recovery.Preferences)
 		state.Action, state.NextHash, state.Reason = "", "", ""
 		state.Stalled, state.Exhausted = false, false
-		state.RemoteStatus, state.Progress = 2, 100
+		state.RemoteStatus, state.Progress = pan.OfflineStatusDone, 100
 		update.SetRecovery(state)
 	}
 	return update.Exec(ctx)
