@@ -193,7 +193,7 @@
 - [x] `settings/shared.tsx` 新增 `SettingsActions`（右对齐按钮行容器），`network-section` 与 `emby-section` 的保存/测试按钮组复用。
 - [x] 新增 `features/tasks/use-active-scan.ts` 的 `useActiveScan()`（tasks + scans + active），`media-sync-section`、`tasks-section` 复用。
 - [x] 分类过滤：`MAIN_CATEGORY`/`UNSUPPORTED_CATEGORIES` 移入 `discover/constants.ts`，新增 `discover/use-category-taxonomy.ts` 的 `useCategoryTaxonomy(zone, categoryID?)`，`category-content`、`category-filters` 复用。
-- [ ] `discover/results.tsx` + `browse-results.tsx` 合并
+- [x] `discover/results.tsx` + `browse-results.tsx` 合并为单个 `BrowseResults`（query + 展示），`results.tsx` 已移出项目到 `backups/removed-20261121-1430/`。
 - [ ] `movie-detail/content.tsx:62-108` 两分支后半段 → `CatalogueSections`
 - [ ] `movie-detail/magnets.tsx:231-239` ≈ `:262-269` 按钮内容
 - [x] `recommendations.tsx`、`history/page.tsx` 伪造整条 movie → 卡片 props 收窄：`LibraryMovieCard` 用 `LibraryMovieCardData`、`DiscoverMovieCard` 用 `DiscoverMovieCardData`，`referenceMovie` 只造所需字段，`HistoryCard` 适配器删除、`LibraryMovieActions` 收窄为 `Pick<LibraryMovie,'id'|'code'>`。
