@@ -26,7 +26,6 @@ export function ListPagination({
   onPageChange: (page: number) => void
 }) {
   function changePage(nextPage: number) {
-    if (nextPage === page) return
     onPageChange(nextPage)
     if (scrollToTop) window.scrollTo({ top: 0, behavior: 'smooth' })
   }

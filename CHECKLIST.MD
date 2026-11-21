@@ -129,7 +129,7 @@
 - [x] 🟢 `web/src/api/tasks.ts:87,96`：直接 `toast.error(error.message)`，绕过全局 `meta.errorTitle` / `UNAUTHORIZED` 静默 / `describeApiError`。（已改用 `meta: { errorTitle: '重试失败' / '操作失败' }` 交给全局 MutationCache 统一处理：`describeApiError`、`UNAUTHORIZED` 静默、PAN 失效提示；移除直接 toast 与 `error.message`）
 - [x] 🟢 `web/src/features/access-gate/access-gate.tsx:72`：用 `error.message` 而非 `describeApiError`。（已改为 `describeApiError(login.error)`，非 ApiError 回退统一文案）
 - [x] 🟢 `web/src/components/media-image.tsx:72-77`：`typeof image.decode` 检测多余；decode 失败误标 error。（已去掉 `typeof` 检测，直接 `await image.decode()`；decode 失败不再置 error，仍标记 ready）
-- [ ] 🟢 `web/src/components/list-pagination.tsx:29`：`nextPage === page` 防御多余。
+- [x] 🟢 `web/src/components/list-pagination.tsx:29`：`nextPage === page` 防御多余。（已删除该守卫；实际调用点只会传 `item !== page` / `page±1`）
 - [ ] 🟢 `web/src/components/app-shell.tsx:65-77`：主题类型断言 + `?? 'system'` 多余；暗色显示 Sun 图标语义不符。
 - [ ] 🟢 前端多余空值判断：`app-search.tsx:73`、`library/movie-card.tsx:25`、`library/continue-watching.tsx:15`、`actors/detail-page.tsx:38-39,102`、`discover/movie-subscribe-button.tsx:20`、`player-dialog.tsx:21-25,48`、`subscriptions/page.tsx:100-104`
 - [ ] 🟢 后端多余 nil 检查：`catalogue/state.go:27,48`、`catalogue/recommend.go:23`、`api/router.go:44`、`api/movie.go:207`、`app/app.go:392-415`、`drive/accounts.go:63,88,101`、`freejavbt/client.go:176,181,196`
