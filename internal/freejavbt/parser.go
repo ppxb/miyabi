@@ -171,7 +171,7 @@ func parseRefs(section string) []domain.MovieReference {
 		if image := imgRe.FindStringSubmatch(match[2]); image != nil {
 			thumbnail = image[1]
 		}
-		refs = append(refs, domain.MovieReference{ID: code, Code: code, Thumbnail: thumbnail})
+		refs = append(refs, domain.MovieReference{ID: code, Code: code, Thumbnail: thumbnail, Cover: thumbnail})
 		if len(refs) >= limit {
 			break
 		}

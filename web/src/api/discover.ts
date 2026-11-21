@@ -11,6 +11,7 @@ export type MovieReference = {
   id: string
   code: string
   thumbnail: string
+  cover?: string
   title?: string
   release_date?: string
   rating?: number

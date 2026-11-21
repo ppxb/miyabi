@@ -86,6 +86,7 @@ type MovieReference struct {
 	ID          string  `json:"id"`
 	Code        string  `json:"code"`
 	Thumbnail   string  `json:"thumbnail"`
+	Cover       string  `json:"cover,omitempty"`
 	Title       string  `json:"title,omitempty"`
 	ReleaseDate string  `json:"release_date,omitempty"`
 	Rating      float64 `json:"rating,omitempty"`

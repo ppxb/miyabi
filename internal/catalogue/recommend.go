@@ -130,6 +130,7 @@ func localReference(record *ent.Movie) domain.MovieReference {
 		ID:        codeid.Normalize(record.Code),
 		Code:      record.Code,
 		Thumbnail: thumbnail,
+		Cover:     thumbnail,
 		Title:     record.Title,
 	}
 	if record.ReleaseDate != nil {

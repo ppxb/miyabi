@@ -33,6 +33,6 @@ function referenceMovie(movie: MovieReference): DiscoverMovieCardData {
     title: movie.title ?? '',
     release_date: movie.release_date ?? '',
     rating: movie.rating ?? 0,
-    cover: movie.thumbnail
+    cover: movie.cover || movie.thumbnail
   }
 }

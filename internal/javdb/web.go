@@ -325,7 +325,7 @@ func webRecommendations(document *html.Node, markers ...string) []domain.MovieRe
 			if id == "" || code == "" {
 				continue
 			}
-			references = append(references, domain.MovieReference{ID: id, Code: code, Thumbnail: thumbnail})
+			references = append(references, domain.MovieReference{ID: id, Code: code, Thumbnail: thumbnail, Cover: thumbnail})
 		}
 		return references
 	}

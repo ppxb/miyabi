@@ -81,7 +81,7 @@ func movieReferencesFromWire(ctx context.Context, movieID, field string, source 
 				"reference_id", id, "reason", reason)
 			continue
 		}
-		result = append(result, domain.MovieReference{ID: codeid.Normalize(code), Code: code, Thumbnail: item.ThumbURL})
+		result = append(result, domain.MovieReference{ID: codeid.Normalize(code), Code: code, Thumbnail: item.ThumbURL, Cover: item.CoverURL})
 	}
 	return result
 }
