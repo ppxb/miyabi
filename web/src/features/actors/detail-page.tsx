@@ -20,6 +20,7 @@ import { ErrorState } from '@/components/error-state'
 import { MediaImage } from '@/components/media-image'
 import { MovieGridLayout } from '@/components/movie/movie-grid-layout'
 import { MovieGridSkeleton } from '@/components/movie/movie-grid-skeleton'
+import { StatList } from '@/components/stat-list'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -47,22 +48,7 @@ function ActorStats({ actor }: { actor: ReturnType<typeof useActorDetail>['data'
   }
   if (stats.length === 0) return null
 
-  return (
-    <dl className="flex flex-wrap divide-x divide-border/60 rounded-2xl bg-muted py-1 ring-1 ring-border dark:bg-card/60 dark:ring-0">
-      {stats.map(stat => (
-        <div
-          key={stat.label}
-          className="flex min-w-0 flex-1 flex-col items-center gap-2 p-3 sm:p-4"
-        >
-          <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <stat.icon className="size-4" />
-            {stat.label}
-          </dt>
-          <dd className="text-sm font-semibold whitespace-nowrap tabular-nums">{stat.value}</dd>
-        </div>
-      ))}
-    </dl>
-  )
+  return <StatList stats={stats} />
 }
 
 export function ActorDetailPage({ actorKey }: { actorKey: string }) {

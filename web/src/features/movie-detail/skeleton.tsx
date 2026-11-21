@@ -1,6 +1,7 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent } from '@/components/ui/card'
 import { MovieGridSkeleton } from '@/components/movie'
+import { StatListSkeleton } from '@/components/stat-list'
 
 export function MovieDetailSkeleton() {
   return (
@@ -18,17 +19,7 @@ export function MovieDetailSkeleton() {
               <Skeleton className="h-7 w-4/5 sm:h-8" />
             </div>
           </div>
-          <div className="flex flex-wrap divide-x divide-border/60 rounded-2xl bg-muted py-1 ring-1 ring-border dark:bg-card/60 dark:ring-0">
-            {Array.from({ length: 3 }, (_, index) => (
-              <div
-                key={index}
-                className="flex min-w-0 flex-1 flex-col items-center gap-2 p-3 sm:p-4"
-              >
-                <Skeleton className="h-4 w-16 max-w-full bg-background/70 dark:bg-muted" />
-                <Skeleton className="h-5 w-20 max-w-full bg-background/70 sm:h-6 dark:bg-muted" />
-              </div>
-            ))}
-          </div>
+          <StatListSkeleton />
           <div className="flex flex-wrap gap-2">
             <Skeleton className="h-5 w-12 rounded-full" />
             <Skeleton className="h-5 w-16 rounded-full" />
