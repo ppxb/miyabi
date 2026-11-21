@@ -19,6 +19,12 @@ type Catalogue interface {
 	CatalogueMagnetsByCode(ctx context.Context, code string) ([]domain.Magnet, error)
 }
 
+// MetadataWarmer pre-fetches metadata for a code so a later library scrape can
+// reuse the cached sources instead of hitting the networks again.
+type MetadataWarmer interface {
+	Resolve(context.Context, domain.MovieRef) (domain.MovieMetadata, error)
+}
+
 // Library schedules scans and projects their current workflow status.
 type Library interface {
 	Workflows(context.Context, []*ent.Task) ([]domain.TaskInfo, error)
@@ -32,6 +38,7 @@ type Service struct {
 	drive     *drive.Drive
 	tasks     *tasks.Service
 	library   Library
+	metadata  MetadataWarmer
 	// submitTimeout bounds one remote submission once it has started; the
 	// caller may have gone away but the mutation must be recorded.
 	submitTimeout time.Duration
@@ -58,4 +65,10 @@ func New(database *ent.Client, catalogue Catalogue, drive *drive.Drive, tasks *t
 			maxAttempts:         3,
 		},
 	}
+}
+
+// SetMetadata wires the metadata warmer used to prewarm the scrape cache when a
+// movie is added to the drive. Optional: nil disables prewarming.
+func (service *Service) SetMetadata(warmer MetadataWarmer) {
+	service.metadata = warmer
 }

@@ -190,6 +190,7 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 	cleanup = append(cleanup, metadataSvc.Close)
 
 	offlineSvc := offline.New(store.Client, catalogueSvc, driveSvc, taskSvc, libSvc, offlineSubmitTimeout)
+	offlineSvc.SetMetadata(metadataSvc)
 	monitorSvc := monitor.New(store.Client, catalogueSvc, offlineSvc, taskSvc)
 	subtitleSvc := subtitle.NewService(store.Client, subtitle.NewFinder(networkSvc.ProxyManager()))
 	gfriendsClient := gfriends.New(cfg.DataDir, &http.Client{

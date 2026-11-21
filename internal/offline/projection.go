@@ -187,9 +187,6 @@ func (service *Service) submissions(ctx context.Context, records []*ent.OfflineD
 			if scan.Status == string(task.StatusQueued) || scan.Status == string(task.StatusRunning) {
 				item.Processing = true
 			}
-			if scan.Error != nil {
-				item.Error = scan.Error
-			}
 		} else if record.Status == offlinedownload.StatusDone && (record.FileID != "" || record.AwaitingLocation) {
 			// Remote completion may arrive before its file location. Keep the
 			// indexing workflow active without presenting it as a download.

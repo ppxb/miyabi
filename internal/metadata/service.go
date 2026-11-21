@@ -319,7 +319,10 @@ func (s *Service) fetch(ctx context.Context, source Source, ref domain.MovieRef)
 		if err != nil && !errors.Is(err, ErrNotFound) {
 			return nil, err
 		}
-		ttl := 24 * time.Hour
+		// Successful source results are reused by later scrapes (e.g. after a
+		// movie is added to the drive), so keep them for a week; negative results
+		// expire quickly so a temporarily missing title is retried soon.
+		ttl := 7 * 24 * time.Hour
 		var cached *domain.MovieMetadata
 		if err == nil {
 			if !codeid.IsFormatEquivalent(result.Detail.Code, code) || result.Detail.Title == "" || len(result.Detail.Sources) == 0 {
