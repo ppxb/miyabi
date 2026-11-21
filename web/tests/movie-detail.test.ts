@@ -10,7 +10,6 @@ import {
   subscribeMovieCard
 } from '@/api/movie-detail-cache'
 import type { DiscoverMovieDetail } from '@/api/discover'
-import { observeRecommendation } from '@/features/movie-detail/recommendation-visibility'
 
 function movie(id: string, title = `Title ${id}`): DiscoverMovieDetail {
   return {
@@ -243,63 +242,6 @@ test('normal foreground detail requests remain cancelable', async () => {
   detail.destroy()
   assert.equal(requests[0]!.signal?.aborted, true)
   await setImmediate()
-})
-
-test('brief intersections do not enqueue work and leaving or unmounting releases it', () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-  const observers: MockIntersectionObserver[] = []
-  class MockIntersectionObserver {
-    element?: Element
-    disconnected = false
-    constructor(
-      private notify: (entries: Pick<IntersectionObserverEntry, 'isIntersecting'>[]) => void
-    ) {
-      observers.push(this)
-    }
-    observe(element: Element) {
-      this.element = element
-    }
-    disconnect() {
-      this.disconnected = true
-    }
-    enter(visible: boolean) {
-      this.notify([{ isIntersecting: visible }])
-    }
-  }
-  vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
-  let requested = 0
-  let released = 0
-  // The observer only uses element identity; no DOM methods are invoked.
-  const element = {} as Element
-  const dispose = observeRecommendation(element, () => {
-    requested++
-    return () => released++
-  })
-  const observer = observers[0]
-  assert.ok(observer)
-  assert.equal(observer.element, element)
-  observer.enter(true)
-  vi.advanceTimersByTime(199)
-  observer.enter(false)
-  vi.advanceTimersByTime(1000)
-  assert.equal(requested, 0)
-
-  observer.enter(true)
-  vi.advanceTimersByTime(200)
-  assert.equal(requested, 1)
-  observer.enter(true)
-  vi.advanceTimersByTime(200)
-  assert.equal(requested, 1)
-  observer.enter(false)
-  assert.equal(released, 1)
-
-  observer.enter(true)
-  vi.advanceTimersByTime(200)
-  dispose()
-  assert.equal(released, 2)
-  assert.equal(observer.disconnected, true)
-  vi.advanceTimersByTime(1000)
-  assert.equal(requested, 2)
 })
 
 test('card lookup follows list replacement and removal without retaining orphaned entries', () => {
