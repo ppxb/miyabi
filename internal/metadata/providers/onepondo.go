@@ -40,12 +40,7 @@ func (s *OnePondo) Fetch(ctx context.Context, ref domain.MovieRef) (domain.Movie
 	if !s.Supports(code) {
 		return domain.MovieMetadata{}, metadata.ErrNotFound
 	}
-	movieID := strings.ReplaceAll(strings.TrimPrefix(code, "1PONDO-"), "-", "_")
-	body, err := s.client.get(ctx, "https://www.1pondo.tv/dyn/phpauto/movie_details/movie_id/"+movieID+".json")
-	if err != nil {
-		return domain.MovieMetadata{}, err
-	}
-	return parseOnePondoJSON(body, code)
+	return fetchPondoJSON(ctx, &s.client, "https://www.1pondo.tv/", code, "onepondo", 2470, "1PONDO-")
 }
 
 func parseOnePondoJSON(body []byte, code string) (domain.MovieMetadata, error) {
