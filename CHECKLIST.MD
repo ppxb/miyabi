@@ -98,7 +98,7 @@
 - [ ] `internal/metadata/service.go:244` `needsSupplement`；`:255-264` `attachSourceIdentity` 简化（已删 `needsSupplement` 及测试断言；`attachSourceIdentity` 简化待办）
 - [x] `internal/catalogue/service.go:40` `proxy`、`internal/database/sqlite.go:21` `db` 只写不读（已删 `Service.proxy` 字段及赋值；`Store.db` 被数据库测试读取，保留）
 - [x] `internal/domain/movie.go:47` `SearchOptions`；`tasks/payload.go:35` `SetPayloadField`、`netx.ProxyManager.Update`（仅测试用）（复核成立但【评估后保留，不改】：三项均仅测试引用、无生产调用；删除需改多份测试并削减 `ProxyManager` 等公共 API 覆盖，运行收益为 0，属过度清理）
-- [ ] `internal/api/error.go:83` 不可达分支；`:112` 硬编码文案比较（复核：`:112` 成立；`:83` 仅 `fs.ErrNotExist` 半支不可达，`ent.IsNotFound` 待确认，待办）
+- [x] `internal/api/error.go:83` 不可达分支；`:112` 硬编码文案比较（已处理：`:83` 删除不可达的 `errors.Is(err, fs.ErrNotExist)` 分支——`domain.KindOf` 已把 `fs.ErrNotExist` 映射为 `KindNotFound`；`:112` 改为 `status==404 && ent.IsNotFound(err)` 时用 `domain.PublicMessage(domain.E(domain.KindNotFound,"",nil))` 取规范文案，去掉字面量比较。`go build`/`go vet`/`go test ./internal/api/...` 通过）
 
 ### 未被传入的 props
 - [ ] `components/movie/movie-card.tsx` `coverLoading`、`onCoverReady`；探索/库卡片多余的 `titleTooltip={false}`
