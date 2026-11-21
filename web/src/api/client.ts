@@ -76,7 +76,8 @@ function requestJSON<T>(path: string, method: 'POST' | 'PATCH' | 'PUT', body: un
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
-    ...init
+    ...init,
+    credentials: 'same-origin'
   })
 
   if (!response.ok) {

@@ -123,11 +123,8 @@ test('library cards play on activation instead of opening details', () => {
       id: 42,
       code: 'ABP-123',
       title: 'Library movie',
-      duration: 0,
       rating: 0,
-      actors: [],
-      tags: [],
-      scrape_status: 'done'
+      actors: []
     },
     onPlay
   })

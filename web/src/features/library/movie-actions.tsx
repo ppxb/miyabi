@@ -19,7 +19,7 @@ import { notifyTaskError, useNotifyScanTask } from '@/features/tasks/task-toast'
 
 // Renders the context-menu content and its correction dialog. The ContextMenu
 // root/trigger live in the card so right-clicking the whole card opens it.
-export function LibraryMovieActions({ movie }: { movie: LibraryMovie }) {
+export function LibraryMovieActions({ movie }: { movie: Pick<LibraryMovie, 'id' | 'code'> }) {
   const [correcting, setCorrecting] = useState(false)
   const [code, setCode] = useState(movie.code)
   const scrape = useRescrapeLibraryMovie(movie.id)

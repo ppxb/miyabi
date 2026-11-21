@@ -1,12 +1,6 @@
 import { useState } from 'react'
 
-import {
-  HISTORY_PAGE_SIZE,
-  useClearHistory,
-  useHistory,
-  type WatchHistoryItem
-} from '@/api/history'
-import type { LibraryMovie } from '@/api/library'
+import { HISTORY_PAGE_SIZE, useClearHistory, useHistory } from '@/api/history'
 import { AppPage } from '@/components/app-page'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
@@ -61,13 +55,29 @@ export function HistoryPage({
       ) : (
         <>
           <MovieGridLayout>
-            {history.data.items.map(item => (
-              <HistoryCard
-                key={item.movie_id}
-                item={item}
-                onPlay={() => setPlayingId(item.movie_id)}
-              />
-            ))}
+            {history.data.items.map(item => {
+              const percent =
+                item.duration > 0
+                  ? Math.max(0, Math.min(100, Math.round((item.position / item.duration) * 100)))
+                  : 0
+              return (
+                <LibraryMovieCard
+                  key={item.movie_id}
+                  movie={{
+                    id: item.movie_id,
+                    code: item.code,
+                    title: item.title,
+                    cover: item.cover,
+                    rating: item.rating ?? 0,
+                    actors: item.actors ?? [],
+                    source: item.source,
+                    has_subtitle: item.has_subtitle
+                  }}
+                  progress={percent}
+                  onPlay={() => setPlayingId(item.movie_id)}
+                />
+              )
+            })}
           </MovieGridLayout>
           <ListPagination
             page={page}
@@ -108,25 +118,4 @@ export function HistoryPage({
       <LazyLibraryPlayerDialog movieId={playingId} onClose={() => setPlayingId(null)} />
     </AppPage>
   )
-}
-
-function HistoryCard({ item, onPlay }: { item: WatchHistoryItem; onPlay: () => void }) {
-  const percent =
-    item.duration > 0
-      ? Math.max(0, Math.min(100, Math.round((item.position / item.duration) * 100)))
-      : 0
-  const movie: LibraryMovie = {
-    id: item.movie_id,
-    code: item.code,
-    title: item.title,
-    cover: item.cover,
-    poster: item.poster,
-    duration: item.duration,
-    rating: item.rating ?? 0,
-    actors: item.actors ?? [],
-    source: item.source,
-    tags: [],
-    scrape_status: 'done'
-  }
-  return <LibraryMovieCard movie={movie} progress={percent} onPlay={onPlay} />
 }

@@ -74,13 +74,7 @@ function submission(action: 'rescrape' | 'scan' | 'rebuild') {
         ? LibraryMovieActions({
             movie: {
               id: 48,
-              code: queued.code!,
-              title: '',
-              duration: 0,
-              rating: 0,
-              actors: [],
-              tags: [],
-              scrape_status: 'failed'
+              code: queued.code!
             }
           })
         : LibraryScanButton({

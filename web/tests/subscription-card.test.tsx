@@ -38,10 +38,13 @@ function findPath(
   type: ReactElement['type']
 ): ReactElement<{ children?: ReactNode }>[] | undefined {
   for (const child of Children.toArray(node)) {
-    if (!isValidElement<{ children?: ReactNode }>(child)) continue
+    if (!isValidElement<{ children?: ReactNode; render?: ReactNode }>(child)) continue
     if (child.type === type) return [child]
-    const path = findPath(child.props.children, type)
-    if (path) return [child, ...path]
+    // Support triggers that render their element via `render` rather than children.
+    for (const branch of [child.props.children, child.props.render]) {
+      const path = branch ? findPath(branch, type) : undefined
+      if (path) return [child, ...path]
+    }
   }
 }
 

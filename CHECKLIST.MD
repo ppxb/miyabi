@@ -158,7 +158,7 @@
 - [x] 🟢 在 shadcn 组件上叠加样式：
   - `app-search.tsx` 搜索按钮 `variant="link"` → `ghost`；CommandDialog 去掉重复 `overflow-hidden`（居中定位为有意保留）
   - `page-back-button.tsx` → `size="lg"`；`subscription-card.tsx` Checkbox `text-white` → `text-success-foreground`；`directory-breadcrumbs.tsx` 去掉重复 `gap-1 sm:gap-1`
-- [x] 🟢 与默认值重复的 class / props：已清理 `Input h-8`（filter-bar/catalog-page）、`Card overflow-hidden`（movie-card/movie-grid-skeleton）、`tracking-normal`（recommendations/previews/magnets）、`main.tsx delay={0}`、`credentials: 'same-origin'`（api/client、task-events）、`task-toast dismissible/icon`、`api/pan staleTime: 30_000`。（Button 内显式 `size-4` 与 `type="button"` 保留：前者有 Button 的 `[&_svg]` 规则兜底、后者涉及表单默认行为，未盲删。）
+- [x] 🟢 与默认值重复的 class / props：已清理 `Input h-8`（filter-bar/catalog-page）、`Card overflow-hidden`（movie-card/movie-grid-skeleton）、`tracking-normal`（recommendations/previews/magnets）、`main.tsx delay={0}`、`credentials: 'same-origin'`（task-events；`api/client` 保留——有测试断言 `credentials === 'same-origin'`）、`task-toast dismissible/icon`、`api/pan staleTime: 30_000`。（Button 内显式 `size-4` 与 `type="button"` 保留：前者有 Button 的 `[&_svg]` 规则兜底、后者涉及表单默认行为，未盲删。）
 - [x] 🟢 `components/movie/movie-card.tsx`：Badge `truncate` 改为内包 `<span className="truncate">`。
 - [x] 🟢 `components/app-shell.tsx`：移除不生效的 `transition-[width,height] ease-linear`。（外层包装层保留：涉及布局，未盲删。）
 - [x] 🟢 `styles/globals.css`：删除与 shadcn `@utility no-scrollbar` 重复的 `.no-scrollbar` 块。（`--warning`/`--chart-1..5` 保留：仍被 `@theme` 颜色映射引用。）
@@ -184,7 +184,7 @@
 ## P6 · 可复用 / 可抽取
 
 ### 前端
-- [ ] 卡片封面浮层（评分角标 + 渐变标题）：`discover/movie-card.tsx:34-47` ≈ `library/movie-card.tsx:58-67` → `MovieRatingPill` / `MovieCoverCaption`
+- [x] 卡片封面浮层（评分角标 + 渐变标题）：抽出 `components/movie/movie-cover-overlay.tsx` 的 `MovieRatingPill` / `MovieCoverCaption`，`discover/movie-card` 与 `library/movie-card` 复用；同时移除探索卡已废弃的订阅分支（`allowSubscribe`/`subscribable`/`MovieSubscribeButton`）——`features/discover/movie-subscribe-button.tsx` 现已无引用，归 P2 走「移到回收站」。
 - [ ] 统计条：`movie-detail/hero.tsx:77-90`、`actors/detail-page.tsx:55-68`、`movie-detail/skeleton.tsx:21` → `StatList`
 - [ ] 横向列表项宽度：`continue-watching.tsx:33`、`recent-shelf.tsx:14`、`top-rated-shelf.tsx:14` → `MovieShelfItem`；recent/top-rated 可合并
 - [ ] 演员头像 URL：`app-search.tsx:59-62`、`actors/catalog-page.tsx:16-19`、`actors/detail-page.tsx:27-30` → 并入 `imageURL`
@@ -196,7 +196,7 @@
 - [ ] `discover/results.tsx` + `browse-results.tsx` 合并
 - [ ] `movie-detail/content.tsx:62-108` 两分支后半段 → `CatalogueSections`
 - [ ] `movie-detail/magnets.tsx:231-239` ≈ `:262-269` 按钮内容
-- [ ] `recommendations.tsx:29-48`、`history/page.tsx:120-132` 伪造整条 movie → 卡片 props 收窄为 `Pick<>`
+- [x] `recommendations.tsx`、`history/page.tsx` 伪造整条 movie → 卡片 props 收窄：`LibraryMovieCard` 用 `LibraryMovieCardData`、`DiscoverMovieCard` 用 `DiscoverMovieCardData`，`referenceMovie` 只造所需字段，`HistoryCard` 适配器删除、`LibraryMovieActions` 收窄为 `Pick<LibraryMovie,'id'|'code'>`。
 - [ ] `subscription-card.tsx:20-26,129-133` 两张状态表合并
 - [ ] `task-notification-diff.ts:78-118` scan / batch 循环 → `shouldNotify`
 - [ ] 4 个路由重复 errorComponent（`discover/history/index/subscriptions`）→ `router.tsx` `defaultErrorComponent`
