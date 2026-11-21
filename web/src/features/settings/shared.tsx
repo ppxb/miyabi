@@ -1,13 +1,21 @@
 import type { ReactNode } from 'react'
 
 import { Card, CardContent } from '@/components/ui/card'
-import { Field, FieldContent, FieldDescription, FieldTitle } from '@/components/ui/field'
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldTitle
+} from '@/components/ui/field'
 import { cn } from 'cn'
 
 export function SettingsCard({ children }: { children: ReactNode }) {
   return (
     <Card>
-      <CardContent className="@container/field-group space-y-8">{children}</CardContent>
+      <CardContent>
+        <FieldGroup className="gap-8">{children}</FieldGroup>
+      </CardContent>
     </Card>
   )
 }
@@ -49,13 +57,11 @@ export function SettingRow({
   return (
     <Field
       orientation={inline ? 'horizontal' : 'responsive'}
-      className={cn('justify-between gap-3 sm:gap-6', inline && 'gap-4')}
+      className={cn('justify-between gap-3 @md/field-group:gap-6', inline && 'gap-4')}
     >
       <FieldContent>
         <FieldTitle>{title}</FieldTitle>
-        <FieldDescription className="text-xs leading-5 wrap-break-word">
-          {description}
-        </FieldDescription>
+        <FieldDescription className="wrap-break-word">{description}</FieldDescription>
       </FieldContent>
       <div className="max-w-full shrink-0">{children}</div>
     </Field>

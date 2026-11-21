@@ -12,13 +12,23 @@ export function MovieRatingPill({ rating }: { rating: number }) {
   )
 }
 
-/** Gradient caption at the bottom of a cover: title plus a feature-specific slot. */
-export function MovieCoverCaption({ title, children }: { title: string; children?: ReactNode }) {
+/** Gradient caption at the bottom of a cover: title, an optional subtitle line,
+ * plus a feature-specific slot. */
+export function MovieCoverCaption({
+  title,
+  subtitle,
+  children
+}: {
+  title: string
+  subtitle?: string | undefined
+  children?: ReactNode
+}) {
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/85 via-black/45 to-transparent p-3 pt-8">
       <h3 className="truncate text-sm leading-5 font-semibold text-white" title={title}>
         {title}
       </h3>
+      {subtitle ? <p className="mt-0.5 truncate text-xs text-white/75">{subtitle}</p> : null}
       {children}
     </div>
   )

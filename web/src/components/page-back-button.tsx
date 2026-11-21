@@ -11,8 +11,8 @@ export function PageBackButton() {
     <Button
       type="button"
       variant="ghost"
-      size="lg"
-      className="self-start gap-2"
+      // Larger than the Button scale on purpose: the page-level back affordance.
+      className="h-11 gap-2 self-start px-3 text-base"
       onClick={() => {
         if (canGoBack) router.history.back()
         else void router.navigate({ to: '/discover', replace: true })

@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { FilmIcon, SearchIcon, UserIcon, type LucideIcon } from 'lucide-react'
+import { SearchIcon, UserIcon, type LucideIcon } from 'lucide-react'
 import { useScrollFade } from '@animate-ui/react/primitives/effects/scroll-fade'
 
 import { apiGet, imageURL } from '@/api/client'
@@ -89,11 +89,7 @@ function FadingCommandList({ children }: { children: ReactNode }) {
 /** Header trigger; the palette itself is mounted once by the shell and opened through props. */
 export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
   return (
-    <Button
-      onClick={onOpen}
-      variant="ghost"
-      className="font-normal text-muted-foreground"
-    >
+    <Button onClick={onOpen} variant="ghost" className="font-normal text-muted-foreground">
       <SearchIcon data-icon="inline-start" />
       搜索
       <KbdGroup>
@@ -115,7 +111,7 @@ function ResultRow({ item }: { item: SearchItem }) {
   }
   const isActor = item.kind === 'actor'
   return (
-    <span className="flex w-full min-w-0 items-center gap-3">
+    <div className="flex w-full min-w-0 items-center gap-3">
       {isActor ? (
         <Avatar className="size-10 shrink-0">
           <AvatarImage src={item.image ? imageURL(item.image) : undefined} alt={item.label} />
@@ -123,14 +119,10 @@ function ResultRow({ item }: { item: SearchItem }) {
             <UserIcon className="size-4 text-muted-foreground" />
           </AvatarFallback>
         </Avatar>
-      ) : item.image ? (
-        <span className="h-24 w-36 shrink-0 overflow-hidden rounded-md bg-muted">
-          <MediaImage source={item.image} className="object-cover" />
-        </span>
       ) : (
-        <span className="flex h-24 w-36 shrink-0 items-center justify-center rounded-md bg-muted">
-          <FilmIcon className="size-4 text-muted-foreground" />
-        </span>
+        <div className="h-24 w-36 shrink-0 overflow-hidden rounded-md">
+          <MediaImage source={item.image ?? ''} className="object-cover" />
+        </div>
       )}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="truncate text-sm font-medium">{item.label}</span>
@@ -140,7 +132,7 @@ function ResultRow({ item }: { item: SearchItem }) {
           </span>
         ))}
       </span>
-    </span>
+    </div>
   )
 }
 

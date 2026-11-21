@@ -31,7 +31,7 @@ export function MovieSubscriptions({
   disabled = false
 }: MovieSubscriptionsProps) {
   if (isPending) {
-    return <MovieGridSkeleton />
+    return <MovieGridSkeleton withContent />
   }
   if (isError) {
     return <ErrorState message="订阅列表加载失败" onRetry={onRetry} retrying={isFetching} />

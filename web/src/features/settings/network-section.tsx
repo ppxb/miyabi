@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { GlobeIcon, LoaderCircleIcon } from 'lucide-react'
+import { GlobeIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { describeApiError } from '@/api/client'
@@ -8,6 +8,7 @@ import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { SettingRow, SettingsActions, SettingsSection } from './shared'
 
@@ -125,7 +126,10 @@ function NetworkForm({ config, onSaved }: { config: NetworkConfig; onSaved: () =
 
           <SettingsActions>
             <Button type="button" size="sm" disabled={disabled || !isDirty} onClick={handleSave}>
-              <LoaderCircleIcon className={updateConfig.isPending ? 'animate-spin' : 'invisible'} />
+              <Spinner
+                data-icon="inline-start"
+                className={updateConfig.isPending ? undefined : 'invisible'}
+              />
               保存
             </Button>
           </SettingsActions>

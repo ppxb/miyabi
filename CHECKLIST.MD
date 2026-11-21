@@ -262,13 +262,13 @@
 - [x] `ensureProfileTx`（`actors/service.go:1135`）≈ `ensureProfile`；`domain.ActorNameKey` 与 `actors.Key` 重复 sha1。（已修复：合并为单个包级 `ensureProfile(ctx, db *ent.Client, ...)`，事务内传 `tx.Client()`；删除 `actors.Key`，URL key 统一用 `domain.ActorNameKey`（归一化幂等，结果不变，且与 `name_key` 列同源）；同步测试；`go build`/`go vet`/`go test ./internal/actors/... ./internal/api/...` 通过）
 
 样式 / shadcn
-- [ ] `components/movie/movie-cover-overlay.tsx:18` `bg-gradient-to-t` 为 v3 名（v4 `bg-linear-to-t`）；discover/library 卡片副标题样式不一（`text-[11px] text-white/60` vs `text-xs text-white/75`），`MovieCoverCaption` 可接收 `subtitle` 统一。
-- [ ] `settings/shared.tsx:10` 手写 `@container/field-group`，应用 `FieldGroup`；`:52` 视口断点 `sm:gap-6` 与容器查询混用；`:56` 覆盖 `FieldDescription` 默认样式。
-- [ ] `components/app-search.tsx:126-133` 外层 `span` 包 `MediaImage` 的 `div`（非法嵌套）、`bg-muted` 重复；`image` 为空分支可交给 `MediaImage` 占位。
-- [ ] `settings/emby-section.tsx:240`、`network-section.tsx:132` 常驻 `LoaderCircleIcon invisible` 占位，与全站 `Spinner` 不一致。
+- [x] `components/movie/movie-cover-overlay.tsx:18` `bg-gradient-to-t` 为 v3 名（v4 `bg-linear-to-t`）；discover/library 卡片副标题样式不一（`text-[11px] text-white/60` vs `text-xs text-white/75`），`MovieCoverCaption` 可接收 `subtitle` 统一。（已修复：`bg-linear-to-t` 已是 v4 写法；`MovieCoverCaption` 新增 `subtitle`，统一为 `mt-0.5 truncate text-xs text-white/75`，discover 发行日期与 library 演员均改传 `subtitle`）
+- [x] `settings/shared.tsx:10` 手写 `@container/field-group`，应用 `FieldGroup`；`:52` 视口断点 `sm:gap-6` 与容器查询混用；`:56` 覆盖 `FieldDescription` 默认样式。（已修复：`SettingsCard` 改用 `FieldGroup`（自带 `@container/field-group`，`gap-8` 保持原间距）；`sm:gap-6` 改为容器查询 `@md/field-group:gap-6`；`FieldDescription` 去掉 `text-xs leading-5` 覆盖、仅保留 `wrap-break-word`，描述字号随 shadcn 默认变为 `text-sm`）
+- [x] `components/app-search.tsx:126-133` 外层 `span` 包 `MediaImage` 的 `div`（非法嵌套）、`bg-muted` 重复；`image` 为空分支可交给 `MediaImage` 占位。（已修复：结果行与缩略图容器 `span`→`div`，去掉重复 `bg-muted`；无图分支交给 `MediaImage` 自带占位，移除 `FilmIcon`）
+- [x] `settings/emby-section.tsx:240`、`network-section.tsx:132` 常驻 `LoaderCircleIcon invisible` 占位，与全站 `Spinner` 不一致。（已修复：两处改为 `Spinner`，保存中显示、空闲时 `invisible` 占位以避免按钮宽度跳动）
 - [x] `settings/scraping-section.tsx:79-84` 单个 `Switch` 外多余 `div`。（已随 `SourceToggleList` 重构移除多余包裹）
-- [ ] 待确认：`components/page-back-button.tsx` 改 `size="lg"` 后由 `h-11 text-base` 变为 `h-9 text-sm`，是否有意。
-- [ ] 待确认：`videojs/ui/container.tsx:22` 删除 `focus-visible:outline-media-ring` 改 `outline-none`，键盘用户无焦点提示；可改为 `focus({ preventScroll: true, focusVisible: false })`。
+- [x] 待确认：`components/page-back-button.tsx` 改 `size="lg"` 后由 `h-11 text-base` 变为 `h-9 text-sm`，是否有意。（已决定恢复大尺寸：还原为基线的 `h-11 gap-2 px-3 text-base`）
+- [x] 待确认：`videojs/ui/container.tsx:22` 删除 `focus-visible:outline-media-ring` 改 `outline-none`，键盘用户无焦点提示；可改为 `focus({ preventScroll: true, focusVisible: false })`。（已决定：播放器容器保持不显示焦点框，维持现状）
 
 死代码 / 过度防御
 - [x] `player-dialog.tsx:483`、`hero.tsx:76` `stats.length === 0` 恒假（评分恒 push）。（已删除两处恒假守卫）

@@ -74,7 +74,7 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
           ))}
         </div>
         <Skeleton className="h-6 w-24" />
-        <MovieGridSkeleton count={6} compact />
+        <MovieGridSkeleton count={6} />
       </AppPage>
     )
   }

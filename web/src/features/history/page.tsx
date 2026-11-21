@@ -43,7 +43,7 @@ export function HistoryPage({
       </PageHeader>
 
       {history.isPending ? (
-        <MovieGridSkeleton count={HISTORY_PAGE_SIZE} compact />
+        <MovieGridSkeleton count={HISTORY_PAGE_SIZE} />
       ) : history.isError ? (
         <ErrorState
           message="无法读取观看历史，请检查后端服务后重试"

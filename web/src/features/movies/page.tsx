@@ -52,7 +52,7 @@ export function MoviesPage({
       <MovieFilterBar options={options.data} value={filters} onChange={handleFiltersChange} />
 
       {movies.isPending ? (
-        <MovieGridSkeleton count={PAGE_SIZE} compact />
+        <MovieGridSkeleton count={PAGE_SIZE} />
       ) : movies.isError ? (
         <ErrorState
           message="无法读取影片，请检查后端服务后重试"

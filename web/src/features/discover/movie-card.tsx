@@ -23,11 +23,7 @@ export function DiscoverMovieCard({ movie }: { movie: DiscoverMovieCardData }) {
         coverOverlay={
           <>
             <MovieRatingPill rating={movie.rating} />
-            <MovieCoverCaption title={title}>
-              {movie.release_date ? (
-                <p className="mt-0.5 text-[11px] leading-4 text-white/60">{movie.release_date}</p>
-              ) : null}
-            </MovieCoverCaption>
+            <MovieCoverCaption title={title} subtitle={movie.release_date} />
           </>
         }
       />
