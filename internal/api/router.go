@@ -85,7 +85,6 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	settingsAPI.DELETE("/cache", dataClearCacheHandler(deps.Maintenance))
 	settingsAPI.GET("/network", networkHandler(deps.Network))
 	settingsAPI.PUT("/network", networkUpdateHandler(deps.Network))
-	settingsAPI.POST("/network/test", networkTestHandler(deps.Network))
 	settingsAPI.GET("/emby", embyConfigHandler(deps.Emby))
 	settingsAPI.PUT("/emby", embyUpdateHandler(deps.Emby))
 	settingsAPI.POST("/emby/test", embyTestHandler(deps.Emby))

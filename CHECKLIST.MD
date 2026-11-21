@@ -122,7 +122,7 @@
 - [x] 🟠 `web/src/stores/theme.ts:58-66`：DOM 副作用在被 3 处调用的 hook 中重复执行；登录页不同步系统主题。改法：单点 `ThemeSync`。（已抽出 `ThemeSync` 组件并在 `__root` 的 `AccessGate` 之外挂载一次，`useTheme` 改为纯读取；登录页可同步系统主题，重复副作用消除）
 - [x] 🟢 `web/src/stores/theme.ts:26-46`：SPA 中的 SSR 守卫。（已删除 `typeof window`/`matchMedia` 守卫与 `getServerSnapshot` fallback，`useSyncExternalStore` 去掉第三参）
 - [x] 🟠 `internal/api/discover.go:122-128`：匿名接口运行时断言 + 吞错。改法：加入 `CatalogueManager` 接口。（已把 `LocalRecommendations` 加入 `CatalogueManager` 并直接调用，移除匿名接口断言；错误改为 `c.Error` 记录、不再吞掉，推荐仍为 best-effort）
-- [ ] 🟠 `internal/network/service.go:65-87`：单任务 goroutine + WaitGroup。
+- [x] 🟠 `internal/network/service.go:65-87`：单任务 goroutine + WaitGroup。（已整体取消网络代理"测试连接"环节：删 `TestNetwork`、`networkProbeTimeout`、`TestResult/ProbeResult`、`NetworkManager.TestNetwork`、`POST /network/test` 路由与相关后端测试，前端删 `useTestNetwork` 与测试按钮；`javbus/probe.go` 一并移除）
 - [ ] 🟠 `internal/app/app.go:129-259`：手写出错清理链。改法：`cleanup []func()` + defer 逆序。
 - [ ] 🟠 `web/src/api/library.ts:190-205`、`api/offline.ts:77-96,106-123`：条件 `setQueryData` 写三遍且紧接 invalidate。
 - [ ] 🟢 `web/src/api/emby.ts:42-59`、`api/network.ts:36-53`：乐观更新 + 回滚 + 立即 invalidate，回滚冗余。

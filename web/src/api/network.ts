@@ -1,20 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { apiGet, apiPost, apiPut } from '@/api/client'
+import { apiGet, apiPut } from '@/api/client'
 
 export type NetworkConfig = {
   enabled: boolean
   url: string
-}
-
-export type NetworkProbeResult = {
-  available: boolean
-  latency_ms?: number
-  error?: string
-}
-
-export type NetworkTestResponse = {
-  javbus: NetworkProbeResult
 }
 
 export const networkKeys = {
@@ -51,12 +41,5 @@ export function useUpdateNetworkConfig() {
       }
       void queryClient.invalidateQueries({ queryKey: networkKeys.config })
     }
-  })
-}
-
-export function useTestNetwork() {
-  return useMutation({
-    mutationFn: (candidate: NetworkConfig) =>
-      apiPost<NetworkTestResponse>('/api/settings/network/test', candidate)
   })
 }

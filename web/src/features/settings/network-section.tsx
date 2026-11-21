@@ -1,16 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
-import { GlobeIcon, LoaderCircleIcon, RefreshCwIcon } from 'lucide-react'
+import { GlobeIcon, LoaderCircleIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { describeApiError } from '@/api/client'
-import {
-  type NetworkConfig,
-  type NetworkProbeResult,
-  type NetworkTestResponse,
-  useNetworkConfig,
-  useTestNetwork,
-  useUpdateNetworkConfig
-} from '@/api/network'
+import { type NetworkConfig, useNetworkConfig, useUpdateNetworkConfig } from '@/api/network'
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -51,7 +44,6 @@ export function NetworkSection() {
 
 function NetworkForm({ config, onSaved }: { config: NetworkConfig; onSaved: () => void }) {
   const updateConfig = useUpdateNetworkConfig()
-  const testNetwork = useTestNetwork()
   const inputRef = useRef<HTMLInputElement>(null)
 
   const initial = useMemo(() => configToFormData(config), [config])
@@ -115,24 +107,6 @@ function NetworkForm({ config, onSaved }: { config: NetworkConfig; onSaved: () =
     )
   }
 
-  function handleTest() {
-    const normalized = normalizeProxyInput(form.url)
-    if (!normalized) {
-      toast.error('请先输入要测试的代理地址')
-      inputRef.current?.focus()
-      return
-    }
-    testNetwork.mutate(
-      { enabled: true, url: normalized },
-      {
-        onSuccess: showProbeResult,
-        onError: error => {
-          toast.error(describeApiError(error))
-        }
-      }
-    )
-  }
-
   return (
     <>
       <SettingRow title="启用代理服务" description="将代理除 115 以外的所有网络请求" inline>
@@ -154,16 +128,6 @@ function NetworkForm({ config, onSaved }: { config: NetworkConfig; onSaved: () =
           </SettingRow>
 
           <div className="flex items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={disabled || testNetwork.isPending}
-              onClick={handleTest}
-            >
-              <RefreshCwIcon className={testNetwork.isPending ? 'animate-spin' : undefined} />
-              测试连接
-            </Button>
             <Button type="button" size="sm" disabled={disabled || !isDirty} onClick={handleSave}>
               <LoaderCircleIcon className={updateConfig.isPending ? 'animate-spin' : 'invisible'} />
               保存
@@ -173,16 +137,6 @@ function NetworkForm({ config, onSaved }: { config: NetworkConfig; onSaved: () =
       ) : null}
     </>
   )
-}
-
-function showProbeResult({ javbus }: NetworkTestResponse) {
-  const description = `JavBus ${describeProbe(javbus)}`
-  if (javbus.available) toast.success('代理连接正常', { description })
-  else toast.error('代理连接失败', { description })
-}
-
-function describeProbe(result: NetworkProbeResult): string {
-  return result.available ? `${result.latency_ms ?? 0} ms` : '不可用'
 }
 
 function normalizeProxyInput(input: string): string {
