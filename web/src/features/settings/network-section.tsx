@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { GlobeIcon, LoaderCircleIcon, RefreshCwIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { describeApiError } from '@/api/client'
 import {
+  type NetworkConfig,
   type NetworkProbeResult,
   type NetworkTestResponse,
   useNetworkConfig,
@@ -16,49 +17,82 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { SettingRow, SettingsSection } from './shared'
 
+interface NetworkFormData {
+  enabled: boolean
+  url: string
+}
+
+function configToFormData(config: NetworkConfig): NetworkFormData {
+  return { enabled: config.enabled, url: config.url }
+}
+
 export function NetworkSection() {
   const network = useNetworkConfig()
+  const [resetToken, setResetToken] = useState(0)
+
+  return (
+    <SettingsSection icon={<GlobeIcon className="size-4" />} title="网络代理">
+      {network.data ? (
+        <NetworkForm
+          key={resetToken}
+          config={network.data}
+          onSaved={() => setResetToken(token => token + 1)}
+        />
+      ) : null}
+
+      {network.isError ? (
+        <InlineError>
+          后端服务暂不可用，无法读取网络设置。请检查后端服务状态后刷新重试。
+        </InlineError>
+      ) : null}
+    </SettingsSection>
+  )
+}
+
+function NetworkForm({ config, onSaved }: { config: NetworkConfig; onSaved: () => void }) {
   const updateConfig = useUpdateNetworkConfig()
   const testNetwork = useTestNetwork()
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const config = network.data
-  const [userEnabled, setUserEnabled] = useState<boolean | null>(null)
-  const [userInput, setUserInput] = useState<string | null>(null)
+  const initial = useMemo(() => configToFormData(config), [config])
+  const [form, setForm] = useState<NetworkFormData>(initial)
 
-  const isEnabled = userEnabled ?? config?.enabled ?? false
-  const url = userInput ?? config?.url ?? ''
-  const isDirty =
-    (userEnabled !== null && userEnabled !== (config?.enabled ?? false)) ||
-    (userInput !== null && userInput !== (config?.url ?? ''))
-  const disabled = network.isLoading || network.isError || updateConfig.isPending
+  const isDirty = form.enabled !== initial.enabled || form.url !== initial.url
+  const disabled = updateConfig.isPending
+
+  function updateField<K extends keyof NetworkFormData>(key: K, value: NetworkFormData[K]) {
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
 
   function handleToggle(checked: boolean) {
     if (checked) {
-      setUserEnabled(true)
-    } else {
-      if (config?.enabled) {
-        updateConfig.mutate(
-          { enabled: false, url: normalizeProxyInput(url) },
-          {
-            onSuccess: () => {
-              setUserEnabled(null)
-              setUserInput(null)
-              toast.success('已关闭网络代理')
-            },
-            onError: error => {
-              toast.error(describeApiError(error))
-            }
-          }
-        )
-      } else {
-        setUserEnabled(null)
-      }
+      updateField('enabled', true)
+      return
     }
+
+    if (!config.enabled) {
+      updateField('enabled', false)
+      return
+    }
+
+    updateField('enabled', false)
+    updateConfig.mutate(
+      { enabled: false, url: normalizeProxyInput(form.url) },
+      {
+        onSuccess: () => {
+          toast.success('已关闭网络代理')
+          onSaved()
+        },
+        onError: error => {
+          toast.error(describeApiError(error))
+          setForm(initial)
+        }
+      }
+    )
   }
 
   function handleSave() {
-    const normalized = normalizeProxyInput(url)
+    const normalized = normalizeProxyInput(form.url)
     if (!normalized) {
       toast.error('请填写代理地址以开启服务')
       inputRef.current?.focus()
@@ -66,14 +100,13 @@ export function NetworkSection() {
     }
 
     updateConfig.mutate(
-      { enabled: isEnabled, url: normalized },
+      { enabled: form.enabled, url: normalized },
       {
         onSuccess: () => {
-          setUserEnabled(null)
-          setUserInput(null)
           toast.success(
-            isEnabled ? (config?.enabled ? '代理地址已保存' : '已开启网络代理') : '代理设置已保存'
+            form.enabled ? (config.enabled ? '代理地址已保存' : '已开启网络代理') : '代理设置已保存'
           )
+          onSaved()
         },
         onError: error => {
           toast.error(describeApiError(error))
@@ -83,7 +116,7 @@ export function NetworkSection() {
   }
 
   function handleTest() {
-    const normalized = normalizeProxyInput(url)
+    const normalized = normalizeProxyInput(form.url)
     if (!normalized) {
       toast.error('请先输入要测试的代理地址')
       inputRef.current?.focus()
@@ -101,22 +134,22 @@ export function NetworkSection() {
   }
 
   return (
-    <SettingsSection icon={<GlobeIcon className="size-4" />} title="网络代理">
+    <>
       <SettingRow title="启用代理服务" description="将代理除 115 以外的所有网络请求" inline>
-        <Switch checked={isEnabled} disabled={disabled} onCheckedChange={handleToggle} />
+        <Switch checked={form.enabled} disabled={disabled} onCheckedChange={handleToggle} />
       </SettingRow>
 
-      {isEnabled ? (
+      {form.enabled ? (
         <>
           <SettingRow title="代理地址" description="支持 HTTP、HTTPS 与 SOCKS5 代理协议">
             <Input
               ref={inputRef}
-              autoFocus={userEnabled === true}
+              autoFocus={form.enabled && !initial.enabled}
               type="text"
-              value={url}
+              value={form.url}
               placeholder="http://127.0.0.1:7890"
               disabled={disabled}
-              onChange={e => setUserInput(e.target.value)}
+              onChange={e => updateField('url', e.target.value)}
             />
           </SettingRow>
 
@@ -132,19 +165,13 @@ export function NetworkSection() {
               测试连接
             </Button>
             <Button type="button" size="sm" disabled={disabled || !isDirty} onClick={handleSave}>
-              {updateConfig.isPending ? <LoaderCircleIcon className="animate-spin" /> : null}
+              <LoaderCircleIcon className={updateConfig.isPending ? 'animate-spin' : 'invisible'} />
               保存
             </Button>
           </div>
         </>
       ) : null}
-
-      {network.isError ? (
-        <InlineError>
-          后端服务暂不可用，无法读取网络设置。请检查后端服务状态后刷新重试。
-        </InlineError>
-      ) : null}
-    </SettingsSection>
+    </>
   )
 }
 
