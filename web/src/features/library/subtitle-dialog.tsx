@@ -68,23 +68,42 @@ export function SubtitleDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
+  // Keep the body mounted through the close animation so the whole panel fades
+  // out together; unmounting it on `open=false` collapsed the dialog to an
+  // empty shell mid-animation, which read as a visual residue.
+  const [closing, setClosing] = useState(false)
+  const showBody = open || closing
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-2xl">
+    <Dialog
+      open={open}
+      onOpenChange={next => {
+        setClosing(!next)
+        onOpenChange(next)
+      }}
+      onOpenChangeComplete={next => {
+        if (!next) setClosing(false)
+      }}
+    >
+      <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{movie.code} 的字幕</DialogTitle>
           <DialogDescription>预览确认内容与时长后再下载</DialogDescription>
         </DialogHeader>
-        <ScrollBody>{open ? <SubtitleManager movieID={movie.id} /> : null}</ScrollBody>
+        <ScrollBody active={open}>
+          {showBody ? <SubtitleManager movieID={movie.id} /> : null}
+        </ScrollBody>
       </DialogContent>
     </Dialog>
   )
 }
 
 /** Scrollable dialog body with the shared animated scroll fade; the header stays put. */
-function ScrollBody({ children }: PropsWithChildren) {
+function ScrollBody({ children, active }: PropsWithChildren<{ active: boolean }>) {
   const ref = useRef<HTMLDivElement>(null)
-  useScrollFade(ref)
+  // Disable the fade (and clear its mask) while closing, so the mask layer does
+  // not linger over the dialog's exit animation.
+  useScrollFade(ref, { enabled: active })
   return (
     <div
       ref={ref}
