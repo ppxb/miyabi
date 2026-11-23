@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -197,6 +198,49 @@ func TestDetailEnrichesOnce(t *testing.T) {
 	}
 	if provider.calls != 2 || db.ActorProfile.GetX(ctx, pid).EnrichedAt == nil {
 		t.Fatalf("provider calls = %d, want 2 and enriched_at set", provider.calls)
+	}
+}
+
+type blockingProvider struct {
+	started chan struct{}
+	release chan struct{}
+}
+
+func (p *blockingProvider) Name() string { return "av-league" }
+
+func (p *blockingProvider) Lookup(context.Context, string) (*Profile, error) {
+	p.started <- struct{}{}
+	<-p.release
+	return &Profile{Birthday: "2000-01-01"}, nil
+}
+
+// A viewer leaving mid-lookup must not cancel the shared enrichment attempt.
+func TestDetailEnrichmentOutlivesTheRequest(t *testing.T) {
+	db := openDB(t)
+	a := db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("瀬戸環奈").SaveX(t.Context())
+	db.Movie.Create().SetCode("TEST-001").AddActors(a).SaveX(t.Context())
+	link(t, db, a)
+	pid := pidOf(t, db, a.ID)
+
+	provider := &blockingProvider{started: make(chan struct{}, 1), release: make(chan struct{})}
+	svc := New(db, nil, "", nil, provider)
+	if err := svc.UpdateSettings(t.Context(), []domain.SourceToggle{{ID: "av-league", Enabled: true}, {ID: "gfriends", Enabled: false}}); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	go func() {
+		<-provider.started
+		cancel()
+	}()
+	_, _ = svc.Detail(ctx, pid) // returns once the viewer leaves, before the lookup ends
+	close(provider.release)
+
+	deadline := time.Now().Add(5 * time.Second)
+	for db.ActorProfile.GetX(t.Context(), pid).EnrichedAt == nil {
+		if time.Now().After(deadline) {
+			t.Fatal("enrichment was cancelled with the request")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 

@@ -249,9 +249,7 @@ func (s *Service) Detail(ctx context.Context, id int) (Detail, error) {
 			slog.WarnContext(ctx, "persist gfriends actor images failed", "profile", id, "error", err)
 		}
 	}
-	enrichCtx, cancelEnrich := context.WithTimeout(ctx, 20*time.Second)
-	s.enrichIfNeeded(enrichCtx, id, p.Name)
-	cancelEnrich()
+	s.enrichIfNeeded(ctx, id, p.Name)
 
 	// Reload: enrichment may have filled the biography.
 	bio, err := s.db.ActorProfile.Query().Where(actorprofile.ID(id)).WithAliases().Only(ctx)
@@ -677,18 +675,38 @@ func (s *Service) fetchImageBytes(ctx context.Context, src imageSource) ([]byte,
 	return io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 }
 
+const (
+	// enrichTimeout bounds one shared provider lookup.
+	enrichTimeout = 20 * time.Second
+	// enrichWait is how long a detail request waits for it before answering
+	// with the stored profile; the lookup keeps running and a later view sees it.
+	enrichWait = 3 * time.Second
+)
+
 // enrichIfNeeded consults the actor providers once per profile. enriched_at
 // records a finished attempt (found or not), so only transient errors retry on
-// a later view; concurrent first views share one attempt.
+// a later view; concurrent first views share one attempt. The attempt runs
+// detached from the request, so a viewer leaving neither cancels it nor fails
+// the other waiters.
 func (s *Service) enrichIfNeeded(ctx context.Context, pid int, display string) {
 	if len(s.providers) == 0 {
 		return
 	}
-	_, err, _ := s.enriching.Do(strconv.Itoa(pid), func() (any, error) {
-		return nil, s.enrichProfile(ctx, pid, display)
+	done := s.enriching.DoChan(strconv.Itoa(pid), func() (any, error) {
+		enrichCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), enrichTimeout)
+		defer cancel()
+		err := s.enrichProfile(enrichCtx, pid, display)
+		if err != nil {
+			slog.WarnContext(enrichCtx, "enrich actor profile failed", "profile", pid, "error", err)
+		}
+		return nil, err
 	})
-	if err != nil {
-		slog.WarnContext(ctx, "enrich actor profile failed", "profile", pid, "error", err)
+	wait := time.NewTimer(enrichWait)
+	defer wait.Stop()
+	select {
+	case <-done:
+	case <-wait.C:
+	case <-ctx.Done():
 	}
 }
 
