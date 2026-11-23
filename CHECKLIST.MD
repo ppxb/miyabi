@@ -312,7 +312,7 @@
   - 5 处 setter 注入：`SetMetadata`、`SetMountProvider` 仅是构造顺序问题，调换顺序改构造参数；`SetScanHandler`/`SetLocalScanHandler`（source↔library 互相回调）可改由 API 层编排（保存源后直接调 library 入队）。（已修复：`source.New(client, mounts)`、`offline.New(..., metadata, ...)` 改为构造参数；删除 `SetScanHandler`/`SetLocalScanHandler`/`triggerScans`，`sourceUpdateHandler` 保存成功后调 `library.StartIncrementalSync`，入队失败记 warn 不影响保存；新增 `TestSavingSourcesQueuesScan`。`SetMediaNotifier` 为 library↔emby 真循环依赖，保留）
   - `New()` 含副作用：启动账号刷新 goroutine、入队全部扫描、STRM 重写（`app.go:93,270-295`）。改法：移到 `Run()`，`New` 只做组装。（已修复：三项副作用收进 `(*App).start(ctx)`，`Run` 开头调用；账号刷新改用 `Run` 的 ctx；`local_scan_test` 在 `New` 后显式调 `start`）
 - [x] **D5 三套「来源开关」实现**：`metadata.sources`（`metadata/service.go:60`）、演员来源（`actors/service.go:113`）、`magnet.sources`（`catalogue/magnet_settings.go:64`）各自一套类型/读取/排序/API；前端 `settings/magnet-sources-section.tsx` 复制了 `SourceToggleList` 的逻辑。改法：后端抽通用开关列表 helper，前端统一一个组件。（已修复：新增 `domain.SourceToggle` + `ValidateSourceToggles`/`MergeSourceToggles`，三处删除各自类型改用之，各自仅保留特有规则（FANZA 首位排序、磁力 Toggle 生效）；演员来源非法输入由 500 改为 400；前端抽出 `settings/source-toggle-list.tsx`，刮削/演员/磁力三处共用）
-- [ ] **D6 上游源健康检测**：`613fcad` 仅把挑战页映射为 `domain.Blocked`，连接失败/超时仍每次等满超时。改法：在磁力聚合层加所有源共用的熔断（连续失败 N 次 → 冷却 T 分钟），可参考 providers 的 `admit` 冷却；不恢复 javbus 单源探活。
+- [x] **D6 上游源健康检测**：`613fcad` 仅把挑战页映射为 `domain.Blocked`，连接失败/超时仍每次等满超时。改法：在磁力聚合层加所有源共用的熔断（连续失败 N 次 → 冷却 T 分钟），可参考 providers 的 `admit` 冷却；不恢复 javbus 单源探活。（已修复：`magnet.Aggregator` 按源维护熔断，连续失败 3 次冷却 5 分钟，冷却期不发请求、计为失败（结果标记部分失败，全部冷却时返回「所有磁力来源均不可用」）；冷却后下一次查询即试探，成功清零。开关关闭、挑战页、调用方取消不计入；超时计入。新增 `TestAggregatorBreakerCoolsDownFailingSource`、`TestAggregatorBreakerAllCoolingAndCallerCancel`）
 
 ### 功能设计
 

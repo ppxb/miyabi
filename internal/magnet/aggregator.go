@@ -12,13 +12,30 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 )
 
-const defaultAggregatorTimeout = 8 * time.Second
+const (
+	defaultAggregatorTimeout = 8 * time.Second
+	// breakerThreshold consecutive failures put a source into a cooldown of
+	// breakerCooldown, so an unreachable source stops costing a full timeout on
+	// every query. The first query after the cooldown probes it again.
+	breakerThreshold = 3
+	breakerCooldown  = 5 * time.Minute
+)
+
+// errCoolingDown reports a source left out while its breaker is open.
+var errCoolingDown = errors.New("cooling down after repeated failures")
+
+type breaker struct {
+	failures  int
+	openUntil time.Time
+}
 
 // Aggregator queries every source concurrently, merges records that share an
 // infohash, enriches them with inferred tags, and orders the result.
 type Aggregator struct {
-	sources []Source
-	timeout time.Duration
+	sources  []Source
+	timeout  time.Duration
+	mu       sync.Mutex
+	breakers []breaker
 }
 
 // NewAggregator creates an Aggregator. Each source gets its own timeout;
@@ -27,7 +44,31 @@ func NewAggregator(sources []Source, timeout time.Duration) *Aggregator {
 	if timeout <= 0 {
 		timeout = defaultAggregatorTimeout
 	}
-	return &Aggregator{sources: sources, timeout: timeout}
+	return &Aggregator{sources: sources, timeout: timeout, breakers: make([]breaker, len(sources))}
+}
+
+func (a *Aggregator) admit(i int) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return !time.Now().Before(a.breakers[i].openUntil)
+}
+
+// record updates a source's breaker with a query outcome and reports whether
+// this failure opened it.
+func (a *Aggregator) record(i int, err error) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	b := &a.breakers[i]
+	if err == nil {
+		b.failures = 0
+		return false
+	}
+	b.failures++
+	if b.failures < breakerThreshold {
+		return false
+	}
+	b.openUntil = time.Now().Add(breakerCooldown)
+	return true
 }
 
 type queryResult struct {
@@ -58,10 +99,23 @@ func (a *Aggregator) FindDetailed(ctx context.Context, ref domain.MovieRef) ([]d
 	var wg sync.WaitGroup
 	for i, src := range a.sources {
 		wg.Go(func() {
+			if !a.admit(i) {
+				results[i] = queryResult{source: src.Name(), err: errCoolingDown}
+				return
+			}
 			sourceCtx, cancel := context.WithTimeout(ctx, a.timeout)
 			defer cancel()
 			magnets, err := src.Find(sourceCtx, ref)
 			results[i] = queryResult{source: src.Name(), magnets: magnets, err: err}
+			// A switched-off or challenged source says nothing about its health,
+			// and a caller that went away is not the source's fault.
+			if ctx.Err() != nil || errors.Is(err, ErrSkipped) || errors.Is(err, domain.ErrBlocked) {
+				return
+			}
+			if a.record(i, err) {
+				slog.WarnContext(ctx, "magnet source cooling down after repeated failures",
+					"source", src.Name(), "failures", breakerThreshold, "cooldown", breakerCooldown)
+			}
 		})
 	}
 	wg.Wait()
@@ -82,6 +136,10 @@ func (a *Aggregator) FindDetailed(ctx context.Context, ref domain.MovieRef) ([]d
 			slog.WarnContext(ctx, "magnet source blocked by challenge; treating as no result",
 				"source", res.source, "code", ref.Code)
 			blocked++
+			continue
+		}
+		if errors.Is(res.err, errCoolingDown) {
+			failures = append(failures, fmt.Errorf("%s: %w", res.source, res.err))
 			continue
 		}
 		if res.err != nil {

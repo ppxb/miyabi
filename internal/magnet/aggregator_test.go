@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
@@ -217,5 +218,84 @@ func TestAggregatorAllSourcesBlockedReturnsEmpty(t *testing.T) {
 	results, partial, err := NewAggregator(sources, time.Second).FindDetailed(t.Context(), domain.MovieRef{Code: "SSIS-001"})
 	if err != nil || len(results) != 0 || !partial {
 		t.Fatalf("expected 0 results, partial=true, nil err; got results=%d partial=%v err=%v", len(results), partial, err)
+	}
+}
+
+type countingSource struct {
+	name  string
+	calls int
+	err   error
+}
+
+func (s *countingSource) Name() string { return s.name }
+
+func (s *countingSource) Find(context.Context, domain.MovieRef) ([]domain.Magnet, error) {
+	s.calls++
+	if s.err != nil {
+		return nil, s.err
+	}
+	return []domain.Magnet{{Hash: "3333333333333333333333333333333333333333", Name: "ok", Sources: []string{s.name}}}, nil
+}
+
+// A source failing breakerThreshold times in a row is left out for
+// breakerCooldown, then probed again; a success closes the breaker.
+func TestAggregatorBreakerCoolsDownFailingSource(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		healthy := &countingSource{name: "javdb"}
+		broken := &countingSource{name: domain.MagnetSourceJavBus, err: errors.New("connection refused")}
+		agg := NewAggregator([]Source{healthy, broken}, time.Second)
+		ref := domain.MovieRef{Code: "SSIS-001"}
+		find := func() bool {
+			t.Helper()
+			magnets, partial, err := agg.FindDetailed(t.Context(), ref)
+			if err != nil || len(magnets) != 1 {
+				t.Fatalf("healthy source result: %d magnets, %v", len(magnets), err)
+			}
+			return partial
+		}
+
+		for range breakerThreshold {
+			find()
+		}
+		if !find() || broken.calls != breakerThreshold {
+			t.Fatalf("open breaker still queried the source: %d calls", broken.calls)
+		}
+
+		time.Sleep(breakerCooldown)
+		broken.err = nil
+		if find() || broken.calls != breakerThreshold+1 {
+			t.Fatalf("cooldown did not probe the source again: %d calls", broken.calls)
+		}
+		broken.err = errors.New("connection refused")
+		find()
+		find()
+		if find(); broken.calls != breakerThreshold+4 {
+			t.Fatalf("a success did not reset the failure count: %d calls", broken.calls)
+		}
+	})
+}
+
+// When every source is cooling down the query fails as all-unavailable, and a
+// caller cancelling its own request does not count against a source.
+func TestAggregatorBreakerAllCoolingAndCallerCancel(t *testing.T) {
+	broken := &countingSource{name: "javdb", err: errors.New("down")}
+	agg := NewAggregator([]Source{broken}, time.Second)
+	ref := domain.MovieRef{Code: "SSIS-001"}
+
+	cancelled, cancel := context.WithCancel(t.Context())
+	cancel()
+	for range breakerThreshold {
+		_, _ = agg.Find(cancelled, ref)
+	}
+	if !agg.admit(0) {
+		t.Fatal("caller cancellations opened the breaker")
+	}
+
+	for range breakerThreshold {
+		_, _ = agg.Find(t.Context(), ref)
+	}
+	calls := broken.calls
+	if _, err := agg.Find(t.Context(), ref); !domain.IsKind(err, domain.KindUpstream) || broken.calls != calls {
+		t.Fatalf("all-cooling query: err = %v, calls %d -> %d", err, calls, broken.calls)
 	}
 }
