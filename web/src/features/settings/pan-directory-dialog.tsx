@@ -1,5 +1,5 @@
 import { ChevronLeftIcon, ChevronRightIcon, FolderIcon } from 'lucide-react'
-import { useState, type ReactElement, type ReactNode } from 'react'
+import { useState, type ReactElement } from 'react'
 
 import { usePanAccountFiles, useSelectPanAccountDirectory, type PanDirectory } from '@/api/pan'
 import { InlineError } from '@/components/error-state'
@@ -23,13 +23,13 @@ export function PanDirectoryDialog({
 }: {
   accountID: string
   directory?: PanDirectory
-  children: ReactNode
+  children: ReactElement
 }) {
   const [open, setOpen] = useState(false)
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={children as ReactElement} />
+      <DialogTrigger render={children} />
       <DialogContent className="max-h-[calc(100dvh-2rem)] grid-cols-1 overflow-x-hidden overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>选择媒体目录</DialogTitle>

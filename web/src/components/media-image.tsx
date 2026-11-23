@@ -7,6 +7,7 @@ import { useSettingsStore } from '@/stores/settings'
 
 type MediaImageProps = {
   source: string
+  alt?: string
   original?: string
   loading?: 'eager' | 'lazy'
   blurredBackground?: boolean
@@ -27,6 +28,7 @@ export function MediaImage(props: MediaImageProps) {
 
 function MediaImageContent({
   source,
+  alt,
   original,
   loading = 'lazy',
   blurredBackground = false,
@@ -59,6 +61,7 @@ function MediaImageContent({
           ) : null}
           <img
             {...imageProps}
+            alt={alt}
             className={cn('relative size-full', className)}
             onLoad={async event => {
               const image = event.currentTarget

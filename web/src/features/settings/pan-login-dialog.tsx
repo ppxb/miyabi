@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2Icon, QrCodeIcon, RefreshCwIcon } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { toast } from 'sonner'
 
 import {
@@ -25,7 +25,7 @@ export function PanLoginDialog({
   children,
   onAuthorized
 }: {
-  children: ReactNode
+  children: ReactElement
   onAuthorized?: (accountID: string) => void
 }) {
   const queryClient = useQueryClient()
@@ -53,7 +53,7 @@ export function PanLoginDialog({
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogTrigger render={children as ReactElement} />
+      <DialogTrigger render={children} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>登录 115 网盘</DialogTitle>

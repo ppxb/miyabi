@@ -115,9 +115,15 @@ function LibraryPlayer({
     playback.data?.sources?.[0]
   const source = matchedSource ?? originalSource
   const qualityValue = matchedSource?.src ?? 'direct'
-  // Only persist the rendition once the list resolved it; otherwise omit it so
-  // the backend keeps the previously saved rendition instead of overwriting it.
-  const qualityForSave = needsQualities ? matchedSource?.label : 'direct'
+  // Persist the rendition only once the list resolved. A saved rendition the
+  // list no longer offers is replaced by the original, so later opens stop
+  // waiting for the list. While the list is pending or failed, omit it so the
+  // backend keeps the previously saved rendition.
+  const qualityForSave = needsQualities
+    ? qualities.data
+      ? (matchedSource?.label ?? 'direct')
+      : undefined
+    : 'direct'
 
   const handleQualityChange = (value: string) => {
     if (value === qualityValue) return

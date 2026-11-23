@@ -171,6 +171,7 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
               <div key={index} className="aspect-3/4 w-full overflow-hidden rounded-lg">
                 <MediaImage
                   source={`/api/actors/${actor.key}/image/${index}`}
+                  alt={`${actor.name} ${index + 1}`}
                   className="object-cover"
                 />
               </div>

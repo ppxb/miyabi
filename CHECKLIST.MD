@@ -290,11 +290,11 @@
 - [x] `app.go:172-178` cleanup 栈与 `metadata.Close`/`catalogue.Close` 重复关闭（幂等无 bug，所有权不清）。（已修复：删除 17 个 provider 与 4 个磁力客户端的单独 cleanup 登记，所有权归 `metadata`/`catalogue`；provider 直接内联进 `metadata.New`，单一列表。`freejavbt` 仍被两者共享关闭，其 Close 仅 `CloseIdleConnections`，幂等）
 
 其他
-- [ ] `actors/detail-page.tsx:142` 改用 `MediaImage` 后丢失 `alt`；`MediaImage` 需透传 `alt`。
-- [ ] `routes/actors.index.tsx:7-10` `validateSearch` 写在路由文件，与 `features/*/search.ts` 惯例不一致。
-- [ ] `settings/pan-login-dialog.tsx:27,55`、`pan-directory-dialog.tsx:25,31` `children as ReactElement` 断言，props 直接声明 `ReactElement`。
-- [ ] 待确认：`player-dialog.tsx:108,120` 保存的清晰度已不在列表时，每次打开都等列表请求，且旧值永不清除。
-- [ ] 待确认：`api/discover.go:124` `c.Error(recErr)` 后仍 200，能否被记录取决于 sloggin；`source/source.go:140` 任一账号 Mount 出错使 `LibrarySources` 整体失败，启动扫描全部跳过，是否本意。
+- [x] `actors/detail-page.tsx:142` 改用 `MediaImage` 后丢失 `alt`；`MediaImage` 需透传 `alt`。（已修复：`MediaImage` 新增 `alt` 透传到主图；图集恢复 `` `${actor.name} ${index + 1}` ``）
+- [x] `routes/actors.index.tsx:7-10` `validateSearch` 写在路由文件，与 `features/*/search.ts` 惯例不一致。（已修复：移到 `features/actors/search.ts` 的 `validateActorsSearch`）
+- [x] `settings/pan-login-dialog.tsx:27,55`、`pan-directory-dialog.tsx:25,31` `children as ReactElement` 断言，props 直接声明 `ReactElement`。（已修复：`children: ReactElement`，去掉断言）
+- [x] 待确认：`player-dialog.tsx:108,120` 保存的清晰度已不在列表时，每次打开都等列表请求，且旧值永不清除。（已决定并修复：列表成功返回但无该清晰度时按「原画」保存，覆盖旧值；列表加载中/失败时仍不覆盖）
+- [x] 待确认：`api/discover.go:124` `c.Error(recErr)` 后仍 200，能否被记录取决于 sloggin；`source/source.go:140` 任一账号 Mount 出错使 `LibrarySources` 整体失败，启动扫描全部跳过，是否本意。（`source.go` 部分已决定并修复：`LibrarySources` 遇到 Mount 出错的账号记 warn 后跳过，其他账号照常返回，测试已覆盖；`discover.go` 部分已核实：`requestDiagnosticsMiddleware` 会把 `c.Errors` 作为 `error`/`kind` 属性附到访问日志（message 为 `request failed`），但 200 时 slog-gin 级别为 INFO，`MIYABI_LOG_LEVEL=warn` 及以上会看不到；按「有记录不改」未改动。另：`routes/history.tsx` 的 `validateSearch` 同样移到 `features/history/search.ts`）
 
 ---
 

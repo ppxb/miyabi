@@ -3,6 +3,7 @@ package source
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -123,6 +124,8 @@ func (s *Service) triggerScans(ctx context.Context, sources []Source) {
 }
 
 // LibrarySources returns the enabled 115 sources that have a mounted directory.
+// An account whose mount cannot be read is logged and skipped so it does not
+// block the other accounts.
 func (s *Service) LibrarySources(ctx context.Context) ([]domain.LibrarySource, error) {
 	sources, err := s.List(ctx)
 	if err != nil {
@@ -139,7 +142,8 @@ func (s *Service) LibrarySources(ctx context.Context) ([]domain.LibrarySource, e
 		}
 		mount, ok, err := s.mounts.Mount(ctx, accountID)
 		if err != nil {
-			return nil, err
+			slog.WarnContext(ctx, "skip 115 source with unreadable mount", "account", accountID, "error", err)
+			continue
 		}
 		if ok {
 			result = append(result, mount)

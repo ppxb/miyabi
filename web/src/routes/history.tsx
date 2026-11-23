@@ -1,13 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { HistoryPage } from '@/features/history/page'
-import { parseSearchPage } from '@/lib/search-schema'
+import { validateHistorySearch } from '@/features/history/search'
 
 export const Route = createFileRoute('/history')({
-  validateSearch: (search: Record<string, unknown>): { page?: number } => {
-    const page = parseSearchPage(search.page)
-    return page ? { page } : {}
-  },
+  validateSearch: validateHistorySearch,
   component: HistoryRoute
 })
 
