@@ -20,6 +20,11 @@ type LibraryFile struct {
 type PlaybackSettings struct {
 	Rate    float64 `json:"rate,omitempty"`
 	Quality string  `json:"quality,omitempty"`
+	// Subtitle is the chosen subtitle track id, or "off".
+	Subtitle string `json:"subtitle,omitempty"`
+	// SubtitleOffset shifts subtitle cues in seconds; zero is a real choice,
+	// so a nil pointer means "not mentioned".
+	SubtitleOffset *float64 `json:"subtitle_offset,omitempty"`
 }
 
 // Value lets an upsert pass PlaybackSettings to the SQL driver as JSON. Reads

@@ -109,6 +109,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	subtitlesAPI.POST("/preview", subtitlePreviewHandler(deps.Subtitles))
 	subtitlesAPI.POST("", subtitleSaveHandler(deps.Subtitles))
 	subtitlesAPI.DELETE("/:subtitleID", subtitleDeleteHandler(deps.Subtitles))
+	subtitlesAPI.GET("/:subtitleID/cues", subtitleCuesHandler(deps.Subtitles))
 	protected.POST("/library/scan", libraryScanHandler(deps.Library, deps.Emby))
 	protected.POST("/library/sync", librarySyncHandler(deps.Library))
 	protected.GET("/library/pending", libraryPendingHandler(deps.Library))

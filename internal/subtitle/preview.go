@@ -31,21 +31,38 @@ var (
 	assTags   = regexp.MustCompile(`\{[^}]*\}`)
 )
 
+// TimedCue is one subtitle cue in seconds, shaped as the player's text cue.
+// Text keeps the cue's line breaks.
+type TimedCue struct {
+	StartTime float64 `json:"startTime"`
+	EndTime   float64 `json:"endTime"`
+	Text      string  `json:"text"`
+}
+
 func previewOf(text, format string) Preview {
 	preview := Preview{Lines: []Cue{}}
-	add := func(start, end float64, line string) {
-		line = strings.Join(strings.Fields(line), " ")
-		if line == "" {
-			return
-		}
+	for _, cue := range parseCues(text, format) {
 		preview.Cues++
-		preview.End = max(preview.End, end)
+		preview.End = max(preview.End, cue.EndTime)
 		if len(preview.Lines) < previewLines {
-			preview.Lines = append(preview.Lines, Cue{Start: start, Text: line})
+			preview.Lines = append(preview.Lines, Cue{Start: cue.StartTime, Text: strings.Join(strings.Fields(cue.Text), " ")})
+		}
+	}
+	return preview
+}
+
+// parseCues reads SRT/VTT timing blocks or ASS/SSA Dialogue lines, dropping
+// ASS override tags and cues without text.
+func parseCues(text, format string) []TimedCue {
+	cues := []TimedCue{}
+	add := func(start, end, body string) {
+		if body = strings.TrimSpace(body); body != "" {
+			cues = append(cues, TimedCue{StartTime: timestamp(start), EndTime: timestamp(end), Text: body})
 		}
 	}
 	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
 	if format == "ass" || format == "ssa" {
+		breaks := strings.NewReplacer(`\N`, "\n", `\n`, "\n", `\h`, " ")
 		for _, line := range lines {
 			rest, ok := cutPrefixFold(strings.TrimSpace(line), "dialogue:")
 			if !ok {
@@ -56,10 +73,9 @@ func previewOf(text, format string) Preview {
 			if len(fields) < 10 {
 				continue
 			}
-			body := strings.NewReplacer(`\N`, " ", `\n`, " ", `\h`, " ").Replace(assTags.ReplaceAllString(fields[9], ""))
-			add(timestamp(fields[1]), timestamp(fields[2]), body)
+			add(fields[1], fields[2], breaks.Replace(assTags.ReplaceAllString(fields[9], "")))
 		}
-		return preview
+		return cues
 	}
 	for i := 0; i < len(lines); i++ {
 		match := cueTiming.FindStringSubmatch(lines[i])
@@ -69,11 +85,11 @@ func previewOf(text, format string) Preview {
 		var body []string
 		for i+1 < len(lines) && strings.TrimSpace(lines[i+1]) != "" {
 			i++
-			body = append(body, lines[i])
+			body = append(body, strings.TrimSpace(lines[i]))
 		}
-		add(timestamp(match[1]), timestamp(match[2]), strings.Join(body, " "))
+		add(match[1], match[2], strings.Join(body, "\n"))
 	}
-	return preview
+	return cues
 }
 
 // timestamp parses [h:]m:s[.,]fraction into seconds.

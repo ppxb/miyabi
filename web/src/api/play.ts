@@ -12,6 +12,10 @@ export type PlaySource = { src: string; type: string; label: string }
 export type PlaybackSettings = {
   rate?: number
   quality?: string
+  /** Chosen subtitle track id, or 'off'. */
+  subtitle?: string
+  /** Seconds the subtitle cues are shifted by; 0 is a saved choice too. */
+  subtitle_offset?: number
 }
 
 export type PlaybackResume = {

@@ -33,13 +33,44 @@ export type SubtitlePreview = {
   lines: SubtitleCue[]
 }
 
+/** A cue as the player reads it, in seconds. */
+export type SubtitlePlayerCue = { startTime: number; endTime: number; text: string }
+
 export const subtitleKeys = {
   all: ['subtitles'] as const,
   tracks: (movieID: number) => ['subtitles', movieID, 'tracks'] as const,
-  search: (movieID: number) => ['subtitles', movieID, 'search'] as const
+  search: (movieID: number) => ['subtitles', movieID, 'search'] as const,
+  cues: (movieID: number, trackID: number) => ['subtitles', movieID, 'cues', trackID] as const
 }
 
 const base = (movieID: number) => `/api/library/movies/${movieID}/subtitles`
+
+const languageLabels: Record<string, string> = {
+  'zh-CN': '简体中文',
+  'zh-TW': '繁体中文',
+  en: '英文',
+  ja: '日文'
+}
+
+export const subtitleVersionLabels: Record<string, string> = {
+  uncensored: '无码',
+  leaked: '流出',
+  extended: '加长'
+}
+
+export function subtitleLanguageLabel(language: string) {
+  return languageLabels[language] ?? (language ? language : '语言待识别')
+}
+
+// A track's file only changes by deleting and saving it again, which gives it a new id.
+export function subtitleCuesQuery(movieID: number, trackID: number) {
+  return {
+    queryKey: subtitleKeys.cues(movieID, trackID),
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      apiGet<SubtitlePlayerCue[]>(`${base(movieID)}/${trackID}/cues`, undefined, signal),
+    staleTime: Infinity
+  }
+}
 
 export function useMovieSubtitles(movieID: number, enabled: boolean) {
   return useQuery({

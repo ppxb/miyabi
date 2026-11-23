@@ -123,6 +123,12 @@ func mergePlaybackSettings(base, incoming *domain.PlaybackSettings) *domain.Play
 	if incoming.Quality != "" {
 		merged.Quality = incoming.Quality
 	}
+	if incoming.Subtitle != "" {
+		merged.Subtitle = incoming.Subtitle
+	}
+	if incoming.SubtitleOffset != nil {
+		merged.SubtitleOffset = incoming.SubtitleOffset
+	}
 	return &merged
 }
 

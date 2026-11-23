@@ -1,3 +1,4 @@
+import { TimerIcon } from 'lucide-react'
 import type { ComponentProps } from 'react'
 
 import { AudioTrackMenu } from '@/components/videojs/ui/audio-track-menu'
@@ -6,6 +7,13 @@ import { CustomQualityMenu, type QualityChoice } from '@/components/videojs/ui/c
 import { PlaybackRateSubmenu } from '@/components/videojs/ui/playback-rate-submenu'
 import { SettingsMenu } from '@/components/videojs/ui/settings-menu'
 
+/** Choices of an app-defined settings submenu. */
+export type ChoiceMenu = {
+  options: QualityChoice[]
+  value: string
+  onValueChange: (value: string) => void
+}
+
 export type VideoSettingsMenuProps = Omit<
   NonNullable<ComponentProps<typeof SettingsMenu>>,
   'children'
@@ -13,12 +21,15 @@ export type VideoSettingsMenuProps = Omit<
   qualityOptions: QualityChoice[]
   qualityValue: string
   onQualityChange: (value: string) => void
+  /** Shown only when the media has subtitles to shift. */
+  subtitleOffsetMenu?: ChoiceMenu
 }
 
 export function VideoSettingsMenu({
   qualityOptions,
   qualityValue,
   onQualityChange,
+  subtitleOffsetMenu,
   ...props
 }: VideoSettingsMenuProps) {
   return (
@@ -31,6 +42,9 @@ export function VideoSettingsMenu({
       <AudioTrackMenu />
       <PlaybackRateSubmenu />
       <CaptionsSubmenu />
+      {subtitleOffsetMenu ? (
+        <CustomQualityMenu title="字幕偏移" icon={TimerIcon} {...subtitleOffsetMenu} />
+      ) : null}
     </SettingsMenu>
   )
 }

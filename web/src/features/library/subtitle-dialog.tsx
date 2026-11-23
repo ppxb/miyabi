@@ -9,6 +9,8 @@ import {
   usePreviewSubtitle,
   useSaveSubtitle,
   useSubtitleSearch,
+  subtitleLanguageLabel,
+  subtitleVersionLabels,
   type SubtitleOffer,
   type SubtitlePreview,
   type SubtitleTrack
@@ -25,21 +27,8 @@ import {
 } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
 
-const languageLabels: Record<string, string> = {
-  'zh-CN': '简体中文',
-  'zh-TW': '繁体中文',
-  en: '英文',
-  ja: '日文'
-}
-const versionLabels: Record<string, string> = {
-  uncensored: '无码',
-  leaked: '流出',
-  extended: '加长'
-}
-
-function languageLabel(language: string) {
-  return languageLabels[language] ?? (language ? language : '语言待识别')
-}
+const languageLabel = subtitleLanguageLabel
+const versionLabels = subtitleVersionLabels
 
 function formatTime(seconds: number) {
   const total = Math.floor(seconds)

@@ -170,6 +170,34 @@ func (s *Service) Save(ctx context.Context, movieID int, offer Offer) (Track, er
 	return trackOf(saved), nil
 }
 
+// Cues reads a movie's track, downloaded or local, as player cues. Local files
+// may be GBK or Big5 encoded and are decoded like downloads.
+func (s *Service) Cues(ctx context.Context, movieID, trackID int) ([]TimedCue, error) {
+	track, err := s.db.Subtitle.Query().Where(subtitle.IDEQ(trackID), subtitle.MovieIDEQ(movieID)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, domain.E(domain.KindNotFound, "字幕不存在", nil)
+	}
+	if err != nil {
+		return nil, err
+	}
+	info, err := os.Stat(track.StoragePath)
+	if err != nil || info.IsDir() {
+		return nil, domain.E(domain.KindNotFound, "字幕文件不存在", err)
+	}
+	if info.Size() > maxSize {
+		return nil, domain.E(domain.KindInvalid, "字幕文件过大", nil)
+	}
+	raw, err := os.ReadFile(track.StoragePath)
+	if err != nil {
+		return nil, fmt.Errorf("read subtitle: %w", err)
+	}
+	text, err := DecodeToUTF8(raw)
+	if err != nil {
+		return nil, domain.E(domain.KindInvalid, "字幕文件无法解码", err)
+	}
+	return parseCues(text, track.Format), nil
+}
+
 // Delete removes a downloaded track, its file and its exported copy.
 func (s *Service) Delete(ctx context.Context, movieID, trackID int) error {
 	s.files.Lock()

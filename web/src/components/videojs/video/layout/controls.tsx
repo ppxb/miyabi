@@ -10,7 +10,7 @@ import { TimeSlider } from '@/components/videojs/ui/time-slider'
 import { VolumePopover } from '@/components/videojs/ui/volume-popover'
 import { cn } from '@/lib/resolve-class-name'
 
-import { VideoSettingsMenu } from '../menus/settings-menu'
+import { VideoSettingsMenu, type ChoiceMenu } from '../menus/settings-menu'
 
 export interface DefaultVideoControlsProps {
   renderThumbnail?: NonNullable<ComponentProps<typeof TimeSlider>>['renderThumbnail']
@@ -18,6 +18,7 @@ export interface DefaultVideoControlsProps {
   qualityValue: string
   onQualityChange: (value: string) => void
   onSettingsOpen?: () => void
+  subtitleOffsetMenu?: ChoiceMenu
 }
 
 export function DefaultVideoControls({
@@ -25,7 +26,8 @@ export function DefaultVideoControls({
   qualityOptions,
   qualityValue,
   onQualityChange,
-  onSettingsOpen
+  onSettingsOpen,
+  subtitleOffsetMenu
 }: DefaultVideoControlsProps) {
   return (
     <Controls.Root>
@@ -171,6 +173,7 @@ export function DefaultVideoControls({
               qualityOptions={qualityOptions}
               qualityValue={qualityValue}
               onQualityChange={onQualityChange}
+              subtitleOffsetMenu={subtitleOffsetMenu}
               onOpenChange={open => {
                 if (open) onSettingsOpen?.()
               }}

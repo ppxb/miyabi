@@ -26,6 +26,9 @@ export interface VideoSkinProps extends Omit<
   qualityValue: string
   onQualityChange: (value: string) => void
   onSettingsOpen?: () => void
+  subtitleOffsetMenu?: NonNullable<
+    ComponentProps<typeof DefaultVideoControls>
+  >['subtitleOffsetMenu']
 }
 
 export function VideoSkin({
@@ -37,6 +40,7 @@ export function VideoSkin({
   qualityValue,
   onQualityChange,
   onSettingsOpen,
+  subtitleOffsetMenu,
   ...props
 }: VideoSkinProps) {
   return (
@@ -58,6 +62,7 @@ export function VideoSkin({
         qualityValue={qualityValue}
         onQualityChange={onQualityChange}
         onSettingsOpen={onSettingsOpen}
+        subtitleOffsetMenu={subtitleOffsetMenu}
       />
 
       <VideoHotkeys />

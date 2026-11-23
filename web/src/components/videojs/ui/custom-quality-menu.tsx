@@ -2,6 +2,7 @@
 
 import { QualityIcon } from '@videojs/react/icons'
 import { Menu } from '@videojs/react'
+import type { ComponentType } from 'react'
 
 import { MenuChevron } from '@/components/videojs/ui/menu-chevron'
 import { RadioItem } from '@/components/videojs/ui/radio-item'
@@ -9,16 +10,21 @@ import { cn } from '@/lib/resolve-class-name'
 
 export type QualityChoice = { value: string; label: string }
 
+/** A settings submenu of app-defined choices, such as quality or subtitle offset. */
 export interface CustomQualityMenuProps extends Omit<Menu.RootProps, 'children'> {
   options: QualityChoice[]
   value: string
   onValueChange: (value: string) => void
+  title?: string
+  icon?: ComponentType<{ className?: string }>
 }
 
 export function CustomQualityMenu({
   options,
   value,
   onValueChange,
+  title = '清晰度',
+  icon: Icon = QualityIcon,
   ...props
 }: CustomQualityMenuProps) {
   const selected = options.find(option => option.value === value)?.label ?? '原画'
@@ -41,14 +47,14 @@ export function CustomQualityMenu({
           'media-anchored:media-highlighted:bg-transparent'
         )}
       >
-        <QualityIcon
+        <Icon
           className={cn(
             'shrink-0 text-media-muted-foreground drop-shadow-media-icon',
             'size-media-icon',
             'group-media-highlighted/menu-trigger-item:text-inherit'
           )}
         />
-        <span>清晰度</span>
+        <span>{title}</span>
         <span className={'ms-auto inline-flex min-w-0 items-center gap-1 ps-2'}>
           <span className={'max-w-24 truncate opacity-65'}>{selected}</span>
           <MenuChevron />
@@ -90,7 +96,7 @@ export function CustomQualityMenu({
           )}
         >
           <MenuChevron back />
-          <span>清晰度</span>
+          <span>{title}</span>
         </Menu.Item>
         <Menu.Separator
           className={cn(

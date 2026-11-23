@@ -15,6 +15,12 @@ type SubtitleManager interface {
 	Preview(ctx context.Context, movieID int, offer subtitle.Offer) (subtitle.Preview, error)
 	Save(ctx context.Context, movieID int, offer subtitle.Offer) (subtitle.Track, error)
 	Delete(ctx context.Context, movieID, trackID int) error
+	Cues(ctx context.Context, movieID, trackID int) ([]subtitle.TimedCue, error)
+}
+
+type subtitleTrackURI struct {
+	ID         int `uri:"id" binding:"min=1"`
+	SubtitleID int `uri:"subtitleID" binding:"min=1"`
 }
 
 type subtitleMovieURI struct {
@@ -90,14 +96,24 @@ func subtitleSaveHandler(subtitles SubtitleManager) gin.HandlerFunc {
 
 func subtitleDeleteHandler(subtitles SubtitleManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		uri, ok := bindURI[struct {
-			ID         int `uri:"id" binding:"min=1"`
-			SubtitleID int `uri:"subtitleID" binding:"min=1"`
-		}](c)
+		uri, ok := bindURI[subtitleTrackURI](c)
 		if !ok {
 			return
 		}
 		err := subtitles.Delete(c.Request.Context(), uri.ID, uri.SubtitleID)
 		respond(c, gin.H{"deleted": true}, err)
+	}
+}
+
+// subtitleCuesHandler serves a track as player cues, so every format the
+// library holds plays in the browser without converting files.
+func subtitleCuesHandler(subtitles SubtitleManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[subtitleTrackURI](c)
+		if !ok {
+			return
+		}
+		cues, err := subtitles.Cues(c.Request.Context(), uri.ID, uri.SubtitleID)
+		respond(c, cues, err)
 	}
 }

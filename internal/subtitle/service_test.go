@@ -242,6 +242,33 @@ func TestSearchReturnsRankedOffersForTheMovie(t *testing.T) {
 	}
 }
 
+func TestCuesReadsDownloadedAndLocalTracksForThePlayer(t *testing.T) {
+	f := newSubtitleFixture(t, map[string]string{"/styled.ass": simplifiedASS})
+	ctx := t.Context()
+	saved, err := f.service.Save(ctx, f.movieID, offerFor("/styled.ass", "ass", "zh-CN"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cues, err := f.service.Cues(ctx, f.movieID, saved.ID)
+	if err != nil || len(cues) != 1 || cues[0].StartTime != 1.5 || cues[0].EndTime != 2 || cues[0].Text != "这是\n第一句" {
+		t.Fatalf("ASS cues = %+v, %v", cues, err)
+	}
+
+	// A local subtitle in GBK: "你好" encoded as C4 E3 BA C3.
+	local := filepath.Join(t.TempDir(), "ABP-123.srt")
+	if err := os.WriteFile(local, append([]byte("1\n00:00:03,000 --> 00:00:04,000\n"), 0xC4, 0xE3, 0xBA, 0xC3, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	record := f.db.Subtitle.Create().SetMovieID(f.movieID).SetName("ABP-123.srt").SetStoragePath(local).SaveX(ctx)
+	cues, err = f.service.Cues(ctx, f.movieID, record.ID)
+	if err != nil || len(cues) != 1 || cues[0].Text != "你好" || cues[0].StartTime != 3 {
+		t.Fatalf("GBK cues = %+v, %v", cues, err)
+	}
+	if _, err := f.service.Cues(ctx, f.movieID+1, record.ID); domain.KindOf(err) != domain.KindNotFound {
+		t.Fatalf("another movie's track = %v, want not found", err)
+	}
+}
+
 func TestDownloadRejectsUnsupportedFormats(t *testing.T) {
 	f := newSubtitleFixture(t, nil)
 	_, err := f.service.Save(t.Context(), f.movieID, offerFor("/x.sub", "sub", ""))
