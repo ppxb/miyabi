@@ -47,20 +47,12 @@ test('library page header shows the multi-source description without scan contro
   expect(html).not.toContain('同步媒体库')
 })
 
-test('loading and hidden controls still retain the scan mutation hook', () => {
+test('the loading placeholder still retains the scan mutation hook', () => {
   vi.mocked(useStartLibraryScan).mockReturnValue({ isPending: true } as ReturnType<
     typeof useStartLibraryScan
   >)
-  const props = {
-    scanning: false,
-    rebuilding: false,
-    connected: true,
-    onStarted: vi.fn()
-  }
-  LibraryScanButton({ ...props, loading: true, available: false })
+  LibraryScanButton({ scanning: false, rebuilding: false, connected: true, loading: true })
   expect(useStartLibraryScan).toHaveBeenCalledTimes(1)
-  expect(LibraryScanButton({ ...props, loading: false, available: false })).toBeNull()
-  expect(useStartLibraryScan).toHaveBeenCalledTimes(2)
 })
 
 test('scan submission keeps success navigation and failure notification', () => {
@@ -69,14 +61,11 @@ test('scan submission keeps success navigation and failure notification', () => 
     isPending: false,
     mutate
   } as unknown as ReturnType<typeof useStartLibraryScan>)
-  const onStarted = vi.fn()
   const tree = LibraryScanButton({
     loading: false,
-    available: true,
     scanning: false,
     rebuilding: false,
-    connected: true,
-    onStarted
+    connected: true
   })!
   const button = elements(tree.props.children)[0]!
   ;(button.props.onClick as () => void)()
@@ -85,7 +74,6 @@ test('scan submission keeps success navigation and failure notification', () => 
   const task = { id: 123 }
   callbacks.onSuccess(task)
   expect(notifyScanTask).toHaveBeenCalledWith(task)
-  expect(onStarted).toHaveBeenCalledOnce()
   callbacks.onError(new Error('request failed'))
   expect(notifyTaskError).toHaveBeenCalledWith(
     'scan:submit-error',
@@ -102,11 +90,9 @@ test('rebuild control submits a full rebuild and both controls disable during pr
   } as unknown as ReturnType<typeof useStartLibraryScan>)
   const props = {
     loading: false,
-    available: true,
     scanning: false,
     rebuilding: false,
-    connected: true,
-    onStarted: vi.fn()
+    connected: true
   }
   const buttons = (tree: ReturnType<typeof LibraryScanButton>) => elements(tree!.props.children)
   const controls = buttons(LibraryScanButton(props))

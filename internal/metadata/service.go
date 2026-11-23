@@ -173,7 +173,7 @@ func (s *Service) resolve(ctx context.Context, ref domain.MovieRef, skip map[str
 			return domain.MovieMetadata{}, err
 		}
 		if merged.Detail.Code != "" {
-			return attachSourceIdentity(merged, "")
+			return attachSourceIdentity(merged), nil
 		}
 		if len(failures) > 0 {
 			break
@@ -220,15 +220,15 @@ func (s *Service) resolveLayer(ctx context.Context, source Source, ref domain.Mo
 	return matched, nil
 }
 
-func attachSourceIdentity(result domain.MovieMetadata, knownID string) (domain.MovieMetadata, error) {
+func attachSourceIdentity(result domain.MovieMetadata) domain.MovieMetadata {
+	result.Detail.ID = ""
 	for _, source := range result.Detail.Sources {
 		if source.Provider == "javdb" {
 			result.Detail.ID = source.ID
-			return result, nil
+			break
 		}
 	}
-	result.Detail.ID = knownID
-	return result, nil
+	return result
 }
 
 // Fallback is used after independent artwork downloads fail. It checks only
@@ -246,7 +246,7 @@ func (s *Service) Fallback(ctx context.Context, ref domain.MovieRef) (domain.Mov
 	if err != nil {
 		return domain.MovieMetadata{}, err
 	}
-	return attachSourceIdentity(result, "")
+	return attachSourceIdentity(result), nil
 }
 
 func (s *Service) fetch(ctx context.Context, source Source, ref domain.MovieRef) (domain.MovieMetadata, error) {

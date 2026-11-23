@@ -182,8 +182,11 @@ func validate(src Source) error {
 		if !info.IsDir() {
 			return domain.E(domain.KindInvalid, fmt.Sprintf("路径不是目录：%s", path), nil)
 		}
-	case Kind115, KindPikPak:
+	case Kind115:
 		// Cloud sources are authenticated separately; nothing to validate here.
+	case KindPikPak:
+		// Reserved for a future PikPak drive; there is no login or scan yet.
+		return domain.E(domain.KindInvalid, "PikPak 存储源暂不支持", nil)
 	default:
 		return domain.E(domain.KindInvalid, "未知的存储源类型", nil)
 	}

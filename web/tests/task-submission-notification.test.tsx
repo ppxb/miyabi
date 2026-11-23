@@ -79,11 +79,9 @@ function submission(action: 'rescrape' | 'scan' | 'rebuild') {
           })
         : LibraryScanButton({
             loading: false,
-            available: true,
             scanning: false,
             rebuilding: false,
-            connected: true,
-            onStarted: vi.fn()
+            connected: true
           })
     return null
   }

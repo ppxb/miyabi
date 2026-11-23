@@ -454,8 +454,8 @@ function SourceDialog({
               </SelectTrigger>
               <SelectContent>
                 {KIND_ORDER.map(value => (
-                  <SelectItem key={value} value={value}>
-                    {KIND_LABELS[value]}
+                  <SelectItem key={value} value={value} disabled={value === 'pikpak'}>
+                    {value === 'pikpak' ? `${KIND_LABELS[value]}（即将支持）` : KIND_LABELS[value]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -496,11 +496,7 @@ function SourceDialog({
               </Field>
             </>
           ) : (
-            <FieldDescription>
-              {kind === '115'
-                ? '保存后请在卡片中登录 115，登录后再选择媒体目录。'
-                : '保存后请在卡片中完成登录并选择媒体目录。'}
-            </FieldDescription>
+            <FieldDescription>保存后请在卡片中登录 115，登录后再选择媒体目录。</FieldDescription>
           )}
 
           <Field orientation="horizontal">

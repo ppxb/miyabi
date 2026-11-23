@@ -9,24 +9,19 @@ import { notifyTaskError, useNotifyScanTask } from '@/features/tasks/task-toast'
 
 export function LibraryScanButton({
   loading,
-  available,
   scanning,
   rebuilding,
-  connected,
-  onStarted
+  connected
 }: {
   loading: boolean
-  available: boolean
   scanning: boolean
   rebuilding: boolean
   connected: boolean
-  onStarted: () => void
 }) {
   const startScan = useStartLibraryScan()
   const notifyScan = useNotifyScanTask()
   // Keep the mutation observer mounted while pagination replaces the visible control.
   if (loading) return <Skeleton className="h-8 w-60 rounded-lg" />
-  if (!available) return null
 
   return (
     <div className="flex items-center gap-2">
@@ -43,10 +38,7 @@ export function LibraryScanButton({
             disabled={scanning || startScan.isPending}
             onClick={() =>
               startScan.mutate(rebuild, {
-                onSuccess: task => {
-                  notifyScan(task)
-                  onStarted()
-                },
+                onSuccess: notifyScan,
                 onError: error => {
                   notifyTaskError(
                     'scan:submit-error',

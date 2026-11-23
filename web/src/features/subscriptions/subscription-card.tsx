@@ -18,12 +18,16 @@ const dateTimeFormat = new Intl.DateTimeFormat('zh-CN', {
   minute: '2-digit'
 })
 
-const statusLabels: Record<SubscriptionItem['status'], string> = {
-  waiting: '等待磁力',
-  added: '已加入 115',
-  stale: '长期无源',
-  active: '生效中',
-  paused: '已暂停'
+// One entry per status, so a new status needs both its label and badge style.
+const statusBadges: Record<
+  SubscriptionItem['status'],
+  { label: string; variant: 'default' | 'success' | 'secondary' }
+> = {
+  waiting: { label: '等待磁力', variant: 'default' },
+  added: { label: '已加入 115', variant: 'success' },
+  stale: { label: '长期无源', variant: 'secondary' },
+  active: { label: '生效中', variant: 'default' },
+  paused: { label: '已暂停', variant: 'secondary' }
 }
 
 // Keep the card mounted when switching between browsing and selection.
@@ -62,7 +66,9 @@ export function SubscriptionCard({
       state={
         <>
           <MovieStateBadge movie={{ id: item.target_id, code: item.code }} hideViewed />
-          <Badge variant={statusVariant(item.status)}>{statusLabels[item.status]}</Badge>
+          <Badge variant={statusBadges[item.status].variant}>
+            {statusBadges[item.status].label}
+          </Badge>
         </>
       }
       coverOverlay={
@@ -123,12 +129,6 @@ export function SubscriptionCard({
       ) : null}
     </div>
   )
-}
-
-function statusVariant(status: SubscriptionItem['status']) {
-  if (status === 'added') return 'success' as const
-  if (status === 'stale' || status === 'paused') return 'secondary' as const
-  return 'default' as const
 }
 
 function describeSchedule(item: SubscriptionItem) {

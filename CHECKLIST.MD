@@ -26,7 +26,7 @@
 - [x] 🟠 `web/src/features/sources/sources-section.tsx:166`：保存失败的 `InlineError` 渲染在模态框之下，用户不可见。改法：`onError` 用 toast 或把错误传入 `SourceDialog`。（已修复：`persist` 增加 `onError` toast，移除被遮住的 `InlineError`）
 - [x] 🟠 `web/src/features/library/player-dialog.tsx:156-160`：`try { void seek() } catch {}` 捕获不到异步 reject。改法：`seek(...).catch(() => {})`。（已修复：改为 `void seek(...).catch(() => {})`）
 - [x] 🟠 `web/src/features/library/player-dialog.tsx:53-55,87,118`：`sources` 为空时永远显示"加载中"；失败无重试。改法：区分 pending / error / 无源，失败用 `InlineError onRetry`。（已核实：后端成功响应必带 ≥1 条 source，"成功+空源"分支不可达；已修复真实问题——播放失败改用 `InlineError onRetry`，右侧信息区失败态用 `InlineError`、加载态改骨架屏）
-- [ ] 🟠 `web/src/features/sources/sources-section.tsx:484-488,210-214`：PikPak 提示"在卡片中完成登录"，但卡片无此入口。改法：移除 pikpak 选项或改文案（暂不处理）。
+- [x] 🟠 `web/src/features/sources/sources-section.tsx:484-488,210-214`：PikPak 提示"在卡片中完成登录"，但卡片无此入口。改法：移除 pikpak 选项或改文案（暂不处理）。（已决定保留但禁用：PikPak 无任何后端实现；类型下拉中显示「PikPak（即将支持）」且不可选，后端 `validate` 拒绝 PikPak，删除仅对 PikPak 生效的提示文案；新增校验用例）
 - [x] 🟠 `web/src/features/sources/sources-section.tsx:505-514`：删除存储源无二次确认（data-section 清理缓存有确认）。（已修复：删除前弹出二次确认对话框）
 - [x] 🟠 `web/src/components/app-navigation.tsx:36,57`：`onNavigate` 无人传入，移动端点击导航后侧边栏不关闭。改法：内部 `useSidebar().setOpenMobile(false)`。（已修复：`AppNavigation` 内部 `setOpenMobile(false)` 并移除死 prop；侧栏 logo 链接同样关闭）
 - [x] 🟠 `internal/drive/events.go:18-19` vs `account_ops.go:74-78`：注释承诺"commit 锁下运行、失败回滚"，代码未实现。改法：实现或修正注释。（已修正注释：明确回调不在 commit 锁下、失败不会回滚已持久化的 mount）
@@ -90,12 +90,12 @@
 - [x] `web/src/api/pan.ts:67-68` `fileLists`、`panKeys.files`（已删 `fileLists`；`panKeys.files` 经核实被 `web/tests/query-errors.test.ts:90` 使用，保留）
 - [x] `web/src/features/tasks/task-notification-diff.ts:1-14` 重复的 `isScanTask/isTaskActive/isOfflineTaskActive`（已改为复用 `@/api/tasks`、`@/api/offline`，仅保留本地 `isBatchTask`）
 - [x] `web/src/features/tasks/task-toast.tsx:79-81` 不可达分支（已简化：active 分支恒有 `movie_id`，删除不可达的 `正在${action}媒体库` 分支）
-- [ ] `web/src/features/tasks/task-progress-state.ts:6-13` 从未显示的 `stages[].label`（复核成立；涉及 `TaskProgress` 取 label 兜底的重构，待办）
+- [x] `web/src/features/tasks/task-progress-state.ts:6-13` 从未显示的 `stages[].label`（复核成立；涉及 `TaskProgress` 取 label 兜底的重构，待办）（已修复：唯一调用方总会传入自身文案，6 个阶段 label 从不显示；`stages` 改为仅保留阶段顺序）
 - [x] `internal/offline/recovery.go:83-101` `Service.Recover`（已删除；`recoverSource` 仍由 `sync.go:66,132` 使用，保留）
 - [x] `internal/offline/service.go:18-20` 接口未用方法 → `catalogue.HasMagnet`（`magnets.go:67`）、`MovieCode`（`service.go:225`）；`monitor.OfflineAdder.Add` → `offline.Service.Add`（已从接口删除 `HasMagnet`/`MovieCode` 与 `OfflineAdder.Add`；实现与测试保留）
 - [x] `internal/catalogue/types.go:81` `LocalState.Source()`（已从接口删除；包内 0 调用）
 - [x] `internal/gfriends/client.go:31` `rawContentBase`、`:410-419` `FetchImage`；`:234-245` 改用 `escapeContentRel`（已删 `rawContentBase` 与 `Client.FetchImage`；`escapeContentRel` 已在 `FetchRel` 使用）
-- [ ] `internal/metadata/service.go:244` `needsSupplement`；`:255-264` `attachSourceIdentity` 简化（已删 `needsSupplement` 及测试断言；`attachSourceIdentity` 简化待办）
+- [x] `internal/metadata/service.go:244` `needsSupplement`；`:255-264` `attachSourceIdentity` 简化（已删 `needsSupplement` 及测试断言；`attachSourceIdentity` 简化待办）（已修复：两处调用 `knownID` 均为空、`error` 恒为 nil，去掉该参数与 error 返回值）
 - [x] `internal/catalogue/service.go:40` `proxy`、`internal/database/sqlite.go:21` `db` 只写不读（已删 `Service.proxy` 字段及赋值；`Store.db` 被数据库测试读取，保留）
 - [x] `internal/domain/movie.go:47` `SearchOptions`；`tasks/payload.go:35` `SetPayloadField`、`netx.ProxyManager.Update`（仅测试用）（复核成立但【评估后保留，不改】：三项均仅测试引用、无生产调用；删除需改多份测试并削减 `ProxyManager` 等公共 API 覆盖，运行收益为 0，属过度清理）
 - [x] `internal/api/error.go:83` 不可达分支；`:112` 硬编码文案比较（已处理：`:83` 删除不可达的 `errors.Is(err, fs.ErrNotExist)` 分支——`domain.KindOf` 已把 `fs.ErrNotExist` 映射为 `KindNotFound`；`:112` 改为 `status==404 && ent.IsNotFound(err)` 时用 `domain.PublicMessage(domain.E(domain.KindNotFound,"",nil))` 取规范文案，去掉字面量比较。`go build`/`go vet`/`go test ./internal/api/...` 通过）
@@ -107,7 +107,7 @@
 - [x] `components/movie/movie-grid-skeleton.tsx:7` `compact`（复核为已使用：history/actors/movies 页均传 `compact`，保留）
 - [x] `components/page-header.tsx:9` `inlineActions`；`components/app-page.tsx:9` `contentClassName`（`inlineActions` 已被 history/library 页使用，保留；`contentClassName` 无调用方，已删）
 - [x] `features/library/movie-card.tsx:11-15` `busy`、`playIcon`、`hideActors`（连带 `movie-actions` 的 `disabled`）（全部调用点均未传；已删这些 props 与对应分支，`LibraryMovieActions` 去掉 `disabled`）
-- [ ] `features/library/scan-button.tsx` `available`、`onStarted`（复核：生产调用传的是常量 `available` 与空实现 `onStarted`，非“未传”；评估后保留，改动收益低）
+- [x] `features/library/scan-button.tsx` `available`、`onStarted`（复核：生产调用传的是常量 `available` 与空实现 `onStarted`，非“未传”；评估后保留，改动收益低）（已修复：唯一调用方传常量 `available` 与空 `onStarted`，删除两参数及相关判断，测试同步调整）
 - [x] `features/discover/results.tsx` `searching`（恒 false）、`errorMessage`（唯一调用传 `searching={false}`、从不传 `errorMessage`；已删两个 props 并固定文案）
 - [x] `features/movie-detail/metadata.tsx:76` `EntityLink` 的 `kind`（调用处传了 `kind` 但函数未用；已删 `kind` 参数与各调用点，仍渲染 `span`）
 - [x] `features/movie-detail/dialog-context.ts:11` `openMovie` 的 `_trigger`（含 `app-search.tsx:218` 的 `document.createElement('div')`）（已删 `trigger` 参数、`detail-trigger`/`app-search` 的第二实参与 `createElement('div')`，同步改测试断言）
@@ -176,7 +176,7 @@
 - [x] 🟢 **骨架尺寸与真实控件不符**：`discover/category-filters` 骨架改 `h-8 rounded-lg`；`library/scan-button` 骨架改 `h-8 rounded-lg`；`actors/detail-page` 骨架头像 `size-48`→`size-32`。
 - [x] 🟢 `actors/catalog-page.tsx`：加载仅文字改为头像骨架网格。
 - [x] 🟢 写法不统一：`aspect-[3/4]`→`aspect-3/4`（`actors/detail-page`）；`preview-zoom.ts`、`task-notification-diff.ts` 相对路径改 `@/`；`custom-quality-menu` lucide `Hd` 改 videojs `QualityIcon`。（`movie-subscribe-button asChild` 已在 P4 统一为 `render`。）
-- [ ] 🟢 进度口径不一致：`library/library-progress.tsx` 仍自算百分比（其实按 `scan.metadata_*`/`directories_*`/`task.progress` 兜底，与 `scanCount()` 文案口径不同）。保留：两者语义不同（圆形进度 vs 任务文案），强合并会改变现有展示，建议单独评估。
+- [x] 🟢 进度口径不一致：`library/library-progress.tsx` 仍自算百分比（其实按 `scan.metadata_*`/`directories_*`/`task.progress` 兜底，与 `scanCount()` 文案口径不同）。保留：两者语义不同（圆形进度 vs 任务文案），强合并会改变现有展示，建议单独评估。（已关闭：圆形进度与其提示文案同源、组件内一致，与任务文案口径不同属展示目的不同，不改）
 - [x] 🟢 `LibraryPlayerDialog` 引入方式统一：新增 `features/library/player-dialog-lazy.tsx` 共享懒加载封装，`history/library/movies/actors` 统一使用。
 
 ---
@@ -197,7 +197,7 @@
 - [x] `movie-detail/content.tsx` 两分支后半段抽 `CatalogueSections`（容器 + InlineError + Hero + Plot + Previews，`children` 放各自追加段）。
 - [x] `movie-detail/magnets.tsx` 提交按钮内容（pending/submitted 图标 + label）抽 `SubmitLabel`，单账号按钮与多账号下拉触发器复用。
 - [x] `recommendations.tsx`、`history/page.tsx` 伪造整条 movie → 卡片 props 收窄：`LibraryMovieCard` 用 `LibraryMovieCardData`、`DiscoverMovieCard` 用 `DiscoverMovieCardData`，`referenceMovie` 只造所需字段，`HistoryCard` 适配器删除、`LibraryMovieActions` 收窄为 `Pick<LibraryMovie,'id'|'code'>`。
-- [ ] `subscription-card.tsx:20-26,129-133` 两张状态表合并
+- [x] `subscription-card.tsx:20-26,129-133` 两张状态表合并（已修复：合并为 `Record<status, {label, variant}>`，新增状态时文案与样式均有编译期检查）
 - [x] `task-notification-diff.ts` 抽 `shouldNotify({ active, old, id, dismissed, announced, initialized, extra })`，scan / batch / offline 三处循环统一守卫。
 - [x] 路由重复 errorComponent（实际 6 处：`discover/movies/actors.index/index/subscriptions/history`）→ 统一到 `router.tsx` 的 `defaultErrorComponent`（用 `error.message`，兜底「页面加载失败」），各路由已移除。
 - [x] ~~`custom-quality-menu.tsx` 与 `quality-menu.tsx` 约 70 行 class 重复~~：`quality-menu.tsx` 不存在；相关 class 重复此前已清理，无需再抽常量。

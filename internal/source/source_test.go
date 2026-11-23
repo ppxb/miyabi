@@ -36,6 +36,7 @@ func TestReplaceValidates(t *testing.T) {
 	}{
 		{"empty name", Source{ID: "1", Kind: KindLocal, Name: " ", Config: map[string]string{"path": dir}}},
 		{"unknown kind", Source{ID: "1", Kind: "ftp", Name: "x"}},
+		{"pikpak not supported yet", Source{ID: "1", Kind: KindPikPak, Name: "x"}},
 		{"local missing path", Source{ID: "1", Kind: KindLocal, Name: "x"}},
 		{"local not directory", Source{ID: "1", Kind: KindLocal, Name: "x", Config: map[string]string{"path": file}}},
 		{"local missing directory", Source{ID: "1", Kind: KindLocal, Name: "x", Config: map[string]string{"path": filepath.Join(dir, "nope")}}},

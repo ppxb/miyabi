@@ -46,11 +46,9 @@ export function MediaSyncSection() {
       <SettingRow title="全库维护" description="全库扫描重建索引，或重新刮削全部影片">
         <LibraryScanButton
           loading={tasks.isPending}
-          available
           scanning={!!active}
           rebuilding={!!active?.rebuild}
           connected={connection.status === 'connected'}
-          onStarted={() => undefined}
         />
       </SettingRow>
     </SettingsSection>
