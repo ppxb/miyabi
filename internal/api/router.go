@@ -96,6 +96,10 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	settingsAPI.GET("/sources", sourceListHandler(deps.Sources))
 	settingsAPI.PUT("/sources", sourceUpdateHandler(deps.Sources, deps.Library))
 
+	// MPV bridge installer scripts, downloaded from the Outputs settings page.
+	protected.GET("/mpv-bridge/install.ps1", noStore(), mpvBridgeScriptHandler(mpvBridgeInstall, "install-mpv-bridge.ps1"))
+	protected.GET("/mpv-bridge/uninstall.ps1", noStore(), mpvBridgeScriptHandler(mpvBridgeUninstall, "uninstall-mpv-bridge.ps1"))
+
 	protected.GET("/library/movies", libraryMoviesHandler(deps.Library))
 	protected.GET("/library/browse", libraryBrowseHandler(deps.Library))
 	protected.GET("/library/filter-options", libraryFilterOptionsHandler(deps.Library))
