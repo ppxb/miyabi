@@ -153,11 +153,15 @@ func TestTaskEventsStreamsSnapshotsAndRevisionsUntilTheClientLeaves(t *testing.T
 	expectSnapshot(0, 0)
 	stub.publish(40)
 	expectSnapshot(40, 1)
-	// Coalesced notifications: two publishes before the writer wakes yield
-	// one fresh snapshot, never a stale intermediate one.
+	sentAt := time.Now()
+	// Coalesced notifications: two publishes within one interval yield one
+	// fresh snapshot, never a stale intermediate one.
 	stub.publish(60)
 	stub.publish(80)
 	expectSnapshot(80, 3)
+	if gap := time.Since(sentAt); gap < taskEventInterval/2 {
+		t.Fatalf("snapshots %v apart, want about %v", gap, taskEventInterval)
+	}
 
 	cancel()
 	select {
