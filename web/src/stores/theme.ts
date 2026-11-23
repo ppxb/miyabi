@@ -48,11 +48,14 @@ export function ThemeSync() {
   useEffect(() => {
     const root = document.documentElement
     root.setAttribute('data-theme-mode', theme)
-    // Disable transitions for a frame so switching themes does not animate every colour.
+    // Disable transitions while the theme changes so colours do not animate.
+    // Reading a computed style flushes the new theme with transitions still off;
+    // a requestAnimationFrame removal would run before that style pass.
     root.classList.add('disable-transitions')
     root.classList.toggle('dark', resolvedTheme === 'dark')
     root.style.colorScheme = resolvedTheme
-    requestAnimationFrame(() => root.classList.remove('disable-transitions'))
+    void window.getComputedStyle(root).opacity
+    root.classList.remove('disable-transitions')
   }, [theme, resolvedTheme])
 
   return null

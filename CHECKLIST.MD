@@ -45,7 +45,7 @@
 
 ### 后端
 - [x] 🔴 ✅ `internal/actors/service.go:642-692`：每个头像请求全表扫描 Actor 并逐行 sha1（头像已改为 eager 加载，放大开销）。改法：profile 存 key 列或用 profile ID，按索引单行查询。（已修复：`Actor` 新增索引列 `name_key`（归一化名的 sha1），`scrape/mapping.go` 写入，`findNames` 改为按 `name_key` 走索引查询；并给 `actors.actor_profile` 加索引，存在 profile 时补合并别名仍走索引。查询计划由 `SCAN actors` 变为 `SEARCH ... USING INDEX actor_name_key`/`actor_actor_profile`）
-- [ ] 🔴 `internal/actors/service.go:219-281,351-362`：`Catalog/Detail` 全量加载演员与影片边后内存分页；`:279` 排序比较器内反复调用 `display()`（每次复制+排序）。改法：以 ActorProfile 为主表 SQL 分页，`display()` 预计算。（部分改善：`display()/norm` 已改为每组只算一次；`Detail` 改走 `name_key` 索引只加载单组，不再全量构建目录。Catalog 的 SQL 分页未做——分组键是「profile_id 或归一化名」的派生值、非可索引列，且库中 3/91 有 profile，需先物化分组表，另行处理）
+- [x] 🔴 `internal/actors/service.go:219-281,351-362`：`Catalog/Detail` 全量加载演员与影片边后内存分页；`:279` 排序比较器内反复调用 `display()`（每次复制+排序）。改法：以 ActorProfile 为主表 SQL 分页，`display()` 预计算。（部分改善：`display()/norm` 已改为每组只算一次；`Detail` 改走 `name_key` 索引只加载单组，不再全量构建目录。Catalog 的 SQL 分页未做——分组键是「profile_id 或归一化名」的派生值、非可索引列，且库中 3/91 有 profile，需先物化分组表，另行处理）（已随 D3 解决：目录改为以 `ActorProfile` 为主表在 SQL 中分页，内存分组与 `display()` 已删除）
 - [x] 🔴 ✅ `internal/actors/service.go:936-943`：`EnsureProfiles` 循环逐行写、无事务、错误全吞。改法：`WithTx` + `Update().Where(IDIn)` + `CreateBulk`。（已重写为增量对账：只处理「尚无 profile 且能匹配到已有 profile」的演员，补挂 profile + 缺失别名；`s.db.Tx` 事务内批量 `Update().Where(IDIn)`，不再逐行写/全删重建/新建 profile。新增 `EnsureMovieProfiles(ctx, movieID)` 在每次影片刮削入库后调用（`scrape.go` 紧随 `MergeMovieCrossLanguage`），避免新抓到的同名演员在列表里裂成两条。`EnsureProfiles` 保留为全量增量兜底，仅处理未挂载演员）
 - [x] 🟠 ✅ `internal/actors/service.go:377-382`：GET `Detail` 中逐个 UPDATE 写库。（已修复：改为单条批量 `Actor.Update().Where(IDIn(ids...), 仅未挂载或挂到别的 profile).SetProfileID(pid)`，已挂到本 profile 的演员跳过，重复打开详情页 0 写；错误改为返回不再 `_ =` 吞掉）
 - [x] 🟠 ✅ `internal/actors/service.go:504-534`：`mergeActorPair` 多步写无事务、错误全吞；`fillProfileFrom:585`、`applyProfile:847` 同。（已修复：`mergeActorPair` 整体放进 `s.db.Tx`，其中 `ensureProfileTx`/`fillProfileFrom`/`copyProfileImages` 全部改为接收 tx 并返回 error，任一失败回滚；`applyProfile` 也改为「先取 `persistMu`（统一锁序 persistMu→tx）再开事务」，资料更新 + 图片写入同事务、返回 error；`appendProfileImages` 改 tx 版、错误不再 `_ =`。`enrichProfile` 现在会把 `applyProfile` 的错误向上返回以便下次重试）
@@ -326,11 +326,11 @@
 
 - [x] `api/rate_limiter.go:71`：记录满 4096 后拒绝所有新 IP，是否可接受。（已决定并修复：满表时淘汰最快到期的空闲记录（普通失败窗口先于封禁被淘汰），有进行中尝试的记录不淘汰；全部在进行中时才拒绝。容量测试同步更新）
 - [x] `netx/ssrf.go:122-124`：启用代理后跳过 SSRF 检查，是否符合威胁模型。（已决定并修复：拨号期检查对代理请求必须跳过（拨的是代理本身），但此前目标 URL 也一并未校验——刮削 provider、演员图片、AV-League、freejavbt 直接 `client.Do`，经代理可访问内网。现于 `NewSafeTransport` 的 `Proxy` 回调中对代理请求执行 `ValidateSafeURL`（每个请求与每跳重定向都会经过），重定向检查统一为形状校验；新增 `TestSafeClientValidatesProxiedTargets`。已知局限：代理自行解析 DNS，无法防 DNS 重绑定，需在代理侧禁止内网）
-- [ ] `api/auth.go:369`：未校验来源即采信 `X-Forwarded-Proto` 决定 cookie `Secure`。
-- [ ] `task-events.tsx`：后端 revision 是否在重启后归零（决定 P1 修复方式）。
-- [ ] Go 空切片序列化为 `null`：前端 `?? []`（`metadata.tsx:18-19`、`recommendations.tsx:12`、`previews.tsx:12`）是否必要。
-- [ ] `api/actors.ts:70`：演员 key 未 `encodeURIComponent`。
-- [ ] `apiDelete<null>` 遇 204 空响应是否会在 `response.json()` 抛错（`subscriptions.ts:157`、`pan.ts:165,177`）。
-- [ ] `stores/theme.ts:62-65`：`disable-transitions` 在 rAF 中移除可能无效（无强制回流）。
-- [ ] `metadata/providers/javbus.go:30`：`proxy == nil` 时 `Media()` 可能 panic。
-- [ ] `sources-section.tsx:94-99`：`crypto.randomUUID` 兜底是否因局域网 HTTP 部署而必要。
+- [x] `api/auth.go:369`：未校验来源即采信 `X-Forwarded-Proto` 决定 cookie `Secure`。（已核实，不改：该头由客户端自带，伪造只会让伪造者自己拿到 HTTP 下不回传的 Secure cookie，影响不到他人）
+- [x] `task-events.tsx`：后端 revision 是否在重启后归零（决定 P1 修复方式）。（已核实：revision 为内存计数器，重启归零；前端已按 `instance` 识别重启（`task-events.tsx:124-127`），无需再改）
+- [x] Go 空切片序列化为 `null`：前端 `?? []`（`metadata.tsx:18-19`、`recommendations.tsx:12`、`previews.tsx:12`）是否必要。（已核实：nil 切片确会输出 `null`，前端 `?? []` 必要，保留）
+- [x] `api/actors.ts:70`：演员 key 未 `encodeURIComponent`。（D3 后 key 为数字 profile ID，无需编码）
+- [x] `apiDelete<null>` 遇 204 空响应是否会在 `response.json()` 抛错（`subscriptions.ts:157`、`pan.ts:165,177`）。（已核实：后端无 204 响应，删除接口返回 200 + JSON `null`，可正常解析）
+- [x] `stores/theme.ts:62-65`：`disable-transitions` 在 rAF 中移除可能无效（无强制回流）。（已修复：改为 `getComputedStyle` 强制刷新样式后同步移除 `disable-transitions`，rAF 中移除时该类从未参与样式计算）
+- [x] `metadata/providers/javbus.go:30`：`proxy == nil` 时 `Media()` 可能 panic。（已核实，不会 panic：零值媒体客户端的域名白名单为空，`Media()` 先返回「图片地址不属于此来源」，不会发请求；app 也总是传入代理）
+- [x] `sources-section.tsx:94-99`：`crypto.randomUUID` 兜底是否因局域网 HTTP 部署而必要。（已核实：`crypto.randomUUID` 仅在 HTTPS/localhost 可用，局域网 HTTP 部署需要兜底，保留）
