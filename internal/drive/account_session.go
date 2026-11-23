@@ -41,11 +41,15 @@ func (s *accountSession) checkSource(ctx context.Context) error {
 }
 
 // checkCredentials rejects commits authorized by older credentials.
-func (s *accountSession) checkCredentials() error {
+func (s *accountSession) checkCredentials(ctx context.Context) error {
 	if s.drive.accountCredVersion(s.accountID) != s.credVersion {
 		return ErrSourceChanged
 	}
-	if s.drive.accountToken(s.accountID).AccessToken == "" {
+	tokens, err := s.drive.accountToken(ctx, s.accountID)
+	if err != nil {
+		return err
+	}
+	if tokens.AccessToken == "" {
 		return pan.ErrUnauthorized
 	}
 	return nil
@@ -58,7 +62,10 @@ func accountWithToken[T any](ctx context.Context, s *accountSession, request fun
 		if err := ctx.Err(); err != nil {
 			return zero, err
 		}
-		tokens := s.drive.accountToken(s.accountID)
+		tokens, err := s.drive.accountToken(ctx, s.accountID)
+		if err != nil {
+			return zero, err
+		}
 		if tokens.AccessToken == "" {
 			return zero, pan.ErrUnauthorized
 		}
@@ -78,12 +85,15 @@ func accountWithToken[T any](ctx context.Context, s *accountSession, request fun
 
 func (d *Drive) refreshAccountTokens(ctx context.Context, accountID string) error {
 	result := d.accountRefresh.DoChan(accountID, func() (any, error) {
-		tokens := d.accountToken(accountID)
+		refreshContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), upstreamTimeout)
+		defer cancel()
+		tokens, err := d.accountToken(refreshContext, accountID)
+		if err != nil {
+			return nil, err
+		}
 		if tokens.RefreshToken == "" {
 			return nil, pan.ErrUnauthorized
 		}
-		refreshContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), upstreamTimeout)
-		defer cancel()
 		next, err := d.client.RefreshToken(refreshContext, tokens.RefreshToken)
 		if err != nil {
 			if errors.Is(err, pan.ErrUnauthorized) {
@@ -91,7 +101,7 @@ func (d *Drive) refreshAccountTokens(ctx context.Context, accountID string) erro
 			}
 			return nil, fmt.Errorf("refresh 115 credentials: %w", err)
 		}
-		if err := d.saveAccountTokens(refreshContext, accountID, next); err != nil {
+		if err := d.updateAccountTokens(refreshContext, accountID, next); err != nil {
 			return nil, err
 		}
 		return nil, nil
@@ -174,7 +184,7 @@ func (s *accountSession) RemoveOffline(ctx context.Context, hash string) error {
 }
 
 func (s *accountSession) OfflineTasks(ctx context.Context, page int) (pan.OfflinePage, error) {
-	if err := s.checkCredentials(); err != nil {
+	if err := s.checkCredentials(ctx); err != nil {
 		return pan.OfflinePage{}, err
 	}
 	return accountWithToken(ctx, s, func(token string) (pan.OfflinePage, error) {
@@ -202,7 +212,7 @@ func (s *accountSession) CommitAccount(ctx context.Context, fn func(tx *ent.Tx) 
 		return err
 	}
 	defer s.drive.commit.Unlock()
-	if err := s.checkCredentials(); err != nil {
+	if err := s.checkCredentials(ctx); err != nil {
 		return err
 	}
 	if s.drive.closedState() {

@@ -21,7 +21,9 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/metadatacache"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
+	"github.com/ppxb/miyabi/internal/ent/panaccount"
 	"github.com/ppxb/miyabi/internal/ent/setting"
+	"github.com/ppxb/miyabi/internal/ent/storagesource"
 	"github.com/ppxb/miyabi/internal/ent/subscription"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/ent/tag"
@@ -97,7 +99,9 @@ func checkColumn(t, c string) error {
 			metadatacache.Table:    metadatacache.ValidColumn,
 			movie.Table:            movie.ValidColumn,
 			offlinedownload.Table:  offlinedownload.ValidColumn,
+			panaccount.Table:       panaccount.ValidColumn,
 			setting.Table:          setting.ValidColumn,
+			storagesource.Table:    storagesource.ValidColumn,
 			subscription.Table:     subscription.ValidColumn,
 			subtitle.Table:         subtitle.ValidColumn,
 			tag.Table:              tag.ValidColumn,

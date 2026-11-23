@@ -2,6 +2,7 @@ package drive
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -18,7 +19,7 @@ func TestAccountRegistryAndMount(t *testing.T) {
 	if err := d.saveAccountTokens(ctx, "A", tokens); err != nil {
 		t.Fatal(err)
 	}
-	if got := d.accountToken("A"); got.AccessToken != tokens.AccessToken {
+	if got := testToken(t, d, "A"); got.AccessToken != tokens.AccessToken {
 		t.Fatalf("cached token = %+v", got)
 	}
 
@@ -36,7 +37,7 @@ func TestAccountRegistryAndMount(t *testing.T) {
 	if err := d.removeAccount(ctx, "A"); err != nil {
 		t.Fatal(err)
 	}
-	if d.accountToken("A").AccessToken != "" {
+	if testToken(t, d, "A").AccessToken != "" {
 		t.Fatal("account token was not cleared")
 	}
 	if _, ok, err := d.Mount(ctx, "A"); err != nil {
@@ -92,7 +93,7 @@ func TestRefreshAccountTokens(t *testing.T) {
 	if err := d.refreshAccountTokens(ctx, "A"); err != nil {
 		t.Fatal(err)
 	}
-	if got := d.accountToken("A"); got.AccessToken != "rotated-access" {
+	if got := testToken(t, d, "A"); got.AccessToken != "rotated-access" {
 		t.Fatalf("refreshed token = %+v", got)
 	}
 }
@@ -119,7 +120,7 @@ func TestAccountsRefreshesExpiredTokens(t *testing.T) {
 	if len(accounts) != 1 || !accounts[0].Connected {
 		t.Fatalf("accounts = %+v", accounts)
 	}
-	if got := d.accountToken("A"); got.AccessToken != "rotated-access" {
+	if got := testToken(t, d, "A"); got.AccessToken != "rotated-access" {
 		t.Fatalf("refreshed token = %+v", got)
 	}
 }
@@ -168,17 +169,58 @@ func TestSaveAccountTokensConcurrentPersistsAll(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	store, err := d.loadAccounts(ctx)
+	rows, err := d.listAccounts(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(store) != n {
-		t.Fatalf("persisted accounts = %d, want %d", len(store), n)
+	if len(rows) != n {
+		t.Fatalf("persisted accounts = %d, want %d", len(rows), n)
 	}
 	for i := 0; i < n; i++ {
 		id := fmt.Sprintf("acct-%d", i)
-		if got := store[id].Tokens.AccessToken; got != id+"-access" {
+		if got := testToken(t, d, id).AccessToken; got != id+"-access" {
 			t.Fatalf("account %s access token = %q", id, got)
 		}
+	}
+}
+
+// testToken reads an account's stored tokens.
+func testToken(t *testing.T, d *Drive, accountID string) pan.Tokens {
+	t.Helper()
+	tokens, err := d.accountToken(t.Context(), accountID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tokens
+}
+
+// A refresh that completes after the account was disconnected must not
+// recreate it, and a mount for a removed account is rejected.
+func TestRemovedAccountStaysRemoved(t *testing.T) {
+	ctx := t.Context()
+	var d *Drive
+	client := &stubClient{
+		refreshToken: func(ctx context.Context, _ string) (pan.Tokens, error) {
+			// The user disconnects while the upstream refresh is in flight.
+			if err := d.removeAccount(ctx, "A"); err != nil {
+				t.Error(err)
+			}
+			return testTokens("rotated"), nil
+		},
+	}
+	d = newTestDrive(t, client)
+	if err := d.saveAccountTokens(ctx, "A", pan.Tokens{AccessToken: "old-access", RefreshToken: "old-refresh", ExpiresAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := d.refreshAccountTokens(ctx, "A"); !errors.Is(err, pan.ErrUnauthorized) {
+		t.Fatalf("refresh after disconnect: err = %v", err)
+	}
+	if rows, err := d.listAccounts(ctx); err != nil || len(rows) != 0 {
+		t.Fatalf("account resurrected: %d rows, err = %v", len(rows), err)
+	}
+	mount := mountRecord{AccountID: "A", LibraryDirectory: domain.LibraryDirectory{ID: "10"}}
+	if err := d.saveAccountMount(ctx, "A", mount); !errors.Is(err, pan.ErrUnauthorized) {
+		t.Fatalf("mount for removed account: err = %v", err)
 	}
 }

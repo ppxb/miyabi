@@ -46,17 +46,16 @@ type Drive struct {
 	database *ent.Client
 	client   Client
 
-	mu         sync.Mutex
-	accountsMu sync.Mutex
-	commit     syncx.ContextLock
-	work       sync.WaitGroup
-	closed     bool
+	mu     sync.Mutex
+	commit syncx.ContextLock
+	work   sync.WaitGroup
+	closed bool
 
 	login         qrLogin
 	mountListener MountListener
 
-	accountTokens       map[string]pan.Tokens
-	accountMounts       map[string]mountRecord
+	// Credential/authorization versions are runtime invalidation counters for
+	// in-flight sessions; account data itself lives in PanAccount rows.
 	accountCredVersions map[string]uint64
 	accountAuthVersions map[string]uint64
 	accountRefresh      singleflight.Group
@@ -67,25 +66,15 @@ func New(ctx context.Context, db *ent.Client) (*Drive, error) {
 	return NewWithClient(ctx, db, pan.New())
 }
 
-func NewWithClient(ctx context.Context, db *ent.Client, client Client) (*Drive, error) {
+func NewWithClient(_ context.Context, db *ent.Client, client Client) (*Drive, error) {
 	d := &Drive{
-		database:    db,
-		client:      client,
-		refreshStop: make(chan struct{}),
+		database:            db,
+		client:              client,
+		refreshStop:         make(chan struct{}),
+		accountCredVersions: make(map[string]uint64),
+		accountAuthVersions: make(map[string]uint64),
 	}
 	d.login.drive = d
-	store, err := d.loadAccounts(ctx)
-	if err != nil {
-		return nil, err
-	}
-	d.accountTokens = make(map[string]pan.Tokens, len(store))
-	d.accountMounts = make(map[string]mountRecord, len(store))
-	d.accountCredVersions = make(map[string]uint64, len(store))
-	d.accountAuthVersions = make(map[string]uint64, len(store))
-	for id, record := range store {
-		d.accountTokens[id] = record.Tokens
-		d.accountMounts[id] = record.Directory
-	}
 	return d, nil
 }
 

@@ -24,7 +24,9 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/metadatacache"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
+	"github.com/ppxb/miyabi/internal/ent/panaccount"
 	"github.com/ppxb/miyabi/internal/ent/setting"
+	"github.com/ppxb/miyabi/internal/ent/storagesource"
 	"github.com/ppxb/miyabi/internal/ent/subscription"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/ent/tag"
@@ -56,8 +58,12 @@ type Client struct {
 	Movie *MovieClient
 	// OfflineDownload is the client for interacting with the OfflineDownload builders.
 	OfflineDownload *OfflineDownloadClient
+	// PanAccount is the client for interacting with the PanAccount builders.
+	PanAccount *PanAccountClient
 	// Setting is the client for interacting with the Setting builders.
 	Setting *SettingClient
+	// StorageSource is the client for interacting with the StorageSource builders.
+	StorageSource *StorageSourceClient
 	// Subscription is the client for interacting with the Subscription builders.
 	Subscription *SubscriptionClient
 	// Subtitle is the client for interacting with the Subtitle builders.
@@ -90,7 +96,9 @@ func (c *Client) init() {
 	c.MetadataCache = NewMetadataCacheClient(c.config)
 	c.Movie = NewMovieClient(c.config)
 	c.OfflineDownload = NewOfflineDownloadClient(c.config)
+	c.PanAccount = NewPanAccountClient(c.config)
 	c.Setting = NewSettingClient(c.config)
+	c.StorageSource = NewStorageSourceClient(c.config)
 	c.Subscription = NewSubscriptionClient(c.config)
 	c.Subtitle = NewSubtitleClient(c.config)
 	c.Tag = NewTagClient(c.config)
@@ -198,7 +206,9 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		MetadataCache:    NewMetadataCacheClient(cfg),
 		Movie:            NewMovieClient(cfg),
 		OfflineDownload:  NewOfflineDownloadClient(cfg),
+		PanAccount:       NewPanAccountClient(cfg),
 		Setting:          NewSettingClient(cfg),
+		StorageSource:    NewStorageSourceClient(cfg),
 		Subscription:     NewSubscriptionClient(cfg),
 		Subtitle:         NewSubtitleClient(cfg),
 		Tag:              NewTagClient(cfg),
@@ -233,7 +243,9 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		MetadataCache:    NewMetadataCacheClient(cfg),
 		Movie:            NewMovieClient(cfg),
 		OfflineDownload:  NewOfflineDownloadClient(cfg),
+		PanAccount:       NewPanAccountClient(cfg),
 		Setting:          NewSettingClient(cfg),
+		StorageSource:    NewStorageSourceClient(cfg),
 		Subscription:     NewSubscriptionClient(cfg),
 		Subtitle:         NewSubtitleClient(cfg),
 		Tag:              NewTagClient(cfg),
@@ -270,8 +282,9 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.Actor, c.ActorAlias, c.ActorImage, c.ActorProfile, c.EmbyNotification, c.File,
-		c.MetadataCache, c.Movie, c.OfflineDownload, c.Setting, c.Subscription,
-		c.Subtitle, c.Tag, c.Task, c.ViewedMovie, c.WatchHistory,
+		c.MetadataCache, c.Movie, c.OfflineDownload, c.PanAccount, c.Setting,
+		c.StorageSource, c.Subscription, c.Subtitle, c.Tag, c.Task, c.ViewedMovie,
+		c.WatchHistory,
 	} {
 		n.Use(hooks...)
 	}
@@ -282,8 +295,9 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.Actor, c.ActorAlias, c.ActorImage, c.ActorProfile, c.EmbyNotification, c.File,
-		c.MetadataCache, c.Movie, c.OfflineDownload, c.Setting, c.Subscription,
-		c.Subtitle, c.Tag, c.Task, c.ViewedMovie, c.WatchHistory,
+		c.MetadataCache, c.Movie, c.OfflineDownload, c.PanAccount, c.Setting,
+		c.StorageSource, c.Subscription, c.Subtitle, c.Tag, c.Task, c.ViewedMovie,
+		c.WatchHistory,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -310,8 +324,12 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Movie.mutate(ctx, m)
 	case *OfflineDownloadMutation:
 		return c.OfflineDownload.mutate(ctx, m)
+	case *PanAccountMutation:
+		return c.PanAccount.mutate(ctx, m)
 	case *SettingMutation:
 		return c.Setting.mutate(ctx, m)
+	case *StorageSourceMutation:
+		return c.StorageSource.mutate(ctx, m)
 	case *SubscriptionMutation:
 		return c.Subscription.mutate(ctx, m)
 	case *SubtitleMutation:
@@ -1719,6 +1737,139 @@ func (c *OfflineDownloadClient) mutate(ctx context.Context, m *OfflineDownloadMu
 	}
 }
 
+// PanAccountClient is a client for the PanAccount schema.
+type PanAccountClient struct {
+	config
+}
+
+// NewPanAccountClient returns a client for the PanAccount from the given config.
+func NewPanAccountClient(c config) *PanAccountClient {
+	return &PanAccountClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `panaccount.Hooks(f(g(h())))`.
+func (c *PanAccountClient) Use(hooks ...Hook) {
+	c.hooks.PanAccount = append(c.hooks.PanAccount, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `panaccount.Intercept(f(g(h())))`.
+func (c *PanAccountClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PanAccount = append(c.inters.PanAccount, interceptors...)
+}
+
+// Create returns a builder for creating a PanAccount entity.
+func (c *PanAccountClient) Create() *PanAccountCreate {
+	mutation := newPanAccountMutation(c.config, OpCreate)
+	return &PanAccountCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PanAccount entities.
+func (c *PanAccountClient) CreateBulk(builders ...*PanAccountCreate) *PanAccountCreateBulk {
+	return &PanAccountCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PanAccountClient) MapCreateBulk(slice any, setFunc func(*PanAccountCreate, int)) *PanAccountCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PanAccountCreateBulk{err: fmt.Errorf("calling to PanAccountClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PanAccountCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PanAccountCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PanAccount.
+func (c *PanAccountClient) Update() *PanAccountUpdate {
+	mutation := newPanAccountMutation(c.config, OpUpdate)
+	return &PanAccountUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PanAccountClient) UpdateOne(_m *PanAccount) *PanAccountUpdateOne {
+	mutation := newPanAccountMutation(c.config, OpUpdateOne, withPanAccount(_m))
+	return &PanAccountUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PanAccountClient) UpdateOneID(id int) *PanAccountUpdateOne {
+	mutation := newPanAccountMutation(c.config, OpUpdateOne, withPanAccountID(id))
+	return &PanAccountUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PanAccount.
+func (c *PanAccountClient) Delete() *PanAccountDelete {
+	mutation := newPanAccountMutation(c.config, OpDelete)
+	return &PanAccountDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PanAccountClient) DeleteOne(_m *PanAccount) *PanAccountDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PanAccountClient) DeleteOneID(id int) *PanAccountDeleteOne {
+	builder := c.Delete().Where(panaccount.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PanAccountDeleteOne{builder}
+}
+
+// Query returns a query builder for PanAccount.
+func (c *PanAccountClient) Query() *PanAccountQuery {
+	return &PanAccountQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePanAccount},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PanAccount entity by its id.
+func (c *PanAccountClient) Get(ctx context.Context, id int) (*PanAccount, error) {
+	return c.Query().Where(panaccount.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PanAccountClient) GetX(ctx context.Context, id int) *PanAccount {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PanAccountClient) Hooks() []Hook {
+	return c.hooks.PanAccount
+}
+
+// Interceptors returns the client interceptors.
+func (c *PanAccountClient) Interceptors() []Interceptor {
+	return c.inters.PanAccount
+}
+
+func (c *PanAccountClient) mutate(ctx context.Context, m *PanAccountMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PanAccountCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PanAccountUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PanAccountUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PanAccountDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PanAccount mutation op: %q", m.Op())
+	}
+}
+
 // SettingClient is a client for the Setting schema.
 type SettingClient struct {
 	config
@@ -1849,6 +2000,139 @@ func (c *SettingClient) mutate(ctx context.Context, m *SettingMutation) (Value, 
 		return (&SettingDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Setting mutation op: %q", m.Op())
+	}
+}
+
+// StorageSourceClient is a client for the StorageSource schema.
+type StorageSourceClient struct {
+	config
+}
+
+// NewStorageSourceClient returns a client for the StorageSource from the given config.
+func NewStorageSourceClient(c config) *StorageSourceClient {
+	return &StorageSourceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `storagesource.Hooks(f(g(h())))`.
+func (c *StorageSourceClient) Use(hooks ...Hook) {
+	c.hooks.StorageSource = append(c.hooks.StorageSource, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `storagesource.Intercept(f(g(h())))`.
+func (c *StorageSourceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.StorageSource = append(c.inters.StorageSource, interceptors...)
+}
+
+// Create returns a builder for creating a StorageSource entity.
+func (c *StorageSourceClient) Create() *StorageSourceCreate {
+	mutation := newStorageSourceMutation(c.config, OpCreate)
+	return &StorageSourceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of StorageSource entities.
+func (c *StorageSourceClient) CreateBulk(builders ...*StorageSourceCreate) *StorageSourceCreateBulk {
+	return &StorageSourceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *StorageSourceClient) MapCreateBulk(slice any, setFunc func(*StorageSourceCreate, int)) *StorageSourceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &StorageSourceCreateBulk{err: fmt.Errorf("calling to StorageSourceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*StorageSourceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &StorageSourceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for StorageSource.
+func (c *StorageSourceClient) Update() *StorageSourceUpdate {
+	mutation := newStorageSourceMutation(c.config, OpUpdate)
+	return &StorageSourceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *StorageSourceClient) UpdateOne(_m *StorageSource) *StorageSourceUpdateOne {
+	mutation := newStorageSourceMutation(c.config, OpUpdateOne, withStorageSource(_m))
+	return &StorageSourceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *StorageSourceClient) UpdateOneID(id string) *StorageSourceUpdateOne {
+	mutation := newStorageSourceMutation(c.config, OpUpdateOne, withStorageSourceID(id))
+	return &StorageSourceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for StorageSource.
+func (c *StorageSourceClient) Delete() *StorageSourceDelete {
+	mutation := newStorageSourceMutation(c.config, OpDelete)
+	return &StorageSourceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *StorageSourceClient) DeleteOne(_m *StorageSource) *StorageSourceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *StorageSourceClient) DeleteOneID(id string) *StorageSourceDeleteOne {
+	builder := c.Delete().Where(storagesource.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &StorageSourceDeleteOne{builder}
+}
+
+// Query returns a query builder for StorageSource.
+func (c *StorageSourceClient) Query() *StorageSourceQuery {
+	return &StorageSourceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeStorageSource},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a StorageSource entity by its id.
+func (c *StorageSourceClient) Get(ctx context.Context, id string) (*StorageSource, error) {
+	return c.Query().Where(storagesource.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *StorageSourceClient) GetX(ctx context.Context, id string) *StorageSource {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *StorageSourceClient) Hooks() []Hook {
+	return c.hooks.StorageSource
+}
+
+// Interceptors returns the client interceptors.
+func (c *StorageSourceClient) Interceptors() []Interceptor {
+	return c.inters.StorageSource
+}
+
+func (c *StorageSourceClient) mutate(ctx context.Context, m *StorageSourceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&StorageSourceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&StorageSourceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&StorageSourceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&StorageSourceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown StorageSource mutation op: %q", m.Op())
 	}
 }
 
@@ -2686,12 +2970,12 @@ func (c *WatchHistoryClient) mutate(ctx context.Context, m *WatchHistoryMutation
 type (
 	hooks struct {
 		Actor, ActorAlias, ActorImage, ActorProfile, EmbyNotification, File,
-		MetadataCache, Movie, OfflineDownload, Setting, Subscription, Subtitle, Tag,
-		Task, ViewedMovie, WatchHistory []ent.Hook
+		MetadataCache, Movie, OfflineDownload, PanAccount, Setting, StorageSource,
+		Subscription, Subtitle, Tag, Task, ViewedMovie, WatchHistory []ent.Hook
 	}
 	inters struct {
 		Actor, ActorAlias, ActorImage, ActorProfile, EmbyNotification, File,
-		MetadataCache, Movie, OfflineDownload, Setting, Subscription, Subtitle, Tag,
-		Task, ViewedMovie, WatchHistory []ent.Interceptor
+		MetadataCache, Movie, OfflineDownload, PanAccount, Setting, StorageSource,
+		Subscription, Subtitle, Tag, Task, ViewedMovie, WatchHistory []ent.Interceptor
 	}
 )

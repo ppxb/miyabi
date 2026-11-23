@@ -304,7 +304,7 @@
 
 ### 系统设计
 
-- [ ] **D1 实体数据存在 KV 设置表中**：115 账号整份 map 存于 `pan.accounts`（`drive/accounts.go:17,32`），存储源整份 `[]Source` 存于设置（`source/source.go:74`）。改一个账号需全局 `accountsMu` 读改写，再叠加内存缓存同步，R1 高「mount 缓存被旧快照覆盖」即源于此。改法：改为 ent 实体 `PanAccount` / `StorageSource`，行级更新，去掉全局锁并简化缓存。
+- [x] **D1 实体数据存在 KV 设置表中**：115 账号整份 map 存于 `pan.accounts`（`drive/accounts.go:17,32`），存储源整份 `[]Source` 存于设置（`source/source.go:74`）。改一个账号需全局 `accountsMu` 读改写，再叠加内存缓存同步，R1 高「mount 缓存被旧快照覆盖」即源于此。改法：改为 ent 实体 `PanAccount` / `StorageSource`，行级更新，去掉全局锁并简化缓存。（已修复：新增 ent 实体 `PanAccount`（每账号一行，token 字段 `Sensitive`）与 `StorageSource`（`position` 保序）；drive 以表为唯一数据源，删除 `accountsMu`、token/挂载两份内存缓存与整表同步，凭证/授权版本号仍在内存；登录 upsert、刷新与挂载只更新已有行（顺带修复：刷新期间断开账号会被刷新结果「复活」、为已删账号发布挂载）；source `Replace` 事务内删后批量插入并拒绝重复 ID。不兼容老库：升级后需重新登录 115、重新添加存储源。顺带修复：`PlaybackSettings` 实现 `sql.Scanner` 导致重新 `go generate` 后 ent 代码编译失败，已删除 `Scan`（保留 upsert 需要的 `Value`）。新增 `TestRemovedAccountStaysRemoved`、`TestReplaceKeepsOrderAndClears`）
 - [ ] **D2 派生列缺统一的存量回填机制**：`rating10` 用 hook、`name_key` 在 `scrape/mapping.go:128` 写入、`canonical_code` 用 hook，均无回填，老库需重刮（R1 高「name_key 无存量回填」）。改法：`database.Open` 后执行极简「数据版本号 + 幂等回填函数列表」；`name_key` 改由 hook 维护。
 - [ ] **D3 演员分组键为派生值而非实体**：分组键 =「profile_id 或归一化名」，导致 Catalog 无法 SQL 分页（P1 第 49 条），并衍生 `reconcileActorProfiles`/`EnsureMovieProfiles`/`EnsureProfiles`/`loadGroup`/`findNames` 多套对账与反查（R1 高 #4、中「loadGroup/findNames 重复」）。改法：演员入库即挂 profile（无匹配则新建），分组键统一为 `profile_id`，Catalog 以 `ActorProfile` 为主表分页；对账逻辑与 `name_key` 随之收敛。改动面最大，需单独评估。
 - [x] **D4 组装根 `app/app.go` 简化**：

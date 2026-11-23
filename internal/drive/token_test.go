@@ -13,11 +13,11 @@ func futureTime() time.Time { return time.Now().Add(time.Hour) }
 func TestAccountTokenRefresh(t *testing.T) {
 	d, client := mountedTestDrive(t)
 	// Expire the account token so the next read refreshes it first.
-	d.mu.Lock()
-	tokens := d.accountTokens[testSource.AccountID]
+	tokens := testToken(t, d, testSource.AccountID)
 	tokens.ExpiresAt = time.Now()
-	d.accountTokens[testSource.AccountID] = tokens
-	d.mu.Unlock()
+	if err := d.saveAccountTokens(t.Context(), testSource.AccountID, tokens); err != nil {
+		t.Fatal(err)
+	}
 
 	var used string
 	client.list = func(_ context.Context, token, _ string, _, _ int) (pan.FilePage, error) {
@@ -34,7 +34,7 @@ func TestAccountTokenRefresh(t *testing.T) {
 	if used != "refreshed-access" {
 		t.Fatalf("read used token %q, want refreshed token", used)
 	}
-	if got := d.accountToken(testSource.AccountID).AccessToken; got != "refreshed-access" {
+	if got := testToken(t, d, testSource.AccountID).AccessToken; got != "refreshed-access" {
 		t.Fatalf("refreshed token not persisted: %q", got)
 	}
 }

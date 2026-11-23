@@ -33,8 +33,14 @@ type Movie func(*sql.Selector)
 // OfflineDownload is the predicate function for offlinedownload builders.
 type OfflineDownload func(*sql.Selector)
 
+// PanAccount is the predicate function for panaccount builders.
+type PanAccount func(*sql.Selector)
+
 // Setting is the predicate function for setting builders.
 type Setting func(*sql.Selector)
+
+// StorageSource is the predicate function for storagesource builders.
+type StorageSource func(*sql.Selector)
 
 // Subscription is the predicate function for subscription builders.
 type Subscription func(*sql.Selector)

@@ -8,12 +8,10 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/ent/storagesource"
 )
-
-const settingKey = "sources"
 
 // Kind identifies how a storage source is reached.
 type Kind string
@@ -33,7 +31,7 @@ type Source struct {
 	Config  map[string]string `json:"config,omitempty"`
 }
 
-// Service persists the configured storage sources as a single settings row.
+// Service persists the configured storage sources, one StorageSource row each.
 type Service struct {
 	client *ent.Client
 	mounts MountProvider
@@ -56,12 +54,13 @@ func New(client *ent.Client, mounts MountProvider) *Service {
 }
 
 func (s *Service) List(ctx context.Context) ([]Source, error) {
-	sources, _, err := database.LoadSetting[[]Source](ctx, s.client, settingKey)
+	rows, err := s.client.StorageSource.Query().Order(ent.Asc(storagesource.FieldPosition)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if sources == nil {
-		sources = []Source{}
+	sources := make([]Source, 0, len(rows))
+	for _, row := range rows {
+		sources = append(sources, Source{ID: row.ID, Kind: Kind(row.Kind), Name: row.Name, Enabled: row.Enabled, Config: row.Config})
 	}
 	return sources, nil
 }
@@ -70,15 +69,33 @@ func (s *Service) Replace(ctx context.Context, sources []Source) ([]Source, erro
 	if sources == nil {
 		sources = []Source{}
 	}
+	seen := make(map[string]bool, len(sources))
 	for i := range sources {
 		if strings.TrimSpace(sources[i].ID) == "" {
 			sources[i].ID = uuid.NewString()
 		}
+		if seen[sources[i].ID] {
+			return nil, domain.E(domain.KindInvalid, "存储源 ID 重复", nil)
+		}
+		seen[sources[i].ID] = true
 		if err := validate(sources[i]); err != nil {
 			return nil, err
 		}
 	}
-	if err := database.SaveSetting(ctx, s.client, settingKey, sources); err != nil {
+	// The settings page submits the whole ordered list, so replace every row.
+	err := ent.WithTx(ctx, s.client, func(tx *ent.Tx) error {
+		if _, err := tx.StorageSource.Delete().Exec(ctx); err != nil {
+			return err
+		}
+		builders := make([]*ent.StorageSourceCreate, 0, len(sources))
+		for i, src := range sources {
+			builders = append(builders, tx.StorageSource.Create().
+				SetID(src.ID).SetKind(string(src.Kind)).SetName(src.Name).
+				SetEnabled(src.Enabled).SetConfig(src.Config).SetPosition(i))
+		}
+		return tx.StorageSource.CreateBulk(builders...).Exec(ctx)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return sources, nil

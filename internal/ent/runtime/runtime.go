@@ -15,8 +15,10 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/metadatacache"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
+	"github.com/ppxb/miyabi/internal/ent/panaccount"
 	"github.com/ppxb/miyabi/internal/ent/schema"
 	"github.com/ppxb/miyabi/internal/ent/setting"
+	"github.com/ppxb/miyabi/internal/ent/storagesource"
 	"github.com/ppxb/miyabi/internal/ent/subscription"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/ent/tag"
@@ -343,6 +345,45 @@ func init() {
 	offlinedownloadDescAwaitingLocation := offlinedownloadFields[12].Descriptor()
 	// offlinedownload.DefaultAwaitingLocation holds the default value on creation for the awaiting_location field.
 	offlinedownload.DefaultAwaitingLocation = offlinedownloadDescAwaitingLocation.Default.(bool)
+	panaccountMixin := schema.PanAccount{}.Mixin()
+	panaccountMixinFields0 := panaccountMixin[0].Fields()
+	_ = panaccountMixinFields0
+	panaccountFields := schema.PanAccount{}.Fields()
+	_ = panaccountFields
+	// panaccountDescCreatedAt is the schema descriptor for created_at field.
+	panaccountDescCreatedAt := panaccountMixinFields0[0].Descriptor()
+	// panaccount.DefaultCreatedAt holds the default value on creation for the created_at field.
+	panaccount.DefaultCreatedAt = panaccountDescCreatedAt.Default.(func() time.Time)
+	// panaccountDescUpdatedAt is the schema descriptor for updated_at field.
+	panaccountDescUpdatedAt := panaccountMixinFields0[1].Descriptor()
+	// panaccount.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	panaccount.DefaultUpdatedAt = panaccountDescUpdatedAt.Default.(func() time.Time)
+	// panaccount.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	panaccount.UpdateDefaultUpdatedAt = panaccountDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// panaccountDescAccountID is the schema descriptor for account_id field.
+	panaccountDescAccountID := panaccountFields[0].Descriptor()
+	// panaccount.AccountIDValidator is a validator for the "account_id" field. It is called by the builders before save.
+	panaccount.AccountIDValidator = panaccountDescAccountID.Validators[0].(func(string) error)
+	// panaccountDescAccessToken is the schema descriptor for access_token field.
+	panaccountDescAccessToken := panaccountFields[1].Descriptor()
+	// panaccount.DefaultAccessToken holds the default value on creation for the access_token field.
+	panaccount.DefaultAccessToken = panaccountDescAccessToken.Default.(string)
+	// panaccountDescRefreshToken is the schema descriptor for refresh_token field.
+	panaccountDescRefreshToken := panaccountFields[2].Descriptor()
+	// panaccount.DefaultRefreshToken holds the default value on creation for the refresh_token field.
+	panaccount.DefaultRefreshToken = panaccountDescRefreshToken.Default.(string)
+	// panaccountDescDirectoryID is the schema descriptor for directory_id field.
+	panaccountDescDirectoryID := panaccountFields[4].Descriptor()
+	// panaccount.DefaultDirectoryID holds the default value on creation for the directory_id field.
+	panaccount.DefaultDirectoryID = panaccountDescDirectoryID.Default.(string)
+	// panaccountDescDirectoryName is the schema descriptor for directory_name field.
+	panaccountDescDirectoryName := panaccountFields[5].Descriptor()
+	// panaccount.DefaultDirectoryName holds the default value on creation for the directory_name field.
+	panaccount.DefaultDirectoryName = panaccountDescDirectoryName.Default.(string)
+	// panaccountDescDirectoryPath is the schema descriptor for directory_path field.
+	panaccountDescDirectoryPath := panaccountFields[6].Descriptor()
+	// panaccount.DefaultDirectoryPath holds the default value on creation for the directory_path field.
+	panaccount.DefaultDirectoryPath = panaccountDescDirectoryPath.Default.(string)
 	settingMixin := schema.Setting{}.Mixin()
 	settingMixinFields0 := settingMixin[0].Fields()
 	_ = settingMixinFields0
@@ -362,6 +403,41 @@ func init() {
 	settingDescKey := settingFields[0].Descriptor()
 	// setting.KeyValidator is a validator for the "key" field. It is called by the builders before save.
 	setting.KeyValidator = settingDescKey.Validators[0].(func(string) error)
+	storagesourceMixin := schema.StorageSource{}.Mixin()
+	storagesourceMixinFields0 := storagesourceMixin[0].Fields()
+	_ = storagesourceMixinFields0
+	storagesourceFields := schema.StorageSource{}.Fields()
+	_ = storagesourceFields
+	// storagesourceDescCreatedAt is the schema descriptor for created_at field.
+	storagesourceDescCreatedAt := storagesourceMixinFields0[0].Descriptor()
+	// storagesource.DefaultCreatedAt holds the default value on creation for the created_at field.
+	storagesource.DefaultCreatedAt = storagesourceDescCreatedAt.Default.(func() time.Time)
+	// storagesourceDescUpdatedAt is the schema descriptor for updated_at field.
+	storagesourceDescUpdatedAt := storagesourceMixinFields0[1].Descriptor()
+	// storagesource.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	storagesource.DefaultUpdatedAt = storagesourceDescUpdatedAt.Default.(func() time.Time)
+	// storagesource.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	storagesource.UpdateDefaultUpdatedAt = storagesourceDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// storagesourceDescKind is the schema descriptor for kind field.
+	storagesourceDescKind := storagesourceFields[1].Descriptor()
+	// storagesource.KindValidator is a validator for the "kind" field. It is called by the builders before save.
+	storagesource.KindValidator = storagesourceDescKind.Validators[0].(func(string) error)
+	// storagesourceDescName is the schema descriptor for name field.
+	storagesourceDescName := storagesourceFields[2].Descriptor()
+	// storagesource.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	storagesource.NameValidator = storagesourceDescName.Validators[0].(func(string) error)
+	// storagesourceDescEnabled is the schema descriptor for enabled field.
+	storagesourceDescEnabled := storagesourceFields[3].Descriptor()
+	// storagesource.DefaultEnabled holds the default value on creation for the enabled field.
+	storagesource.DefaultEnabled = storagesourceDescEnabled.Default.(bool)
+	// storagesourceDescPosition is the schema descriptor for position field.
+	storagesourceDescPosition := storagesourceFields[5].Descriptor()
+	// storagesource.DefaultPosition holds the default value on creation for the position field.
+	storagesource.DefaultPosition = storagesourceDescPosition.Default.(int)
+	// storagesourceDescID is the schema descriptor for id field.
+	storagesourceDescID := storagesourceFields[0].Descriptor()
+	// storagesource.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	storagesource.IDValidator = storagesourceDescID.Validators[0].(func(string) error)
 	subscriptionMixin := schema.Subscription{}.Mixin()
 	subscriptionMixinFields0 := subscriptionMixin[0].Fields()
 	_ = subscriptionMixinFields0

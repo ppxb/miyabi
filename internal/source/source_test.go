@@ -133,3 +133,32 @@ func TestLibrarySources(t *testing.T) {
 		t.Fatalf("library sources = %+v", list)
 	}
 }
+
+func TestReplaceKeepsOrderAndClears(t *testing.T) {
+	ctx := t.Context()
+	service := newTestService(t, nil)
+	dir := t.TempDir()
+	list := []Source{
+		{ID: "b", Kind: KindLocal, Name: "second", Enabled: true, Config: map[string]string{"path": dir}},
+		{ID: "a", Kind: KindLocal, Name: "first", Enabled: false, Config: map[string]string{"path": dir}},
+	}
+	if _, err := service.Replace(ctx, list); err != nil {
+		t.Fatal(err)
+	}
+	got, err := service.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].ID != "b" || got[1].ID != "a" || got[1].Enabled || got[0].Config["path"] != dir {
+		t.Fatalf("sources = %+v", got)
+	}
+	if _, err := service.Replace(ctx, []Source{list[0], list[0]}); !domain.IsKind(err, domain.KindInvalid) {
+		t.Fatalf("duplicate ids: err = %v", err)
+	}
+	if _, err := service.Replace(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := service.List(ctx); err != nil || len(got) != 0 {
+		t.Fatalf("after clear: %+v, %v", got, err)
+	}
+}

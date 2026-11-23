@@ -310,6 +310,25 @@ var (
 			},
 		},
 	}
+	// PanAccountsColumns holds the columns for the "pan_accounts" table.
+	PanAccountsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "account_id", Type: field.TypeString, Unique: true},
+		{Name: "access_token", Type: field.TypeString, Default: ""},
+		{Name: "refresh_token", Type: field.TypeString, Default: ""},
+		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "directory_id", Type: field.TypeString, Default: ""},
+		{Name: "directory_name", Type: field.TypeString, Default: ""},
+		{Name: "directory_path", Type: field.TypeString, Default: ""},
+	}
+	// PanAccountsTable holds the schema information for the "pan_accounts" table.
+	PanAccountsTable = &schema.Table{
+		Name:       "pan_accounts",
+		Columns:    PanAccountsColumns,
+		PrimaryKey: []*schema.Column{PanAccountsColumns[0]},
+	}
 	// SettingsColumns holds the columns for the "settings" table.
 	SettingsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -323,6 +342,23 @@ var (
 		Name:       "settings",
 		Columns:    SettingsColumns,
 		PrimaryKey: []*schema.Column{SettingsColumns[0]},
+	}
+	// StorageSourcesColumns holds the columns for the "storage_sources" table.
+	StorageSourcesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Unique: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "kind", Type: field.TypeString},
+		{Name: "name", Type: field.TypeString},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "config", Type: field.TypeJSON, Nullable: true},
+		{Name: "position", Type: field.TypeInt, Default: 0},
+	}
+	// StorageSourcesTable holds the schema information for the "storage_sources" table.
+	StorageSourcesTable = &schema.Table{
+		Name:       "storage_sources",
+		Columns:    StorageSourcesColumns,
+		PrimaryKey: []*schema.Column{StorageSourcesColumns[0]},
 	}
 	// SubscriptionsColumns holds the columns for the "subscriptions" table.
 	SubscriptionsColumns = []*schema.Column{
@@ -568,7 +604,9 @@ var (
 		MetadataCachesTable,
 		MoviesTable,
 		OfflineDownloadsTable,
+		PanAccountsTable,
 		SettingsTable,
+		StorageSourcesTable,
 		SubscriptionsTable,
 		SubtitlesTable,
 		TagsTable,

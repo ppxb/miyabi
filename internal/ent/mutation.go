@@ -23,8 +23,10 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/metadatacache"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
+	"github.com/ppxb/miyabi/internal/ent/panaccount"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 	"github.com/ppxb/miyabi/internal/ent/setting"
+	"github.com/ppxb/miyabi/internal/ent/storagesource"
 	"github.com/ppxb/miyabi/internal/ent/subscription"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/ent/tag"
@@ -52,7 +54,9 @@ const (
 	TypeMetadataCache    = "MetadataCache"
 	TypeMovie            = "Movie"
 	TypeOfflineDownload  = "OfflineDownload"
+	TypePanAccount       = "PanAccount"
 	TypeSetting          = "Setting"
+	TypeStorageSource    = "StorageSource"
 	TypeSubscription     = "Subscription"
 	TypeSubtitle         = "Subtitle"
 	TypeTag              = "Tag"
@@ -9892,6 +9896,786 @@ func (m *OfflineDownloadMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown OfflineDownload edge %s", name)
 }
 
+// PanAccountMutation represents an operation that mutates the PanAccount nodes in the graph.
+type PanAccountMutation struct {
+	config
+	op             Op
+	typ            string
+	id             *int
+	created_at     *time.Time
+	updated_at     *time.Time
+	account_id     *string
+	access_token   *string
+	refresh_token  *string
+	expires_at     *time.Time
+	directory_id   *string
+	directory_name *string
+	directory_path *string
+	clearedFields  map[string]struct{}
+	done           bool
+	oldValue       func(context.Context) (*PanAccount, error)
+	predicates     []predicate.PanAccount
+}
+
+var _ ent.Mutation = (*PanAccountMutation)(nil)
+
+// panaccountOption allows management of the mutation configuration using functional options.
+type panaccountOption func(*PanAccountMutation)
+
+// newPanAccountMutation creates new mutation for the PanAccount entity.
+func newPanAccountMutation(c config, op Op, opts ...panaccountOption) *PanAccountMutation {
+	m := &PanAccountMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePanAccount,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPanAccountID sets the ID field of the mutation.
+func withPanAccountID(id int) panaccountOption {
+	return func(m *PanAccountMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PanAccount
+		)
+		m.oldValue = func(ctx context.Context) (*PanAccount, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PanAccount.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPanAccount sets the old PanAccount of the mutation.
+func withPanAccount(node *PanAccount) panaccountOption {
+	return func(m *PanAccountMutation) {
+		m.oldValue = func(context.Context) (*PanAccount, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PanAccountMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PanAccountMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PanAccountMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PanAccountMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PanAccount.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PanAccountMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PanAccountMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PanAccount entity.
+// If the PanAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PanAccountMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PanAccountMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *PanAccountMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *PanAccountMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the PanAccount entity.
+// If the PanAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PanAccountMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *PanAccountMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetAccountID sets the "account_id" field.
+func (m *PanAccountMutation) SetAccountID(s string) {
+	m.account_id = &s
+}
+
+// AccountID returns the value of the "account_id" field in the mutation.
+func (m *PanAccountMutation) AccountID() (r string, exists bool) {
+	v := m.account_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountID returns the old "account_id" field's value of the PanAccount entity.
+// If the PanAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PanAccountMutation) OldAccountID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountID: %w", err)
+	}
+	return oldValue.AccountID, nil
+}
+
+// ResetAccountID resets all changes to the "account_id" field.
+func (m *PanAccountMutation) ResetAccountID() {
+	m.account_id = nil
+}
+
+// SetAccessToken sets the "access_token" field.
+func (m *PanAccountMutation) SetAccessToken(s string) {
+	m.access_token = &s
+}
+
+// AccessToken returns the value of the "access_token" field in the mutation.
+func (m *PanAccountMutation) AccessToken() (r string, exists bool) {
+	v := m.access_token
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccessToken returns the old "access_token" field's value of the PanAccount entity.
+// If the PanAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PanAccountMutation) OldAccessToken(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccessToken is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccessToken requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccessToken: %w", err)
+	}
+	return oldValue.AccessToken, nil
+}
+
+// ResetAccessToken resets all changes to the "access_token" field.
+func (m *PanAccountMutation) ResetAccessToken() {
+	m.access_token = nil
+}
+
+// SetRefreshToken sets the "refresh_token" field.
+func (m *PanAccountMutation) SetRefreshToken(s string) {
+	m.refresh_token = &s
+}
+
+// RefreshToken returns the value of the "refresh_token" field in the mutation.
+func (m *PanAccountMutation) RefreshToken() (r string, exists bool) {
+	v := m.refresh_token
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRefreshToken returns the old "refresh_token" field's value of the PanAccount entity.
+// If the PanAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PanAccountMutation) OldRefreshToken(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRefreshToken is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRefreshToken requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRefreshToken: %w", err)
+	}
+	return oldValue.RefreshToken, nil
+}
+
+// ResetRefreshToken resets all changes to the "refresh_token" field.
+func (m *PanAccountMutation) ResetRefreshToken() {
+	m.refresh_token = nil
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *PanAccountMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *PanAccountMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the PanAccount entity.
+// If the PanAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PanAccountMutation) OldExpiresAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (m *PanAccountMutation) ClearExpiresAt() {
+	m.expires_at = nil
+	m.clearedFields[panaccount.FieldExpiresAt] = struct{}{}
+}
+
+// ExpiresAtCleared returns if the "expires_at" field was cleared in this mutation.
+func (m *PanAccountMutation) ExpiresAtCleared() bool {
+	_, ok := m.clearedFields[panaccount.FieldExpiresAt]
+	return ok
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *PanAccountMutation) ResetExpiresAt() {
+	m.expires_at = nil
+	delete(m.clearedFields, panaccount.FieldExpiresAt)
+}
+
+// SetDirectoryID sets the "directory_id" field.
+func (m *PanAccountMutation) SetDirectoryID(s string) {
+	m.directory_id = &s
+}
+
+// DirectoryID returns the value of the "directory_id" field in the mutation.
+func (m *PanAccountMutation) DirectoryID() (r string, exists bool) {
+	v := m.directory_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDirectoryID returns the old "directory_id" field's value of the PanAccount entity.
+// If the PanAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PanAccountMutation) OldDirectoryID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDirectoryID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDirectoryID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDirectoryID: %w", err)
+	}
+	return oldValue.DirectoryID, nil
+}
+
+// ResetDirectoryID resets all changes to the "directory_id" field.
+func (m *PanAccountMutation) ResetDirectoryID() {
+	m.directory_id = nil
+}
+
+// SetDirectoryName sets the "directory_name" field.
+func (m *PanAccountMutation) SetDirectoryName(s string) {
+	m.directory_name = &s
+}
+
+// DirectoryName returns the value of the "directory_name" field in the mutation.
+func (m *PanAccountMutation) DirectoryName() (r string, exists bool) {
+	v := m.directory_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDirectoryName returns the old "directory_name" field's value of the PanAccount entity.
+// If the PanAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PanAccountMutation) OldDirectoryName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDirectoryName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDirectoryName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDirectoryName: %w", err)
+	}
+	return oldValue.DirectoryName, nil
+}
+
+// ResetDirectoryName resets all changes to the "directory_name" field.
+func (m *PanAccountMutation) ResetDirectoryName() {
+	m.directory_name = nil
+}
+
+// SetDirectoryPath sets the "directory_path" field.
+func (m *PanAccountMutation) SetDirectoryPath(s string) {
+	m.directory_path = &s
+}
+
+// DirectoryPath returns the value of the "directory_path" field in the mutation.
+func (m *PanAccountMutation) DirectoryPath() (r string, exists bool) {
+	v := m.directory_path
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDirectoryPath returns the old "directory_path" field's value of the PanAccount entity.
+// If the PanAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PanAccountMutation) OldDirectoryPath(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDirectoryPath is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDirectoryPath requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDirectoryPath: %w", err)
+	}
+	return oldValue.DirectoryPath, nil
+}
+
+// ResetDirectoryPath resets all changes to the "directory_path" field.
+func (m *PanAccountMutation) ResetDirectoryPath() {
+	m.directory_path = nil
+}
+
+// Where appends a list predicates to the PanAccountMutation builder.
+func (m *PanAccountMutation) Where(ps ...predicate.PanAccount) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PanAccountMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PanAccountMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PanAccount, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PanAccountMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PanAccountMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PanAccount).
+func (m *PanAccountMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PanAccountMutation) Fields() []string {
+	fields := make([]string, 0, 9)
+	if m.created_at != nil {
+		fields = append(fields, panaccount.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, panaccount.FieldUpdatedAt)
+	}
+	if m.account_id != nil {
+		fields = append(fields, panaccount.FieldAccountID)
+	}
+	if m.access_token != nil {
+		fields = append(fields, panaccount.FieldAccessToken)
+	}
+	if m.refresh_token != nil {
+		fields = append(fields, panaccount.FieldRefreshToken)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, panaccount.FieldExpiresAt)
+	}
+	if m.directory_id != nil {
+		fields = append(fields, panaccount.FieldDirectoryID)
+	}
+	if m.directory_name != nil {
+		fields = append(fields, panaccount.FieldDirectoryName)
+	}
+	if m.directory_path != nil {
+		fields = append(fields, panaccount.FieldDirectoryPath)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PanAccountMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case panaccount.FieldCreatedAt:
+		return m.CreatedAt()
+	case panaccount.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case panaccount.FieldAccountID:
+		return m.AccountID()
+	case panaccount.FieldAccessToken:
+		return m.AccessToken()
+	case panaccount.FieldRefreshToken:
+		return m.RefreshToken()
+	case panaccount.FieldExpiresAt:
+		return m.ExpiresAt()
+	case panaccount.FieldDirectoryID:
+		return m.DirectoryID()
+	case panaccount.FieldDirectoryName:
+		return m.DirectoryName()
+	case panaccount.FieldDirectoryPath:
+		return m.DirectoryPath()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PanAccountMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case panaccount.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case panaccount.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case panaccount.FieldAccountID:
+		return m.OldAccountID(ctx)
+	case panaccount.FieldAccessToken:
+		return m.OldAccessToken(ctx)
+	case panaccount.FieldRefreshToken:
+		return m.OldRefreshToken(ctx)
+	case panaccount.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	case panaccount.FieldDirectoryID:
+		return m.OldDirectoryID(ctx)
+	case panaccount.FieldDirectoryName:
+		return m.OldDirectoryName(ctx)
+	case panaccount.FieldDirectoryPath:
+		return m.OldDirectoryPath(ctx)
+	}
+	return nil, fmt.Errorf("unknown PanAccount field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PanAccountMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case panaccount.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case panaccount.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case panaccount.FieldAccountID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountID(v)
+		return nil
+	case panaccount.FieldAccessToken:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccessToken(v)
+		return nil
+	case panaccount.FieldRefreshToken:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRefreshToken(v)
+		return nil
+	case panaccount.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	case panaccount.FieldDirectoryID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDirectoryID(v)
+		return nil
+	case panaccount.FieldDirectoryName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDirectoryName(v)
+		return nil
+	case panaccount.FieldDirectoryPath:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDirectoryPath(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PanAccount field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PanAccountMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PanAccountMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PanAccountMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PanAccount numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PanAccountMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(panaccount.FieldExpiresAt) {
+		fields = append(fields, panaccount.FieldExpiresAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PanAccountMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PanAccountMutation) ClearField(name string) error {
+	switch name {
+	case panaccount.FieldExpiresAt:
+		m.ClearExpiresAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PanAccount nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PanAccountMutation) ResetField(name string) error {
+	switch name {
+	case panaccount.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case panaccount.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case panaccount.FieldAccountID:
+		m.ResetAccountID()
+		return nil
+	case panaccount.FieldAccessToken:
+		m.ResetAccessToken()
+		return nil
+	case panaccount.FieldRefreshToken:
+		m.ResetRefreshToken()
+		return nil
+	case panaccount.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	case panaccount.FieldDirectoryID:
+		m.ResetDirectoryID()
+		return nil
+	case panaccount.FieldDirectoryName:
+		m.ResetDirectoryName()
+		return nil
+	case panaccount.FieldDirectoryPath:
+		m.ResetDirectoryPath()
+		return nil
+	}
+	return fmt.Errorf("unknown PanAccount field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PanAccountMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PanAccountMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PanAccountMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PanAccountMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PanAccountMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PanAccountMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PanAccountMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PanAccount unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PanAccountMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PanAccount edge %s", name)
+}
+
 // SettingMutation represents an operation that mutates the Setting nodes in the graph.
 type SettingMutation struct {
 	config
@@ -10394,6 +11178,720 @@ func (m *SettingMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *SettingMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown Setting edge %s", name)
+}
+
+// StorageSourceMutation represents an operation that mutates the StorageSource nodes in the graph.
+type StorageSourceMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *string
+	created_at    *time.Time
+	updated_at    *time.Time
+	kind          *string
+	name          *string
+	enabled       *bool
+	_config       *map[string]string
+	position      *int
+	addposition   *int
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*StorageSource, error)
+	predicates    []predicate.StorageSource
+}
+
+var _ ent.Mutation = (*StorageSourceMutation)(nil)
+
+// storagesourceOption allows management of the mutation configuration using functional options.
+type storagesourceOption func(*StorageSourceMutation)
+
+// newStorageSourceMutation creates new mutation for the StorageSource entity.
+func newStorageSourceMutation(c config, op Op, opts ...storagesourceOption) *StorageSourceMutation {
+	m := &StorageSourceMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeStorageSource,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withStorageSourceID sets the ID field of the mutation.
+func withStorageSourceID(id string) storagesourceOption {
+	return func(m *StorageSourceMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *StorageSource
+		)
+		m.oldValue = func(ctx context.Context) (*StorageSource, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().StorageSource.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withStorageSource sets the old StorageSource of the mutation.
+func withStorageSource(node *StorageSource) storagesourceOption {
+	return func(m *StorageSourceMutation) {
+		m.oldValue = func(context.Context) (*StorageSource, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m StorageSourceMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m StorageSourceMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of StorageSource entities.
+func (m *StorageSourceMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *StorageSourceMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *StorageSourceMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().StorageSource.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *StorageSourceMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *StorageSourceMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the StorageSource entity.
+// If the StorageSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StorageSourceMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *StorageSourceMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *StorageSourceMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *StorageSourceMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the StorageSource entity.
+// If the StorageSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StorageSourceMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *StorageSourceMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetKind sets the "kind" field.
+func (m *StorageSourceMutation) SetKind(s string) {
+	m.kind = &s
+}
+
+// Kind returns the value of the "kind" field in the mutation.
+func (m *StorageSourceMutation) Kind() (r string, exists bool) {
+	v := m.kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKind returns the old "kind" field's value of the StorageSource entity.
+// If the StorageSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StorageSourceMutation) OldKind(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKind is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKind requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKind: %w", err)
+	}
+	return oldValue.Kind, nil
+}
+
+// ResetKind resets all changes to the "kind" field.
+func (m *StorageSourceMutation) ResetKind() {
+	m.kind = nil
+}
+
+// SetName sets the "name" field.
+func (m *StorageSourceMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *StorageSourceMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the StorageSource entity.
+// If the StorageSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StorageSourceMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *StorageSourceMutation) ResetName() {
+	m.name = nil
+}
+
+// SetEnabled sets the "enabled" field.
+func (m *StorageSourceMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *StorageSourceMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnabled returns the old "enabled" field's value of the StorageSource entity.
+// If the StorageSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StorageSourceMutation) OldEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnabled: %w", err)
+	}
+	return oldValue.Enabled, nil
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *StorageSourceMutation) ResetEnabled() {
+	m.enabled = nil
+}
+
+// SetConfig sets the "config" field.
+func (m *StorageSourceMutation) SetConfig(value map[string]string) {
+	m._config = &value
+}
+
+// Config returns the value of the "config" field in the mutation.
+func (m *StorageSourceMutation) Config() (r map[string]string, exists bool) {
+	v := m._config
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfig returns the old "config" field's value of the StorageSource entity.
+// If the StorageSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StorageSourceMutation) OldConfig(ctx context.Context) (v map[string]string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfig is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfig requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfig: %w", err)
+	}
+	return oldValue.Config, nil
+}
+
+// ClearConfig clears the value of the "config" field.
+func (m *StorageSourceMutation) ClearConfig() {
+	m._config = nil
+	m.clearedFields[storagesource.FieldConfig] = struct{}{}
+}
+
+// ConfigCleared returns if the "config" field was cleared in this mutation.
+func (m *StorageSourceMutation) ConfigCleared() bool {
+	_, ok := m.clearedFields[storagesource.FieldConfig]
+	return ok
+}
+
+// ResetConfig resets all changes to the "config" field.
+func (m *StorageSourceMutation) ResetConfig() {
+	m._config = nil
+	delete(m.clearedFields, storagesource.FieldConfig)
+}
+
+// SetPosition sets the "position" field.
+func (m *StorageSourceMutation) SetPosition(i int) {
+	m.position = &i
+	m.addposition = nil
+}
+
+// Position returns the value of the "position" field in the mutation.
+func (m *StorageSourceMutation) Position() (r int, exists bool) {
+	v := m.position
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPosition returns the old "position" field's value of the StorageSource entity.
+// If the StorageSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StorageSourceMutation) OldPosition(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPosition is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPosition requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPosition: %w", err)
+	}
+	return oldValue.Position, nil
+}
+
+// AddPosition adds i to the "position" field.
+func (m *StorageSourceMutation) AddPosition(i int) {
+	if m.addposition != nil {
+		*m.addposition += i
+	} else {
+		m.addposition = &i
+	}
+}
+
+// AddedPosition returns the value that was added to the "position" field in this mutation.
+func (m *StorageSourceMutation) AddedPosition() (r int, exists bool) {
+	v := m.addposition
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPosition resets all changes to the "position" field.
+func (m *StorageSourceMutation) ResetPosition() {
+	m.position = nil
+	m.addposition = nil
+}
+
+// Where appends a list predicates to the StorageSourceMutation builder.
+func (m *StorageSourceMutation) Where(ps ...predicate.StorageSource) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the StorageSourceMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *StorageSourceMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.StorageSource, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *StorageSourceMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *StorageSourceMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (StorageSource).
+func (m *StorageSourceMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *StorageSourceMutation) Fields() []string {
+	fields := make([]string, 0, 7)
+	if m.created_at != nil {
+		fields = append(fields, storagesource.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, storagesource.FieldUpdatedAt)
+	}
+	if m.kind != nil {
+		fields = append(fields, storagesource.FieldKind)
+	}
+	if m.name != nil {
+		fields = append(fields, storagesource.FieldName)
+	}
+	if m.enabled != nil {
+		fields = append(fields, storagesource.FieldEnabled)
+	}
+	if m._config != nil {
+		fields = append(fields, storagesource.FieldConfig)
+	}
+	if m.position != nil {
+		fields = append(fields, storagesource.FieldPosition)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *StorageSourceMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case storagesource.FieldCreatedAt:
+		return m.CreatedAt()
+	case storagesource.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case storagesource.FieldKind:
+		return m.Kind()
+	case storagesource.FieldName:
+		return m.Name()
+	case storagesource.FieldEnabled:
+		return m.Enabled()
+	case storagesource.FieldConfig:
+		return m.Config()
+	case storagesource.FieldPosition:
+		return m.Position()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *StorageSourceMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case storagesource.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case storagesource.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case storagesource.FieldKind:
+		return m.OldKind(ctx)
+	case storagesource.FieldName:
+		return m.OldName(ctx)
+	case storagesource.FieldEnabled:
+		return m.OldEnabled(ctx)
+	case storagesource.FieldConfig:
+		return m.OldConfig(ctx)
+	case storagesource.FieldPosition:
+		return m.OldPosition(ctx)
+	}
+	return nil, fmt.Errorf("unknown StorageSource field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *StorageSourceMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case storagesource.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case storagesource.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case storagesource.FieldKind:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKind(v)
+		return nil
+	case storagesource.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case storagesource.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
+		return nil
+	case storagesource.FieldConfig:
+		v, ok := value.(map[string]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfig(v)
+		return nil
+	case storagesource.FieldPosition:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPosition(v)
+		return nil
+	}
+	return fmt.Errorf("unknown StorageSource field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *StorageSourceMutation) AddedFields() []string {
+	var fields []string
+	if m.addposition != nil {
+		fields = append(fields, storagesource.FieldPosition)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *StorageSourceMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case storagesource.FieldPosition:
+		return m.AddedPosition()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *StorageSourceMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case storagesource.FieldPosition:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPosition(v)
+		return nil
+	}
+	return fmt.Errorf("unknown StorageSource numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *StorageSourceMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(storagesource.FieldConfig) {
+		fields = append(fields, storagesource.FieldConfig)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *StorageSourceMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *StorageSourceMutation) ClearField(name string) error {
+	switch name {
+	case storagesource.FieldConfig:
+		m.ClearConfig()
+		return nil
+	}
+	return fmt.Errorf("unknown StorageSource nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *StorageSourceMutation) ResetField(name string) error {
+	switch name {
+	case storagesource.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case storagesource.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case storagesource.FieldKind:
+		m.ResetKind()
+		return nil
+	case storagesource.FieldName:
+		m.ResetName()
+		return nil
+	case storagesource.FieldEnabled:
+		m.ResetEnabled()
+		return nil
+	case storagesource.FieldConfig:
+		m.ResetConfig()
+		return nil
+	case storagesource.FieldPosition:
+		m.ResetPosition()
+		return nil
+	}
+	return fmt.Errorf("unknown StorageSource field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *StorageSourceMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *StorageSourceMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *StorageSourceMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *StorageSourceMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *StorageSourceMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *StorageSourceMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *StorageSourceMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown StorageSource unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *StorageSourceMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown StorageSource edge %s", name)
 }
 
 // SubscriptionMutation represents an operation that mutates the Subscription nodes in the graph.

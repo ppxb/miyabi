@@ -117,6 +117,18 @@ func (f OfflineDownloadFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Va
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.OfflineDownloadMutation", m)
 }
 
+// The PanAccountFunc type is an adapter to allow the use of ordinary
+// function as PanAccount mutator.
+type PanAccountFunc func(context.Context, *ent.PanAccountMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PanAccountFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PanAccountMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PanAccountMutation", m)
+}
+
 // The SettingFunc type is an adapter to allow the use of ordinary
 // function as Setting mutator.
 type SettingFunc func(context.Context, *ent.SettingMutation) (ent.Value, error)
@@ -127,6 +139,18 @@ func (f SettingFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, err
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SettingMutation", m)
+}
+
+// The StorageSourceFunc type is an adapter to allow the use of ordinary
+// function as StorageSource mutator.
+type StorageSourceFunc func(context.Context, *ent.StorageSourceMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f StorageSourceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.StorageSourceMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.StorageSourceMutation", m)
 }
 
 // The SubscriptionFunc type is an adapter to allow the use of ordinary

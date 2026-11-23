@@ -30,8 +30,12 @@ type Tx struct {
 	Movie *MovieClient
 	// OfflineDownload is the client for interacting with the OfflineDownload builders.
 	OfflineDownload *OfflineDownloadClient
+	// PanAccount is the client for interacting with the PanAccount builders.
+	PanAccount *PanAccountClient
 	// Setting is the client for interacting with the Setting builders.
 	Setting *SettingClient
+	// StorageSource is the client for interacting with the StorageSource builders.
+	StorageSource *StorageSourceClient
 	// Subscription is the client for interacting with the Subscription builders.
 	Subscription *SubscriptionClient
 	// Subtitle is the client for interacting with the Subtitle builders.
@@ -184,7 +188,9 @@ func (tx *Tx) init() {
 	tx.MetadataCache = NewMetadataCacheClient(tx.config)
 	tx.Movie = NewMovieClient(tx.config)
 	tx.OfflineDownload = NewOfflineDownloadClient(tx.config)
+	tx.PanAccount = NewPanAccountClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)
+	tx.StorageSource = NewStorageSourceClient(tx.config)
 	tx.Subscription = NewSubscriptionClient(tx.config)
 	tx.Subtitle = NewSubtitleClient(tx.config)
 	tx.Tag = NewTagClient(tx.config)

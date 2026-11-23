@@ -1,117 +1,95 @@
 package drive
 
 import (
-	"cmp"
 	"context"
 	"log/slog"
-	"maps"
-	"slices"
 	"time"
 
-	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/ent/panaccount"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
 const (
-	accountsSetting      = "pan.accounts"
 	accountRefreshTick   = 10 * time.Minute
 	accountRefreshWindow = 30 * time.Minute
 )
 
-// accountRecord keeps one 115 account's tokens and mounted directory so several
-// accounts can be listed and, in later steps, scanned independently.
+// accountRecord is one 115 account's tokens and mounted directory. Each account
+// is its own PanAccount row, so writes update a single row and need no global
+// lock or in-memory mirror.
 type accountRecord struct {
-	Tokens    pan.Tokens  `json:"tokens"`
-	Directory mountRecord `json:"directory"`
+	Tokens    pan.Tokens
+	Directory mountRecord
 }
 
-type accountStore map[string]accountRecord
+func recordOf(row *ent.PanAccount) accountRecord {
+	return accountRecord{
+		Tokens: pan.Tokens{AccessToken: row.AccessToken, RefreshToken: row.RefreshToken, ExpiresAt: row.ExpiresAt},
+		Directory: mountRecord{
+			AccountID:        row.AccountID,
+			LibraryDirectory: domain.LibraryDirectory{ID: row.DirectoryID, Name: row.DirectoryName, Path: row.DirectoryPath},
+		},
+	}
+}
 
-func (d *Drive) loadAccounts(ctx context.Context) (accountStore, error) {
-	store, _, err := database.LoadSetting[accountStore](ctx, d.database, accountsSetting)
+// accountRecord reads one account. A missing account is an empty record.
+func (d *Drive) accountRecord(ctx context.Context, accountID string) (accountRecord, error) {
+	row, err := d.database.PanAccount.Query().Where(panaccount.AccountID(accountID)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return accountRecord{}, nil
+	}
 	if err != nil {
-		return nil, err
+		return accountRecord{}, err
 	}
-	if store == nil {
-		store = accountStore{}
-	}
-	return store, nil
+	return recordOf(row), nil
 }
 
+func (d *Drive) accountToken(ctx context.Context, accountID string) (pan.Tokens, error) {
+	record, err := d.accountRecord(ctx, accountID)
+	return record.Tokens, err
+}
+
+func (d *Drive) listAccounts(ctx context.Context) ([]*ent.PanAccount, error) {
+	return d.database.PanAccount.Query().Order(ent.Asc(panaccount.FieldAccountID)).All(ctx)
+}
+
+// saveAccountTokens stores the tokens of a newly authorized account, creating
+// its row when needed. Only login may create accounts.
 func (d *Drive) saveAccountTokens(ctx context.Context, accountID string, tokens pan.Tokens) error {
 	if accountID == "" {
 		return nil
 	}
-	d.accountsMu.Lock()
-	defer d.accountsMu.Unlock()
-	store, err := d.loadAccounts(ctx)
-	if err != nil {
-		return err
+	return d.database.PanAccount.Create().
+		SetAccountID(accountID).
+		SetAccessToken(tokens.AccessToken).
+		SetRefreshToken(tokens.RefreshToken).
+		SetExpiresAt(tokens.ExpiresAt).
+		OnConflictColumns(panaccount.FieldAccountID).
+		Update(func(u *ent.PanAccountUpsert) {
+			u.UpdateAccessToken()
+			u.UpdateRefreshToken()
+			u.UpdateExpiresAt()
+			u.UpdateUpdatedAt()
+		}).
+		Exec(ctx)
+}
+
+// updateAccountTokens stores refreshed tokens of an existing account. It never
+// recreates a row, so a refresh that finishes after the account was
+// disconnected reports ErrUnauthorized instead of resurrecting it.
+func (d *Drive) updateAccountTokens(ctx context.Context, accountID string, tokens pan.Tokens) error {
+	updated, err := d.database.PanAccount.Update().
+		Where(panaccount.AccountID(accountID)).
+		SetAccessToken(tokens.AccessToken).
+		SetRefreshToken(tokens.RefreshToken).
+		SetExpiresAt(tokens.ExpiresAt).
+		Save(ctx)
+	if err == nil && updated == 0 {
+		return pan.ErrUnauthorized
 	}
-	record := store[accountID]
-	record.Tokens = tokens
-	store[accountID] = record
-	d.setAccountToken(accountID, tokens)
-	return database.SaveSetting(ctx, d.database, accountsSetting, store)
-}
-
-func (d *Drive) accountToken(accountID string) pan.Tokens {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.accountTokens[accountID]
-}
-
-func (d *Drive) setAccountToken(accountID string, tokens pan.Tokens) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.accountTokens[accountID] = tokens
-}
-
-func (d *Drive) accountMount(accountID string) (mountRecord, bool) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	record, ok := d.accountMounts[accountID]
-	return record, ok
-}
-
-func (d *Drive) setAccountMount(accountID string, mount mountRecord) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.accountMounts[accountID] = mount
-}
-
-func (d *Drive) clearAccountMount(accountID string) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	delete(d.accountMounts, accountID)
-}
-
-// syncAccountMounts replaces the in-memory mount registry with the given stored
-// accounts, so periodic refreshes pick up any external/manual DB edit.
-func (d *Drive) syncAccountMounts(store accountStore) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	next := make(map[string]mountRecord, len(store))
-	for id, record := range store {
-		next[id] = record.Directory
-	}
-	d.accountMounts = next
-}
-
-// loadAccountsAndMounts reloads the account store and refreshes the in-memory
-// mount registry under accountsMu. Holding the write lock across both steps
-// prevents a concurrent saveAccountMount from having its newer mount overwritten
-// by the stale snapshot this call just loaded.
-func (d *Drive) loadAccountsAndMounts(ctx context.Context) (accountStore, error) {
-	d.accountsMu.Lock()
-	defer d.accountsMu.Unlock()
-	store, err := d.loadAccounts(ctx)
-	if err != nil {
-		return nil, err
-	}
-	d.syncAccountMounts(store)
-	return store, nil
+	return err
 }
 
 func (d *Drive) accountCredVersion(accountID string) uint64 {
@@ -133,9 +111,6 @@ func (d *Drive) bumpAccountCredential(accountID string) {
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if d.accountCredVersions == nil {
-		d.accountCredVersions = make(map[string]uint64)
-	}
 	d.accountCredVersions[accountID]++
 }
 
@@ -146,116 +121,91 @@ func (d *Drive) bumpAccountAuthorization(accountID string) {
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if d.accountAuthVersions == nil {
-		d.accountAuthVersions = make(map[string]uint64)
-	}
 	d.accountAuthVersions[accountID]++
 }
 
+// saveAccountMount stores the mounted directory of an existing account; an
+// empty directory clears the mount. An account removed meanwhile reports
+// ErrUnauthorized, so callers do not publish a mount for it.
 func (d *Drive) saveAccountMount(ctx context.Context, accountID string, mount mountRecord) error {
 	if accountID == "" {
 		return nil
 	}
-	d.accountsMu.Lock()
-	defer d.accountsMu.Unlock()
-	store, err := d.loadAccounts(ctx)
-	if err != nil {
-		return err
-	}
-	record := store[accountID]
-	record.Directory = mount
-	store[accountID] = record
 	d.bumpAccountAuthorization(accountID)
-	if err := database.SaveSetting(ctx, d.database, accountsSetting, store); err != nil {
-		return err
+	updated, err := d.database.PanAccount.Update().
+		Where(panaccount.AccountID(accountID)).
+		SetDirectoryID(mount.ID).
+		SetDirectoryName(mount.Name).
+		SetDirectoryPath(mount.Path).
+		Save(ctx)
+	if err == nil && updated == 0 {
+		return pan.ErrUnauthorized
 	}
-	d.setAccountMount(accountID, mount)
-	return nil
+	return err
 }
 
 func (d *Drive) removeAccount(ctx context.Context, accountID string) error {
 	if accountID == "" {
 		return nil
 	}
-	d.accountsMu.Lock()
-	defer d.accountsMu.Unlock()
-	store, err := d.loadAccounts(ctx)
-	if err != nil {
+	removed, err := d.database.PanAccount.Delete().Where(panaccount.AccountID(accountID)).Exec(ctx)
+	if err != nil || removed == 0 {
 		return err
 	}
-	if _, ok := store[accountID]; !ok {
-		return nil
-	}
-	delete(store, accountID)
-	d.setAccountToken(accountID, pan.Tokens{})
 	d.bumpAccountCredential(accountID)
 	d.bumpAccountAuthorization(accountID)
-	if err := database.SaveSetting(ctx, d.database, accountsSetting, store); err != nil {
-		return err
-	}
-	d.clearAccountMount(accountID)
 	return nil
 }
 
-// accountRecord builds one account record from the in-memory registry. Tokens
-// and mounts are loaded at construction and kept in sync by the write paths, so
-// callers such as OpenSource/accountSessionFor no longer reload the whole store.
-func (d *Drive) accountRecord(_ context.Context, accountID string) (accountRecord, error) {
-	mount, _ := d.accountMount(accountID)
-	return accountRecord{Tokens: d.accountToken(accountID), Directory: mount}, nil
-}
-
 // Mount returns the stored library source of an account when it has one. A
-// missing mount reports ok=false with a nil error. The mount is served from the
-// in-memory registry (kept in sync by saveAccountMount/removeAccount) so remote
-// operations do not reload and deserialize the whole account store.
-func (d *Drive) Mount(_ context.Context, accountID string) (domain.LibrarySource, bool, error) {
-	record, ok := d.accountMount(accountID)
-	if !ok || record.ID == "" || record.AccountID == "" {
+// missing account or mount reports ok=false with a nil error.
+func (d *Drive) Mount(ctx context.Context, accountID string) (domain.LibrarySource, bool, error) {
+	record, err := d.accountRecord(ctx, accountID)
+	if err != nil {
+		return domain.LibrarySource{}, false, err
+	}
+	if record.Directory.ID == "" {
 		return domain.LibrarySource{}, false, nil
 	}
-	return record.source(), true, nil
+	return record.Directory.source(), true, nil
 }
 
 // Mounts returns every stored account's mounted library source, without
 // verifying credentials, so callers can operate each account independently.
-func (d *Drive) Mounts(_ context.Context) ([]domain.LibrarySource, error) {
-	d.mu.Lock()
-	result := make([]domain.LibrarySource, 0, len(d.accountMounts))
-	for _, record := range d.accountMounts {
-		if record.ID == "" || record.AccountID == "" {
-			continue
-		}
-		result = append(result, record.source())
+func (d *Drive) Mounts(ctx context.Context) ([]domain.LibrarySource, error) {
+	rows, err := d.database.PanAccount.Query().
+		Where(panaccount.DirectoryIDNEQ("")).
+		Order(ent.Asc(panaccount.FieldAccountID), ent.Asc(panaccount.FieldDirectoryID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
 	}
-	d.mu.Unlock()
-	slices.SortFunc(result, func(a, b domain.LibrarySource) int {
-		if a.AccountID != b.AccountID {
-			return cmp.Compare(a.AccountID, b.AccountID)
-		}
-		return cmp.Compare(a.Directory.ID, b.Directory.ID)
-	})
+	result := make([]domain.LibrarySource, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, recordOf(row).Directory.source())
+	}
 	return result, nil
 }
 
 // Accounts lists every stored 115 account and its mounted directory.
 func (d *Drive) Accounts(ctx context.Context) ([]AccountStatus, error) {
-	store, err := d.loadAccountsAndMounts(ctx)
+	rows, err := d.listAccounts(ctx)
 	if err != nil {
 		return nil, err
 	}
-	ids := slices.Sorted(maps.Keys(store))
-
-	result := make([]AccountStatus, 0, len(ids))
-	for _, id := range ids {
-		record := store[id]
+	result := make([]AccountStatus, 0, len(rows))
+	for _, row := range rows {
+		id := row.AccountID
+		record := recordOf(row)
 		if tokensNeedRefresh(record.Tokens) {
 			if err := d.refreshAccountTokens(ctx, id); err != nil {
 				slog.Warn("refresh 115 account tokens", "account", id, "error", err)
 				result = append(result, AccountStatus{AccountID: id, Connected: false})
 				continue
 			}
-			record.Tokens = d.accountToken(id)
+			if record.Tokens, err = d.accountToken(ctx, id); err != nil {
+				return nil, err
+			}
 		}
 		account, err := d.client.Account(ctx, record.Tokens.AccessToken)
 		if err != nil {
@@ -309,15 +259,15 @@ func (d *Drive) StartAccountRefresh(ctx context.Context) {
 }
 
 func (d *Drive) refreshExpiringAccounts(ctx context.Context) {
-	store, err := d.loadAccountsAndMounts(ctx)
+	rows, err := d.listAccounts(ctx)
 	if err != nil {
 		slog.Warn("load 115 accounts for refresh", "error", err)
 		return
 	}
-	for id, record := range store {
-		if tokensNeedRefresh(record.Tokens) {
-			if err := d.refreshAccountTokens(ctx, id); err != nil {
-				slog.Warn("refresh 115 account tokens", "account", id, "error", err)
+	for _, row := range rows {
+		if tokensNeedRefresh(recordOf(row).Tokens) {
+			if err := d.refreshAccountTokens(ctx, row.AccountID); err != nil {
+				slog.Warn("refresh 115 account tokens", "account", row.AccountID, "error", err)
 			}
 		}
 	}

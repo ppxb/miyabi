@@ -19,7 +19,7 @@ func TestLoginStoresAccountAndReturnsID(t *testing.T) {
 	if err != nil || status.State != pan.LoginAuthorized || status.AccountID != testSource.AccountID {
 		t.Fatalf("login status = %+v err=%v", status, err)
 	}
-	if got := d.accountToken(testSource.AccountID).AccessToken; got != "login-access" {
+	if got := testToken(t, d, testSource.AccountID).AccessToken; got != "login-access" {
 		t.Fatalf("login token = %q", got)
 	}
 }
