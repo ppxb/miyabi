@@ -30,7 +30,6 @@ func TestFailedRebuildMarksMovieFailedUntilSuccessfulRetry(t *testing.T) {
 	f.scrape = scrape.New(f.store.Client, f.driveService, meta, f.images, f.tasks, scrape.Dependencies{
 		ExportManager: export.NewManager(export.Config{EmbyDir: f.embyDir, PublicURL: "http://127.0.0.1:8080"}),
 	})
-	t.Cleanup(f.scrape.Close)
 	f.tasks.Registry().Register(tasks.NewHandler(tasks.KindScrape, f.scrape.Scrape, f.scrape.Finished).WithRetry(domain.RetryDelay))
 	f.drive.addFile("101", "10", "042126_100.mp4", 2<<30, []byte("video"))
 	if _, err := f.library.StartScan(ctx); err != nil {
@@ -95,7 +94,6 @@ func TestRebuildReplacesSavedMetadataAndPublishesNewPreviews(t *testing.T) {
 			f.scrape = scrape.New(f.store.Client, f.driveService, meta, f.images, f.tasks, scrape.Dependencies{
 				ExportManager: export.NewManager(export.Config{EmbyDir: f.embyDir, PublicURL: "http://127.0.0.1:8080"}),
 			})
-			t.Cleanup(f.scrape.Close)
 			f.tasks.Registry().Register(tasks.NewHandler(tasks.KindScrape, f.scrape.Scrape, f.scrape.Finished).WithRetry(domain.RetryDelay))
 			f.drive.addFile("101", "10", tc.code+".mp4", 2<<30, []byte("video"))
 			if _, err := f.library.StartScan(ctx); err != nil {

@@ -241,19 +241,24 @@ func findMatchingSubtitles(stem string, subFiles []string) []string {
 	return matches
 }
 
-// indexLocalSubtitle records a subtitle already beside a local .strm so its
-// kind is not exported again.
+// indexLocalSubtitle records a subtitle already beside a local .strm. A copy
+// exported for a downloaded track of the same kind is not a second track.
 func indexLocalSubtitle(ctx context.Context, tx *ent.Tx, movieID int, subPath string) error {
 	name := filepath.Base(subPath)
 	format := subtitlemeta.Format(filepath.Ext(name))
 	if format == "" {
 		return nil
 	}
-	exists, err := tx.Subtitle.Query().Where(subtitle.MovieIDEQ(movieID), subtitle.StoragePathEQ(subPath)).Exist(ctx)
+	language := string(subtitlemeta.DetectLanguage(name, ""))
+	version := string(subtitlemeta.DetectVersion(name))
+	exists, err := tx.Subtitle.Query().Where(subtitle.MovieIDEQ(movieID), subtitle.Or(
+		subtitle.StoragePathEQ(subPath),
+		subtitle.And(subtitle.SourceURLNEQ(""), subtitle.LanguageEQ(language), subtitle.VersionTagEQ(version), subtitle.FormatEQ(format)),
+	)).Exist(ctx)
 	if err != nil || exists {
 		return err
 	}
 	return tx.Subtitle.Create().SetMovieID(movieID).SetName(name).SetFormat(format).
-		SetLanguage(string(subtitlemeta.DetectLanguage(name, ""))).SetVersionTag(string(subtitlemeta.DetectVersion(name))).
+		SetLanguage(language).SetVersionTag(version).
 		SetSource("local").SetStoragePath(subPath).Exec(ctx)
 }

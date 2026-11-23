@@ -75,7 +75,6 @@ func TestTransientImageFailureAutomaticallyResumesSavedMetadata(t *testing.T) {
 	}
 	t.Cleanup(meta.Close)
 	f.scrape = scrape.New(f.store.Client, f.driveService, meta, f.images, f.tasks, scrape.Dependencies{ExportManager: export.NewManager(export.Config{EmbyDir: f.embyDir, PublicURL: "http://127.0.0.1:8080"})})
-	t.Cleanup(f.scrape.Close)
 	f.tasks.Registry().Register(tasks.NewHandler(tasks.KindScrape, f.scrape.Scrape, f.scrape.Finished).WithRetry(domain.RetryDelay))
 	f.drive.addFile("101", "10", "ABP-123.mp4", 2<<30, []byte("video"))
 	if _, err := f.library.StartScan(t.Context()); err != nil {
@@ -229,7 +228,6 @@ func TestJavDBMetadataAndArtworkCheckpointSurvivePublishFailure(t *testing.T) {
 	}
 	t.Cleanup(meta.Close)
 	f.scrape = scrape.New(f.store.Client, f.driveService, meta, f.images, f.tasks, scrape.Dependencies{ExportManager: export.NewManager(export.Config{EmbyDir: f.embyDir, PublicURL: "http://127.0.0.1:8080"})})
-	t.Cleanup(f.scrape.Close)
 	failPublish := true
 	f.store.Client.Task.Use(func(next ent.Mutator) ent.Mutator {
 		return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
@@ -284,7 +282,6 @@ func TestMultiSourceScrapeWithoutJavDBResumesAfterImageFailure(t *testing.T) {
 	}
 	t.Cleanup(meta.Close)
 	service := scrape.New(f.store.Client, f.driveService, meta, f.images, f.tasks, scrape.Dependencies{ExportManager: export.NewManager(export.Config{EmbyDir: f.embyDir, PublicURL: "http://127.0.0.1:8080"})})
-	t.Cleanup(service.Close)
 	f.scrape = service
 	f.drive.addFile("101", "10", "ABP-123.mp4", 2<<30, []byte("video"))
 	if _, err := f.library.StartScan(t.Context()); err != nil {

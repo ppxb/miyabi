@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -61,7 +62,6 @@ type App struct {
 	driveSvc  *drive.Drive
 	play      *playback.Service
 	catalogue *catalogue.Service
-	scrape    *scrape.Service
 	metadata  *metadata.Service
 	embySvc   *emby.Service
 	library   *library.Service
@@ -182,7 +182,6 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 
 	offlineSvc := offline.New(store.Client, catalogueSvc, driveSvc, taskSvc, libSvc, metadataSvc, offlineSubmitTimeout)
 	monitorSvc := monitor.New(store.Client, catalogueSvc, offlineSvc, taskSvc)
-	subtitleSvc := subtitle.NewService(store.Client, subtitle.NewFinder(networkSvc.ProxyManager()))
 	gfriendsClient := gfriends.New(cfg.DataDir, &http.Client{
 		Timeout:   30 * time.Second,
 		Transport: netx.NewTransport(networkSvc.ProxyManager()),
@@ -216,10 +215,11 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 	// This is the only cycle: library -> Emby -> catalogue -> library.
 	// Bind it before starting task pools or accepting requests.
 	libSvc.SetMediaNotifier(embySvc)
+	subtitleSvc := subtitle.NewService(store.Client, subtitle.NewFinder(networkSvc.ProxyManager()),
+		filepath.Join(cfg.DataDir, "subtitles"), func() string { return exportMgr.Config().EmbyDir }, embySvc)
 	scrapeSvc := scrape.New(store.Client, driveSvc, metadataSvc, images, taskSvc, scrape.Dependencies{
 		ExportManager: exportMgr, MediaNotifier: embySvc, Subtitles: subtitleSvc, Merger: actorsSvc,
 	})
-	cleanup = append(cleanup, scrapeSvc.Close)
 	maintenanceSvc, err := maintenance.New(cfg.DataDir, store.Client, images, scrapeSvc)
 	if err != nil {
 		return nil, fmt.Errorf("initialize maintenance service: %w", err)
@@ -249,6 +249,7 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 		Emby:           embySvc,
 		Sources:        sourceSvc,
 		Actors:         actorsSvc,
+		Subtitles:      subtitleSvc,
 		Frontend:       miyabi.Frontend(),
 		STRMToken:      cfg.STRMToken,
 		TrustedProxies: cfg.TrustedProxies,
@@ -272,7 +273,6 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 		driveSvc:  driveSvc,
 		play:      playSvc,
 		catalogue: catalogueSvc,
-		scrape:    scrapeSvc,
 		metadata:  metadataSvc,
 		embySvc:   embySvc,
 		library:   libSvc,
@@ -354,7 +354,6 @@ func (a *App) Run(ctx context.Context) error {
 // Close releases resources held by the application.
 func (a *App) Close() error {
 	a.embySvc.Close()
-	a.scrape.Close()
 	a.metadata.Close()
 	a.catalogue.Close()
 	a.play.Close()

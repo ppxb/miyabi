@@ -32,6 +32,7 @@ type Dependencies struct {
 	Emby           EmbyManager
 	Sources        SourceManager
 	Actors         ActorManager
+	Subtitles      SubtitleManager
 	Frontend       fs.FS
 	STRMToken      string
 	TrustedProxies []string
@@ -102,6 +103,12 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.GET("/library/movies/:id", libraryMovieHandler(deps.Library))
 	protected.POST("/library/movies/:id/scrape", libraryMovieScrapeHandler(deps.Library))
 	protected.GET("/library/movies/:id/previews/:index", libraryPreviewHandler(deps.Library, deps.Metadata))
+	subtitlesAPI := protected.Group("/library/movies/:id/subtitles", noStore())
+	subtitlesAPI.GET("", subtitleListHandler(deps.Subtitles))
+	subtitlesAPI.GET("/search", subtitleSearchHandler(deps.Subtitles))
+	subtitlesAPI.POST("/preview", subtitlePreviewHandler(deps.Subtitles))
+	subtitlesAPI.POST("", subtitleSaveHandler(deps.Subtitles))
+	subtitlesAPI.DELETE("/:subtitleID", subtitleDeleteHandler(deps.Subtitles))
 	protected.POST("/library/scan", libraryScanHandler(deps.Library, deps.Emby))
 	protected.POST("/library/sync", librarySyncHandler(deps.Library))
 	protected.GET("/library/pending", libraryPendingHandler(deps.Library))

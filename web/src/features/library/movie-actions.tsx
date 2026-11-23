@@ -1,4 +1,4 @@
-import { PencilIcon, RefreshCwIcon } from 'lucide-react'
+import { CaptionsIcon, PencilIcon, RefreshCwIcon } from 'lucide-react'
 import { useState } from 'react'
 
 import { describeApiError } from '@/api/client'
@@ -15,12 +15,14 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { SubtitleDialog } from '@/features/library/subtitle-dialog'
 import { notifyTaskError, useNotifyScanTask } from '@/features/tasks/task-toast'
 
 // Renders the context-menu content and its correction dialog. The ContextMenu
 // root/trigger live in the card so right-clicking the whole card opens it.
 export function LibraryMovieActions({ movie }: { movie: Pick<LibraryMovie, 'id' | 'code'> }) {
   const [correcting, setCorrecting] = useState(false)
+  const [managingSubtitles, setManagingSubtitles] = useState(false)
   const [code, setCode] = useState(movie.code)
   const scrape = useRescrapeLibraryMovie(movie.id)
   const notifyScan = useNotifyScanTask()
@@ -57,7 +59,12 @@ export function LibraryMovieActions({ movie }: { movie: Pick<LibraryMovie, 'id' 
           <PencilIcon />
           纠正番号
         </ContextMenuItem>
+        <ContextMenuItem onClick={() => setManagingSubtitles(true)}>
+          <CaptionsIcon />
+          字幕下载
+        </ContextMenuItem>
       </ContextMenuContent>
+      <SubtitleDialog movie={movie} open={managingSubtitles} onOpenChange={setManagingSubtitles} />
       <Dialog
         open={correcting}
         onOpenChange={open => {

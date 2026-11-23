@@ -259,7 +259,6 @@ func TestLocalArtworkPreparationAllowsWritesAndBlocksPruningUntilCommit(t *testi
 	scanner := localScannerFixture(t)
 	ctx, root := t.Context(), t.TempDir()
 	scraper := scrape.New(scanner.db, nil, nil, scanner.images, nil, scrape.Dependencies{})
-	t.Cleanup(scraper.Close)
 	magic := "local-scan-test:" + root // Unique even when this test is run repeatedly.
 	decoded := 0
 	image.RegisterFormat("local-scan-test", magic, func(io.Reader) (image.Image, error) {

@@ -77,7 +77,6 @@ func TestScanRefreshesOutdatedPostersOnceWithoutDownloadingCovers(t *testing.T) 
 				return nil
 			}},
 		})
-	t.Cleanup(service.Close)
 	fixture.scrape = service
 	if _, err := fixture.library.StartScan(ctx); err != nil {
 		t.Fatal(err)

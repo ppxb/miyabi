@@ -294,7 +294,6 @@ func libraryFixture(t testing.TB) testLibraryFixture {
 	}
 
 	scrapeSvc := scrapePkg.New(store.Client, driveSvc, nil, images, taskSvc, scrapePkg.Dependencies{})
-	t.Cleanup(scrapeSvc.Close)
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScan, lib.Scan, lib.Finished))
 	taskSvc.Registry().Register(tasks.NewHandler(tasks.KindScrape, scrapeSvc.Scrape, scrapeSvc.Finished))
 	return testLibraryFixture{

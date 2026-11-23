@@ -3,6 +3,7 @@ package subtitle
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -57,7 +58,7 @@ func (f *Finder) Search(ctx context.Context, code string, uncensored bool) []Can
 }
 
 // search queries all providers concurrently. A failing provider must not hide
-// the others' results, so its error is dropped.
+// the others' results, so its error is only logged.
 func (f *Finder) search(ctx context.Context, query string) []Candidate {
 	var (
 		mu         sync.Mutex
@@ -67,7 +68,10 @@ func (f *Finder) search(ctx context.Context, query string) []Candidate {
 	)
 	for _, provider := range f.providers {
 		wg.Go(func() {
-			results, _ := provider.Search(ctx, query)
+			results, err := provider.Search(ctx, query)
+			if err != nil {
+				slog.WarnContext(ctx, "subtitle provider search failed", "provider", fmt.Sprintf("%T", provider), "query", query, "error", err)
+			}
 			mu.Lock()
 			defer mu.Unlock()
 			for _, candidate := range results {

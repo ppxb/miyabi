@@ -11,7 +11,6 @@ import (
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
-	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
@@ -56,9 +55,9 @@ type Notifier interface {
 	WakePool()
 }
 
-// SubtitleExporter writes a movie's subtitles beside its exported .strm file.
+// SubtitleExporter copies a movie's downloaded subtitles beside its exported .strm file.
 type SubtitleExporter interface {
-	Export(ctx context.Context, movieID int, target subtitlemeta.Target) (int, error)
+	SyncExport(ctx context.Context, movieID int) error
 }
 
 // ActorMerger merges same-person actor rows discovered during a movie scrape.
@@ -79,14 +78,13 @@ type dirCacheEntry struct {
 
 // Service manages movie metadata scraping and artwork caching.
 type Service struct {
-	db            *ent.Client
-	drive         *drive.Drive
-	metadata      MetadataSource
-	images        *mediaimage.Cache
-	notifier      Notifier
-	subtitles     SubtitleExporter
-	merger        ActorMerger
-	subtitleQueue *SubtitleQueue
+	db        *ent.Client
+	drive     *drive.Drive
+	metadata  MetadataSource
+	images    *mediaimage.Cache
+	notifier  Notifier
+	subtitles SubtitleExporter
+	merger    ActorMerger
 
 	dirMu    sync.Mutex
 	dirCache map[string]dirCacheEntry
@@ -109,7 +107,7 @@ type Dependencies struct {
 	Merger        ActorMerger
 }
 
-// New installs dependencies before starting subtitle workers.
+// New installs the scrape dependencies.
 func New(db *ent.Client, d *drive.Drive, metadata MetadataSource, images *mediaimage.Cache, notifier Notifier, deps Dependencies) *Service {
 	service := &Service{
 		db:            db,
@@ -123,13 +121,7 @@ func New(db *ent.Client, d *drive.Drive, metadata MetadataSource, images *mediai
 		subtitles:     deps.Subtitles,
 		merger:        deps.Merger,
 	}
-	service.subtitleQueue = newSubtitleQueue(service)
 	return service
-}
-
-// Close releases resources and terminates background workers.
-func (service *Service) Close() {
-	service.subtitleQueue.Close()
 }
 
 // TryLockArtwork attempts to acquire the artwork lock for cache maintenance.
@@ -189,12 +181,14 @@ func (service *Service) Scrape(ctx context.Context, job tasks.Job) error {
 	if err := tasks.Checkpoint(ctx, service.db); err != nil {
 		return err
 	}
-	subTask, err := service.publishMovie(ctx, sess, job, input)
-	if err != nil {
+	if err := service.publishMovie(ctx, sess, job, input); err != nil {
 		return err
 	}
-	if subTask != nil {
-		service.subtitleQueue.Enqueue(*subTask)
+	// Subtitles are picked by the user; re-exporting only restores their copies.
+	if service.subtitles != nil {
+		if err := service.subtitles.SyncExport(ctx, input.MovieID); err != nil {
+			slog.WarnContext(ctx, "export movie subtitles", "movie_id", input.MovieID, "error", err)
+		}
 	}
 	return nil
 }

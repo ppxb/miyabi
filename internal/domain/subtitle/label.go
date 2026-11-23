@@ -7,14 +7,18 @@ import (
 	"strings"
 )
 
-// Language identifies the Chinese variant of a subtitle. Values are the
-// culture codes Emby reads from subtitle file names.
+// Language identifies a subtitle's language. Values are the culture codes
+// Emby reads from subtitle file names.
 type Language string
 
 const (
 	LangSimplifiedChinese  Language = "zh-CN"
 	LangTraditionalChinese Language = "zh-TW"
-	LangUnknown            Language = ""
+	// English and Japanese only come from providers that label them; text
+	// detection still tells Chinese variants apart only.
+	LangEnglish  Language = "en"
+	LangJapanese Language = "ja"
+	LangUnknown  Language = ""
 )
 
 // VersionTag identifies the release cut a subtitle was timed against.
@@ -44,6 +48,10 @@ var (
 
 	traditionalHint = regexp.MustCompile(`(?i)(zh[-_]?(tw|hk|hant)|\bcht\b|繁)`)
 	simplifiedHint  = regexp.MustCompile(`(?i)(zh[-_]?(cn|hans)|\bchs\b|简|簡)`)
+	// English and Japanese tags as in ABP-123.en.srt; Chinese tags win in
+	// bilingual names.
+	englishHint  = regexp.MustCompile(`(?i)[._-](en|eng|english)(?:[._-]|$)`)
+	japaneseHint = regexp.MustCompile(`(?i)[._-](ja|jp|jpn|japanese)(?:[._-]|$)`)
 
 	// Frequency counters for discriminating Simplified vs Traditional Chinese.
 	simplifiedMarkers  = []rune("为与个么开关东风头后发这边过还进时样气应实话说问题现经体万台农国门书车云")
@@ -86,14 +94,18 @@ func HasChineseSubtitle(name string) bool {
 	return chineseSubtitleTag.MatchString(name)
 }
 
-// LanguageHint recognizes an explicit Chinese variant in a file name or
-// provider metadata, returning LangUnknown when there is none.
+// LanguageHint recognizes an explicit language tag in a file name or provider
+// metadata, returning LangUnknown when there is none.
 func LanguageHint(hint string) Language {
 	switch {
 	case traditionalHint.MatchString(hint):
 		return LangTraditionalChinese
 	case simplifiedHint.MatchString(hint):
 		return LangSimplifiedChinese
+	case englishHint.MatchString(hint):
+		return LangEnglish
+	case japaneseHint.MatchString(hint):
+		return LangJapanese
 	default:
 		return LangUnknown
 	}

@@ -141,7 +141,6 @@ func TestCoverCleanupOnlyBlocksUntilArtworkCheckpoint(t *testing.T) {
 				return nil
 			}},
 		})
-	t.Cleanup(service.Close)
 	if err := service.Scrape(ctx, *job); err != nil {
 		t.Fatal(err)
 	}
