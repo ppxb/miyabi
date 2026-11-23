@@ -16,6 +16,7 @@ type SubtitleManager interface {
 	Save(ctx context.Context, movieID int, offer subtitle.Offer) (subtitle.Track, error)
 	Delete(ctx context.Context, movieID, trackID int) error
 	Cues(ctx context.Context, movieID, trackID int) ([]subtitle.TimedCue, error)
+	Text(ctx context.Context, trackID int) (subtitle.SubtitleText, error)
 }
 
 type subtitleTrackURI struct {

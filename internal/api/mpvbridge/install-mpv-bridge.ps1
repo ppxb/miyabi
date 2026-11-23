@@ -41,17 +41,19 @@ $wrapperPath = Join-Path $targetDir 'mpv-open.ps1'
 $wrapper = @'
 param([string]$Uri)
 $ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-if ($Uri -notmatch '^miyabi-mpv://play\?(.*)$') { exit }
-$query = $Matches[1]
+if ($Uri -notmatch '^miyabi-mpv://') { exit }
+$qidx = $Uri.IndexOf('?')
+if ($qidx -lt 0) { exit }
+$query = $Uri.Substring($qidx + 1)
 $p = @{}
 foreach ($pair in $query.Split('&')) {
   $kv = $pair.Split('=', 2)
   if ($kv[0]) { $p[$kv[0]] = [Uri]::UnescapeDataString($kv[1]) }
 }
 if ($p['u'] -notmatch '^https?://') { exit }
-$a = @($p['u'], "--user-agent=$ua")
-if ($p['s'] -match '^https?://') { $a += "--sub-file=$($p['s'])" }
-Start-Process -FilePath '__MPV__' -ArgumentList $a
+$argList = '"' + $p['u'] + '" --user-agent="' + $ua + '"'
+if ($p['s'] -match '^https?://') { $argList += ' --sub-file="' + $p['s'] + '"' }
+Start-Process -FilePath '__MPV__' -ArgumentList $argList
 '@
 $wrapper = $wrapper.Replace('__MPV__', $mpv)
 Set-Content -Path $wrapperPath -Value $wrapper -Encoding UTF8

@@ -75,6 +75,10 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	api.GET("/strm/play/:fileID/*filename", noStore(), strmHandler)
 	api.HEAD("/strm/play/:fileID/*filename", noStore(), strmHandler)
 
+	// External players cannot send the session cookie; serve a subtitle as
+	// UTF-8 text using the same token policy as the STRM relay.
+	api.GET("/subtitle-file/:trackID", noStore(), subtitleFileHandler(deps.Subtitles, deps.STRMToken, deps.Access))
+
 	protected := api.Group("", authMiddleware(deps.Access))
 
 	settingsAPI := protected.Group("/settings", noStore())
@@ -137,6 +141,9 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	playAPI.GET("/:id/stream/:resource", playStreamHandler(deps.Play))
 	playAPI.HEAD("/:id/stream/:resource", playStreamHandler(deps.Play))
 	playAPI.POST("/progress", playProgressHandler(deps.Play))
+
+	// Builds the miyabi-mpv:// deep link used by the movie card context menu.
+	protected.GET("/mpv-link", noStore(), mpvLinkHandler(deps.Play, deps.Subtitles, deps.STRMToken))
 
 	protected.GET("/history", noStore(), historyHandler(deps.Play))
 	protected.POST("/history/remove", historyRemoveHandler(deps.Play))

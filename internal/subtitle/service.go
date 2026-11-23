@@ -198,6 +198,41 @@ func (s *Service) Cues(ctx context.Context, movieID, trackID int) ([]TimedCue, e
 	return parseCues(text, track.Format), nil
 }
 
+// SubtitleText is a saved track decoded to UTF-8, for external players.
+type SubtitleText struct {
+	Name   string
+	Format string
+	Text   string
+}
+
+// Text reads a track and decodes it to UTF-8 so external players such as mpv
+// can load it without caring about the original file encoding.
+func (s *Service) Text(ctx context.Context, trackID int) (SubtitleText, error) {
+	track, err := s.db.Subtitle.Query().Where(subtitle.IDEQ(trackID)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return SubtitleText{}, domain.E(domain.KindNotFound, "字幕不存在", nil)
+	}
+	if err != nil {
+		return SubtitleText{}, err
+	}
+	info, err := os.Stat(track.StoragePath)
+	if err != nil || info.IsDir() {
+		return SubtitleText{}, domain.E(domain.KindNotFound, "字幕文件不存在", err)
+	}
+	if info.Size() > maxSize {
+		return SubtitleText{}, domain.E(domain.KindInvalid, "字幕文件过大", nil)
+	}
+	raw, err := os.ReadFile(track.StoragePath)
+	if err != nil {
+		return SubtitleText{}, fmt.Errorf("read subtitle: %w", err)
+	}
+	text, err := DecodeToUTF8(raw)
+	if err != nil {
+		return SubtitleText{}, domain.E(domain.KindInvalid, "字幕文件无法解码", err)
+	}
+	return SubtitleText{Name: track.Name, Format: track.Format, Text: text}, nil
+}
+
 // Delete removes a downloaded track, its file and its exported copy.
 func (s *Service) Delete(ctx context.Context, movieID, trackID int) error {
 	s.files.Lock()
