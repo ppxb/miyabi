@@ -2,6 +2,7 @@ package library
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -333,33 +334,34 @@ func libraryScope(source *domain.LibrarySource) predicate.File {
 }
 
 // StartIncrementalSync queues an incremental scan for every enabled source.
+// A source that fails to queue does not stop the others; all failures are
+// joined into the returned error.
 func (s *Service) StartIncrementalSync(ctx context.Context) (int, error) {
 	started := 0
+	var errs []error
 	if s.localSources != nil {
 		targets, err := s.localSources(ctx)
-		if err != nil {
-			return started, err
-		}
+		errs = append(errs, err)
 		for _, target := range targets {
 			if _, err := s.StartLocalSourceScanModeIncremental(ctx, target.Path, target.MetadataOnly); err != nil {
-				return started, err
+				errs = append(errs, fmt.Errorf("queue local source %s: %w", target.Path, err))
+				continue
 			}
 			started++
 		}
 	}
 	if s.sources != nil {
 		list, err := s.sources(ctx)
-		if err != nil {
-			return started, err
-		}
+		errs = append(errs, err)
 		for _, source := range list {
 			if _, err := s.EnqueueSyncMode(ctx, source, false); err != nil {
-				return started, err
+				errs = append(errs, fmt.Errorf("queue 115 source %s: %w", source.AccountID, err))
+				continue
 			}
 			started++
 		}
 	}
-	return started, nil
+	return started, errors.Join(errs...)
 }
 
 // PendingCount reports movies across the aggregated sources still awaiting metadata.

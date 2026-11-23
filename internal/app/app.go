@@ -65,7 +65,6 @@ type App struct {
 	metadata  *metadata.Service
 	embySvc   *emby.Service
 	library   *library.Service
-	sources   *source.Service
 	export    *export.Manager
 }
 
@@ -277,35 +276,21 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 		metadata:  metadataSvc,
 		embySvc:   embySvc,
 		library:   libSvc,
-		sources:   sourceSvc,
 		export:    exportMgr,
 	}, nil
 }
 
 // start runs the startup side effects that New deliberately leaves out: the
-// account token refresh loop, the startup scans and the STRM rewrite.
+// account token refresh loop, the startup scans and the STRM rewrite. Sources
+// only get an incremental sync: new files are still discovered, but existing
+// movies are not all re-scraped on every start.
 func (a *App) start(ctx context.Context) {
 	a.driveSvc.StartAccountRefresh(ctx)
 	if err := a.library.ScheduleLocalScan(ctx); err != nil {
 		a.logger.ErrorContext(ctx, "failed to queue startup Emby directory scan", "error", err)
 	}
-	if targets, err := a.sources.LocalTargets(ctx); err != nil {
-		a.logger.ErrorContext(ctx, "failed to load local sources", "error", err)
-	} else {
-		for _, target := range targets {
-			if _, err := a.library.StartLocalSourceScanMode(ctx, target.Path, target.MetadataOnly); err != nil {
-				a.logger.ErrorContext(ctx, "failed to queue local source scan", "path", target.Path, "error", err)
-			}
-		}
-	}
-	if mounts, err := a.sources.LibrarySources(ctx); err != nil {
-		a.logger.ErrorContext(ctx, "failed to load cloud sources", "error", err)
-	} else {
-		for _, source := range mounts {
-			if _, err := a.library.EnqueueScan(ctx, source); err != nil {
-				a.logger.ErrorContext(ctx, "failed to queue cloud source scan", "error", err)
-			}
-		}
+	if _, err := a.library.StartIncrementalSync(ctx); err != nil {
+		a.logger.ErrorContext(ctx, "failed to queue startup source sync", "error", err)
 	}
 	if exportCfg := a.export.Config(); exportCfg.PublicURL != "" && exportCfg.EmbyDir != "" {
 		a.embySvc.StartStartupSTRMRewrite()

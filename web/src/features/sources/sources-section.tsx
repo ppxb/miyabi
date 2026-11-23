@@ -50,6 +50,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { PanDirectoryDialog } from '@/features/settings/pan-directory-dialog'
@@ -138,6 +139,7 @@ export function SourcesSection() {
         </Button>
       </div>
 
+      {sources.isPending ? <Skeleton className="h-4 w-40" /> : null}
       {sources.isError ? (
         <InlineError
           onRetry={() => void sources.refetch()}

@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { XIcon } from 'lucide-react'
 
 import type { LibraryFilterOptions } from '@/api/library'
@@ -12,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
+import { useDebouncedSearch } from '@/hooks/use-debounced-search'
 import { FilterMultiSelect } from './filter-multi-select'
 import type { MoviesFilter } from './types'
 
@@ -36,26 +36,7 @@ export function MovieFilterBar({
   value: MoviesFilter
   onChange: (next: MoviesFilter) => void
 }) {
-  const [query, setQuery] = useState(value.q ?? '')
-  const [syncedQ, setSyncedQ] = useState(value.q ?? '')
-
-  // Reflect external URL changes (back/forward) into the input, but never erase
-  // what the user is still typing: skip the write when the URL value merely
-  // echoes our own trimmed submission ("abc " -> "abc").
-  const externalQ = value.q ?? ''
-  if (externalQ !== syncedQ) {
-    setSyncedQ(externalQ)
-    if (externalQ !== query.trim()) {
-      setQuery(externalQ)
-    }
-  }
-
-  useEffect(() => {
-    const current = value.q ?? ''
-    if (query.trim() === current) return
-    const timer = setTimeout(() => onChange({ ...value, q: query.trim() || undefined }), 300)
-    return () => clearTimeout(timer)
-  }, [query, value, onChange])
+  const [query, setQuery] = useDebouncedSearch(value.q, q => onChange({ ...value, q }))
 
   const sortValue = value.sort ?? 'recent'
   const sourceValue = value.source ?? 'all'

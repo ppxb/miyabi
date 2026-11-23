@@ -15,6 +15,7 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/emby"
 	"github.com/ppxb/miyabi/internal/ent/task"
+	"github.com/ppxb/miyabi/internal/source"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -124,5 +125,42 @@ func TestSavingSourcesQueuesScan(t *testing.T) {
 	payload, err := tasks.DecodePayload[domain.ScanPayload](queued.Payload)
 	if err != nil || payload.Source.Directory.Path != wantRoot {
 		t.Fatalf("save did not queue source scan: got path %q, want %q; error %v", payload.Source.Directory.Path, wantRoot, err)
+	}
+}
+
+// Startup only runs an incremental sync of the configured sources, and a source
+// that cannot be queued (here its directory is gone) does not block the others.
+func TestStartupQueuesIncrementalSyncPerSource(t *testing.T) {
+	ctx := t.Context()
+	root := t.TempDir()
+	wantRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(t.TempDir(), "gone")
+	if err := os.Mkdir(missing, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &config.Config{DataDir: t.TempDir(), Listen: "127.0.0.1:0"}
+	a, err := New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = a.Close() }()
+	if _, err := source.New(a.store.Client, nil).Replace(ctx, []source.Source{
+		{Kind: source.KindLocal, Name: "gone", Enabled: true, Config: map[string]string{"path": missing}},
+		{Kind: source.KindLocal, Name: "ok", Enabled: true, Config: map[string]string{"path": root}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(missing); err != nil {
+		t.Fatal(err)
+	}
+
+	a.start(ctx)
+	queued := a.store.Client.Task.Query().Where(task.StatusEQ(task.StatusQueued)).OnlyX(ctx)
+	payload, err := tasks.DecodePayload[domain.ScanPayload](queued.Payload)
+	if err != nil || payload.Source.Directory.Path != wantRoot || !payload.Incremental {
+		t.Fatalf("startup scan = %+v, error %v; want incremental scan of %q", payload, err, wantRoot)
 	}
 }

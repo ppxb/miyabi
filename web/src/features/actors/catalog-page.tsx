@@ -1,6 +1,4 @@
 import { Link } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
-
 import { useActorCatalog } from '@/api/actors'
 import { imageURL } from '@/api/client'
 import { AppPage } from '@/components/app-page'
@@ -11,6 +9,7 @@ import { PageHeader } from '@/components/page-header'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useDebouncedSearch } from '@/hooks/use-debounced-search'
 
 const PAGE_SIZE = 40
 
@@ -23,28 +22,9 @@ export function ActorsCatalogPage({
   page: number
   onSearchChange: (next: { q?: string; page?: number }) => void
 }) {
-  const [query, setQuery] = useState(q ?? '')
-  const [syncedQ, setSyncedQ] = useState(q ?? '')
-
-  // Reflect external URL changes (back/forward) into the input, but never erase
-  // what the user is still typing: skip the write when the URL value merely
-  // echoes our own trimmed submission ("abc " -> "abc").
-  const externalQ = q ?? ''
-  if (externalQ !== syncedQ) {
-    setSyncedQ(externalQ)
-    if (externalQ !== query.trim()) {
-      setQuery(externalQ)
-    }
-  }
-
-  useEffect(() => {
-    const current = q ?? ''
-    if (query.trim() === current) return
-    const timer = setTimeout(() => {
-      onSearchChange({ q: query.trim() || undefined, page: undefined })
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [query, q, onSearchChange])
+  const [query, setQuery] = useDebouncedSearch(q, next =>
+    onSearchChange({ q: next, page: undefined })
+  )
 
   const catalog = useActorCatalog({ q: q ?? '', page, limit: PAGE_SIZE })
   const items = catalog.data?.actors ?? []

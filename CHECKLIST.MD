@@ -316,9 +316,9 @@
 
 ### 功能设计
 
-- [ ] **D7 每次启动全量入队扫描（待确认是否有意）**：`app.go:270-292` 启动即为全部云盘与本地源入队扫描，账号多、库大时启动即大量调用 115 API。改法：若非有意，改为仅补扫未完成任务或交由定时任务。
-- [ ] **D8 搜索框 ↔ URL 同步逻辑两份**：`movies/filter-bar.tsx:44-53` 与 `actors/catalog-page.tsx:31-38` 各写一份「防抖 + 渲染期回写」，并共有吞末尾空格 bug（R1 高）。改法：抽 `useDebouncedSearch` hook，一处修复。
-- [ ] **D9 settings 各 section 状态处理约定**：加载/错误/保存各自实现（R1 中「settings 各 section 仍不统一」）。改法：统一约定「加载 → Skeleton、错误 → `InlineError onRetry`、单一按钮尺寸」，不新增抽象，避免过度设计。
+- [x] **D7 每次启动全量入队扫描（待确认是否有意）**：`app.go:270-292` 启动即为全部云盘与本地源入队扫描，账号多、库大时启动即大量调用 115 API。改法：若非有意，改为仅补扫未完成任务或交由定时任务。（已决定并修复：启动改为 `StartIncrementalSync`——仍遍历目录发现新文件，只为未刮削影片排刮削任务，不再整库重刮；Emby 目录的只读本地扫描保留。`StartIncrementalSync` 改为单个源入队失败不影响其他源、错误合并返回；新增 `TestStartupQueuesIncrementalSyncPerSource`）
+- [x] **D8 搜索框 ↔ URL 同步逻辑两份**：`movies/filter-bar.tsx:44-53` 与 `actors/catalog-page.tsx:31-38` 各写一份「防抖 + 渲染期回写」，并共有吞末尾空格 bug（R1 高）。改法：抽 `useDebouncedSearch` hook，一处修复。（已修复：新增 `hooks/use-debounced-search.ts`，用 `useEffectEvent` 读取最新提交回调，调用方可传内联函数而不重置防抖；两处改用之。前端无 DOM 测试环境，未补 hook 单测）
+- [x] **D9 settings 各 section 状态处理约定**：加载/错误/保存各自实现（R1 中「settings 各 section 仍不统一」）。改法：统一约定「加载 → Skeleton、错误 → `InlineError onRetry`、单一按钮尺寸」，不新增抽象，避免过度设计。（核对：R1 已统一大部分；仅 `sources/sources-section.tsx` 加载态缺 `Skeleton`，已补）
 
 ---
 
