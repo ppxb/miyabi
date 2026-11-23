@@ -60,8 +60,7 @@ export const actorSourceNames: Record<string, string> = {
 export function useActorSources() {
   return useQuery({
     queryKey: actorSourcesKey,
-    queryFn: ({ signal }) =>
-      apiGet<ActorSource[]>('/api/settings/actor-sources', undefined, signal)
+    queryFn: ({ signal }) => apiGet<ActorSource[]>('/api/settings/actor-sources', undefined, signal)
   })
 }
 

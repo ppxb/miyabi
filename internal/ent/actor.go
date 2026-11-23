@@ -34,7 +34,7 @@ type Actor struct {
 	Gender actor.Gender `json:"gender,omitempty"`
 	// Avatar holds the value of the "avatar" field.
 	Avatar *string `json:"avatar,omitempty"`
-	// sha1 of the normalized name; indexed for O(log n) avatar lookups.
+	// sha1 of the normalized name, derived by a hook; indexed for O(log n) avatar lookups.
 	NameKey string `json:"name_key,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the ActorQuery when eager-loading is set.

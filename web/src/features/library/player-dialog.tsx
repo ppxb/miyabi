@@ -140,7 +140,11 @@ function LibraryPlayer({
           paused: current.state.paused
         }
       } else if (!pendingSeekRef.current) {
-        pendingSeekRef.current = { time: 0, rate: current.state.playbackRate, paused: current.state.paused }
+        pendingSeekRef.current = {
+          time: 0,
+          rate: current.state.playbackRate,
+          paused: current.state.paused
+        }
       }
     }
     if (value === 'direct') {

@@ -3,7 +3,13 @@ import { ChevronsUpDownIcon } from 'lucide-react'
 
 import type { LibraryFilterOption } from '@/api/library'
 import { Button } from '@/components/ui/button'
-import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList
+} from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 export function FilterMultiSelect({

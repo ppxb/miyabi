@@ -268,7 +268,9 @@ function MagnetCard({
                       <CloudDownloadIcon />
                       <div className="min-w-0">
                         <p className="truncate text-sm">{account.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{account.directory}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {account.directory}
+                        </p>
                       </div>
                     </DropdownMenuItem>
                   ))}

@@ -103,7 +103,7 @@ function MovieShelfContent({
       </div>
       <div
         ref={listRef}
-        className="-mx-4 flex snap-x snap-mandatory scroll-px-4 no-scrollbar gap-3 overflow-x-auto px-4 pt-1 pb-4 sm:gap-4 sm:py-1"
+        className="-mx-4 no-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pt-1 pb-4 sm:gap-4 sm:py-1"
       >
         {children}
       </div>

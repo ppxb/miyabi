@@ -214,7 +214,9 @@ func (_u *ActorUpdate) ClearProfile() *ActorUpdate {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (_u *ActorUpdate) Save(ctx context.Context) (int, error) {
-	_u.defaults()
+	if err := _u.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, _u.sqlSave, _u.mutation, _u.hooks)
 }
 
@@ -241,11 +243,15 @@ func (_u *ActorUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (_u *ActorUpdate) defaults() {
+func (_u *ActorUpdate) defaults() error {
 	if _, ok := _u.mutation.UpdatedAt(); !ok {
+		if actor.UpdateDefaultUpdatedAt == nil {
+			return fmt.Errorf("ent: uninitialized actor.UpdateDefaultUpdatedAt (forgotten import ent/runtime?)")
+		}
 		v := actor.UpdateDefaultUpdatedAt()
 		_u.mutation.SetUpdatedAt(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -606,7 +612,9 @@ func (_u *ActorUpdateOne) Select(field string, fields ...string) *ActorUpdateOne
 
 // Save executes the query and returns the updated Actor entity.
 func (_u *ActorUpdateOne) Save(ctx context.Context) (*Actor, error) {
-	_u.defaults()
+	if err := _u.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, _u.sqlSave, _u.mutation, _u.hooks)
 }
 
@@ -633,11 +641,15 @@ func (_u *ActorUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (_u *ActorUpdateOne) defaults() {
+func (_u *ActorUpdateOne) defaults() error {
 	if _, ok := _u.mutation.UpdatedAt(); !ok {
+		if actor.UpdateDefaultUpdatedAt == nil {
+			return fmt.Errorf("ent: uninitialized actor.UpdateDefaultUpdatedAt (forgotten import ent/runtime?)")
+		}
 		v := actor.UpdateDefaultUpdatedAt()
 		_u.mutation.SetUpdatedAt(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

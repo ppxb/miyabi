@@ -167,7 +167,9 @@ func (_c *ActorCreate) Mutation() *ActorMutation {
 
 // Save creates the Actor in the database.
 func (_c *ActorCreate) Save(ctx context.Context) (*Actor, error) {
-	_c.defaults()
+	if err := _c.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -194,12 +196,18 @@ func (_c *ActorCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (_c *ActorCreate) defaults() {
+func (_c *ActorCreate) defaults() error {
 	if _, ok := _c.mutation.CreatedAt(); !ok {
+		if actor.DefaultCreatedAt == nil {
+			return fmt.Errorf("ent: uninitialized actor.DefaultCreatedAt (forgotten import ent/runtime?)")
+		}
 		v := actor.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
 	}
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
+		if actor.DefaultUpdatedAt == nil {
+			return fmt.Errorf("ent: uninitialized actor.DefaultUpdatedAt (forgotten import ent/runtime?)")
+		}
 		v := actor.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
@@ -211,6 +219,7 @@ func (_c *ActorCreate) defaults() {
 		v := actor.DefaultNameKey
 		_c.mutation.SetNameKey(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

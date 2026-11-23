@@ -27,9 +27,7 @@ export function MovieHero({
             <Badge variant="outline" className="tabular-nums">
               {movie.code}
             </Badge>
-            {libraryStatus && movie.has_subtitle ? (
-              <Badge variant="outline">中文</Badge>
-            ) : null}
+            {libraryStatus && movie.has_subtitle ? <Badge variant="outline">中文</Badge> : null}
             {libraryStatus ? (
               <Badge variant={libraryStatus === 'done' ? 'library' : 'secondary'}>
                 {{ done: '已入库', pending: '待刮削', failed: '刮削失败' }[libraryStatus]}

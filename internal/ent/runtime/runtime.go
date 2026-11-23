@@ -32,6 +32,8 @@ import (
 // to their package variables.
 func init() {
 	actorMixin := schema.Actor{}.Mixin()
+	actorHooks := schema.Actor{}.Hooks()
+	actor.Hooks[0] = actorHooks[0]
 	actorMixinFields0 := actorMixin[0].Fields()
 	_ = actorMixinFields0
 	actorFields := schema.Actor{}.Fields()

@@ -11,7 +11,11 @@ import { PageHeader } from '@/components/page-header'
 import { LibraryMovieCard } from '@/features/library/movie-card'
 import { LazyLibraryPlayerDialog } from '@/features/library/player-dialog-lazy'
 import { MovieFilterBar } from '@/features/movies/filter-bar'
-import { moviesFilterFromSearch, moviesSearchFromFilter, type MoviesSearch } from '@/features/movies/search'
+import {
+  moviesFilterFromSearch,
+  moviesSearchFromFilter,
+  type MoviesSearch
+} from '@/features/movies/search'
 import type { MoviesFilter } from '@/features/movies/types'
 
 const PAGE_SIZE = 20

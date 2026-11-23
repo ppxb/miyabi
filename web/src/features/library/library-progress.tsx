@@ -33,32 +33,21 @@ export function LibraryProgress({ task }: { task?: ScanTask }) {
           />
         }
       >
-          <svg
-            viewBox="0 0 44 44"
-            className="size-11 -rotate-90"
-            shapeRendering="geometricPrecision"
-          >
-            <circle
-              cx="22"
-              cy="22"
-              r={radius}
-              fill="none"
-              strokeWidth="4"
-              className="stroke-muted"
-            />
-            <circle
-              cx="22"
-              cy="22"
-              r={radius}
-              fill="none"
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeDasharray={circumference}
-              strokeDashoffset={offset}
-              className="stroke-success transition-[stroke-dashoffset] duration-500"
-            />
-          </svg>
-          <span className="absolute text-[10px] font-medium tabular-nums">{bounded}%</span>
+        <svg viewBox="0 0 44 44" className="size-11 -rotate-90" shapeRendering="geometricPrecision">
+          <circle cx="22" cy="22" r={radius} fill="none" strokeWidth="4" className="stroke-muted" />
+          <circle
+            cx="22"
+            cy="22"
+            r={radius}
+            fill="none"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            className="stroke-success transition-[stroke-dashoffset] duration-500"
+          />
+        </svg>
+        <span className="absolute text-[10px] font-medium tabular-nums">{bounded}%</span>
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>

@@ -23,8 +23,8 @@ func TestEnsureProfilesAndCatalog(t *testing.T) {
 	defer store.Close()
 	db := store.Client
 
-	a1 := db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("七ツ森 りり").SetNameKey(domain.ActorNameKey("七ツ森 りり")).SaveX(ctx)
-	a2 := db.Actor.Create().SetProvider("duga").SetSourceID("x2").SetName("七ツ森りり").SetNameKey(domain.ActorNameKey("七ツ森りり")).SaveX(ctx)
+	a1 := db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("七ツ森 りり").SaveX(ctx)
+	a2 := db.Actor.Create().SetProvider("duga").SetSourceID("x2").SetName("七ツ森りり").SaveX(ctx)
 	db.Movie.Create().SetCode("TEST-001").AddActors(a1, a2).SaveX(ctx)
 
 	svc := New(db, nil, "", nil)
@@ -73,8 +73,8 @@ func TestDetailPersistsAliasesAndImages(t *testing.T) {
 	defer store.Close()
 	db := store.Client
 
-	a1 := db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("七ツ森 りり").SetNameKey(domain.ActorNameKey("七ツ森 りり")).SaveX(ctx)
-	a2 := db.Actor.Create().SetProvider("duga").SetSourceID("x2").SetName("七ツ森りり").SetNameKey(domain.ActorNameKey("七ツ森りり")).SaveX(ctx)
+	a1 := db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("七ツ森 りり").SaveX(ctx)
+	a2 := db.Actor.Create().SetProvider("duga").SetSourceID("x2").SetName("七ツ森りり").SaveX(ctx)
 	db.Movie.Create().SetCode("TEST-001").AddActors(a1, a2).SaveX(ctx)
 
 	gfDir := t.TempDir()
@@ -198,8 +198,8 @@ func TestFindNamesByIndexedKey(t *testing.T) {
 	db := store.Client
 
 	key := domain.ActorNameKey("七ツ森 りり")
-	db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("七ツ森 りり").SetNameKey(key).SaveX(ctx)
-	db.Actor.Create().SetProvider("duga").SetSourceID("x2").SetName("七ツ森りり").SetNameKey(domain.ActorNameKey("七ツ森りり")).SaveX(ctx)
+	db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("七ツ森 りり").SaveX(ctx)
+	db.Actor.Create().SetProvider("duga").SetSourceID("x2").SetName("七ツ森りり").SaveX(ctx)
 
 	names, err := New(db, nil, "", nil).findNames(ctx, key)
 	if err != nil {
@@ -255,5 +255,38 @@ func TestEnsureMovieProfilesLinksNewActorToExistingProfile(t *testing.T) {
 	freshActor := db.Actor.GetX(ctx, fresh.ID)
 	if fid, err := freshActor.QueryProfile().OnlyID(ctx); err != nil || fid != pid {
 		t.Fatalf("fresh actor profile=%d,%v want %d", fid, err, pid)
+	}
+}
+
+// name_key is derived by the Actor hook on create, bulk upsert (the scrape
+// path) and rename, so no writer has to set it.
+func TestActorNameKeyDerivedByHook(t *testing.T) {
+	ctx := t.Context()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	db := store.Client
+
+	upsert := func(name string) {
+		t.Helper()
+		if err := db.Actor.CreateBulk(db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName(name)).
+			OnConflictColumns(actor.FieldProvider, actor.FieldSourceID).UpdateNewValues().Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	upsert("七ツ森 りり")
+	got := db.Actor.Query().OnlyX(ctx)
+	if got.NameKey != domain.ActorNameKey("七ツ森 りり") {
+		t.Fatalf("created name_key = %q", got.NameKey)
+	}
+	upsert("別名")
+	if key := db.Actor.Query().OnlyX(ctx).NameKey; key != domain.ActorNameKey("別名") {
+		t.Fatalf("upserted name_key = %q", key)
+	}
+	renamed := got.Update().SetName("改名").SaveX(ctx)
+	if renamed.NameKey != domain.ActorNameKey("改名") {
+		t.Fatalf("renamed name_key = %q", renamed.NameKey)
 	}
 }

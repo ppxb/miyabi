@@ -108,10 +108,7 @@ export function MoviePreviewViewer({
           {activeIndex + 1} / {total}
         </p>
 
-        <div
-          ref={stripRef}
-          className="flex shrink-0 no-scrollbar overflow-x-auto px-4 pt-4 pb-6"
-        >
+        <div ref={stripRef} className="no-scrollbar flex shrink-0 overflow-x-auto px-4 pt-4 pb-6">
           {/* Centered while the thumbnails fit, still scrollable once they do not. */}
           <div className="mx-auto flex items-center gap-2">
             {images.map((image, itemIndex) => (

@@ -489,7 +489,8 @@ func (c *ActorClient) QueryProfile(_m *Actor) *ActorProfileQuery {
 
 // Hooks returns the client hooks.
 func (c *ActorClient) Hooks() []Hook {
-	return c.hooks.Actor
+	hooks := c.hooks.Actor
+	return append(hooks[:len(hooks):len(hooks)], actor.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
