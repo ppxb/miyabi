@@ -1193,8 +1193,8 @@ func ensureProfile(ctx context.Context, db *ent.Client, norm, name, nameZHT, ava
 }
 
 // persistImages seeds the actor's gfriends image paths once, only when the
-// profile has no images yet. It runs in a transaction so a partial failure does
-// not leave an incomplete gallery that future calls would skip.
+// profile has no images yet. rels is already deduplicated by imageRels, and a
+// single bulk insert is atomic, so a failure never leaves a partial gallery.
 func (s *Service) persistImages(ctx context.Context, norm string, rels []string) error {
 	if len(rels) == 0 {
 		return nil
@@ -1216,17 +1216,10 @@ func (s *Service) persistImages(ctx context.Context, norm string, rels []string)
 	if count > 0 {
 		return nil
 	}
-	tx, err := s.db.Tx(ctx)
-	if err != nil {
-		return err
+	builders := make([]*ent.ActorImageCreate, 0, len(rels))
+	for position, rel := range rels {
+		builders = append(builders, s.db.ActorImage.Create().
+			SetActorID(pid).SetURL(rel).SetProvider("gfriends").SetRole("portrait").SetPosition(position))
 	}
-	defer func() { _ = tx.Rollback() }()
-	items := make([]imageItem, 0, len(rels))
-	for _, rel := range rels {
-		items = append(items, imageItem{url: rel, provider: "gfriends", role: "portrait"})
-	}
-	if err := s.appendImageRows(ctx, tx, pid, items); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return s.db.ActorImage.CreateBulk(builders...).Exec(ctx)
 }

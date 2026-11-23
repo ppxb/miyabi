@@ -33,14 +33,13 @@ func (s *TenMusume) Fetch(ctx context.Context, ref domain.MovieRef) (domain.Movi
 	if !tenMusumeCode.MatchString(code) {
 		return domain.MovieMetadata{}, metadata.ErrNotFound
 	}
-	return fetchPondoJSON(ctx, &s.client, s.base, code, "10musume", 2471, "")
+	return fetchPondoJSON(ctx, &s.client, code, strings.ReplaceAll(code, "-", "_"), "10musume", 2471)
 }
 
-// fetchPondoJSON fetches and parses the shared 1pondo-family movie JSON for a
-// code. stripPrefix is removed from the code before deriving the movie id.
-func fetchPondoJSON(ctx context.Context, c *client, base, code, providerID string, siteID int, stripPrefix string) (domain.MovieMetadata, error) {
-	movieID := strings.ReplaceAll(strings.TrimPrefix(code, stripPrefix), "-", "_")
-	body, err := c.get(ctx, base+"dyn/phpauto/movie_details/movie_id/"+movieID+".json")
+// fetchPondoJSON fetches and parses the shared 1pondo-family movie JSON for
+// movieID from the client's site.
+func fetchPondoJSON(ctx context.Context, c *client, code, movieID, providerID string, siteID int) (domain.MovieMetadata, error) {
+	body, err := c.get(ctx, c.base+"dyn/phpauto/movie_details/movie_id/"+movieID+".json")
 	if err != nil {
 		return domain.MovieMetadata{}, err
 	}
@@ -48,7 +47,7 @@ func fetchPondoJSON(ctx context.Context, c *client, base, code, providerID strin
 }
 
 // parsePondoMovieJSON reads the shared 1pondo-family movie JSON (used by
-// 10musume and muramura; onepondo has its own slightly older variant).
+// onepondo, 10musume and muramura).
 func parsePondoMovieJSON(body []byte, code, movieID, providerID string, expectedSiteID int) (domain.MovieMetadata, error) {
 	var doc map[string]any
 	if err := json.Unmarshal(body, &doc); err != nil {

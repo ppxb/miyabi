@@ -77,7 +77,7 @@ func TestOfflineCompletionAndTargetedScanCommitTogether(t *testing.T) {
 	if count, err := service.database.Task.Query().Where(task.TypeEQ("scan")).Count(ctx); err != nil || count != 1 {
 		t.Fatalf("scan escaped rollback: count=%d err=%v", count, err)
 	}
-	if err := service.UpdateTask(ctx, sess, record, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
+	if err := updateTestTask(service, ctx, sess, record, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
 		t.Fatal(err)
 	}
 	done, err := service.database.OfflineDownload.Get(ctx, record.ID)
@@ -104,7 +104,7 @@ func TestOfflineCompletionAndTargetedScanCommitTogether(t *testing.T) {
 	if count, err := service.database.Task.Query().Where(task.TypeEQ("scan")).Count(ctx); err != nil || count != 2 {
 		t.Fatalf("targeted scan count=%d err=%v", count, err)
 	}
-	if err := service.UpdateTask(ctx, sess, done, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
+	if err := updateTestTask(service, ctx, sess, done, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
 		t.Fatal(err)
 	}
 	if count, err := service.database.Task.Query().Where(task.TypeEQ("scan")).Count(ctx); err != nil || count != 2 {
@@ -119,7 +119,7 @@ func TestOfflineActionDependsOnCurrentFilesRatherThanDownloadHistory(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := service.UpdateTask(ctx, sess, record, pan.OfflineTask{Status: 2, FileID: "video-1"}); err != nil {
+	if err := updateTestTask(service, ctx, sess, record, pan.OfflineTask{Status: 2, FileID: "video-1"}); err != nil {
 		t.Fatal(err)
 	}
 	record, err = service.database.OfflineDownload.Get(ctx, record.ID)
@@ -176,7 +176,7 @@ func TestCompletedOfflineTaskDefersScanForAnotherMount(t *testing.T) {
 	mountSource(t, service.drive, stubOf(t, service.drive), domain.LibrarySource{
 		AccountID: source.AccountID, Directory: domain.LibraryDirectory{ID: "another-root", Name: "Another", Path: "/Another"},
 	})
-	if err := service.UpdateTask(t.Context(), sess, record, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
+	if err := updateTestTask(service, t.Context(), sess, record, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
 		t.Fatal(err)
 	}
 	record, err = service.database.OfflineDownload.Get(t.Context(), record.ID)
@@ -239,7 +239,7 @@ func TestOfflineActivitySeparatesLibraryEntryFromArtworkAndRechecksFiles(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := service.UpdateTask(ctx, sess, download, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
+	if err := updateTestTask(service, ctx, sess, download, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
 		t.Fatal(err)
 	}
 	download, err = service.database.OfflineDownload.Get(ctx, download.ID)

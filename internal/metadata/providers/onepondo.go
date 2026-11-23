@@ -14,12 +14,10 @@ import (
 )
 
 // OnePondo adapts 1pondo's public movie JSON into the metadata provider contract.
-type OnePondo struct {
-	client client
-}
+type OnePondo struct{ client }
 
 func NewOnePondo(proxy *netx.ProxyManager) *OnePondo {
-	return &OnePondo{client: newClient(proxy, "https://www.1pondo.tv/", "", "1pondo.tv")}
+	return &OnePondo{newClient(proxy, "https://www.1pondo.tv/", "", "1pondo.tv")}
 }
 
 func (*OnePondo) ID() string { return "onepondo" }
@@ -31,21 +29,13 @@ func (*OnePondo) Supports(code string) bool {
 	return strings.HasPrefix(upper, "1PONDO-") || onePondoCode.MatchString(upper)
 }
 
-func (s *OnePondo) Media(ctx context.Context, target string) (domain.Media, error) {
-	return s.client.Media(ctx, target)
-}
-
 func (s *OnePondo) Fetch(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
 	code := codeid.Normalize(ref.Code)
 	if !s.Supports(code) {
 		return domain.MovieMetadata{}, metadata.ErrNotFound
 	}
-	return fetchPondoJSON(ctx, &s.client, "https://www.1pondo.tv/", code, "onepondo", 2470, "1PONDO-")
-}
-
-func parseOnePondoJSON(body []byte, code string) (domain.MovieMetadata, error) {
 	movieID := strings.ReplaceAll(strings.TrimPrefix(code, "1PONDO-"), "-", "_")
-	return parsePondoMovieJSON(body, code, movieID, "onepondo", 2470)
+	return fetchPondoJSON(ctx, &s.client, code, movieID, "onepondo", 2470)
 }
 
 func firstValue(doc map[string]any, keys ...string) any {

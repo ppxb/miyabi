@@ -283,11 +283,11 @@
 - [x] `subscription-section.tsx:49` `items={[...options]}` 每次渲染复制；`:51` `next ?? ''` 写空串；三处 `as MagnetPreferences[...]`。改法：`PreferenceSelect<T extends string>` 泛型。（已修复：`PreferenceSelect<T extends string>` 泛型；`items` 直接传只读数组不再复制；`null` 时不触发 `onChange`；三处 `as MagnetPreferences[...]` 移除）
 
 薄封装 / 过度设计
-- [ ] `library/recent-shelf.tsx`、`top-rated-shelf.tsx` 各两行、唯一调用方，可内联用 `MovieShelfSection`（可选）。
-- [ ] `offline/sync.go:150` 导出 `UpdateTask`、`providers/onepondo.go:46` `parseOnePondoJSON` 仅测试使用。
-- [ ] `providers/tenmusume.go:41` `fetchPondoJSON` 7 参数，`stripPrefix` 仅 1pondo 用。改法：调用方传 movieID 或 `pondoSite{base, provider, siteID}`。
-- [ ] `actors` `persistImages` 已持 `persistMu`，为单条 `CreateBulk` 另开事务多余。
-- [ ] `app.go:172-178` cleanup 栈与 `metadata.Close`/`catalogue.Close` 重复关闭（幂等无 bug，所有权不清）。
+- [x] `library/recent-shelf.tsx`、`top-rated-shelf.tsx` 各两行、唯一调用方，可内联用 `MovieShelfSection`（可选）。（已修复：`library/page.tsx` 直接用 `MovieShelfSection` + `useRecentMovies`/`useTopRatedMovies(12)`，两文件移入回收站；`tsc`/`oxlint`/`vitest` 通过）
+- [x] `offline/sync.go:150` 导出 `UpdateTask`、`providers/onepondo.go:46` `parseOnePondoJSON` 仅测试使用。（已修复：删除 `UpdateTask`，测试改用 `sync_test.go` 内的 `updateTestTask` 助手；删除 `parseOnePondoJSON`，测试直接调 `parsePondoMovieJSON`）
+- [x] `providers/tenmusume.go:41` `fetchPondoJSON` 7 参数，`stripPrefix` 仅 1pondo 用。改法：调用方传 movieID 或 `pondoSite{base, provider, siteID}`。（已修复：去掉 `base`（改用 `c.base`）与 `stripPrefix`，调用方传 movieID；1pondo 自行去前缀）
+- [x] `actors` `persistImages` 已持 `persistMu`，为单条 `CreateBulk` 另开事务多余。（已修复：`count == 0` 后直接 `s.db.ActorImage.CreateBulk`，不再开事务、不再经 `appendImageRows` 重查已有图片）
+- [x] `app.go:172-178` cleanup 栈与 `metadata.Close`/`catalogue.Close` 重复关闭（幂等无 bug，所有权不清）。（已修复：删除 17 个 provider 与 4 个磁力客户端的单独 cleanup 登记，所有权归 `metadata`/`catalogue`；provider 直接内联进 `metadata.New`，单一列表。`freejavbt` 仍被两者共享关闭，其 Close 仅 `CloseIdleConnections`，幂等）
 
 其他
 - [ ] `actors/detail-page.tsx:142` 改用 `MediaImage` 后丢失 `alt`；`MediaImage` 需透传 `alt`。

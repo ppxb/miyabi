@@ -110,7 +110,7 @@ func TestRecoverySwitchesSeriallyAndPreservesTaskIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := r.s.UpdateTask(t.Context(), sess, original, pan.OfflineTask{Status: 2, FileID: "old-output"}); err != nil {
+	if err := updateTestTask(r.s, t.Context(), sess, original, pan.OfflineTask{Status: 2, FileID: "old-output"}); err != nil {
 		t.Fatal(err)
 	}
 	if got := r.s.database.OfflineDownload.GetX(t.Context(), original.ID); got.ScanTaskID != 0 || got.Status != offlinedownload.StatusRunning {

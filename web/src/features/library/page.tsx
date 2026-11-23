@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { useLibraryMovies } from '@/api/library'
+import { useLibraryMovies, useRecentMovies, useTopRatedMovies } from '@/api/library'
 import { isTaskActive } from '@/api/tasks'
 import { AppPage } from '@/components/app-page'
 import { EmptyState } from '@/components/empty-state'
@@ -8,14 +8,15 @@ import { ErrorState, InlineError } from '@/components/error-state'
 import { PageHeader } from '@/components/page-header'
 import { ContinueWatching } from '@/features/library/continue-watching'
 import { LibraryProgress } from '@/features/library/library-progress'
+import { MovieShelfSection } from '@/features/library/movie-shelf-section'
 import { LazyLibraryPlayerDialog } from '@/features/library/player-dialog-lazy'
-import { RecentlyAddedShelf } from '@/features/library/recent-shelf'
-import { TopRatedShelf } from '@/features/library/top-rated-shelf'
 import { useTaskConnection } from '@/features/tasks/task-events'
 import { useActiveScan } from '@/features/tasks/use-active-scan'
 
 export function LibraryPage() {
   const library = useLibraryMovies(1)
+  const recent = useRecentMovies()
+  const topRated = useTopRatedMovies(12)
   // `active` covers any active library task, including a single-movie rescrape.
   const { tasks, scans, active: progressTask } = useActiveScan()
   const connection = useTaskConnection()
@@ -49,8 +50,12 @@ export function LibraryPage() {
       ) : (
         <>
           <ContinueWatching onPlay={setPlayingId} />
-          <RecentlyAddedShelf onPlay={setPlayingId} />
-          <TopRatedShelf onPlay={setPlayingId} />
+          <MovieShelfSection
+            title="最近加入"
+            movies={recent.data?.movies ?? []}
+            onPlay={setPlayingId}
+          />
+          <MovieShelfSection title="高分影片" movies={topRated.data ?? []} onPlay={setPlayingId} />
           {!library.isPending && library.data.total === 0 ? (
             <EmptyState
               className="min-h-0 flex-1 py-12"

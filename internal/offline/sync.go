@@ -145,16 +145,8 @@ func (service *Service) currentMountFor(ctx context.Context, record *ent.Offline
 	return &source, nil
 }
 
-// UpdateTask applies a 115 offline remote task state to a local offline task.
+// updateTask applies a 115 offline remote task state to a local offline task.
 // The caller has already matched the remote task to the record by info hash.
-func (service *Service) UpdateTask(ctx context.Context, sess drive.Session, record *ent.OfflineDownload, remote pan.OfflineTask) error {
-	_, prefs, err := service.config(ctx)
-	if err != nil {
-		return err
-	}
-	return service.updateTask(ctx, sess, record, remote, prefs)
-}
-
 func (service *Service) updateTask(ctx context.Context, sess drive.Session, record *ent.OfflineDownload, remote pan.OfflineTask, prefs magnet.Preferences) error {
 	unlock, err := service.lockTask(ctx, record.ID)
 	if err != nil {

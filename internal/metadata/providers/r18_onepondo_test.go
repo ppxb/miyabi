@@ -67,7 +67,7 @@ func TestParseOnePondoFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := parseOnePondoJSON(body, "1PONDO-050826-001")
+	result, err := parsePondoMovieJSON(body, "1PONDO-050826-001", "050826_001", "onepondo", 2470)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestParseOnePondoRejectsMismatchedResponse(t *testing.T) {
 		`{"MovieID":"999999_999","SiteID":2470,"Title":"x"}`,
 		`{"MovieID":"050826_001","SiteID":2470}`,
 	} {
-		if _, err := parseOnePondoJSON([]byte(body), "1PONDO-050826-001"); !errors.Is(err, metadata.ErrNotFound) {
+		if _, err := parsePondoMovieJSON([]byte(body), "1PONDO-050826-001", "050826_001", "onepondo", 2470); !errors.Is(err, metadata.ErrNotFound) {
 			t.Fatalf("body %s accepted: %v", body, err)
 		}
 	}

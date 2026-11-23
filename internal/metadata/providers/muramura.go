@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"regexp"
+	"strings"
 
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -28,5 +29,5 @@ func (s *MuraMura) Fetch(ctx context.Context, ref domain.MovieRef) (domain.Movie
 	if !muraMuraCode.MatchString(code) {
 		return domain.MovieMetadata{}, metadata.ErrNotFound
 	}
-	return fetchPondoJSON(ctx, &s.client, s.base, code, "muramura", 2476, "")
+	return fetchPondoJSON(ctx, &s.client, code, strings.ReplaceAll(code, "-", "_"), "muramura", 2476)
 }

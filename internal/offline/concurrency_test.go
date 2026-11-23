@@ -208,7 +208,7 @@ func TestOfflineStaleResultsPreserveCompletionAndIndexedFiles(t *testing.T) {
 	completed := pan.OfflineTask{Status: 2, FileID: "download-folder"}
 	finished := make(chan error, 2)
 	for range 2 {
-		go func() { finished <- service.UpdateTask(t.Context(), sess, record, completed) }()
+		go func() { finished <- updateTestTask(service, t.Context(), sess, record, completed) }()
 	}
 	for range 2 {
 		if err := awaitPan(t, finished); err != nil {
@@ -221,7 +221,7 @@ func TestOfflineStaleResultsPreserveCompletionAndIndexedFiles(t *testing.T) {
 	saved.FileIds = []string{"newly-indexed-video"}
 	service.database.OfflineDownload.UpdateOneID(record.ID).SetFileIds(saved.FileIds).ExecX(t.Context())
 	for _, remote := range []pan.OfflineTask{{Status: 1, Progress: 20}, {Status: -1}, {Status: 2, FileID: "old-download-folder"}} {
-		if err := service.UpdateTask(t.Context(), sess, record, remote); err != nil {
+		if err := updateTestTask(service, t.Context(), sess, record, remote); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -288,7 +288,7 @@ func TestOfflinePlayableProcessingStillDeduplicatesUntilWorkflowFinishes(t *test
 		Code: "ABP-001", Hash: offlineHashA, InfoHash: offlineHashA}
 
 	record := createDownload(service.database, input).SetStatus(offlinedownload.StatusRunning).SaveX(ctx)
-	if err := service.UpdateTask(ctx, sess, record, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
+	if err := updateTestTask(service, ctx, sess, record, pan.OfflineTask{Status: 2, FileID: "download-folder"}); err != nil {
 		t.Fatal(err)
 	}
 	record = service.database.OfflineDownload.GetX(ctx, record.ID)
@@ -333,7 +333,7 @@ func TestOfflineCompletionAndScanPagePreserveEachOthersFields(t *testing.T) {
 	finished := make(chan error, 2)
 	go func() {
 		<-start
-		finished <- service.UpdateTask(ctx, sess, record, pan.OfflineTask{Status: 2, FileID: payload.TargetID})
+		finished <- updateTestTask(service, ctx, sess, record, pan.OfflineTask{Status: 2, FileID: payload.TargetID})
 	}()
 	go func() {
 		<-start

@@ -137,59 +137,52 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 	if err != nil {
 		return nil, err
 	}
-	cleanup = append(cleanup, javbusClient.Close)
 	sukebeiClient, err := sukebei.New(sukebei.Options{Proxy: networkSvc.ProxyManager()})
 	if err != nil {
 		return nil, fmt.Errorf("initialize Sukebei magnet source: %w", err)
 	}
-	cleanup = append(cleanup, sukebeiClient.Close)
 	freejavbtClient, err := freejavbt.New(freejavbt.Options{Proxy: networkSvc.ProxyManager()})
 	if err != nil {
 		return nil, fmt.Errorf("initialize freejavbt source: %w", err)
 	}
-	cleanup = append(cleanup, freejavbtClient.Close)
 	projectjavClient, err := projectjav.New(projectjav.Options{Proxy: networkSvc.ProxyManager()})
 	if err != nil {
 		return nil, fmt.Errorf("initialize ProjectJav magnet source: %w", err)
 	}
-	cleanup = append(cleanup, projectjavClient.Close)
+	// catalogue owns the magnet clients and metadata owns its providers: each
+	// service's Close releases what it was given, so they are not registered
+	// separately here. freejavbt is shared by both; its Close is idempotent.
 	catalogueSvc, err := catalogue.New(ctx, store.Client, networkSvc.ProxyManager(), libSvc, javbusClient, sukebeiClient, freejavbtClient, projectjavClient)
 	if err != nil {
 		return nil, fmt.Errorf("initialize catalogue service: %w", err)
 	}
 	cleanup = append(cleanup, catalogueSvc.Close)
-	fc2Source := providers.NewFC2(networkSvc.ProxyManager())
-	fc2dbSource := providers.NewFC2DB(networkSvc.ProxyManager())
-	fanzaSource := providers.NewFANZA(networkSvc.ProxyManager())
-	heyzoSource := providers.NewHEYZO(networkSvc.ProxyManager())
-	pacopacomamaSource := providers.NewPacopacomama(networkSvc.ProxyManager())
-	jav321Source := providers.NewJav321(networkSvc.ProxyManager())
-	tokyohotSource := providers.NewTokyoHot(networkSvc.ProxyManager())
-	heydougaSource := providers.NewHeydouga(networkSvc.ProxyManager())
-	caribbeancomSource := providers.NewCaribbeancom(networkSvc.ProxyManager())
-	caribbeancomprSource := providers.NewCaribbeancomPremium(networkSvc.ProxyManager())
-	c0930Source := providers.NewC0930(networkSvc.ProxyManager())
-	h0930Source := providers.NewH0930(networkSvc.ProxyManager())
-	h4610Source := providers.NewH4610(networkSvc.ProxyManager())
-	tenmusumeSource := providers.NewTenMusume(networkSvc.ProxyManager())
-	muramuraSource := providers.NewMuraMura(networkSvc.ProxyManager())
-	dahliaSource := providers.NewDahlia(networkSvc.ProxyManager())
-	dugaSource := providers.NewDuga(networkSvc.ProxyManager())
-	cleanup = append(cleanup,
-		fc2Source.Close, fc2dbSource.Close, fanzaSource.Close, heyzoSource.Close,
-		pacopacomamaSource.Close, jav321Source.Close, tokyohotSource.Close, heydougaSource.Close,
-		caribbeancomSource.Close, caribbeancomprSource.Close, c0930Source.Close, h0930Source.Close,
-		h4610Source.Close, tenmusumeSource.Close, muramuraSource.Close, dahliaSource.Close,
-		dugaSource.Close,
+	proxy := networkSvc.ProxyManager()
+	metadataSvc, err := metadata.New(ctx, store.Client,
+		providers.NewFANZA(proxy),
+		providers.NewFC2(proxy),
+		providers.NewFC2DB(proxy),
+		providers.NewHEYZO(proxy),
+		providers.NewPacopacomama(proxy),
+		providers.NewJavDB(catalogueSvc),
+		providers.NewJavBus(javbusClient, proxy),
+		providers.NewR18(proxy),
+		providers.NewOnePondo(proxy),
+		providers.NewCodeAV(proxy),
+		providers.NewJav321(proxy),
+		providers.NewTokyoHot(proxy),
+		providers.NewHeydouga(proxy),
+		providers.NewCaribbeancom(proxy),
+		providers.NewCaribbeancomPremium(proxy),
+		providers.NewC0930(proxy),
+		providers.NewH0930(proxy),
+		providers.NewH4610(proxy),
+		providers.NewTenMusume(proxy),
+		providers.NewMuraMura(proxy),
+		providers.NewDahlia(proxy),
+		providers.NewDuga(proxy),
+		freejavbtClient,
 	)
-	metadataSvc, err := metadata.New(ctx, store.Client, fanzaSource, fc2Source, fc2dbSource, heyzoSource, pacopacomamaSource,
-		providers.NewJavDB(catalogueSvc), providers.NewJavBus(javbusClient, networkSvc.ProxyManager()),
-		providers.NewR18(networkSvc.ProxyManager()),
-		providers.NewOnePondo(networkSvc.ProxyManager()),
-		providers.NewCodeAV(networkSvc.ProxyManager()),
-		jav321Source, tokyohotSource, heydougaSource,
-		caribbeancomSource, caribbeancomprSource, c0930Source, h0930Source, h4610Source, tenmusumeSource, muramuraSource,
-		dahliaSource, dugaSource, freejavbtClient)
 	if err != nil {
 		return nil, err
 	}
