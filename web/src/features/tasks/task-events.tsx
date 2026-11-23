@@ -10,6 +10,7 @@ import {
   type PropsWithChildren
 } from 'react'
 
+import { actorKeys } from '@/api/actors'
 import { notifyUnauthorized } from '@/api/client'
 import { movieStateKeys } from '@/api/movie-states'
 import { cancelQueryRefresh, refreshQueries } from '@/api/query-refresh'
@@ -127,7 +128,8 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
       const prev = stored?.instance === next.instance ? stored : undefined
       const keys: QueryKey[] = []
       const libraryChanged = prev?.library !== next.library
-      if (libraryChanged) keys.push(libraryKeys.all)
+      // Actor catalog and detail derive from library movies (counts, films, merges).
+      if (libraryChanged) keys.push(libraryKeys.all, actorKeys.all)
       if (libraryChanged || prev?.offline !== next.offline) {
         keys.push(movieStateKeys.all, offlineKeys.all)
       }
