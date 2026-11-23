@@ -214,3 +214,48 @@ func TestSafeDownloadLimitsAndRedirects(t *testing.T) {
 		})
 	}
 }
+
+// A proxied safe client validates the target itself before contacting the
+// proxy, so a plain client.Do (not only SafeDownload) cannot reach a private
+// address through it.
+func TestSafeClientValidatesProxiedTargets(t *testing.T) {
+	hits := 0
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer proxy.Close()
+	manager, err := NewProxyManager(ProxyConfig{Enabled: true, URL: proxy.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := NewSafeDownloadClient(manager, time.Second)
+	defer client.CloseIdleConnections()
+
+	for _, target := range []string{"http://10.0.0.1/x", "http://127.0.0.1/x", "http://localhost/x"} {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp, err := client.Do(req); err == nil {
+			resp.Body.Close()
+			t.Fatalf("%s reached the proxy", target)
+		}
+	}
+	if hits != 0 {
+		t.Fatalf("proxy contacted %d times for private targets", hits)
+	}
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://93.184.216.34/x", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("public target through proxy: %v", err)
+	}
+	resp.Body.Close()
+	if hits != 1 {
+		t.Fatalf("proxy hits = %d, want 1", hits)
+	}
+}

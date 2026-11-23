@@ -325,7 +325,7 @@
 ## 待确认（需人工判断，暂不处理）
 
 - [x] `api/rate_limiter.go:71`：记录满 4096 后拒绝所有新 IP，是否可接受。（已决定并修复：满表时淘汰最快到期的空闲记录（普通失败窗口先于封禁被淘汰），有进行中尝试的记录不淘汰；全部在进行中时才拒绝。容量测试同步更新）
-- [ ] `netx/ssrf.go:122-124`：启用代理后跳过 SSRF 检查，是否符合威胁模型。
+- [x] `netx/ssrf.go:122-124`：启用代理后跳过 SSRF 检查，是否符合威胁模型。（已决定并修复：拨号期检查对代理请求必须跳过（拨的是代理本身），但此前目标 URL 也一并未校验——刮削 provider、演员图片、AV-League、freejavbt 直接 `client.Do`，经代理可访问内网。现于 `NewSafeTransport` 的 `Proxy` 回调中对代理请求执行 `ValidateSafeURL`（每个请求与每跳重定向都会经过），重定向检查统一为形状校验；新增 `TestSafeClientValidatesProxiedTargets`。已知局限：代理自行解析 DNS，无法防 DNS 重绑定，需在代理侧禁止内网）
 - [ ] `api/auth.go:369`：未校验来源即采信 `X-Forwarded-Proto` 决定 cookie `Secure`。
 - [ ] `task-events.tsx`：后端 revision 是否在重启后归零（决定 P1 修复方式）。
 - [ ] Go 空切片序列化为 `null`：前端 `?? []`（`metadata.tsx:18-19`、`recommendations.tsx:12`、`previews.tsx:12`）是否必要。

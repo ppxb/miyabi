@@ -119,9 +119,26 @@ func ValidateSafeURL(ctx context.Context, rawURL string) (*url.URL, error) {
 	return parsed, nil
 }
 
-// NewSafeTransport creates an http.Transport with SSRF protection at dial time.
+// NewSafeTransport creates an http.Transport with SSRF protection. Direct
+// connections are checked and pinned at dial time; proxied requests have their
+// target validated before being handed to the proxy.
 func NewSafeTransport(proxyManager *ProxyManager) *http.Transport {
 	transport := NewTransport(proxyManager)
+	if proxy := transport.Proxy; proxy != nil {
+		// The transport calls Proxy for every request, including each redirect
+		// hop. A proxied request dials the proxy itself, so the dial-time check
+		// below cannot see the target: resolve and validate it here instead.
+		transport.Proxy = func(req *http.Request) (*url.URL, error) {
+			proxyURL, err := proxy(req)
+			if err != nil || proxyURL == nil {
+				return proxyURL, err
+			}
+			if _, err := ValidateSafeURL(req.Context(), req.URL.String()); err != nil {
+				return nil, err
+			}
+			return proxyURL, nil
+		}
+	}
 
 	dialer := &net.Dialer{
 		Timeout:   10 * time.Second,
@@ -131,8 +148,8 @@ func NewSafeTransport(proxyManager *ProxyManager) *http.Transport {
 	// Enforce SSRF protection at TCP dial time to prevent DNS rebinding attacks
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		// When traffic is routed through a proxy, addr is the proxy server itself
-		// (e.g. 127.0.0.1:7890 or a LAN proxy). Direct SSRF checks apply strictly
-		// to direct connections, as the proxy handles upstream resolution.
+		// (e.g. 127.0.0.1:7890 or a LAN proxy); the target was already validated
+		// in transport.Proxy, so only direct connections are checked here.
 		if proxyManager != nil && proxyManager.Resolve() != nil {
 			return dialer.DialContext(ctx, network, addr)
 		}
@@ -197,15 +214,9 @@ func NewSafeDownloadClient(proxyManager *ProxyManager, timeout time.Duration) *h
 			if len(via) >= MaxRedirects {
 				return fmt.Errorf("stopped after %d redirects", MaxRedirects)
 			}
-			// A proxied transport skips dial-time SSRF checks (it dials the proxy),
-			// so the redirect target must be fully validated here. Direct
-			// connections are resolved and pinned at dial time, so a cheap shape
-			// check avoids a duplicate DNS lookup.
-			if proxyManager != nil && proxyManager.Resolve() != nil {
-				if _, err := ValidateSafeURL(req.Context(), req.URL.String()); err != nil {
-					return fmt.Errorf("redirect blocked: %w", err)
-				}
-			} else if _, err := validateSafeURLShape(req.URL.String()); err != nil {
+			// The redirect hop is fully validated again by the transport (Proxy
+			// hook or dial-time check), so a cheap shape check is enough here.
+			if _, err := validateSafeURLShape(req.URL.String()); err != nil {
 				return fmt.Errorf("redirect blocked: %w", err)
 			}
 			return nil
