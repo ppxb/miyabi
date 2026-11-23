@@ -66,9 +66,7 @@ func (l *loginRateLimiter) begin(ip string) (*ipLoginRecord, error) {
 
 	rec := l.records[ip]
 	if rec == nil {
-		// Never evict active bans to admit a new IP: rotating IPs must not
-		// erase another address's failure history or release in-flight slots.
-		if len(l.records) >= maxLoginRecords {
+		if len(l.records) >= maxLoginRecords && !l.evictSoonestExpiring() {
 			return nil, ErrTooManyLoginAttempts
 		}
 		rec = &ipLoginRecord{}
@@ -119,6 +117,28 @@ func (l *loginRateLimiter) finish(ip string, rec *ipLoginRecord, result loginAtt
 	if rec.pending == 0 && rec.failures == 0 {
 		delete(l.records, ip)
 	}
+}
+
+// evictSoonestExpiring makes room in a full table by dropping the idle record
+// that would expire first, so short failure windows go before long bans.
+// Records with pending attempts are never evicted because finish still holds
+// them; it reports false when every record is pending.
+func (l *loginRateLimiter) evictSoonestExpiring() bool {
+	var victim string
+	var soonest time.Time
+	found := false
+	for key, rec := range l.records {
+		if rec.pending > 0 {
+			continue
+		}
+		if at := rec.expiresAt(l.window); !found || at.Before(soonest) {
+			victim, soonest, found = key, at, true
+		}
+	}
+	if found {
+		delete(l.records, victim)
+	}
+	return found
 }
 
 func (rec *ipLoginRecord) expiresAt(window time.Duration) time.Time {

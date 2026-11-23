@@ -106,17 +106,23 @@ func TestLoginRateLimiterCapacityAndExpiredRecordReclamation(t *testing.T) {
 		for i := range maxLoginRecords - 2 {
 			completeLoginAttempt(t, limiter, fmt.Sprint(i), loginFailed)
 		}
-		for range 3 {
-			if _, err := limiter.begin("new"); !errors.Is(err, ErrTooManyLoginAttempts) {
-				t.Fatalf("full limiter admitted an untracked IP: %v", err)
-			}
+		// A full table admits a new IP by evicting the idle record that expires
+		// first: a short failure window, never the longer active ban or the
+		// record with an in-flight attempt.
+		newcomer, err := limiter.begin("new")
+		if err != nil {
+			t.Fatalf("full limiter rejected a new IP: %v", err)
 		}
-		if len(limiter.records) != maxLoginRecords {
+		if len(limiter.records) != maxLoginRecords || limiter.records["new"] != newcomer {
 			t.Fatalf("record count=%d", len(limiter.records))
+		}
+		if limiter.records["pending"] != pending {
+			t.Fatal("capacity pressure evicted a pending record")
 		}
 		if _, err := limiter.begin("banned"); !errors.Is(err, ErrTooManyLoginAttempts) {
 			t.Fatalf("capacity pressure evicted an active ban: %v", err)
 		}
+		limiter.finish("new", newcomer, loginNotVerified)
 		// Known IPs can still authenticate while the table is full.
 		completeLoginAttempt(t, limiter, "0", loginSucceeded)
 		completeLoginAttempt(t, limiter, "new", loginNotVerified)
