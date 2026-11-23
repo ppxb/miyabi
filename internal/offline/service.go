@@ -47,14 +47,16 @@ type Service struct {
 	policy        recoveryPolicy
 }
 
-// New creates a new offline download management service.
-func New(database *ent.Client, catalogue Catalogue, drive *drive.Drive, tasks *tasks.Service, library Library, submitTimeout time.Duration) *Service {
+// New creates a new offline download management service. metadata prewarms the
+// scrape cache when a movie is added to the drive; nil disables prewarming.
+func New(database *ent.Client, catalogue Catalogue, drive *drive.Drive, tasks *tasks.Service, library Library, metadata MetadataWarmer, submitTimeout time.Duration) *Service {
 	return &Service{
 		database:  database,
 		catalogue: catalogue,
 		drive:     drive,
 		tasks:     tasks,
 		library:   library,
+		metadata:  metadata,
 
 		submitTimeout: submitTimeout,
 		now:           time.Now,
@@ -65,10 +67,4 @@ func New(database *ent.Client, catalogue Catalogue, drive *drive.Drive, tasks *t
 			maxAttempts:         3,
 		},
 	}
-}
-
-// SetMetadata wires the metadata warmer used to prewarm the scrape cache when a
-// movie is added to the drive. Optional: nil disables prewarming.
-func (service *Service) SetMetadata(warmer MetadataWarmer) {
-	service.metadata = warmer
 }

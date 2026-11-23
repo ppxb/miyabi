@@ -267,7 +267,7 @@ func libraryBaseFixture(t testing.TB) (*Service, *drive.Drive, *ent.Client, doma
 			"ABP-001":       {{Hash: offlineHashA}, {Hash: offlineHashB}},
 		},
 	}
-	service := New(store.Client, cat, driveSvc, taskSvc, lib, 2*time.Minute)
+	service := New(store.Client, cat, driveSvc, taskSvc, lib, nil, 2*time.Minute)
 	return service, driveSvc, store.Client, source
 }
 

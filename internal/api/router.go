@@ -93,7 +93,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	settingsAPI.GET("/subscription", subscriptionSettingsGetHandler(deps.Monitor))
 	settingsAPI.PUT("/subscription", subscriptionSettingsUpdateHandler(deps.Monitor))
 	settingsAPI.GET("/sources", sourceListHandler(deps.Sources))
-	settingsAPI.PUT("/sources", sourceUpdateHandler(deps.Sources))
+	settingsAPI.PUT("/sources", sourceUpdateHandler(deps.Sources, deps.Library))
 
 	protected.GET("/library/movies", libraryMoviesHandler(deps.Library))
 	protected.GET("/library/browse", libraryBrowseHandler(deps.Library))

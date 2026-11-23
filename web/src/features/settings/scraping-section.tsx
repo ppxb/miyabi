@@ -8,10 +8,8 @@ import {
   useUpdateActorSources,
   useUpdateScrapingSources
 } from '@/api/metadata'
-import { InlineError } from '@/components/error-state'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Switch } from '@/components/ui/switch'
-import { SettingRow, SettingsSection } from './shared'
+import { SettingsSection } from './shared'
+import { SourceToggleList } from './source-toggle-list'
 
 const descriptions: Record<string, string> = {
   fanza: '官方封面、预览图和影片资料',
@@ -42,73 +40,6 @@ const descriptions: Record<string, string> = {
 const actorDescriptions: Record<string, string> = {
   'av-league': '演员个性化数据来源',
   gfriends: '演员头像来源'
-}
-
-type ToggleSource = { id: string; enabled: boolean }
-type ToggleQuery = {
-  data?: ToggleSource[]
-  isPending: boolean
-  isError: boolean
-  isFetching: boolean
-  refetch: () => void
-}
-type ToggleUpdate = {
-  isPending: boolean
-  isError: boolean
-  variables?: ToggleSource[]
-  mutate: (next: ToggleSource[]) => void
-}
-
-/** Source on/off toggles with loading, optimistic state and retry handling. */
-function SourceToggleList({
-  query,
-  update,
-  names,
-  descriptions,
-  errorText
-}: {
-  query: ToggleQuery
-  update: ToggleUpdate
-  names: Record<string, string>
-  descriptions: Record<string, string>
-  errorText: string
-}) {
-  // Show the submitted state while the save is in flight so the toggle reacts
-  // immediately instead of waiting for the refetch.
-  const sources = (update.isPending ? update.variables : query.data) ?? []
-  return (
-    <>
-      {query.isPending ? <Skeleton className="h-4 w-40" /> : null}
-      {sources.map(source => (
-        <SettingRow
-          key={source.id}
-          title={names[source.id] ?? source.id}
-          description={descriptions[source.id]}
-          inline
-        >
-          <Switch
-            checked={source.enabled}
-            onCheckedChange={enabled =>
-              update.mutate(
-                sources.map(item => (item.id === source.id ? { ...item, enabled } : item))
-              )
-            }
-          />
-        </SettingRow>
-      ))}
-      {query.isError || update.isError ? (
-        <InlineError
-          onRetry={() => {
-            if (query.isError) void query.refetch()
-            else if (update.variables) update.mutate(update.variables)
-          }}
-          retrying={query.isFetching || update.isPending}
-        >
-          {errorText}
-        </InlineError>
-      ) : null}
-    </>
-  )
 }
 
 export function ScrapingSection() {

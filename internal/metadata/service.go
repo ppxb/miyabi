@@ -29,11 +29,6 @@ type Source interface {
 	Media(context.Context, string) (domain.Media, error)
 }
 
-type SourceSetting struct {
-	ID      string `json:"id"`
-	Enabled bool   `json:"enabled"`
-}
-
 type Service struct {
 	ctx      context.Context
 	cancel   context.CancelFunc
@@ -42,7 +37,7 @@ type Service struct {
 	db       *ent.Client
 	sources  map[string]Source
 	mu       sync.RWMutex
-	settings []SourceSetting
+	settings []domain.SourceToggle
 	requests singleflight.Group
 	capacity chan struct{}
 }
@@ -55,31 +50,16 @@ func New(ctx context.Context, db *ent.Client, sources ...Source) (*Service, erro
 			return nil, fmt.Errorf("duplicate metadata source %s", source.ID())
 		}
 		s.sources[source.ID()] = source
-		s.settings = append(s.settings, SourceSetting{ID: source.ID(), Enabled: true})
+		s.settings = append(s.settings, domain.SourceToggle{ID: source.ID(), Enabled: true})
 	}
-	settings, found, err := database.LoadSetting[[]SourceSetting](ctx, db, "metadata.sources")
+	settings, found, err := database.LoadSetting[[]domain.SourceToggle](ctx, db, "metadata.sources")
 	if err != nil {
 		return nil, err
 	}
 	if found {
-		// The registry defines available sources. Preserve their saved order and
-		// switches, discard removed sources, then append newly registered ones.
-		registered := make(map[string]bool, len(s.sources))
-		var current []SourceSetting
-		for _, setting := range settings {
-			if s.sources[setting.ID] != nil {
-				current = append(current, setting)
-				registered[setting.ID] = true
-			}
-		}
-		for _, setting := range s.settings {
-			if !registered[setting.ID] {
-				current = append(current, setting)
-			}
-		}
-		s.settings = current
+		s.settings = domain.MergeSourceToggles(settings, s.settings)
 	}
-	slices.SortStableFunc(s.settings, func(a, b SourceSetting) int {
+	slices.SortStableFunc(s.settings, func(a, b domain.SourceToggle) int {
 		return cmp.Compare(sourceOrder(a.ID), sourceOrder(b.ID))
 	})
 	if err := s.validate(s.settings); err != nil {
@@ -101,23 +81,17 @@ func sourceOrder(id string) int {
 	}
 }
 
-func (s *Service) Settings() []SourceSetting {
+func (s *Service) Settings() []domain.SourceToggle {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return slices.Clone(s.settings)
 }
 
-func (s *Service) validate(settings []SourceSetting) error {
-	count := len(s.sources)
-	if len(settings) != count {
-		return domain.E(domain.KindInvalid, "请提供完整的刮削来源列表", nil)
+func (s *Service) validate(settings []domain.SourceToggle) error {
+	if err := domain.ValidateSourceToggles(settings, s.sources, "刮削来源"); err != nil {
+		return err
 	}
-	seen := make(map[string]bool)
 	for i, item := range settings {
-		if s.sources[item.ID] == nil || seen[item.ID] {
-			return domain.E(domain.KindInvalid, "未知或重复的刮削来源", nil)
-		}
-		seen[item.ID] = true
 		if i > 0 && sourceOrder(settings[i-1].ID) > sourceOrder(item.ID) {
 			return domain.E(domain.KindInvalid, "FANZA 必须为首选来源", nil)
 		}
@@ -125,7 +99,7 @@ func (s *Service) validate(settings []SourceSetting) error {
 	return nil
 }
 
-func (s *Service) UpdateSettings(ctx context.Context, settings []SourceSetting) error {
+func (s *Service) UpdateSettings(ctx context.Context, settings []domain.SourceToggle) error {
 	if err := s.validate(settings); err != nil {
 		return err
 	}

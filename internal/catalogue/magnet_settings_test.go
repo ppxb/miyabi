@@ -41,7 +41,7 @@ func TestMagnetSourceSettingsPersistAndRestore(t *testing.T) {
 		t.Fatalf("magnet sources should default to enabled: %+v", initial)
 	}
 
-	updated := []MagnetSourceSetting{
+	updated := []domain.SourceToggle{
 		{ID: domain.MagnetSourceSukebei, Enabled: true},
 		{ID: domain.MagnetSourceProjectJav, Enabled: false},
 	}
@@ -60,7 +60,7 @@ func TestMagnetSourceSettingsPersistAndRestore(t *testing.T) {
 	}
 
 	// Reject unknown sources.
-	if err := reopened.UpdateMagnetSourceSettings(t.Context(), []MagnetSourceSetting{{ID: "unknown", Enabled: true}}); err == nil {
+	if err := reopened.UpdateMagnetSourceSettings(t.Context(), []domain.SourceToggle{{ID: "unknown", Enabled: true}}); err == nil {
 		t.Fatal("expected validation error for unknown magnet source")
 	}
 }

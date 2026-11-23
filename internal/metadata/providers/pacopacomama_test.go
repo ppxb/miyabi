@@ -246,7 +246,7 @@ func TestPacopacomamaResolveKeepsJavDBEntitiesAndWorksWithoutCatalogue(t *testin
 				t.Fatal(err)
 			}
 			defer s.Close()
-			if !reflect.DeepEqual(s.Settings(), []metadata.SourceSetting{{ID: "pacopacomama", Enabled: true}, {ID: "javdb", Enabled: true}}) {
+			if !reflect.DeepEqual(s.Settings(), []domain.SourceToggle{{ID: "pacopacomama", Enabled: true}, {ID: "javdb", Enabled: true}}) {
 				t.Fatalf("source not enabled by default: %+v", s.Settings())
 			}
 			ref := domain.MovieRef{Code: "PACOPACOMAMA-010126-100"}

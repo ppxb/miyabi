@@ -35,6 +35,7 @@ func TestEmbyDirectoryAutomaticallyQueuesLocalScan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	a.start(ctx)
 	defer func() {
 		if a != nil {
 			_ = a.Close()
@@ -82,9 +83,46 @@ func TestEmbyDirectoryAutomaticallyQueuesLocalScan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	a.start(ctx)
 	queued = a.store.Client.Task.Query().Where(task.StatusEQ(task.StatusQueued)).OnlyX(ctx)
 	payload, err = tasks.DecodePayload[domain.ScanPayload](queued.Payload)
 	if err != nil || payload.Source.Directory.Path != wantNewRoot {
 		t.Fatalf("restart used stale directory: got path %q, want %q; error %v", payload.Source.Directory.Path, wantNewRoot, err)
+	}
+}
+
+// Saving sources through the real settings handler queues a scan for each
+// enabled source; the API layer now orchestrates this instead of source.
+func TestSavingSourcesQueuesScan(t *testing.T) {
+	ctx := t.Context()
+	root := t.TempDir()
+	wantRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := &config.Config{DataDir: t.TempDir(), Listen: "127.0.0.1:0"}
+	a, err := New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = a.Close() }()
+
+	body, err := json.Marshal([]map[string]any{
+		{"kind": "local", "name": "local", "enabled": true, "config": map[string]string{"path": root}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPut, "/api/settings/sources", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	a.server.Handler.ServeHTTP(response, req)
+	if response.Code != http.StatusOK {
+		t.Fatalf("save: %d %s", response.Code, response.Body.String())
+	}
+	queued := a.store.Client.Task.Query().Where(task.StatusEQ(task.StatusQueued)).OnlyX(ctx)
+	payload, err := tasks.DecodePayload[domain.ScanPayload](queued.Payload)
+	if err != nil || payload.Source.Directory.Path != wantRoot {
+		t.Fatalf("save did not queue source scan: got path %q, want %q; error %v", payload.Source.Directory.Path, wantRoot, err)
 	}
 }

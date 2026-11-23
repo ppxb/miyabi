@@ -5,12 +5,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/domain"
-	"github.com/ppxb/miyabi/internal/metadata"
 )
 
 type MetadataManager interface {
-	Settings() []metadata.SourceSetting
-	UpdateSettings(context.Context, []metadata.SourceSetting) error
+	Settings() []domain.SourceToggle
+	UpdateSettings(context.Context, []domain.SourceToggle) error
 	ResolveExcept(context.Context, domain.MovieRef, ...string) (domain.MovieMetadata, error)
 	Image(context.Context, domain.ImageCandidate) (domain.Media, error)
 }
@@ -20,7 +19,7 @@ func metadataSettingsHandler(service MetadataManager) gin.HandlerFunc {
 }
 func metadataUpdateHandler(service MetadataManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		settings, ok := bindJSON[[]metadata.SourceSetting](c)
+		settings, ok := bindJSON[[]domain.SourceToggle](c)
 		if !ok {
 			return
 		}

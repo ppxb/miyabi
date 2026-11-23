@@ -35,10 +35,8 @@ type Source struct {
 
 // Service persists the configured storage sources as a single settings row.
 type Service struct {
-	client      *ent.Client
-	onLocalScan func(context.Context, string, bool) error
-	onScan      func(context.Context, domain.LibrarySource) error
-	mounts      MountProvider
+	client *ent.Client
+	mounts MountProvider
 }
 
 // LocalTarget is an enabled local source directory and its metadata mode.
@@ -52,23 +50,9 @@ type MountProvider interface {
 	Mount(context.Context, string) (domain.LibrarySource, bool, error)
 }
 
-func New(client *ent.Client) *Service {
-	return &Service{client: client}
-}
-
-// SetLocalScanHandler lets the composition root enqueue scans after sources change.
-func (s *Service) SetLocalScanHandler(handler func(context.Context, string, bool) error) {
-	s.onLocalScan = handler
-}
-
-// SetScanHandler enqueues scans for configured cloud sources.
-func (s *Service) SetScanHandler(handler func(context.Context, domain.LibrarySource) error) {
-	s.onScan = handler
-}
-
-// SetMountProvider lets the service resolve 115 account mounts.
-func (s *Service) SetMountProvider(provider MountProvider) {
-	s.mounts = provider
+// New creates the source service; mounts resolves 115 account mount directories.
+func New(client *ent.Client, mounts MountProvider) *Service {
+	return &Service{client: client, mounts: mounts}
 }
 
 func (s *Service) List(ctx context.Context) ([]Source, error) {
@@ -97,30 +81,7 @@ func (s *Service) Replace(ctx context.Context, sources []Source) ([]Source, erro
 	if err := database.SaveSetting(ctx, s.client, settingKey, sources); err != nil {
 		return nil, err
 	}
-	s.triggerScans(ctx, sources)
 	return sources, nil
-}
-
-func (s *Service) triggerScans(ctx context.Context, sources []Source) {
-	for _, src := range sources {
-		if !src.Enabled {
-			continue
-		}
-		switch src.Kind {
-		case KindLocal:
-			if path := strings.TrimSpace(src.Config["path"]); path != "" && s.onLocalScan != nil {
-				_ = s.onLocalScan(ctx, path, localMetadataOnly(src))
-			}
-		case Kind115:
-			accountID := strings.TrimSpace(src.Config["account_id"])
-			if accountID == "" || s.mounts == nil {
-				continue
-			}
-			if mount, ok, err := s.mounts.Mount(ctx, accountID); err == nil && ok && s.onScan != nil {
-				_ = s.onScan(ctx, mount)
-			}
-		}
-	}
 }
 
 // LibrarySources returns the enabled 115 sources that have a mounted directory.
@@ -133,7 +94,7 @@ func (s *Service) LibrarySources(ctx context.Context) ([]domain.LibrarySource, e
 	}
 	result := make([]domain.LibrarySource, 0)
 	for _, src := range sources {
-		if src.Kind != Kind115 || !src.Enabled || s.mounts == nil {
+		if src.Kind != Kind115 || !src.Enabled {
 			continue
 		}
 		accountID := strings.TrimSpace(src.Config["account_id"])

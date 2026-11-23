@@ -2,7 +2,7 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/ppxb/miyabi/internal/catalogue"
+	"github.com/ppxb/miyabi/internal/domain"
 )
 
 func magnetSourceSettingsHandler(catalogueMgr CatalogueManager) gin.HandlerFunc {
@@ -13,7 +13,7 @@ func magnetSourceSettingsHandler(catalogueMgr CatalogueManager) gin.HandlerFunc 
 
 func magnetSourceUpdateHandler(catalogueMgr CatalogueManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		settings, ok := bindJSON[[]catalogue.MagnetSourceSetting](c)
+		settings, ok := bindJSON[[]domain.SourceToggle](c)
 		if !ok {
 			return
 		}

@@ -307,11 +307,11 @@
 - [ ] **D1 实体数据存在 KV 设置表中**：115 账号整份 map 存于 `pan.accounts`（`drive/accounts.go:17,32`），存储源整份 `[]Source` 存于设置（`source/source.go:74`）。改一个账号需全局 `accountsMu` 读改写，再叠加内存缓存同步，R1 高「mount 缓存被旧快照覆盖」即源于此。改法：改为 ent 实体 `PanAccount` / `StorageSource`，行级更新，去掉全局锁并简化缓存。
 - [ ] **D2 派生列缺统一的存量回填机制**：`rating10` 用 hook、`name_key` 在 `scrape/mapping.go:128` 写入、`canonical_code` 用 hook，均无回填，老库需重刮（R1 高「name_key 无存量回填」）。改法：`database.Open` 后执行极简「数据版本号 + 幂等回填函数列表」；`name_key` 改由 hook 维护。
 - [ ] **D3 演员分组键为派生值而非实体**：分组键 =「profile_id 或归一化名」，导致 Catalog 无法 SQL 分页（P1 第 49 条），并衍生 `reconcileActorProfiles`/`EnsureMovieProfiles`/`EnsureProfiles`/`loadGroup`/`findNames` 多套对账与反查（R1 高 #4、中「loadGroup/findNames 重复」）。改法：演员入库即挂 profile（无匹配则新建），分组键统一为 `profile_id`，Catalog 以 `ActorProfile` 为主表分页；对账逻辑与 `name_key` 随之收敛。改动面最大，需单独评估。
-- [ ] **D4 组装根 `app/app.go` 简化**：
-  - 17 个 provider 手动 new、单独登记 Close，又按另一份顺序传入 `metadata.New`，两份列表不一致（R18/OnePondo/CodeAV/JavDB/JavBus 不在 cleanup 中）。改法：provider 列表单一来源，由 `metadata.Service` 统一持有与关闭。
-  - 5 处 setter 注入：`SetMetadata`、`SetMountProvider` 仅是构造顺序问题，调换顺序改构造参数；`SetScanHandler`/`SetLocalScanHandler`（source↔library 互相回调）可改由 API 层编排（保存源后直接调 library 入队）。
-  - `New()` 含副作用：启动账号刷新 goroutine、入队全部扫描、STRM 重写（`app.go:93,270-295`）。改法：移到 `Run()`，`New` 只做组装。
-- [ ] **D5 三套「来源开关」实现**：`metadata.sources`（`metadata/service.go:60`）、演员来源（`actors/service.go:113`）、`magnet.sources`（`catalogue/magnet_settings.go:64`）各自一套类型/读取/排序/API；前端 `settings/magnet-sources-section.tsx` 复制了 `SourceToggleList` 的逻辑。改法：后端抽通用开关列表 helper，前端统一一个组件。
+- [x] **D4 组装根 `app/app.go` 简化**：
+  - 17 个 provider 手动 new、单独登记 Close，又按另一份顺序传入 `metadata.New`，两份列表不一致（R18/OnePondo/CodeAV/JavDB/JavBus 不在 cleanup 中）。改法：provider 列表单一来源，由 `metadata.Service` 统一持有与关闭。（已随「薄封装」第 5 条修复：provider 内联进 `metadata.New`，单独 cleanup 登记删除；OnePondo 改为嵌入 client 后也能被关闭）
+  - 5 处 setter 注入：`SetMetadata`、`SetMountProvider` 仅是构造顺序问题，调换顺序改构造参数；`SetScanHandler`/`SetLocalScanHandler`（source↔library 互相回调）可改由 API 层编排（保存源后直接调 library 入队）。（已修复：`source.New(client, mounts)`、`offline.New(..., metadata, ...)` 改为构造参数；删除 `SetScanHandler`/`SetLocalScanHandler`/`triggerScans`，`sourceUpdateHandler` 保存成功后调 `library.StartIncrementalSync`，入队失败记 warn 不影响保存；新增 `TestSavingSourcesQueuesScan`。`SetMediaNotifier` 为 library↔emby 真循环依赖，保留）
+  - `New()` 含副作用：启动账号刷新 goroutine、入队全部扫描、STRM 重写（`app.go:93,270-295`）。改法：移到 `Run()`，`New` 只做组装。（已修复：三项副作用收进 `(*App).start(ctx)`，`Run` 开头调用；账号刷新改用 `Run` 的 ctx；`local_scan_test` 在 `New` 后显式调 `start`）
+- [x] **D5 三套「来源开关」实现**：`metadata.sources`（`metadata/service.go:60`）、演员来源（`actors/service.go:113`）、`magnet.sources`（`catalogue/magnet_settings.go:64`）各自一套类型/读取/排序/API；前端 `settings/magnet-sources-section.tsx` 复制了 `SourceToggleList` 的逻辑。改法：后端抽通用开关列表 helper，前端统一一个组件。（已修复：新增 `domain.SourceToggle` + `ValidateSourceToggles`/`MergeSourceToggles`，三处删除各自类型改用之，各自仅保留特有规则（FANZA 首位排序、磁力 Toggle 生效）；演员来源非法输入由 500 改为 400；前端抽出 `settings/source-toggle-list.tsx`，刮削/演员/磁力三处共用）
 - [ ] **D6 上游源健康检测**：`613fcad` 仅把挑战页映射为 `domain.Blocked`，连接失败/超时仍每次等满超时。改法：在磁力聚合层加所有源共用的熔断（连续失败 N 次 → 冷却 T 分钟），可参考 providers 的 `admit` 冷却；不恢复 javbus 单源探活。
 
 ### 功能设计

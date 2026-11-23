@@ -11,19 +11,19 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 )
 
-func newTestService(t *testing.T) *Service {
+func newTestService(t *testing.T, mounts MountProvider) *Service {
 	t.Helper()
 	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
-	return New(store.Client)
+	return New(store.Client, mounts)
 }
 
 func TestReplaceValidates(t *testing.T) {
 	ctx := t.Context()
-	service := newTestService(t)
+	service := newTestService(t, nil)
 	dir := t.TempDir()
 	file := filepath.Join(dir, "file.txt")
 	if err := os.WriteFile(file, []byte("x"), 0o600); err != nil {
@@ -51,7 +51,7 @@ func TestReplaceValidates(t *testing.T) {
 
 func TestReplaceAssignsIDAndPersists(t *testing.T) {
 	ctx := t.Context()
-	service := newTestService(t)
+	service := newTestService(t, nil)
 	dir := t.TempDir()
 
 	saved, err := service.Replace(ctx, []Source{
@@ -74,7 +74,7 @@ func TestReplaceAssignsIDAndPersists(t *testing.T) {
 
 func TestLocalRoots(t *testing.T) {
 	ctx := t.Context()
-	service := newTestService(t)
+	service := newTestService(t, nil)
 	first := t.TempDir()
 	second := t.TempDir()
 
@@ -110,12 +110,11 @@ func (f fakeMounts) Mount(_ context.Context, accountID string) (domain.LibrarySo
 
 func TestLibrarySources(t *testing.T) {
 	ctx := t.Context()
-	service := newTestService(t)
 	mounted := domain.LibrarySource{
 		AccountID: "A",
 		Directory: domain.LibraryDirectory{ID: "10", Name: "Movies", Path: "/Movies"},
 	}
-	service.SetMountProvider(fakeMounts{mounts: map[string]domain.LibrarySource{"A": mounted}, broken: "ERR"})
+	service := newTestService(t, fakeMounts{mounts: map[string]domain.LibrarySource{"A": mounted}, broken: "ERR"})
 
 	if _, err := service.Replace(ctx, []Source{
 		{Kind: Kind115, Name: "broken", Enabled: true, Config: map[string]string{"account_id": "ERR"}},

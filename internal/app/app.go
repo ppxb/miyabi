@@ -64,6 +64,9 @@ type App struct {
 	scrape    *scrape.Service
 	metadata  *metadata.Service
 	embySvc   *emby.Service
+	library   *library.Service
+	sources   *source.Service
+	export    *export.Manager
 }
 
 // New initializes all services, database connections, and registers task handlers.
@@ -92,13 +95,12 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 
 	taskRegistry := tasks.NewRegistry()
 	taskSvc := tasks.NewService(store.Client, taskRegistry)
-	sourceSvc := source.New(store.Client)
 	driveSvc, err := drive.New(ctx, store.Client)
 	if err != nil {
 		return nil, fmt.Errorf("initialize drive service: %w", err)
 	}
 	cleanup = append(cleanup, driveSvc.Close)
-	driveSvc.StartAccountRefresh(ctx)
+	sourceSvc := source.New(store.Client, driveSvc)
 
 	images, err := mediaimage.NewCache(cfg.DataDir)
 	if err != nil {
@@ -123,15 +125,6 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 			}
 			return result, nil
 		},
-	})
-	sourceSvc.SetMountProvider(driveSvc)
-	sourceSvc.SetScanHandler(func(ctx context.Context, src domain.LibrarySource) error {
-		_, err := libSvc.EnqueueSyncMode(ctx, src, false)
-		return err
-	})
-	sourceSvc.SetLocalScanHandler(func(ctx context.Context, root string, metadataOnly bool) error {
-		_, err := libSvc.StartLocalSourceScanModeIncremental(ctx, root, metadataOnly)
-		return err
 	})
 	javbusClient, err := javbus.New(javbus.Options{Proxy: networkSvc.ProxyManager()})
 	if err != nil {
@@ -188,8 +181,7 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 	}
 	cleanup = append(cleanup, metadataSvc.Close)
 
-	offlineSvc := offline.New(store.Client, catalogueSvc, driveSvc, taskSvc, libSvc, offlineSubmitTimeout)
-	offlineSvc.SetMetadata(metadataSvc)
+	offlineSvc := offline.New(store.Client, catalogueSvc, driveSvc, taskSvc, libSvc, metadataSvc, offlineSubmitTimeout)
 	monitorSvc := monitor.New(store.Client, catalogueSvc, offlineSvc, taskSvc)
 	subtitleSvc := subtitle.NewService(store.Client, subtitle.NewFinder(networkSvc.ProxyManager()))
 	gfriendsClient := gfriends.New(cfg.DataDir, &http.Client{
@@ -232,31 +224,6 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 	maintenanceSvc, err := maintenance.New(cfg.DataDir, store.Client, images, scrapeSvc)
 	if err != nil {
 		return nil, fmt.Errorf("initialize maintenance service: %w", err)
-	}
-
-	if err := libSvc.ScheduleLocalScan(ctx); err != nil {
-		logger.ErrorContext(ctx, "failed to queue startup Emby directory scan", "error", err)
-	}
-	if targets, err := sourceSvc.LocalTargets(ctx); err != nil {
-		logger.ErrorContext(ctx, "failed to load local sources", "error", err)
-	} else {
-		for _, target := range targets {
-			if _, err := libSvc.StartLocalSourceScanMode(ctx, target.Path, target.MetadataOnly); err != nil {
-				logger.ErrorContext(ctx, "failed to queue local source scan", "path", target.Path, "error", err)
-			}
-		}
-	}
-	if mounts, err := sourceSvc.LibrarySources(ctx); err != nil {
-		logger.ErrorContext(ctx, "failed to load cloud sources", "error", err)
-	} else {
-		for _, source := range mounts {
-			if _, err := libSvc.EnqueueScan(ctx, source); err != nil {
-				logger.ErrorContext(ctx, "failed to queue cloud source scan", "error", err)
-			}
-		}
-	}
-	if exportCfg := exportMgr.Config(); exportCfg.PublicURL != "" && exportCfg.EmbyDir != "" {
-		embySvc.StartStartupSTRMRewrite()
 	}
 
 	taskRegistry.Register(tasks.NewHandler(tasks.KindScan, libSvc.Scan, libSvc.Finished).WithRetry(domain.RetryDelay))
@@ -309,16 +276,51 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 		scrape:    scrapeSvc,
 		metadata:  metadataSvc,
 		embySvc:   embySvc,
+		library:   libSvc,
+		sources:   sourceSvc,
+		export:    exportMgr,
 	}, nil
 }
 
-// Run starts the task pools, the periodic workers and the HTTP server, then
-// blocks until ctx is cancelled or one of them fails. Every exit path shuts
-// the server down gracefully and waits for the workers before returning.
+// start runs the startup side effects that New deliberately leaves out: the
+// account token refresh loop, the startup scans and the STRM rewrite.
+func (a *App) start(ctx context.Context) {
+	a.driveSvc.StartAccountRefresh(ctx)
+	if err := a.library.ScheduleLocalScan(ctx); err != nil {
+		a.logger.ErrorContext(ctx, "failed to queue startup Emby directory scan", "error", err)
+	}
+	if targets, err := a.sources.LocalTargets(ctx); err != nil {
+		a.logger.ErrorContext(ctx, "failed to load local sources", "error", err)
+	} else {
+		for _, target := range targets {
+			if _, err := a.library.StartLocalSourceScanMode(ctx, target.Path, target.MetadataOnly); err != nil {
+				a.logger.ErrorContext(ctx, "failed to queue local source scan", "path", target.Path, "error", err)
+			}
+		}
+	}
+	if mounts, err := a.sources.LibrarySources(ctx); err != nil {
+		a.logger.ErrorContext(ctx, "failed to load cloud sources", "error", err)
+	} else {
+		for _, source := range mounts {
+			if _, err := a.library.EnqueueScan(ctx, source); err != nil {
+				a.logger.ErrorContext(ctx, "failed to queue cloud source scan", "error", err)
+			}
+		}
+	}
+	if exportCfg := a.export.Config(); exportCfg.PublicURL != "" && exportCfg.EmbyDir != "" {
+		a.embySvc.StartStartupSTRMRewrite()
+	}
+}
+
+// Run runs the startup side effects, starts the task pools, the periodic
+// workers and the HTTP server, then blocks until ctx is cancelled or one of
+// them fails. Every exit path shuts the server down gracefully and waits for
+// the workers before returning.
 func (a *App) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	a.server.BaseContext = func(net.Listener) context.Context { return ctx }
+	a.start(ctx)
 
 	var workers sync.WaitGroup
 	poolError := make(chan error, len(a.pools))

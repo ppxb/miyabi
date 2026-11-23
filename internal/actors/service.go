@@ -94,64 +94,32 @@ func New(db *ent.Client, g *gfriends.Client, dataDir string, imageHTTP *http.Cli
 	return &Service{db: db, gfriends: g, dataDir: dataDir, imageHTTP: imageHTTP, providers: providers}
 }
 
-// SourceSetting is one actor data source switch kept in settings.
-type SourceSetting struct {
-	ID      string `json:"id"`
-	Enabled bool   `json:"enabled"`
-}
-
 const actorSourcesSetting = "metadata.actor_sources"
 
-var actorSourceOrder = []string{"av-league", "gfriends"}
+var actorSourceIDs = map[string]bool{"av-league": true, "gfriends": true}
 
-func defaultActorSources() []SourceSetting {
-	return []SourceSetting{{ID: "av-league", Enabled: true}, {ID: "gfriends", Enabled: true}}
+func defaultActorSources() []domain.SourceToggle {
+	return []domain.SourceToggle{{ID: "av-league", Enabled: true}, {ID: "gfriends", Enabled: true}}
 }
 
 // Settings returns the actor data source switches (merged with defaults).
-func (s *Service) Settings(ctx context.Context) ([]SourceSetting, error) {
-	stored, found, err := database.LoadSetting[[]SourceSetting](ctx, s.db, actorSourcesSetting)
+func (s *Service) Settings(ctx context.Context) ([]domain.SourceToggle, error) {
+	stored, found, err := database.LoadSetting[[]domain.SourceToggle](ctx, s.db, actorSourcesSetting)
 	if err != nil {
 		return nil, err
 	}
 	if !found {
 		return defaultActorSources(), nil
 	}
-	byID := make(map[string]SourceSetting, len(stored))
-	for _, item := range stored {
-		byID[item.ID] = item
-	}
-	out := make([]SourceSetting, 0, len(actorSourceOrder))
-	for _, id := range actorSourceOrder {
-		if item, ok := byID[id]; ok {
-			out = append(out, item)
-		} else {
-			out = append(out, SourceSetting{ID: id, Enabled: true})
-		}
-	}
-	return out, nil
+	return domain.MergeSourceToggles(stored, defaultActorSources()), nil
 }
 
 // UpdateSettings validates and persists the actor data source switches.
-func (s *Service) UpdateSettings(ctx context.Context, settings []SourceSetting) error {
-	valid := map[string]bool{"av-league": true, "gfriends": true}
-	seen := make(map[string]bool, len(settings))
-	byID := make(map[string]SourceSetting, len(settings))
-	for _, item := range settings {
-		if !valid[item.ID] || seen[item.ID] {
-			return errors.New("未知或重复的演员来源")
-		}
-		seen[item.ID] = true
-		byID[item.ID] = item
+func (s *Service) UpdateSettings(ctx context.Context, settings []domain.SourceToggle) error {
+	if err := domain.ValidateSourceToggles(settings, actorSourceIDs, "演员来源"); err != nil {
+		return err
 	}
-	if len(settings) != len(actorSourceOrder) {
-		return errors.New("请提供完整的演员来源列表")
-	}
-	out := make([]SourceSetting, 0, len(actorSourceOrder))
-	for _, id := range actorSourceOrder {
-		out = append(out, byID[id])
-	}
-	return database.SaveSetting(ctx, s.db, actorSourcesSetting, out)
+	return database.SaveSetting(ctx, s.db, actorSourcesSetting, settings)
 }
 
 func (s *Service) sourceEnabled(ctx context.Context, id string) bool {

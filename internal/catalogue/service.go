@@ -39,7 +39,7 @@ type Service struct {
 
 	magnetMu       sync.RWMutex
 	magnetToggles  map[string]*magnet.Toggle
-	magnetSettings []MagnetSourceSetting
+	magnetSettings []domain.SourceToggle
 
 	lists   *responseCache[[]domain.Movie]
 	details *responseCache[domain.MovieDetail]

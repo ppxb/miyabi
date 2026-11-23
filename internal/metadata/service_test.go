@@ -134,7 +134,7 @@ func TestCompleteOfficialMetadataStillQueriesJavDBAndReusesCache(t *testing.T) {
 	if fallback.calls.Load() != 1 {
 		t.Fatal("image fallback did not reuse source cache")
 	}
-	if err := s.UpdateSettings(t.Context(), []SourceSetting{{ID: "fanza", Enabled: true}, {ID: "javdb", Enabled: false}}); err != nil {
+	if err := s.UpdateSettings(t.Context(), []domain.SourceToggle{{ID: "fanza", Enabled: true}, {ID: "javdb", Enabled: false}}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Fallback(t.Context(), domain.MovieRef{Code: "ABP-123"}); err == nil {
@@ -220,7 +220,7 @@ func TestPrimaryFailureCanUseSameIdentityFallbackButNeverWeakerIdentity(t *testi
 
 func TestFANZAFirstAndJavDBLastSurviveSavedSettings(t *testing.T) {
 	old := newTestService(t, &sourceStub{id: "fc2"})
-	if err := old.UpdateSettings(t.Context(), []SourceSetting{{ID: "fc2", Enabled: false}}); err != nil {
+	if err := old.UpdateSettings(t.Context(), []domain.SourceToggle{{ID: "fc2", Enabled: false}}); err != nil {
 		t.Fatal(err)
 	}
 	s, err := New(t.Context(), old.db, &sourceStub{id: "fanza"}, &sourceStub{id: "fc2"}, &sourceStub{id: "javdb"})
@@ -228,11 +228,11 @@ func TestFANZAFirstAndJavDBLastSurviveSavedSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	want := []SourceSetting{{ID: "fanza", Enabled: true}, {ID: "fc2", Enabled: false}, {ID: "javdb", Enabled: true}}
+	want := []domain.SourceToggle{{ID: "fanza", Enabled: true}, {ID: "fc2", Enabled: false}, {ID: "javdb", Enabled: true}}
 	if !reflect.DeepEqual(s.Settings(), want) {
 		t.Fatalf("order=%v", s.Settings())
 	}
-	reversed := []SourceSetting{want[1], want[0], want[2]}
+	reversed := []domain.SourceToggle{want[1], want[0], want[2]}
 	if err := s.UpdateSettings(t.Context(), reversed); err == nil {
 		t.Fatal("FANZA can lose its priority")
 	}
@@ -244,7 +244,7 @@ func TestJavDBHonorsSavedSwitch(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	if err := database.SaveSetting(t.Context(), store.Client, "metadata.sources", []SourceSetting{
+	if err := database.SaveSetting(t.Context(), store.Client, "metadata.sources", []domain.SourceToggle{
 		{ID: "javdb", Enabled: false}, {ID: "fanza", Enabled: false},
 	}); err != nil {
 		t.Fatal(err)
@@ -261,7 +261,7 @@ func TestJavDBHonorsSavedSwitch(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	want := []SourceSetting{{ID: "fanza", Enabled: false}, {ID: "javdb", Enabled: false}}
+	want := []domain.SourceToggle{{ID: "fanza", Enabled: false}, {ID: "javdb", Enabled: false}}
 	if !reflect.DeepEqual(s.Settings(), want) {
 		t.Fatalf("public settings = %v", s.Settings())
 	}
@@ -296,7 +296,7 @@ func TestSourceSettingsFollowRegisteredSources(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	saved := []SourceSetting{{ID: "removed", Enabled: true}, {ID: "retained", Enabled: false}}
+	saved := []domain.SourceToggle{{ID: "removed", Enabled: true}, {ID: "retained", Enabled: false}}
 	if err := database.SaveSetting(t.Context(), store.Client, "metadata.sources", saved); err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +305,7 @@ func TestSourceSettingsFollowRegisteredSources(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	want := []SourceSetting{{ID: "retained", Enabled: false}, {ID: "added", Enabled: true}}
+	want := []domain.SourceToggle{{ID: "retained", Enabled: false}, {ID: "added", Enabled: true}}
 	if got := s.Settings(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("settings = %+v, want %+v", got, want)
 	}
@@ -344,7 +344,7 @@ func TestResolveWithoutJavDBMergesInPriorityOrderAndPersistsCache(t *testing.T) 
 	if primary.calls.Load() != 1 || secondary.calls.Load() != 1 {
 		t.Fatal("hot cache fetched sources again")
 	}
-	if err := s.UpdateSettings(t.Context(), []SourceSetting{{ID: "secondary", Enabled: true}, {ID: "primary", Enabled: false}}); err != nil {
+	if err := s.UpdateSettings(t.Context(), []domain.SourceToggle{{ID: "secondary", Enabled: true}, {ID: "primary", Enabled: false}}); err != nil {
 		t.Fatal(err)
 	}
 	got, err := s.Resolve(t.Context(), domain.MovieRef{Code: "ABP-123"})
@@ -452,7 +452,7 @@ func TestConfirmedMissIsCachedAndSourceSettingsValidate(t *testing.T) {
 	if source.calls.Load() != 1 {
 		t.Fatalf("negative cache missed: %d", source.calls.Load())
 	}
-	if err := s.UpdateSettings(t.Context(), []SourceSetting{{ID: "unknown", Enabled: true}}); err == nil {
+	if err := s.UpdateSettings(t.Context(), []domain.SourceToggle{{ID: "unknown", Enabled: true}}); err == nil {
 		t.Fatal("unknown source accepted")
 	}
 }

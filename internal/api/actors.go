@@ -18,8 +18,8 @@ type ActorManager interface {
 	Detail(context.Context, string) (actors.Detail, error)
 	FetchImage(context.Context, string, int) ([]byte, error)
 	FetchAvatar(context.Context, string) ([]byte, error)
-	Settings(context.Context) ([]actors.SourceSetting, error)
-	UpdateSettings(context.Context, []actors.SourceSetting) error
+	Settings(context.Context) ([]domain.SourceToggle, error)
+	UpdateSettings(context.Context, []domain.SourceToggle) error
 }
 
 func actorSourceSettingsHandler(manager ActorManager) gin.HandlerFunc {
@@ -31,7 +31,7 @@ func actorSourceSettingsHandler(manager ActorManager) gin.HandlerFunc {
 
 func actorSourceUpdateHandler(manager ActorManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		settings, ok := bindJSON[[]actors.SourceSetting](c)
+		settings, ok := bindJSON[[]domain.SourceToggle](c)
 		if !ok {
 			return
 		}
