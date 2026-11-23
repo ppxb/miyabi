@@ -1,18 +1,15 @@
 # Miyabi
 
-配合 115 网盘的一站式 Jav & Emby 管理平台。
+一站式 Jav 管理平台。
 
-Miyabi 支持直接对接 115 进行刮削、订阅，也可由 Miyabi 作为底层服务，对 Emby 提供支持。
+Miyabi 支持直接对接 115 和本地影片 进行刮削、订阅，也可由 Miyabi 作为底层服务，对 Emby 提供支持。
 
-> [!NOTE]
-> 请注意，JavDB 目前收紧了 API 调用策略，可能会导致账号被封禁。在解决这个问题前，请不要使用本项目。
+> \[!IMPORTANT]
+> 1.0.0 版本不支持老版本的数据库，请重新进行部署。
 
 ## 项目预览
 
-![媒体库](./screenshots/ScreenShot_2026-09-19_131853_357.png)
-![发现](./screenshots/ScreenShot_2026-09-19_132213_340.png)
-![搜索](./screenshots/ScreenShot_2026-09-19_132227_063.png)
-![设置](./screenshots/ScreenShot_2026-09-19_132249_331.png)
+![影片](./screenshots/ScreenShot_2026-09-19_131853_357.png)
 
 ## Docker 部署
 
@@ -109,21 +106,21 @@ docker compose pull && docker compose up -d
 
 通过 `MIYABI_ACCESS_PASSWORD` 配置访问密码。未配置密码或将密码设为空时关闭门禁。**强烈建议您开启门禁**。
 
-| 环境变量                 | 用途                                                  | 默认值                                        |
-| ------------------------ | ----------------------------------------------------- | --------------------------------------------- |
-| `MIYABI_ACCESS_PASSWORD` | Web 入口访问密码                                      | 空，关闭门禁（强烈建议配置）                  |
-| `MIYABI_JWT_SECRET`      | 登录 JWT 的签名与校验密钥                              | 空，开启门禁时由访问密码派生固定密钥           |
+| 环境变量                 | 用途                                                   | 默认值                                        |
+| ------------------------ | ------------------------------------------------------ | --------------------------------------------- |
+| `MIYABI_ACCESS_PASSWORD` | Web 入口访问密码                                       | 空，关闭门禁（强烈建议配置）                  |
+| `MIYABI_JWT_SECRET`      | 登录 JWT 的签名与校验密钥                              | 空，开启门禁时由访问密码派生固定密钥          |
 | `MIYABI_TRUSTED_PROXIES` | 可信代理 IP 或 CIDR，用于识别客户端 IP，多个用逗号分隔 | 空，不信任任何代理                            |
-| `MIYABI_LOG_LEVEL`       | 日志级别，可选 `debug`、`info`、`warn`、`error`         | `info`                                        |
-| `MIYABI_PUBLIC_URL`      | 外部访问 Miyabi 的根地址，用于生成 STRM 播放直链      | 默认根据监听端口推导                          |
-| `MIYABI_LISTEN`          | HTTP 监听地址                                         | `:8080`                                       |
-| `MIYABI_DATA_DIR`        | SQLite 与图片缓存目录                                 | 容器内为 `/app/data`，二进制为 `./data`       |
-| `MIYABI_EMBY_DIR`        | STRM 与媒体导出目录                                   | `$MIYABI_DATA_DIR/emby`                       |
-| `MIYABI_EMBY_ENABLED`    | 是否启用 Emby 集成通知刷新                            | 配置了服务器或密钥时自动为 `true`             |
-| `MIYABI_EMBY_SERVER_URL` | Emby 服务器访问地址（如 `http://192.168.1.100:8096`） | 空，可在 Web 界面动态配置                     |
-| `MIYABI_EMBY_API_KEY`    | Emby API 密钥（在 Emby「高级」→「API 密钥」中生成）   | 空，可在 Web 界面动态配置                     |
-| `MIYABI_EMBY_MEDIA_PATH` | Emby 容器内挂载的媒体库路径（如 `/media`）            | 空（默认使用本地路径），可在 Web 界面动态配置 |
-| `MIYABI_STRM_TOKEN`      | STRM 播放直链访问鉴权 Token                           | 空，未启用 Token 鉴权                         |
+| `MIYABI_LOG_LEVEL`       | 日志级别，可选 `debug`、`info`、`warn`、`error`        | `info`                                        |
+| `MIYABI_PUBLIC_URL`      | 外部访问 Miyabi 的根地址，用于生成 STRM 播放直链       | 默认根据监听端口推导                          |
+| `MIYABI_LISTEN`          | HTTP 监听地址                                          | `:8080`                                       |
+| `MIYABI_DATA_DIR`        | SQLite 与图片缓存目录                                  | 容器内为 `/app/data`，二进制为 `./data`       |
+| `MIYABI_EMBY_DIR`        | STRM 与媒体导出目录                                    | `$MIYABI_DATA_DIR/emby`                       |
+| `MIYABI_EMBY_ENABLED`    | 是否启用 Emby 集成通知刷新                             | 配置了服务器或密钥时自动为 `true`             |
+| `MIYABI_EMBY_SERVER_URL` | Emby 服务器访问地址（如 `http://192.168.1.100:8096`）  | 空，可在 Web 界面动态配置                     |
+| `MIYABI_EMBY_API_KEY`    | Emby API 密钥（在 Emby「高级」→「API 密钥」中生成）    | 空，可在 Web 界面动态配置                     |
+| `MIYABI_EMBY_MEDIA_PATH` | Emby 容器内挂载的媒体库路径（如 `/media`）             | 空（默认使用本地路径），可在 Web 界面动态配置 |
+| `MIYABI_STRM_TOKEN`      | STRM 播放直链访问鉴权 Token                            | 空，未启用 Token 鉴权                         |
 
 部署在 nginx 等反向代理后面时，需将反向代理连接 Miyabi 时使用的 IP 填入 `MIYABI_TRUSTED_PROXIES`，以便正确识别客户端 IP。
 
