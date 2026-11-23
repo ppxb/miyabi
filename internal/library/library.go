@@ -905,35 +905,25 @@ func (s *Service) FilterOptions(ctx context.Context) (FilterOptions, error) {
 
 	tags, err := s.database.Tag.Query().
 		Where(tag.HasMoviesWith(movieInScope)).
-		Order(ent.Asc(tag.FieldName), ent.Asc(tag.FieldID)).
-		All(ctx)
+		Unique(true).
+		Order(ent.Asc(tag.FieldName)).
+		Select(tag.FieldName).
+		Strings(ctx)
 	if err != nil {
 		return result, fmt.Errorf("list filter tags: %w", err)
 	}
-	seen := make(map[string]struct{}, len(tags))
-	for _, item := range tags {
-		if _, ok := seen[item.Name]; ok {
-			continue
-		}
-		seen[item.Name] = struct{}{}
-		result.Tags = append(result.Tags, FilterOption{ID: item.Name, Name: item.Name})
-	}
+	result.Tags = namedOptions(tags)
 
 	actors, err := s.database.Actor.Query().
 		Where(actor.HasMoviesWith(movieInScope)).
-		Order(ent.Asc(actor.FieldName), ent.Asc(actor.FieldID)).
-		All(ctx)
+		Unique(true).
+		Order(ent.Asc(actor.FieldName)).
+		Select(actor.FieldName).
+		Strings(ctx)
 	if err != nil {
 		return result, fmt.Errorf("list filter actors: %w", err)
 	}
-	seen = make(map[string]struct{}, len(actors))
-	for _, item := range actors {
-		if _, ok := seen[item.Name]; ok {
-			continue
-		}
-		seen[item.Name] = struct{}{}
-		result.Actors = append(result.Actors, FilterOption{ID: item.Name, Name: item.Name})
-	}
+	result.Actors = namedOptions(actors)
 
 	result.Makers = s.distinctMovieNames(ctx, movieInScope, movie.FieldMakerName, movie.MakerNameNotNil(), movie.MakerNameNEQ(""))
 	result.Series = s.distinctMovieNames(ctx, movieInScope, movie.FieldSeriesName, movie.SeriesNameNotNil(), movie.SeriesNameNEQ(""))
@@ -944,42 +934,26 @@ func (s *Service) FilterOptions(ctx context.Context) (FilterOptions, error) {
 // column (maker/series) within the library scope, sorted for stable display.
 func (s *Service) distinctMovieNames(ctx context.Context, scope predicate.Movie, field string, extra ...predicate.Movie) []FilterOption {
 	preds := append([]predicate.Movie{scope}, extra...)
-	records, err := s.database.Movie.Query().
+	names, err := s.database.Movie.Query().
 		Where(preds...).
+		Unique(true).
 		Order(ent.Asc(field)).
 		Select(field).
-		All(ctx)
+		Strings(ctx)
 	if err != nil {
 		return []FilterOption{}
 	}
-	result := make([]FilterOption, 0, len(records))
-	seen := make(map[string]struct{}, len(records))
-	for _, record := range records {
-		name := movieNameField(record, field)
-		if name == "" {
-			continue
-		}
-		if _, ok := seen[name]; ok {
-			continue
-		}
-		seen[name] = struct{}{}
-		result = append(result, FilterOption{ID: name, Name: name})
-	}
-	return result
+	return namedOptions(names)
 }
 
-func movieNameField(record *ent.Movie, field string) string {
-	switch field {
-	case movie.FieldMakerName:
-		if record.MakerName != nil {
-			return *record.MakerName
-		}
-	case movie.FieldSeriesName:
-		if record.SeriesName != nil {
-			return *record.SeriesName
-		}
+// namedOptions turns distinct names into filter options keyed by name. The
+// result is never nil so empty groups encode as [] rather than null.
+func namedOptions(names []string) []FilterOption {
+	result := make([]FilterOption, len(names))
+	for i, name := range names {
+		result[i] = FilterOption{ID: name, Name: name}
 	}
-	return ""
+	return result
 }
 
 func nonEmptyStrings(values []string) []string {
