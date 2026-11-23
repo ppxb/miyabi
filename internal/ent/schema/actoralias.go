@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
 )
 
 // ActorAlias is an alternative spelling (translation, old stage name, spacing
@@ -20,6 +21,12 @@ func (ActorAlias) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("alias").NotEmpty(),
 		field.String("normalized").NotEmpty(),
+	}
+}
+
+func (ActorAlias) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("normalized"),
 	}
 }
 

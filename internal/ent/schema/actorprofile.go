@@ -44,6 +44,10 @@ func (ActorProfile) Fields() []ent.Field {
 		field.String("skill").Optional().Nillable(),
 		field.String("debut_date").Optional().Nillable(),
 		field.String("source_url").Optional().Nillable(),
+		field.Time("enriched_at").
+			Optional().
+			Nillable().
+			Comment("Set once actor providers were consulted (found or not); nil retries on the next detail view."),
 	}
 }
 

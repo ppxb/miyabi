@@ -2,6 +2,7 @@ package actors
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -86,5 +87,26 @@ func TestLoadImageCachesOnDisk(t *testing.T) {
 	}
 	if atomic.LoadInt32(&hits) != 1 {
 		t.Fatalf("expected 1 remote fetch, got %d", hits)
+	}
+}
+
+// A search miss is a not-found, but a found actress whose page has no name
+// (challenge or layout change) is an error, so enrichment retries later.
+func TestAvLeagueNamelessPageIsNotAMiss(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/search/") {
+			_, _ = w.Write([]byte(`<div class="l-name"><a href="/actress/123.html">三上悠亜</a></div>`))
+			return
+		}
+		_, _ = w.Write([]byte(`<html><body>challenge</body></html>`))
+	}))
+	defer srv.Close()
+	a := &AVLeague{http: srv.Client(), base: srv.URL + "/"}
+
+	if _, err := a.Lookup(t.Context(), "三上悠亜"); err == nil || errors.Is(err, ErrProviderNotFound) {
+		t.Fatalf("nameless page: err = %v, want a retryable error", err)
+	}
+	if _, err := a.Lookup(t.Context(), "存在しない"); !errors.Is(err, ErrProviderNotFound) {
+		t.Fatalf("search miss: err = %v, want ErrProviderNotFound", err)
 	}
 }

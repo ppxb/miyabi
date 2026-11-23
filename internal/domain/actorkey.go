@@ -1,8 +1,6 @@
 package domain
 
 import (
-	"crypto/sha1"
-	"encoding/hex"
 	"strings"
 	"unicode"
 )
@@ -17,10 +15,4 @@ func NormalizeActorName(name string) string {
 		}
 		return r
 	}, name)
-}
-
-// ActorNameKey returns the stable key stored on Actor.NameKey for a raw name.
-func ActorNameKey(name string) string {
-	sum := sha1.Sum([]byte(NormalizeActorName(name)))
-	return hex.EncodeToString(sum[:])
 }

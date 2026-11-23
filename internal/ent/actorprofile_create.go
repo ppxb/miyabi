@@ -261,6 +261,20 @@ func (_c *ActorProfileCreate) SetNillableSourceURL(v *string) *ActorProfileCreat
 	return _c
 }
 
+// SetEnrichedAt sets the "enriched_at" field.
+func (_c *ActorProfileCreate) SetEnrichedAt(v time.Time) *ActorProfileCreate {
+	_c.mutation.SetEnrichedAt(v)
+	return _c
+}
+
+// SetNillableEnrichedAt sets the "enriched_at" field if the given value is not nil.
+func (_c *ActorProfileCreate) SetNillableEnrichedAt(v *time.Time) *ActorProfileCreate {
+	if v != nil {
+		_c.SetEnrichedAt(*v)
+	}
+	return _c
+}
+
 // AddSourceIDs adds the "sources" edge to the Actor entity by IDs.
 func (_c *ActorProfileCreate) AddSourceIDs(ids ...int) *ActorProfileCreate {
 	_c.mutation.AddSourceIDs(ids...)
@@ -485,6 +499,10 @@ func (_c *ActorProfileCreate) createSpec() (*ActorProfile, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.SourceURL(); ok {
 		_spec.SetField(actorprofile.FieldSourceURL, field.TypeString, value)
 		_node.SourceURL = &value
+	}
+	if value, ok := _c.mutation.EnrichedAt(); ok {
+		_spec.SetField(actorprofile.FieldEnrichedAt, field.TypeTime, value)
+		_node.EnrichedAt = &value
 	}
 	if nodes := _c.mutation.SourcesIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -874,6 +892,24 @@ func (u *ActorProfileUpsert) ClearSourceURL() *ActorProfileUpsert {
 	return u
 }
 
+// SetEnrichedAt sets the "enriched_at" field.
+func (u *ActorProfileUpsert) SetEnrichedAt(v time.Time) *ActorProfileUpsert {
+	u.Set(actorprofile.FieldEnrichedAt, v)
+	return u
+}
+
+// UpdateEnrichedAt sets the "enriched_at" field to the value that was provided on create.
+func (u *ActorProfileUpsert) UpdateEnrichedAt() *ActorProfileUpsert {
+	u.SetExcluded(actorprofile.FieldEnrichedAt)
+	return u
+}
+
+// ClearEnrichedAt clears the value of the "enriched_at" field.
+func (u *ActorProfileUpsert) ClearEnrichedAt() *ActorProfileUpsert {
+	u.SetNull(actorprofile.FieldEnrichedAt)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -1252,6 +1288,27 @@ func (u *ActorProfileUpsertOne) UpdateSourceURL() *ActorProfileUpsertOne {
 func (u *ActorProfileUpsertOne) ClearSourceURL() *ActorProfileUpsertOne {
 	return u.Update(func(s *ActorProfileUpsert) {
 		s.ClearSourceURL()
+	})
+}
+
+// SetEnrichedAt sets the "enriched_at" field.
+func (u *ActorProfileUpsertOne) SetEnrichedAt(v time.Time) *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetEnrichedAt(v)
+	})
+}
+
+// UpdateEnrichedAt sets the "enriched_at" field to the value that was provided on create.
+func (u *ActorProfileUpsertOne) UpdateEnrichedAt() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateEnrichedAt()
+	})
+}
+
+// ClearEnrichedAt clears the value of the "enriched_at" field.
+func (u *ActorProfileUpsertOne) ClearEnrichedAt() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearEnrichedAt()
 	})
 }
 
@@ -1799,6 +1856,27 @@ func (u *ActorProfileUpsertBulk) UpdateSourceURL() *ActorProfileUpsertBulk {
 func (u *ActorProfileUpsertBulk) ClearSourceURL() *ActorProfileUpsertBulk {
 	return u.Update(func(s *ActorProfileUpsert) {
 		s.ClearSourceURL()
+	})
+}
+
+// SetEnrichedAt sets the "enriched_at" field.
+func (u *ActorProfileUpsertBulk) SetEnrichedAt(v time.Time) *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetEnrichedAt(v)
+	})
+}
+
+// UpdateEnrichedAt sets the "enriched_at" field to the value that was provided on create.
+func (u *ActorProfileUpsertBulk) UpdateEnrichedAt() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateEnrichedAt()
+	})
+}
+
+// ClearEnrichedAt clears the value of the "enriched_at" field.
+func (u *ActorProfileUpsertBulk) ClearEnrichedAt() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearEnrichedAt()
 	})
 }
 

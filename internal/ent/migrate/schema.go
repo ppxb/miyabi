@@ -19,7 +19,6 @@ var (
 		{Name: "name_zht", Type: field.TypeString, Nullable: true},
 		{Name: "gender", Type: field.TypeEnum, Enums: []string{"female", "male", "unknown"}, Default: "unknown"},
 		{Name: "avatar", Type: field.TypeString, Nullable: true},
-		{Name: "name_key", Type: field.TypeString, Default: ""},
 		{Name: "actor_profile", Type: field.TypeInt, Nullable: true},
 	}
 	// ActorsTable holds the schema information for the "actors" table.
@@ -30,7 +29,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "actors_actor_profiles_profile",
-				Columns:    []*schema.Column{ActorsColumns[10]},
+				Columns:    []*schema.Column{ActorsColumns[9]},
 				RefColumns: []*schema.Column{ActorProfilesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -42,14 +41,9 @@ var (
 				Columns: []*schema.Column{ActorsColumns[3], ActorsColumns[4]},
 			},
 			{
-				Name:    "actor_name_key",
-				Unique:  false,
-				Columns: []*schema.Column{ActorsColumns[9]},
-			},
-			{
 				Name:    "actor_actor_profile",
 				Unique:  false,
-				Columns: []*schema.Column{ActorsColumns[10]},
+				Columns: []*schema.Column{ActorsColumns[9]},
 			},
 		},
 	}
@@ -73,6 +67,13 @@ var (
 				Columns:    []*schema.Column{ActorAliasColumns[5]},
 				RefColumns: []*schema.Column{ActorProfilesColumns[0]},
 				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "actoralias_normalized",
+				Unique:  false,
+				Columns: []*schema.Column{ActorAliasColumns[4]},
 			},
 		},
 	}
@@ -123,6 +124,7 @@ var (
 		{Name: "skill", Type: field.TypeString, Nullable: true},
 		{Name: "debut_date", Type: field.TypeString, Nullable: true},
 		{Name: "source_url", Type: field.TypeString, Nullable: true},
+		{Name: "enriched_at", Type: field.TypeTime, Nullable: true},
 	}
 	// ActorProfilesTable holds the schema information for the "actor_profiles" table.
 	ActorProfilesTable = &schema.Table{

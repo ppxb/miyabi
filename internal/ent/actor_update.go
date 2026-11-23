@@ -132,20 +132,6 @@ func (_u *ActorUpdate) ClearAvatar() *ActorUpdate {
 	return _u
 }
 
-// SetNameKey sets the "name_key" field.
-func (_u *ActorUpdate) SetNameKey(v string) *ActorUpdate {
-	_u.mutation.SetNameKey(v)
-	return _u
-}
-
-// SetNillableNameKey sets the "name_key" field if the given value is not nil.
-func (_u *ActorUpdate) SetNillableNameKey(v *string) *ActorUpdate {
-	if v != nil {
-		_u.SetNameKey(*v)
-	}
-	return _u
-}
-
 // AddMovieIDs adds the "movies" edge to the Movie entity by IDs.
 func (_u *ActorUpdate) AddMovieIDs(ids ...int) *ActorUpdate {
 	_u.mutation.AddMovieIDs(ids...)
@@ -214,9 +200,7 @@ func (_u *ActorUpdate) ClearProfile() *ActorUpdate {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (_u *ActorUpdate) Save(ctx context.Context) (int, error) {
-	if err := _u.defaults(); err != nil {
-		return 0, err
-	}
+	_u.defaults()
 	return withHooks(ctx, _u.sqlSave, _u.mutation, _u.hooks)
 }
 
@@ -243,15 +227,11 @@ func (_u *ActorUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (_u *ActorUpdate) defaults() error {
+func (_u *ActorUpdate) defaults() {
 	if _, ok := _u.mutation.UpdatedAt(); !ok {
-		if actor.UpdateDefaultUpdatedAt == nil {
-			return fmt.Errorf("ent: uninitialized actor.UpdateDefaultUpdatedAt (forgotten import ent/runtime?)")
-		}
 		v := actor.UpdateDefaultUpdatedAt()
 		_u.mutation.SetUpdatedAt(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -317,9 +297,6 @@ func (_u *ActorUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.AvatarCleared() {
 		_spec.ClearField(actor.FieldAvatar, field.TypeString)
-	}
-	if value, ok := _u.mutation.NameKey(); ok {
-		_spec.SetField(actor.FieldNameKey, field.TypeString, value)
 	}
 	if _u.mutation.MoviesCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -517,20 +494,6 @@ func (_u *ActorUpdateOne) ClearAvatar() *ActorUpdateOne {
 	return _u
 }
 
-// SetNameKey sets the "name_key" field.
-func (_u *ActorUpdateOne) SetNameKey(v string) *ActorUpdateOne {
-	_u.mutation.SetNameKey(v)
-	return _u
-}
-
-// SetNillableNameKey sets the "name_key" field if the given value is not nil.
-func (_u *ActorUpdateOne) SetNillableNameKey(v *string) *ActorUpdateOne {
-	if v != nil {
-		_u.SetNameKey(*v)
-	}
-	return _u
-}
-
 // AddMovieIDs adds the "movies" edge to the Movie entity by IDs.
 func (_u *ActorUpdateOne) AddMovieIDs(ids ...int) *ActorUpdateOne {
 	_u.mutation.AddMovieIDs(ids...)
@@ -612,9 +575,7 @@ func (_u *ActorUpdateOne) Select(field string, fields ...string) *ActorUpdateOne
 
 // Save executes the query and returns the updated Actor entity.
 func (_u *ActorUpdateOne) Save(ctx context.Context) (*Actor, error) {
-	if err := _u.defaults(); err != nil {
-		return nil, err
-	}
+	_u.defaults()
 	return withHooks(ctx, _u.sqlSave, _u.mutation, _u.hooks)
 }
 
@@ -641,15 +602,11 @@ func (_u *ActorUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (_u *ActorUpdateOne) defaults() error {
+func (_u *ActorUpdateOne) defaults() {
 	if _, ok := _u.mutation.UpdatedAt(); !ok {
-		if actor.UpdateDefaultUpdatedAt == nil {
-			return fmt.Errorf("ent: uninitialized actor.UpdateDefaultUpdatedAt (forgotten import ent/runtime?)")
-		}
 		v := actor.UpdateDefaultUpdatedAt()
 		_u.mutation.SetUpdatedAt(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -732,9 +689,6 @@ func (_u *ActorUpdateOne) sqlSave(ctx context.Context) (_node *Actor, err error)
 	}
 	if _u.mutation.AvatarCleared() {
 		_spec.ClearField(actor.FieldAvatar, field.TypeString)
-	}
-	if value, ok := _u.mutation.NameKey(); ok {
-		_spec.SetField(actor.FieldNameKey, field.TypeString, value)
 	}
 	if _u.mutation.MoviesCleared() {
 		edge := &sqlgraph.EdgeSpec{

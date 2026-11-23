@@ -79,7 +79,6 @@ type ActorMutation struct {
 	name_zht       *string
 	gender         *actor.Gender
 	avatar         *string
-	name_key       *string
 	clearedFields  map[string]struct{}
 	movies         map[int]struct{}
 	removedmovies  map[int]struct{}
@@ -503,42 +502,6 @@ func (m *ActorMutation) ResetAvatar() {
 	delete(m.clearedFields, actor.FieldAvatar)
 }
 
-// SetNameKey sets the "name_key" field.
-func (m *ActorMutation) SetNameKey(s string) {
-	m.name_key = &s
-}
-
-// NameKey returns the value of the "name_key" field in the mutation.
-func (m *ActorMutation) NameKey() (r string, exists bool) {
-	v := m.name_key
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldNameKey returns the old "name_key" field's value of the Actor entity.
-// If the Actor object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ActorMutation) OldNameKey(ctx context.Context) (v string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldNameKey is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldNameKey requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldNameKey: %w", err)
-	}
-	return oldValue.NameKey, nil
-}
-
-// ResetNameKey resets all changes to the "name_key" field.
-func (m *ActorMutation) ResetNameKey() {
-	m.name_key = nil
-}
-
 // AddMovieIDs adds the "movies" edge to the Movie entity by ids.
 func (m *ActorMutation) AddMovieIDs(ids ...int) {
 	if m.movies == nil {
@@ -666,7 +629,7 @@ func (m *ActorMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ActorMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 8)
 	if m.created_at != nil {
 		fields = append(fields, actor.FieldCreatedAt)
 	}
@@ -690,9 +653,6 @@ func (m *ActorMutation) Fields() []string {
 	}
 	if m.avatar != nil {
 		fields = append(fields, actor.FieldAvatar)
-	}
-	if m.name_key != nil {
-		fields = append(fields, actor.FieldNameKey)
 	}
 	return fields
 }
@@ -718,8 +678,6 @@ func (m *ActorMutation) Field(name string) (ent.Value, bool) {
 		return m.Gender()
 	case actor.FieldAvatar:
 		return m.Avatar()
-	case actor.FieldNameKey:
-		return m.NameKey()
 	}
 	return nil, false
 }
@@ -745,8 +703,6 @@ func (m *ActorMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldGender(ctx)
 	case actor.FieldAvatar:
 		return m.OldAvatar(ctx)
-	case actor.FieldNameKey:
-		return m.OldNameKey(ctx)
 	}
 	return nil, fmt.Errorf("unknown Actor field %s", name)
 }
@@ -811,13 +767,6 @@ func (m *ActorMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAvatar(v)
-		return nil
-	case actor.FieldNameKey:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetNameKey(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Actor field %s", name)
@@ -906,9 +855,6 @@ func (m *ActorMutation) ResetField(name string) error {
 		return nil
 	case actor.FieldAvatar:
 		m.ResetAvatar()
-		return nil
-	case actor.FieldNameKey:
-		m.ResetNameKey()
 		return nil
 	}
 	return fmt.Errorf("unknown Actor field %s", name)
@@ -2349,6 +2295,7 @@ type ActorProfileMutation struct {
 	skill          *string
 	debut_date     *string
 	source_url     *string
+	enriched_at    *time.Time
 	clearedFields  map[string]struct{}
 	sources        map[int]struct{}
 	removedsources map[int]struct{}
@@ -3300,6 +3247,55 @@ func (m *ActorProfileMutation) ResetSourceURL() {
 	delete(m.clearedFields, actorprofile.FieldSourceURL)
 }
 
+// SetEnrichedAt sets the "enriched_at" field.
+func (m *ActorProfileMutation) SetEnrichedAt(t time.Time) {
+	m.enriched_at = &t
+}
+
+// EnrichedAt returns the value of the "enriched_at" field in the mutation.
+func (m *ActorProfileMutation) EnrichedAt() (r time.Time, exists bool) {
+	v := m.enriched_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnrichedAt returns the old "enriched_at" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldEnrichedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnrichedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnrichedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnrichedAt: %w", err)
+	}
+	return oldValue.EnrichedAt, nil
+}
+
+// ClearEnrichedAt clears the value of the "enriched_at" field.
+func (m *ActorProfileMutation) ClearEnrichedAt() {
+	m.enriched_at = nil
+	m.clearedFields[actorprofile.FieldEnrichedAt] = struct{}{}
+}
+
+// EnrichedAtCleared returns if the "enriched_at" field was cleared in this mutation.
+func (m *ActorProfileMutation) EnrichedAtCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldEnrichedAt]
+	return ok
+}
+
+// ResetEnrichedAt resets all changes to the "enriched_at" field.
+func (m *ActorProfileMutation) ResetEnrichedAt() {
+	m.enriched_at = nil
+	delete(m.clearedFields, actorprofile.FieldEnrichedAt)
+}
+
 // AddSourceIDs adds the "sources" edge to the Actor entity by ids.
 func (m *ActorProfileMutation) AddSourceIDs(ids ...int) {
 	if m.sources == nil {
@@ -3496,7 +3492,7 @@ func (m *ActorProfileMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ActorProfileMutation) Fields() []string {
-	fields := make([]string, 0, 18)
+	fields := make([]string, 0, 19)
 	if m.created_at != nil {
 		fields = append(fields, actorprofile.FieldCreatedAt)
 	}
@@ -3551,6 +3547,9 @@ func (m *ActorProfileMutation) Fields() []string {
 	if m.source_url != nil {
 		fields = append(fields, actorprofile.FieldSourceURL)
 	}
+	if m.enriched_at != nil {
+		fields = append(fields, actorprofile.FieldEnrichedAt)
+	}
 	return fields
 }
 
@@ -3595,6 +3594,8 @@ func (m *ActorProfileMutation) Field(name string) (ent.Value, bool) {
 		return m.DebutDate()
 	case actorprofile.FieldSourceURL:
 		return m.SourceURL()
+	case actorprofile.FieldEnrichedAt:
+		return m.EnrichedAt()
 	}
 	return nil, false
 }
@@ -3640,6 +3641,8 @@ func (m *ActorProfileMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldDebutDate(ctx)
 	case actorprofile.FieldSourceURL:
 		return m.OldSourceURL(ctx)
+	case actorprofile.FieldEnrichedAt:
+		return m.OldEnrichedAt(ctx)
 	}
 	return nil, fmt.Errorf("unknown ActorProfile field %s", name)
 }
@@ -3775,6 +3778,13 @@ func (m *ActorProfileMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetSourceURL(v)
 		return nil
+	case actorprofile.FieldEnrichedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnrichedAt(v)
+		return nil
 	}
 	return fmt.Errorf("unknown ActorProfile field %s", name)
 }
@@ -3859,6 +3869,9 @@ func (m *ActorProfileMutation) ClearedFields() []string {
 	if m.FieldCleared(actorprofile.FieldSourceURL) {
 		fields = append(fields, actorprofile.FieldSourceURL)
 	}
+	if m.FieldCleared(actorprofile.FieldEnrichedAt) {
+		fields = append(fields, actorprofile.FieldEnrichedAt)
+	}
 	return fields
 }
 
@@ -3911,6 +3924,9 @@ func (m *ActorProfileMutation) ClearField(name string) error {
 		return nil
 	case actorprofile.FieldSourceURL:
 		m.ClearSourceURL()
+		return nil
+	case actorprofile.FieldEnrichedAt:
+		m.ClearEnrichedAt()
 		return nil
 	}
 	return fmt.Errorf("unknown ActorProfile nullable field %s", name)
@@ -3973,6 +3989,9 @@ func (m *ActorProfileMutation) ResetField(name string) error {
 		return nil
 	case actorprofile.FieldSourceURL:
 		m.ResetSourceURL()
+		return nil
+	case actorprofile.FieldEnrichedAt:
+		m.ResetEnrichedAt()
 		return nil
 	}
 	return fmt.Errorf("unknown ActorProfile field %s", name)

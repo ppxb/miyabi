@@ -346,6 +346,26 @@ func (_u *ActorProfileUpdate) ClearSourceURL() *ActorProfileUpdate {
 	return _u
 }
 
+// SetEnrichedAt sets the "enriched_at" field.
+func (_u *ActorProfileUpdate) SetEnrichedAt(v time.Time) *ActorProfileUpdate {
+	_u.mutation.SetEnrichedAt(v)
+	return _u
+}
+
+// SetNillableEnrichedAt sets the "enriched_at" field if the given value is not nil.
+func (_u *ActorProfileUpdate) SetNillableEnrichedAt(v *time.Time) *ActorProfileUpdate {
+	if v != nil {
+		_u.SetEnrichedAt(*v)
+	}
+	return _u
+}
+
+// ClearEnrichedAt clears the value of the "enriched_at" field.
+func (_u *ActorProfileUpdate) ClearEnrichedAt() *ActorProfileUpdate {
+	_u.mutation.ClearEnrichedAt()
+	return _u
+}
+
 // AddSourceIDs adds the "sources" edge to the Actor entity by IDs.
 func (_u *ActorProfileUpdate) AddSourceIDs(ids ...int) *ActorProfileUpdate {
 	_u.mutation.AddSourceIDs(ids...)
@@ -619,6 +639,12 @@ func (_u *ActorProfileUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if _u.mutation.SourceURLCleared() {
 		_spec.ClearField(actorprofile.FieldSourceURL, field.TypeString)
+	}
+	if value, ok := _u.mutation.EnrichedAt(); ok {
+		_spec.SetField(actorprofile.FieldEnrichedAt, field.TypeTime, value)
+	}
+	if _u.mutation.EnrichedAtCleared() {
+		_spec.ClearField(actorprofile.FieldEnrichedAt, field.TypeTime)
 	}
 	if _u.mutation.SourcesCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1090,6 +1116,26 @@ func (_u *ActorProfileUpdateOne) ClearSourceURL() *ActorProfileUpdateOne {
 	return _u
 }
 
+// SetEnrichedAt sets the "enriched_at" field.
+func (_u *ActorProfileUpdateOne) SetEnrichedAt(v time.Time) *ActorProfileUpdateOne {
+	_u.mutation.SetEnrichedAt(v)
+	return _u
+}
+
+// SetNillableEnrichedAt sets the "enriched_at" field if the given value is not nil.
+func (_u *ActorProfileUpdateOne) SetNillableEnrichedAt(v *time.Time) *ActorProfileUpdateOne {
+	if v != nil {
+		_u.SetEnrichedAt(*v)
+	}
+	return _u
+}
+
+// ClearEnrichedAt clears the value of the "enriched_at" field.
+func (_u *ActorProfileUpdateOne) ClearEnrichedAt() *ActorProfileUpdateOne {
+	_u.mutation.ClearEnrichedAt()
+	return _u
+}
+
 // AddSourceIDs adds the "sources" edge to the Actor entity by IDs.
 func (_u *ActorProfileUpdateOne) AddSourceIDs(ids ...int) *ActorProfileUpdateOne {
 	_u.mutation.AddSourceIDs(ids...)
@@ -1393,6 +1439,12 @@ func (_u *ActorProfileUpdateOne) sqlSave(ctx context.Context) (_node *ActorProfi
 	}
 	if _u.mutation.SourceURLCleared() {
 		_spec.ClearField(actorprofile.FieldSourceURL, field.TypeString)
+	}
+	if value, ok := _u.mutation.EnrichedAt(); ok {
+		_spec.SetField(actorprofile.FieldEnrichedAt, field.TypeTime, value)
+	}
+	if _u.mutation.EnrichedAtCleared() {
+		_spec.ClearField(actorprofile.FieldEnrichedAt, field.TypeTime)
 	}
 	if _u.mutation.SourcesCleared() {
 		edge := &sqlgraph.EdgeSpec{

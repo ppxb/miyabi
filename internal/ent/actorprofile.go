@@ -53,6 +53,8 @@ type ActorProfile struct {
 	DebutDate *string `json:"debut_date,omitempty"`
 	// SourceURL holds the value of the "source_url" field.
 	SourceURL *string `json:"source_url,omitempty"`
+	// Set once actor providers were consulted (found or not); nil retries on the next detail view.
+	EnrichedAt *time.Time `json:"enriched_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the ActorProfileQuery when eager-loading is set.
 	Edges        ActorProfileEdges `json:"edges"`
@@ -108,7 +110,7 @@ func (*ActorProfile) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case actorprofile.FieldMatchKey, actorprofile.FieldName, actorprofile.FieldNameZht, actorprofile.FieldGender, actorprofile.FieldAvatar, actorprofile.FieldSummary, actorprofile.FieldBirthday, actorprofile.FieldCupSize, actorprofile.FieldMeasurements, actorprofile.FieldBloodType, actorprofile.FieldNationality, actorprofile.FieldHobby, actorprofile.FieldSkill, actorprofile.FieldDebutDate, actorprofile.FieldSourceURL:
 			values[i] = new(sql.NullString)
-		case actorprofile.FieldCreatedAt, actorprofile.FieldUpdatedAt:
+		case actorprofile.FieldCreatedAt, actorprofile.FieldUpdatedAt, actorprofile.FieldEnrichedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -252,6 +254,13 @@ func (_m *ActorProfile) assignValues(columns []string, values []any) error {
 				_m.SourceURL = new(string)
 				*_m.SourceURL = value.String
 			}
+		case actorprofile.FieldEnrichedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field enriched_at", values[i])
+			} else if value.Valid {
+				_m.EnrichedAt = new(time.Time)
+				*_m.EnrichedAt = value.Time
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -381,6 +390,11 @@ func (_m *ActorProfile) String() string {
 	if v := _m.SourceURL; v != nil {
 		builder.WriteString("source_url=")
 		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.EnrichedAt; v != nil {
+		builder.WriteString("enriched_at=")
+		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteByte(')')
 	return builder.String()

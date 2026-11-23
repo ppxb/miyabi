@@ -112,20 +112,6 @@ func (_c *ActorCreate) SetNillableAvatar(v *string) *ActorCreate {
 	return _c
 }
 
-// SetNameKey sets the "name_key" field.
-func (_c *ActorCreate) SetNameKey(v string) *ActorCreate {
-	_c.mutation.SetNameKey(v)
-	return _c
-}
-
-// SetNillableNameKey sets the "name_key" field if the given value is not nil.
-func (_c *ActorCreate) SetNillableNameKey(v *string) *ActorCreate {
-	if v != nil {
-		_c.SetNameKey(*v)
-	}
-	return _c
-}
-
 // AddMovieIDs adds the "movies" edge to the Movie entity by IDs.
 func (_c *ActorCreate) AddMovieIDs(ids ...int) *ActorCreate {
 	_c.mutation.AddMovieIDs(ids...)
@@ -167,9 +153,7 @@ func (_c *ActorCreate) Mutation() *ActorMutation {
 
 // Save creates the Actor in the database.
 func (_c *ActorCreate) Save(ctx context.Context) (*Actor, error) {
-	if err := _c.defaults(); err != nil {
-		return nil, err
-	}
+	_c.defaults()
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -196,18 +180,12 @@ func (_c *ActorCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (_c *ActorCreate) defaults() error {
+func (_c *ActorCreate) defaults() {
 	if _, ok := _c.mutation.CreatedAt(); !ok {
-		if actor.DefaultCreatedAt == nil {
-			return fmt.Errorf("ent: uninitialized actor.DefaultCreatedAt (forgotten import ent/runtime?)")
-		}
 		v := actor.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
 	}
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
-		if actor.DefaultUpdatedAt == nil {
-			return fmt.Errorf("ent: uninitialized actor.DefaultUpdatedAt (forgotten import ent/runtime?)")
-		}
 		v := actor.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
@@ -215,11 +193,6 @@ func (_c *ActorCreate) defaults() error {
 		v := actor.DefaultGender
 		_c.mutation.SetGender(v)
 	}
-	if _, ok := _c.mutation.NameKey(); !ok {
-		v := actor.DefaultNameKey
-		_c.mutation.SetNameKey(v)
-	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -261,9 +234,6 @@ func (_c *ActorCreate) check() error {
 		if err := actor.GenderValidator(v); err != nil {
 			return &ValidationError{Name: "gender", err: fmt.Errorf(`ent: validator failed for field "Actor.gender": %w`, err)}
 		}
-	}
-	if _, ok := _c.mutation.NameKey(); !ok {
-		return &ValidationError{Name: "name_key", err: errors.New(`ent: missing required field "Actor.name_key"`)}
 	}
 	return nil
 }
@@ -323,10 +293,6 @@ func (_c *ActorCreate) createSpec() (*Actor, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Avatar(); ok {
 		_spec.SetField(actor.FieldAvatar, field.TypeString, value)
 		_node.Avatar = &value
-	}
-	if value, ok := _c.mutation.NameKey(); ok {
-		_spec.SetField(actor.FieldNameKey, field.TypeString, value)
-		_node.NameKey = value
 	}
 	if nodes := _c.mutation.MoviesIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -509,18 +475,6 @@ func (u *ActorUpsert) ClearAvatar() *ActorUpsert {
 	return u
 }
 
-// SetNameKey sets the "name_key" field.
-func (u *ActorUpsert) SetNameKey(v string) *ActorUpsert {
-	u.Set(actor.FieldNameKey, v)
-	return u
-}
-
-// UpdateNameKey sets the "name_key" field to the value that was provided on create.
-func (u *ActorUpsert) UpdateNameKey() *ActorUpsert {
-	u.SetExcluded(actor.FieldNameKey)
-	return u
-}
-
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -675,20 +629,6 @@ func (u *ActorUpsertOne) UpdateAvatar() *ActorUpsertOne {
 func (u *ActorUpsertOne) ClearAvatar() *ActorUpsertOne {
 	return u.Update(func(s *ActorUpsert) {
 		s.ClearAvatar()
-	})
-}
-
-// SetNameKey sets the "name_key" field.
-func (u *ActorUpsertOne) SetNameKey(v string) *ActorUpsertOne {
-	return u.Update(func(s *ActorUpsert) {
-		s.SetNameKey(v)
-	})
-}
-
-// UpdateNameKey sets the "name_key" field to the value that was provided on create.
-func (u *ActorUpsertOne) UpdateNameKey() *ActorUpsertOne {
-	return u.Update(func(s *ActorUpsert) {
-		s.UpdateNameKey()
 	})
 }
 
@@ -1012,20 +952,6 @@ func (u *ActorUpsertBulk) UpdateAvatar() *ActorUpsertBulk {
 func (u *ActorUpsertBulk) ClearAvatar() *ActorUpsertBulk {
 	return u.Update(func(s *ActorUpsert) {
 		s.ClearAvatar()
-	})
-}
-
-// SetNameKey sets the "name_key" field.
-func (u *ActorUpsertBulk) SetNameKey(v string) *ActorUpsertBulk {
-	return u.Update(func(s *ActorUpsert) {
-		s.SetNameKey(v)
-	})
-}
-
-// UpdateNameKey sets the "name_key" field to the value that was provided on create.
-func (u *ActorUpsertBulk) UpdateNameKey() *ActorUpsertBulk {
-	return u.Update(func(s *ActorUpsert) {
-		s.UpdateNameKey()
 	})
 }
 

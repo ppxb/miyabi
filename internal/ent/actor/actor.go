@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 )
@@ -32,8 +31,6 @@ const (
 	FieldGender = "gender"
 	// FieldAvatar holds the string denoting the avatar field in the database.
 	FieldAvatar = "avatar"
-	// FieldNameKey holds the string denoting the name_key field in the database.
-	FieldNameKey = "name_key"
 	// EdgeMovies holds the string denoting the movies edge name in mutations.
 	EdgeMovies = "movies"
 	// EdgeProfile holds the string denoting the profile edge name in mutations.
@@ -65,7 +62,6 @@ var Columns = []string{
 	FieldNameZht,
 	FieldGender,
 	FieldAvatar,
-	FieldNameKey,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "actors"
@@ -95,13 +91,7 @@ func ValidColumn(column string) bool {
 	return false
 }
 
-// Note that the variables below are initialized by the runtime
-// package on the initialization of the application. Therefore,
-// it should be imported in the main as follows:
-//
-//	import _ "github.com/ppxb/miyabi/internal/ent/runtime"
 var (
-	Hooks [1]ent.Hook
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -114,8 +104,6 @@ var (
 	SourceIDValidator func(string) error
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
-	// DefaultNameKey holds the default value on creation for the "name_key" field.
-	DefaultNameKey string
 )
 
 // Gender defines the type for the "gender" enum field.
@@ -191,11 +179,6 @@ func ByGender(opts ...sql.OrderTermOption) OrderOption {
 // ByAvatar orders the results by the avatar field.
 func ByAvatar(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAvatar, opts...).ToFunc()
-}
-
-// ByNameKey orders the results by the name_key field.
-func ByNameKey(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldNameKey, opts...).ToFunc()
 }
 
 // ByMoviesCount orders the results by movies count.

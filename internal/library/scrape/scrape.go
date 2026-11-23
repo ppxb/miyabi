@@ -64,7 +64,6 @@ type SubtitleExporter interface {
 // ActorMerger merges same-person actor rows discovered during a movie scrape.
 type ActorMerger interface {
 	MergeMovieCrossLanguage(ctx context.Context, movieID int) (int, error)
-	EnsureMovieProfiles(ctx context.Context, movieID int) error
 }
 
 const (
@@ -248,9 +247,6 @@ func (service *Service) prepareMetadata(ctx context.Context, sess drive.Session,
 	if service.merger != nil {
 		if _, err := service.merger.MergeMovieCrossLanguage(ctx, input.MovieID); err != nil {
 			slog.WarnContext(ctx, "merge cross-language actors failed", "movie_id", input.MovieID, "error", err)
-		}
-		if err := service.merger.EnsureMovieProfiles(ctx, input.MovieID); err != nil {
-			slog.WarnContext(ctx, "reconcile actor profiles failed", "movie_id", input.MovieID, "error", err)
 		}
 	}
 	return nil

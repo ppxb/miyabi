@@ -140,6 +140,11 @@ func SourceURL(v string) predicate.ActorProfile {
 	return predicate.ActorProfile(sql.FieldEQ(FieldSourceURL, v))
 }
 
+// EnrichedAt applies equality check predicate on the "enriched_at" field. It's identical to EnrichedAtEQ.
+func EnrichedAt(v time.Time) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldEnrichedAt, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.ActorProfile {
 	return predicate.ActorProfile(sql.FieldEQ(FieldCreatedAt, v))
@@ -1318,6 +1323,56 @@ func SourceURLEqualFold(v string) predicate.ActorProfile {
 // SourceURLContainsFold applies the ContainsFold predicate on the "source_url" field.
 func SourceURLContainsFold(v string) predicate.ActorProfile {
 	return predicate.ActorProfile(sql.FieldContainsFold(FieldSourceURL, v))
+}
+
+// EnrichedAtEQ applies the EQ predicate on the "enriched_at" field.
+func EnrichedAtEQ(v time.Time) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldEQ(FieldEnrichedAt, v))
+}
+
+// EnrichedAtNEQ applies the NEQ predicate on the "enriched_at" field.
+func EnrichedAtNEQ(v time.Time) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNEQ(FieldEnrichedAt, v))
+}
+
+// EnrichedAtIn applies the In predicate on the "enriched_at" field.
+func EnrichedAtIn(vs ...time.Time) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIn(FieldEnrichedAt, vs...))
+}
+
+// EnrichedAtNotIn applies the NotIn predicate on the "enriched_at" field.
+func EnrichedAtNotIn(vs ...time.Time) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotIn(FieldEnrichedAt, vs...))
+}
+
+// EnrichedAtGT applies the GT predicate on the "enriched_at" field.
+func EnrichedAtGT(v time.Time) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGT(FieldEnrichedAt, v))
+}
+
+// EnrichedAtGTE applies the GTE predicate on the "enriched_at" field.
+func EnrichedAtGTE(v time.Time) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldGTE(FieldEnrichedAt, v))
+}
+
+// EnrichedAtLT applies the LT predicate on the "enriched_at" field.
+func EnrichedAtLT(v time.Time) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLT(FieldEnrichedAt, v))
+}
+
+// EnrichedAtLTE applies the LTE predicate on the "enriched_at" field.
+func EnrichedAtLTE(v time.Time) predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldLTE(FieldEnrichedAt, v))
+}
+
+// EnrichedAtIsNil applies the IsNil predicate on the "enriched_at" field.
+func EnrichedAtIsNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIsNull(FieldEnrichedAt))
+}
+
+// EnrichedAtNotNil applies the NotNil predicate on the "enriched_at" field.
+func EnrichedAtNotNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotNull(FieldEnrichedAt))
 }
 
 // HasSources applies the HasEdge predicate on the "sources" edge.

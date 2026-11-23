@@ -122,8 +122,10 @@ func (a *AVLeague) fetch(ctx context.Context, id string) (*Profile, error) {
 			p.Name = strings.TrimSpace(text(pan))
 		}
 	}
+	// The search already found this actress, so a page without her name is a
+	// challenge or layout change, not a miss: report it so the lookup retries.
 	if p.Name == "" {
-		return nil, ErrProviderNotFound
+		return nil, fmt.Errorf("av-league actress page %s has no name", id)
 	}
 	if prof := elementByID(doc, "j-prof"); prof != nil {
 		for _, span := range nodes(prof, func(n *html.Node) bool { return n.Data == "span" }) {

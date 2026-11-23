@@ -32,8 +32,6 @@ import (
 // to their package variables.
 func init() {
 	actorMixin := schema.Actor{}.Mixin()
-	actorHooks := schema.Actor{}.Hooks()
-	actor.Hooks[0] = actorHooks[0]
 	actorMixinFields0 := actorMixin[0].Fields()
 	_ = actorMixinFields0
 	actorFields := schema.Actor{}.Fields()
@@ -60,10 +58,6 @@ func init() {
 	actorDescName := actorFields[2].Descriptor()
 	// actor.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	actor.NameValidator = actorDescName.Validators[0].(func(string) error)
-	// actorDescNameKey is the schema descriptor for name_key field.
-	actorDescNameKey := actorFields[6].Descriptor()
-	// actor.DefaultNameKey holds the default value on creation for the name_key field.
-	actor.DefaultNameKey = actorDescNameKey.Default.(string)
 	actoraliasMixin := schema.ActorAlias{}.Mixin()
 	actoraliasMixinFields0 := actoraliasMixin[0].Fields()
 	_ = actoraliasMixinFields0

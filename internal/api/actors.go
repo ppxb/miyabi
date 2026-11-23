@@ -15,9 +15,9 @@ import (
 // ActorManager exposes the canonical actor read model.
 type ActorManager interface {
 	Catalog(context.Context, string, int, int) (actors.Page, error)
-	Detail(context.Context, string) (actors.Detail, error)
-	FetchImage(context.Context, string, int) ([]byte, error)
-	FetchAvatar(context.Context, string) ([]byte, error)
+	Detail(context.Context, int) (actors.Detail, error)
+	FetchImage(context.Context, int, int) ([]byte, error)
+	FetchAvatar(context.Context, int) ([]byte, error)
 	Settings(context.Context) ([]domain.SourceToggle, error)
 	UpdateSettings(context.Context, []domain.SourceToggle) error
 }
@@ -58,6 +58,11 @@ func actorListHandler(manager ActorManager) gin.HandlerFunc {
 	}
 }
 
+// actorURI is the canonical actor id (ActorProfile id) in /api/actors/:key.
+type actorURI struct {
+	ID int `uri:"key" binding:"required,min=1"`
+}
+
 type actorDetailResponse struct {
 	actors.Detail
 	Films lib.Page `json:"films"`
@@ -65,13 +70,11 @@ type actorDetailResponse struct {
 
 func actorDetailHandler(manager ActorManager, library LibraryManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		uri, ok := bindURI[struct {
-			Key string `uri:"key" binding:"required,len=40,hexadecimal"`
-		}](c)
+		uri, ok := bindURI[actorURI](c)
 		if !ok {
 			return
 		}
-		detail, err := manager.Detail(c.Request.Context(), uri.Key)
+		detail, err := manager.Detail(c.Request.Context(), uri.ID)
 		if err != nil {
 			if errors.Is(err, actors.ErrNotFound) {
 				c.Error(domain.E(domain.KindNotFound, "演员不存在", nil))
@@ -97,26 +100,24 @@ func actorDetailHandler(manager ActorManager, library LibraryManager) gin.Handle
 func actorImageHandler(manager ActorManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		uri, ok := bindURI[struct {
-			Key   string `uri:"key" binding:"required,len=40,hexadecimal"`
-			Index int    `uri:"index" binding:"min=0,max=999"`
+			actorURI
+			Index int `uri:"index" binding:"min=0,max=999"`
 		}](c)
 		if !ok {
 			return
 		}
-		data, err := manager.FetchImage(c.Request.Context(), uri.Key, uri.Index)
+		data, err := manager.FetchImage(c.Request.Context(), uri.ID, uri.Index)
 		writeActorImage(c, data, err)
 	}
 }
 
 func actorAvatarHandler(manager ActorManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		uri, ok := bindURI[struct {
-			Key string `uri:"key" binding:"required,len=40,hexadecimal"`
-		}](c)
+		uri, ok := bindURI[actorURI](c)
 		if !ok {
 			return
 		}
-		data, err := manager.FetchAvatar(c.Request.Context(), uri.Key)
+		data, err := manager.FetchAvatar(c.Request.Context(), uri.ID)
 		writeActorImage(c, data, err)
 	}
 }

@@ -51,6 +51,8 @@ const (
 	FieldDebutDate = "debut_date"
 	// FieldSourceURL holds the string denoting the source_url field in the database.
 	FieldSourceURL = "source_url"
+	// FieldEnrichedAt holds the string denoting the enriched_at field in the database.
+	FieldEnrichedAt = "enriched_at"
 	// EdgeSources holds the string denoting the sources edge name in mutations.
 	EdgeSources = "sources"
 	// EdgeAliases holds the string denoting the aliases edge name in mutations.
@@ -103,6 +105,7 @@ var Columns = []string{
 	FieldSkill,
 	FieldDebutDate,
 	FieldSourceURL,
+	FieldEnrichedAt,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -251,6 +254,11 @@ func ByDebutDate(opts ...sql.OrderTermOption) OrderOption {
 // BySourceURL orders the results by the source_url field.
 func BySourceURL(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSourceURL, opts...).ToFunc()
+}
+
+// ByEnrichedAt orders the results by the enriched_at field.
+func ByEnrichedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEnrichedAt, opts...).ToFunc()
 }
 
 // BySourcesCount orders the results by sources count.
