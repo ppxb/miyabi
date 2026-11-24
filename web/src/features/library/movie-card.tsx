@@ -16,6 +16,8 @@ export type LibraryMovieCardData = {
   actors: Array<{ name: string }>
   source?: string
   has_subtitle?: boolean
+  has_uncensored?: boolean
+  has_cracked?: boolean
   finished?: boolean
 }
 
@@ -52,10 +54,17 @@ export function LibraryMovieCard({
             movie={movie}
             hideContent
             state={
-              movie.source === '115' || movie.has_subtitle || movie.finished ? (
+              movie.source === '115' ||
+              movie.has_subtitle ||
+              movie.has_uncensored ||
+              movie.has_cracked ||
+              movie.finished ? (
                 <>
                   {movie.source === '115' ? <Badge variant="frosted">115</Badge> : null}
                   {movie.has_subtitle ? <Badge variant="frosted">中文</Badge> : null}
+                  {movie.has_uncensored || movie.has_cracked ? (
+                    <Badge variant="frosted">无码</Badge>
+                  ) : null}
                   {movie.finished ? <Badge variant="success">已看完</Badge> : null}
                 </>
               ) : undefined

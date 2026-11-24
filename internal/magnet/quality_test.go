@@ -35,6 +35,9 @@ func TestInfer(t *testing.T) {
 		{"SSIS-001 流出破解版", false, false, false, true},
 		{"SSIS-001.Leaked.720p", false, false, false, true},
 		{"(無修正-流出) SSIS-001 (Uncensored Leaked)一ヶ月間の禁欲の果てに", false, false, true, true},
+		{"SSIS-001-LTX", false, false, false, true},
+		{"ssis001-ltx.mp4", false, false, false, true},
+		{"SSIS-001LTX", false, false, false, true},
 		{"SSIS-001 禁欲生活 葵司 乙白", true, false, false, false}, // hanzi title without kana
 	}
 	for _, c := range cases {

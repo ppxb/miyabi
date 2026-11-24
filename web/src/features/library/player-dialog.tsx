@@ -437,6 +437,9 @@ function MovieInfo({ movieId }: { movieId: number }) {
           <Badge variant="frosted">{movie.code}</Badge>
           {movie.source === '115' ? <Badge variant="frosted">115</Badge> : null}
           {movie.has_subtitle ? <Badge variant="frosted">中文</Badge> : null}
+          {movie.has_uncensored || movie.has_cracked ? (
+            <Badge variant="frosted">无码</Badge>
+          ) : null}
         </div>
         <h2 className="text-xl leading-snug font-bold">{movie.title || movie.code}</h2>
         {movie.origin_title && movie.origin_title !== movie.title ? (

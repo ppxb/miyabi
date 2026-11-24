@@ -24,6 +24,7 @@ import (
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scan"
+	"github.com/ppxb/miyabi/internal/magnet"
 	"github.com/ppxb/miyabi/internal/syncx"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -64,6 +65,10 @@ type Movie struct {
 	// HasSubtitle marks movies whose file or indexed subtitle names indicate a
 	// Chinese-subtitle release.
 	HasSubtitle bool `json:"has_subtitle"`
+	// HasUncensored marks movies whose file names indicate an uncensored release.
+	HasUncensored bool `json:"has_uncensored,omitempty"`
+	// HasCracked marks movies whose file names indicate a cracked/leaked release.
+	HasCracked bool `json:"has_cracked,omitempty"`
 	// Finished marks movies whose saved playback position reached the end.
 	Finished bool `json:"finished,omitempty"`
 }
@@ -634,10 +639,22 @@ func (s *Service) markSubtitleStatus(ctx context.Context, movies []Movie) error 
 		return fmt.Errorf("read library subtitle files: %w", err)
 	}
 	for _, record := range files {
-		if record.MovieID != nil && subtitlemeta.HasChineseSubtitle(record.Name) {
-			if item, ok := index[*record.MovieID]; ok {
-				item.HasSubtitle = true
-			}
+		if record.MovieID == nil {
+			continue
+		}
+		item, ok := index[*record.MovieID]
+		if !ok {
+			continue
+		}
+		if subtitlemeta.HasChineseSubtitle(record.Name) {
+			item.HasSubtitle = true
+		}
+		inf := magnet.Infer(record.Name)
+		if inf.HasUncensored {
+			item.HasUncensored = true
+		}
+		if inf.HasCracked {
+			item.HasCracked = true
 		}
 	}
 	tracks, err := s.database.Subtitle.Query().

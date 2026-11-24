@@ -24,8 +24,10 @@ var (
 	uncensoredRegex       = regexp.MustCompile(`(?i)(?:[^A-Za-z0-9]|^)(?:uncensored|mosaic)(?:[^A-Za-z0-9]|$)`)
 	uncensoredSuffixRegex = regexp.MustCompile(`(?i)[-_]U(?:C)?(?:[^A-Za-z0-9]|$)`)
 	leakedRegex           = regexp.MustCompile(`(?i)(?:[^A-Za-z]|^)leaked(?:[^A-Za-z]|$)`)
-	uncensoredWords       = []string{"无码", "無碼"}
-	crackedWords          = []string{"破解", "破坏", "破壞", "流出"}
+	// LTX marks a cracked/uncensored re-release (SSIS-001-LTX, SSIS-001LTX).
+	ltxRegex        = regexp.MustCompile(`(?i)(?:[-_. ]|[0-9])LTX(?:[^A-Za-z]|$)`)
+	uncensoredWords = []string{"无码", "無碼"}
+	crackedWords    = []string{"破解", "破坏", "破壞", "流出"}
 
 	versionModifierRegex = regexp.MustCompile(`(?i)(破解|破坏|破壞|无码|無碼|流出|高清|版本|原盘|壓制|压制|自制|精修|字幕)`)
 
@@ -91,6 +93,11 @@ func Infer(name string) QualityInference {
 				break
 			}
 		}
+	}
+
+	// LTX is a cracked re-release marker; cracked and uncensored are exclusive.
+	if ltxRegex.MatchString(cleaned) {
+		res.HasCracked = true
 	}
 
 	return res

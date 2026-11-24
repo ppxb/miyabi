@@ -8,6 +8,7 @@ import (
 	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/magnet"
 	"github.com/ppxb/miyabi/internal/nfo"
 )
 
@@ -82,6 +83,13 @@ func (s *Service) Movie(ctx context.Context, id int) (MovieDetail, error) {
 		}
 		if !detail.HasSubtitle && subtitlemeta.HasChineseSubtitle(file.Name) {
 			detail.HasSubtitle = true
+		}
+		inf := magnet.Infer(file.Name)
+		if inf.HasUncensored {
+			detail.HasUncensored = true
+		}
+		if inf.HasCracked {
+			detail.HasCracked = true
 		}
 	}
 	if !detail.HasSubtitle {

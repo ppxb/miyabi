@@ -176,6 +176,8 @@ type Movie struct {
 	PreviewVideo  string            `json:"preview_video"`
 	MagnetsCount  int               `json:"magnets_count"`
 	HasSubtitle   bool              `json:"has_subtitle"`
+	HasUncensored bool              `json:"has_uncensored,omitempty"`
+	HasCracked    bool              `json:"has_cracked,omitempty"`
 	HasPreview    bool              `json:"has_preview"`
 	Actors        []Actor           `json:"actors"`
 	Tags          []Tag             `json:"tags"`

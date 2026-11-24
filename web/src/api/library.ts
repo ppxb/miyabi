@@ -36,6 +36,8 @@ export type LibraryMovie = {
   scrape_status: 'pending' | 'done' | 'failed'
   source?: string
   has_subtitle?: boolean
+  has_uncensored?: boolean
+  has_cracked?: boolean
   finished?: boolean
 }
 

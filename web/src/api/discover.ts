@@ -62,6 +62,8 @@ export type DiscoverMovie = {
   preview_video: string
   magnets_count: number
   has_subtitle: boolean
+  has_uncensored?: boolean
+  has_cracked?: boolean
   has_preview: boolean
   actors: Actor[]
   tags: Tag[]
