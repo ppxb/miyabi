@@ -319,3 +319,52 @@ func TestLocalScannerNFO_UnnormalizedCodeIsNormalized(t *testing.T) {
 		t.Fatalf("expected scrape status done, got %v", film.ScrapeStatus)
 	}
 }
+
+// A pure local-NFO library can keep the catalogue number only inside the NFO
+// when neither the filename nor its folder names it. Those movies must still be
+// imported instead of being silently skipped.
+func TestLocalScannerIdentifiesFromNFOWhenNamesLackCode(t *testing.T) {
+	ctx := t.Context()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	tempDir := t.TempDir()
+	movieDir := filepath.Join(tempDir, "无码影片")
+	if err := os.MkdirAll(movieDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(movieDir, "movie.mp4"), []byte("v"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	nfoBytes, err := nfo.Encode(nfo.Movie{Code: "ABP-777", Title: "NFO only title"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(movieDir, "movie.nfo"), nfoBytes, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	scanner := NewLocalScanner(store.Client, nil)
+	res, err := scanner.Scan(ctx, tempDir)
+	if err != nil {
+		t.Fatalf("local scan failed: %v", err)
+	}
+	if res.MediaFiles != 1 || res.MoviesAdded != 1 || res.NFORead != 1 {
+		t.Fatalf("unexpected scan result: %+v", res)
+	}
+
+	film, err := store.Client.Movie.Query().Where(movie.CodeEQ("ABP-777")).Only(ctx)
+	if err != nil {
+		t.Fatalf("query movie: %v", err)
+	}
+	if film.Title != "NFO only title" || film.ScrapeStatus != movie.ScrapeStatusDone {
+		t.Fatalf("unexpected movie: title=%q status=%v", film.Title, film.ScrapeStatus)
+	}
+	files, err := store.Client.File.Query().Where(file.MovieIDEQ(film.ID)).Count(ctx)
+	if err != nil || files != 1 {
+		t.Fatalf("file count=%d err=%v", files, err)
+	}
+}

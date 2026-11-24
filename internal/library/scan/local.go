@@ -15,6 +15,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
+	"github.com/ppxb/miyabi/internal/nfo"
 )
 
 // LocalScanResult summarizes the outcome of a local directory scan.
@@ -133,6 +134,15 @@ func (s *LocalScanner) Scan(ctx context.Context, rootDir string) (*LocalScanResu
 			if !ok || code == "" {
 				code, ok = codeid.Parse(filepath.Base(dir))
 			}
+			nfoPath := findMatchingNFO(dir, stem, code, group.nfoFiles)
+			// A local-NFO library may keep the catalogue number only inside the
+			// NFO when neither the file nor its folder names it. Fall back to the
+			// matched NFO's code so those movies are not silently skipped.
+			if (!ok || code == "") && nfoPath != "" {
+				if docCode, err := readNFOCode(nfoPath); err == nil && docCode != "" {
+					code, ok = docCode, true
+				}
+			}
 			if !ok || code == "" {
 				continue
 			}
@@ -141,7 +151,7 @@ func (s *LocalScanner) Scan(ctx context.Context, rootDir string) (*LocalScanResu
 			posterPath, fanartPath := findMatchingArtwork(dir, stem, group.imageFiles)
 			batch = append(batch, localMedia{
 				path: mediaPath, name: media.Name(), size: media.Size(), code: code,
-				nfoPath:    findMatchingNFO(dir, stem, code, group.nfoFiles),
+				nfoPath:    nfoPath,
 				posterPath: posterPath, fanartPath: fanartPath,
 				subPaths: findMatchingSubtitles(stem, group.subFiles),
 			})
@@ -168,11 +178,11 @@ func isImageFile(name string) bool {
 }
 
 func findMatchingNFO(dir, stem, code string, nfoFiles []string) string {
-	candidates := []string{
-		filepath.Join(dir, stem+".nfo"),
-		filepath.Join(dir, code+".nfo"),
-		filepath.Join(dir, "movie.nfo"),
+	candidates := []string{filepath.Join(dir, stem+".nfo")}
+	if code != "" {
+		candidates = append(candidates, filepath.Join(dir, code+".nfo"))
 	}
+	candidates = append(candidates, filepath.Join(dir, "movie.nfo"))
 	for _, cand := range candidates {
 		for _, f := range nfoFiles {
 			if strings.EqualFold(f, cand) {
@@ -184,6 +194,19 @@ func findMatchingNFO(dir, stem, code string, nfoFiles []string) string {
 		return nfoFiles[0]
 	}
 	return ""
+}
+
+// readNFOCode returns the normalized catalogue number stored inside an NFO file.
+func readNFOCode(path string) (string, error) {
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	doc, err := nfo.Decode(body)
+	if err != nil {
+		return "", err
+	}
+	return codeid.Normalize(doc.Code), nil
 }
 
 func findMatchingArtwork(dir, stem string, imageFiles []string) (posterPath, fanartPath string) {
