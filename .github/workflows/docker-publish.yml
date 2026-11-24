@@ -180,9 +180,113 @@ jobs:
           provenance: false
           sbom: false
 
+  # 构建免 Docker 的独立二进制（当前为 Windows 桌面版），并附到同一个 Release。
+  binaries:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+            archive: zip
+            ldflags: "-s -w -H windowsgui"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Build web assets
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binary
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          go build -mod=readonly -trimpath \
+            -ldflags="${{ matrix.ldflags }}" \
+            -o "dist/miyabi${{ matrix.ext }}" ./cmd
+
+      - name: Package
+        id: package
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          name="miyabi_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
+          mkdir -p pkg
+          cp "dist/miyabi${{ matrix.ext }}" pkg/
+          cp LICENSE pkg/
+          cp README.md pkg/ 2>/dev/null || true
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            (cd pkg && zip -r "../${name}.zip" .)
+            echo "file=${name}.zip" >> "$GITHUB_OUTPUT"
+          else
+            tar -czf "${name}.tar.gz" -C pkg .
+            echo "file=${name}.tar.gz" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ${{ steps.package.outputs.file }}
+          if-no-files-found: error
+
+  # 汇总所有二进制，校验和一并附到 draft release（在正式发布前完成）。
+  release-assets:
+    name: Attach binaries to release
+    needs: [version, create-draft-release, binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          merge-multiple: true
+          path: dist
+
+      - name: Generate checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt
+
+      - name: Upload to draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: gh release upload "v${VERSION}" dist/* --clobber --repo "${{ github.repository }}"
+
   publish-release:
     name: Publish release
-    needs: [version, create-draft-release, publish]
+    needs: [version, create-draft-release, publish, release-assets]
     runs-on: ubuntu-latest
     permissions:
       contents: write
