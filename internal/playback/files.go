@@ -158,42 +158,15 @@ func (service *Service) StartMovie(ctx context.Context, movieID int, userAgent s
 	if fileErr != nil {
 		return Playback{}, fmt.Errorf("read indexed videos: %w", fileErr)
 	}
-	if len(records) == 0 {
-		return Playback{}, domain.E(domain.KindNotFound, "当前挂载目录中未找到该影片的媒体文件", nil)
-	}
 	if resumeErr != nil {
 		return Playback{}, resumeErr
 	}
-	target := records[0]
-	if resume != nil {
-		for _, item := range records {
-			if item.FileID == resume.FileID {
-				target = item
-				break
-			}
-		}
-		if target.FileID != resume.FileID {
-			resume = nil
-		}
+	target, resume := service.selectPlayableFile(ctx, records, resume)
+	if target == nil {
+		return Playback{}, domain.E(domain.KindNotFound, "当前挂载目录中未找到可播放的文件", nil)
 	}
 	if target.AccountID == domain.LocalAccountID {
-		if _, localErr := service.LocateLocalFile(ctx, target.FileID); localErr == nil {
-			return service.startLocalPlayback(ctx, target, resume)
-		} else {
-			// A local root that was removed or renamed must not break playback when
-			// the same movie still has a playable cloud file.
-			var fallback *ent.File
-			for _, item := range records {
-				if item.AccountID != domain.LocalAccountID {
-					fallback = item
-					break
-				}
-			}
-			if fallback == nil {
-				return Playback{}, localErr
-			}
-			target, resume = fallback, nil
-		}
+		return service.startLocalPlayback(ctx, target, resume)
 	}
 	opened, err := service.openFileRecord(ctx, target)
 	if err != nil {
@@ -210,6 +183,67 @@ func (service *Service) StartMovie(ctx context.Context, movieID int, userAgent s
 	result.FileID = target.FileID
 	result.Resume = resume
 	return result, nil
+}
+
+// selectPlayableFile picks the file StartMovie/Mpv should play: the resumed file
+// when present, otherwise the largest. A local pick that can no longer be located
+// falls back to a playable cloud file so a removed local root never blocks play.
+func (service *Service) selectPlayableFile(ctx context.Context, records []*ent.File, resume *domain.WatchResume) (*ent.File, *domain.WatchResume) {
+	if len(records) == 0 {
+		return nil, nil
+	}
+	target := records[0]
+	if resume != nil {
+		matched := false
+		for _, item := range records {
+			if item.FileID == resume.FileID {
+				target, matched = item, true
+				break
+			}
+		}
+		if !matched {
+			resume = nil
+		}
+	}
+	if target.AccountID == domain.LocalAccountID {
+		if _, err := service.LocateLocalFile(ctx, target.FileID); err != nil {
+			var fallback *ent.File
+			for _, item := range records {
+				if item.AccountID != domain.LocalAccountID {
+					fallback = item
+					break
+				}
+			}
+			if fallback == nil {
+				return nil, nil
+			}
+			target, resume = fallback, nil
+		}
+	}
+	return target, resume
+}
+
+// PrimaryFile reports the file MPV should open for a movie, and whether it is a
+// local file (served from disk) or a cloud file (served through the 115 relay).
+type PrimaryFile struct {
+	FileID string `json:"file_id"`
+	Name   string `json:"name"`
+	Local  bool   `json:"local"`
+}
+
+func (service *Service) PrimaryFile(ctx context.Context, movieID int) (PrimaryFile, error) {
+	records, err := service.database.File.Query().
+		Where(file.MovieIDEQ(movieID)).
+		Select(file.FieldFileID, file.FieldName, file.FieldSize, file.FieldAccountID, file.FieldPath).
+		Order(ent.Desc(file.FieldSize), ent.Asc(file.FieldPath), ent.Asc(file.FieldID)).All(ctx)
+	if err != nil {
+		return PrimaryFile{}, fmt.Errorf("read indexed videos: %w", err)
+	}
+	target, _ := service.selectPlayableFile(ctx, records, nil)
+	if target == nil {
+		return PrimaryFile{}, domain.E(domain.KindNotFound, "当前挂载目录中未找到可播放的文件", nil)
+	}
+	return PrimaryFile{FileID: target.FileID, Name: target.Name, Local: target.AccountID == domain.LocalAccountID}, nil
 }
 
 // playSourceSession is the subset of a drive session needed to resolve media.

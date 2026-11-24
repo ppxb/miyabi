@@ -51,6 +51,12 @@ func TestStartMoviePlaysLocalFile(t *testing.T) {
 		t.Fatalf("locate local file = %q, %v", abs, err)
 	}
 
+	// MPV selection reports the local file so the link uses /api/play-local.
+	pf, err := service.PrimaryFile(ctx, film.ID)
+	if err != nil || pf.FileID != "local-abc" || !pf.Local || pf.Name != "ABP-001.mp4" {
+		t.Fatalf("primary file = %+v, %v", pf, err)
+	}
+
 	// A record whose relative path escapes the configured root must be refused.
 	store.Client.File.Create().SetFileID("local-out").SetName("escape.mp4").SetSize(1).
 		SetAccountID(domain.LocalAccountID).SetRootID(domain.LocalAccountID).

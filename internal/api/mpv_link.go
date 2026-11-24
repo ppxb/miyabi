@@ -40,17 +40,22 @@ func mpvLinkHandler(play PlayManager, subtitles SubtitleManager, token string) g
 		if !ok {
 			return
 		}
-		files, err := play.Files(c.Request.Context(), query.MovieID)
+		file, err := play.PrimaryFile(c.Request.Context(), query.MovieID)
 		if err != nil {
 			respond(c, nil, err)
 			return
 		}
-		if len(files.Files) == 0 {
+		if file.FileID == "" {
 			respond(c, nil, domain.E(domain.KindNotFound, "当前挂载目录中未找到可播放文件", nil))
 			return
 		}
 		base := requestBase(c)
-		videoURL := withToken(base+"/api/strm/play/"+files.Files[0].ID, token)
+		// Local files are served from disk; cloud files go through the 115 relay.
+		streamPath := "/api/strm/play/" + file.FileID
+		if file.Local {
+			streamPath = "/api/play-local/" + file.FileID
+		}
+		videoURL := withToken(base+streamPath, token)
 		link := "miyabi-mpv://play?u=" + url.QueryEscape(videoURL)
 
 		tracks, err := subtitles.List(c.Request.Context(), query.MovieID)

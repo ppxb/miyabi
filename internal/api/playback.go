@@ -22,6 +22,7 @@ type PlayManager interface {
 	Stream(context.Context, string, int, string, http.Header) (*http.Response, error)
 	Release(string)
 	LocateLocalFile(context.Context, string) (string, error)
+	PrimaryFile(context.Context, int) (playback.PrimaryFile, error)
 	SaveProgress(context.Context, int, string, float64, float64, *domain.PlaybackSettings) error
 	History(context.Context, int) (domain.WatchHistoryPage, error)
 	RemoveHistory(context.Context, []int) (int, error)
@@ -172,10 +173,16 @@ func playReleaseHandler(play PlayManager) gin.HandlerFunc {
 }
 
 // localStreamHandler serves an indexed local video from disk with Range support,
-// or redirects a local .strm to the URL it wraps. Only paths inside a configured
-// local source directory (validated by LocateLocalFile) are served.
-func localStreamHandler(play PlayManager) gin.HandlerFunc {
+// or redirects a local .strm to the URL it wraps. It accepts the STRM token so an
+// external player (MPV) without a session cookie can use it, and a signed-in
+// cookie for the built-in player. Only paths inside a configured local source
+// directory (validated by LocateLocalFile) are served.
+func localStreamHandler(play PlayManager, token string, gate AccessGate) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !strmAuthorized(c, token, gate) {
+			c.Error(domain.E(domain.KindUnauthorized, "无效的播放令牌", nil))
+			return
+		}
 		uri, ok := bindURI[struct {
 			FileID string `uri:"fileID" binding:"required,max=128"`
 		}](c)
