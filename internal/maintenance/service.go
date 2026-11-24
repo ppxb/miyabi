@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
+	"github.com/ppxb/miyabi/internal/logging"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -28,6 +31,68 @@ type Info struct {
 	DataDirectory     string                `json:"data_directory"`
 	DatabaseSizeBytes int64                 `json:"database_size_bytes"`
 	Cache             mediaimage.CacheStats `json:"cache"`
+}
+
+// LogInfo is the tail of the runtime log file.
+type LogInfo struct {
+	Path      string   `json:"path"`
+	Lines     []string `json:"lines"`
+	SizeBytes int64    `json:"size_bytes"`
+}
+
+// Logs reads the newest lines of the runtime log without loading the whole file.
+func (service *Service) Logs(ctx context.Context, limit int) (LogInfo, error) {
+	path := logging.Path(service.directory)
+	result := LogInfo{Path: path, Lines: []string{}}
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return result, nil
+	}
+	if err != nil {
+		return result, fmt.Errorf("stat runtime log: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return result, errors.New("runtime log path is not a regular file")
+	}
+	result.SizeBytes = info.Size()
+	if limit <= 0 {
+		limit = 500
+	}
+	if limit > 2000 {
+		limit = 2000
+	}
+	const readLimit = 256 << 10
+	start := int64(0)
+	if info.Size() > readLimit {
+		start = info.Size() - readLimit
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return result, fmt.Errorf("open runtime log: %w", err)
+	}
+	defer file.Close()
+	if start > 0 {
+		if _, err := file.Seek(start, io.SeekStart); err != nil {
+			return result, fmt.Errorf("seek runtime log: %w", err)
+		}
+	}
+	data, err := io.ReadAll(io.LimitReader(file, readLimit+1))
+	if err != nil {
+		return result, fmt.Errorf("read runtime log: %w", err)
+	}
+	lines := strings.Split(strings.TrimRight(string(data), "\r\n"), "\n")
+	// The first line is partial when starting in the middle of the file.
+	if start > 0 && len(lines) > 0 {
+		lines = lines[1:]
+	}
+	if len(lines) > limit {
+		lines = lines[len(lines)-limit:]
+	}
+	if len(lines) == 1 && lines[0] == "" {
+		lines = []string{}
+	}
+	result.Lines = lines
+	return result, nil
 }
 
 // ArtworkLocker excludes pruning while new images gain durable references.

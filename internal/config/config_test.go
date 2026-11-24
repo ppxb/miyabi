@@ -38,8 +38,8 @@ func TestLoadDefaultsAndEnvironment(t *testing.T) {
 			name: "defaults",
 			want: Config{
 				Listen:         ":8080",
-				DataDir:        "./data",
-				EmbyDir:        filepath.Join("./data", "emby"),
+				DataDir:        defaultDataDir(),
+				EmbyDir:        filepath.Join(defaultDataDir(), "emby"),
 				PublicURL:      "http://" + netx.OutboundIP() + ":8080",
 				LogLevel:       slog.LevelInfo,
 				EmbySyncActors: true,
@@ -81,8 +81,8 @@ func TestLoadDefaultsAndEnvironment(t *testing.T) {
 			env:  map[string]string{"MIYABI_ACCESS_PASSWORD": ""},
 			want: Config{
 				Listen:         ":8080",
-				DataDir:        "./data",
-				EmbyDir:        filepath.Join("./data", "emby"),
+				DataDir:        defaultDataDir(),
+				EmbyDir:        filepath.Join(defaultDataDir(), "emby"),
 				PublicURL:      "http://" + netx.OutboundIP() + ":8080",
 				LogLevel:       slog.LevelInfo,
 				EmbySyncActors: true,
@@ -164,7 +164,7 @@ func TestLoadIgnoresLegacyConfigFile(t *testing.T) {
 	if err := os.WriteFile("config.toml", []byte("invalid legacy TOML ["), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if cfg, err := Load(); err != nil || cfg.Listen != ":8080" || cfg.DataDir != "./data" {
+	if cfg, err := Load(); err != nil || cfg.Listen != ":8080" || cfg.DataDir != defaultDataDir() {
 		t.Fatalf("local config file affected environment-only startup: %+v, %v", cfg, err)
 	}
 }

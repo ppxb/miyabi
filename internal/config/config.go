@@ -31,7 +31,7 @@ type Config struct {
 
 func Load() (Config, error) {
 	listen := envOrDefault("MIYABI_LISTEN", ":8080")
-	dataDir := envOrDefault("MIYABI_DATA_DIR", "./data")
+	dataDir := envOrDefault("MIYABI_DATA_DIR", defaultDataDir())
 	logLevel, err := parseLogLevel(envOrDefault("MIYABI_LOG_LEVEL", "info"))
 	if err != nil {
 		return Config{}, err
@@ -88,6 +88,40 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// LocalURL returns the loopback address of the web UI for the tray menu.
+func (cfg Config) LocalURL() string {
+	host, port, err := net.SplitHostPort(cfg.Listen)
+	if err != nil {
+		return "http://127.0.0.1:8080"
+	}
+	switch host {
+	case "", "0.0.0.0", "::":
+		host = "127.0.0.1"
+	}
+	return "http://" + net.JoinHostPort(host, port)
+}
+
+// defaultDataDir stores runtime data next to the executable so a portable,
+// double-clicked binary keeps its state beside it, since the working directory
+// is launcher-dependent. MIYABI_DATA_DIR still overrides this default.
+func defaultDataDir() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return "./data"
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	dir := filepath.Dir(exe)
+	// `go run`/`go test` build into a temp go-build dir; keep the old
+	// CWD-relative default there so dev runs do not scatter data into ephemeral
+	// folders that are removed on exit.
+	if strings.Contains(dir, "go-build") {
+		return "./data"
+	}
+	return filepath.Join(dir, "data")
 }
 
 func envOrDefault(key, fallback string) string {

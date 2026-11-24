@@ -32,3 +32,5 @@ config.local.*
 Thumbs.db
 .openidea/
 backups/
+
+dist/
