@@ -23,7 +23,7 @@ export function MpvSection() {
     <SettingsSection icon={<PlayIcon className="size-4" />} title="MPV 播放器">
       <SettingRow
         title="使用 MPV 播放"
-        description="安装插件后可直接唤起本机 MPV 播放。首次使用请下载安装脚本并执行。"
+        description="安装脚本后可直接唤起本机 MPV 播放。首次使用请下载安装脚本并执行。"
       >
         <div className="flex items-center gap-2">
           <Button

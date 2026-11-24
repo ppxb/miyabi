@@ -21,7 +21,7 @@ const MovieDetailContent = lazy(() =>
 /** Scrollable detail body with the shared animated scroll fade. */
 function DetailScrollBody({ children }: PropsWithChildren) {
   const ref = useRef<HTMLDivElement>(null)
-  useScrollFade(ref)
+  useScrollFade(ref, { shrink: 0, blur: 0 })
   return (
     <div
       ref={ref}
