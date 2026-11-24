@@ -119,7 +119,7 @@ func TestCompleteOfficialMetadataStillQueriesJavDBAndReusesCache(t *testing.T) {
 	s := newTestService(t, primary, fallback)
 	for range 2 {
 		m, err := s.Resolve(t.Context(), domain.MovieRef{Code: "ABP-123"})
-		if err != nil || m.Detail.Title != "javdb title" || m.Detail.ID != "ABP-123" || m.Detail.Actors[0].Provider != "javdb" || m.Detail.Tags[0].Provider != "javdb" {
+		if err != nil || m.Detail.Title != "fanza title" || m.Detail.ID != "ABP-123" || m.Detail.Actors[0].Provider != "fanza" || m.Detail.Tags[0].Provider != "fanza" {
 			t.Fatalf("result=%+v err=%v", m, err)
 		}
 	}
@@ -142,22 +142,22 @@ func TestCompleteOfficialMetadataStillQueriesJavDBAndReusesCache(t *testing.T) {
 	}
 }
 
-func TestJavDBMetadataTakesPriorityAndReturnsItsConfirmedIdentity(t *testing.T) {
-	var order []string
+func TestOfficialMetadataWinsAndJavDBConfirmsIdentity(t *testing.T) {
 	primary := &sourceStub{id: "fanza", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
-		order = append(order, "fanza")
 		return fixture("fanza", code, "Official title"), nil
 	}}
 	fallback := &sourceStub{id: "javdb", fetch: func(_ context.Context, code string) (domain.MovieMetadata, error) {
-		order = append(order, "javdb")
 		m := completeFixture("javdb", code)
 		m.Detail.Sources[0].ID = "catalogue-id"
 		return m, nil
 	}}
 	s := newTestService(t, primary, fallback)
 	m, err := s.Resolve(t.Context(), domain.MovieRef{Code: "ABP-123"})
-	if err != nil || !reflect.DeepEqual(order, []string{"fanza", "javdb"}) || m.Detail.Title != "javdb title" || m.Detail.ID != "catalogue-id" || m.Detail.FieldSources["title"] != "javdb" || m.Detail.FieldSources["actors"] != "javdb" {
-		t.Fatalf("merge=%+v order=%v err=%v", m, order, err)
+	if err != nil || m.Detail.Title != "Official title" || m.Detail.ID != "catalogue-id" || m.Detail.FieldSources["title"] != "fanza" || m.Detail.FieldSources["actors"] != "javdb" {
+		t.Fatalf("merge=%+v err=%v", m, err)
+	}
+	if primary.calls.Load() != 1 || fallback.calls.Load() != 1 {
+		t.Fatalf("sources were not all queried: primary=%d javdb=%d", primary.calls.Load(), fallback.calls.Load())
 	}
 }
 
@@ -218,7 +218,7 @@ func TestPrimaryFailureCanUseSameIdentityFallbackButNeverWeakerIdentity(t *testi
 	}
 }
 
-func TestFANZAFirstAndJavDBLastSurviveSavedSettings(t *testing.T) {
+func TestFANZAFirstAndJavDBSecondSurviveSavedSettings(t *testing.T) {
 	old := newTestService(t, &sourceStub{id: "fc2"})
 	if err := old.UpdateSettings(t.Context(), []domain.SourceToggle{{ID: "fc2", Enabled: false}}); err != nil {
 		t.Fatal(err)
@@ -228,7 +228,7 @@ func TestFANZAFirstAndJavDBLastSurviveSavedSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	want := []domain.SourceToggle{{ID: "fanza", Enabled: true}, {ID: "fc2", Enabled: false}, {ID: "javdb", Enabled: true}}
+	want := []domain.SourceToggle{{ID: "fanza", Enabled: true}, {ID: "javdb", Enabled: true}, {ID: "fc2", Enabled: false}}
 	if !reflect.DeepEqual(s.Settings(), want) {
 		t.Fatalf("order=%v", s.Settings())
 	}

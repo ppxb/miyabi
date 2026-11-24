@@ -251,7 +251,7 @@ func TestJavDBMetadataAndArtworkCheckpointSurvivePublishFailure(t *testing.T) {
 		t.Fatalf("fallback checkpoint=%+v err=%v", p, err)
 	}
 	failed := f.store.Client.Movie.Query().OnlyX(t.Context())
-	if failed.Code != "ABP-123" || failed.Metadata.Actors[0].Provider != "javdb" {
+	if failed.Code != "ABP-123" || failed.Metadata.Actors[0].Provider != "fanza" {
 		t.Fatal("catalogue metadata was not checkpointed before artwork")
 	}
 	if failed.Poster != nil || failed.MetadataSnapshot != nil || failed.ScrapeStatus != movie.ScrapeStatusFailed {
@@ -261,11 +261,11 @@ func TestJavDBMetadataAndArtworkCheckpointSurvivePublishFailure(t *testing.T) {
 	job.Update().SetStatus(task.StatusQueued).ExecX(t.Context())
 	f.runQueue(t)
 	record := f.store.Client.Movie.Query().WithActors().WithTags().OnlyX(t.Context())
-	if record.ScrapeStatus != movie.ScrapeStatusDone || record.Code != "ABP-123" || record.Metadata.IDs[0].Type != "code" || record.Edges.Actors[0].Provider != "javdb" || record.Edges.Tags[0].Provider != "javdb" || record.Metadata.SelectedImage.Provider != "javdb" {
+	if record.ScrapeStatus != movie.ScrapeStatusDone || record.Code != "ABP-123" || record.Metadata.IDs[0].Type != "code" || record.Edges.Actors[0].Provider != "fanza" || record.Edges.Tags[0].Provider != "fanza" || record.Metadata.SelectedImage.Provider != "javdb" {
 		t.Fatalf("catalogue metadata lost during publish: %+v", record)
 	}
 	detail, err := f.library.Movie(t.Context(), record.ID)
-	if err != nil || len(detail.PreviewImages) != 2 || detail.Tags[0].Provider != "javdb" {
+	if err != nil || len(detail.PreviewImages) != 2 || detail.Tags[0].Provider != "fanza" {
 		t.Fatalf("saved detail lost previews or searchable tags: %+v %v", detail, err)
 	}
 	if primary.queries != 1 || fallback.queries != 1 || primary.images != 1 || fallback.images != 1 || len(f.catalogue.calls) != 0 {

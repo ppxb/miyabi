@@ -5,6 +5,9 @@ type MovieRef struct {
 	Refresh bool   `json:"refresh,omitempty"`
 	Code    string `json:"code"`
 	Zone    Zone   `json:"zone,omitempty"`
+	// JavdbID carries a known JavDB catalogue id so the JavDB magnet source can
+	// query opportunistically; empty means "no JavDB id, skip".
+	JavdbID string `json:"javdb_id,omitempty"`
 }
 
 // NormalizeRating10 converts a source rating to a 10-point scale.

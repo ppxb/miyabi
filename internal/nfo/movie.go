@@ -115,6 +115,17 @@ func (movie Movie) Poster() string {
 	return ""
 }
 
+// SourceID returns the stored source identity (e.g. "javdb") captured from a
+// previous scrape, or "" when absent.
+func (movie Movie) SourceID(provider string) string {
+	for _, id := range movie.IDs {
+		if id.Type == provider {
+			return id.Value
+		}
+	}
+	return ""
+}
+
 func Decode(body []byte) (Movie, error) {
 	var movie Movie
 	if err := xml.Unmarshal(body, &movie); err != nil {

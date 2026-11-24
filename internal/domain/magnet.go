@@ -31,4 +31,5 @@ const (
 	MagnetSourceSukebei    = "sukebei"
 	MagnetSourceFreeJavBT  = "freejavbt"
 	MagnetSourceProjectJav = "projectjav"
+	MagnetSourceJavDB      = "javdb"
 )

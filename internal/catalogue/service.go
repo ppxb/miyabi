@@ -90,7 +90,12 @@ func New(
 		return nil, err
 	}
 
-	service := newService(db, client, supplement, local, route, sukebei, extraMagnets...)
+	// Wire the real JavDB client as an opportunistic magnet source. It only
+	// queries when a movie's JavDB id is known and skips silently otherwise.
+	magnetSources := make([]magnet.Source, 0, len(extraMagnets)+1)
+	magnetSources = append(magnetSources, extraMagnets...)
+	magnetSources = append(magnetSources, javdb.NewMagnetSource(client))
+	service := newService(db, client, supplement, local, route, sukebei, magnetSources...)
 	if err := service.restoreMagnetSettings(ctx); err != nil {
 		return nil, err
 	}
@@ -130,7 +135,8 @@ const (
 )
 
 func newService(database *ent.Client, primary JavDBClient, supplement JavBusSource, local LocalState, route persistedRoute, sukebei magnet.Source, extraMagnets ...magnet.Source) *Service {
-	// JavDB is intentionally absent: magnets come from the supplementary sources only.
+	// Magnet sources are the supplementary providers plus any extra sources. JavDB
+	// (wired by New) is one extra source that self-skips without a JavDB id.
 	sources := make([]magnet.Source, 0, 2+len(extraMagnets))
 	if supplement != nil {
 		sources = append(sources, supplement)

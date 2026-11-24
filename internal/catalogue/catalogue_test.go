@@ -327,9 +327,10 @@ func TestServiceMagnetsWithAggregator(t *testing.T) {
 	}
 }
 
-// TestJavDBIsNotAMagnetSource pins that the JavDB client, though still used for
-// catalogue metadata, never contributes magnets after the source swap.
-func TestJavDBIsNotAMagnetSource(t *testing.T) {
+// TestNewWithClientsHasNoJavDBMagnetSource pins that explicitly-injected clients
+// (used in tests) do not include JavDB; only New() wires the opportunistic JavDB
+// magnet source with the real client.
+func TestNewWithClientsHasNoJavDBMagnetSource(t *testing.T) {
 	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {
 		t.Fatal(err)

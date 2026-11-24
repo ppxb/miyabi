@@ -218,7 +218,7 @@ function MagnetCard({
               {magnet.uri}
             </p>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm leading-6 text-muted-foreground">
-              <span className="text-xs">{formatSize(magnet.size)}</span>
+              <span className="text-xs">{magnet.size > 0 ? formatSize(magnet.size) : '未知'}</span>
               {magnet.sources?.map(source => (
                 <Badge key={source} variant="outline">
                   {sourceLabels[source] ?? source}

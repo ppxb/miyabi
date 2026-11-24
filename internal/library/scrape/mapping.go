@@ -32,6 +32,14 @@ func DetailNFO(detail domain.MovieDetail) nfo.Movie {
 	if detail.Code != "" {
 		doc.IDs = []nfo.UniqueID{{Type: "code", Value: detail.Code, Default: true}}
 	}
+	// Preserve provider source identities (e.g. the JavDB id) so a rescan and the
+	// magnet lookup keep them without re-querying the source.
+	for _, source := range detail.Sources {
+		if source.Provider == "" || source.ID == "" {
+			continue
+		}
+		doc.IDs = append(doc.IDs, nfo.UniqueID{Type: source.Provider, Value: source.ID})
+	}
 	if detail.Director != nil {
 		doc.Director = nfo.Entity{Provider: detail.Director.Provider, ID: detail.Director.ID, Name: detail.Director.Name}
 	}

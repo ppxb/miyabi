@@ -1,17 +1,16 @@
 package metadata
 
 import (
-	"cmp"
 	"slices"
 	"strings"
 
 	"github.com/ppxb/miyabi/internal/domain"
 )
 
-// merge only combines confirmed results for the same film. JavDB owns catalogue
-// metadata when available, while artwork keeps the configured source order.
-// Actors and tags are unioned across providers (deduplicated by name) so every
-// source can contribute instead of stopping at the first complete one.
+// merge combines confirmed results for the same film. No source is privileged:
+// single-value fields fill from the first source (in the caller's source order)
+// that has a value, and artwork keeps that same order. Actors and tags are
+// unioned across providers (deduplicated by name) so every source contributes.
 func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 	var result domain.MovieMetadata
 	result.Detail.FieldSources = make(map[string]string)
@@ -32,16 +31,8 @@ func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 			}
 		}
 	}
+	// Keep the caller's source order; no provider is privileged.
 	results = slices.Clone(results)
-	slices.SortStableFunc(results, func(a, b domain.MovieMetadata) int {
-		priority := func(m domain.MovieMetadata) int {
-			if slices.ContainsFunc(m.Detail.Sources, func(id domain.SourceID) bool { return id.Provider == "javdb" }) {
-				return 0
-			}
-			return 1
-		}
-		return cmp.Compare(priority(a), priority(b))
-	})
 	for _, item := range results {
 		m := item.Detail
 		if m.Code == "" {
@@ -65,7 +56,16 @@ func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 			}
 		}
 		text("code", &out.Code, m.Code)
-		text("title", &out.Title, m.Title)
+		// Title prefers the Japanese original (OriginTitle) over a localized
+		// title, matching the configured "prefer official original" policy.
+		if out.Title == "" {
+			switch {
+			case m.OriginTitle != "":
+				out.Title, out.FieldSources["title"] = m.OriginTitle, provider
+			case m.Title != "":
+				out.Title, out.FieldSources["title"] = m.Title, provider
+			}
+		}
 		text("origin_title", &out.OriginTitle, m.OriginTitle)
 		text("release_date", &out.ReleaseDate, m.ReleaseDate)
 		text("cover", &out.Cover, m.Cover)
