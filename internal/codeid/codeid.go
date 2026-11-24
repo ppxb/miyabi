@@ -48,15 +48,21 @@ var (
 	codecNoise  = regexp.MustCompile(`\b[HX][ ._-]?26[45]\b`)
 	partNoise   = regexp.MustCompile(`([0-9][A-Z0-9]*)[-_. ]+(?:CD|DISC|PART)[0-9]+([^A-Z0-9]|$)`)
 	nameSuffix  = regexp.MustCompile(`^[-_]+([A-Z][A-Z0-9]*)(?:[^A-Z0-9]|$)`)
-	fileMarker  = regexp.MustCompile(`^(?:C|U|UC|CHS|CHT|SUB|HD|FHD|UHD|(?:CD|DISC|PART)[0-9]+)$`)
+	fileMarker  = regexp.MustCompile(`^(?:C|U|UC|CHS|CHT|SUB|HD|FHD|UHD|LTX|(?:CD|DISC|PART)[0-9]+)$`)
 	// SSNI releases append C directly to the numeric serial for subtitles.
 	// Limit this filename alias to the known family; other catalogues have real letter variants.
 	ssniSubtitle  = regexp.MustCompile(`^(SSNI-[0-9]+)C$`)
 	versionSuffix = regexp.MustCompile(`^[-_]([A-Z])(?:[^A-Z0-9]|$)`)
-	layerToken    = regexp.MustCompile(`[A-Z0-9]+(?:[-_.][A-Z0-9]+)*`)
-	layerSerial   = regexp.MustCompile(`[A-Z][A-Z0-9]*[-_.]?[0-9]`)
-	layerNumeric  = regexp.MustCompile(`^[0-9]+[-_][0-9]+(?:[-_][A-Z0-9]+)*$`)
-	layerPart     = regexp.MustCompile(`^[0-9]{1,2}$`)
+	// attachedLTX / attachedC match a marker glued to the numeric serial without a
+	// separator (SSIS-001LTX, FJIN-106C). LTX is a leak/uncensored release marker;
+	// a bare C is only offered as a relaxed lookup fallback, never at parse time,
+	// because it can be a genuine serial letter (FJIN-106C is distinct from FJIN-106).
+	attachedLTX  = regexp.MustCompile(`^(.*[0-9])LTX$`)
+	attachedC    = regexp.MustCompile(`^(.*[0-9])C$`)
+	layerToken   = regexp.MustCompile(`[A-Z0-9]+(?:[-_.][A-Z0-9]+)*`)
+	layerSerial  = regexp.MustCompile(`[A-Z][A-Z0-9]*[-_.]?[0-9]`)
+	layerNumeric = regexp.MustCompile(`^[0-9]+[-_][0-9]+(?:[-_][A-Z0-9]+)*$`)
+	layerPart    = regexp.MustCompile(`^[0-9]{1,2}$`)
 )
 
 // Parse extracts a catalogue number from a filename, discarding website,
@@ -74,6 +80,10 @@ func Parse(name string) (string, bool) {
 	code = ssniSubtitle.ReplaceAllString(code, "$1")
 	// A trailing CH marks a Chinese-subtitle variant, not part of the number.
 	if base := withoutSubtitleSuffix(code); base != "" {
+		code = base
+	}
+	// A trailing LTX glued to the serial is a leak/uncensored release marker.
+	if base := stripAttachedReleaseLTX(code); base != "" {
 		code = base
 	}
 	// SCUTE includes the model name in its catalogue number. Other studios'
@@ -113,6 +123,20 @@ func withoutSubtitleSuffix(code string) string {
 		return match[1]
 	}
 	return ""
+}
+
+// stripAttachedReleaseLTX removes an LTX leak/uncensored marker glued to the
+// numeric serial (SSIS-001LTX -> SSIS-001). The remainder must still look like a
+// catalogue number so a real serial is never truncated.
+func stripAttachedReleaseLTX(code string) string {
+	if match := attachedLTX.FindStringSubmatch(code); match != nil && isCatalogueShape(match[1]) {
+		return match[1]
+	}
+	return ""
+}
+
+func isCatalogueShape(code string) bool {
+	return layerSerial.MatchString(code) || layerNumeric.MatchString(code)
 }
 
 // Layers generates catalogue candidates in priority order:
@@ -197,6 +221,16 @@ func Layers(name string) [][]string {
 		dualFallbacks = append(dualFallbacks, stripPrefix(code)...)
 	}
 	addLayer(dualFallbacks)
+
+	// Release markers and possible subtitle letters glued to the serial are offered
+	// as the lowest-priority candidates so the base code can still resolve without
+	// altering the stored identity.
+	if base := stripAttachedReleaseLTX(complete); base != "" {
+		addLayer([]string{base})
+	}
+	if match := attachedC.FindStringSubmatch(complete); match != nil {
+		addLayer([]string{match[1]})
+	}
 
 	return layers
 }
