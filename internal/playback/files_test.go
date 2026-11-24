@@ -96,7 +96,7 @@ func TestResolveSpecsCachesDirectURL(t *testing.T) {
 			return nil, nil
 		},
 	}
-	service := New(nil, nil, time.Minute)
+	service := New(nil, nil, time.Minute, nil)
 	for i := 0; i < 3; i++ {
 		specs, err := service.resolveSpecs(context.Background(), sess, "acct", "pick", "ua")
 		if err != nil || len(specs) != 1 || specs[0].address != "https://cdn.example/video.mp4" {

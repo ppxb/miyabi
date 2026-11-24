@@ -109,7 +109,7 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 	exportMgr := export.NewManager(export.Config{
 		EmbyDir: cfg.EmbyDir, PublicURL: cfg.PublicURL, STRMToken: cfg.STRMToken,
 	})
-	playSvc := playback.New(store.Client, driveSvc, 8*time.Hour)
+	playSvc := playback.New(store.Client, driveSvc, 8*time.Hour, sourceSvc.LocalRoots)
 	libSvc := library.New(store.Client, driveSvc, taskSvc, images, library.Options{
 		ExportManager: exportMgr,
 		Sources:       sourceSvc.LibrarySources,

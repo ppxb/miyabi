@@ -1,6 +1,7 @@
 package playback
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -42,6 +43,9 @@ type Service struct {
 	// file starts without another round trip. Guarded by urlMu.
 	urlMu    sync.Mutex
 	urlCache map[string]urlCacheEntry
+	// localRoots lists the configured local source directories, used to turn an
+	// indexed relative path back into an absolute path for local playback.
+	localRoots func(context.Context) ([]string, error)
 }
 
 // downloadURLCacheTTL keeps resolved direct URLs only briefly; 115 signed URLs
@@ -53,13 +57,14 @@ type urlCacheEntry struct {
 	expires time.Time
 }
 
-func New(database *ent.Client, d *drive.Drive, sessionTTL time.Duration) *Service {
+func New(database *ent.Client, d *drive.Drive, sessionTTL time.Duration, localRoots func(context.Context) ([]string, error)) *Service {
 	return &Service{
 		database:   database,
 		drive:      d,
 		sessions:   make(map[string]*playSession),
 		sessionTTL: sessionTTL,
 		urlCache:   make(map[string]urlCacheEntry),
+		localRoots: localRoots,
 	}
 }
 

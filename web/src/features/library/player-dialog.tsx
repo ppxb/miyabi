@@ -88,11 +88,13 @@ function LibraryPlayer({
   const savedLabel = resumeApplies ? resume?.settings?.quality || 'direct' : 'direct'
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null)
   const effectiveLabel = selectedLabel ?? savedLabel
-  const needsQualities = effectiveLabel !== 'direct'
+  // Local files are served directly by this server and have no 115 renditions.
+  const isLocal = playback.data?.source?.account_id === 'local'
+  const needsQualities = effectiveLabel !== 'direct' && !isLocal
 
   const qualities = usePlayQualities(
     playback.data?.file_id,
-    !!playback.data?.file_id && (qualitiesRequested || needsQualities)
+    !!playback.data?.file_id && !isLocal && (qualitiesRequested || needsQualities)
   )
   const playerRef = useRef<PlayerControls | null>(null)
   const pendingSeekRef = useRef<PendingSeek | null>(null)

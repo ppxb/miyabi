@@ -5,6 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/ppxb/miyabi/internal/database"
@@ -142,7 +146,7 @@ func (service *Service) StartMovie(ctx context.Context, movieID int, userAgent s
 	go func() {
 		defer wg.Done()
 		records, fileErr = service.database.File.Query().
-			Where(file.MovieIDEQ(movieID), file.AccountIDNEQ(domain.LocalAccountID)).
+			Where(file.MovieIDEQ(movieID)).
 			Select(file.FieldFileID, file.FieldSize, file.FieldAccountID, file.FieldRootID, file.FieldPickCode, file.FieldName, file.FieldPath).
 			Order(ent.Desc(file.FieldSize), ent.Asc(file.FieldPath), ent.Asc(file.FieldID)).All(ctx)
 	}()
@@ -170,6 +174,25 @@ func (service *Service) StartMovie(ctx context.Context, movieID int, userAgent s
 		}
 		if target.FileID != resume.FileID {
 			resume = nil
+		}
+	}
+	if target.AccountID == domain.LocalAccountID {
+		if _, localErr := service.LocateLocalFile(ctx, target.FileID); localErr == nil {
+			return service.startLocalPlayback(ctx, target, resume)
+		} else {
+			// A local root that was removed or renamed must not break playback when
+			// the same movie still has a playable cloud file.
+			var fallback *ent.File
+			for _, item := range records {
+				if item.AccountID != domain.LocalAccountID {
+					fallback = item
+					break
+				}
+			}
+			if fallback == nil {
+				return Playback{}, localErr
+			}
+			target, resume = fallback, nil
 		}
 	}
 	opened, err := service.openFileRecord(ctx, target)
@@ -266,4 +289,132 @@ func (service *Service) sourceFor(ctx context.Context, accountID, rootID string)
 		return domain.LibrarySource{}, domain.E(domain.KindNotFound, "当前挂载目录中未找到该影片的媒体文件", nil)
 	}
 	return source, nil
+}
+
+// LocateLocalFile resolves an indexed local file to its absolute path on disk.
+// Paths that leave every configured local source directory are refused, and a
+// path that exists under more than one root is reported as ambiguous instead of
+// silently picking one, since file rows do not record which root they came from.
+func (service *Service) LocateLocalFile(ctx context.Context, fileID string) (string, error) {
+	record, err := service.database.File.Query().
+		Where(file.FileIDEQ(fileID), file.AccountIDEQ(domain.LocalAccountID)).
+		Select(file.FieldPath).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return "", domain.E(domain.KindNotFound, "本地文件不存在，请重新扫描", fs.ErrNotExist)
+		}
+		return "", err
+	}
+	if service.localRoots == nil {
+		return "", domain.E(domain.KindNotFound, "本地文件不在已配置的本地目录中，请重新扫描", fs.ErrNotExist)
+	}
+	roots, err := service.localRoots(ctx)
+	if err != nil {
+		return "", err
+	}
+	var canonicalRoots []string
+	for _, root := range roots {
+		if canonical := canonicalPath(root); canonical != "" {
+			canonicalRoots = append(canonicalRoots, canonical)
+		}
+	}
+	var candidates []string
+	if filepath.IsAbs(record.Path) {
+		candidates = []string{record.Path}
+	} else {
+		for _, root := range canonicalRoots {
+			candidates = append(candidates, filepath.Join(root, record.Path))
+		}
+	}
+	var found []string
+	for _, candidate := range candidates {
+		real := canonicalPath(candidate)
+		if real == "" || !withinAny(canonicalRoots, real) {
+			continue
+		}
+		if info, err := os.Stat(real); err == nil && info.Mode().IsRegular() {
+			found = append(found, real)
+		}
+	}
+	switch len(found) {
+	case 1:
+		return found[0], nil
+	case 0:
+		return "", domain.E(domain.KindNotFound, "本地文件不在已配置的本地目录中，请重新扫描", fs.ErrNotExist)
+	default:
+		return "", domain.E(domain.KindConflict, "本地文件在多个目录中都存在，无法确定播放哪个，请检查本地源配置", nil)
+	}
+}
+
+// canonicalPath returns the absolute, symlink-resolved form of a path, or "" on
+// error (for example a path that does not exist yet).
+func canonicalPath(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return ""
+	}
+	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		return resolved
+	}
+	return abs
+}
+
+func withinAny(roots []string, target string) bool {
+	for _, root := range roots {
+		rel, err := filepath.Rel(root, target)
+		if err != nil || filepath.IsAbs(rel) || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// startLocalPlayback exposes a local file through this server (see the
+// /api/play-local route) instead of the 115 proxy session.
+func (service *Service) startLocalPlayback(ctx context.Context, record *ent.File, resume *domain.WatchResume) (Playback, error) {
+	if !domain.IsMedia(record.Name) {
+		return Playback{}, domain.E(domain.KindNotFound, "视频已不在当前媒体目录中，请重新扫描", fs.ErrNotExist)
+	}
+	return Playback{
+		FileID:  record.FileID,
+		Sources: []MediaSource{{Src: "/api/play-local/" + record.FileID, Type: service.localMediaType(ctx, record), Label: "原画"}},
+		Source: domain.LibrarySource{
+			AccountID: domain.LocalAccountID,
+			Directory: domain.LibraryDirectory{ID: domain.LocalAccountID, Name: "本地目录"},
+		},
+		Resume: resume,
+	}, nil
+}
+
+func (service *Service) localMediaType(ctx context.Context, record *ent.File) string {
+	if strings.EqualFold(filepath.Ext(record.Name), ".m3u8") {
+		return "application/x-mpegurl"
+	}
+	if strings.EqualFold(filepath.Ext(record.Name), ".strm") {
+		if path, err := service.LocateLocalFile(ctx, record.FileID); err == nil {
+			if body, err := os.ReadFile(path); err == nil && isHLSURL(firstNonBlankLine(string(body))) {
+				return "application/x-mpegurl"
+			}
+		}
+	}
+	return "video/mp4"
+}
+
+func firstNonBlankLine(s string) string {
+	for _, line := range strings.Split(s, "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func isHLSURL(target string) bool {
+	parsed, err := url.Parse(target)
+	if err != nil {
+		return false
+	}
+	ext := strings.ToLower(filepath.Ext(parsed.Path))
+	return ext == ".m3u8" || ext == ".m3u"
 }

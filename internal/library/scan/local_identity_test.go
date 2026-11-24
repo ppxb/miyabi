@@ -35,7 +35,7 @@ func TestLocalFilesInDifferentRootsKeepSeparateIdentities(t *testing.T) {
 			if first.FileID == second.FileID || second.MovieID == nil || *second.MovieID != film.ID || film.ID == corrected.ID {
 				t.Fatal("second root reused the first root's corrected file association")
 			}
-			if second.Size != int64(len("https://example.com/second-version")) || second.Path != name {
+			if second.Size != int64(len("https://example.com/second-version")) || second.Path != filepath.Join(secondRoot, name) {
 				t.Fatalf("second root did not retain its file data: %+v", second)
 			}
 			// File facts must refresh even when manual movie metadata is protected.
@@ -45,7 +45,7 @@ func TestLocalFilesInDifferentRootsKeepSeparateIdentities(t *testing.T) {
 				t.Fatal(err)
 			}
 			updated := scanner.db.File.GetX(ctx, first.ID)
-			if updated.FileID != first.FileID || updated.Name != name || updated.Path != name || updated.Size != int64(len("updated file content")) || *updated.MovieID != corrected.ID {
+			if updated.FileID != first.FileID || updated.Name != name || updated.Path != filepath.Join(firstRoot, name) || updated.Size != int64(len("updated file content")) || *updated.MovieID != corrected.ID {
 				t.Fatalf("rescan lost identity or retained stale file facts: %+v", updated)
 			}
 			if got := scanner.db.Movie.GetX(ctx, corrected.ID); got.Code != corrected.Code || got.Title != corrected.Title || got.ManualCode != corrected.ManualCode {
@@ -96,7 +96,7 @@ func TestLocalSTRMRescanRefreshesFileFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	after := scanner.db.File.Query().OnlyX(ctx)
-	if after.ID != before.ID || after.FileID != "remote-1" || after.Path != rel || after.Name != filepath.Base(rel) || after.Size != int64(len(content)) {
+	if after.ID != before.ID || after.FileID != "remote-1" || after.Path != filepath.Join(root, rel) || after.Name != filepath.Base(rel) || after.Size != int64(len(content)) {
 		t.Fatalf("local STRM facts were not refreshed: %+v", after)
 	}
 }

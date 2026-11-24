@@ -139,8 +139,8 @@ func (s *LocalScanner) ingestBatch(ctx context.Context, rootDir string, batch []
 			}
 			existing := files[media.fileID]
 			if existing != nil && existing.AccountID == domain.LocalAccountID &&
-				(existing.Name != media.name || existing.Size != media.size || existing.Path != media.rel) {
-				updated, err := tx.File.UpdateOneID(existing.ID).SetName(media.name).SetSize(media.size).SetPath(media.rel).Save(ctx)
+				(existing.Name != media.name || existing.Size != media.size || existing.Path != media.path) {
+				updated, err := tx.File.UpdateOneID(existing.ID).SetName(media.name).SetSize(media.size).SetPath(media.path).Save(ctx)
 				if err != nil {
 					return err
 				}
@@ -192,7 +192,7 @@ func (s *LocalScanner) ingestBatch(ctx context.Context, rootDir string, batch []
 			if existing == nil {
 				created, err := tx.File.Create().SetFileID(media.fileID).SetName(media.name).SetSize(media.size).
 					SetAccountID(domain.LocalAccountID).SetRootID(domain.LocalAccountID).
-					SetPath(media.rel).SetMovieID(record.ID).Save(ctx)
+					SetPath(media.path).SetMovieID(record.ID).Save(ctx)
 				if err != nil {
 					return err
 				}

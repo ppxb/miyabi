@@ -4,6 +4,10 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -17,6 +21,7 @@ type PlayManager interface {
 	StartHLS(context.Context, string, string) (playback.Playback, error)
 	Stream(context.Context, string, int, string, http.Header) (*http.Response, error)
 	Release(string)
+	LocateLocalFile(context.Context, string) (string, error)
 	SaveProgress(context.Context, int, string, float64, float64, *domain.PlaybackSettings) error
 	History(context.Context, int) (domain.WatchHistoryPage, error)
 	RemoveHistory(context.Context, []int) (int, error)
@@ -164,4 +169,59 @@ func playReleaseHandler(play PlayManager) gin.HandlerFunc {
 		play.Release(uri.ID)
 		respond(c, gin.H{"released": true}, nil)
 	}
+}
+
+// localStreamHandler serves an indexed local video from disk with Range support,
+// or redirects a local .strm to the URL it wraps. Only paths inside a configured
+// local source directory (validated by LocateLocalFile) are served.
+func localStreamHandler(play PlayManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[struct {
+			FileID string `uri:"fileID" binding:"required,max=128"`
+		}](c)
+		if !ok {
+			return
+		}
+		path, err := play.LocateLocalFile(c.Request.Context(), uri.FileID)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		if strings.EqualFold(filepath.Ext(path), ".strm") {
+			body, err := os.ReadFile(path)
+			if err != nil {
+				c.Error(err)
+				return
+			}
+			target := firstNonBlankLine(string(body))
+			parsed, parseErr := url.Parse(target)
+			if target == "" || parseErr != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+				c.Error(domain.E(domain.KindInvalid, "本地 STRM 内容不是可播放的链接", nil))
+				return
+			}
+			c.Redirect(http.StatusFound, target)
+			return
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		defer file.Close()
+		info, err := file.Stat()
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		http.ServeContent(c.Writer, c.Request, filepath.Base(path), info.ModTime(), file)
+	}
+}
+
+func firstNonBlankLine(s string) string {
+	for _, line := range strings.Split(s, "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
