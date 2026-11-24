@@ -244,7 +244,6 @@ jobs:
           mkdir -p pkg
           cp "dist/miyabi${{ matrix.ext }}" pkg/
           cp LICENSE pkg/
-          cp README.md pkg/ 2>/dev/null || true
           if [ "${{ matrix.archive }}" = "zip" ]; then
             (cd pkg && zip -r "../${name}.zip" .)
             echo "file=${name}.zip" >> "$GITHUB_OUTPUT"
