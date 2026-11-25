@@ -67,7 +67,7 @@ func (r *recoveryRig) saveConfig(prefs magnet.Preferences) {
 
 func (r *recoveryRig) add(hash string) *ent.OfflineDownload {
 	r.t.Helper()
-	result, err := r.s.Add(r.t.Context(), "fixture-movie", hash)
+	result, err := r.s.AddForAccount(r.t.Context(), "100", "fixture-movie", hash)
 	if err != nil {
 		r.t.Fatal(err)
 	}

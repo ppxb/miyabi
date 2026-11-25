@@ -67,7 +67,7 @@
   - （已修复：与 P1 磁力缓存拆开处理）
     - `offline/add.go`：`resolveMagnet` 收到 code（即 `AddByCode`，调用方只有 monitor 的上述两处，hash 刚从同一番号的聚合结果中选出）时直接返回规范化番号，不再拉磁力列表。`Add`、`AddForAccount`（API 上用户提交的 hash）不传 code，仍校验。monitor 与接口签名未改。
     - 测试：`internal/offline/concurrency_test.go` 新增 `TestOfflineAddByCodeTrustsPickedMagnet`（hash 不在目录磁力列表中，`AddByCode` 仍提交并以规范化番号落库）；换回旧代码后测试复现"磁力链不属于当前影片"。原有 `TestOfflineAddRejectsUnknownMagnetBeforeSubmission` 继续覆盖不传 code 时的校验。`go test ./internal/...` 全部通过。
-  - 遗留：`AddByCode` 不再校验 hash 归属，以后新增的调用方必须传入刚从该番号磁力中选出的 hash（已写进函数注释）。
+  - 后续（2026-11-25）：订阅自动下载已整体移除，`Add`、`AddByCode` 及 `resolveMagnet` 的免校验分支一并删除；离线下载只剩 API 的 `AddForAccount`，始终校验磁力归属，本条问题随之不复存在。
 - [x] 🟢 ✅ **按影片 ID 添加订阅把番号当 JavDB ID 用**：`internal/catalogue/service.go:337` 把 `item.ID` 设为番号，`internal/monitor/subscribe.go:25` 的 `AddMovie` 及 `catalogue/magnets.go:94` 会把它拼进 `/api/v4/movies/{id}`（`internal/javdb/movie.go:28`）。前端 `useAddSubscription` 已无调用方。
   - 复核：JavDB 影片 ID 是 `ZY5eq` 这类短编码，与番号不同（`ResolveMovieID` 专门经搜索页把番号换成 ID，`internal/javdb/websearch.go:39`），整条 `AddMovie` 链路没有调用它。界面上没有手动订阅影片的入口，属于潜在 bug；演员派生的影片订阅走 `addMovie`，不受影响。
   - （已修复：按产品方向"订阅只支持演员、JavDB 磁力只在有 JavDB ID 时取"处理，不修这条链路而是删掉）
