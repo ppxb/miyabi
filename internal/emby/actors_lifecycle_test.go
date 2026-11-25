@@ -130,11 +130,12 @@ func TestServiceCloseFlushesBufferedNotifications(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	svc, err := NewService(t.Context(), store.Client, Config{Enabled: true, ServerURL: server.URL, APIKey: "key"}, Dependencies{})
+	localDir := t.TempDir()
+	svc, err := NewService(t.Context(), store.Client, Config{Enabled: true, ServerURL: server.URL, APIKey: "key", LocalDir: localDir}, Dependencies{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc.NotifyUpdated(t.Context(), t.TempDir())
+	svc.NotifyUpdated(t.Context(), localDir)
 	svc.Close()
 	select {
 	case <-updates:

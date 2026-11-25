@@ -23,12 +23,16 @@ func (s *Service) NotifyUpdatedTx(ctx context.Context, tx *ent.Tx, path string) 
 }
 
 func (s *Service) enqueueNotification(ctx context.Context, db *ent.Client, path string) error {
-	if !s.currentConfig().ready() || strings.TrimSpace(path) == "" {
+	cfg := s.currentConfig()
+	if !cfg.ready() || strings.TrimSpace(path) == "" {
 		return nil
 	}
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return fmt.Errorf("resolve Emby notification path: %w", err)
+	}
+	if !inLocalDir(path, cfg.LocalDir) {
+		return nil
 	}
 	now := time.Now()
 	return db.EmbyNotification.Create().SetPath(path).SetNextAttemptAt(now).
@@ -48,6 +52,20 @@ func (s *Service) RetryPending(ctx context.Context) error {
 	default:
 	}
 	return nil
+}
+
+// inLocalDir reports whether path lies in the Emby local directory, the only
+// tree Emby can see; path must be absolute.
+func inLocalDir(path, localDir string) bool {
+	if localDir == "" {
+		return false
+	}
+	dir, err := filepath.Abs(localDir)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(dir, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func notificationBackoff(attempts int) time.Duration {
@@ -87,18 +105,21 @@ func (s *Service) flushNotifications(ctx context.Context) {
 	if len(rows) == 0 {
 		return
 	}
-	var valid []*ent.EmbyNotification
+	var valid, stale []*ent.EmbyNotification
 	var paths []string
 	for _, row := range rows {
-		if translatePath(row.Path, cfg.LocalDir, cfg.MediaPath) == "" {
-			err := domain.E(domain.KindInvalid, "待通知目录与 Emby 路径配置不匹配", nil)
-			if saveErr := s.finishNotifications(ctx, []*ent.EmbyNotification{row}, err); saveErr != nil {
-				slog.ErrorContext(ctx, "save Emby notification failure", "error", saveErr)
-			}
+		if !inLocalDir(row.Path, cfg.LocalDir) {
+			stale = append(stale, row)
 			continue
 		}
 		valid = append(valid, row)
 		paths = append(paths, row.Path)
+	}
+	// Queued under an older Emby directory: no retry can ever deliver them.
+	if len(stale) > 0 {
+		if err := s.finishNotifications(ctx, stale, nil); err != nil {
+			slog.ErrorContext(ctx, "drop stale Emby notifications", "error", err)
+		}
 	}
 	if len(valid) == 0 {
 		return

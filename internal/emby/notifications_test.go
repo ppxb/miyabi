@@ -2,9 +2,11 @@ package emby
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -98,6 +100,54 @@ func TestNotificationsPersistFailureBackoffAndRecoverAfterRestart(t *testing.T) 
 	}
 }
 
+func TestNotificationsOutsideLocalDirAreDropped(t *testing.T) {
+	for _, mediaPath := range []string{"", "/media"} {
+		t.Run("media path "+mediaPath, func(t *testing.T) {
+			var sent []string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/Library/Media/Updated" {
+					var body mediaUpdateRequest
+					if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+						t.Error(err)
+					}
+					for _, update := range body.Updates {
+						sent = append(sent, update.Path)
+					}
+				}
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			defer server.Close()
+			store, err := database.Open(t.Context(), t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = store.Close() })
+			root := t.TempDir()
+			cfg := Config{Enabled: true, ServerURL: server.URL, APIKey: "key", MediaPath: mediaPath, LocalDir: filepath.Join(root, "emby")}
+			s := notificationService(t, store.Client, cfg)
+			outside := filepath.Join(root, "local-source", "ABC-123")
+			if err := s.NotifyUpdated(t.Context(), outside); err != nil {
+				t.Fatal(err)
+			}
+			if count := store.Client.EmbyNotification.Query().CountX(t.Context()); count != 0 {
+				t.Fatalf("queued a path outside the Emby directory: %d", count)
+			}
+			// A row queued before the Emby directory moved can never be delivered.
+			store.Client.EmbyNotification.Create().SetPath(outside).SetNextAttemptAt(time.Now()).SaveX(t.Context())
+			if err := s.NotifyUpdated(t.Context(), filepath.Join(cfg.LocalDir, "ABC-123")); err != nil {
+				t.Fatal(err)
+			}
+			s.flushNotifications(t.Context())
+			if count := store.Client.EmbyNotification.Query().CountX(t.Context()); count != 0 {
+				t.Fatalf("notifications left in queue: %d", count)
+			}
+			if len(sent) != 1 || strings.Contains(sent[0], "local-source") {
+				t.Fatalf("sent to Emby = %v", sent)
+			}
+		})
+	}
+}
+
 func TestNotificationTransactionsAndConcurrentUpdates(t *testing.T) {
 	for _, manual := range []bool{false, true} {
 		for _, success := range []bool{true, false} {
@@ -121,8 +171,8 @@ func TestNotificationTransactionsAndConcurrentUpdates(t *testing.T) {
 					t.Fatal(err)
 				}
 				t.Cleanup(func() { _ = store.Close() })
-				s := notificationService(t, store.Client, Config{Enabled: true, ServerURL: server.URL, APIKey: "key"})
 				path := t.TempDir()
+				s := notificationService(t, store.Client, Config{Enabled: true, ServerURL: server.URL, APIKey: "key", LocalDir: path})
 				tx, err := store.Client.Tx(t.Context())
 				if err != nil {
 					t.Fatal(err)

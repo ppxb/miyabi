@@ -52,8 +52,15 @@
   - （已修复）
     - `scrape/scrape.go`：`prepareMetadata` 对已完成且非重建的影片只保存任务断点，不调用 `SaveMovieMetadata`，也不做演员合并和库变化通知，状态保持 Done。需要联网获取元数据的分支（待刮削、失败重试、重建）不变。
     - 测试：`internal/app/scrape_completed_test.go` 新增 `TestFailedReexportKeepsCompletedMovie`（已完成影片走非重建刮削、在发布阶段注入失败，断言全程保持 Done 且影片记录未被修改）。换回修复前的代码，测试复现了"进行中变 Pending、失败后变 Failed"。
-- [ ] 🟠 **Emby 目录以外的通知永远清不掉**：`internal/emby/notifications.go:291` 的 `enqueueNotification` 不检查路径是否在 LocalDir 下；路径不匹配时只累加重试次数，记录永不删除，最长每 5 分钟重试。MediaPath 为空时原始本地路径会直接发给 Emby（`internal/emby/service.go:231`）。
-  - 改法：入队时过滤掉不在 LocalDir 下的路径，配置不匹配的记录直接删除。
+- [x] 🟢 ✅ **Emby 目录以外的通知永远清不掉**（复核后由 🟠 降为 🟢）：`internal/emby/notifications.go:25` 的 `enqueueNotification` 不检查路径是否在 LocalDir 下；路径不匹配时只累加重试次数，记录永不删除，最长每 5 分钟重试。MediaPath 为空时原始本地路径会直接发给 Emby（`internal/emby/service.go:229` 的 `translatePath`）。
+  - 触发来源：本地源扫描对每个视频所在目录发通知（`internal/library/scan/local_ingest.go:218-222`），本地源不在 Emby 目录下时必中；改 LocalDir/MediaPath 后排队中的旧记录也会残留。
+  - 实际影响：用户无感知（不打日志、不影响正常通知）。每个本地影片目录残留一条记录，每 5 分钟查询加写事务一次；手动扫描或保存 Emby 设置时 `RetryPending` 把它们全部置为到期，flush 每次只取 50 条，正常通知会被推迟几个 3 秒周期。
+  - （已修复：统一过滤，MediaPath 为空时同样只通知 LocalDir 内的路径）
+    - `emby/notifications.go`：新增 `inLocalDir`（Abs + Rel，LocalDir 自身算在内，跨盘符或 LocalDir 为空判为不在内）。`enqueueNotification` 对 LocalDir 以外的路径直接返回、不入队；`flushNotifications` 遇到不在当前 LocalDir 下的记录按 revision 匹配直接删除，不再算作失败重试。
+    - 测试：`internal/emby/notifications_test.go` 新增 `TestNotificationsOutsideLocalDirAreDropped`（MediaPath 为空和非空两种：目录外路径不入队、旧配置遗留记录被删除、只有目录内路径发给 Emby），分别关掉入队过滤和 flush 删除做反向验证，两处都会失败。原有两个测试（`TestNotificationTransactionsAndConcurrentUpdates`、`actors_lifecycle_test.go` 的 `TestServiceCloseFlushesBufferedNotifications`）原先用空 LocalDir，补上 LocalDir（生产环境来自 `cfg.EmbyDir`，非空）。`go test ./...` 中 `internal/` 全部通过。
+  - 遗留（极低）：
+    - flush 先取配置快照再查询。如果恰好在两步之间改了 LocalDir，并且新目录下的记录也已入队，这条记录会按旧目录被删掉（以前是记失败后重试）。窗口为微秒级，未处理。
+    - 用户自己把本地源目录加进 Emby 媒体库时，不再通知 Emby 刷新这些目录（按方案统一过滤）。
 - [ ] 🟢 ✅ **订阅自动下载时磁力聚合两次，可能误报找不到磁力**（推断，未验证）：`internal/monitor/check.go:118` 取一次，`internal/offline/add.go:50` 的 `resolveMagnet` 再取一次。来源不稳定时两次结果可能不一致，返回 `ErrMagnetNotFound`。
   - 改法：内部调用方传入已选中的磁力，跳过二次校验（与 P1 磁力缓存一并处理）。
 - [ ] 🟢 **（待确认）按影片 ID 添加订阅把番号当 JavDB ID 用**：`internal/catalogue/service.go:337` 把 `item.ID` 设为番号，`internal/monitor/subscribe.go:25` 的 `AddMovie` 及 `catalogue/magnets.go:94` 会把它拼进 `/api/v4/movies/{id}`（`internal/javdb/movie.go:28`）。前端 `useAddSubscription` 已无调用方。
