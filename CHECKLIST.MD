@@ -46,8 +46,12 @@
   - （已修复：可复用的任务必须覆盖请求的全部工作，否则按最新请求处理）
     - `library/workflow.go`：排队中的同源任务直接改为请求的模式（`MetadataOnly` 以最新为准，`Incremental` 只从增量放宽为全量、不会收窄），不重复排任务、不重复遍历 115 目录；正在运行的任务只有 `MetadataOnly` 相同且（它是全量或请求就是增量）时才复用，否则新排一个排队任务（扫描池只有 1 个 worker，会在当前任务后执行）。调用方持有队列锁，排队任务在改写期间不会被领取。
     - 测试：`internal/library/scan_reuse_test.go` 新增 `TestScanReuseRespectsRequestedMode`（排队增量被全量请求放宽且不被收窄回去、运行中的增量不顶替全量、运行中的全量覆盖增量、本地模式以最新设置为准、运行中的旧模式不被复用），换回旧行为后三个子测试全部失败。
-- [ ] 🟠 **已完成影片重新刮削时被降级为 Pending，失败后变 Failed**：`internal/library/scrape/mapping.go:263` 的 `SaveMovieMetadata` 固定设 Pending；`internal/library/scrape/scrape.go:202` 对已完成影片也重存同一份文档；`publish.go` 里又 `SetMetadata` 一次，元数据写两次。
-  - 改法：已完成且非重建时跳过保存；状态由调用方决定。
+- [x] 🟠 ✅ **已完成影片重新刮削时被降级为 Pending，失败后变 Failed**：全量扫描会给视频变化或封面缺失的已完成影片排非重建刮削（`internal/library/scan/reconcile.go:236-247`）。`prepareMetadata` 沿用已存元数据后仍调用 `SaveMovieMetadata`（`internal/library/scrape/scrape.go:244`），后者固定写 Pending（`internal/library/scrape/mapping.go:85`），使 `Finished` 对已完成影片的保护（`ScrapeStatusNEQ(Done)`）失效。
+  - 实际影响：任务进行中详情页显示"待刮削"并计入待刮削数；发布阶段任一失败（视频已移动、索引变化重试耗尽、115 登录过期、封面重新下载失败）都会把它标成"刮削失败"。此后增量同步不处理它，Emby 目录回导也不会恢复它，下次全量扫描还会重新向元数据源请求。顺带白做：清空并重建演员、标签，跨语言演员合并，库变化通知。
+  - 原描述"元数据写两次"不成立：发布阶段的 `SetMetadata` 仍需要，因为封面阶段可能向元数据追加备选图片。
+  - （已修复）
+    - `scrape/scrape.go`：`prepareMetadata` 对已完成且非重建的影片只保存任务断点，不调用 `SaveMovieMetadata`，也不做演员合并和库变化通知，状态保持 Done。需要联网获取元数据的分支（待刮削、失败重试、重建）不变。
+    - 测试：`internal/app/scrape_completed_test.go` 新增 `TestFailedReexportKeepsCompletedMovie`（已完成影片走非重建刮削、在发布阶段注入失败，断言全程保持 Done 且影片记录未被修改）。换回修复前的代码，测试复现了"进行中变 Pending、失败后变 Failed"。
 - [ ] 🟠 **Emby 目录以外的通知永远清不掉**：`internal/emby/notifications.go:291` 的 `enqueueNotification` 不检查路径是否在 LocalDir 下；路径不匹配时只累加重试次数，记录永不删除，最长每 5 分钟重试。MediaPath 为空时原始本地路径会直接发给 Emby（`internal/emby/service.go:231`）。
   - 改法：入队时过滤掉不在 LocalDir 下的路径，配置不匹配的记录直接删除。
 - [ ] 🟢 ✅ **订阅自动下载时磁力聚合两次，可能误报找不到磁力**（推断，未验证）：`internal/monitor/check.go:118` 取一次，`internal/offline/add.go:50` 的 `resolveMagnet` 再取一次。来源不稳定时两次结果可能不一致，返回 `ErrMagnetNotFound`。

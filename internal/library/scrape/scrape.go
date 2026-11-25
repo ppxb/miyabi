@@ -212,7 +212,10 @@ func (service *Service) prepareMetadata(ctx context.Context, commit func(func(*e
 	if err != nil {
 		return fmt.Errorf("load indexed movie for metadata: %w", err)
 	}
-	if record.ScrapeStatus == movie.ScrapeStatusDone && !input.Rebuild {
+	// A completed movie keeps its saved metadata and its done status, so a
+	// failed re-export does not turn it into a pending or failed movie.
+	reused := record.ScrapeStatus == movie.ScrapeStatusDone && !input.Rebuild
+	if reused {
 		input.Document, err = MovieNFO(record)
 		if err != nil {
 			return err
@@ -241,12 +244,17 @@ func (service *Service) prepareMetadata(ctx context.Context, commit func(func(*e
 		return err
 	}
 	if err := commit(func(tx *ent.Tx) error {
-		if err := SaveMovieMetadata(ctx, tx, input.MovieID, input.Document); err != nil {
-			return err
+		if !reused {
+			if err := SaveMovieMetadata(ctx, tx, input.MovieID, input.Document); err != nil {
+				return err
+			}
 		}
 		return tx.Task.UpdateOneID(taskID).SetPayload(encoded).Exec(ctx)
 	}); err != nil {
 		return fmt.Errorf("save movie metadata checkpoint: %w", err)
+	}
+	if reused {
+		return nil
 	}
 	if service.notifier != nil {
 		service.notifier.NotifyLibraryChanged()
