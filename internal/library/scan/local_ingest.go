@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -28,6 +29,7 @@ type localMedia struct {
 	nfoPath, posterPath, fanartPath string
 	subPaths                        []string
 	rel, fileID                     string
+	linked                          bool // fileID was read from a Miyabi .strm URL
 	document                        *nfo.Movie
 	artwork                         mediaimage.Artwork
 }
@@ -74,6 +76,7 @@ func (s *LocalScanner) prepareMedia(ctx context.Context, rootDir string, media *
 	if domain.IsSTRM(media.name) {
 		body, _ := os.ReadFile(media.path)
 		media.fileID = export.ParseSTRMFileID(string(body))
+		media.linked = media.fileID != ""
 	}
 	rel, err := filepath.Rel(rootDir, media.path)
 	if err != nil {
@@ -84,7 +87,7 @@ func (s *LocalScanner) prepareMedia(ctx context.Context, rootDir string, media *
 		// Scan normalizes the root first, so the absolute path distinguishes
 		// identical relative names in different libraries without aliasing rescans.
 		hash := sha256.Sum256([]byte(media.path))
-		media.fileID = "local-" + hex.EncodeToString(hash[:16])
+		media.fileID = domain.LocalFileIDPrefix + hex.EncodeToString(hash[:16])
 	}
 	return ctx.Err()
 }
@@ -138,7 +141,10 @@ func (s *LocalScanner) ingestBatch(ctx context.Context, rootDir string, batch []
 				return err
 			}
 			existing := files[media.fileID]
-			if existing != nil && existing.AccountID == domain.LocalAccountID &&
+			// A .strm exported for a local file names that file's row; it must not
+			// move the row onto the .strm, or local playback reads the .strm instead.
+			referencesLocal := media.linked && strings.HasPrefix(media.fileID, domain.LocalFileIDPrefix)
+			if existing != nil && existing.AccountID == domain.LocalAccountID && !referencesLocal &&
 				(existing.Name != media.name || existing.Size != media.size || existing.Path != media.path) {
 				updated, err := tx.File.UpdateOneID(existing.ID).SetName(media.name).SetSize(media.size).SetPath(media.path).Save(ctx)
 				if err != nil {

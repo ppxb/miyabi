@@ -15,6 +15,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/ent/predicate"
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/nfo"
@@ -156,9 +157,16 @@ func (service *Service) Scrape(ctx context.Context, job tasks.Job) error {
 		return nil
 	}
 	input.Code = codeid.Normalize(input.Code)
-	sess, err := service.begin(ctx, input.MetadataPayload)
-	if err != nil {
-		return err
+	// Local files are read from disk and need no 115 session.
+	local := input.Source.AccountID == domain.LocalAccountID
+	var sess drive.Session
+	commit := func(fn func(*ent.Tx) error) error { return ent.WithTx(ctx, service.db, fn) }
+	if !local {
+		sess, err = service.begin(ctx, input.MetadataPayload)
+		if err != nil {
+			return err
+		}
+		commit = func(fn func(*ent.Tx) error) error { return sess.Commit(ctx, fn) }
 	}
 	current, err := service.db.Movie.Query().Where(movie.IDEQ(input.MovieID)).Select(movie.FieldID, movie.FieldManualCode).Only(ctx)
 	if err != nil {
@@ -168,7 +176,7 @@ func (service *Service) Scrape(ctx context.Context, job tasks.Job) error {
 		return domain.E(domain.KindConflict, "影片番号已纠正，请使用新的刮削任务", nil)
 	}
 	if !input.MetadataReady {
-		if err := service.prepareMetadata(ctx, sess, job.ID, &input); err != nil {
+		if err := service.prepareMetadata(ctx, commit, job.ID, &input); err != nil {
 			return err
 		}
 	}
@@ -181,7 +189,12 @@ func (service *Service) Scrape(ctx context.Context, job tasks.Job) error {
 	if err := tasks.Checkpoint(ctx, service.db); err != nil {
 		return err
 	}
-	if err := service.publishMovie(ctx, sess, job, input); err != nil {
+	if local {
+		err = service.publishLocal(ctx, job, input)
+	} else {
+		err = service.publishMovie(ctx, sess, job, input)
+	}
+	if err != nil {
 		return err
 	}
 	// Subtitles are picked by the user; re-exporting only restores their copies.
@@ -193,9 +206,9 @@ func (service *Service) Scrape(ctx context.Context, job tasks.Job) error {
 	return nil
 }
 
-func (service *Service) prepareMetadata(ctx context.Context, sess drive.Session, taskID int, input *Payload) error {
+func (service *Service) prepareMetadata(ctx context.Context, commit func(func(*ent.Tx) error) error, taskID int, input *Payload) error {
 	record, err := service.db.Movie.Query().Where(movie.IDEQ(input.MovieID),
-		movie.HasFilesWith(database.LibraryFiles(input.Source))).Only(ctx)
+		movie.HasFilesWith(movieFiles(input.Source))).Only(ctx)
 	if err != nil {
 		return fmt.Errorf("load indexed movie for metadata: %w", err)
 	}
@@ -227,7 +240,7 @@ func (service *Service) prepareMetadata(ctx context.Context, sess drive.Session,
 	if err != nil {
 		return err
 	}
-	if err := sess.Commit(ctx, func(tx *ent.Tx) error {
+	if err := commit(func(tx *ent.Tx) error {
 		if err := SaveMovieMetadata(ctx, tx, input.MovieID, input.Document); err != nil {
 			return err
 		}
@@ -260,7 +273,7 @@ func (service *Service) Finished(ctx context.Context, tx *ent.Tx, job tasks.Job,
 	update := tx.Movie.Update().Where(
 		movie.IDEQ(input.MovieID),
 		movie.ManualCodeEQ(input.ManualCode),
-		movie.HasFilesWith(database.LibraryFiles(input.Source)),
+		movie.HasFilesWith(movieFiles(input.Source)),
 	)
 	if !input.Rebuild {
 		update.Where(movie.ScrapeStatusNEQ(movie.ScrapeStatusDone))
@@ -269,6 +282,15 @@ func (service *Service) Finished(ctx context.Context, tx *ent.Tx, job tasks.Job,
 		return 0, err
 	}
 	return tasks.ChangeLibrary, nil
+}
+
+// movieFiles scopes a movie's indexed files to the job's source. Local scans
+// index every directory under one shared root, unlike mounted 115 sources.
+func movieFiles(source domain.LibrarySource) predicate.File {
+	if source.AccountID == domain.LocalAccountID {
+		return file.AccountIDEQ(domain.LocalAccountID)
+	}
+	return database.LibraryFiles(source)
 }
 
 // MovieDirectory groups a movie's indexed videos with the current directory listing.

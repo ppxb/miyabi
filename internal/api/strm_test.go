@@ -2,10 +2,13 @@ package api
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -40,6 +43,45 @@ func (s *strmRelayStub) Probe(ctx context.Context, address string, headers http.
 		res.StatusCode = http.StatusOK
 	}
 	return res, nil
+}
+
+type localFilePlayStub struct {
+	PlayManager
+	path string
+}
+
+func (s localFilePlayStub) LocateLocalFile(context.Context, string) (string, error) {
+	return s.path, nil
+}
+
+// Exported .strm files of local videos use the STRM route with a local file ID;
+// those are streamed from disk instead of the 115 relay.
+func TestSTRMLocalFileIDStreamsFromDisk(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ABP-123.mp4")
+	if err := os.WriteFile(path, []byte("0123456789"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	relay := &strmRelayStub{streamErr: errors.New("relay must not be used")}
+	router := NewRouter(Dependencies{
+		Access:    NewAccessGateService("", ""),
+		STRM:      relay,
+		Play:      localFilePlayStub{path: path},
+		STRMToken: "secret",
+		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/strm/play/local-abc?token=secret", nil)
+	request.Header.Set("Range", "bytes=2-4")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusPartialContent || response.Body.String() != "234" {
+		t.Fatalf("status=%d body=%q", response.Code, response.Body.String())
+	}
+
+	anonymous := httptest.NewRecorder()
+	router.ServeHTTP(anonymous, httptest.NewRequest(http.MethodGet, "/api/strm/play/local-abc", nil))
+	if anonymous.Code != http.StatusUnauthorized {
+		t.Fatalf("anonymous status=%d", anonymous.Code)
+	}
 }
 
 func TestSTRMRangeRequestsRedirectWithoutProbing(t *testing.T) {

@@ -69,8 +69,19 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	authAPI.GET("/config", accessConfigHandler(deps.Access))
 	authAPI.POST("/login", accessLoginHandler(deps.Access, loginLimiter))
 
+	// Local media for external players (no session cookie) and the built-in
+	// player; uses the same token/session policy as the STRM relay.
+	localHandler := localStreamHandler(deps.Play, deps.STRMToken, deps.Access)
 	// Exported .strm files keep this path; it must stay stable across releases.
-	strmHandler := strmStreamHandler(deps.STRM, deps.STRMToken, deps.Access)
+	// Local file IDs are served from disk, everything else is a 115 file.
+	relayHandler := strmStreamHandler(deps.STRM, deps.STRMToken, deps.Access)
+	strmHandler := func(c *gin.Context) {
+		if strings.HasPrefix(c.Param("fileID"), domain.LocalFileIDPrefix) {
+			localHandler(c)
+			return
+		}
+		relayHandler(c)
+	}
 	api.GET("/strm/play/:fileID", noStore(), strmHandler)
 	api.HEAD("/strm/play/:fileID", noStore(), strmHandler)
 	api.GET("/strm/play/:fileID/*filename", noStore(), strmHandler)
@@ -79,9 +90,6 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	// External players cannot send the session cookie; serve a subtitle as
 	// UTF-8 text using the same token policy as the STRM relay.
 	api.GET("/subtitle-file/:trackID", noStore(), subtitleFileHandler(deps.Subtitles, deps.STRMToken, deps.Access))
-	// Local media for external players (no session cookie) and the built-in
-	// player; uses the same token/session policy as the STRM relay.
-	localHandler := localStreamHandler(deps.Play, deps.STRMToken, deps.Access)
 	api.GET("/play-local/:fileID", noStore(), localHandler)
 	api.HEAD("/play-local/:fileID", noStore(), localHandler)
 

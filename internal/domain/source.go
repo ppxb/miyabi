@@ -3,6 +3,10 @@ package domain
 // LocalAccountID identifies files and scan tasks in the local library.
 const LocalAccountID = "local"
 
+// LocalFileIDPrefix starts every file ID assigned by a local scan, so exported
+// .strm URLs can tell local files apart from 115 file IDs.
+const LocalFileIDPrefix = "local-"
+
 // LibraryDirectory describes a mounted media directory on remote storage.
 type LibraryDirectory struct {
 	ID   string `json:"id"`
