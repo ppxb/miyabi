@@ -10,7 +10,6 @@ import (
 type SubscriptionManager interface {
 	List(ctx context.Context, kind string, page int, limit int) ([]monitor.Item, error)
 	Targets(ctx context.Context, kind string) ([]monitor.TargetItem, error)
-	AddMovie(ctx context.Context, movieID string, opts monitor.AddMovieOptions) (monitor.Item, error)
 	AddActor(ctx context.Context, actorID string, opts monitor.AddActorOptions) (monitor.Item, error)
 	Update(ctx context.Context, id int, opts monitor.UpdateOptions) (monitor.Item, error)
 	Remove(ctx context.Context, id int) error
@@ -37,7 +36,8 @@ type subscriptionTargetsQuery struct {
 }
 
 type subscriptionCreateInput struct {
-	Kind         string `json:"kind" binding:"required,oneof=movie actor"`
+	// Only actors can be subscribed; movie subscriptions come from actor checks.
+	Kind         string `json:"kind" binding:"required,oneof=actor"`
 	TargetID     string `json:"target_id" binding:"required"`
 	Title        string `json:"title"`
 	Cover        string `json:"cover"`
@@ -86,19 +86,11 @@ func subscriptionCreateHandler(mgr SubscriptionManager) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		var item monitor.Item
-		var err error
-		if input.Kind == "actor" {
-			item, err = mgr.AddActor(c.Request.Context(), input.TargetID, monitor.AddActorOptions{
-				Title:        input.Title,
-				Cover:        input.Cover,
-				AutoDownload: input.AutoDownload,
-			})
-		} else {
-			item, err = mgr.AddMovie(c.Request.Context(), input.TargetID, monitor.AddMovieOptions{
-				AutoDownload: input.AutoDownload,
-			})
-		}
+		item, err := mgr.AddActor(c.Request.Context(), input.TargetID, monitor.AddActorOptions{
+			Title:        input.Title,
+			Cover:        input.Cover,
+			AutoDownload: input.AutoDownload,
+		})
 		created(c, item, err)
 	}
 }

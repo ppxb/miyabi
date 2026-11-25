@@ -31,9 +31,6 @@ func TestActorSubscriptionSpawnsOnlyNewWorks(t *testing.T) {
 	if err != nil || len(feed) != 1 || feed[0].TargetID != "act-upcoming" || feed[0].OriginID == nil || *feed[0].OriginID != actor.ID || feed[0].AutoDownload {
 		t.Fatalf("only the unreleased work is tracked at subscription time: %#v %v", feed, err)
 	}
-	if f.discover.summaryCalls != 0 {
-		t.Fatalf("spawned works must not cost detail requests, got %d", f.discover.summaryCalls)
-	}
 
 	f.discover.actorMovies["actor-1"] = append([]domain.Movie{
 		{ID: "act-new", Code: "NEW-001", ReleaseDate: "2099-02-01"},
@@ -71,7 +68,7 @@ func TestAddActorRequiresWorksPage(t *testing.T) {
 
 func TestCheckMovieWithoutAutoDownloadWaitsUntilTomorrow(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
-	item, _ := f.service.AddMovie(ctx, "m1", AddMovieOptions{AutoDownload: new(false)})
+	item, _ := f.addMovie(ctx, "m1", AddMovieOptions{AutoDownload: new(false)})
 	f.discover.magnets["m1"] = []domain.Magnet{{Hash: "h1", Name: "MOCK-m1", HasSubtitle: true}}
 	if err := f.service.Check(ctx); err != nil {
 		t.Fatal(err)
@@ -95,7 +92,7 @@ func TestCheckMovieWithoutAutoDownloadWaitsUntilTomorrow(t *testing.T) {
 
 func TestCheckDefersUpstreamFailure(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
-	item, _ := f.service.AddMovie(ctx, "m1", AddMovieOptions{})
+	item, _ := f.addMovie(ctx, "m1", AddMovieOptions{})
 	f.discover.magnetsErr = domain.E(domain.KindUpstream, "JavDB 暂不可用", nil)
 	revision := f.tasks.Revisions().Monitor
 	if err := f.service.Check(ctx); err == nil {

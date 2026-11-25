@@ -87,7 +87,7 @@ func (goldenDiscover) MovieStates(context.Context, []catalogue.MovieIdentity) ([
 	}, nil
 }
 
-func (goldenDiscover) Magnets(context.Context, string) ([]catalogue.Magnet, error) {
+func (goldenDiscover) MagnetsByCode(context.Context, string, string) ([]catalogue.Magnet, error) {
 	return []catalogue.Magnet{
 		{Magnet: domain.Magnet{Hash: "0000000000000000000000000000000000000003", Name: "HD subtitle fixture", Size: 1024 << 20,
 			HasSubtitle: true, HD: true, FilesCount: 3, CreatedAt: "2026-08-03",
@@ -96,10 +96,6 @@ func (goldenDiscover) Magnets(context.Context, string) ([]catalogue.Magnet, erro
 			HD: true, FilesCount: 2, CreatedAt: "2026-08-02",
 			Sources: []string{"javbus"}, Tags: []string{"高清", "4K"}, Inferred: true}, URI: "magnet:?xt=urn:btih:0000000000000000000000000000000000000002"},
 	}, nil
-}
-
-func (stub goldenDiscover) MagnetsByCode(ctx context.Context, _ string) ([]catalogue.Magnet, error) {
-	return stub.Magnets(ctx, "movie-exact")
 }
 
 func (goldenDiscover) Tags(context.Context, domain.Zone) ([]domain.TagCategory, error) {
@@ -240,7 +236,7 @@ func TestResponseContractsMatchGoldenFiles(t *testing.T) {
 		{name: "discover_browse", method: http.MethodGet, path: "/api/discover/movies?zone=censored&page=1"},
 		{name: "discover_browse", method: http.MethodGet, path: "/api/discover/movies?zone=censored"},
 		{name: "discover_movie", method: http.MethodGet, path: "/api/discover/movies/movie-exact"},
-		{name: "discover_magnets", method: http.MethodGet, path: "/api/discover/movies/movie-exact/magnets"},
+		{name: "discover_magnets", method: http.MethodGet, path: "/api/discover/movies/movie-exact/magnets?code=SSIS-001"},
 		{name: "discover_movie_states", method: http.MethodPost, path: "/api/discover/movie-states",
 			body: `{"movies":[{"id":"movie-exact","code":"ABP-123"},{"id":"movie-near","code":"ABP-124"},{"id":"movie-saving","code":"SONE-001"}]}`},
 		{name: "discover_tags", method: http.MethodGet, path: "/api/discover/tags?zone=censored"},

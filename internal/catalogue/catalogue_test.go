@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +14,8 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent/setting"
 	"github.com/ppxb/miyabi/internal/javdb"
+	"github.com/ppxb/miyabi/internal/magnet"
+	"github.com/ppxb/miyabi/internal/nfo"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -289,7 +290,7 @@ func TestServiceMagnetsWithAggregator(t *testing.T) {
 	}
 	defer service.Close()
 
-	magnets, err := service.Magnets(t.Context(), "movie-1")
+	magnets, err := service.MagnetsByCode(t.Context(), "SSIS-001", "")
 	if err != nil {
 		t.Fatalf("unexpected error fetching magnets: %v", err)
 	}
@@ -304,26 +305,72 @@ func TestServiceMagnetsWithAggregator(t *testing.T) {
 	// All entry points must share the populated cache, even when the source changes.
 	provider.magnets = nil
 	magnets[0] = Magnet{}
-	domainMagnets, err := service.CatalogueMagnets(t.Context(), "movie-1")
+	domainMagnets, err := service.CatalogueMagnetsByCode(t.Context(), "ssis-001")
 	if err != nil || len(domainMagnets) != 1 || !reflect.DeepEqual(domainMagnets[0], want) {
 		t.Fatalf("domain magnets = %+v, error = %v, want cached %+v", domainMagnets, err, want)
 	}
 	domainMagnets[0] = domain.Magnet{}
-	for _, lookup := range []struct {
-		hash string
-		want bool
-	}{
-		{hash: strings.ToUpper(hash), want: true},
-		{hash: "0000000000000000000000000000000000000000", want: false},
-	} {
-		has, err := service.HasMagnet(t.Context(), "movie-1", lookup.hash)
-		if err != nil || has != lookup.want {
-			t.Errorf("HasMagnet(%q) = %v, error = %v, want %v", lookup.hash, has, err, lookup.want)
-		}
-	}
-	cached, err := service.Magnets(t.Context(), "movie-1")
+	cached, err := service.MagnetsByCode(t.Context(), "SSIS-001", "")
 	if err != nil || len(cached) != 1 || !reflect.DeepEqual(cached[0].Magnet, want) || cached[0].URI != "magnet:?xt=urn:btih:"+hash {
 		t.Fatalf("returned slices changed cached magnets: %+v, error = %v", cached, err)
+	}
+}
+
+// idOnlyJavDBSource answers like the real JavDB magnet source: only with a JavDB id.
+type idOnlyJavDBSource struct{ ids []string }
+
+func (*idOnlyJavDBSource) Name() string { return domain.MagnetSourceJavDB }
+func (s *idOnlyJavDBSource) Find(_ context.Context, ref domain.MovieRef) ([]domain.Magnet, error) {
+	if ref.JavdbID == "" {
+		return nil, magnet.ErrSkipped
+	}
+	s.ids = append(s.ids, ref.JavdbID)
+	return []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "javdb", Sources: []string{domain.MagnetSourceJavDB}}}, nil
+}
+
+type codeOnlySource struct{}
+
+func (codeOnlySource) Name() string { return domain.MagnetSourceSukebei }
+func (codeOnlySource) Find(context.Context, domain.MovieRef) ([]domain.Magnet, error) {
+	return []domain.Magnet{{Hash: "2222222222222222222222222222222222222222", Name: "sukebei", Sources: []string{domain.MagnetSourceSukebei}}}, nil
+}
+
+func TestMagnetsByCodeQueriesJavDBOnlyWithAnID(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	provider := &detailCountingProvider{}
+	javdbSource := &idOnlyJavDBSource{}
+	service, err := NewWithClients(t.Context(), store.Client, provider, nil, &stubLocalState{}, codeOnlySource{}, javdbSource)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer service.Close()
+
+	count := func(code, javdbID string) int {
+		t.Helper()
+		magnets, err := service.MagnetsByCode(t.Context(), code, javdbID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(magnets)
+	}
+	if got := count("SSIS-001", ""); got != 1 || len(javdbSource.ids) != 0 {
+		t.Fatalf("without a JavDB id: magnets=%d javdb queries=%v", got, javdbSource.ids)
+	}
+	// The cached code-only result must not answer a request carrying an id.
+	if got := count("SSIS-001", "ZY5eq"); got != 2 || len(javdbSource.ids) != 1 || javdbSource.ids[0] != "ZY5eq" {
+		t.Fatalf("with a card's JavDB id: magnets=%d javdb queries=%v", got, javdbSource.ids)
+	}
+	store.Client.Movie.Create().SetCode("ABP-001").
+		SetMetadata(&nfo.Movie{IDs: []nfo.UniqueID{{Type: domain.MagnetSourceJavDB, Value: "QD3n9"}}}).SaveX(t.Context())
+	if got := count("ABP-001", ""); got != 2 || javdbSource.ids[len(javdbSource.ids)-1] != "QD3n9" {
+		t.Fatalf("with the library's JavDB id: magnets=%d javdb queries=%v", got, javdbSource.ids)
+	}
+	if calls := provider.detailCalls.Load(); calls != 0 {
+		t.Fatalf("code lookups fetched JavDB detail %d times", calls)
 	}
 }
 
@@ -347,7 +394,7 @@ func TestNewWithClientsHasNoJavDBMagnetSource(t *testing.T) {
 	}
 	defer service.Close()
 
-	magnets, err := service.Magnets(t.Context(), "movie-1")
+	magnets, err := service.MagnetsByCode(t.Context(), "SSIS-001", "")
 	if err != nil || len(magnets) != 0 {
 		t.Fatalf("JavDB must not be a magnet source: %+v %v", magnets, err)
 	}

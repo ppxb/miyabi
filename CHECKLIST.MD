@@ -68,8 +68,18 @@
     - `offline/add.go`：`resolveMagnet` 收到 code（即 `AddByCode`，调用方只有 monitor 的上述两处，hash 刚从同一番号的聚合结果中选出）时直接返回规范化番号，不再拉磁力列表。`Add`、`AddForAccount`（API 上用户提交的 hash）不传 code，仍校验。monitor 与接口签名未改。
     - 测试：`internal/offline/concurrency_test.go` 新增 `TestOfflineAddByCodeTrustsPickedMagnet`（hash 不在目录磁力列表中，`AddByCode` 仍提交并以规范化番号落库）；换回旧代码后测试复现"磁力链不属于当前影片"。原有 `TestOfflineAddRejectsUnknownMagnetBeforeSubmission` 继续覆盖不传 code 时的校验。`go test ./internal/...` 全部通过。
   - 遗留：`AddByCode` 不再校验 hash 归属，以后新增的调用方必须传入刚从该番号磁力中选出的 hash（已写进函数注释）。
-- [ ] 🟢 **（待确认）按影片 ID 添加订阅把番号当 JavDB ID 用**：`internal/catalogue/service.go:337` 把 `item.ID` 设为番号，`internal/monitor/subscribe.go:25` 的 `AddMovie` 及 `catalogue/magnets.go:94` 会把它拼进 `/api/v4/movies/{id}`（`internal/javdb/movie.go:28`）。前端 `useAddSubscription` 已无调用方。
-  - 先确认 JavDB 是否接受番号作为 ID，再决定修（先 `ResolveMovieID`）还是删。
+- [x] 🟢 ✅ **按影片 ID 添加订阅把番号当 JavDB ID 用**：`internal/catalogue/service.go:337` 把 `item.ID` 设为番号，`internal/monitor/subscribe.go:25` 的 `AddMovie` 及 `catalogue/magnets.go:94` 会把它拼进 `/api/v4/movies/{id}`（`internal/javdb/movie.go:28`）。前端 `useAddSubscription` 已无调用方。
+  - 复核：JavDB 影片 ID 是 `ZY5eq` 这类短编码，与番号不同（`ResolveMovieID` 专门经搜索页把番号换成 ID，`internal/javdb/websearch.go:39`），整条 `AddMovie` 链路没有调用它。界面上没有手动订阅影片的入口，属于潜在 bug；演员派生的影片订阅走 `addMovie`，不受影响。
+  - （已修复：按产品方向"订阅只支持演员、JavDB 磁力只在有 JavDB ID 时取"处理，不修这条链路而是删掉）
+    - 订阅只收演员：`api/subscription.go` 创建接口只接受 `kind=actor`；删除 `monitor.AddMovie`、`retry`（仅手动重订阅会用到）、`catalogue.MovieSummary` 及 `Discoverer.MovieSummary`；`existingMovie` 简化为已存在就原样返回。前端 `useAddSubscription` 保留（以后加演员订阅按钮用），固定 `kind: 'actor'`。
+    - 磁力只按番号查：删除按影片 ID 查磁力的路径（`catalogue` 的 `Magnets`、`CatalogueMagnets`、`HasMagnet`、`cachedMagnets`、`MovieCode`，它们会把 ID 当 JavDB ID 请求 JavDB 详情），`monitor`、`offline` 接口同步收窄。`/api/discover/movies/:id/magnets` 增加可选 `javdb_id`，无合法番号时返回 400；`catalogue/magnets.go` 优先用请求的 `javdb_id`，其次用库内元数据记录的 JavDB ID，都没有则 JavDB 跳过（不算失败）；缓存键带上 JavDB ID。`CatalogueMagnetsByCode` 改为返回副本。monitor 只按订阅 Code 查磁力。
+    - 前端：`DiscoverMovie` 补 `sources` 类型；`movie-detail-cache.ts` 新增 `findCachedJavdbID`（扫描所有缓存卡片，详情响应不含 JavDB）；`useDiscoverMagnets` 带上 `javdb_id`，查询键含之。
+    - JavDB 限速或 403 不影响其他来源：聚合器已满足（`ErrBlocked` 视为空结果，其他失败只标 partial），未改。
+    - 测试：`internal/api/subscription_test.go` 新增 `TestSubscriptionCreateOnlyAcceptsActors`；`internal/api/discover_magnets_test.go` 新增 `TestDiscoverMagnetsLooksUpByCodeOnly`；`internal/catalogue/catalogue_test.go` 新增 `TestMagnetsByCodeQueriesJavDBOnlyWithAnID`（无 ID 不查 JavDB、仅番号的缓存不复用给带 ID 的请求、库内 ID 生效、全程不请求 JavDB 详情）；`web/tests/movie-detail.test.ts` 新增 JavDB ID 取自任一缓存卡片的用例。原有 catalogue、monitor、api 测试迁移到按番号查询，删除已无意义的"详情失败后重试"用例。`go test ./internal/...`、`npx vitest run`（172 个）、`npm run typecheck` 全部通过；子代理只读 review 未发现问题。
+  - 遗留：
+    - 订阅页的影片卡片没有目录卡片缓存，带不上 javdb_id，只有影片已入库时 JavDB 磁力才参与（符合设计）。
+    - 界面上仍没有订阅演员的入口。
+    - "订阅只展示演员新作、取消自动下载和入库"另作任务，待出删改清单后实施。
 
 ---
 

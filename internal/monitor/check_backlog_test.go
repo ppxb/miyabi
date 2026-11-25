@@ -18,13 +18,6 @@ type observedDiscoverer struct {
 	before func(kind, id string) error
 }
 
-func (d observedDiscoverer) CatalogueMagnets(ctx context.Context, id string) ([]domain.Magnet, error) {
-	if err := d.before("movie", id); err != nil {
-		return nil, err
-	}
-	return d.Discoverer.CatalogueMagnets(ctx, id)
-}
-
 func (d observedDiscoverer) CatalogueMagnetsByCode(ctx context.Context, code string) ([]domain.Magnet, error) {
 	if err := d.before("movie", code); err != nil {
 		return nil, err
@@ -55,8 +48,10 @@ func TestCheckDrainsDuePagesWithoutRepeatingFailures(t *testing.T) {
 		} {
 			for i := range group.count {
 				// Equal deadlines cross page boundaries; older deadlines have larger IDs.
+				// Movie subscriptions look magnets up by code, which equals the target id.
+				target := fmt.Sprintf("%s-%02d", group.kind, i)
 				due = append(due, f.client.Subscription.Create().SetKind(group.kind).SetStatus(group.status).
-					SetTargetID(fmt.Sprintf("%s-%02d", group.kind, i)).SetReleaseDate(start.Format(dateLayout)).
+					SetTargetID(target).SetCode(target).SetReleaseDate(start.Format(dateLayout)).
 					SetNextCheckAt(start.Add(-time.Hour-time.Duration(i/12)*time.Minute)).SaveX(ctx))
 			}
 		}

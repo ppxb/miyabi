@@ -15,7 +15,6 @@ var ErrMagnetNotFound = domain.E(domain.KindInvalid, "磁力链不属于当前�
 
 // Catalogue supplies movie metadata and magnet availability verification.
 type Catalogue interface {
-	CatalogueMagnets(ctx context.Context, movieID string) ([]domain.Magnet, error)
 	CatalogueMagnetsByCode(ctx context.Context, code string) ([]domain.Magnet, error)
 }
 

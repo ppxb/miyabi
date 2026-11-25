@@ -14,8 +14,7 @@ type CatalogueManager interface {
 	Browse(context.Context, domain.BrowseOptions) ([]catalogue.Movie, error)
 	MovieDetail(context.Context, string) (catalogue.MovieDetail, error)
 	MovieStates(context.Context, []catalogue.MovieIdentity) ([]catalogue.MovieStateItem, error)
-	Magnets(context.Context, string) ([]catalogue.Magnet, error)
-	MagnetsByCode(context.Context, string) ([]catalogue.Magnet, error)
+	MagnetsByCode(ctx context.Context, code, javdbID string) ([]catalogue.Magnet, error)
 	Tags(context.Context, domain.Zone) ([]domain.TagCategory, error)
 	Media(context.Context, string) (domain.Media, error)
 	LocalRecommendations(context.Context, domain.MovieMetadata) ([]domain.MovieReference, []domain.MovieReference, error)
@@ -148,7 +147,8 @@ func discoverTagsHandler(discover CatalogueManager) gin.HandlerFunc {
 }
 
 type discoverMagnetsQuery struct {
-	Code string `form:"code" binding:"omitempty,max=200"`
+	Code    string `form:"code" binding:"omitempty,max=200"`
+	JavdbID string `form:"javdb_id" binding:"omitempty,max=64"`
 }
 
 func discoverMagnetsHandler(discover CatalogueManager) gin.HandlerFunc {
@@ -161,15 +161,17 @@ func discoverMagnetsHandler(discover CatalogueManager) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		// A known code lets magnets bypass the JavDB detail lookup; without it we
-		// still fall back to the movie-ID path for older clients.
-		var magnets []catalogue.Magnet
-		var err error
-		if code := codeid.Normalize(query.Code); code != "" && codeid.Valid(code) {
-			magnets, err = discover.MagnetsByCode(c.Request.Context(), code)
-		} else {
-			magnets, err = discover.Magnets(c.Request.Context(), uri.ID)
+		// Magnets are looked up by code only, like the discover identity; the
+		// path id is the code for clients that omit it.
+		code := codeid.Normalize(query.Code)
+		if code == "" {
+			code = codeid.Normalize(uri.ID)
 		}
+		if !codeid.Valid(code) {
+			respond(c, nil, domain.E(domain.KindInvalid, "缺少有效番号，无法查询磁力", nil))
+			return
+		}
+		magnets, err := discover.MagnetsByCode(c.Request.Context(), code, query.JavdbID)
 		respond(c, magnets, err)
 	}
 }

@@ -116,20 +116,16 @@ export function useActorFeed(
   })
 }
 
+// Only actors can be subscribed; their new works appear as movie subscriptions.
 export function useAddSubscription() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (payload: { kind: SubscriptionKind; target_id: string; title?: string }) =>
-      apiPost<SubscriptionItem>('/api/subscriptions', payload),
+    mutationFn: (payload: { target_id: string; title?: string; cover?: string }) =>
+      apiPost<SubscriptionItem>('/api/subscriptions', { kind: 'actor', ...payload }),
     onSuccess: item => {
       void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
-      toast.success(item.kind === 'actor' ? `已订阅演员 ${item.title}` : item.code, {
-        description:
-          item.kind === 'actor'
-            ? '每天检查一次新作，未发售作品会自动加入影片订阅。'
-            : item.auto_download
-              ? '出现符合偏好的磁力后会自动加入 115。'
-              : '出现磁力后可在订阅页手动入库。'
+      toast.success(`已订阅演员 ${item.title}`, {
+        description: '每天检查一次新作，未发售作品会自动加入影片订阅。'
       })
     },
     meta: { errorTitle: '订阅失败' }

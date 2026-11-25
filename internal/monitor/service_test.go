@@ -15,29 +15,21 @@ import (
 )
 
 type mockDiscoverer struct {
-	mu           sync.Mutex
-	magnets      map[string][]domain.Magnet
-	magnetsErr   error
-	actorMovies  map[string][]domain.Movie
-	browseErr    error
-	summaryCalls int
+	mu          sync.Mutex
+	magnets     map[string][]domain.Magnet
+	magnetsErr  error
+	actorMovies map[string][]domain.Movie
+	browseErr   error
 }
 
 func newMockDiscoverer() *mockDiscoverer {
 	return &mockDiscoverer{magnets: map[string][]domain.Magnet{}, actorMovies: map[string][]domain.Movie{}}
 }
 
-func (m *mockDiscoverer) MovieSummary(_ context.Context, movieID string) (domain.MovieSummary, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.summaryCalls++
-	return domain.MovieSummary{ID: movieID, Code: "MOCK-" + movieID, Title: "Mock " + movieID, Cover: "https://example.com/cover.jpg", ReleaseDate: "2026-10-01"}, nil
-}
-
-func (m *mockDiscoverer) CatalogueMagnets(_ context.Context, movieID string) ([]domain.Magnet, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.magnets[movieID], m.magnetsErr
+// addMovie records a movie subscription the way an actor check does.
+func (f fixture) addMovie(ctx context.Context, movieID string, opts AddMovieOptions) (Item, error) {
+	return f.service.addMovie(ctx, domain.MovieSummary{ID: movieID, Code: "MOCK-" + movieID, Title: "Mock " + movieID,
+		Cover: "https://example.com/cover.jpg", ReleaseDate: "2026-10-01"}, opts)
 }
 
 func (m *mockDiscoverer) CatalogueMagnetsByCode(_ context.Context, code string) ([]domain.Magnet, error) {
@@ -98,12 +90,12 @@ func newFixture(t *testing.T) fixture {
 
 func TestMovieSubscriptionLifecycle(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
-	item, err := f.service.AddMovie(ctx, "m1", AddMovieOptions{})
+	item, err := f.addMovie(ctx, "m1", AddMovieOptions{})
 	if err != nil || item.Code != "MOCK-m1" || item.Status != subscription.StatusWaiting || !item.AutoDownload {
-		t.Fatalf("AddMovie: %#v %v", item, err)
+		t.Fatalf("addMovie: %#v %v", item, err)
 	}
-	if again, err := f.service.AddMovie(ctx, "m1", AddMovieOptions{}); err != nil || again.ID != item.ID || f.discover.summaryCalls != 1 {
-		t.Fatalf("re-adding a waiting subscription must be a no-op without a catalogue lookup: %#v %v calls=%d", again, err, f.discover.summaryCalls)
+	if again, err := f.addMovie(ctx, "m1", AddMovieOptions{}); err != nil || again.ID != item.ID {
+		t.Fatalf("re-adding a waiting subscription must be a no-op: %#v %v", again, err)
 	}
 	if list, err := f.service.List(ctx, "movie", 1, 10); err != nil || len(list) != 1 {
 		t.Fatalf("List: %d %v", len(list), err)
@@ -123,9 +115,9 @@ func TestMovieSubscriptionLifecycle(t *testing.T) {
 	}
 }
 
-func TestReAddingFinishedSubscriptionOnlyResetsForUsers(t *testing.T) {
+func TestReAddingFinishedSubscriptionLeavesItAlone(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
-	item, _ := f.service.AddMovie(ctx, "m1", AddMovieOptions{})
+	item, _ := f.addMovie(ctx, "m1", AddMovieOptions{})
 	f.discover.magnets["m1"] = []domain.Magnet{{Hash: "h1", Name: "MOCK-m1", HasSubtitle: true}}
 	if added, err := f.service.EnqueueSingle(ctx, item.ID); err != nil || added.Status != subscription.StatusAdded {
 		t.Fatalf("EnqueueSingle: %#v %v", added, err)
@@ -133,10 +125,6 @@ func TestReAddingFinishedSubscriptionOnlyResetsForUsers(t *testing.T) {
 	spawned, err := f.service.addMovie(ctx, domain.MovieSummary{ID: "m1"}, AddMovieOptions{OriginID: new(99)})
 	if err != nil || spawned.ID != item.ID || spawned.Status != subscription.StatusAdded {
 		t.Fatalf("an actor-spawned add must leave an added subscription alone: %#v %v", spawned, err)
-	}
-	rearmed, err := f.service.AddMovie(ctx, "m1", AddMovieOptions{})
-	if err != nil || rearmed.Status != subscription.StatusWaiting || rearmed.Hash != "" {
-		t.Fatalf("a user re-add must re-arm: %#v %v", rearmed, err)
 	}
 	if len(f.offline.submissions) != 1 {
 		t.Fatalf("expected exactly one 115 submission, got %d", len(f.offline.submissions))
@@ -183,11 +171,11 @@ func TestSubscriptionTargetsAndPagination(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m1, err := f.service.AddMovie(ctx, "m1", AddMovieOptions{})
+	m1, err := f.addMovie(ctx, "m1", AddMovieOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	m2, err := f.service.AddMovie(ctx, "m2", AddMovieOptions{})
+	m2, err := f.addMovie(ctx, "m2", AddMovieOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

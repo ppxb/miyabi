@@ -16,23 +16,10 @@ type AddMovieOptions struct {
 	OriginID *int
 }
 
-// AddMovie subscribes to a movie. Re-adding a waiting subscription is a
-// no-op; a user re-adding a finished or stale one re-arms it.
-func (service *Service) AddMovie(ctx context.Context, movieID string, opts AddMovieOptions) (Item, error) {
-	if item, found, err := service.existingMovie(ctx, movieID, opts); err != nil || found {
-		return item, err
-	}
-	summary, err := service.discover.MovieSummary(ctx, movieID)
-	if err != nil {
-		return Item{}, err
-	}
-	return service.createMovie(ctx, summary, opts)
-}
-
-// addMovie is AddMovie with the summary already known, which spares actor
-// checks one JavDB detail request per new work.
+// addMovie records a new work found by an actor check. Movies are never
+// subscribed directly; an existing subscription is left untouched.
 func (service *Service) addMovie(ctx context.Context, summary domain.MovieSummary, opts AddMovieOptions) (Item, error) {
-	if item, found, err := service.existingMovie(ctx, summary.ID, opts); err != nil || found {
+	if item, found, err := service.existingMovie(ctx, summary.ID); err != nil || found {
 		return item, err
 	}
 	return service.createMovie(ctx, summary, opts)
@@ -53,7 +40,7 @@ func (service *Service) createMovie(ctx context.Context, summary domain.MovieSum
 	if err != nil {
 		if ent.IsConstraintError(err) {
 			// Lost a race with a concurrent add; query the existing row once.
-			if item, found, findErr := service.existingMovie(ctx, summary.ID, opts); findErr == nil && found {
+			if item, found, findErr := service.existingMovie(ctx, summary.ID); findErr == nil && found {
 				return item, nil
 			}
 		}
@@ -64,9 +51,8 @@ func (service *Service) createMovie(ctx context.Context, summary domain.MovieSum
 	return subscriptionItem(record), nil
 }
 
-// existingMovie resolves a duplicate add. Actor-spawned additions never touch
-// an existing subscription, so a movie that is already added stays added.
-func (service *Service) existingMovie(ctx context.Context, movieID string, opts AddMovieOptions) (Item, bool, error) {
+// existingMovie finds the subscription already recorded for a movie.
+func (service *Service) existingMovie(ctx context.Context, movieID string) (Item, bool, error) {
 	existing, err := service.database.Subscription.Query().
 		Where(subscription.KindEQ(subscription.KindMovie), subscription.TargetIDEQ(movieID)).Only(ctx)
 	if ent.IsNotFound(err) {
@@ -75,22 +61,7 @@ func (service *Service) existingMovie(ctx context.Context, movieID string, opts 
 	if err != nil {
 		return Item{}, false, fmt.Errorf("find subscription: %w", err)
 	}
-	if opts.OriginID != nil || existing.Status == subscription.StatusWaiting {
-		return subscriptionItem(existing), true, nil
-	}
-	item, err := service.retry(ctx, existing)
-	return item, true, err
-}
-
-func (service *Service) retry(ctx context.Context, record *ent.Subscription) (Item, error) {
-	updated, err := record.Update().SetStatus(subscription.StatusWaiting).SetNextCheckAt(time.Now()).
-		SetHash("").ClearTaskID().ClearError().Save(ctx)
-	if err != nil {
-		return Item{}, fmt.Errorf("retry subscription %d: %w", record.ID, err)
-	}
-	service.tasks.NotifyMonitorChanged()
-	service.signal()
-	return subscriptionItem(updated), nil
+	return subscriptionItem(existing), true, nil
 }
 
 type UpdateOptions struct {

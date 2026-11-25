@@ -47,15 +47,15 @@ func TestMagnetsOptionalSourceFailureDoesNotCachePartialResults(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer service.Close()
-	has, err := service.HasMagnet(t.Context(), "movie-1", primary.magnets[0].Hash)
-	if err != nil || !has {
-		t.Fatalf("primary magnet unavailable during partial failure: has=%v error=%v", has, err)
+	partial, err := service.CatalogueMagnetsByCode(t.Context(), "SSIS-001")
+	if err != nil || len(partial) != 1 || partial[0].Hash != primary.magnets[0].Hash {
+		t.Fatalf("primary magnet unavailable during partial failure: magnets=%+v error=%v", partial, err)
 	}
-	domainMagnets, err := service.CatalogueMagnets(t.Context(), "movie-1")
+	domainMagnets, err := service.CatalogueMagnetsByCode(t.Context(), "SSIS-001")
 	if err != nil || len(domainMagnets) != 2 {
 		t.Fatalf("domain lookup did not retry partial results: magnets=%+v error=%v", domainMagnets, err)
 	}
-	magnets, err := service.Magnets(t.Context(), "movie-1")
+	magnets, err := service.MagnetsByCode(t.Context(), "SSIS-001", "")
 	if err != nil || len(magnets) != 2 {
 		t.Fatalf("API lookup lost supplemented result: magnets=%+v error=%v", magnets, err)
 	}
@@ -65,52 +65,6 @@ func TestMagnetsOptionalSourceFailureDoesNotCachePartialResults(t *testing.T) {
 }
 
 type countingJavBusHTTP struct{ calls atomic.Int32 }
-
-type recoveringDetailProvider struct {
-	stubProviderWithMagnets
-	calls int
-}
-
-func (p *recoveringDetailProvider) MovieDetail(ctx context.Context, id string) (domain.MovieDetail, error) {
-	p.calls++
-	if p.calls == 1 {
-		return domain.MovieDetail{}, errors.New("temporary detail failure")
-	}
-	return p.stubProviderWithMagnets.MovieDetail(ctx, id)
-}
-
-func TestMagnetsRetriesDetailBeforeCachingSupplementedResult(t *testing.T) {
-	store, err := database.Open(t.Context(), t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-	primary := &recoveringDetailProvider{stubProviderWithMagnets: stubProviderWithMagnets{
-		magnets: []domain.Magnet{{Hash: "1111111111111111111111111111111111111111", Name: "primary", Sources: []string{"javdb"}}},
-	}}
-	upstream := &countingJavBusHTTP{}
-	service, err := NewWithClients(t.Context(), store.Client, primary, javbus.NewForTest(upstream), &stubLocalState{}, primary)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer service.Close()
-	for i, wantDetailCalls := range []int{1, 2, 2} {
-		magnets, err := service.Magnets(t.Context(), "movie-1")
-		if err != nil || len(magnets) != 1 {
-			t.Fatalf("request %d: magnets=%+v error=%v", i, magnets, err)
-		}
-		if primary.calls != wantDetailCalls {
-			t.Fatalf("request %d: detail calls=%d want=%d", i, primary.calls, wantDetailCalls)
-		}
-		wantUpstreamCalls := int32(1)
-		if i == 0 {
-			wantUpstreamCalls = 0
-		}
-		if got := upstream.calls.Load(); got != wantUpstreamCalls {
-			t.Fatalf("request %d: supplement calls=%d want=%d", i, got, wantUpstreamCalls)
-		}
-	}
-}
 
 func (c *countingJavBusHTTP) Do(*http.Request) (*http.Response, error) {
 	c.calls.Add(1)
@@ -145,19 +99,19 @@ func TestMagnets_WithAvailableJavBus(t *testing.T) {
 	}
 	defer service.Close()
 
-	magnets, err := service.Magnets(t.Context(), "movie-1")
+	magnets, err := service.MagnetsByCode(t.Context(), "SSIS-001", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(magnets) != 1 {
 		t.Fatalf("expected 1 magnet, got %d", len(magnets))
 	}
-	if provider.detailCalls.Load() != 1 {
-		t.Fatalf("expected 1 detail call when JavBus is available, got %d", provider.detailCalls.Load())
+	if provider.detailCalls.Load() != 0 {
+		t.Fatalf("code lookups must not fetch JavDB detail, got %d calls", provider.detailCalls.Load())
 	}
 	// Repeated page loads must not reach JavBus while the outer result is cached.
 	for range 3 {
-		cached, err := service.Magnets(t.Context(), "movie-1")
+		cached, err := service.MagnetsByCode(t.Context(), "SSIS-001", "")
 		if err != nil || len(cached) != 1 {
 			t.Fatalf("cached magnets: %+v %v", cached, err)
 		}
@@ -166,7 +120,7 @@ func TestMagnets_WithAvailableJavBus(t *testing.T) {
 		t.Fatalf("cached requests reached JavBus %d times", calls)
 	}
 	service.magnets.reset()
-	if _, err := service.Magnets(t.Context(), "movie-1"); err != nil {
+	if _, err := service.MagnetsByCode(t.Context(), "SSIS-001", ""); err != nil {
 		t.Fatal(err)
 	}
 	if calls := upstream.calls.Load(); calls != 2 {
@@ -194,15 +148,14 @@ func TestMagnets_WithUnavailableJavBus(t *testing.T) {
 	}
 	defer service.Close()
 
-	magnets, err := service.Magnets(t.Context(), "movie-1")
+	magnets, err := service.MagnetsByCode(t.Context(), "SSIS-001", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(magnets) != 1 {
 		t.Fatalf("expected 1 magnet from JavDB, got %d", len(magnets))
 	}
-	// Sukebei is code-based, so CatalogueDetail is still queried to derive the code.
-	if provider.detailCalls.Load() != 1 {
-		t.Fatalf("expected 1 detail call when a code-based source is available, got %d", provider.detailCalls.Load())
+	if provider.detailCalls.Load() != 0 {
+		t.Fatalf("code lookups must not fetch JavDB detail, got %d calls", provider.detailCalls.Load())
 	}
 }

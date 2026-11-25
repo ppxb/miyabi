@@ -15,7 +15,7 @@ import (
 
 func TestEnqueueSingle(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
-	item, err := f.service.AddMovie(ctx, "m1", AddMovieOptions{AutoDownload: new(false)})
+	item, err := f.addMovie(ctx, "m1", AddMovieOptions{AutoDownload: new(false)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestBatchReadsSubscriptionsOnceAndSharesSettings(t *testing.T) {
 		f, ctx := newFixture(t), t.Context()
 		var ids []int
 		for i := range 3 {
-			item, err := f.service.AddMovie(ctx, fmt.Sprint(i), AddMovieOptions{})
+			item, err := f.addMovie(ctx, fmt.Sprint(i), AddMovieOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -94,8 +94,8 @@ func TestBatchReadsSubscriptionsOnceAndSharesSettings(t *testing.T) {
 
 func TestBatchEnqueueTask(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
-	item1, _ := f.service.AddMovie(ctx, "batch-1", AddMovieOptions{})
-	item2, _ := f.service.AddMovie(ctx, "batch-2", AddMovieOptions{})
+	item1, _ := f.addMovie(ctx, "batch-1", AddMovieOptions{})
+	item2, _ := f.addMovie(ctx, "batch-2", AddMovieOptions{})
 	f.discover.magnets["batch-1"] = []domain.Magnet{{Hash: "hash1", Name: "batch-1", HasSubtitle: true, HD: true, Size: 1000}}
 
 	if _, err := f.service.EnqueueBatch(ctx, BatchEnqueueRequest{}); !domain.IsKind(err, domain.KindInvalid) {
@@ -154,8 +154,8 @@ func TestBatchEnqueueTask(t *testing.T) {
 
 func TestBatchHandlerResume(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
-	item1, _ := f.service.AddMovie(ctx, "resume-1", AddMovieOptions{})
-	item2, _ := f.service.AddMovie(ctx, "resume-2", AddMovieOptions{})
+	item1, _ := f.addMovie(ctx, "resume-1", AddMovieOptions{})
+	item2, _ := f.addMovie(ctx, "resume-2", AddMovieOptions{})
 	f.discover.magnets["resume-2"] = []domain.Magnet{{Hash: "hash2", Name: "resume-2", HasSubtitle: true, HD: true, Size: 1000}}
 
 	taskID, err := f.service.EnqueueBatch(ctx, BatchEnqueueRequest{IDs: []int{item1.ID, item2.ID}})

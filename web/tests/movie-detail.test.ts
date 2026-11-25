@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 
-import { discoverKeys, findCachedMovieCard } from '@/api/movie-detail-cache'
+import { discoverKeys, findCachedJavdbID, findCachedMovieCard } from '@/api/movie-detail-cache'
 import type { DiscoverMovieDetail } from '@/api/discover'
 
 function movie(id: string, title = `Title ${id}`): DiscoverMovieDetail {
@@ -61,4 +61,14 @@ test('full detail cache counts as a card source', () => {
   const detail = movie('one')
   client.setQueryData(discoverKeys.movie('one'), detail)
   assert.deepEqual(findCachedMovieCard(client, 'one'), detail)
+})
+
+test('JavDB id comes from any cached catalogue card, not only the newest', () => {
+  const client = clientFixture()
+  const card = { ...movie('one'), sources: [{ provider: 'javdb', id: 'ZY5eq' }] }
+  client.setQueryData(discoverKeys.movies({ page: 1 }), [card], { updatedAt: 100 })
+  // The newer detail response resolves without JavDB and carries no id.
+  client.setQueryData(discoverKeys.movie('one'), movie('one'), { updatedAt: 200 })
+  assert.equal(findCachedJavdbID(client, 'one'), 'ZY5eq')
+  assert.equal(findCachedJavdbID(client, 'two'), undefined)
 })

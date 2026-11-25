@@ -37,7 +37,7 @@ func TestBatchCheckpointFailureStopsAndCanResumeWithoutDuplicateSubmission(t *te
 	f, ctx := newFixture(t), t.Context()
 	var ids []int
 	for _, movieID := range []string{"first", "second"} {
-		item, err := f.service.AddMovie(ctx, movieID, AddMovieOptions{})
+		item, err := f.addMovie(ctx, movieID, AddMovieOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -103,7 +103,7 @@ func TestBatchRetryKeepsOnlyFailedAndUnprocessedSubscriptions(t *testing.T) {
 
 func TestBatchPersistsFailureIDsAndRetriesSuccessfulSubset(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
-	item, err := f.service.AddMovie(ctx, "retry-movie", AddMovieOptions{})
+	item, err := f.addMovie(ctx, "retry-movie", AddMovieOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

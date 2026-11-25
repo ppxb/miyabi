@@ -239,28 +239,6 @@ func (service *Service) MovieDetail(ctx context.Context, movieID string) (MovieD
 	}, nil
 }
 
-func (service *Service) MovieCode(ctx context.Context, movieID string) (string, error) {
-	movie, err := service.CatalogueDetail(ctx, movieID)
-	if err != nil {
-		return "", err
-	}
-	return movie.Code, nil
-}
-
-func (service *Service) MovieSummary(ctx context.Context, movieID string) (domain.MovieSummary, error) {
-	detail, err := service.MovieDetail(ctx, movieID)
-	if err != nil {
-		return domain.MovieSummary{}, err
-	}
-	return domain.MovieSummary{
-		ID:          detail.ID,
-		Code:        detail.Code,
-		Title:       detail.Title,
-		Cover:       detail.Cover,
-		ReleaseDate: detail.ReleaseDate,
-	}, nil
-}
-
 // BrowseMovies returns browsed movies as domain types for callers requiring domain boundaries.
 func (service *Service) BrowseMovies(ctx context.Context, options domain.BrowseOptions) ([]domain.Movie, error) {
 	movies, err := service.Browse(ctx, options)

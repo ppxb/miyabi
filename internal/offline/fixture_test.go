@@ -294,10 +294,6 @@ type stubCatalogue struct {
 	magnets map[string][]domain.Magnet
 }
 
-func (s *stubCatalogue) CatalogueMagnets(ctx context.Context, movieID string) ([]domain.Magnet, error) {
-	return s.magnets[movieID], nil
-}
-
 func (s *stubCatalogue) CatalogueMagnetsByCode(ctx context.Context, code string) ([]domain.Magnet, error) {
 	for key, magnets := range s.magnets {
 		if codeid.Normalize(key) == codeid.Normalize(code) {
@@ -310,22 +306,6 @@ func (s *stubCatalogue) CatalogueMagnetsByCode(ctx context.Context, code string)
 		}
 	}
 	return nil, nil
-}
-
-func (s *stubCatalogue) HasMagnet(ctx context.Context, movieID, hash string) (bool, error) {
-	for _, m := range s.magnets[movieID] {
-		if strings.EqualFold(m.Hash, hash) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (s *stubCatalogue) MovieCode(ctx context.Context, movieID string) (string, error) {
-	if m, ok := s.movies[movieID]; ok {
-		return m.Code, nil
-	}
-	return "", nil
 }
 
 const (

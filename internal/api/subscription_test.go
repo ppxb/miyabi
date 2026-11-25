@@ -22,6 +22,7 @@ type subscriptionStub struct {
 	actorFeedPage     int
 	actorFeedLimit    int
 	actorFeedCalls    int
+	addedActor        string
 }
 
 func (s *subscriptionStub) Targets(_ context.Context, kind string) ([]monitor.TargetItem, error) {
@@ -40,6 +41,34 @@ func (s *subscriptionStub) ActorFeed(_ context.Context, actorID, page, limit int
 	return []monitor.Item{
 		{ID: 3, Kind: "movie", TargetID: "m-spawned", Title: "Spawned"},
 	}, nil
+}
+
+func (s *subscriptionStub) AddActor(_ context.Context, actorID string, opts monitor.AddActorOptions) (monitor.Item, error) {
+	s.addedActor = actorID
+	return monitor.Item{ID: 4, Kind: "actor", TargetID: actorID, Title: opts.Title}, nil
+}
+
+func TestSubscriptionCreateOnlyAcceptsActors(t *testing.T) {
+	for _, tc := range []struct {
+		body   string
+		status int
+	}{
+		{`{"kind":"actor","target_id":"a1","title":"Actor"}`, http.StatusCreated},
+		{`{"kind":"movie","target_id":"SSIS-001"}`, http.StatusBadRequest},
+	} {
+		stub := &subscriptionStub{}
+		router := NewRouter(Dependencies{Access: NewAccessGateService("", ""), Monitor: stub, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+		request := httptest.NewRequest(http.MethodPost, "/api/subscriptions", bytes.NewReader([]byte(tc.body)))
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		if response.Code != tc.status {
+			t.Fatalf("%s: status=%d, want %d: %s", tc.body, response.Code, tc.status, response.Body)
+		}
+		if wantActor := map[bool]string{true: "a1"}[tc.status == http.StatusCreated]; stub.addedActor != wantActor {
+			t.Fatalf("%s: added actor %q", tc.body, stub.addedActor)
+		}
+	}
 }
 
 func (s *subscriptionStub) UpdateConfig(_ context.Context, cfg monitor.Config) (monitor.Config, error) {

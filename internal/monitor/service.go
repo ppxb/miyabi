@@ -88,8 +88,6 @@ type Item struct {
 
 // Discoverer is the catalogue surface the service needs, in domain types.
 type Discoverer interface {
-	MovieSummary(ctx context.Context, movieID string) (domain.MovieSummary, error)
-	CatalogueMagnets(ctx context.Context, movieID string) ([]domain.Magnet, error)
 	CatalogueMagnetsByCode(ctx context.Context, code string) ([]domain.Magnet, error)
 	BrowseMovies(ctx context.Context, options domain.BrowseOptions) ([]domain.Movie, error)
 }
@@ -98,14 +96,10 @@ type OfflineAdder interface {
 	AddByCode(ctx context.Context, movieID string, code string, hash string) (domain.OfflineSubmission, error)
 }
 
-// catalogueMagnets resolves magnets for a subscription. Movie subscriptions
-// store their code, so the lookup can avoid re-fetching JavDB detail; legacy
-// rows without a code fall back to the movie-ID path.
+// catalogueMagnets resolves magnets for a subscription by its code; a row
+// without one finds none.
 func (service *Service) catalogueMagnets(ctx context.Context, record *ent.Subscription) ([]domain.Magnet, error) {
-	if record.Code != "" {
-		return service.discover.CatalogueMagnetsByCode(ctx, record.Code)
-	}
-	return service.discover.CatalogueMagnets(ctx, record.TargetID)
+	return service.discover.CatalogueMagnetsByCode(ctx, record.Code)
 }
 
 // Service manages movie and actor subscriptions: it polls JavDB on the daily
