@@ -93,6 +93,8 @@ func TestParseSTRMFileID(t *testing.T) {
 		{"http://127.0.0.1:8080/api/strm/play/12345?token=abc", "12345"},
 		{"http://10.0.0.1:8080/api/strm/play/video-101\n", "video-101"},
 		{"http://10.0.0.1:8080/api/strm/play/local-abcdef123456?token=secret\n", "local-abcdef123456"},
+		{"https://example.invalid/api/strm/play/115/1001", "115/1001"},
+		{"https://example.invalid/api/strm/play/115/1002?token=x\n", "115/1002"},
 		{"invalid strm content", ""},
 		{"http://127.0.0.1:8080/api/other/12345", ""},
 	} {

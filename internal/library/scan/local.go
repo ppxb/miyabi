@@ -214,6 +214,7 @@ func findMatchingArtwork(dir, stem string, imageFiles []string) (posterPath, fan
 		"poster.jpg", "cover.jpg",
 		stem + "-poster.jpg", stem + "-cover.jpg", stem + ".jpg",
 		"poster.png", "cover.png",
+		stem + "-poster.png", stem + "-cover.png", stem + ".png",
 	}
 	fanartNames := []string{
 		"fanart.jpg", stem + "-fanart.jpg",

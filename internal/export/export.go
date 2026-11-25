@@ -19,7 +19,12 @@ import (
 // STRMPlayPath is the API route prefix for media streaming playback in .strm files.
 const STRMPlayPath = "/api/strm/play/"
 
-var strmPlayRegex = regexp.MustCompile(`/api/strm/play/([a-zA-Z0-9_\-]+)`)
+// The catalogue of the file id may span multiple path segments (for example
+// /api/strm/play/115/1001). Capture the whole remainder so two distinct local
+// .strm files never collapse onto the same id, which would clobber one movie's
+// file record during import. Query, fragment, whitespace and quotes are not part
+// of the id.
+var strmPlayRegex = regexp.MustCompile(`/api/strm/play/([^?\s#"'<>]+)`)
 
 // ParseSTRMFileID extracts the 115 file ID from a .strm file's content or URL.
 func ParseSTRMFileID(content string) string {
