@@ -45,6 +45,25 @@ func TestOfflineAddRejectsUnknownMagnetBeforeSubmission(t *testing.T) {
 	}
 }
 
+// Subscriptions pick the hash from a fresh aggregation; a second, uncached
+// aggregation that misses it must not reject the submission.
+func TestOfflineAddByCodeTrustsPickedMagnet(t *testing.T) {
+	service, client := offlineAddFixture(t)
+	adds := 0
+	client.addOffline = func(_ context.Context, _, uri, _ string) (string, error) {
+		adds++
+		return strings.TrimPrefix(uri, "magnet:?xt=urn:btih:"), nil
+	}
+	hash := strings.Repeat("c", 40)
+	if _, err := service.AddByCode(t.Context(), "fixture-movie", "abp-001", hash); err != nil {
+		t.Fatal(err)
+	}
+	record := service.database.OfflineDownload.Query().OnlyX(t.Context())
+	if adds != 1 || record.Code != "ABP-001" || record.Hash != hash {
+		t.Fatalf("picked magnet not submitted: adds=%d record=%+v", adds, record)
+	}
+}
+
 func TestOfflineConcurrentAddsDeduplicateWithoutBlockingOtherHashes(t *testing.T) {
 	service, client := offlineAddFixture(t)
 	started := make(chan struct{}, 1)

@@ -20,9 +20,8 @@ func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.O
 	return service.AddByCode(ctx, movieID, "", hash)
 }
 
-// AddByCode submits a magnet for a movie whose catalogue code is already known,
-// so validating the magnet and recording the movie never re-fetches JavDB
-// detail. An empty code keeps the movie-ID lookup path.
+// AddByCode submits a magnet the caller just picked from the code's magnets,
+// so it is not validated again. An empty code keeps the validated movie-ID path.
 func (service *Service) AddByCode(ctx context.Context, movieID, code, hash string) (domain.OfflineSubmission, error) {
 	sources, err := service.drive.Mounts(ctx)
 	if err != nil {
@@ -41,12 +40,13 @@ func (service *Service) AddForAccount(ctx context.Context, accountID, movieID, h
 }
 
 // resolveMagnet confirms the hash belongs to the movie and returns its code.
-// A known code skips the movie-ID lookup entirely.
+// A known code trusts the caller's pick: aggregating again skips the cache for
+// partial results and can miss a magnet whose only source failed this time.
 func (service *Service) resolveMagnet(ctx context.Context, movieID, codeHint, hash string) (string, error) {
-	code := codeid.Normalize(movieID)
 	if codeHint != "" {
-		code = codeid.Normalize(codeHint)
+		return codeid.Normalize(codeHint), nil
 	}
+	code := codeid.Normalize(movieID)
 	magnets, err := service.catalogue.CatalogueMagnetsByCode(ctx, code)
 	if err != nil {
 		return "", err

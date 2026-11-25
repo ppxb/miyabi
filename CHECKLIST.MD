@@ -61,8 +61,13 @@
   - 遗留（极低）：
     - flush 先取配置快照再查询。如果恰好在两步之间改了 LocalDir，并且新目录下的记录也已入队，这条记录会按旧目录被删掉（以前是记失败后重试）。窗口为微秒级，未处理。
     - 用户自己把本地源目录加进 Emby 媒体库时，不再通知 Emby 刷新这些目录（按方案统一过滤）。
-- [ ] 🟢 ✅ **订阅自动下载时磁力聚合两次，可能误报找不到磁力**（推断，未验证）：`internal/monitor/check.go:118` 取一次，`internal/offline/add.go:50` 的 `resolveMagnet` 再取一次。来源不稳定时两次结果可能不一致，返回 `ErrMagnetNotFound`。
-  - 改法：内部调用方传入已选中的磁力，跳过二次校验（与 P1 磁力缓存一并处理）。
+- [x] 🟢 ✅ **订阅自动下载时磁力聚合两次，可能误报找不到磁力**：`internal/monitor/check.go:118` 取一次，`internal/offline/add.go:50` 的 `resolveMagnet` 再取一次。来源不稳定时两次结果可能不一致，返回 `ErrMagnetNotFound`。
+  - 复核：两次都走 `CatalogueMagnetsByCode`（订阅创建时总会写 Code，`internal/monitor/subscribe.go:49`）。结果完整时第二次命中 1 分钟缓存，不会误报；结果为 partial 时返回 `ErrDoNotCache`、不进缓存（`internal/catalogue/magnets.go:53`），第二次重新远程聚合。选中的磁力只来自某个这次失败的来源时，就会误报。
+  - 实际影响：定时检查（`check.go:146`）显示"加入 115 失败"，1 小时后重试；手动"入库"（`internal/monitor/batch.go:59`）直接把错误返回给用户。只要结果是 partial，每次提交都多一轮远程聚合。
+  - （已修复：与 P1 磁力缓存拆开处理）
+    - `offline/add.go`：`resolveMagnet` 收到 code（即 `AddByCode`，调用方只有 monitor 的上述两处，hash 刚从同一番号的聚合结果中选出）时直接返回规范化番号，不再拉磁力列表。`Add`、`AddForAccount`（API 上用户提交的 hash）不传 code，仍校验。monitor 与接口签名未改。
+    - 测试：`internal/offline/concurrency_test.go` 新增 `TestOfflineAddByCodeTrustsPickedMagnet`（hash 不在目录磁力列表中，`AddByCode` 仍提交并以规范化番号落库）；换回旧代码后测试复现"磁力链不属于当前影片"。原有 `TestOfflineAddRejectsUnknownMagnetBeforeSubmission` 继续覆盖不传 code 时的校验。`go test ./internal/...` 全部通过。
+  - 遗留：`AddByCode` 不再校验 hash 归属，以后新增的调用方必须传入刚从该番号磁力中选出的 hash（已写进函数注释）。
 - [ ] 🟢 **（待确认）按影片 ID 添加订阅把番号当 JavDB ID 用**：`internal/catalogue/service.go:337` 把 `item.ID` 设为番号，`internal/monitor/subscribe.go:25` 的 `AddMovie` 及 `catalogue/magnets.go:94` 会把它拼进 `/api/v4/movies/{id}`（`internal/javdb/movie.go:28`）。前端 `useAddSubscription` 已无调用方。
   - 先确认 JavDB 是否接受番号作为 ID，再决定修（先 `ResolveMovieID`）还是删。
 
