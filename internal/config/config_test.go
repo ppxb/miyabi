@@ -181,3 +181,38 @@ func TestLoadParsesTrustedProxies(t *testing.T) {
 		t.Fatalf("trusted proxies = %v, want %v", cfg.TrustedProxies, want)
 	}
 }
+
+// A protected instance needs a STRM token, since Emby and external players
+// cannot send the session cookie; without one it is derived from the password.
+func TestLoadDerivesSTRMTokenForProtectedAccess(t *testing.T) {
+	load := func(env map[string]string) Config {
+		t.Helper()
+		clearConfigEnvironment(t)
+		for key, value := range env {
+			t.Setenv(key, value)
+		}
+		cfg, err := Load()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cfg
+	}
+
+	derived := load(map[string]string{"MIYABI_ACCESS_PASSWORD": "pass-one"}).STRMToken
+	if len(derived) != 32 {
+		t.Fatalf("derived token = %q", derived)
+	}
+	if again := load(map[string]string{"MIYABI_ACCESS_PASSWORD": "pass-one"}).STRMToken; again != derived {
+		t.Fatalf("token changed across restarts: %q != %q", again, derived)
+	}
+	if other := load(map[string]string{"MIYABI_ACCESS_PASSWORD": "pass-two"}).STRMToken; other == derived {
+		t.Fatal("different passwords derived the same token")
+	}
+	explicit := load(map[string]string{"MIYABI_ACCESS_PASSWORD": "pass-one", "MIYABI_STRM_TOKEN": " mine "}).STRMToken
+	if explicit != "mine" {
+		t.Fatalf("explicit token = %q, want mine", explicit)
+	}
+	if open := load(nil).STRMToken; open != "" {
+		t.Fatalf("open instance token = %q, want empty", open)
+	}
+}

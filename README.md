@@ -120,7 +120,7 @@ docker compose pull && docker compose up -d
 | `MIYABI_EMBY_SERVER_URL` | Emby 服务器访问地址（如 `http://192.168.1.100:8096`）  | 空，可在 Web 界面动态配置                     |
 | `MIYABI_EMBY_API_KEY`    | Emby API 密钥（在 Emby「高级」→「API 密钥」中生成）    | 空，可在 Web 界面动态配置                     |
 | `MIYABI_EMBY_MEDIA_PATH` | Emby 容器内挂载的媒体库路径（如 `/media`）             | 空（默认使用本地路径），可在 Web 界面动态配置 |
-| `MIYABI_STRM_TOKEN`      | STRM 播放直链访问鉴权 Token                            | 空，未启用 Token 鉴权                         |
+| `MIYABI_STRM_TOKEN`      | STRM 播放直链访问鉴权 Token                            | 空，开启门禁时由访问密码派生固定 Token        |
 
 部署在 nginx 等反向代理后面时，需将反向代理连接 Miyabi 时使用的 IP 填入 `MIYABI_TRUSTED_PROXIES`，以便正确识别客户端 IP。
 

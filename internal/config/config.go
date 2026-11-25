@@ -1,6 +1,9 @@
 package config
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -68,14 +71,20 @@ func Load() (Config, error) {
 		}
 	}
 
+	accessPassword := os.Getenv("MIYABI_ACCESS_PASSWORD")
+	strmToken := strings.TrimSpace(os.Getenv("MIYABI_STRM_TOKEN"))
+	if strmToken == "" && accessPassword != "" {
+		strmToken = deriveSTRMToken(accessPassword)
+	}
+
 	cfg := Config{
 		Listen:         listen,
 		DataDir:        dataDir,
 		EmbyDir:        embyDir,
 		PublicURL:      publicURL,
-		STRMToken:      strings.TrimSpace(os.Getenv("MIYABI_STRM_TOKEN")),
+		STRMToken:      strmToken,
 		LogLevel:       logLevel,
-		AccessPassword: os.Getenv("MIYABI_ACCESS_PASSWORD"),
+		AccessPassword: accessPassword,
 		JWTSecret:      strings.TrimSpace(os.Getenv("MIYABI_JWT_SECRET")),
 		EmbyEnabled:    embyEnabled,
 		EmbyServerURL:  embyServerURL,
@@ -88,6 +97,18 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// strmTokenSalt keeps the derived STRM token unrelated to the derived JWT secret.
+const strmTokenSalt = "miyabi-strm-token"
+
+// deriveSTRMToken gives a protected instance a fixed STRM token, so Emby and
+// external players, which cannot send the session cookie, can still stream.
+// The token is written into .strm files, so it is derived one-way.
+func deriveSTRMToken(password string) string {
+	mac := hmac.New(sha256.New, []byte(strmTokenSalt))
+	mac.Write([]byte(password))
+	return hex.EncodeToString(mac.Sum(nil))[:32]
 }
 
 // LocalURL returns the loopback address of the web UI for the tray menu.

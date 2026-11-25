@@ -31,8 +31,14 @@
     - `playback/service.go`：`cachedDownloadURL` 读到过期条目时从 map 删除。
     - 测试：`internal/playback/files_test.go` 新增 `TestResolveSpecsCacheIsScopedToUserAgentAndAuthorization`（换 UA、换授权版本都不命中缓存，过期条目被删除），两处改动都做过反向验证。
   - 遗留：两套 115 直链解析的收敛仍见 P2 第 1 条。
-- [ ] 🟠 **开了访问密码但未配 `MIYABI_STRM_TOKEN` 时 MPV/STRM 返回 401**：`internal/api/mpv_link.go:28` 的 `withToken` 在 token 为空时原样返回 URL；`internal/api/strm.go:63` 开了门禁时只认 cookie，外部播放器带不了 cookie。前端仍显示 MPV 入口。
-  - 改法：启动时校验（开门禁必须配 token），或 token 为空时 `/api/mpv-link` 返回明确错误。
+- [x] 🔴 ✅ **开了访问密码但未配 `MIYABI_STRM_TOKEN` 时 MPV/STRM 返回 401**（复核后由 🟠 升为 🔴）：`internal/config/config.go:76` 中 token 可选且不校验、不派生；token 为空时导出的 .strm 与 MPV 链接都不带 `?token=`（`internal/export/export.go:51`、`internal/api/mpv_link.go:25`），而开门禁后 `strmAuthorized`（`internal/api/strm.go:60`）只认 token 或 cookie，外部播放器带不了 cookie。
+  - 实际影响：Emby 播放 .strm、"用 MPV 播放"、MPV 外挂字幕（`/api/subtitle-file/`）全部 401。README 的 docker run / Compose 示例都配了访问密码（并"强烈建议开启门禁"），却都没有 `MIYABI_STRM_TOKEN`，按文档部署并接入 Emby 必然踩中。
+  - （已修复：开门禁且未配 token 时从访问密码派生固定 token，与 JWT 密钥的做法一致）
+    - `config/config.go`：`Load` 中 `MIYABI_STRM_TOKEN` 为空且设置了访问密码时，用 HMAC-SHA256（独立盐 `miyabi-strm-token`，与 JWT 派生互不相关）派生 32 位十六进制 token。导出、播放鉴权、MPV 链接都读 `cfg.STRMToken`，一处生效。
+    - 已有 .strm 无需手动处理：启动时 `StartStartupSTRMRewrite`（`internal/app/app.go:296`）会按当前 token 改写；改密码后重启同样自动更新。显式配置 token 的行为不变。
+    - `README.md`：`MIYABI_STRM_TOKEN` 默认值改为"空，开启门禁时由访问密码派生固定 Token"。
+    - 测试：`internal/config/config_test.go` 新增 `TestLoadDerivesSTRMTokenForProtectedAccess`（派生稳定、不同密码不同、显式配置优先、未开门禁为空）；开门禁时凭 token 放行已有 `internal/api/strm_test.go` 覆盖。
+  - 说明：派生 token 会明文写进 .strm 文件，能读媒体目录者可凭它播放（不能登录或管理），与手动配置 token 相同。
 - [ ] 🟠 **扫描任务复用不区分模式**：`internal/library/workflow.go:209` 的 `ensureScanTask` 只按"来源 + 是否重建"复用，不比较 `incremental` / `metadataOnly`。启动排上增量同步后，用户手动点"扫描"拿到的仍是增量任务。
   - 改法：把这两个标志加进匹配条件。
 - [ ] 🟠 **已完成影片重新刮削时被降级为 Pending，失败后变 Failed**：`internal/library/scrape/mapping.go:263` 的 `SaveMovieMetadata` 固定设 Pending；`internal/library/scrape/scrape.go:202` 对已完成影片也重存同一份文档；`publish.go` 里又 `SetMetadata` 一次，元数据写两次。
