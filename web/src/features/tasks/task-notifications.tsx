@@ -6,7 +6,7 @@ import { useTasks } from '@/api/tasks'
 import { sourceKey } from '@/lib/source'
 import { useTaskConnection } from './task-events'
 import { diffTaskNotifications, type NotificationEntry } from './task-notification-diff'
-import { notifyBatchTask, notifyOfflineTask, notifyScanTask } from './task-toast'
+import { notifyOfflineTask, notifyScanTask } from './task-toast'
 
 export function TaskNotifications() {
   const tasks = useTasks()
@@ -55,8 +55,6 @@ export function TaskNotifications() {
       }
       if (action.type === 'notify_scan') {
         notifyScanTask(action.task, { ...callbacks, waiting: action.waiting })
-      } else if (action.type === 'notify_batch') {
-        notifyBatchTask(action.task, { ...callbacks, waiting: action.waiting })
       } else if (action.type === 'notify_offline') {
         notifyOfflineTask(action.task, {
           ...callbacks,

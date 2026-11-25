@@ -28,7 +28,7 @@ func TestActorSubscriptionSpawnsOnlyNewWorks(t *testing.T) {
 		t.Fatalf("AddActor: %#v %v", actor, err)
 	}
 	feed, err := f.service.ActorFeed(ctx, actor.ID, 1, 10)
-	if err != nil || len(feed) != 1 || feed[0].TargetID != "act-upcoming" || feed[0].OriginID == nil || *feed[0].OriginID != actor.ID || feed[0].AutoDownload {
+	if err != nil || len(feed) != 1 || feed[0].TargetID != "act-upcoming" || feed[0].OriginID == nil || *feed[0].OriginID != actor.ID {
 		t.Fatalf("only the unreleased work is tracked at subscription time: %#v %v", feed, err)
 	}
 
@@ -66,40 +66,17 @@ func TestAddActorRequiresWorksPage(t *testing.T) {
 	}
 }
 
-func TestCheckMovieWithoutAutoDownloadWaitsUntilTomorrow(t *testing.T) {
-	f, ctx := newFixture(t), t.Context()
-	item, _ := f.addMovie(ctx, "m1", AddMovieOptions{AutoDownload: new(false)})
-	f.discover.magnets["m1"] = []domain.Magnet{{Hash: "h1", Name: "MOCK-m1", HasSubtitle: true}}
-	if err := f.service.Check(ctx); err != nil {
-		t.Fatal(err)
-	}
-	record := f.client.Subscription.GetX(ctx, item.ID)
-	if record.Status != subscription.StatusWaiting || record.Hash != "h1" || record.NextCheckAt == nil || !record.NextCheckAt.After(time.Now()) || len(f.offline.submissions) != 0 {
-		t.Fatalf("manual subscriptions remember the pick and wait for tomorrow: %#v submissions=%d", record, len(f.offline.submissions))
-	}
-
-	if _, err := f.service.Update(ctx, item.ID, UpdateOptions{AutoDownload: new(true)}); err != nil {
-		t.Fatal(err)
-	}
-	f.forceDue(t, item.ID)
-	if err := f.service.Check(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if record = f.client.Subscription.GetX(ctx, item.ID); record.Status != subscription.StatusAdded || len(f.offline.submissions) != 1 {
-		t.Fatalf("with auto-download the same check submits: %#v submissions=%d", record, len(f.offline.submissions))
-	}
-}
-
 func TestCheckDefersUpstreamFailure(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
-	item, _ := f.addMovie(ctx, "m1", AddMovieOptions{})
-	f.discover.magnetsErr = domain.E(domain.KindUpstream, "JavDB 暂不可用", nil)
+	item, _ := f.service.AddActor(ctx, "actor-1", AddActorOptions{Title: "Actor"})
+	f.forceDue(t, item.ID)
+	f.discover.browseErr = domain.E(domain.KindUpstream, "JavDB 暂不可用", nil)
 	revision := f.tasks.Revisions().Monitor
 	if err := f.service.Check(ctx); err == nil {
 		t.Fatal("Check must surface the deferred cause")
 	}
 	record := f.client.Subscription.GetX(ctx, item.ID)
-	if record.Status != subscription.StatusWaiting || record.Error == nil || record.NextCheckAt == nil || record.NextCheckAt.After(time.Now().Add(retryInterval)) {
+	if record.Status != subscription.StatusActive || record.Error == nil || record.NextCheckAt == nil || record.NextCheckAt.After(time.Now().Add(retryInterval)) {
 		t.Fatalf("a failed check retries within the hour: %#v", record)
 	}
 	if f.tasks.Revisions().Monitor == revision {

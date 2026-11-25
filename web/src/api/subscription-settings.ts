@@ -11,9 +11,8 @@ export type MagnetPreferences = {
   uncensored: UncensoredFilter
 }
 
+// Download settings; check_time schedules the daily check of followed actors.
 export type SubscriptionConfig = {
-  movie_auto_download: boolean
-  actor_auto_download: boolean
   check_time: string
   preferences: MagnetPreferences
   download: { auto_switch: boolean }

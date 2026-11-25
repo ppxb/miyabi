@@ -26,14 +26,14 @@ func TestTaskPoolsIsolateScanningScrapingAndBatches(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	started := make(chan tasks.Job, 12)
 	gate := make(chan struct{})
-	var scans, scrapes, batches atomic.Int32
+	var scans, scrapes atomic.Int32
 	var exceeded atomic.Bool
 	for _, config := range []struct {
 		kind  tasks.Kind
 		count *atomic.Int32
 		limit int32
 	}{
-		{tasks.KindScan, &scans, 1}, {tasks.KindScrape, &scrapes, 2}, {tasks.KindSubscriptionBatch, &batches, 1},
+		{tasks.KindScan, &scans, 1}, {tasks.KindScrape, &scrapes, 2},
 	} {
 		registry.Register(tasks.NewHandler(config.kind, func(ctx context.Context, job tasks.Job) error {
 			if config.count.Add(1) > config.limit {
@@ -52,17 +52,16 @@ func TestTaskPoolsIsolateScanningScrapingAndBatches(t *testing.T) {
 		}))
 	}
 	body := json.RawMessage(`{"checkpoint":"saved"}`)
-	// An older scrape backlog must not prevent a new scan or batch from starting.
+	// An older scrape backlog must not prevent a new scan from starting.
 	var jobs []*ent.Task
-	for _, kind := range []tasks.Kind{tasks.KindScrape, tasks.KindScrape, tasks.KindScrape, tasks.KindScan, tasks.KindScan, tasks.KindSubscriptionBatch, tasks.KindSubscriptionBatch} {
+	for _, kind := range []tasks.Kind{tasks.KindScrape, tasks.KindScrape, tasks.KindScrape, tasks.KindScan, tasks.KindScan} {
 		jobs = append(jobs, store.Client.Task.Create().SetType(string(kind)).SetPayload(body).SaveX(ctx))
 	}
 	jobs[0].Update().SetStatus(task.StatusRunning).ExecX(ctx)
 	jobs[3].Update().SetStatus(task.StatusRunning).ExecX(ctx)
-	jobs[5].Update().SetStatus(task.StatusRunning).ExecX(ctx)
 	start := func() (context.CancelFunc, <-chan error) {
 		runCtx, cancel := context.WithCancel(ctx)
-		stopped := make(chan error, 3)
+		stopped := make(chan error, 2)
 		for _, pool := range newTaskPools(service, logger) {
 			go func() { stopped <- pool.Run(runCtx) }()
 		}
@@ -70,7 +69,7 @@ func TestTaskPoolsIsolateScanningScrapingAndBatches(t *testing.T) {
 	}
 	stop := func(cancel context.CancelFunc, stopped <-chan error) {
 		cancel()
-		for range 3 {
+		for range 2 {
 			if err := awaitPan(t, stopped); err != nil {
 				t.Error(err)
 			}
@@ -79,19 +78,19 @@ func TestTaskPoolsIsolateScanningScrapingAndBatches(t *testing.T) {
 	cancel, stopped := start()
 	t.Cleanup(cancel)
 	seen := make(map[int]bool)
-	for range 4 {
+	for range 3 {
 		job := awaitPan(t, started)
 		seen[job.ID] = true
 		if string(job.Payload) != string(body) {
 			t.Fatal("recovery discarded checkpoint")
 		}
 	}
-	for _, i := range []int{0, 1, 3, 5} {
+	for _, i := range []int{0, 1, 3} {
 		if !seen[jobs[i].ID] {
 			t.Fatalf("task %d starved", jobs[i].ID)
 		}
 	}
-	for _, i := range []int{2, 4, 6} {
+	for _, i := range []int{2, 4} {
 		if store.Client.Task.GetX(ctx, jobs[i].ID).Status != task.StatusQueued {
 			t.Fatal("pool exceeded concurrency")
 		}
@@ -117,7 +116,7 @@ func TestTaskPoolsIsolateScanningScrapingAndBatches(t *testing.T) {
 		t.Fatal("duplicate completions or excess concurrency")
 	}
 	// Wake all idle pool kinds through the shared bus.
-	for _, kind := range []tasks.Kind{tasks.KindScan, tasks.KindScrape, tasks.KindSubscriptionBatch} {
+	for _, kind := range []tasks.Kind{tasks.KindScan, tasks.KindScrape} {
 		job := store.Client.Task.Create().SetType(string(kind)).SaveX(ctx)
 		service.WakePool()
 		if got := awaitPan(t, started); got.ID != job.ID {

@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, useLocation } from '@tanstack/react-router'
 import {
-  BellIcon,
   DatabaseIcon,
+  DownloadIcon,
   HardDriveIcon,
   NetworkIcon,
   Share2Icon,
@@ -20,7 +20,7 @@ const SETTINGS_NAV = [
   { to: '/settings/data', label: '数据', icon: DatabaseIcon },
   { to: '/settings/outputs', label: '输出目标', icon: Share2Icon },
   { to: '/settings/network', label: '网络', icon: NetworkIcon },
-  { to: '/settings/subscription', label: '订阅', icon: BellIcon }
+  { to: '/settings/download', label: '下载', icon: DownloadIcon }
 ] as const
 
 export const Route = createFileRoute('/settings')({

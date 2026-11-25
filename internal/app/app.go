@@ -181,7 +181,7 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 	cleanup = append(cleanup, metadataSvc.Close)
 
 	offlineSvc := offline.New(store.Client, catalogueSvc, driveSvc, taskSvc, libSvc, metadataSvc, offlineSubmitTimeout)
-	monitorSvc := monitor.New(store.Client, catalogueSvc, offlineSvc, taskSvc)
+	monitorSvc := monitor.New(store.Client, catalogueSvc, taskSvc)
 	gfriendsClient := gfriends.New(cfg.DataDir, &http.Client{
 		Timeout:   30 * time.Second,
 		Transport: netx.NewTransport(networkSvc.ProxyManager()),
@@ -227,7 +227,6 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 
 	taskRegistry.Register(tasks.NewHandler(tasks.KindScan, libSvc.Scan, libSvc.Finished).WithRetry(domain.RetryDelay))
 	taskRegistry.Register(tasks.NewHandler(tasks.KindScrape, scrapeSvc.Scrape, scrapeSvc.Finished).WithRetry(domain.RetryDelay))
-	taskRegistry.Register(tasks.NewHandler(tasks.KindSubscriptionBatch, monitorSvc.BatchHandler, monitorSvc.BatchFinished))
 
 	pools := newTaskPools(taskSvc, logger)
 
@@ -242,7 +241,7 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 		Library:        libSvc,
 		Play:           playSvc,
 		STRM:           strm.New(store.Client, driveSvc),
-		Tasks:          &taskViews{Service: taskSvc, database: store.Client, library: libSvc, monitor: monitorSvc},
+		Tasks:          &taskViews{Service: taskSvc, database: store.Client, library: libSvc},
 		Artwork:        scrapeSvc,
 		Maintenance:    maintenanceSvc,
 		Logs:           maintenanceSvc,
@@ -319,7 +318,7 @@ func (a *App) Run(ctx context.Context) error {
 		tasks.RunPeriodic(ctx, a.logger, "sync 115 offline tasks", offlineSyncInterval, nil, a.offline.Sync)
 	})
 	workers.Go(func() {
-		tasks.RunPeriodic(ctx, a.logger, "monitor", monitorCheckInterval, a.monitors.Pending(), a.monitors.Check)
+		tasks.RunPeriodic(ctx, a.logger, "monitor", monitorCheckInterval, nil, a.monitors.Check)
 	})
 
 	serverError := make(chan error, 1)

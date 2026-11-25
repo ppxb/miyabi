@@ -18,13 +18,12 @@ import (
 	"github.com/ppxb/miyabi/internal/api"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
-	"github.com/ppxb/miyabi/internal/monitor"
 )
 
 func snapshotFixture(t *testing.T) (*taskViews, testLibraryFixture) {
 	t.Helper()
 	fix := libraryFixture(t)
-	return &taskViews{Service: fix.Tasks, database: fix.DB, library: fix.Service, monitor: monitor.New(fix.DB, nil, nil, fix.Tasks)}, fix
+	return &taskViews{Service: fix.Tasks, database: fix.DB, library: fix.Service}, fix
 }
 
 type snapshotResult struct {

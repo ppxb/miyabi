@@ -18,13 +18,6 @@ type observedDiscoverer struct {
 	before func(kind, id string) error
 }
 
-func (d observedDiscoverer) CatalogueMagnetsByCode(ctx context.Context, code string) ([]domain.Magnet, error) {
-	if err := d.before("movie", code); err != nil {
-		return nil, err
-	}
-	return d.Discoverer.CatalogueMagnetsByCode(ctx, code)
-}
-
 func (d observedDiscoverer) BrowseMovies(ctx context.Context, options domain.BrowseOptions) ([]domain.Movie, error) {
 	if err := d.before("actor", options.EntityID); err != nil {
 		return nil, err
@@ -36,32 +29,23 @@ func TestCheckDrainsDuePagesWithoutRepeatingFailures(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f, ctx := newFixture(t), t.Context()
 		start := time.Now()
-		const movies, actors = movieBatchSize*2 + 3, actorBatchSize + 2
+		// Three actor pages; equal deadlines cross page boundaries and older
+		// deadlines have larger IDs.
+		const actors = actorBatchSize*2 + 3
 		var due []*ent.Subscription
-		for _, group := range []struct {
-			kind   subscription.Kind
-			status subscription.Status
-			count  int
-		}{
-			{subscription.KindMovie, subscription.StatusWaiting, movies},
-			{subscription.KindActor, subscription.StatusActive, actors},
-		} {
-			for i := range group.count {
-				// Equal deadlines cross page boundaries; older deadlines have larger IDs.
-				// Movie subscriptions look magnets up by code, which equals the target id.
-				target := fmt.Sprintf("%s-%02d", group.kind, i)
-				due = append(due, f.client.Subscription.Create().SetKind(group.kind).SetStatus(group.status).
-					SetTargetID(target).SetCode(target).SetReleaseDate(start.Format(dateLayout)).
-					SetNextCheckAt(start.Add(-time.Hour-time.Duration(i/12)*time.Minute)).SaveX(ctx))
-			}
+		for i := range actors {
+			due = append(due, f.client.Subscription.Create().SetKind(subscription.KindActor).SetStatus(subscription.StatusActive).
+				SetTargetID(fmt.Sprintf("actor-%02d", i)).
+				SetNextCheckAt(start.Add(-time.Hour-time.Duration(i/6)*time.Minute)).SaveX(ctx))
 		}
-		future := f.client.Subscription.Create().SetTargetID("future").SetNextCheckAt(start.Add(time.Second)).SaveX(ctx)
+		// Movie subscriptions only record works and are never checked.
+		movie := f.client.Subscription.Create().SetTargetID("movie").SetNextCheckAt(start.Add(-time.Hour)).SaveX(ctx)
+		future := f.client.Subscription.Create().SetKind(subscription.KindActor).SetStatus(subscription.StatusActive).
+			SetTargetID("future").SetNextCheckAt(start.Add(time.Second)).SaveX(ctx)
 		paused := f.client.Subscription.Create().SetKind(subscription.KindActor).SetStatus(subscription.StatusPaused).
 			SetTargetID("paused").SetNextCheckAt(start.Add(-time.Hour)).SaveX(ctx)
-		stale := f.client.Subscription.Create().SetStatus(subscription.StatusStale).
-			SetTargetID("stale").SetNextCheckAt(start.Add(-time.Hour)).SaveX(ctx)
-		// The last record of the first movie page fails to persist its next check.
-		failedID := due[21].ID
+		// The last record of the first page fails to persist its next check.
+		failedID := due[actorBatchSize-1].ID
 		writeFailure := errors.New("fixture update failure")
 		f.client.Subscription.Use(func(next ent.Mutator) ent.Mutator {
 			return ent.MutateFunc(func(ctx context.Context, mutation ent.Mutation) (ent.Value, error) {
@@ -75,25 +59,20 @@ func TestCheckDrainsDuePagesWithoutRepeatingFailures(t *testing.T) {
 		})
 		upstreamFailure := errors.New("fixture catalogue failure")
 		calls := make(map[string]int)
-		var kinds []string
 		var last time.Time
-		f.service.discover = observedDiscoverer{f.discover, func(kind, id string) error {
+		f.service.discover = observedDiscoverer{f.discover, func(_, id string) error {
 			if !last.IsZero() && time.Since(last) < requestGap {
-				t.Error("request pacing was lost across a page or subscription kind")
+				t.Error("request pacing was lost across a page")
 			}
 			last = time.Now()
 			calls[id]++
-			kinds = append(kinds, kind)
-			if id == "movie-00" {
+			if id == "actor-00" {
 				return upstreamFailure
 			}
 			return nil
 		}}
 		if err := f.service.Check(ctx); !errors.Is(err, writeFailure) || !errors.Is(err, upstreamFailure) {
 			t.Fatalf("check did not retain item failures: %v", err)
-		}
-		if len(kinds) != movies+actors || kinds[movieBatchSize] != "actor" || kinds[movieBatchSize+actorBatchSize] != "movie" {
-			t.Fatalf("backlog was truncated or actors were starved: %v", kinds)
 		}
 		for _, record := range due {
 			if calls[record.TargetID] != 1 {
@@ -108,7 +87,7 @@ func TestCheckDrainsDuePagesWithoutRepeatingFailures(t *testing.T) {
 				t.Fatalf("due subscription was not rescheduled: %s", record.TargetID)
 			}
 		}
-		for _, record := range []*ent.Subscription{future, paused, stale} {
+		for _, record := range []*ent.Subscription{future, paused, movie} {
 			if calls[record.TargetID] != 0 || f.client.Subscription.GetX(ctx, record.ID).LastCheckedAt != nil {
 				t.Fatalf("ineligible subscription was checked: %s", record.TargetID)
 			}
@@ -119,8 +98,9 @@ func TestCheckDrainsDuePagesWithoutRepeatingFailures(t *testing.T) {
 func TestCheckCancellationLeavesRemainingSubscriptionsDue(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f := newFixture(t)
-		for i := range movieBatchSize + 1 {
-			f.client.Subscription.Create().SetTargetID(fmt.Sprint(i)).SetNextCheckAt(time.Now()).SaveX(t.Context())
+		for i := range actorBatchSize + 1 {
+			f.client.Subscription.Create().SetKind(subscription.KindActor).SetStatus(subscription.StatusActive).
+				SetTargetID(fmt.Sprint(i)).SetNextCheckAt(time.Now()).SaveX(t.Context())
 		}
 		calls := 0
 		f.service.discover = observedDiscoverer{f.discover, func(string, string) error { calls++; return nil }}
@@ -130,7 +110,7 @@ func TestCheckCancellationLeavesRemainingSubscriptionsDue(t *testing.T) {
 		if err := f.service.Check(ctx); !errors.Is(err, context.Canceled) || calls != 1 {
 			t.Fatalf("canceled check: calls=%d err=%v", calls, err)
 		}
-		if err := f.service.Check(t.Context()); err != nil || calls != movieBatchSize+1 {
+		if err := f.service.Check(t.Context()); err != nil || calls != actorBatchSize+1 {
 			t.Fatalf("next run did not resume remaining checks: calls=%d err=%v", calls, err)
 		}
 		for _, record := range f.client.Subscription.Query().AllX(t.Context()) {
@@ -139,21 +119,4 @@ func TestCheckCancellationLeavesRemainingSubscriptionsDue(t *testing.T) {
 			}
 		}
 	})
-}
-
-func TestCheckNotifiesWhenNoMagnetIsFound(t *testing.T) {
-	f, ctx := newFixture(t), t.Context()
-	record := f.client.Subscription.Create().SetTargetID("waiting").SetReleaseDate(time.Now().Format(dateLayout)).
-		SetNextCheckAt(time.Now()).SetError("previous failure").SaveX(ctx)
-	revision := f.tasks.Revisions().Monitor
-	if err := f.service.Check(ctx); err != nil {
-		t.Fatal(err)
-	}
-	updated := f.client.Subscription.GetX(ctx, record.ID)
-	if updated.Status != subscription.StatusWaiting || updated.Checks != 1 || updated.Error != nil || updated.LastCheckedAt == nil || !updated.NextCheckAt.After(time.Now()) {
-		t.Fatalf("no-magnet check did not update the waiting subscription: %+v", updated)
-	}
-	if f.tasks.Revisions().Monitor <= revision {
-		t.Fatal("waiting subscription check did not notify the UI")
-	}
 }

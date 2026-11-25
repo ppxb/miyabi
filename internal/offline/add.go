@@ -13,39 +13,14 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 )
 
-// Add submits an offline download to the first mounted 115 account. It is the
-// default entry for automation without an explicit account; the API passes an
-// account explicitly through AddForAccount.
-func (service *Service) Add(ctx context.Context, movieID, hash string) (domain.OfflineSubmission, error) {
-	return service.AddByCode(ctx, movieID, "", hash)
-}
-
-// AddByCode submits a magnet the caller just picked from the code's magnets,
-// so it is not validated again. An empty code keeps the validated movie-ID path.
-func (service *Service) AddByCode(ctx context.Context, movieID, code, hash string) (domain.OfflineSubmission, error) {
-	sources, err := service.drive.Mounts(ctx)
-	if err != nil {
-		return domain.OfflineSubmission{}, err
-	}
-	if len(sources) == 0 {
-		return domain.OfflineSubmission{}, domain.E(domain.KindInvalid, "没有已挂载的 115 账号", nil)
-	}
-	return service.addForAccount(ctx, sources[0].AccountID, movieID, code, hash)
-}
-
 // AddForAccount validates and records a new offline download for the given 115
 // account's mounted directory.
 func (service *Service) AddForAccount(ctx context.Context, accountID, movieID, hash string) (domain.OfflineSubmission, error) {
-	return service.addForAccount(ctx, accountID, movieID, "", hash)
+	return service.addForAccount(ctx, accountID, movieID, hash)
 }
 
 // resolveMagnet confirms the hash belongs to the movie and returns its code.
-// A known code trusts the caller's pick: aggregating again skips the cache for
-// partial results and can miss a magnet whose only source failed this time.
-func (service *Service) resolveMagnet(ctx context.Context, movieID, codeHint, hash string) (string, error) {
-	if codeHint != "" {
-		return codeid.Normalize(codeHint), nil
-	}
+func (service *Service) resolveMagnet(ctx context.Context, movieID, hash string) (string, error) {
 	code := codeid.Normalize(movieID)
 	magnets, err := service.catalogue.CatalogueMagnetsByCode(ctx, code)
 	if err != nil {
@@ -73,9 +48,9 @@ func (service *Service) warmMetadata(code string) {
 	}()
 }
 
-func (service *Service) addForAccount(ctx context.Context, accountID, movieID, codeHint, hash string) (domain.OfflineSubmission, error) {
+func (service *Service) addForAccount(ctx context.Context, accountID, movieID, hash string) (domain.OfflineSubmission, error) {
 	hash = strings.ToLower(hash)
-	code, err := service.resolveMagnet(ctx, movieID, codeHint, hash)
+	code, err := service.resolveMagnet(ctx, movieID, hash)
 	if err != nil {
 		return domain.OfflineSubmission{}, err
 	}

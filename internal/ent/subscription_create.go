@@ -140,20 +140,6 @@ func (_c *SubscriptionCreate) SetNillableOriginID(v *int) *SubscriptionCreate {
 	return _c
 }
 
-// SetAutoDownload sets the "auto_download" field.
-func (_c *SubscriptionCreate) SetAutoDownload(v bool) *SubscriptionCreate {
-	_c.mutation.SetAutoDownload(v)
-	return _c
-}
-
-// SetNillableAutoDownload sets the "auto_download" field if the given value is not nil.
-func (_c *SubscriptionCreate) SetNillableAutoDownload(v *bool) *SubscriptionCreate {
-	if v != nil {
-		_c.SetAutoDownload(*v)
-	}
-	return _c
-}
-
 // SetStatus sets the "status" field.
 func (_c *SubscriptionCreate) SetStatus(v subscription.Status) *SubscriptionCreate {
 	_c.mutation.SetStatus(v)
@@ -178,34 +164,6 @@ func (_c *SubscriptionCreate) SetCursor(v string) *SubscriptionCreate {
 func (_c *SubscriptionCreate) SetNillableCursor(v *string) *SubscriptionCreate {
 	if v != nil {
 		_c.SetCursor(*v)
-	}
-	return _c
-}
-
-// SetHash sets the "hash" field.
-func (_c *SubscriptionCreate) SetHash(v string) *SubscriptionCreate {
-	_c.mutation.SetHash(v)
-	return _c
-}
-
-// SetNillableHash sets the "hash" field if the given value is not nil.
-func (_c *SubscriptionCreate) SetNillableHash(v *string) *SubscriptionCreate {
-	if v != nil {
-		_c.SetHash(*v)
-	}
-	return _c
-}
-
-// SetTaskID sets the "task_id" field.
-func (_c *SubscriptionCreate) SetTaskID(v int) *SubscriptionCreate {
-	_c.mutation.SetTaskID(v)
-	return _c
-}
-
-// SetNillableTaskID sets the "task_id" field if the given value is not nil.
-func (_c *SubscriptionCreate) SetNillableTaskID(v *int) *SubscriptionCreate {
-	if v != nil {
-		_c.SetTaskID(*v)
 	}
 	return _c
 }
@@ -329,10 +287,6 @@ func (_c *SubscriptionCreate) defaults() {
 		v := subscription.DefaultReleaseDate
 		_c.mutation.SetReleaseDate(v)
 	}
-	if _, ok := _c.mutation.AutoDownload(); !ok {
-		v := subscription.DefaultAutoDownload
-		_c.mutation.SetAutoDownload(v)
-	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := subscription.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -340,10 +294,6 @@ func (_c *SubscriptionCreate) defaults() {
 	if _, ok := _c.mutation.Cursor(); !ok {
 		v := subscription.DefaultCursor
 		_c.mutation.SetCursor(v)
-	}
-	if _, ok := _c.mutation.Hash(); !ok {
-		v := subscription.DefaultHash
-		_c.mutation.SetHash(v)
 	}
 	if _, ok := _c.mutation.Checks(); !ok {
 		v := subscription.DefaultChecks
@@ -387,9 +337,6 @@ func (_c *SubscriptionCreate) check() error {
 	if _, ok := _c.mutation.ReleaseDate(); !ok {
 		return &ValidationError{Name: "release_date", err: errors.New(`ent: missing required field "Subscription.release_date"`)}
 	}
-	if _, ok := _c.mutation.AutoDownload(); !ok {
-		return &ValidationError{Name: "auto_download", err: errors.New(`ent: missing required field "Subscription.auto_download"`)}
-	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "Subscription.status"`)}
 	}
@@ -400,9 +347,6 @@ func (_c *SubscriptionCreate) check() error {
 	}
 	if _, ok := _c.mutation.Cursor(); !ok {
 		return &ValidationError{Name: "cursor", err: errors.New(`ent: missing required field "Subscription.cursor"`)}
-	}
-	if _, ok := _c.mutation.Hash(); !ok {
-		return &ValidationError{Name: "hash", err: errors.New(`ent: missing required field "Subscription.hash"`)}
 	}
 	if _, ok := _c.mutation.Checks(); !ok {
 		return &ValidationError{Name: "checks", err: errors.New(`ent: missing required field "Subscription.checks"`)}
@@ -475,10 +419,6 @@ func (_c *SubscriptionCreate) createSpec() (*Subscription, *sqlgraph.CreateSpec)
 		_spec.SetField(subscription.FieldOriginID, field.TypeInt, value)
 		_node.OriginID = &value
 	}
-	if value, ok := _c.mutation.AutoDownload(); ok {
-		_spec.SetField(subscription.FieldAutoDownload, field.TypeBool, value)
-		_node.AutoDownload = value
-	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(subscription.FieldStatus, field.TypeEnum, value)
 		_node.Status = value
@@ -486,14 +426,6 @@ func (_c *SubscriptionCreate) createSpec() (*Subscription, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.Cursor(); ok {
 		_spec.SetField(subscription.FieldCursor, field.TypeString, value)
 		_node.Cursor = value
-	}
-	if value, ok := _c.mutation.Hash(); ok {
-		_spec.SetField(subscription.FieldHash, field.TypeString, value)
-		_node.Hash = value
-	}
-	if value, ok := _c.mutation.TaskID(); ok {
-		_spec.SetField(subscription.FieldTaskID, field.TypeInt, value)
-		_node.TaskID = &value
 	}
 	if value, ok := _c.mutation.NextCheckAt(); ok {
 		_spec.SetField(subscription.FieldNextCheckAt, field.TypeTime, value)
@@ -671,18 +603,6 @@ func (u *SubscriptionUpsert) ClearOriginID() *SubscriptionUpsert {
 	return u
 }
 
-// SetAutoDownload sets the "auto_download" field.
-func (u *SubscriptionUpsert) SetAutoDownload(v bool) *SubscriptionUpsert {
-	u.Set(subscription.FieldAutoDownload, v)
-	return u
-}
-
-// UpdateAutoDownload sets the "auto_download" field to the value that was provided on create.
-func (u *SubscriptionUpsert) UpdateAutoDownload() *SubscriptionUpsert {
-	u.SetExcluded(subscription.FieldAutoDownload)
-	return u
-}
-
 // SetStatus sets the "status" field.
 func (u *SubscriptionUpsert) SetStatus(v subscription.Status) *SubscriptionUpsert {
 	u.Set(subscription.FieldStatus, v)
@@ -704,42 +624,6 @@ func (u *SubscriptionUpsert) SetCursor(v string) *SubscriptionUpsert {
 // UpdateCursor sets the "cursor" field to the value that was provided on create.
 func (u *SubscriptionUpsert) UpdateCursor() *SubscriptionUpsert {
 	u.SetExcluded(subscription.FieldCursor)
-	return u
-}
-
-// SetHash sets the "hash" field.
-func (u *SubscriptionUpsert) SetHash(v string) *SubscriptionUpsert {
-	u.Set(subscription.FieldHash, v)
-	return u
-}
-
-// UpdateHash sets the "hash" field to the value that was provided on create.
-func (u *SubscriptionUpsert) UpdateHash() *SubscriptionUpsert {
-	u.SetExcluded(subscription.FieldHash)
-	return u
-}
-
-// SetTaskID sets the "task_id" field.
-func (u *SubscriptionUpsert) SetTaskID(v int) *SubscriptionUpsert {
-	u.Set(subscription.FieldTaskID, v)
-	return u
-}
-
-// UpdateTaskID sets the "task_id" field to the value that was provided on create.
-func (u *SubscriptionUpsert) UpdateTaskID() *SubscriptionUpsert {
-	u.SetExcluded(subscription.FieldTaskID)
-	return u
-}
-
-// AddTaskID adds v to the "task_id" field.
-func (u *SubscriptionUpsert) AddTaskID(v int) *SubscriptionUpsert {
-	u.Add(subscription.FieldTaskID, v)
-	return u
-}
-
-// ClearTaskID clears the value of the "task_id" field.
-func (u *SubscriptionUpsert) ClearTaskID() *SubscriptionUpsert {
-	u.SetNull(subscription.FieldTaskID)
 	return u
 }
 
@@ -986,20 +870,6 @@ func (u *SubscriptionUpsertOne) ClearOriginID() *SubscriptionUpsertOne {
 	})
 }
 
-// SetAutoDownload sets the "auto_download" field.
-func (u *SubscriptionUpsertOne) SetAutoDownload(v bool) *SubscriptionUpsertOne {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.SetAutoDownload(v)
-	})
-}
-
-// UpdateAutoDownload sets the "auto_download" field to the value that was provided on create.
-func (u *SubscriptionUpsertOne) UpdateAutoDownload() *SubscriptionUpsertOne {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.UpdateAutoDownload()
-	})
-}
-
 // SetStatus sets the "status" field.
 func (u *SubscriptionUpsertOne) SetStatus(v subscription.Status) *SubscriptionUpsertOne {
 	return u.Update(func(s *SubscriptionUpsert) {
@@ -1025,48 +895,6 @@ func (u *SubscriptionUpsertOne) SetCursor(v string) *SubscriptionUpsertOne {
 func (u *SubscriptionUpsertOne) UpdateCursor() *SubscriptionUpsertOne {
 	return u.Update(func(s *SubscriptionUpsert) {
 		s.UpdateCursor()
-	})
-}
-
-// SetHash sets the "hash" field.
-func (u *SubscriptionUpsertOne) SetHash(v string) *SubscriptionUpsertOne {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.SetHash(v)
-	})
-}
-
-// UpdateHash sets the "hash" field to the value that was provided on create.
-func (u *SubscriptionUpsertOne) UpdateHash() *SubscriptionUpsertOne {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.UpdateHash()
-	})
-}
-
-// SetTaskID sets the "task_id" field.
-func (u *SubscriptionUpsertOne) SetTaskID(v int) *SubscriptionUpsertOne {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.SetTaskID(v)
-	})
-}
-
-// AddTaskID adds v to the "task_id" field.
-func (u *SubscriptionUpsertOne) AddTaskID(v int) *SubscriptionUpsertOne {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.AddTaskID(v)
-	})
-}
-
-// UpdateTaskID sets the "task_id" field to the value that was provided on create.
-func (u *SubscriptionUpsertOne) UpdateTaskID() *SubscriptionUpsertOne {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.UpdateTaskID()
-	})
-}
-
-// ClearTaskID clears the value of the "task_id" field.
-func (u *SubscriptionUpsertOne) ClearTaskID() *SubscriptionUpsertOne {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.ClearTaskID()
 	})
 }
 
@@ -1491,20 +1319,6 @@ func (u *SubscriptionUpsertBulk) ClearOriginID() *SubscriptionUpsertBulk {
 	})
 }
 
-// SetAutoDownload sets the "auto_download" field.
-func (u *SubscriptionUpsertBulk) SetAutoDownload(v bool) *SubscriptionUpsertBulk {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.SetAutoDownload(v)
-	})
-}
-
-// UpdateAutoDownload sets the "auto_download" field to the value that was provided on create.
-func (u *SubscriptionUpsertBulk) UpdateAutoDownload() *SubscriptionUpsertBulk {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.UpdateAutoDownload()
-	})
-}
-
 // SetStatus sets the "status" field.
 func (u *SubscriptionUpsertBulk) SetStatus(v subscription.Status) *SubscriptionUpsertBulk {
 	return u.Update(func(s *SubscriptionUpsert) {
@@ -1530,48 +1344,6 @@ func (u *SubscriptionUpsertBulk) SetCursor(v string) *SubscriptionUpsertBulk {
 func (u *SubscriptionUpsertBulk) UpdateCursor() *SubscriptionUpsertBulk {
 	return u.Update(func(s *SubscriptionUpsert) {
 		s.UpdateCursor()
-	})
-}
-
-// SetHash sets the "hash" field.
-func (u *SubscriptionUpsertBulk) SetHash(v string) *SubscriptionUpsertBulk {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.SetHash(v)
-	})
-}
-
-// UpdateHash sets the "hash" field to the value that was provided on create.
-func (u *SubscriptionUpsertBulk) UpdateHash() *SubscriptionUpsertBulk {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.UpdateHash()
-	})
-}
-
-// SetTaskID sets the "task_id" field.
-func (u *SubscriptionUpsertBulk) SetTaskID(v int) *SubscriptionUpsertBulk {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.SetTaskID(v)
-	})
-}
-
-// AddTaskID adds v to the "task_id" field.
-func (u *SubscriptionUpsertBulk) AddTaskID(v int) *SubscriptionUpsertBulk {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.AddTaskID(v)
-	})
-}
-
-// UpdateTaskID sets the "task_id" field to the value that was provided on create.
-func (u *SubscriptionUpsertBulk) UpdateTaskID() *SubscriptionUpsertBulk {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.UpdateTaskID()
-	})
-}
-
-// ClearTaskID clears the value of the "task_id" field.
-func (u *SubscriptionUpsertBulk) ClearTaskID() *SubscriptionUpsertBulk {
-	return u.Update(func(s *SubscriptionUpsert) {
-		s.ClearTaskID()
 	})
 }
 

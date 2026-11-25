@@ -51,21 +51,7 @@ export type ScanTask = TaskBase & {
   }
 }
 
-// A queued subscription batch: each movie is submitted to 115, left waiting
-// for a qualifying magnet, or failed.
-export type BatchTask = TaskBase & {
-  type: 'subscription_batch'
-  batch: {
-    total: number
-    processed: number
-    submitted: number
-    waiting: number
-    failed: number
-    failures?: { code: string; error: string }[]
-  }
-}
-
-export type Task = ScanTask | BatchTask
+export type Task = ScanTask
 
 export const taskKeys = { all: ['tasks'] as const }
 

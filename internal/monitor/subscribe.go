@@ -11,7 +11,6 @@ import (
 )
 
 type AddMovieOptions struct {
-	AutoDownload *bool
 	// OriginID marks a subscription spawned by an actor subscription.
 	OriginID *int
 }
@@ -26,17 +25,10 @@ func (service *Service) addMovie(ctx context.Context, summary domain.MovieSummar
 }
 
 func (service *Service) createMovie(ctx context.Context, summary domain.MovieSummary, opts AddMovieOptions) (Item, error) {
-	var autoDownload bool
-	if opts.AutoDownload != nil {
-		autoDownload = *opts.AutoDownload
-	} else {
-		autoDownload = service.config(ctx).MovieAutoDownload
-	}
 	record, err := service.database.Subscription.Create().
 		SetKind(subscription.KindMovie).SetTargetID(summary.ID).SetCode(summary.Code).
 		SetTitle(summary.Title).SetCover(summary.Cover).SetReleaseDate(summary.ReleaseDate).
-		SetAutoDownload(autoDownload).SetStatus(subscription.StatusWaiting).
-		SetNillableOriginID(opts.OriginID).SetNextCheckAt(time.Now()).Save(ctx)
+		SetNillableOriginID(opts.OriginID).Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
 			// Lost a race with a concurrent add; query the existing row once.
@@ -47,7 +39,6 @@ func (service *Service) createMovie(ctx context.Context, summary domain.MovieSum
 		return Item{}, fmt.Errorf("create movie subscription: %w", err)
 	}
 	service.tasks.NotifyMonitorChanged()
-	service.signal()
 	return subscriptionItem(record), nil
 }
 
@@ -65,9 +56,7 @@ func (service *Service) existingMovie(ctx context.Context, movieID string) (Item
 }
 
 type UpdateOptions struct {
-	AutoDownload *bool
-	// Status pauses or resumes an actor subscription; movie status only moves
-	// through checks and enqueues.
+	// Status pauses or resumes an actor subscription.
 	Status *string
 }
 
@@ -77,9 +66,6 @@ func (service *Service) Update(ctx context.Context, id int, opts UpdateOptions) 
 		return Item{}, err
 	}
 	update := record.Update()
-	if opts.AutoDownload != nil {
-		update.SetAutoDownload(*opts.AutoDownload)
-	}
 	if opts.Status != nil {
 		status := subscription.Status(*opts.Status)
 		if record.Kind != subscription.KindActor || (status != subscription.StatusActive && status != subscription.StatusPaused) {
@@ -98,9 +84,40 @@ func (service *Service) Update(ctx context.Context, id int, opts UpdateOptions) 
 	return subscriptionItem(updated), nil
 }
 
-// Remove deletes a subscription; a missing ID surfaces as not found.
+// Remove deletes a subscription; a missing ID surfaces as not found. A work is
+// recorded once under the first actor that found it, so each work of a removed
+// actor moves to another followed actor who has seen it, or is deleted.
 func (service *Service) Remove(ctx context.Context, id int) error {
-	if err := service.database.Subscription.DeleteOneID(id).Exec(ctx); err != nil {
+	if err := ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
+		works, err := tx.Subscription.Query().Where(subscription.OriginIDEQ(id)).All(ctx)
+		if err != nil {
+			return err
+		}
+		if len(works) > 0 {
+			others, err := tx.Subscription.Query().
+				Where(subscription.KindEQ(subscription.KindActor), subscription.IDNEQ(id)).All(ctx)
+			if err != nil {
+				return err
+			}
+			seenBy := make(map[string]int)
+			for _, other := range others {
+				for _, movieID := range decodeCursor(other.Cursor).SeenMovieIDs {
+					seenBy[movieID] = other.ID
+				}
+			}
+			for _, work := range works {
+				if owner, ok := seenBy[work.TargetID]; ok {
+					err = tx.Subscription.UpdateOneID(work.ID).SetOriginID(owner).Exec(ctx)
+				} else {
+					err = tx.Subscription.DeleteOneID(work.ID).Exec(ctx)
+				}
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return tx.Subscription.DeleteOneID(id).Exec(ctx)
+	}); err != nil {
 		return err
 	}
 	service.tasks.NotifyMonitorChanged()

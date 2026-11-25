@@ -3,19 +3,12 @@ import { toast } from 'sonner'
 
 import type { OfflineSubmission } from '@/api/offline'
 import { Spinner } from '@/components/ui/spinner'
-import {
-  isScanTask,
-  isTaskActive,
-  taskKeys,
-  type BatchTask,
-  type ScanTask,
-  type Task
-} from '@/api/tasks'
+import { isScanTask, isTaskActive, taskKeys, type ScanTask, type Task } from '@/api/tasks'
 import { isOfflineTaskActive } from '@/api/offline'
 import { scanStage, scanStatus } from './scan-status'
 import { TaskProgress } from './task-progress'
 import { TaskToastActions } from './task-toast-actions'
-import { batchToastID, offlineToastID, scanToastID } from './task-notification-diff'
+import { offlineToastID, scanToastID } from './task-notification-diff'
 import { downloadStatus } from './download-status'
 
 type TaskToastOptions = {
@@ -153,32 +146,5 @@ export function notifyOfflineTask(
           ? '视频已下载，但尚未识别为对应影片，请在 115 检查文件名和大小后同步媒体库。'
           : '当前媒体目录内未找到该任务的视频文件。'
     })
-  }
-}
-
-export function notifyBatchTask(task: BatchTask, options: TaskToastOptions = {}) {
-  const active = isTaskActive(task)
-  const props = taskToastOptions(
-    batchToastID(task.id),
-    active,
-    options,
-    task.can_retry ? task.id : undefined
-  )
-  const { total, processed, submitted, waiting, failed, failures } = task.batch
-  const summary = `已加入 115 ${submitted} 部 · 等待磁力 ${waiting} 部${failed > 0 ? ` · 失败 ${failed} 部` : ''}`
-  if (active) {
-    toast.info('正在批量入库', {
-      ...props,
-      icon: options.waiting ? undefined : <Spinner />,
-      description: options.waiting ? '等待进度同步' : `${processed} / ${total} 部，${summary}`
-    })
-  } else if (task.status === 'failed') {
-    toast.error('批量入库中断', { ...props, description: task.error })
-  } else {
-    const detail = failures?.length
-      ? `${summary}。失败：${failures.map(item => `${item.code || '未知番号'}（${item.error}）`).join('；')}`
-      : summary
-    const notify = failed > 0 ? toast.warning : toast.success
-    notify('批量入库完成', { ...props, description: detail })
   }
 }

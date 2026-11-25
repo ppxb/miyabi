@@ -1,15 +1,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import type { ScanTask, BatchTask, Task } from '@/api/tasks'
+import type { ScanTask, Task } from '@/api/tasks'
 import type { OfflineSubmission } from '@/api/offline'
 import type { DiffContext } from '@/features/tasks/task-notification-diff'
 import { offlineSubmission } from './fixtures'
 
-import {
-  diffTaskNotifications,
-  scanFingerprint,
-  batchFingerprint
-} from '@/features/tasks/task-notification-diff'
+import { diffTaskNotifications, scanFingerprint } from '@/features/tasks/task-notification-diff'
 
 const dummySource = {
   account_id: 'acc1',
@@ -47,17 +43,14 @@ test('offline failures gain retry actions when their scan arrives later', () => 
   assert.equal(third.actions.length, 0)
 })
 
-for (const kind of ['scan', 'batch', 'offline']) {
+for (const kind of ['scan', 'offline']) {
   test(`${kind} retry results update visible notifications even if active state is missed`, () => {
-    const failed =
-      kind === 'batch'
-        ? makeBatchTask({ status: 'done', can_retry: true, updated_at: '2026-09-28T10:00:00Z' })
-        : makeScanTask({
-            status: 'failed',
-            can_retry: true,
-            updated_at: '2026-09-28T10:00:00Z',
-            ...(kind === 'offline' ? { offline_task_id: 9 } : {})
-          })
+    const failed = makeScanTask({
+      status: 'failed',
+      can_retry: true,
+      updated_at: '2026-09-28T10:00:00Z',
+      ...(kind === 'offline' ? { offline_task_id: 9 } : {})
+    })
     const offline: OfflineSubmission = offlineSubmission({
       task_id: 9,
       scan_task_id: failed.id,
@@ -143,25 +136,6 @@ function makeScanTask(overrides: Partial<ScanTask> = {}): ScanTask {
   }
 }
 
-function makeBatchTask(overrides: Partial<BatchTask> = {}): BatchTask {
-  return {
-    id: 2,
-    type: 'subscription_batch',
-    status: 'running',
-    progress: 50,
-    created_at: '2026-09-28T09:00:00Z',
-    updated_at: '2026-09-28T09:00:00Z',
-    batch: {
-      total: 10,
-      processed: 5,
-      submitted: 5,
-      waiting: 0,
-      failed: 0
-    },
-    ...overrides
-  }
-}
-
 test('fingerprint produces consistent and discriminative strings', () => {
   const t1 = makeScanTask()
   const fp1 = scanFingerprint(t1)
@@ -170,24 +144,13 @@ test('fingerprint produces consistent and discriminative strings', () => {
 
   const t2 = makeScanTask({ progress: 40 })
   assert.notEqual(fp1, scanFingerprint(t2))
-
-  const b1 = makeBatchTask()
-  const bfp1 = batchFingerprint(b1)
-  assert.equal(typeof bfp1, 'string')
-  assert.equal(bfp1, batchFingerprint(b1))
-
-  const b2 = makeBatchTask({
-    batch: { total: 10, processed: 6, submitted: 6, waiting: 0, failed: 0 }
-  })
-  assert.notEqual(bfp1, batchFingerprint(b2))
 })
 
 test('diffTaskNotifications announces new active tasks and tracks them', () => {
   const scanTask = makeScanTask()
-  const batchTask = makeBatchTask()
 
   const result = diffTaskNotifications({
-    tasks: [scanTask, batchTask],
+    tasks: [scanTask],
     activity: { source: dummySource, tasks: [] },
     waiting: false,
     isTasksError: false,
@@ -198,11 +161,10 @@ test('diffTaskNotifications announces new active tasks and tracks them', () => {
     initialized: false
   })
 
-  assert.equal(result.actions.length, 2)
+  assert.equal(result.actions.length, 1)
   assert.equal(result.actions[0]!.type, 'notify_scan')
-  assert.equal(result.actions[1]!.type, 'notify_batch')
   assert.equal(result.dismissIDs.length, 0)
-  assert.equal(result.nextEntries.size, 2)
+  assert.equal(result.nextEntries.size, 1)
 })
 
 test('diffTaskNotifications avoids re-notifying when fingerprint is unchanged', () => {

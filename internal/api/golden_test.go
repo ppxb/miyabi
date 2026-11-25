@@ -181,13 +181,13 @@ type goldenSubscription struct {
 }
 
 func (goldenSubscription) List(context.Context, string, int, int) ([]monitor.Item, error) {
-	taskID, failure, next := 9, "JavDB 暂不可用", goldenTime().Add(time.Hour)
-	last := goldenTime()
+	failure, next := "JavDB 暂不可用", goldenTime().Add(time.Hour)
+	last, origin := goldenTime(), 3
 	return []monitor.Item{
-		{ID: 2, Kind: "movie", TargetID: "movie-upcoming", Code: "SONE-002", Title: "Upcoming", Cover: "https://media.example/upcoming.jpg", ReleaseDate: "2026-10-01",
-			AutoDownload: true, Status: subscription.StatusWaiting, NextCheckAt: &next, LastCheckedAt: &last, Checks: 3, Error: &failure, CreatedAt: goldenTime(), UpdatedAt: goldenTime()},
-		{ID: 1, Kind: "movie", TargetID: "movie-exact", Code: "ABP-123", Title: "Localized title", Cover: "https://media.example/cover.jpg", ReleaseDate: "2026-08-01",
-			AutoDownload: true, Status: subscription.StatusAdded, Hash: "0000000000000000000000000000000000000003", TaskID: &taskID, Checks: 1, CreatedAt: goldenTime(), UpdatedAt: goldenTime()},
+		{ID: 3, Kind: "actor", TargetID: "actor-1", Title: "Actor", Cover: "https://media.example/actor.jpg",
+			Status: subscription.StatusActive, NextCheckAt: &next, LastCheckedAt: &last, Checks: 3, Error: &failure, CreatedAt: goldenTime(), UpdatedAt: goldenTime()},
+		{ID: 2, Kind: "movie", TargetID: "SONE-002", Code: "SONE-002", Title: "Upcoming", Cover: "https://media.example/upcoming.jpg", ReleaseDate: "2026-10-01",
+			OriginID: &origin, Status: subscription.StatusWaiting, CreatedAt: goldenTime(), UpdatedAt: goldenTime()},
 	}, nil
 }
 

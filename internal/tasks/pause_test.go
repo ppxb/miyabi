@@ -34,7 +34,9 @@ func TestLibraryPausePersistsAndPreservesCheckpoints(t *testing.T) {
 		t.Fatalf("pause discarded state: %+v", before)
 	}
 	store.Client.Task.Create().SetType(string(KindScrape)).SetRetryAt(time.Now().Add(time.Second)).SaveX(ctx)
-	batch := store.Client.Task.Create().SetType(string(KindSubscriptionBatch)).SaveX(ctx)
+	// Pausing the library must not hold back a task of any other kind.
+	const otherKind Kind = "other"
+	other := store.Client.Task.Create().SetType(string(otherKind)).SaveX(ctx)
 	svc = NewService(store.Client, NewRegistry())
 	if err := svc.Queue().Recover(ctx, []Kind{KindScan, KindScrape}); err != nil {
 		t.Fatal(err)
@@ -45,8 +47,8 @@ func TestLibraryPausePersistsAndPreservesCheckpoints(t *testing.T) {
 	if next, err := svc.Queue().NextRetry(ctx, []Kind{KindScrape}); err != nil || !next.IsZero() {
 		t.Fatalf("paused retry timer active: %v %v", next, err)
 	}
-	if job, err := svc.Queue().Claim(ctx, []Kind{KindSubscriptionBatch}); err != nil || job == nil || job.ID != batch.ID {
-		t.Fatalf("pause affected submission: %+v %v", job, err)
+	if job, err := svc.Queue().Claim(ctx, []Kind{otherKind}); err != nil || job == nil || job.ID != other.ID {
+		t.Fatalf("pause affected another task kind: %+v %v", job, err)
 	}
 	if err := svc.SetLibraryPaused(ctx, false); err != nil {
 		t.Fatal(err)

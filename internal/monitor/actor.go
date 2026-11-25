@@ -12,9 +12,8 @@ import (
 )
 
 type AddActorOptions struct {
-	Title        string
-	Cover        string
-	AutoDownload *bool
+	Title string
+	Cover string
 }
 
 func (service *Service) existingActor(ctx context.Context, actorID string) (Item, bool, error) {
@@ -64,15 +63,11 @@ func (service *Service) AddActor(ctx context.Context, actorID string, opts AddAc
 	}
 
 	cfg := service.config(ctx)
-	autoDownload := cfg.ActorAutoDownload
-	if opts.AutoDownload != nil {
-		autoDownload = *opts.AutoDownload
-	}
 	now := time.Now()
 	today := now.Format(dateLayout)
 	record, err := service.database.Subscription.Create().
 		SetKind(subscription.KindActor).SetTargetID(actorID).SetTitle(title).SetCover(cover).
-		SetAutoDownload(autoDownload).SetStatus(subscription.StatusActive).
+		SetStatus(subscription.StatusActive).
 		SetCursor(snapshotCursor(movies, today).encode()).SetNextCheckAt(nextDaily(now, cfg.CheckTime)).Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
@@ -102,12 +97,11 @@ func (service *Service) browseActor(ctx context.Context, actorID string) ([]doma
 	return movies, nil
 }
 
-// spawnMovie tracks one work of an actor subscription, inheriting its
-// auto-download setting. Failures are logged; one bad title must not stop
-// the actor check.
+// spawnMovie records one new work of an actor subscription. Failures are
+// logged; one bad title must not stop the actor check.
 func (service *Service) spawnMovie(ctx context.Context, origin *ent.Subscription, movie domain.Movie) {
 	summary := domain.MovieSummary{ID: movie.ID, Code: movie.Code, Title: movie.Title, Cover: movie.Cover, ReleaseDate: movie.ReleaseDate}
-	opts := AddMovieOptions{AutoDownload: &origin.AutoDownload, OriginID: &origin.ID}
+	opts := AddMovieOptions{OriginID: &origin.ID}
 	if _, err := service.addMovie(ctx, summary, opts); err != nil {
 		slog.WarnContext(ctx, "actor subscription could not track a work", "actor", origin.Title, "code", movie.Code, "error", err)
 	}

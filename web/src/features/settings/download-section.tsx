@@ -1,4 +1,4 @@
-import { BellIcon } from 'lucide-react'
+import { DownloadIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { describeApiError } from '@/api/client'
@@ -67,7 +67,7 @@ function PreferenceSelect<T extends string>({
   )
 }
 
-export function SubscriptionSection() {
+export function DownloadSection() {
   const settings = useSubscriptionSettings()
   const update = useUpdateSubscriptionSettings()
   const config = settings.data
@@ -78,7 +78,7 @@ export function SubscriptionSection() {
     update.mutate(
       { ...config, ...patch, preferences: { ...config.preferences, ...preferences } },
       {
-        onSuccess: () => toast.success('订阅与下载设置已保存'),
+        onSuccess: () => toast.success('下载设置已保存'),
         onError: error => {
           toast.error(describeApiError(error))
         }
@@ -87,32 +87,8 @@ export function SubscriptionSection() {
   }
 
   return (
-    <SettingsSection icon={<BellIcon className="size-4" />} title="订阅与下载">
+    <SettingsSection icon={<DownloadIcon className="size-4" />} title="下载">
       {settings.isPending ? <Skeleton className="h-4 w-40" /> : null}
-      <SettingRow
-        title="影片默认自动入库"
-        description="新订阅的影片出现符合偏好的磁力后自动加入 115"
-        inline
-      >
-        <Switch
-          checked={config?.movie_auto_download ?? true}
-          disabled={disabled}
-          onCheckedChange={checked => save({ movie_auto_download: checked })}
-        />
-      </SettingRow>
-
-      <SettingRow
-        title="演员新作默认自动入库"
-        description="演员订阅发现的新作是否默认自动加入 115"
-        inline
-      >
-        <Switch
-          checked={config?.actor_auto_download ?? false}
-          disabled={disabled}
-          onCheckedChange={checked => save({ actor_auto_download: checked })}
-        />
-      </SettingRow>
-
       <SettingRow
         title="自动切换磁力"
         description="下载长时间没有进展时，取消当前下载并尝试下一条符合偏好的磁力"
@@ -125,7 +101,10 @@ export function SubscriptionSection() {
         />
       </SettingRow>
 
-      <SettingRow title="字幕" description="订阅与换源共用；「必须」时只选择符合字幕条件的磁力">
+      <SettingRow
+        title="字幕"
+        description="自动切换磁力时按此挑选；「必须」时只选择符合字幕条件的磁力"
+      >
         <PreferenceSelect
           value={config?.preferences.subtitle ?? 'preferred'}
           options={levelOptions}
@@ -154,7 +133,7 @@ export function SubscriptionSection() {
 
       {settings.isError ? (
         <InlineError onRetry={() => void settings.refetch()} retrying={settings.isFetching}>
-          后端服务暂不可用，无法读取订阅与下载设置。
+          后端服务暂不可用，无法读取下载设置。
         </InlineError>
       ) : null}
     </SettingsSection>

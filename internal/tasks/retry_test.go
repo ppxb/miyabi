@@ -151,7 +151,7 @@ func TestPermanentErrorsAndSubscriptionBatchesAreNotRetried(t *testing.T) {
 	}{
 		{KindScan, domain.E(domain.KindConflict, "ambiguous", nil)},
 		{KindScrape, &domain.HTTPError{StatusCode: 404}},
-		{KindSubscriptionBatch, context.DeadlineExceeded},
+		{Kind("other"), context.DeadlineExceeded},
 	} {
 		job := store.Client.Task.Create().SetType(string(tc.kind)).SetStatus(task.StatusRunning).SaveX(t.Context())
 		if err := svc.Queue().Finish(t.Context(), job.ID, tc.err); err != nil {

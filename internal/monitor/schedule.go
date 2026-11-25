@@ -3,7 +3,6 @@ package monitor
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
@@ -11,10 +10,6 @@ import (
 
 const (
 	dateLayout = "2006-01-02"
-	// Unreleased movies are checked every three days, released ones daily
-	// until they go stale a month after release.
-	preReleaseCheckDays = 3
-	staleAfterDays      = 30
 	// Actor cursors keep the newest IDs and tolerate a month of late indexing
 	// so a delayed listing still counts as new while old backfills do not.
 	seenMovieLimit        = 300
@@ -93,30 +88,6 @@ func (cursor ActorCursor) advance(movies []domain.Movie, today string) ActorCurs
 	return cursor
 }
 
-// nextMovieCheck applies the polling policy at the configured daily time:
-// every three days before release but never past the release day, daily for
-// thirty days from release, then stale. An unparsable release date counts
-// from creation.
-func nextMovieCheck(now time.Time, releaseDate string, createdAt time.Time, checkTime string) (time.Time, bool) {
-	today := startOfDay(now)
-	release, err := time.ParseInLocation(dateLayout, strings.TrimSpace(releaseDate), time.Local)
-	if err != nil {
-		release = createdAt
-	}
-	release = startOfDay(release)
-	if today.Before(release) {
-		next := checkTimeOn(today.AddDate(0, 0, preReleaseCheckDays), checkTime)
-		if releaseAt := checkTimeOn(release, checkTime); releaseAt.After(now) && releaseAt.Before(next) {
-			next = releaseAt
-		}
-		return next, false
-	}
-	if today.After(release.AddDate(0, 0, staleAfterDays)) {
-		return time.Time{}, true
-	}
-	return nextDaily(now, checkTime), false
-}
-
 // nextDaily is the next occurrence of the daily check time after now.
 func nextDaily(now time.Time, checkTime string) time.Time {
 	next := checkTimeOn(now, checkTime)
@@ -134,9 +105,4 @@ func checkTimeOn(day time.Time, checkTime string) time.Time {
 	_, _ = fmt.Sscanf(checkTime, "%d:%d", &hour, &minute)
 	day = day.In(time.Local)
 	return time.Date(day.Year(), day.Month(), day.Day(), hour, minute, 0, 0, time.Local)
-}
-
-func startOfDay(value time.Time) time.Time {
-	value = value.In(time.Local)
-	return time.Date(value.Year(), value.Month(), value.Day(), 0, 0, 0, 0, time.Local)
 }

@@ -21,6 +21,4 @@ type TaskInfo struct {
 	Source        LibrarySource `json:"source"`
 	Scan          ScanProgress  `json:"scan"`
 	OfflineTaskID int           `json:"offline_task_id,omitempty"`
-	// Batch is set for subscription batch tasks, which have no scan payload.
-	Batch *SubscriptionBatch `json:"batch,omitempty"`
 }

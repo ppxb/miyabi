@@ -94,24 +94,9 @@ func OriginID(v int) predicate.Subscription {
 	return predicate.Subscription(sql.FieldEQ(FieldOriginID, v))
 }
 
-// AutoDownload applies equality check predicate on the "auto_download" field. It's identical to AutoDownloadEQ.
-func AutoDownload(v bool) predicate.Subscription {
-	return predicate.Subscription(sql.FieldEQ(FieldAutoDownload, v))
-}
-
 // Cursor applies equality check predicate on the "cursor" field. It's identical to CursorEQ.
 func Cursor(v string) predicate.Subscription {
 	return predicate.Subscription(sql.FieldEQ(FieldCursor, v))
-}
-
-// Hash applies equality check predicate on the "hash" field. It's identical to HashEQ.
-func Hash(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldEQ(FieldHash, v))
-}
-
-// TaskID applies equality check predicate on the "task_id" field. It's identical to TaskIDEQ.
-func TaskID(v int) predicate.Subscription {
-	return predicate.Subscription(sql.FieldEQ(FieldTaskID, v))
 }
 
 // NextCheckAt applies equality check predicate on the "next_check_at" field. It's identical to NextCheckAtEQ.
@@ -609,16 +594,6 @@ func OriginIDNotNil() predicate.Subscription {
 	return predicate.Subscription(sql.FieldNotNull(FieldOriginID))
 }
 
-// AutoDownloadEQ applies the EQ predicate on the "auto_download" field.
-func AutoDownloadEQ(v bool) predicate.Subscription {
-	return predicate.Subscription(sql.FieldEQ(FieldAutoDownload, v))
-}
-
-// AutoDownloadNEQ applies the NEQ predicate on the "auto_download" field.
-func AutoDownloadNEQ(v bool) predicate.Subscription {
-	return predicate.Subscription(sql.FieldNEQ(FieldAutoDownload, v))
-}
-
 // StatusEQ applies the EQ predicate on the "status" field.
 func StatusEQ(v Status) predicate.Subscription {
 	return predicate.Subscription(sql.FieldEQ(FieldStatus, v))
@@ -702,121 +677,6 @@ func CursorEqualFold(v string) predicate.Subscription {
 // CursorContainsFold applies the ContainsFold predicate on the "cursor" field.
 func CursorContainsFold(v string) predicate.Subscription {
 	return predicate.Subscription(sql.FieldContainsFold(FieldCursor, v))
-}
-
-// HashEQ applies the EQ predicate on the "hash" field.
-func HashEQ(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldEQ(FieldHash, v))
-}
-
-// HashNEQ applies the NEQ predicate on the "hash" field.
-func HashNEQ(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldNEQ(FieldHash, v))
-}
-
-// HashIn applies the In predicate on the "hash" field.
-func HashIn(vs ...string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldIn(FieldHash, vs...))
-}
-
-// HashNotIn applies the NotIn predicate on the "hash" field.
-func HashNotIn(vs ...string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldNotIn(FieldHash, vs...))
-}
-
-// HashGT applies the GT predicate on the "hash" field.
-func HashGT(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldGT(FieldHash, v))
-}
-
-// HashGTE applies the GTE predicate on the "hash" field.
-func HashGTE(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldGTE(FieldHash, v))
-}
-
-// HashLT applies the LT predicate on the "hash" field.
-func HashLT(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldLT(FieldHash, v))
-}
-
-// HashLTE applies the LTE predicate on the "hash" field.
-func HashLTE(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldLTE(FieldHash, v))
-}
-
-// HashContains applies the Contains predicate on the "hash" field.
-func HashContains(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldContains(FieldHash, v))
-}
-
-// HashHasPrefix applies the HasPrefix predicate on the "hash" field.
-func HashHasPrefix(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldHasPrefix(FieldHash, v))
-}
-
-// HashHasSuffix applies the HasSuffix predicate on the "hash" field.
-func HashHasSuffix(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldHasSuffix(FieldHash, v))
-}
-
-// HashEqualFold applies the EqualFold predicate on the "hash" field.
-func HashEqualFold(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldEqualFold(FieldHash, v))
-}
-
-// HashContainsFold applies the ContainsFold predicate on the "hash" field.
-func HashContainsFold(v string) predicate.Subscription {
-	return predicate.Subscription(sql.FieldContainsFold(FieldHash, v))
-}
-
-// TaskIDEQ applies the EQ predicate on the "task_id" field.
-func TaskIDEQ(v int) predicate.Subscription {
-	return predicate.Subscription(sql.FieldEQ(FieldTaskID, v))
-}
-
-// TaskIDNEQ applies the NEQ predicate on the "task_id" field.
-func TaskIDNEQ(v int) predicate.Subscription {
-	return predicate.Subscription(sql.FieldNEQ(FieldTaskID, v))
-}
-
-// TaskIDIn applies the In predicate on the "task_id" field.
-func TaskIDIn(vs ...int) predicate.Subscription {
-	return predicate.Subscription(sql.FieldIn(FieldTaskID, vs...))
-}
-
-// TaskIDNotIn applies the NotIn predicate on the "task_id" field.
-func TaskIDNotIn(vs ...int) predicate.Subscription {
-	return predicate.Subscription(sql.FieldNotIn(FieldTaskID, vs...))
-}
-
-// TaskIDGT applies the GT predicate on the "task_id" field.
-func TaskIDGT(v int) predicate.Subscription {
-	return predicate.Subscription(sql.FieldGT(FieldTaskID, v))
-}
-
-// TaskIDGTE applies the GTE predicate on the "task_id" field.
-func TaskIDGTE(v int) predicate.Subscription {
-	return predicate.Subscription(sql.FieldGTE(FieldTaskID, v))
-}
-
-// TaskIDLT applies the LT predicate on the "task_id" field.
-func TaskIDLT(v int) predicate.Subscription {
-	return predicate.Subscription(sql.FieldLT(FieldTaskID, v))
-}
-
-// TaskIDLTE applies the LTE predicate on the "task_id" field.
-func TaskIDLTE(v int) predicate.Subscription {
-	return predicate.Subscription(sql.FieldLTE(FieldTaskID, v))
-}
-
-// TaskIDIsNil applies the IsNil predicate on the "task_id" field.
-func TaskIDIsNil() predicate.Subscription {
-	return predicate.Subscription(sql.FieldIsNull(FieldTaskID))
-}
-
-// TaskIDNotNil applies the NotNil predicate on the "task_id" field.
-func TaskIDNotNil() predicate.Subscription {
-	return predicate.Subscription(sql.FieldNotNull(FieldTaskID))
 }
 
 // NextCheckAtEQ applies the EQ predicate on the "next_check_at" field.

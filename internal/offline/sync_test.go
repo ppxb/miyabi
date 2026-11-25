@@ -81,7 +81,7 @@ func TestOfflineSyncMatchesRemoteInfoHash(t *testing.T) {
 	client.addOffline = func(context.Context, string, string, string) (string, error) {
 		return offlineHashB, nil
 	}
-	added, err := service.Add(t.Context(), "fixture-movie", offlineHashA)
+	added, err := service.AddForAccount(t.Context(), "100", "fixture-movie", offlineHashA)
 	if err != nil {
 		t.Fatal(err)
 	}

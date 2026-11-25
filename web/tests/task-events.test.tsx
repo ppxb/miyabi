@@ -65,12 +65,27 @@ class EventSourceStub {
 
 const running: Task = {
   id: 1,
-  type: 'subscription_batch',
+  type: 'scan',
   status: 'running',
   progress: 0,
   created_at: '',
   updated_at: '',
-  batch: { total: 1, processed: 0, submitted: 0, waiting: 0, failed: 0, failures: [] }
+  source: { account_id: 'acc1', directory: { id: 'dir1', name: 'Movies', path: '/Movies' } },
+  scan: {
+    stage: 'scanning',
+    current_path: '/Movies',
+    directories_discovered: 0,
+    directories_scanned: 0,
+    files_scanned: 0,
+    video_files: 0,
+    matched_files: 0,
+    unmatched_files: 0,
+    movies: 0,
+    removed_files: 0,
+    removed_movies: 0,
+    metadata_total: 0,
+    metadata_completed: 0
+  }
 }
 const done: Task = { ...running, status: 'done', progress: 100 }
 

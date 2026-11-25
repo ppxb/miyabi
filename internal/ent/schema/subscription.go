@@ -33,18 +33,11 @@ func (Subscription) Fields() []ent.Field {
 		field.Int("origin_id").
 			Optional().
 			Nillable(),
-		field.Bool("auto_download").
-			Default(true),
 		field.Enum("status").
 			Values("waiting", "added", "stale", "active", "paused").
 			Default("waiting"),
 		field.String("cursor").
 			Default(""),
-		field.String("hash").
-			Default(""),
-		field.Int("task_id").
-			Optional().
-			Nillable(),
 		field.Time("next_check_at").
 			Optional().
 			Nillable(),

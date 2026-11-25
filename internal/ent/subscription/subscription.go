@@ -32,16 +32,10 @@ const (
 	FieldReleaseDate = "release_date"
 	// FieldOriginID holds the string denoting the origin_id field in the database.
 	FieldOriginID = "origin_id"
-	// FieldAutoDownload holds the string denoting the auto_download field in the database.
-	FieldAutoDownload = "auto_download"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldCursor holds the string denoting the cursor field in the database.
 	FieldCursor = "cursor"
-	// FieldHash holds the string denoting the hash field in the database.
-	FieldHash = "hash"
-	// FieldTaskID holds the string denoting the task_id field in the database.
-	FieldTaskID = "task_id"
 	// FieldNextCheckAt holds the string denoting the next_check_at field in the database.
 	FieldNextCheckAt = "next_check_at"
 	// FieldLastCheckedAt holds the string denoting the last_checked_at field in the database.
@@ -66,11 +60,8 @@ var Columns = []string{
 	FieldCover,
 	FieldReleaseDate,
 	FieldOriginID,
-	FieldAutoDownload,
 	FieldStatus,
 	FieldCursor,
-	FieldHash,
-	FieldTaskID,
 	FieldNextCheckAt,
 	FieldLastCheckedAt,
 	FieldChecks,
@@ -104,12 +95,8 @@ var (
 	DefaultCover string
 	// DefaultReleaseDate holds the default value on creation for the "release_date" field.
 	DefaultReleaseDate string
-	// DefaultAutoDownload holds the default value on creation for the "auto_download" field.
-	DefaultAutoDownload bool
 	// DefaultCursor holds the default value on creation for the "cursor" field.
 	DefaultCursor string
-	// DefaultHash holds the default value on creation for the "hash" field.
-	DefaultHash string
 	// DefaultChecks holds the default value on creation for the "checks" field.
 	DefaultChecks int
 	// ChecksValidator is a validator for the "checks" field. It is called by the builders before save.
@@ -224,11 +211,6 @@ func ByOriginID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldOriginID, opts...).ToFunc()
 }
 
-// ByAutoDownload orders the results by the auto_download field.
-func ByAutoDownload(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldAutoDownload, opts...).ToFunc()
-}
-
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
@@ -237,16 +219,6 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByCursor orders the results by the cursor field.
 func ByCursor(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCursor, opts...).ToFunc()
-}
-
-// ByHash orders the results by the hash field.
-func ByHash(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldHash, opts...).ToFunc()
-}
-
-// ByTaskID orders the results by the task_id field.
-func ByTaskID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldTaskID, opts...).ToFunc()
 }
 
 // ByNextCheckAt orders the results by the next_check_at field.

@@ -35,16 +35,10 @@ type Subscription struct {
 	ReleaseDate string `json:"release_date,omitempty"`
 	// OriginID holds the value of the "origin_id" field.
 	OriginID *int `json:"origin_id,omitempty"`
-	// AutoDownload holds the value of the "auto_download" field.
-	AutoDownload bool `json:"auto_download,omitempty"`
 	// Status holds the value of the "status" field.
 	Status subscription.Status `json:"status,omitempty"`
 	// Cursor holds the value of the "cursor" field.
 	Cursor string `json:"cursor,omitempty"`
-	// Hash holds the value of the "hash" field.
-	Hash string `json:"hash,omitempty"`
-	// TaskID holds the value of the "task_id" field.
-	TaskID *int `json:"task_id,omitempty"`
 	// NextCheckAt holds the value of the "next_check_at" field.
 	NextCheckAt *time.Time `json:"next_check_at,omitempty"`
 	// LastCheckedAt holds the value of the "last_checked_at" field.
@@ -61,11 +55,9 @@ func (*Subscription) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case subscription.FieldAutoDownload:
-			values[i] = new(sql.NullBool)
-		case subscription.FieldID, subscription.FieldOriginID, subscription.FieldTaskID, subscription.FieldChecks:
+		case subscription.FieldID, subscription.FieldOriginID, subscription.FieldChecks:
 			values[i] = new(sql.NullInt64)
-		case subscription.FieldKind, subscription.FieldTargetID, subscription.FieldCode, subscription.FieldTitle, subscription.FieldCover, subscription.FieldReleaseDate, subscription.FieldStatus, subscription.FieldCursor, subscription.FieldHash, subscription.FieldError:
+		case subscription.FieldKind, subscription.FieldTargetID, subscription.FieldCode, subscription.FieldTitle, subscription.FieldCover, subscription.FieldReleaseDate, subscription.FieldStatus, subscription.FieldCursor, subscription.FieldError:
 			values[i] = new(sql.NullString)
 		case subscription.FieldCreatedAt, subscription.FieldUpdatedAt, subscription.FieldNextCheckAt, subscription.FieldLastCheckedAt:
 			values[i] = new(sql.NullTime)
@@ -145,12 +137,6 @@ func (_m *Subscription) assignValues(columns []string, values []any) error {
 				_m.OriginID = new(int)
 				*_m.OriginID = int(value.Int64)
 			}
-		case subscription.FieldAutoDownload:
-			if value, ok := values[i].(*sql.NullBool); !ok {
-				return fmt.Errorf("unexpected type %T for field auto_download", values[i])
-			} else if value.Valid {
-				_m.AutoDownload = value.Bool
-			}
 		case subscription.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
@@ -162,19 +148,6 @@ func (_m *Subscription) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field cursor", values[i])
 			} else if value.Valid {
 				_m.Cursor = value.String
-			}
-		case subscription.FieldHash:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field hash", values[i])
-			} else if value.Valid {
-				_m.Hash = value.String
-			}
-		case subscription.FieldTaskID:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field task_id", values[i])
-			} else if value.Valid {
-				_m.TaskID = new(int)
-				*_m.TaskID = int(value.Int64)
 			}
 		case subscription.FieldNextCheckAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -268,22 +241,11 @@ func (_m *Subscription) String() string {
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
-	builder.WriteString("auto_download=")
-	builder.WriteString(fmt.Sprintf("%v", _m.AutoDownload))
-	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Status))
 	builder.WriteString(", ")
 	builder.WriteString("cursor=")
 	builder.WriteString(_m.Cursor)
-	builder.WriteString(", ")
-	builder.WriteString("hash=")
-	builder.WriteString(_m.Hash)
-	builder.WriteString(", ")
-	if v := _m.TaskID; v != nil {
-		builder.WriteString("task_id=")
-		builder.WriteString(fmt.Sprintf("%v", *v))
-	}
 	builder.WriteString(", ")
 	if v := _m.NextCheckAt; v != nil {
 		builder.WriteString("next_check_at=")

@@ -7,34 +7,6 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 )
 
-func TestNextMovieCheckPolicy(t *testing.T) {
-	now := time.Date(2026, 9, 18, 10, 30, 0, 0, time.Local)
-	at := func(month time.Month, day int) time.Time { return time.Date(2026, month, day, 4, 0, 0, 0, time.Local) }
-	for _, test := range []struct {
-		name    string
-		release string
-		want    time.Time
-		stale   bool
-	}{
-		{"far before release polls in three days at the check time", "2026-10-30", at(9, 21), false},
-		{"just before release polls on release day", "2026-09-20", at(9, 20), false},
-		{"release day polls tomorrow", "2026-09-18", at(9, 19), false},
-		{"day 30 after release still polls", "2026-08-19", at(9, 19), false},
-		{"day 31 after release is stale", "2026-08-18", time.Time{}, true},
-		{"missing date counts from creation", "", at(9, 19), false},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			next, stale := nextMovieCheck(now, test.release, now.AddDate(0, 0, -3), "04:00")
-			if stale != test.stale || !next.Equal(test.want) {
-				t.Fatalf("next=%v stale=%v, want next=%v stale=%v", next, stale, test.want, test.stale)
-			}
-		})
-	}
-	if next, _ := nextMovieCheck(now, "2026-09-18", now, "23:00"); !next.Equal(time.Date(2026, 9, 18, 23, 0, 0, 0, time.Local)) {
-		t.Fatalf("a later check time today is still today, got %v", next)
-	}
-}
-
 func TestNextDaily(t *testing.T) {
 	now := time.Date(2026, 9, 18, 10, 30, 0, 0, time.Local)
 	if got := nextDaily(now, "11:00"); !got.Equal(time.Date(2026, 9, 18, 11, 0, 0, 0, time.Local)) {

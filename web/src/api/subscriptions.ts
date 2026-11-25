@@ -16,10 +16,7 @@ export type SubscriptionItem = {
   cover: string
   release_date?: string
   origin_id?: number
-  auto_download: boolean
   status: SubscriptionStatus
-  hash?: string
-  task_id?: number
   next_check_at?: string
   last_checked_at?: string
   checks: number
@@ -116,7 +113,7 @@ export function useActorFeed(
   })
 }
 
-// Only actors can be subscribed; their new works appear as movie subscriptions.
+// Following an actor records their new works for the follow page.
 export function useAddSubscription() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -124,29 +121,23 @@ export function useAddSubscription() {
       apiPost<SubscriptionItem>('/api/subscriptions', { kind: 'actor', ...payload }),
     onSuccess: item => {
       void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
-      toast.success(`已订阅演员 ${item.title}`, {
-        description: '每天检查一次新作，未发售作品会自动加入影片订阅。'
+      toast.success(`已关注 ${item.title}`, {
+        description: '每天检查一次新作，显示在「关注」页。'
       })
     },
-    meta: { errorTitle: '订阅失败' }
+    meta: { errorTitle: '关注失败' }
   })
 }
 
 export function useUpdateSubscription() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      id,
-      ...patch
-    }: {
-      id: number
-      auto_download?: boolean
-      status?: 'active' | 'paused'
-    }) => apiPatch<SubscriptionItem>(`/api/subscriptions/${id}`, patch),
+    mutationFn: ({ id, ...patch }: { id: number; status?: 'active' | 'paused' }) =>
+      apiPatch<SubscriptionItem>(`/api/subscriptions/${id}`, patch),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
     },
-    meta: { errorTitle: '更新订阅失败' }
+    meta: { errorTitle: '更新关注失败' }
   })
 }
 
@@ -157,15 +148,6 @@ export function useRemoveSubscription() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
     },
-    meta: { errorTitle: '取消订阅失败' }
-  })
-}
-
-export function useBatchEnqueueSubscriptions() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (payload: { ids?: number[]; all?: boolean }) =>
-      apiPost<{ task_id: number }>('/api/subscriptions/enqueue', payload),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
+    meta: { errorTitle: '取消关注失败' }
   })
 }

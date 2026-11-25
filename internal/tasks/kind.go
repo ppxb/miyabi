@@ -4,9 +4,8 @@ package tasks
 type Kind string
 
 const (
-	KindScan              Kind = "scan"
-	KindScrape            Kind = "scrape"
-	KindSubscriptionBatch Kind = "subscription_batch"
+	KindScan   Kind = "scan"
+	KindScrape Kind = "scrape"
 )
 
 // String returns the string representation of the task kind.

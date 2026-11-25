@@ -13,7 +13,6 @@ function SubscriptionsRoute() {
   const navigate = Route.useNavigate()
   return (
     <SubscriptionsPage
-      key={`${search.view}:${search.actorID}:${search.page}:${search.actorPage}`}
       search={search}
       onSearchChange={next => void navigate({ search: next, resetScroll: false })}
     />

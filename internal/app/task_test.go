@@ -1,9 +1,7 @@
 package app
 
 import (
-	"encoding/json"
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -11,7 +9,6 @@ import (
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/library/scrape"
-	"github.com/ppxb/miyabi/internal/monitor"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -99,46 +96,9 @@ func TestTaskListRetainsOlderActiveWorkflows(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	views := &taskViews{Service: fix.Tasks, database: fix.DB, library: fix.Service, monitor: monitor.New(fix.DB, nil, nil, fix.Tasks)}
+	views := &taskViews{Service: fix.Tasks, database: fix.DB, library: fix.Service}
 	items, err := views.List(ctx)
 	if err != nil || len(items) != 21 || items[0].ID != parent.ID || items[0].Status != string(task.StatusQueued) {
 		t.Fatalf("active workflows: %+v err=%v", items, err)
-	}
-}
-
-func TestTaskViewsMergeScanAndBatchActivity(t *testing.T) {
-	fix := libraryFixture(t)
-	ctx := t.Context()
-	batchPayload := json.RawMessage(`{"ids":[1,2],"batch":{"total":2,"processed":1,"waiting":1}}`)
-	oldBatch := fix.DB.Task.Create().SetType("subscription_batch").SetStatus(task.StatusRunning).SetProgress(50).SetPayload(batchPayload).SaveX(ctx)
-	var completed []int
-	for range 7 {
-		row := fix.DB.Task.Create().SetType("subscription_batch").SetStatus(task.StatusDone).SetProgress(100).SetPayload(batchPayload).SaveX(ctx)
-		completed = append(completed, row.ID)
-	}
-	queuedBatch := fix.DB.Task.Create().SetType("subscription_batch").SetPayload(batchPayload).SaveX(ctx)
-	scanPayload, err := tasks.EncodePayload(fix.Payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	runningScan := fix.DB.Task.Create().SetType("scan").SetStatus(task.StatusRunning).SetPayload(scanPayload).SaveX(ctx)
-	views := &taskViews{Service: fix.Tasks, database: fix.DB, library: fix.Service, monitor: monitor.New(fix.DB, nil, nil, fix.Tasks)}
-	items, err := views.List(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []int{runningScan.ID, oldBatch.ID, queuedBatch.ID, fix.Queued.ID, completed[6], completed[5], completed[4], completed[3]}
-	var ids []int
-	for _, item := range items {
-		ids = append(ids, item.ID)
-	}
-	if !slices.Equal(ids, want) {
-		t.Fatalf("merged task order=%v want=%v", ids, want)
-	}
-	if batch := items[1]; batch.Batch == nil || batch.Batch.Total != 2 || batch.Batch.Processed != 1 || batch.Progress != 50 {
-		t.Fatalf("batch progress lost: %+v", batch)
-	}
-	if items[0].Source != fix.Payload.Source || items[0].Batch != nil {
-		t.Fatalf("scan identity changed: %+v", items[0])
 	}
 }

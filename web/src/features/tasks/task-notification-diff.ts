@@ -1,9 +1,5 @@
 import { isOfflineTaskActive, type OfflineActivity, type OfflineSubmission } from '@/api/offline'
-import { isScanTask, isTaskActive, type BatchTask, type ScanTask, type Task } from '@/api/tasks'
-
-function isBatchTask(task: Task): task is BatchTask {
-  return task.type === 'subscription_batch'
-}
+import { isScanTask, isTaskActive, type ScanTask, type Task } from '@/api/tasks'
 
 export type NotificationEntry = {
   active: boolean
@@ -26,7 +22,6 @@ export type DiffContext = {
 
 export type NotificationAction =
   | { type: 'notify_scan'; id: string; task: ScanTask; waiting: boolean }
-  | { type: 'notify_batch'; id: string; task: BatchTask; waiting: boolean }
   | {
       type: 'notify_offline'
       id: string
@@ -45,14 +40,8 @@ export const scanToastID = (id: number) => `scan:${id}`
 
 export const offlineToastID = (id: number) => `offline:${id}`
 
-export const batchToastID = (id: number) => `batch:${id}`
-
 export function scanFingerprint(task: ScanTask): string {
   return `${task.status}|${task.progress}|${task.error ?? ''}|${task.scan.stage}|${task.scan.movies}|${task.scan.metadata_total}|${task.scan.metadata_completed}|${task.scan.metadata_retrying ?? 0}|${task.scan.metadata_failed ?? 0}|${task.retry_at ?? ''}|${task.updated_at}|${!!task.can_retry}|${!!task.paused}`
-}
-
-export function batchFingerprint(task: BatchTask): string {
-  return `${task.status}|${task.progress}|${task.error ?? ''}|${task.batch.processed}|${task.batch.failed}|${task.updated_at}|${!!task.can_retry}`
 }
 
 /** Whether a changed entry should raise a toast (active or terminal transition). */
@@ -70,7 +59,6 @@ export function diffTaskNotifications(ctx: DiffContext): DiffResult {
   const waitingForOffline = ctx.waiting || ctx.isActivityError
 
   const scans = ctx.tasks.filter(isScanTask)
-  const batches = ctx.tasks.filter(isBatchTask)
 
   for (const task of scans) {
     if (task.offline_task_id) {
@@ -86,19 +74,6 @@ export function diffTaskNotifications(ctx: DiffContext): DiffResult {
     if (old?.fingerprint !== fp && shouldNotify(id, active, old)) {
       // A retry may finish between polls; refresh its visible terminal result too.
       actions.push({ type: 'notify_scan', id, task, waiting: waitingForScan })
-    }
-  }
-
-  for (const task of batches) {
-    const id = batchToastID(task.id)
-    const active = isTaskActive(task)
-    const fp = `${batchFingerprint(task)}|${waitingForScan}`
-    const entry: NotificationEntry = { active, fingerprint: fp }
-    nextEntries.set(id, entry)
-
-    const old = ctx.previous.get(id)
-    if (old?.fingerprint !== fp && shouldNotify(id, active, old)) {
-      actions.push({ type: 'notify_batch', id, task, waiting: waitingForScan })
     }
   }
 

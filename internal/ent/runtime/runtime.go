@@ -469,20 +469,12 @@ func init() {
 	subscriptionDescReleaseDate := subscriptionFields[5].Descriptor()
 	// subscription.DefaultReleaseDate holds the default value on creation for the release_date field.
 	subscription.DefaultReleaseDate = subscriptionDescReleaseDate.Default.(string)
-	// subscriptionDescAutoDownload is the schema descriptor for auto_download field.
-	subscriptionDescAutoDownload := subscriptionFields[7].Descriptor()
-	// subscription.DefaultAutoDownload holds the default value on creation for the auto_download field.
-	subscription.DefaultAutoDownload = subscriptionDescAutoDownload.Default.(bool)
 	// subscriptionDescCursor is the schema descriptor for cursor field.
-	subscriptionDescCursor := subscriptionFields[9].Descriptor()
+	subscriptionDescCursor := subscriptionFields[8].Descriptor()
 	// subscription.DefaultCursor holds the default value on creation for the cursor field.
 	subscription.DefaultCursor = subscriptionDescCursor.Default.(string)
-	// subscriptionDescHash is the schema descriptor for hash field.
-	subscriptionDescHash := subscriptionFields[10].Descriptor()
-	// subscription.DefaultHash holds the default value on creation for the hash field.
-	subscription.DefaultHash = subscriptionDescHash.Default.(string)
 	// subscriptionDescChecks is the schema descriptor for checks field.
-	subscriptionDescChecks := subscriptionFields[14].Descriptor()
+	subscriptionDescChecks := subscriptionFields[11].Descriptor()
 	// subscription.DefaultChecks holds the default value on creation for the checks field.
 	subscription.DefaultChecks = subscriptionDescChecks.Default.(int)
 	// subscription.ChecksValidator is a validator for the "checks" field. It is called by the builders before save.
