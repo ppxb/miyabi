@@ -10,10 +10,18 @@
 
 ## P0 · 流程跑不通或结果不对（优先修复）
 
-- [ ] 🔴 ✅ **本地源"自动刮削"模式必然失败**：本地 scrape 任务的 `Source.AccountID` 为 `local`，但刮削无条件走 115 会话，查不到账号即返回 `ErrUnauthorized`，影片被标 Failed。
+- [x] 🔴 ✅ **本地源"自动刮削"模式必然失败**：本地 scrape 任务的 `Source.AccountID` 为 `local`，但刮削无条件走 115 会话，查不到账号即返回 `ErrUnauthorized`。另外本地文件行的 `root_id` 固定为 `local`，而任务里的 `Source.Directory.ID` 是目录路径，`database.LibraryFiles(source)` 匹配不到文件，`Finished` 也就标不了 Failed：影片一直停在 Pending，每次扫描都再排一个必败任务。
   - 链路：`internal/library/library.go:351`（`StartLocalSourceScanModeIncremental`）→ `internal/library/local.go:154`（入队 scrape）→ `internal/library/scrape/scrape.go:146`（`drive.OpenSource`）→ `internal/drive/session.go:44`
-  - 现有测试只覆盖到入队这一步。
-  - 改法：给本地源单独做刮削路径（只取元数据、只导出本地文件）；或先在入队时禁用该模式。
+  - （已修复：本地影片既入 Miyabi 库，也导出到 Emby 目录）
+    - `scrape/scrape.go`：本地源不开 115 会话，事务改用 `ent.WithTx`；新增 `movieFiles`，本地按账号划定文件范围，`prepareMetadata`、`Finished` 都改用它，失败时能正确标 Failed。
+    - `scrape/publish.go`：新增 `publishLocal`，写元数据、封面、Done 状态并导出 .strm/NFO/封面；115 发布的落库加通知事务抽成共用的 `commitPublished`。两种情况只入库不导出：影片同时有 115 文件（Emby 目录归 115 导出）、影片文件本身在 Emby 目录内（避免把用户的 .strm 改成指向自己）；不导出时保留原 `MetadataSnapshot`。
+    - `api/router.go`：`/api/strm/play/` 遇到 `local-` 前缀的文件 ID 时转给 `localStreamHandler` 读硬盘（支持 Range，令牌策略相同），.strm 格式、`RewriteSTRM` 不变。
+    - `scan/local_ingest.go`：Emby 目录回导时，.strm 内容解析出的 `local-` ID 只当引用，不把视频行的 path 改写到 .strm 上。
+    - `domain/source.go`：新增 `LocalFileIDPrefix`。
+    - 测试：`internal/app/local_scrape_test.go`（本地扫描 → 刮削 → 导出 → Emby 回导全流程；Emby 目录内的本地源不被重导出）、`internal/api/strm_test.go`（`TestSTRMLocalFileIDStreamsFromDisk`）。两处保护都做过反向验证。
+  - 遗留（低）：
+    - 本地扫描在发布期间并发新增分盘时，可能漏导一个 cd，下次扫描补上。
+    - 数据库为空、先回导 Emby 目录时，.strm 会短暂自建一条本地行；同次启动随后的本地源扫描会纠正。
 - [ ] 🔴 ✅ **播放直链缓存键缺 UA 和授权版本，且不淘汰**：`internal/playback/files.go:278` 的键为 `accountID + "|" + pickCode`；`internal/playback/service.go:42` 的 `urlCache` 只写不删。115 直链与 UA 绑定，换设备或重新登录后 2 分钟内可能拿到失效地址，浏览器被 302 到 CDN 后播放失败（`internal/playback/proxy.go:21`）。
   - 对比：`internal/strm/relay.go:47` 的键包含授权版本和 UA，并按签名过期时间、容量上限、singleflight 管理。
   - 改法：与 P2 的"两套 115 直链解析"一并收敛，缓存键统一包含授权版本和 UA。
