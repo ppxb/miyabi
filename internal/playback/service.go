@@ -82,7 +82,11 @@ func (service *Service) cachedDownloadURL(key string) (string, bool) {
 	service.urlMu.Lock()
 	defer service.urlMu.Unlock()
 	entry, ok := service.urlCache[key]
-	if !ok || time.Now().After(entry.expires) {
+	if !ok {
+		return "", false
+	}
+	if time.Now().After(entry.expires) {
+		delete(service.urlCache, key)
 		return "", false
 	}
 	return entry.address, true

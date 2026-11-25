@@ -248,6 +248,7 @@ func (service *Service) PrimaryFile(ctx context.Context, movieID int) (PrimaryFi
 
 // playSourceSession is the subset of a drive session needed to resolve media.
 type playSourceSession interface {
+	AuthorizationVersion() uint64
 	DownloadURL(ctx context.Context, pickCode, userAgent string) (string, error)
 	PlayURL(ctx context.Context, pickCode, userAgent string) ([]pan.PlaySource, error)
 }
@@ -273,9 +274,11 @@ func mediaSpecs(ctx context.Context, sess playSourceSession, pickCode, userAgent
 
 // resolveSpecs prefers a recently resolved 115 direct URL so reopening the same
 // file starts without another round trip. Only direct mp4 URLs are cached;
-// transcoded HLS is always re-resolved.
+// transcoded HLS is always re-resolved. 115 binds a direct URL to the user agent
+// that requested it, and a new login re-authorizes the account, so both are part
+// of the key (as in the STRM relay).
 func (service *Service) resolveSpecs(ctx context.Context, sess playSourceSession, accountID, pickCode, userAgent string) ([]mediaSpec, error) {
-	key := accountID + "|" + pickCode
+	key := fmt.Sprintf("%d:%q:%q:%q", sess.AuthorizationVersion(), accountID, pickCode, strings.TrimSpace(userAgent))
 	if address, ok := service.cachedDownloadURL(key); ok {
 		return []mediaSpec{{address: address, mediaType: "video/mp4", label: "原画"}}, nil
 	}

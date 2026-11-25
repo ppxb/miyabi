@@ -22,9 +22,15 @@
   - 遗留（低）：
     - 本地扫描在发布期间并发新增分盘时，可能漏导一个 cd，下次扫描补上。
     - 数据库为空、先回导 Emby 目录时，.strm 会短暂自建一条本地行；同次启动随后的本地源扫描会纠正。
-- [ ] 🔴 ✅ **播放直链缓存键缺 UA 和授权版本，且不淘汰**：`internal/playback/files.go:278` 的键为 `accountID + "|" + pickCode`；`internal/playback/service.go:42` 的 `urlCache` 只写不删。115 直链与 UA 绑定，换设备或重新登录后 2 分钟内可能拿到失效地址，浏览器被 302 到 CDN 后播放失败（`internal/playback/proxy.go:21`）。
-  - 对比：`internal/strm/relay.go:47` 的键包含授权版本和 UA，并按签名过期时间、容量上限、singleflight 管理。
-  - 改法：与 P2 的"两套 115 直链解析"一并收敛，缓存键统一包含授权版本和 UA。
+- [x] 🟠 ✅ **播放直链缓存键缺 UA 和授权版本，且不淘汰**（复核后由 🔴 降为 🟠）：`internal/playback/files.go:278` 的键为 `accountID + "|" + pickCode`。115 直链与 UA 绑定（依据代码推断：取直链时原样透传浏览器 UA、连空 UA 都特意保留，`internal/pan/play.go:29`、`internal/pan/client.go:256`；未用真实账号验证），浏览器随后被 302 直连 CDN（`internal/playback/proxy.go:33`）。
+  - 实际影响：只有不同浏览器或设备在 2 分钟内播放同一 115 文件时，后打开的一方拿到别人 UA 的直链而播放失败，2 分钟后恢复。
+  - 另外两点影响很小：命中缓存前仍会打开 115 会话、校验文件归属，权限没有被绕过；过期条目原先读到时只忽略不删，每个文件残留一条小记录。
+  - 对比：`internal/strm/relay.go:47` 的键包含授权版本和 UA。
+  - （已修复：最小方案）
+    - `playback/files.go`：`playSourceSession` 增加 `AuthorizationVersion()`，缓存键改为 `授权版本:账号:pickCode:UA`，与 STRM 中转一致。
+    - `playback/service.go`：`cachedDownloadURL` 读到过期条目时从 map 删除。
+    - 测试：`internal/playback/files_test.go` 新增 `TestResolveSpecsCacheIsScopedToUserAgentAndAuthorization`（换 UA、换授权版本都不命中缓存，过期条目被删除），两处改动都做过反向验证。
+  - 遗留：两套 115 直链解析的收敛仍见 P2 第 1 条。
 - [ ] 🟠 **开了访问密码但未配 `MIYABI_STRM_TOKEN` 时 MPV/STRM 返回 401**：`internal/api/mpv_link.go:28` 的 `withToken` 在 token 为空时原样返回 URL；`internal/api/strm.go:63` 开了门禁时只认 cookie，外部播放器带不了 cookie。前端仍显示 MPV 入口。
   - 改法：启动时校验（开门禁必须配 token），或 token 为空时 `/api/mpv-link` 返回明确错误。
 - [ ] 🟠 **扫描任务复用不区分模式**：`internal/library/workflow.go:209` 的 `ensureScanTask` 只按"来源 + 是否重建"复用，不比较 `incremental` / `metadataOnly`。启动排上增量同步后，用户手动点"扫描"拿到的仍是增量任务。
