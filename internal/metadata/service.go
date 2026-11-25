@@ -71,11 +71,11 @@ func New(ctx context.Context, db *ent.Client, sources ...Source) (*Service, erro
 func sourceOrder(id string) int {
 	switch id {
 	case "fanza":
-		return -1
+		return -2
 	case "javdb":
-		return 1
+		return -1
 	case "freejavbt":
-		return 2
+		return 1
 	default:
 		return 0
 	}
@@ -112,9 +112,9 @@ func (s *Service) UpdateSettings(ctx context.Context, settings []domain.SourceTo
 	return nil
 }
 
-// Resolve checks each identity layer across sources. JavDB is always queried
-// for catalogue identities; official sources supply artwork and missing fields.
-// A network failure never permits a weaker identity.
+// Resolve queries every enabled source for each identity layer concurrently and
+// merges the collected results in source order. No source is privileged; a
+// network failure never permits a weaker identity.
 func (s *Service) Resolve(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
 	return s.resolve(ctx, ref, nil)
 }
@@ -138,32 +138,61 @@ func (s *Service) resolve(ctx context.Context, ref domain.MovieRef, skip map[str
 	var failedSources []string
 	answered := false
 	for _, layer := range codeid.Layers(ref.Code) {
-		var results []domain.MovieMetadata
-		var confirmedCode string
-		for _, setting := range settings {
+		// Query every enabled source for this layer concurrently, then merge the
+		// collected results in source order. Waiting for all sources keeps latency
+		// near the slowest single source instead of summing them; fetch already
+		// bounds concurrency via singleflight + a capacity semaphore.
+		type outcome struct {
+			id     string
+			result domain.MovieMetadata
+			err    error
+			used   bool
+		}
+		outcomes := make([]outcome, len(settings))
+		var wg sync.WaitGroup
+		for i, setting := range settings {
 			if !setting.Enabled || skip[setting.ID] {
 				continue
 			}
-			result, err := s.resolveLayer(ctx, s.sources[setting.ID], ref, layer)
-			if err != nil {
-				if errors.Is(err, ErrNotFound) {
+			source := s.sources[setting.ID]
+			if source == nil {
+				continue
+			}
+			outcomes[i] = outcome{id: setting.ID, used: true}
+			wg.Add(1)
+			go func(index int, source Source) {
+				defer wg.Done()
+				result, err := s.resolveLayer(ctx, source, ref, layer)
+				outcomes[index].result = result
+				outcomes[index].err = err
+			}(i, source)
+		}
+		wg.Wait()
+		var results []domain.MovieMetadata
+		var confirmedCode string
+		for _, item := range outcomes {
+			if !item.used {
+				continue
+			}
+			if item.err != nil {
+				if errors.Is(item.err, ErrNotFound) {
 					answered = true
 				} else {
-					failures = append(failures, fmt.Errorf("%s: %w", setting.ID, err))
-					if !slices.Contains(failedSources, setting.ID) {
-						failedSources = append(failedSources, setting.ID)
+					failures = append(failures, fmt.Errorf("%s: %w", item.id, item.err))
+					if !slices.Contains(failedSources, item.id) {
+						failedSources = append(failedSources, item.id)
 					}
 				}
 				continue
 			}
-			if code := result.Detail.Code; code != "" {
+			if code := item.result.Detail.Code; code != "" {
 				if confirmedCode == "" {
 					confirmedCode = code
 				} else if !codeid.IsFormatEquivalent(confirmedCode, code) {
 					return domain.MovieMetadata{}, domain.E(domain.KindConflict, "来源匹配到了不同影片，无法自动合并", nil)
 				}
 			}
-			results = append(results, result)
+			results = append(results, item.result)
 		}
 		var merged domain.MovieMetadata
 		if len(results) > 0 {
@@ -220,6 +249,9 @@ func (s *Service) resolveLayer(ctx context.Context, source Source, ref domain.Mo
 	return matched, nil
 }
 
+// attachSourceIdentity surfaces the JavDB catalogue id when a JavDB source is
+// present (some callers rely on it); otherwise the movie id stays empty. JavDB
+// is optional: when absent, nothing breaks.
 func attachSourceIdentity(result domain.MovieMetadata) domain.MovieMetadata {
 	result.Detail.ID = ""
 	for _, source := range result.Detail.Sources {
@@ -266,7 +298,13 @@ func (s *Service) fetch(ctx context.Context, source Source, ref domain.MovieRef)
 		s.mu.Unlock()
 		defer s.wg.Done()
 		// Bound shared requests independently of one caller leaving a detail dialog.
-		queryCtx, cancel := context.WithTimeout(s.ctx, 25*time.Second)
+		// JavDB is prone to risk-control stalls, so give it a shorter timeout: with
+		// concurrent sources a slow JavDB no longer blocks the others.
+		timeout := 25 * time.Second
+		if source.ID() == "javdb" {
+			timeout = 8 * time.Second
+		}
+		queryCtx, cancel := context.WithTimeout(s.ctx, timeout)
 		defer cancel()
 		entry, err := s.db.MetadataCache.Query().Where(metadatacache.ProviderEQ(source.ID()), metadatacache.CodeEQ(code)).Only(queryCtx)
 		if err != nil && !ent.IsNotFound(err) {

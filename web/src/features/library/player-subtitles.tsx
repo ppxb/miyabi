@@ -48,6 +48,24 @@ const combineCues = (results: UseQueryResult<SubtitlePlayerCue[]>[]) => ({
   data: results.map(result => result.data)
 })
 
+// The add effect must only re-run when the tracks or their cue content actually
+// change. `cues.data` and `tracks` get fresh array identities on every render,
+// so depending on them directly would tear down and re-add the subtitle tracks
+// on each parent re-render (e.g. when the caption choice state updates), which
+// drops the current selection and breaks turning subtitles back on. A compact
+// signature keeps the effect stable across renders while still reacting to real
+// changes.
+function cueSignature(tracks: SubtitleTrack[], data: (SubtitlePlayerCue[] | undefined)[]) {
+  return tracks
+    .map((track, index) => {
+      const cues = data[index]
+      const first = cues?.[0]
+      const last = cues?.[cues.length - 1]
+      return `${track.id}:${cues ? cues.length : -1}:${first?.startTime ?? ''}:${last?.endTime ?? ''}`
+    })
+    .join('|')
+}
+
 /**
  * Adds a movie's subtitle tracks to the player so the built-in captions button
  * and menu list them. Without a saved choice the first track is shown. Changing
@@ -81,6 +99,8 @@ export function PlayerSubtitles({
   // Selecting a track needs the store attached to the media, which happens a
   // commit after mount; a known duration means the media is attached.
   const attached = usePlayer(state => Number.isFinite(state.duration) && state.duration > 0)
+
+  const cueKey = cueSignature(tracks, cues.data)
 
   useEffect(() => {
     if (!cues.settled || !attached) return
@@ -116,7 +136,10 @@ export function PlayerSubtitles({
         }
       }
     }
-  }, [player, tracks, cues.settled, cues.data, offset, attached])
+    // cueKey/offset/attached stand in for tracks & cues so the effect only
+    // re-runs on real changes, not on every render's new array identities.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player, cueKey, offset, attached, cues.settled])
 
   const showing = usePlayer(
     state =>

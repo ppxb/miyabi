@@ -7,6 +7,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/ent/movie"
 )
 
 // Magnets returns the aggregated magnet list with URIs for the API.
@@ -38,8 +39,14 @@ func (service *Service) CatalogueMagnetsByCode(ctx context.Context, code string)
 		return nil, nil
 	}
 	key := "code:" + code
+	// Use the persisted JavDB source id (captured during scrape) when the code is
+	// already in the library, so the JavDB magnet source can participate here too.
+	ref := domain.MovieRef{Code: code}
+	if record, err := service.database.Movie.Query().Where(movie.CodeEQ(code)).Only(ctx); err == nil && record.Metadata != nil {
+		ref.JavdbID = record.Metadata.SourceID(domain.MagnetSourceJavDB)
+	}
 	magnets, err := cachedJavDB(ctx, service, service.magnets, key, func(ctx context.Context) ([]domain.Magnet, error) {
-		magnets, partial, err := service.aggregator.FindDetailed(ctx, domain.MovieRef{Code: code})
+		magnets, partial, err := service.aggregator.FindDetailed(ctx, ref)
 		if err != nil {
 			return nil, err
 		}
@@ -84,12 +91,16 @@ func (service *Service) cachedMagnets(ctx context.Context, movieID string) ([]do
 	magnets, err := cachedJavDB(ctx, service, service.magnets, movieID, func(ctx context.Context) ([]domain.Magnet, error) {
 		ref := domain.MovieRef{}
 		detailFailed := false
-		if service.sukebei != nil || service.javbus != nil {
-			if detail, err := service.CatalogueDetail(ctx, movieID); err == nil {
-				ref.Code, ref.Zone = detail.Code, detail.Zone
-			} else {
-				detailFailed = true
+		if detail, err := service.CatalogueDetail(ctx, movieID); err == nil {
+			ref.Code, ref.Zone = detail.Code, detail.Zone
+			// The detail's JavDB source id lets the JavDB magnet source participate.
+			for _, source := range detail.Sources {
+				if source.Provider == domain.MagnetSourceJavDB && source.ID != "" {
+					ref.JavdbID = source.ID
+				}
 			}
+		} else {
+			detailFailed = true
 		}
 		magnets, partial, err := service.aggregator.FindDetailed(ctx, ref)
 		if err != nil {

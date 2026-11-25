@@ -28,6 +28,9 @@ export function MovieHero({
               {movie.code}
             </Badge>
             {libraryStatus && movie.has_subtitle ? <Badge variant="outline">中文</Badge> : null}
+            {libraryStatus && (movie.has_uncensored || movie.has_cracked) ? (
+              <Badge variant="outline">无码</Badge>
+            ) : null}
             {libraryStatus ? (
               <Badge variant={libraryStatus === 'done' ? 'library' : 'secondary'}>
                 {{ done: '已入库', pending: '待刮削', failed: '刮削失败' }[libraryStatus]}
