@@ -206,8 +206,11 @@ func scanTaskInfo(record *ent.Task) (domain.TaskInfo, error) {
 }
 
 // ensureScanTask finds an existing reusable scan task for the source or creates a new queued scan.
+// A queued scan takes the requested mode, widening incremental to full but never
+// narrowing it. A running scan is reused only when its work covers the request.
+// Callers hold the queue lock, so a queued scan cannot be claimed meanwhile.
 func ensureScanTask(ctx context.Context, taskClient *ent.TaskClient, source domain.LibrarySource, rebuild, metadataOnly, incremental bool, reusable ...task.Status) (*ent.Task, error) {
-	record, err := taskClient.Query().Where(
+	records, err := taskClient.Query().Where(
 		task.TypeEQ(string(tasks.KindScan)), task.StatusIn(reusable...),
 		func(selector *sql.Selector) {
 			if rebuild {
@@ -220,12 +223,35 @@ func ensureScanTask(ctx context.Context, taskClient *ent.TaskClient, source doma
 				sqljson.ValueEQ(task.FieldPayload, source.Directory.ID, sqljson.Path("source", "directory", "id")),
 			))
 		},
-	).First(ctx)
-	if err == nil {
-		return record, nil
-	}
-	if !ent.IsNotFound(err) {
+	).Order(ent.Asc(task.FieldID)).All(ctx)
+	if err != nil {
 		return nil, fmt.Errorf("find active scan: %w", err)
+	}
+	for _, record := range records {
+		existing, err := tasks.DecodePayload[domain.ScanPayload](record.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("read scan task %d: %w", record.ID, err)
+		}
+		if record.Status != task.StatusQueued {
+			if existing.MetadataOnly == metadataOnly && (incremental || !existing.Incremental) {
+				return record, nil
+			}
+			continue
+		}
+		widened := existing.Incremental && incremental
+		if existing.MetadataOnly == metadataOnly && existing.Incremental == widened {
+			return record, nil
+		}
+		existing.MetadataOnly, existing.Incremental = metadataOnly, widened
+		encoded, err := tasks.EncodePayload(existing)
+		if err != nil {
+			return nil, err
+		}
+		updated, err := record.Update().SetPayload(encoded).Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("update queued scan %d: %w", record.ID, err)
+		}
+		return updated, nil
 	}
 	payload, err := tasks.EncodePayload(domain.ScanPayload{
 		Source: source, Rebuild: rebuild, MetadataOnly: metadataOnly, Incremental: incremental,
@@ -234,7 +260,7 @@ func ensureScanTask(ctx context.Context, taskClient *ent.TaskClient, source doma
 	if err != nil {
 		return nil, err
 	}
-	record, err = taskClient.Create().SetType(string(tasks.KindScan)).SetPayload(payload).Save(ctx)
+	record, err := taskClient.Create().SetType(string(tasks.KindScan)).SetPayload(payload).Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("queue library scan: %w", err)
 	}

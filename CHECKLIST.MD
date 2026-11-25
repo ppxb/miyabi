@@ -39,8 +39,13 @@
     - `README.md`：`MIYABI_STRM_TOKEN` 默认值改为"空，开启门禁时由访问密码派生固定 Token"。
     - 测试：`internal/config/config_test.go` 新增 `TestLoadDerivesSTRMTokenForProtectedAccess`（派生稳定、不同密码不同、显式配置优先、未开门禁为空）；开门禁时凭 token 放行已有 `internal/api/strm_test.go` 覆盖。
   - 说明：派生 token 会明文写进 .strm 文件，能读媒体目录者可凭它播放（不能登录或管理），与手动配置 token 相同。
-- [ ] 🟠 **扫描任务复用不区分模式**：`internal/library/workflow.go:209` 的 `ensureScanTask` 只按"来源 + 是否重建"复用，不比较 `incremental` / `metadataOnly`。启动排上增量同步后，用户手动点"扫描"拿到的仍是增量任务。
-  - 改法：把这两个标志加进匹配条件。
+- [x] 🟠 ✅ **扫描任务复用不区分模式**：`internal/library/workflow.go:209` 的 `ensureScanTask` 只按"来源 + 是否重建"复用，不比较 `Incremental` / `MetadataOnly`。`Incremental` 只对 115 源生效（`internal/library/scan/reconcile.go:188`，增量只给 Pending 影片排刮削），`MetadataOnly` 只对本地源生效（`internal/library/local.go:141`）。
+  - 实际影响（只在同源扫描排队或运行的窗口内）：
+    - 启动增量同步（`internal/library/library.go:362`）期间手动点"扫描"（`library.go:234`），复用了增量任务，全量扫描该做的修复（已完成影片换文件、加分盘、封面缺失）静默不做。
+    - 刚改本地源刮削模式并保存，这一轮仍按旧模式执行；改成"仅使用本地数据"后仍会发起刚关掉的在线刮削。
+  - （已修复：可复用的任务必须覆盖请求的全部工作，否则按最新请求处理）
+    - `library/workflow.go`：排队中的同源任务直接改为请求的模式（`MetadataOnly` 以最新为准，`Incremental` 只从增量放宽为全量、不会收窄），不重复排任务、不重复遍历 115 目录；正在运行的任务只有 `MetadataOnly` 相同且（它是全量或请求就是增量）时才复用，否则新排一个排队任务（扫描池只有 1 个 worker，会在当前任务后执行）。调用方持有队列锁，排队任务在改写期间不会被领取。
+    - 测试：`internal/library/scan_reuse_test.go` 新增 `TestScanReuseRespectsRequestedMode`（排队增量被全量请求放宽且不被收窄回去、运行中的增量不顶替全量、运行中的全量覆盖增量、本地模式以最新设置为准、运行中的旧模式不被复用），换回旧行为后三个子测试全部失败。
 - [ ] 🟠 **已完成影片重新刮削时被降级为 Pending，失败后变 Failed**：`internal/library/scrape/mapping.go:263` 的 `SaveMovieMetadata` 固定设 Pending；`internal/library/scrape/scrape.go:202` 对已完成影片也重存同一份文档；`publish.go` 里又 `SetMetadata` 一次，元数据写两次。
   - 改法：已完成且非重建时跳过保存；状态由调用方决定。
 - [ ] 🟠 **Emby 目录以外的通知永远清不掉**：`internal/emby/notifications.go:291` 的 `enqueueNotification` 不检查路径是否在 LocalDir 下；路径不匹配时只累加重试次数，记录永不删除，最长每 5 分钟重试。MediaPath 为空时原始本地路径会直接发给 Emby（`internal/emby/service.go:231`）。
