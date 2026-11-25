@@ -453,28 +453,36 @@ func init() {
 	subscriptionDescTargetID := subscriptionFields[1].Descriptor()
 	// subscription.TargetIDValidator is a validator for the "target_id" field. It is called by the builders before save.
 	subscription.TargetIDValidator = subscriptionDescTargetID.Validators[0].(func(string) error)
+	// subscriptionDescFanzaID is the schema descriptor for fanza_id field.
+	subscriptionDescFanzaID := subscriptionFields[2].Descriptor()
+	// subscription.DefaultFanzaID holds the default value on creation for the fanza_id field.
+	subscription.DefaultFanzaID = subscriptionDescFanzaID.Default.(string)
+	// subscriptionDescJavdbID is the schema descriptor for javdb_id field.
+	subscriptionDescJavdbID := subscriptionFields[3].Descriptor()
+	// subscription.DefaultJavdbID holds the default value on creation for the javdb_id field.
+	subscription.DefaultJavdbID = subscriptionDescJavdbID.Default.(string)
 	// subscriptionDescCode is the schema descriptor for code field.
-	subscriptionDescCode := subscriptionFields[2].Descriptor()
+	subscriptionDescCode := subscriptionFields[4].Descriptor()
 	// subscription.DefaultCode holds the default value on creation for the code field.
 	subscription.DefaultCode = subscriptionDescCode.Default.(string)
 	// subscriptionDescTitle is the schema descriptor for title field.
-	subscriptionDescTitle := subscriptionFields[3].Descriptor()
+	subscriptionDescTitle := subscriptionFields[5].Descriptor()
 	// subscription.DefaultTitle holds the default value on creation for the title field.
 	subscription.DefaultTitle = subscriptionDescTitle.Default.(string)
 	// subscriptionDescCover is the schema descriptor for cover field.
-	subscriptionDescCover := subscriptionFields[4].Descriptor()
+	subscriptionDescCover := subscriptionFields[6].Descriptor()
 	// subscription.DefaultCover holds the default value on creation for the cover field.
 	subscription.DefaultCover = subscriptionDescCover.Default.(string)
 	// subscriptionDescReleaseDate is the schema descriptor for release_date field.
-	subscriptionDescReleaseDate := subscriptionFields[5].Descriptor()
+	subscriptionDescReleaseDate := subscriptionFields[7].Descriptor()
 	// subscription.DefaultReleaseDate holds the default value on creation for the release_date field.
 	subscription.DefaultReleaseDate = subscriptionDescReleaseDate.Default.(string)
 	// subscriptionDescCursor is the schema descriptor for cursor field.
-	subscriptionDescCursor := subscriptionFields[8].Descriptor()
+	subscriptionDescCursor := subscriptionFields[10].Descriptor()
 	// subscription.DefaultCursor holds the default value on creation for the cursor field.
 	subscription.DefaultCursor = subscriptionDescCursor.Default.(string)
 	// subscriptionDescChecks is the schema descriptor for checks field.
-	subscriptionDescChecks := subscriptionFields[11].Descriptor()
+	subscriptionDescChecks := subscriptionFields[13].Descriptor()
 	// subscription.DefaultChecks holds the default value on creation for the checks field.
 	subscription.DefaultChecks = subscriptionDescChecks.Default.(int)
 	// subscription.ChecksValidator is a validator for the "checks" field. It is called by the builders before save.

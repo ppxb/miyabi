@@ -25,6 +25,10 @@ type Subscription struct {
 	Kind subscription.Kind `json:"kind,omitempty"`
 	// TargetID holds the value of the "target_id" field.
 	TargetID string `json:"target_id,omitempty"`
+	// FanzaID holds the value of the "fanza_id" field.
+	FanzaID string `json:"fanza_id,omitempty"`
+	// JavdbID holds the value of the "javdb_id" field.
+	JavdbID string `json:"javdb_id,omitempty"`
 	// Code holds the value of the "code" field.
 	Code string `json:"code,omitempty"`
 	// Title holds the value of the "title" field.
@@ -57,7 +61,7 @@ func (*Subscription) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case subscription.FieldID, subscription.FieldOriginID, subscription.FieldChecks:
 			values[i] = new(sql.NullInt64)
-		case subscription.FieldKind, subscription.FieldTargetID, subscription.FieldCode, subscription.FieldTitle, subscription.FieldCover, subscription.FieldReleaseDate, subscription.FieldStatus, subscription.FieldCursor, subscription.FieldError:
+		case subscription.FieldKind, subscription.FieldTargetID, subscription.FieldFanzaID, subscription.FieldJavdbID, subscription.FieldCode, subscription.FieldTitle, subscription.FieldCover, subscription.FieldReleaseDate, subscription.FieldStatus, subscription.FieldCursor, subscription.FieldError:
 			values[i] = new(sql.NullString)
 		case subscription.FieldCreatedAt, subscription.FieldUpdatedAt, subscription.FieldNextCheckAt, subscription.FieldLastCheckedAt:
 			values[i] = new(sql.NullTime)
@@ -105,6 +109,18 @@ func (_m *Subscription) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field target_id", values[i])
 			} else if value.Valid {
 				_m.TargetID = value.String
+			}
+		case subscription.FieldFanzaID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field fanza_id", values[i])
+			} else if value.Valid {
+				_m.FanzaID = value.String
+			}
+		case subscription.FieldJavdbID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field javdb_id", values[i])
+			} else if value.Valid {
+				_m.JavdbID = value.String
 			}
 		case subscription.FieldCode:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -223,6 +239,12 @@ func (_m *Subscription) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("target_id=")
 	builder.WriteString(_m.TargetID)
+	builder.WriteString(", ")
+	builder.WriteString("fanza_id=")
+	builder.WriteString(_m.FanzaID)
+	builder.WriteString(", ")
+	builder.WriteString("javdb_id=")
+	builder.WriteString(_m.JavdbID)
 	builder.WriteString(", ")
 	builder.WriteString("code=")
 	builder.WriteString(_m.Code)

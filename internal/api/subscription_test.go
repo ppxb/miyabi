@@ -43,9 +43,9 @@ func (s *subscriptionStub) ActorFeed(_ context.Context, actorID, page, limit int
 	}, nil
 }
 
-func (s *subscriptionStub) AddActor(_ context.Context, actorID string, opts monitor.AddActorOptions) (monitor.Item, error) {
-	s.addedActor = actorID
-	return monitor.Item{ID: 4, Kind: "actor", TargetID: actorID, Title: opts.Title}, nil
+func (s *subscriptionStub) AddActor(_ context.Context, actorKey string) (monitor.Item, error) {
+	s.addedActor = actorKey
+	return monitor.Item{ID: 4, Kind: "actor", TargetID: actorKey}, nil
 }
 
 func TestSubscriptionCreateOnlyAcceptsActors(t *testing.T) {
@@ -53,7 +53,7 @@ func TestSubscriptionCreateOnlyAcceptsActors(t *testing.T) {
 		body   string
 		status int
 	}{
-		{`{"kind":"actor","target_id":"a1","title":"Actor"}`, http.StatusCreated},
+		{`{"kind":"actor","target_id":"a1"}`, http.StatusCreated},
 		{`{"kind":"movie","target_id":"SSIS-001"}`, http.StatusBadRequest},
 	} {
 		stub := &subscriptionStub{}

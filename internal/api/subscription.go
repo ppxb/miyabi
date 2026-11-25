@@ -10,7 +10,7 @@ import (
 type SubscriptionManager interface {
 	List(ctx context.Context, kind string, page int, limit int) ([]monitor.Item, error)
 	Targets(ctx context.Context, kind string) ([]monitor.TargetItem, error)
-	AddActor(ctx context.Context, actorID string, opts monitor.AddActorOptions) (monitor.Item, error)
+	AddActor(ctx context.Context, actorKey string) (monitor.Item, error)
 	Update(ctx context.Context, id int, opts monitor.UpdateOptions) (monitor.Item, error)
 	Remove(ctx context.Context, id int) error
 	ActorFeed(ctx context.Context, actorID int, page int, limit int) ([]monitor.Item, error)
@@ -34,11 +34,10 @@ type subscriptionTargetsQuery struct {
 }
 
 type subscriptionCreateInput struct {
-	// Only actors can be subscribed; movie subscriptions come from actor checks.
+	// Only library actors can be followed, by actor key; movie subscriptions
+	// come from actor checks.
 	Kind     string `json:"kind" binding:"required,oneof=actor"`
 	TargetID string `json:"target_id" binding:"required"`
-	Title    string `json:"title"`
-	Cover    string `json:"cover"`
 }
 
 type subscriptionUpdateInput struct {
@@ -77,10 +76,7 @@ func subscriptionCreateHandler(mgr SubscriptionManager) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		item, err := mgr.AddActor(c.Request.Context(), input.TargetID, monitor.AddActorOptions{
-			Title: input.Title,
-			Cover: input.Cover,
-		})
+		item, err := mgr.AddActor(c.Request.Context(), input.TargetID)
 		created(c, item, err)
 	}
 }

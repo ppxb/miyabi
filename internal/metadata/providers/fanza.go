@@ -280,13 +280,7 @@ func fanzaMetadata(source fanzaMovie, rating float64) domain.MovieMetadata {
 	default:
 		m.Zone = domain.ZoneUnknown
 	}
-	date := source.MakerReleasedAt
-	if date == nil {
-		date = source.DeliveryStartDate
-	}
-	if date != nil {
-		m.ReleaseDate = date.In(time.FixedZone("JST", 9*60*60)).Format(time.DateOnly)
-	}
+	m.ReleaseDate = fanzaReleaseDate(source.MakerReleasedAt, source.DeliveryStartDate)
 	for _, actor := range source.Actresses {
 		m.Actors = append(m.Actors, domain.Actor{Provider: "fanza", ID: actor.ID, Name: actor.Name, Avatar: actor.ImageURL, Gender: "female"})
 	}

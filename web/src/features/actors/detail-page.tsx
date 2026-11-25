@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { LibraryMovieCard } from '@/features/library/movie-card'
 import { LazyLibraryPlayerDialog } from '@/features/library/player-dialog-lazy'
+import { FollowButton } from './follow-button'
 
 function ActorStats({ actor }: { actor: ReturnType<typeof useActorDetail>['data'] }) {
   if (!actor) return null
@@ -113,11 +114,12 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
           <AvatarFallback>{actor.name.slice(0, 1)}</AvatarFallback>
         </Avatar>
         <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-baseline gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-4xl font-bold">{actor.name}</h1>
             {actor.name_zht ? (
               <span className="text-lg text-muted-foreground">{actor.name_zht}</span>
             ) : null}
+            <FollowButton actorKey={actor.key} />
           </div>
           {actor.aliases?.length ? (
             <p className="text-sm text-muted-foreground">{actor.aliases.join(' / ')}</p>

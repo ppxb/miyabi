@@ -38,11 +38,43 @@ func (m *mockDiscoverer) BrowseMovies(_ context.Context, options domain.BrowseOp
 	return m.actorMovies[options.EntityID], nil
 }
 
+// mockFANZA knows the actresses in ids by name and lists works by actress id.
+type mockFANZA struct {
+	mu         sync.Mutex
+	ids        map[string]string
+	works      map[string][]domain.Movie
+	resolveErr error
+}
+
+func (m *mockFANZA) ResolveActress(_ context.Context, names []string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.resolveErr != nil {
+		return "", m.resolveErr
+	}
+	for _, name := range names {
+		if id := m.ids[name]; id != "" {
+			return id, nil
+		}
+	}
+	return "", nil
+}
+
+func (m *mockFANZA) ActressWorks(_ context.Context, id string) ([]domain.Movie, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.works[id], nil
+}
+
 type fixture struct {
 	service  *Service
 	discover *mockDiscoverer
-	tasks    *tasks.Service
-	client   *ent.Client
+	fanza    *mockFANZA
+	// identities overrides the default library actor, named by its key and
+	// browsed on JavDB under the same id.
+	identities map[string]ActorIdentity
+	tasks      *tasks.Service
+	client     *ent.Client
 }
 
 func newFixture(t *testing.T) fixture {
@@ -52,9 +84,20 @@ func newFixture(t *testing.T) fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
-	discover := newMockDiscoverer()
-	taskSvc := tasks.NewService(store.Client, tasks.NewRegistry())
-	return fixture{New(store.Client, discover, taskSvc), discover, taskSvc, store.Client}
+	f := fixture{discover: newMockDiscoverer(), identities: map[string]ActorIdentity{},
+		fanza: &mockFANZA{ids: map[string]string{}, works: map[string][]domain.Movie{}},
+		tasks: tasks.NewService(store.Client, tasks.NewRegistry()), client: store.Client}
+	lookup := func(_ context.Context, key string) (ActorIdentity, error) {
+		if identity, ok := f.identities[key]; ok {
+			if identity.Key == "" {
+				identity.Key = key
+			}
+			return identity, nil
+		}
+		return ActorIdentity{Key: key, Name: key, Names: []string{key}, JavdbID: key}, nil
+	}
+	f.service = New(store.Client, f.discover, f.fanza, lookup, f.tasks)
+	return f
 }
 
 func TestMovieSubscriptionLifecycle(t *testing.T) {
@@ -87,8 +130,8 @@ func TestRemovingActorDropsOnlyItsOwnWorks(t *testing.T) {
 		f.discover.actorMovies[id] = []domain.Movie{{ID: "new-" + id, Code: "NEW-" + id, ReleaseDate: "2099-01-01"}, shared}
 	}
 	// The co-starred work is recorded once, under the first actor.
-	first, _ := f.service.AddActor(ctx, "act1", AddActorOptions{Title: "One"})
-	second, _ := f.service.AddActor(ctx, "act2", AddActorOptions{Title: "Two"})
+	first, _ := f.service.AddActor(ctx, "act1")
+	second, _ := f.service.AddActor(ctx, "act2")
 	if err := f.service.Remove(ctx, first.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +182,7 @@ func TestSubscriptionTargetsAndPagination(t *testing.T) {
 	f.discover.actorMovies["act1"] = []domain.Movie{
 		{ID: "m-spawned", Code: "SPAWN-001", Title: "Spawned Movie", ReleaseDate: "2099-11-01", Actors: []domain.Actor{{ID: "act1", Name: "Actor 1"}}},
 	}
-	actor, err := f.service.AddActor(ctx, "act1", AddActorOptions{Title: "Actor 1"})
+	actor, err := f.service.AddActor(ctx, "act1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,9 +295,7 @@ func TestActorSubscription_ConstraintErrorRecoversWithoutRecursion(t *testing.T)
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			results[idx], errors[idx] = f.service.AddActor(ctx, "act-race", AddActorOptions{
-				Title: "Actor Race",
-			})
+			results[idx], errors[idx] = f.service.AddActor(ctx, "act-race")
 		}(i)
 	}
 	wg.Wait()

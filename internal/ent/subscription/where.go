@@ -69,6 +69,16 @@ func TargetID(v string) predicate.Subscription {
 	return predicate.Subscription(sql.FieldEQ(FieldTargetID, v))
 }
 
+// FanzaID applies equality check predicate on the "fanza_id" field. It's identical to FanzaIDEQ.
+func FanzaID(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldEQ(FieldFanzaID, v))
+}
+
+// JavdbID applies equality check predicate on the "javdb_id" field. It's identical to JavdbIDEQ.
+func JavdbID(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldEQ(FieldJavdbID, v))
+}
+
 // Code applies equality check predicate on the "code" field. It's identical to CodeEQ.
 func Code(v string) predicate.Subscription {
 	return predicate.Subscription(sql.FieldEQ(FieldCode, v))
@@ -282,6 +292,136 @@ func TargetIDEqualFold(v string) predicate.Subscription {
 // TargetIDContainsFold applies the ContainsFold predicate on the "target_id" field.
 func TargetIDContainsFold(v string) predicate.Subscription {
 	return predicate.Subscription(sql.FieldContainsFold(FieldTargetID, v))
+}
+
+// FanzaIDEQ applies the EQ predicate on the "fanza_id" field.
+func FanzaIDEQ(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldEQ(FieldFanzaID, v))
+}
+
+// FanzaIDNEQ applies the NEQ predicate on the "fanza_id" field.
+func FanzaIDNEQ(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldNEQ(FieldFanzaID, v))
+}
+
+// FanzaIDIn applies the In predicate on the "fanza_id" field.
+func FanzaIDIn(vs ...string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldIn(FieldFanzaID, vs...))
+}
+
+// FanzaIDNotIn applies the NotIn predicate on the "fanza_id" field.
+func FanzaIDNotIn(vs ...string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldNotIn(FieldFanzaID, vs...))
+}
+
+// FanzaIDGT applies the GT predicate on the "fanza_id" field.
+func FanzaIDGT(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldGT(FieldFanzaID, v))
+}
+
+// FanzaIDGTE applies the GTE predicate on the "fanza_id" field.
+func FanzaIDGTE(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldGTE(FieldFanzaID, v))
+}
+
+// FanzaIDLT applies the LT predicate on the "fanza_id" field.
+func FanzaIDLT(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldLT(FieldFanzaID, v))
+}
+
+// FanzaIDLTE applies the LTE predicate on the "fanza_id" field.
+func FanzaIDLTE(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldLTE(FieldFanzaID, v))
+}
+
+// FanzaIDContains applies the Contains predicate on the "fanza_id" field.
+func FanzaIDContains(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldContains(FieldFanzaID, v))
+}
+
+// FanzaIDHasPrefix applies the HasPrefix predicate on the "fanza_id" field.
+func FanzaIDHasPrefix(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldHasPrefix(FieldFanzaID, v))
+}
+
+// FanzaIDHasSuffix applies the HasSuffix predicate on the "fanza_id" field.
+func FanzaIDHasSuffix(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldHasSuffix(FieldFanzaID, v))
+}
+
+// FanzaIDEqualFold applies the EqualFold predicate on the "fanza_id" field.
+func FanzaIDEqualFold(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldEqualFold(FieldFanzaID, v))
+}
+
+// FanzaIDContainsFold applies the ContainsFold predicate on the "fanza_id" field.
+func FanzaIDContainsFold(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldContainsFold(FieldFanzaID, v))
+}
+
+// JavdbIDEQ applies the EQ predicate on the "javdb_id" field.
+func JavdbIDEQ(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldEQ(FieldJavdbID, v))
+}
+
+// JavdbIDNEQ applies the NEQ predicate on the "javdb_id" field.
+func JavdbIDNEQ(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldNEQ(FieldJavdbID, v))
+}
+
+// JavdbIDIn applies the In predicate on the "javdb_id" field.
+func JavdbIDIn(vs ...string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldIn(FieldJavdbID, vs...))
+}
+
+// JavdbIDNotIn applies the NotIn predicate on the "javdb_id" field.
+func JavdbIDNotIn(vs ...string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldNotIn(FieldJavdbID, vs...))
+}
+
+// JavdbIDGT applies the GT predicate on the "javdb_id" field.
+func JavdbIDGT(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldGT(FieldJavdbID, v))
+}
+
+// JavdbIDGTE applies the GTE predicate on the "javdb_id" field.
+func JavdbIDGTE(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldGTE(FieldJavdbID, v))
+}
+
+// JavdbIDLT applies the LT predicate on the "javdb_id" field.
+func JavdbIDLT(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldLT(FieldJavdbID, v))
+}
+
+// JavdbIDLTE applies the LTE predicate on the "javdb_id" field.
+func JavdbIDLTE(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldLTE(FieldJavdbID, v))
+}
+
+// JavdbIDContains applies the Contains predicate on the "javdb_id" field.
+func JavdbIDContains(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldContains(FieldJavdbID, v))
+}
+
+// JavdbIDHasPrefix applies the HasPrefix predicate on the "javdb_id" field.
+func JavdbIDHasPrefix(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldHasPrefix(FieldJavdbID, v))
+}
+
+// JavdbIDHasSuffix applies the HasSuffix predicate on the "javdb_id" field.
+func JavdbIDHasSuffix(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldHasSuffix(FieldJavdbID, v))
+}
+
+// JavdbIDEqualFold applies the EqualFold predicate on the "javdb_id" field.
+func JavdbIDEqualFold(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldEqualFold(FieldJavdbID, v))
+}
+
+// JavdbIDContainsFold applies the ContainsFold predicate on the "javdb_id" field.
+func JavdbIDContainsFold(v string) predicate.Subscription {
+	return predicate.Subscription(sql.FieldContainsFold(FieldJavdbID, v))
 }
 
 // CodeEQ applies the EQ predicate on the "code" field.

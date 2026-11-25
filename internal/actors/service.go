@@ -283,6 +283,50 @@ func (s *Service) Detail(ctx context.Context, id int) (Detail, error) {
 	}, nil
 }
 
+// Identity is what following an actor needs, read from the database only.
+type Identity struct {
+	Name   string
+	Avatar string
+	// Names holds every known spelling, the canonical name first.
+	Names []string
+	// SourceIDs maps each provider to the actor's id there.
+	SourceIDs map[string]string
+}
+
+// Identity returns the spellings and provider ids of one canonical actor
+// without the network lookups Detail performs on a first view.
+func (s *Service) Identity(ctx context.Context, id int) (Identity, error) {
+	p, err := s.db.ActorProfile.Query().
+		Where(actorprofile.ID(id), actorprofile.HasSources()).
+		WithSources().WithAliases().Only(ctx)
+	if ent.IsNotFound(err) {
+		return Identity{}, ErrNotFound
+	}
+	if err != nil {
+		return Identity{}, err
+	}
+	identity := Identity{
+		Name:      p.Name,
+		Avatar:    "/api/actors/" + strconv.Itoa(p.ID) + "/avatar",
+		Names:     []string{p.Name},
+		SourceIDs: make(map[string]string, len(p.Edges.Sources)),
+	}
+	for _, source := range p.Edges.Sources {
+		if !slices.Contains(identity.Names, source.Name) {
+			identity.Names = append(identity.Names, source.Name)
+		}
+		if identity.SourceIDs[source.Provider] == "" {
+			identity.SourceIDs[source.Provider] = source.SourceID
+		}
+	}
+	for _, alias := range p.Edges.Aliases {
+		if !slices.Contains(identity.Names, alias.Alias) {
+			identity.Names = append(identity.Names, alias.Alias)
+		}
+	}
+	return identity, nil
+}
+
 // scriptOf classifies a name as Japanese/CJK, Latin, or other.
 func scriptOf(name string) string {
 	for _, r := range name {

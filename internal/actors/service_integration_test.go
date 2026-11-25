@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -322,5 +323,30 @@ func TestLinkProfilesAliasesRenamedLinkedActor(t *testing.T) {
 	page, err := New(db, nil, "", nil).Catalog(ctx, "seto kanna", 1, 10)
 	if err != nil || page.Total != 1 {
 		t.Fatalf("new spelling not searchable: %+v, %v", page, err)
+	}
+}
+
+func TestIdentityListsSpellingsAndProviderIDs(t *testing.T) {
+	ctx := t.Context()
+	db := openDB(t)
+	a1 := db.Actor.Create().SetProvider("fanza").SetSourceID("1044864").SetName("河北彩花").SaveX(ctx)
+	a2 := db.Actor.Create().SetProvider("javdb").SetSourceID("ZY5eq").SetName("河北 彩花").SaveX(ctx)
+	db.Movie.Create().SetCode("TEST-001").AddActors(a1, a2).SaveX(ctx)
+	link(t, db, a1, a2)
+	pid := pidOf(t, db, a1.ID)
+	db.ActorAlias.Create().SetActorID(pid).SetAlias("河北彩伽").SetNormalized("河北彩伽").SaveX(ctx)
+
+	identity, err := New(db, nil, "", nil).Identity(ctx, pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if identity.SourceIDs["fanza"] != "1044864" || identity.SourceIDs["javdb"] != "ZY5eq" {
+		t.Fatalf("provider ids: %#v", identity.SourceIDs)
+	}
+	if identity.Names[0] != identity.Name || !slices.Contains(identity.Names, "河北 彩花") || !slices.Contains(identity.Names, "河北彩伽") {
+		t.Fatalf("spellings: %#v", identity)
+	}
+	if _, err := New(db, nil, "", nil).Identity(ctx, pid+100); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing actor: %v", err)
 	}
 }

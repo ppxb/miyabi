@@ -113,14 +113,16 @@ export function useActorFeed(
   })
 }
 
-// Following an actor records their new works for the follow page.
+// Following a library actor, by actor key, records their new works for the
+// follow page.
 export function useAddSubscription() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (payload: { target_id: string; title?: string; cover?: string }) =>
-      apiPost<SubscriptionItem>('/api/subscriptions', { kind: 'actor', ...payload }),
-    onSuccess: item => {
-      void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
+    mutationFn: (actorKey: string) =>
+      apiPost<SubscriptionItem>('/api/subscriptions', { kind: 'actor', target_id: actorKey }),
+    // Awaiting the refetch keeps the follow button busy until it shows the new state.
+    onSuccess: async item => {
+      await queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
       toast.success(`已关注 ${item.title}`, {
         description: '每天检查一次新作，显示在「关注」页。'
       })
@@ -145,9 +147,7 @@ export function useRemoveSubscription() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (item: { id: number }) => apiDelete<null>(`/api/subscriptions/${item.id}`),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: subscriptionKeys.all }),
     meta: { errorTitle: '取消关注失败' }
   })
 }

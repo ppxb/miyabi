@@ -35,15 +35,15 @@ func TestCheckDrainsDuePagesWithoutRepeatingFailures(t *testing.T) {
 		var due []*ent.Subscription
 		for i := range actors {
 			due = append(due, f.client.Subscription.Create().SetKind(subscription.KindActor).SetStatus(subscription.StatusActive).
-				SetTargetID(fmt.Sprintf("actor-%02d", i)).
+				SetTargetID(fmt.Sprintf("actor-%02d", i)).SetJavdbID(fmt.Sprintf("actor-%02d", i)).
 				SetNextCheckAt(start.Add(-time.Hour-time.Duration(i/6)*time.Minute)).SaveX(ctx))
 		}
 		// Movie subscriptions only record works and are never checked.
-		movie := f.client.Subscription.Create().SetTargetID("movie").SetNextCheckAt(start.Add(-time.Hour)).SaveX(ctx)
+		movie := f.client.Subscription.Create().SetTargetID("movie").SetOriginID(due[0].ID).SetNextCheckAt(start.Add(-time.Hour)).SaveX(ctx)
 		future := f.client.Subscription.Create().SetKind(subscription.KindActor).SetStatus(subscription.StatusActive).
-			SetTargetID("future").SetNextCheckAt(start.Add(time.Second)).SaveX(ctx)
+			SetTargetID("future").SetJavdbID("future").SetNextCheckAt(start.Add(time.Second)).SaveX(ctx)
 		paused := f.client.Subscription.Create().SetKind(subscription.KindActor).SetStatus(subscription.StatusPaused).
-			SetTargetID("paused").SetNextCheckAt(start.Add(-time.Hour)).SaveX(ctx)
+			SetTargetID("paused").SetJavdbID("paused").SetNextCheckAt(start.Add(-time.Hour)).SaveX(ctx)
 		// The last record of the first page fails to persist its next check.
 		failedID := due[actorBatchSize-1].ID
 		writeFailure := errors.New("fixture update failure")
@@ -100,7 +100,7 @@ func TestCheckCancellationLeavesRemainingSubscriptionsDue(t *testing.T) {
 		f := newFixture(t)
 		for i := range actorBatchSize + 1 {
 			f.client.Subscription.Create().SetKind(subscription.KindActor).SetStatus(subscription.StatusActive).
-				SetTargetID(fmt.Sprint(i)).SetNextCheckAt(time.Now()).SaveX(t.Context())
+				SetTargetID(fmt.Sprint(i)).SetJavdbID(fmt.Sprint(i)).SetNextCheckAt(time.Now()).SaveX(t.Context())
 		}
 		calls := 0
 		f.service.discover = observedDiscoverer{f.discover, func(string, string) error { calls++; return nil }}

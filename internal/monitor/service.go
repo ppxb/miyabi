@@ -81,10 +81,28 @@ type Item struct {
 	UpdatedAt     time.Time           `json:"updated_at"`
 }
 
-// Discoverer is the catalogue surface the service needs, in domain types.
+// Discoverer browses JavDB, the fallback source of an actor's works.
 type Discoverer interface {
 	BrowseMovies(ctx context.Context, options domain.BrowseOptions) ([]domain.Movie, error)
 }
+
+// ActressSource lists an actress's works on FANZA, the primary source.
+type ActressSource interface {
+	ResolveActress(ctx context.Context, names []string) (string, error)
+	ActressWorks(ctx context.Context, actressID string) ([]domain.Movie, error)
+}
+
+// ActorIdentity is a library actor as following needs it.
+type ActorIdentity struct {
+	// Key is the canonical actor key subscriptions are stored under.
+	Key, Name, Avatar string
+	// Names holds every known spelling, the canonical name first.
+	Names            []string
+	FanzaID, JavdbID string
+}
+
+// ActorLookup reads a library actor by key; a missing actor is KindNotFound.
+type ActorLookup func(ctx context.Context, key string) (ActorIdentity, error)
 
 // Service manages actor subscriptions: it checks each actor's works on the
 // daily schedule and records new ones as movie subscriptions for display.
@@ -92,11 +110,13 @@ type Discoverer interface {
 type Service struct {
 	database *ent.Client
 	discover Discoverer
+	fanza    ActressSource
+	actors   ActorLookup
 	tasks    *tasks.Service
 }
 
-func New(database *ent.Client, discover Discoverer, taskSvc *tasks.Service) *Service {
-	return &Service{database: database, discover: discover, tasks: taskSvc}
+func New(database *ent.Client, discover Discoverer, fanza ActressSource, actors ActorLookup, taskSvc *tasks.Service) *Service {
+	return &Service{database: database, discover: discover, fanza: fanza, actors: actors, tasks: taskSvc}
 }
 
 func (service *Service) Config(ctx context.Context) (Config, error) {

@@ -11,11 +11,6 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/subscription"
 )
 
-type AddActorOptions struct {
-	Title string
-	Cover string
-}
-
 func (service *Service) existingActor(ctx context.Context, actorID string) (Item, bool, error) {
 	existing, err := service.database.Subscription.Query().
 		Where(subscription.KindEQ(subscription.KindActor), subscription.TargetIDEQ(actorID)).Only(ctx)
@@ -32,46 +27,50 @@ func (service *Service) existingActor(ctx context.Context, actorID string) (Item
 	return item, true, err
 }
 
-// AddActor subscribes to an actor. The current works page becomes the cursor
-// baseline, unreleased works are tracked right away, and later releases
-// arrive through the daily check. Re-adding a paused subscription resumes it.
-func (service *Service) AddActor(ctx context.Context, actorID string, opts AddActorOptions) (Item, error) {
-	if item, found, err := service.existingActor(ctx, actorID); err != nil || found {
-		return item, err
-	}
-
-	movies, err := service.browseActor(ctx, actorID)
+// AddActor follows a library actor by key. Their works are listed on FANZA,
+// or on JavDB when FANZA does not know them; the current works page becomes
+// the cursor baseline, unreleased works are tracked right away, and later
+// releases arrive through the daily check. Re-adding a paused subscription
+// resumes it.
+func (service *Service) AddActor(ctx context.Context, actorKey string) (Item, error) {
+	identity, err := service.actors(ctx, actorKey)
 	if err != nil {
 		return Item{}, err
 	}
-	title, cover := opts.Title, opts.Cover
-	for _, movie := range movies {
-		for _, actor := range movie.Actors {
-			if actor.ID != actorID {
-				continue
+	// Subscriptions are stored under the canonical key, whatever spelling came in.
+	actorKey = identity.Key
+	if item, found, err := service.existingActor(ctx, actorKey); err != nil || found {
+		return item, err
+	}
+	fanzaID := identity.FanzaID
+	if fanzaID == "" {
+		if fanzaID, err = service.fanza.ResolveActress(ctx, identity.Names); err != nil {
+			if identity.JavdbID == "" {
+				return Item{}, fmt.Errorf("find %s on FANZA: %w", identity.Name, err)
 			}
-			if title == "" {
-				title = actor.Name
-			}
-			if cover == "" {
-				cover = actor.Avatar
-			}
+			// FANZA being unreachable or ambiguous must not block the JavDB fallback.
+			slog.WarnContext(ctx, "FANZA lookup failed; following on JavDB", "actor", identity.Name, "error", err)
+			fanzaID = ""
 		}
 	}
-	if title == "" {
-		title = actorID
+	if fanzaID == "" && identity.JavdbID == "" {
+		return Item{}, domain.E(domain.KindInvalid, "FANZA 和 JavDB 都找不到这位演员，无法追踪新作", nil)
+	}
+	movies, err := service.actorWorks(ctx, fanzaID, identity.JavdbID)
+	if err != nil {
+		return Item{}, err
 	}
 
 	cfg := service.config(ctx)
 	now := time.Now()
 	today := now.Format(dateLayout)
 	record, err := service.database.Subscription.Create().
-		SetKind(subscription.KindActor).SetTargetID(actorID).SetTitle(title).SetCover(cover).
-		SetStatus(subscription.StatusActive).
+		SetKind(subscription.KindActor).SetTargetID(actorKey).SetTitle(identity.Name).SetCover(identity.Avatar).
+		SetFanzaID(fanzaID).SetJavdbID(identity.JavdbID).SetStatus(subscription.StatusActive).
 		SetCursor(snapshotCursor(movies, today).encode()).SetNextCheckAt(nextDaily(now, cfg.CheckTime)).Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
-			if item, found, findErr := service.existingActor(ctx, actorID); findErr == nil && found {
+			if item, found, findErr := service.existingActor(ctx, actorKey); findErr == nil && found {
 				return item, nil
 			}
 		}
@@ -86,13 +85,22 @@ func (service *Service) AddActor(ctx context.Context, actorID string, opts AddAc
 	return subscriptionItem(record), nil
 }
 
-func (service *Service) browseActor(ctx context.Context, actorID string) ([]domain.Movie, error) {
+// actorWorks lists an actor's newest works from FANZA, or from JavDB when the
+// actor has no FANZA id.
+func (service *Service) actorWorks(ctx context.Context, fanzaID, javdbID string) ([]domain.Movie, error) {
+	if fanzaID != "" {
+		movies, err := service.fanza.ActressWorks(ctx, fanzaID)
+		if err != nil {
+			return nil, fmt.Errorf("list FANZA actress %s works: %w", fanzaID, err)
+		}
+		return movies, nil
+	}
 	movies, err := service.discover.BrowseMovies(ctx, domain.BrowseOptions{
-		EntityType: domain.EntityActor, EntityID: actorID,
+		EntityType: domain.EntityActor, EntityID: javdbID,
 		Sort: "release", Order: "desc", Page: 1, Limit: actorFeedPageSize,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("browse actor %s works: %w", actorID, err)
+		return nil, fmt.Errorf("browse JavDB actor %s works: %w", javdbID, err)
 	}
 	return movies, nil
 }

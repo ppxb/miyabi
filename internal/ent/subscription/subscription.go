@@ -22,6 +22,10 @@ const (
 	FieldKind = "kind"
 	// FieldTargetID holds the string denoting the target_id field in the database.
 	FieldTargetID = "target_id"
+	// FieldFanzaID holds the string denoting the fanza_id field in the database.
+	FieldFanzaID = "fanza_id"
+	// FieldJavdbID holds the string denoting the javdb_id field in the database.
+	FieldJavdbID = "javdb_id"
 	// FieldCode holds the string denoting the code field in the database.
 	FieldCode = "code"
 	// FieldTitle holds the string denoting the title field in the database.
@@ -55,6 +59,8 @@ var Columns = []string{
 	FieldUpdatedAt,
 	FieldKind,
 	FieldTargetID,
+	FieldFanzaID,
+	FieldJavdbID,
 	FieldCode,
 	FieldTitle,
 	FieldCover,
@@ -87,6 +93,10 @@ var (
 	UpdateDefaultUpdatedAt func() time.Time
 	// TargetIDValidator is a validator for the "target_id" field. It is called by the builders before save.
 	TargetIDValidator func(string) error
+	// DefaultFanzaID holds the default value on creation for the "fanza_id" field.
+	DefaultFanzaID string
+	// DefaultJavdbID holds the default value on creation for the "javdb_id" field.
+	DefaultJavdbID string
 	// DefaultCode holds the default value on creation for the "code" field.
 	DefaultCode string
 	// DefaultTitle holds the default value on creation for the "title" field.
@@ -184,6 +194,16 @@ func ByKind(opts ...sql.OrderTermOption) OrderOption {
 // ByTargetID orders the results by the target_id field.
 func ByTargetID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTargetID, opts...).ToFunc()
+}
+
+// ByFanzaID orders the results by the fanza_id field.
+func ByFanzaID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFanzaID, opts...).ToFunc()
+}
+
+// ByJavdbID orders the results by the javdb_id field.
+func ByJavdbID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldJavdbID, opts...).ToFunc()
 }
 
 // ByCode orders the results by the code field.

@@ -11923,6 +11923,8 @@ type SubscriptionMutation struct {
 	updated_at      *time.Time
 	kind            *subscription.Kind
 	target_id       *string
+	fanza_id        *string
+	javdb_id        *string
 	code            *string
 	title           *string
 	cover           *string
@@ -12182,6 +12184,78 @@ func (m *SubscriptionMutation) OldTargetID(ctx context.Context) (v string, err e
 // ResetTargetID resets all changes to the "target_id" field.
 func (m *SubscriptionMutation) ResetTargetID() {
 	m.target_id = nil
+}
+
+// SetFanzaID sets the "fanza_id" field.
+func (m *SubscriptionMutation) SetFanzaID(s string) {
+	m.fanza_id = &s
+}
+
+// FanzaID returns the value of the "fanza_id" field in the mutation.
+func (m *SubscriptionMutation) FanzaID() (r string, exists bool) {
+	v := m.fanza_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFanzaID returns the old "fanza_id" field's value of the Subscription entity.
+// If the Subscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubscriptionMutation) OldFanzaID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFanzaID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFanzaID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFanzaID: %w", err)
+	}
+	return oldValue.FanzaID, nil
+}
+
+// ResetFanzaID resets all changes to the "fanza_id" field.
+func (m *SubscriptionMutation) ResetFanzaID() {
+	m.fanza_id = nil
+}
+
+// SetJavdbID sets the "javdb_id" field.
+func (m *SubscriptionMutation) SetJavdbID(s string) {
+	m.javdb_id = &s
+}
+
+// JavdbID returns the value of the "javdb_id" field in the mutation.
+func (m *SubscriptionMutation) JavdbID() (r string, exists bool) {
+	v := m.javdb_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldJavdbID returns the old "javdb_id" field's value of the Subscription entity.
+// If the Subscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SubscriptionMutation) OldJavdbID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldJavdbID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldJavdbID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldJavdbID: %w", err)
+	}
+	return oldValue.JavdbID, nil
+}
+
+// ResetJavdbID resets all changes to the "javdb_id" field.
+func (m *SubscriptionMutation) ResetJavdbID() {
+	m.javdb_id = nil
 }
 
 // SetCode sets the "code" field.
@@ -12707,7 +12781,7 @@ func (m *SubscriptionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SubscriptionMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 17)
 	if m.created_at != nil {
 		fields = append(fields, subscription.FieldCreatedAt)
 	}
@@ -12719,6 +12793,12 @@ func (m *SubscriptionMutation) Fields() []string {
 	}
 	if m.target_id != nil {
 		fields = append(fields, subscription.FieldTargetID)
+	}
+	if m.fanza_id != nil {
+		fields = append(fields, subscription.FieldFanzaID)
+	}
+	if m.javdb_id != nil {
+		fields = append(fields, subscription.FieldJavdbID)
 	}
 	if m.code != nil {
 		fields = append(fields, subscription.FieldCode)
@@ -12769,6 +12849,10 @@ func (m *SubscriptionMutation) Field(name string) (ent.Value, bool) {
 		return m.Kind()
 	case subscription.FieldTargetID:
 		return m.TargetID()
+	case subscription.FieldFanzaID:
+		return m.FanzaID()
+	case subscription.FieldJavdbID:
+		return m.JavdbID()
 	case subscription.FieldCode:
 		return m.Code()
 	case subscription.FieldTitle:
@@ -12808,6 +12892,10 @@ func (m *SubscriptionMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldKind(ctx)
 	case subscription.FieldTargetID:
 		return m.OldTargetID(ctx)
+	case subscription.FieldFanzaID:
+		return m.OldFanzaID(ctx)
+	case subscription.FieldJavdbID:
+		return m.OldJavdbID(ctx)
 	case subscription.FieldCode:
 		return m.OldCode(ctx)
 	case subscription.FieldTitle:
@@ -12866,6 +12954,20 @@ func (m *SubscriptionMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTargetID(v)
+		return nil
+	case subscription.FieldFanzaID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFanzaID(v)
+		return nil
+	case subscription.FieldJavdbID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetJavdbID(v)
 		return nil
 	case subscription.FieldCode:
 		v, ok := value.(string)
@@ -13058,6 +13160,12 @@ func (m *SubscriptionMutation) ResetField(name string) error {
 		return nil
 	case subscription.FieldTargetID:
 		m.ResetTargetID()
+		return nil
+	case subscription.FieldFanzaID:
+		m.ResetFanzaID()
+		return nil
+	case subscription.FieldJavdbID:
+		m.ResetJavdbID()
 		return nil
 	case subscription.FieldCode:
 		m.ResetCode()

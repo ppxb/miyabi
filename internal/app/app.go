@@ -150,8 +150,10 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 	}
 	cleanup = append(cleanup, catalogueSvc.Close)
 	proxy := networkSvc.ProxyManager()
+	// FANZA also lists followed actresses' works; metadata closes it.
+	fanza := providers.NewFANZA(proxy)
 	metadataSvc, err := metadata.New(ctx, store.Client,
-		providers.NewFANZA(proxy),
+		fanza,
 		providers.NewFC2(proxy),
 		providers.NewFC2DB(proxy),
 		providers.NewHEYZO(proxy),
@@ -181,7 +183,6 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 	cleanup = append(cleanup, metadataSvc.Close)
 
 	offlineSvc := offline.New(store.Client, catalogueSvc, driveSvc, taskSvc, libSvc, metadataSvc, offlineSubmitTimeout)
-	monitorSvc := monitor.New(store.Client, catalogueSvc, taskSvc)
 	gfriendsClient := gfriends.New(cfg.DataDir, &http.Client{
 		Timeout:   30 * time.Second,
 		Transport: netx.NewTransport(networkSvc.ProxyManager()),
@@ -193,6 +194,7 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 		netx.NewSafeDownloadClient(networkSvc.ProxyManager(), 30*time.Second),
 		actors.NewAVLeague(networkSvc.ProxyManager()),
 	)
+	monitorSvc := monitor.New(store.Client, catalogueSvc, fanza, followedActor(actorsSvc), taskSvc)
 	syncActors := cfg.EmbySyncActors
 	embySvc, err := emby.NewService(ctx, store.Client, emby.Config{
 		Enabled:    cfg.EmbyEnabled,

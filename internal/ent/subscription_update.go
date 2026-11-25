@@ -62,6 +62,34 @@ func (_u *SubscriptionUpdate) SetNillableTargetID(v *string) *SubscriptionUpdate
 	return _u
 }
 
+// SetFanzaID sets the "fanza_id" field.
+func (_u *SubscriptionUpdate) SetFanzaID(v string) *SubscriptionUpdate {
+	_u.mutation.SetFanzaID(v)
+	return _u
+}
+
+// SetNillableFanzaID sets the "fanza_id" field if the given value is not nil.
+func (_u *SubscriptionUpdate) SetNillableFanzaID(v *string) *SubscriptionUpdate {
+	if v != nil {
+		_u.SetFanzaID(*v)
+	}
+	return _u
+}
+
+// SetJavdbID sets the "javdb_id" field.
+func (_u *SubscriptionUpdate) SetJavdbID(v string) *SubscriptionUpdate {
+	_u.mutation.SetJavdbID(v)
+	return _u
+}
+
+// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
+func (_u *SubscriptionUpdate) SetNillableJavdbID(v *string) *SubscriptionUpdate {
+	if v != nil {
+		_u.SetJavdbID(*v)
+	}
+	return _u
+}
+
 // SetCode sets the "code" field.
 func (_u *SubscriptionUpdate) SetCode(v string) *SubscriptionUpdate {
 	_u.mutation.SetCode(v)
@@ -341,6 +369,12 @@ func (_u *SubscriptionUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if value, ok := _u.mutation.TargetID(); ok {
 		_spec.SetField(subscription.FieldTargetID, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.FanzaID(); ok {
+		_spec.SetField(subscription.FieldFanzaID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.JavdbID(); ok {
+		_spec.SetField(subscription.FieldJavdbID, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.Code(); ok {
 		_spec.SetField(subscription.FieldCode, field.TypeString, value)
 	}
@@ -442,6 +476,34 @@ func (_u *SubscriptionUpdateOne) SetTargetID(v string) *SubscriptionUpdateOne {
 func (_u *SubscriptionUpdateOne) SetNillableTargetID(v *string) *SubscriptionUpdateOne {
 	if v != nil {
 		_u.SetTargetID(*v)
+	}
+	return _u
+}
+
+// SetFanzaID sets the "fanza_id" field.
+func (_u *SubscriptionUpdateOne) SetFanzaID(v string) *SubscriptionUpdateOne {
+	_u.mutation.SetFanzaID(v)
+	return _u
+}
+
+// SetNillableFanzaID sets the "fanza_id" field if the given value is not nil.
+func (_u *SubscriptionUpdateOne) SetNillableFanzaID(v *string) *SubscriptionUpdateOne {
+	if v != nil {
+		_u.SetFanzaID(*v)
+	}
+	return _u
+}
+
+// SetJavdbID sets the "javdb_id" field.
+func (_u *SubscriptionUpdateOne) SetJavdbID(v string) *SubscriptionUpdateOne {
+	_u.mutation.SetJavdbID(v)
+	return _u
+}
+
+// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
+func (_u *SubscriptionUpdateOne) SetNillableJavdbID(v *string) *SubscriptionUpdateOne {
+	if v != nil {
+		_u.SetJavdbID(*v)
 	}
 	return _u
 }
@@ -754,6 +816,12 @@ func (_u *SubscriptionUpdateOne) sqlSave(ctx context.Context) (_node *Subscripti
 	}
 	if value, ok := _u.mutation.TargetID(); ok {
 		_spec.SetField(subscription.FieldTargetID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.FanzaID(); ok {
+		_spec.SetField(subscription.FieldFanzaID, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.JavdbID(); ok {
+		_spec.SetField(subscription.FieldJavdbID, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Code(); ok {
 		_spec.SetField(subscription.FieldCode, field.TypeString, value)

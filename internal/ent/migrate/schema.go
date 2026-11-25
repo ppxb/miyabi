@@ -369,6 +369,8 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "kind", Type: field.TypeEnum, Enums: []string{"movie", "actor"}, Default: "movie"},
 		{Name: "target_id", Type: field.TypeString},
+		{Name: "fanza_id", Type: field.TypeString, Default: ""},
+		{Name: "javdb_id", Type: field.TypeString, Default: ""},
 		{Name: "code", Type: field.TypeString, Default: ""},
 		{Name: "title", Type: field.TypeString, Default: ""},
 		{Name: "cover", Type: field.TypeString, Default: ""},
@@ -395,7 +397,7 @@ var (
 			{
 				Name:    "subscription_status_next_check_at",
 				Unique:  false,
-				Columns: []*schema.Column{SubscriptionsColumns[10], SubscriptionsColumns[12]},
+				Columns: []*schema.Column{SubscriptionsColumns[12], SubscriptionsColumns[14]},
 			},
 		},
 	}

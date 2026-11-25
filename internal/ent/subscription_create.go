@@ -70,6 +70,34 @@ func (_c *SubscriptionCreate) SetTargetID(v string) *SubscriptionCreate {
 	return _c
 }
 
+// SetFanzaID sets the "fanza_id" field.
+func (_c *SubscriptionCreate) SetFanzaID(v string) *SubscriptionCreate {
+	_c.mutation.SetFanzaID(v)
+	return _c
+}
+
+// SetNillableFanzaID sets the "fanza_id" field if the given value is not nil.
+func (_c *SubscriptionCreate) SetNillableFanzaID(v *string) *SubscriptionCreate {
+	if v != nil {
+		_c.SetFanzaID(*v)
+	}
+	return _c
+}
+
+// SetJavdbID sets the "javdb_id" field.
+func (_c *SubscriptionCreate) SetJavdbID(v string) *SubscriptionCreate {
+	_c.mutation.SetJavdbID(v)
+	return _c
+}
+
+// SetNillableJavdbID sets the "javdb_id" field if the given value is not nil.
+func (_c *SubscriptionCreate) SetNillableJavdbID(v *string) *SubscriptionCreate {
+	if v != nil {
+		_c.SetJavdbID(*v)
+	}
+	return _c
+}
+
 // SetCode sets the "code" field.
 func (_c *SubscriptionCreate) SetCode(v string) *SubscriptionCreate {
 	_c.mutation.SetCode(v)
@@ -271,6 +299,14 @@ func (_c *SubscriptionCreate) defaults() {
 		v := subscription.DefaultKind
 		_c.mutation.SetKind(v)
 	}
+	if _, ok := _c.mutation.FanzaID(); !ok {
+		v := subscription.DefaultFanzaID
+		_c.mutation.SetFanzaID(v)
+	}
+	if _, ok := _c.mutation.JavdbID(); !ok {
+		v := subscription.DefaultJavdbID
+		_c.mutation.SetJavdbID(v)
+	}
 	if _, ok := _c.mutation.Code(); !ok {
 		v := subscription.DefaultCode
 		_c.mutation.SetCode(v)
@@ -324,6 +360,12 @@ func (_c *SubscriptionCreate) check() error {
 		if err := subscription.TargetIDValidator(v); err != nil {
 			return &ValidationError{Name: "target_id", err: fmt.Errorf(`ent: validator failed for field "Subscription.target_id": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.FanzaID(); !ok {
+		return &ValidationError{Name: "fanza_id", err: errors.New(`ent: missing required field "Subscription.fanza_id"`)}
+	}
+	if _, ok := _c.mutation.JavdbID(); !ok {
+		return &ValidationError{Name: "javdb_id", err: errors.New(`ent: missing required field "Subscription.javdb_id"`)}
 	}
 	if _, ok := _c.mutation.Code(); !ok {
 		return &ValidationError{Name: "code", err: errors.New(`ent: missing required field "Subscription.code"`)}
@@ -398,6 +440,14 @@ func (_c *SubscriptionCreate) createSpec() (*Subscription, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.TargetID(); ok {
 		_spec.SetField(subscription.FieldTargetID, field.TypeString, value)
 		_node.TargetID = value
+	}
+	if value, ok := _c.mutation.FanzaID(); ok {
+		_spec.SetField(subscription.FieldFanzaID, field.TypeString, value)
+		_node.FanzaID = value
+	}
+	if value, ok := _c.mutation.JavdbID(); ok {
+		_spec.SetField(subscription.FieldJavdbID, field.TypeString, value)
+		_node.JavdbID = value
 	}
 	if value, ok := _c.mutation.Code(); ok {
 		_spec.SetField(subscription.FieldCode, field.TypeString, value)
@@ -528,6 +578,30 @@ func (u *SubscriptionUpsert) SetTargetID(v string) *SubscriptionUpsert {
 // UpdateTargetID sets the "target_id" field to the value that was provided on create.
 func (u *SubscriptionUpsert) UpdateTargetID() *SubscriptionUpsert {
 	u.SetExcluded(subscription.FieldTargetID)
+	return u
+}
+
+// SetFanzaID sets the "fanza_id" field.
+func (u *SubscriptionUpsert) SetFanzaID(v string) *SubscriptionUpsert {
+	u.Set(subscription.FieldFanzaID, v)
+	return u
+}
+
+// UpdateFanzaID sets the "fanza_id" field to the value that was provided on create.
+func (u *SubscriptionUpsert) UpdateFanzaID() *SubscriptionUpsert {
+	u.SetExcluded(subscription.FieldFanzaID)
+	return u
+}
+
+// SetJavdbID sets the "javdb_id" field.
+func (u *SubscriptionUpsert) SetJavdbID(v string) *SubscriptionUpsert {
+	u.Set(subscription.FieldJavdbID, v)
+	return u
+}
+
+// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
+func (u *SubscriptionUpsert) UpdateJavdbID() *SubscriptionUpsert {
+	u.SetExcluded(subscription.FieldJavdbID)
 	return u
 }
 
@@ -783,6 +857,34 @@ func (u *SubscriptionUpsertOne) SetTargetID(v string) *SubscriptionUpsertOne {
 func (u *SubscriptionUpsertOne) UpdateTargetID() *SubscriptionUpsertOne {
 	return u.Update(func(s *SubscriptionUpsert) {
 		s.UpdateTargetID()
+	})
+}
+
+// SetFanzaID sets the "fanza_id" field.
+func (u *SubscriptionUpsertOne) SetFanzaID(v string) *SubscriptionUpsertOne {
+	return u.Update(func(s *SubscriptionUpsert) {
+		s.SetFanzaID(v)
+	})
+}
+
+// UpdateFanzaID sets the "fanza_id" field to the value that was provided on create.
+func (u *SubscriptionUpsertOne) UpdateFanzaID() *SubscriptionUpsertOne {
+	return u.Update(func(s *SubscriptionUpsert) {
+		s.UpdateFanzaID()
+	})
+}
+
+// SetJavdbID sets the "javdb_id" field.
+func (u *SubscriptionUpsertOne) SetJavdbID(v string) *SubscriptionUpsertOne {
+	return u.Update(func(s *SubscriptionUpsert) {
+		s.SetJavdbID(v)
+	})
+}
+
+// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
+func (u *SubscriptionUpsertOne) UpdateJavdbID() *SubscriptionUpsertOne {
+	return u.Update(func(s *SubscriptionUpsert) {
+		s.UpdateJavdbID()
 	})
 }
 
@@ -1232,6 +1334,34 @@ func (u *SubscriptionUpsertBulk) SetTargetID(v string) *SubscriptionUpsertBulk {
 func (u *SubscriptionUpsertBulk) UpdateTargetID() *SubscriptionUpsertBulk {
 	return u.Update(func(s *SubscriptionUpsert) {
 		s.UpdateTargetID()
+	})
+}
+
+// SetFanzaID sets the "fanza_id" field.
+func (u *SubscriptionUpsertBulk) SetFanzaID(v string) *SubscriptionUpsertBulk {
+	return u.Update(func(s *SubscriptionUpsert) {
+		s.SetFanzaID(v)
+	})
+}
+
+// UpdateFanzaID sets the "fanza_id" field to the value that was provided on create.
+func (u *SubscriptionUpsertBulk) UpdateFanzaID() *SubscriptionUpsertBulk {
+	return u.Update(func(s *SubscriptionUpsert) {
+		s.UpdateFanzaID()
+	})
+}
+
+// SetJavdbID sets the "javdb_id" field.
+func (u *SubscriptionUpsertBulk) SetJavdbID(v string) *SubscriptionUpsertBulk {
+	return u.Update(func(s *SubscriptionUpsert) {
+		s.SetJavdbID(v)
+	})
+}
+
+// UpdateJavdbID sets the "javdb_id" field to the value that was provided on create.
+func (u *SubscriptionUpsertBulk) UpdateJavdbID() *SubscriptionUpsertBulk {
+	return u.Update(func(s *SubscriptionUpsert) {
+		s.UpdateJavdbID()
 	})
 }
 

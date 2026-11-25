@@ -26,6 +26,9 @@ func (service *Service) Check(ctx context.Context) error {
 		return err
 	}
 
+	if err := service.dropUntracked(ctx); err != nil {
+		return fmt.Errorf("drop untracked subscriptions: %w", err)
+	}
 	cfg := service.config(ctx)
 	requests := 0
 	cutoff := time.Now()
@@ -59,6 +62,35 @@ func (service *Service) Check(ctx context.Context) error {
 	}
 }
 
+// dropUntracked deletes actor subscriptions no source can check, such as those
+// recorded by JavDB actor id before following moved to library actors, and
+// the works no followed actor owns any more.
+func (service *Service) dropUntracked(ctx context.Context) error {
+	removed := 0
+	err := ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
+		actors, err := tx.Subscription.Delete().Where(subscription.KindEQ(subscription.KindActor),
+			subscription.FanzaIDEQ(""), subscription.JavdbIDEQ("")).Exec(ctx)
+		if err != nil {
+			return err
+		}
+		owners, err := tx.Subscription.Query().Where(subscription.KindEQ(subscription.KindActor)).IDs(ctx)
+		if err != nil {
+			return err
+		}
+		orphan := subscription.OriginIDIsNil()
+		if len(owners) > 0 {
+			orphan = subscription.Or(orphan, subscription.OriginIDNotIn(owners...))
+		}
+		works, err := tx.Subscription.Delete().Where(subscription.KindEQ(subscription.KindMovie), orphan).Exec(ctx)
+		removed = actors + works
+		return err
+	})
+	if err == nil && removed > 0 {
+		service.tasks.NotifyMonitorChanged()
+	}
+	return err
+}
+
 func (service *Service) dueSubscriptions(ctx context.Context, kind subscription.Kind, status subscription.Status, cutoff time.Time, after *ent.Subscription, limit int) ([]*ent.Subscription, error) {
 	query := service.database.Subscription.Query().
 		Where(subscription.KindEQ(kind), subscription.StatusEQ(status), subscription.NextCheckAtLTE(cutoff))
@@ -79,7 +111,7 @@ func (service *Service) dueSubscriptions(ctx context.Context, kind subscription.
 
 func (service *Service) checkActor(ctx context.Context, record *ent.Subscription, checkTime string) error {
 	now := time.Now()
-	movies, err := service.browseActor(ctx, record.TargetID)
+	movies, err := service.actorWorks(ctx, record.FanzaID, record.JavdbID)
 	if err != nil {
 		return service.deferCheck(ctx, record, now, domain.E(domain.KindUpstream, "查询演员新作失败："+domain.PublicMessage(err), err))
 	}
