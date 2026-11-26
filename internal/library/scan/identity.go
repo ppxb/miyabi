@@ -58,27 +58,51 @@ func IdentifyScanVideos(payload domain.ScanPayload, videos []Video, previous map
 	}
 }
 
-// Manual identities take precedence over optional sidecars before their validation.
-func applyManualCodes(ctx context.Context, db *ent.Client, accountID string, videos []Video) error {
+// Existing manual identities always take precedence over sidecars. When
+// preserveUnchanged is true, unchanged files already bound to a non-failed
+// movie also keep their stored identity without re-downloading sidecar NFOs.
+func applyKnownCodes(ctx context.Context, db *ent.Client, accountID string, videos []Video, preserveUnchanged bool) error {
 	for start := 0; start < len(videos); start += 100 {
 		chunk := videos[start:min(start+100, len(videos))]
 		ids := make([]string, len(chunk))
 		for i, video := range chunk {
 			ids[i] = video.ID
 		}
-		records, err := db.File.Query().Where(file.AccountIDEQ(accountID), file.FileIDIn(ids...),
-			file.HasMovieWith(movie.ManualCodeNEQ(""))).Select(file.FieldID, file.FieldFileID, file.FieldMovieID).
-			WithMovie(func(q *ent.MovieQuery) { q.Select(movie.FieldCode) }).All(ctx)
+		query := db.File.Query().Where(file.AccountIDEQ(accountID), file.FileIDIn(ids...))
+		if preserveUnchanged {
+			query = query.Where(file.HasMovie())
+		} else {
+			query = query.Where(file.HasMovieWith(movie.ManualCodeNEQ("")))
+		}
+		records, err := query.
+			Select(file.FieldID, file.FieldFileID, file.FieldName, file.FieldSize, file.FieldSha1, file.FieldMovieID).
+			WithMovie(func(q *ent.MovieQuery) {
+				q.Select(movie.FieldCode, movie.FieldManualCode, movie.FieldScrapeStatus)
+			}).All(ctx)
 		if err != nil {
 			return err
 		}
-		codes := make(map[string]string, len(records))
+		existing := make(map[string]*ent.File, len(records))
 		for _, record := range records {
-			codes[record.FileID] = record.Edges.Movie.Code
+			existing[record.FileID] = record
 		}
 		for i := range chunk {
-			if code := codes[chunk[i].ID]; code != "" && canIdentifyVideo(chunk[i].File) {
-				chunk[i].Code, chunk[i].Manual = code, true
+			video := &chunk[i]
+			if !canIdentifyVideo(video.File) {
+				continue
+			}
+			old := existing[video.ID]
+			if old == nil || old.Edges.Movie == nil {
+				continue
+			}
+			film := old.Edges.Movie
+			if film.ManualCode != "" {
+				video.Code, video.Manual, video.known = film.Code, true, true
+				continue
+			}
+			if preserveUnchanged && old.Name == video.Name && old.Size == video.Size && old.Sha1 == video.SHA1 &&
+				film.ScrapeStatus != movie.ScrapeStatusFailed {
+				video.Code, video.known = film.Code, true
 			}
 		}
 	}
@@ -106,7 +130,7 @@ func ResolveNFOCodes(ctx context.Context, sess drive.Session, sidecars []pan.Fil
 	codes := make(map[string]string)
 	for i := range videos {
 		video := &videos[i]
-		if video.Manual || !canIdentifyVideo(video.File) || (video.Code == "" && (shared || len(sidecars) != 1)) {
+		if video.Manual || video.known || !canIdentifyVideo(video.File) || (video.Code == "" && (shared || len(sidecars) != 1)) {
 			continue
 		}
 		entry, found := findNFO(video.Code, shared, sidecars)
@@ -145,7 +169,7 @@ func ResolveNFOCodes(ctx context.Context, sess drive.Session, sidecars []pan.Fil
 // A targeted download checks only its matching NFO, not other movies' metadata.
 func resolveTargetNFO(ctx context.Context, sess drive.Session, videos []Video) error {
 	video := videos[0]
-	if video.Manual || !canIdentifyVideo(video.File) {
+	if video.Manual || video.known || !canIdentifyVideo(video.File) {
 		return nil
 	}
 	entries, err := drive.DirectoryEntries(ctx, sess, video.ParentID)

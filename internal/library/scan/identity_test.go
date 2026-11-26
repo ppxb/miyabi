@@ -5,7 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/drive"
+	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/nfo"
 	"github.com/ppxb/miyabi/internal/pan"
 )
@@ -210,6 +212,143 @@ func TestResolveNFOCodes_ToleranceMatching(t *testing.T) {
 
 		if videos[0].Code != "" {
 			t.Fatalf("multi-NFO folder should not identify unnamed video: got %q", videos[0].Code)
+		}
+	})
+}
+
+func TestApplyKnownCodesSkipsUnchangedFilesAndKeepsSharedDetection(t *testing.T) {
+	ctx := t.Context()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
+	doneMovie := store.Client.Movie.Create().SetCode("ABP-001").SetScrapeStatus(movie.ScrapeStatusDone).SaveX(ctx)
+	otherMovie := store.Client.Movie.Create().SetCode("IPX-123").SetScrapeStatus(movie.ScrapeStatusDone).SaveX(ctx)
+	failedMovie := store.Client.Movie.Create().SetCode("SSIS-001").SetScrapeStatus(movie.ScrapeStatusFailed).SaveX(ctx)
+	manualMovie := store.Client.Movie.Create().SetCode("MIDE-001").SetManualCode("MIDE-001").SetScrapeStatus(movie.ScrapeStatusFailed).SaveX(ctx)
+
+	store.Client.File.Create().
+		SetFileID("v-done").SetName("ABP-001.mp4").SetSize(1 << 30).SetSha1("sha-done").
+		SetAccountID("acc").SetRootID("root").SetMovie(doneMovie).ExecX(ctx)
+	store.Client.File.Create().
+		SetFileID("v-other").SetName("IPX-123.mp4").SetSize(1 << 30).SetSha1("sha-other").
+		SetAccountID("acc").SetRootID("root").SetMovie(otherMovie).ExecX(ctx)
+	store.Client.File.Create().
+		SetFileID("v-failed").SetName("SSIS-001.mp4").SetSize(1 << 30).SetSha1("sha-failed").
+		SetAccountID("acc").SetRootID("root").SetMovie(failedMovie).ExecX(ctx)
+	store.Client.File.Create().
+		SetFileID("v-manual").SetName("MIDE-001.mp4").SetSize(1 << 30).SetSha1("sha-manual").
+		SetAccountID("acc").SetRootID("root").SetMovie(manualMovie).ExecX(ctx)
+
+	t.Run("unchanged non-failed file skips NFO read", func(t *testing.T) {
+		body, _ := nfo.Encode(nfo.Movie{Code: "ABP-001"})
+		sess := &nfoStubSession{bodies: map[string][]byte{"nfo": body}}
+		videos := []Video{
+			{File: pan.File{ID: "v-done", Name: "ABP-001.mp4", Size: 1 << 30, SHA1: "sha-done"}, Code: "ABP-001"},
+		}
+		if err := applyKnownCodes(ctx, store.Client, "acc", videos, true); err != nil {
+			t.Fatal(err)
+		}
+		if err := ResolveNFOCodes(ctx, sess, []pan.File{{ID: "n1", Name: "ABP-001.nfo", PickCode: "nfo"}}, videos); err != nil {
+			t.Fatal(err)
+		}
+		if sess.reads != 0 || videos[0].Code != "ABP-001" {
+			t.Fatalf("expected 0 NFO reads for unchanged file, got reads=%d video=%+v", sess.reads, videos[0])
+		}
+	})
+
+	t.Run("changed file or failed movie still reads NFO", func(t *testing.T) {
+		abpBody, _ := nfo.Encode(nfo.Movie{Code: "ABP-001"})
+		ssisBody, _ := nfo.Encode(nfo.Movie{Code: "SSIS-001"})
+		sess := &nfoStubSession{bodies: map[string][]byte{"abp": abpBody, "ssis": ssisBody}}
+		videos := []Video{
+			{File: pan.File{ID: "v-done", Name: "ABP-001.mp4", Size: 1 << 30, SHA1: "sha-changed"}, Code: "ABP-001"},
+			{File: pan.File{ID: "v-failed", Name: "SSIS-001.mp4", Size: 1 << 30, SHA1: "sha-failed"}, Code: "SSIS-001"},
+		}
+		if err := applyKnownCodes(ctx, store.Client, "acc", videos, true); err != nil {
+			t.Fatal(err)
+		}
+		sidecars := []pan.File{
+			{ID: "n1", Name: "ABP-001.nfo", PickCode: "abp"},
+			{ID: "n2", Name: "SSIS-001.nfo", PickCode: "ssis"},
+		}
+		if err := ResolveNFOCodes(ctx, sess, sidecars, videos); err != nil {
+			t.Fatal(err)
+		}
+		if sess.reads != 2 {
+			t.Fatalf("expected 2 NFO reads for changed + failed files, got %d", sess.reads)
+		}
+	})
+
+	t.Run("known files still mark multi-movie directory as shared", func(t *testing.T) {
+		body, _ := nfo.Encode(nfo.Movie{Code: "ABP-001"})
+		sess := &nfoStubSession{bodies: map[string][]byte{"nfo": body}}
+		videos := []Video{
+			{File: pan.File{ID: "v-done", Name: "ABP-001.mp4", Size: 1 << 30, SHA1: "sha-done"}, Code: "ABP-001"},
+			{File: pan.File{ID: "v-other", Name: "IPX-123.mp4", Size: 1 << 30, SHA1: "sha-other"}, Code: "IPX-123"},
+			{File: pan.File{ID: "v-new", Name: "feature.mp4", Size: 1 << 30}, Code: ""},
+		}
+		if err := applyKnownCodes(ctx, store.Client, "acc", videos, true); err != nil {
+			t.Fatal(err)
+		}
+		if err := ResolveNFOCodes(ctx, sess, []pan.File{{ID: "n1", Name: "movie.nfo", PickCode: "nfo"}}, videos); err != nil {
+			t.Fatal(err)
+		}
+		if sess.reads != 0 || videos[2].Code != "" {
+			t.Fatalf("shared directory should not assign single NFO to unnamed video: reads=%d video=%+v", sess.reads, videos[2])
+		}
+	})
+
+	t.Run("preserveUnchanged false only skips manual codes", func(t *testing.T) {
+		abpBody, _ := nfo.Encode(nfo.Movie{Code: "ABP-001"})
+		mideBody, _ := nfo.Encode(nfo.Movie{Code: "MIDE-001"})
+		sess := &nfoStubSession{bodies: map[string][]byte{"abp": abpBody, "mide": mideBody}}
+		videos := []Video{
+			{File: pan.File{ID: "v-done", Name: "ABP-001.mp4", Size: 1 << 30, SHA1: "sha-done"}, Code: "ABP-001"},
+			{File: pan.File{ID: "v-manual", Name: "MIDE-001.mp4", Size: 1 << 30, SHA1: "sha-changed"}, Code: "MIDE-001"},
+		}
+		if err := applyKnownCodes(ctx, store.Client, "acc", videos, false); err != nil {
+			t.Fatal(err)
+		}
+		sidecars := []pan.File{
+			{ID: "n1", Name: "ABP-001.nfo", PickCode: "abp"},
+			{ID: "n2", Name: "MIDE-001.nfo", PickCode: "mide"},
+		}
+		if err := ResolveNFOCodes(ctx, sess, sidecars, videos); err != nil {
+			t.Fatal(err)
+		}
+		if sess.reads != 1 || !videos[1].Manual || !videos[1].known || videos[0].known {
+			t.Fatalf("unexpected preserveUnchanged=false result: reads=%d videos=%+v", sess.reads, videos)
+		}
+	})
+
+	t.Run("single movie folder uses known firstCode for new unnamed video conflict check", func(t *testing.T) {
+		body, _ := nfo.Encode(nfo.Movie{Code: "IPX-999"})
+		sess := &nfoStubSession{bodies: map[string][]byte{"nfo": body}}
+		videos := []Video{
+			{File: pan.File{ID: "v-done", Name: "ABP-001.mp4", Size: 1 << 30, SHA1: "sha-done"}, Code: "ABP-001"},
+			{File: pan.File{ID: "v-new", Name: "feature.mp4", Size: 1 << 30}, Code: ""},
+		}
+		if err := applyKnownCodes(ctx, store.Client, "acc", videos, true); err != nil {
+			t.Fatal(err)
+		}
+		err := ResolveNFOCodes(ctx, sess, []pan.File{{ID: "n1", Name: "movie.nfo", PickCode: "nfo"}}, videos)
+		if err == nil || !strings.Contains(err.Error(), "不一致") || sess.reads != 1 {
+			t.Fatalf("expected conflict against known firstCode, got err=%v reads=%d", err, sess.reads)
+		}
+	})
+
+	t.Run("resolveTargetNFO short-circuits known unchanged video", func(t *testing.T) {
+		videos := []Video{
+			{File: pan.File{ID: "v-done", Name: "ABP-001.mp4", Size: 1 << 30, SHA1: "sha-done"}, Code: "ABP-001"},
+		}
+		if err := applyKnownCodes(ctx, store.Client, "acc", videos, true); err != nil {
+			t.Fatal(err)
+		}
+		if err := resolveTargetNFO(ctx, nil, videos); err != nil {
+			t.Fatalf("resolveTargetNFO should short-circuit without session calls: %v", err)
 		}
 	})
 }

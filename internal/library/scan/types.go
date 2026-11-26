@@ -13,6 +13,9 @@ type Video struct {
 	pan.File
 	Code   string
 	Manual bool
+	// known marks a video whose unchanged database association already fixes
+	// its movie identity, so sidecar NFO files do not need to be re-downloaded.
+	known bool
 	// DirectoryCode records a provisional part group for transactional validation.
 	DirectoryCode string
 }

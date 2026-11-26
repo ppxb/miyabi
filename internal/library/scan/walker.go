@@ -177,7 +177,7 @@ func (r *scanRun) runTarget(ctx context.Context, isResume bool) error {
 		if r.payload.OfflineTaskID != 0 {
 			videos[0].Code = r.payload.Code
 		}
-		if err := applyManualCodes(ctx, r.scanner.db, r.payload.Source.AccountID, videos); err != nil {
+		if err := applyKnownCodes(ctx, r.scanner.db, r.payload.Source.AccountID, videos, r.payload.OfflineTaskID == 0); err != nil {
 			return err
 		}
 		if err := resolveTargetNFO(ctx, r.session, videos); err != nil {
@@ -303,7 +303,7 @@ func (r *scanRun) indexDirectory(ctx context.Context, directory Directory) error
 	}
 	// Apply single-NFO tolerance matching to establish standard catalogue identity.
 	if len(sidecars) > 0 {
-		if err := applyManualCodes(ctx, r.scanner.db, r.payload.Source.AccountID, directoryVideos); err != nil {
+		if err := applyKnownCodes(ctx, r.scanner.db, r.payload.Source.AccountID, directoryVideos, r.payload.OfflineTaskID == 0); err != nil {
 			return err
 		}
 	}

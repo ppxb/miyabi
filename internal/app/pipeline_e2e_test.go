@@ -608,8 +608,8 @@ func TestPipelineUsesNFOCodeButScrapesCatalogueMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	fixture.runQueue(t)
-	if !maps.Equal(fixture.catalogue.calls, calls) || len(fixture.drive.reads) != 2 {
-		t.Fatalf("remote artwork changes caused redundant scraping: calls=%v reads=%v", fixture.catalogue.calls, fixture.drive.reads)
+	if !maps.Equal(fixture.catalogue.calls, calls) || len(fixture.drive.reads) != 1 {
+		t.Fatalf("rescan of unchanged video caused redundant scraping or NFO read: calls=%v reads=%v", fixture.catalogue.calls, fixture.drive.reads)
 	}
 }
 

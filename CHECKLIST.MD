@@ -164,8 +164,15 @@
     - `internal/offline/recovery.go`：`recoverSource` 对每条需恢复/换源的任务改 `continue` 汇总错误，不再处理第一条就返回；遇 `drive.ErrSourceChanged` / `pan.ErrUnauthorized` 账号级错误或 `ctx.Err()` 立即中止当前账号。
     - `internal/offline/control.go`：`advance` 在 `removeCurrent` 持久化切换到 `actionSubmit` 断点后，重载记录并在独立 `s.submitTimeout` 预算下同轮调用 `resumeSubmission`（先落库断点再提交的崩溃恢复语义保持不变）。
     - 测试：`internal/offline/recovery_test.go` 更新受单轮换源影响的 4 处原有测试（在 `addOffline` hook 中继续验证先落 `actionSubmit` 断点再提交的不变量），新增 `TestRecoveryDoesNotHeadOfLineBlockAcrossMultipleStalledTasks`（首个任务删除失败时不阻塞第 2/3 个任务同轮换源）与 `TestRecoveryStopsSourceOnAccountAuthError`（遇 `ErrUnauthorized` 立即中止当前账号）。`go test ./internal/...`、`go vet ./internal/offline/...`、`gofmt -l` 全部通过；子代理只读 review 指出的提交超时共用与测试缺口已全部补齐。
-- [ ] 🟠 **每次云盘扫描都重新下载所有 NFO**：`internal/library/scan/identity.go:117` 的 `readNFO` 调 `sess.Read`（最多 2MB），不受扫描节流控制，只用来取番号。
+- [x] 🟠 ✅ **每次云盘扫描都重新下载所有 NFO**：`internal/library/scan/identity.go:117` 的 `readNFO` 调 `sess.Read`（最多 2MB），不受扫描节流控制，只用来取番号。
   - 改法：先查已有文件记录，未变化的跳过。
+  - （已修复：已入库且未变化的非失败视频跳过读取 NFO）
+    - `internal/library/scan/types.go`：`Video` 新增内部字段 `known`，标记已在库中锁定身份、无需再读旁路 NFO 的视频。
+    - `internal/library/scan/identity.go`、`walker.go`：`applyManualCodes` 扩展为 `applyKnownCodes(..., preserveUnchanged bool)`，与 `IdentifyScanVideos` 对齐：常规云盘扫描（`OfflineTaskID == 0`）中，同账号且 `Name`/`Size`/`Sha1` 未变、已关联非 `ScrapeStatusFailed` 影片的视频直接沿用 `film.Code` 并标 `known = true`（手动番号无论是否离线/变更均优先标 `Manual = true, known = true`）。`ResolveNFOCodes` 先用全部可识别视频（含 `known`）计算目录 `firstCode`/`shared`，再跳过 `known` 视频的 `readNFO`；`resolveTargetNFO` 对 `known` 视频直接短路，连同省略 `DirectoryEntries`。
+    - 测试：`internal/app/pipeline_e2e_test.go` 的 `TestPipelineUsesNFOCodeButScrapesCatalogueMetadata` 断言二次重扫未变视频时不再读 NFO（`len(reads) == 1`）；`internal/library/scan/identity_test.go` 新增 `TestApplyKnownCodesSkipsUnchangedFilesAndKeepsSharedDetection`（覆盖未变跳过、文件变更或失败重读、多影片混合目录共享判断、离线扫描 `preserveUnchanged=false`、单影片混合目录新视频冲突校验、`resolveTargetNFO` 短路）。`go test ./internal/library/... ./internal/app/...`、`go vet ./internal/library/scan/...`、`gofmt -l` 全部通过；子代理只读评审未发现实质 bug。
+  - 遗留（低）：
+    - 对已入库未变且非失败的视频，若事后仅改了云盘 NFO 内的番号而不改视频文件，重扫时不再报错（此前 `IdentifyScanVideos` 落库也会沿用旧影片番号）。
+    - 极小窗口内若 `applyKnownCodes` 之后、事务落库之前影片刚变为 `ScrapeStatusFailed`，当次扫描仍沿用旧番号，下次扫描自动重读。
 - [ ] 🟠 **发布时逐视频调 `sess.Info`**：`internal/library/scrape/publish.go:84`、`:140-150`（`verifyVideoPositions`）。`Directories` 刚列过同目录，新增的只有 `WithinSource` 检查。
   - 改法：每个目录检查一次。
 - [ ] 🟠 **未开自动下载但已找到磁力的订阅，每天永久重查**：`internal/monitor/check.go:137` 用 `nextDaily`，不走 `nextMovieCheck` 的 stale 策略，每天一次完整多来源聚合。
