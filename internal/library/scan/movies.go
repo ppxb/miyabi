@@ -99,6 +99,25 @@ func movieRank(record *ent.Movie, code string) int {
 	return rank
 }
 
+// compareMovieCode orders equivalent spellings for a newly created movie:
+// shortest first, then lexicographic.
+func compareMovieCode(a, b string) int {
+	return cmp.Or(cmp.Compare(len(a), len(b)), cmp.Compare(a, b))
+}
+
+// preferredNewMovieCode returns the spelling to store when code is created
+// together with other codes from the same import batch. indexMovies applies the
+// same order when it picks the owner of an equivalence group.
+func preferredNewMovieCode(code string, codes []string) string {
+	best := code
+	for _, candidate := range codes {
+		if codeid.IsEquivalent(candidate, code) && compareMovieCode(candidate, best) < 0 {
+			best = candidate
+		}
+	}
+	return best
+}
+
 // indexMovies binds every code to an existing or newly created movie. Equivalent
 // new codes share one record under the shortest spelling, so later scrapes that
 // canonicalize the number cannot collide on the unique movie code.
@@ -115,9 +134,7 @@ func indexMovies(ctx context.Context, tx *ent.Tx, codes []string) (map[string]in
 			pending = append(pending, code)
 		}
 	}
-	slices.SortFunc(pending, func(a, b string) int {
-		return cmp.Or(cmp.Compare(len(a), len(b)), cmp.Compare(a, b))
-	})
+	slices.SortFunc(pending, compareMovieCode)
 	owners := make(map[string][]string)
 	aliases := make(map[string]string)
 	builders := make([]*ent.MovieCreate, 0, len(pending))

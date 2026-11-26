@@ -278,7 +278,10 @@
     - 手动：同源 rebuild 复用父任务，其余冲突；纠正代码时一律冲突；completed 任务忽略（已不再占用影片）。
     - 活跃任务查询按 500 个 resource key 分块，且只解码判定所需字段（`rebuild/source/scan_task_id/completed`），无关 checkpoint 字段损坏不再使整批失败。
     - 测试：`enqueue_test.go` 覆盖 completed 检查点、跨源、rebuild、手动冲突、同挂载改名、窄解码、600/4097 条分块；`local_metadata_test.go` 验证本地路径在已发布任务后仍入队。`go build ./internal/... ./cmd/...`、`go vet ./internal/library/...`、`go test ./internal/library/... ./internal/api/... ./internal/app/... ./internal/tasks/...` 通过；子代理只读 review 两轮，发现的批量变量上限、全量解码、同源比较口径、持锁唤醒均已修复并复核，无遗留 bug。）
-- [ ] 🟢 **本地与云盘导入各有一套影片匹配逻辑**：`internal/library/scan/local_ingest.go:113-159`（逐条 Create）与 `internal/library/scan/movies.go:105`（批量建并合并别名）。
+- [x] 🟢 ✅ **本地与云盘导入各有一套影片匹配逻辑**：`internal/library/scan/local_ingest.go:113-159`（逐条 Create）与 `internal/library/scan/movies.go:105`（批量建并合并别名）。
+  - （复核：匹配已共享——两条路径都用 `loadMovieMatcher`/`movieMatcher.find`；真正分叉只在「新建影片的拼写」：云盘取批内最短等价拼写，本地存首个拼写。）
+  - （已修复：抽出 `compareMovieCode`/`preferredNewMovieCode`，`indexMovies` 的排序与本地懒创建共用同一「最短、再字典序」规则；`local_ingest` 建片改用 `preferredNewMovieCode(media.code, codes)`。保留懒创建与逐条插入：`indexMovies` 预建整批 code 会为 manual 纠正/已导出跳过的文件创建多余影片（见 `TestLocalFilesInDifferentRootsKeepSeparateIdentities` 的语义），且本地批次上限 32，批量插入无收益。）
+  - 测试：新增 `local_spelling_test.go` 覆盖同批装饰码取最短、已有短拼写复用、选码规则（含 CH 后缀/非等价码）；`go build ./internal/... ./cmd/...`、`go vet ./internal/library/...`、`go test ./internal/library/... ./internal/api/... ./internal/app/...` 通过；子代理只读 review 未发现 bug。）
 - [ ] 🟢 **重复类型与转换**：
   - `library.LocalScanTarget` 与 `source.LocalTarget` 字段相同，`internal/app/app.go:116-126` 专门转换；可移到 domain 包。
   - `localMetadataJob`（`internal/library/local.go:18-27`）重复定义 `scrape.MetadataPayload`。

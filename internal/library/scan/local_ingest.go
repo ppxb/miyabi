@@ -217,7 +217,10 @@ func (s *LocalScanner) ingestBatch(ctx context.Context, rootDir string, batch []
 			}
 			record := matcher.find(media.code)
 			if record == nil {
-				record, err = tx.Movie.Create().SetCode(media.code).Save(ctx)
+				// Create lazily so manual corrections and settled exports never
+				// produce a movie row; store the spelling indexMovies would pick
+				// when it indexes equivalent new codes together.
+				record, err = tx.Movie.Create().SetCode(preferredNewMovieCode(media.code, codes)).Save(ctx)
 				if err != nil {
 					return err
 				}
