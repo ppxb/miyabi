@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-query'
 import { beforeEach, expect, onTestFinished, test, vi } from 'vitest'
 
+import { actorKeys } from '@/api/actors'
 import { apiGet } from '@/api/client'
 import * as clientAPI from '@/api/client'
 import { libraryKeys, useStartLibraryScan, useRescrapeLibraryMovie } from '@/api/library'
@@ -241,6 +242,38 @@ test('initial revisions reconcile once, same-instance reconnects stay quiet, and
   await f.events.send('changes', { library: 0, offline: 0, monitor: 0, instance: 'server-b' })
   await vi.advanceTimersByTimeAsync(0)
   for (const key of keys) expect(f.client.getQueryState(key)?.isInvalidated).toBe(true)
+})
+
+test('library bursts refresh at once, then once per interval, without delaying offline views', async () => {
+  const f = fixture()
+  const library = [libraryKeys.all, actorKeys.all]
+  const reset = () => {
+    for (const key of [...library, offlineKeys.all]) f.client.setQueryData(key, [])
+  }
+  const invalidated = (key: readonly unknown[]) => f.client.getQueryState(key)?.isInvalidated
+  reset()
+  await f.events.send('changes', { library: 0, offline: 0, monitor: 0, instance: 'a' })
+  await vi.advanceTimersByTimeAsync(0)
+  for (const key of library) expect(invalidated(key)).toBe(true)
+  reset()
+  // A scrape burst inside the interval waits for one trailing refresh.
+  await f.events.send('changes', { library: 1, offline: 0, monitor: 0, instance: 'a' })
+  await f.events.send('changes', { library: 2, offline: 1, monitor: 0, instance: 'a' })
+  await vi.advanceTimersByTimeAsync(0)
+  for (const key of library) expect(invalidated(key)).toBe(false)
+  expect(invalidated(offlineKeys.all)).toBe(true)
+  await vi.advanceTimersByTimeAsync(1999)
+  for (const key of library) expect(invalidated(key)).toBe(false)
+  await vi.advanceTimersByTimeAsync(1)
+  for (const key of library) expect(invalidated(key)).toBe(true)
+  reset()
+  // A reconnect must not drop the pending refresh: revisions are already recorded.
+  await f.events.send('changes', { library: 3, offline: 1, monitor: 0, instance: 'a' })
+  await vi.advanceTimersByTimeAsync(0)
+  for (const key of library) expect(invalidated(key)).toBe(false)
+  f.reconnect()
+  await vi.advanceTimersByTimeAsync(0)
+  for (const key of library) expect(invalidated(key)).toBe(true)
 })
 
 test('cleanup removes the pending connection timeout', async () => {

@@ -87,8 +87,16 @@
 
 ### 影响大
 
-- [ ] 🔴 ✅ **刮削时整棵查询树反复刷新**：每刮完一部影片后端至少发两次 `NotifyLibraryChanged`（`internal/library/scrape/scrape.go:239`、`internal/library/scrape/publish.go:136`）；前端看到库版本变化就刷新 `libraryKeys.all`、`actorKeys.all`、影片状态和离线任务（`web/src/features/tasks/task-events.tsx:130-133`）。SSE 每 300ms 推一次（`internal/api/sse.go:13`），批量刮削期间当前页面接口被持续重拉。
+- [x] 🟠 ✅ **刮削时整棵查询树反复刷新**（复核后由 🔴 降为 🟠）：每刮完一部影片后端至少发两次 `NotifyLibraryChanged`（`internal/library/scrape/scrape.go:239`、`internal/library/scrape/publish.go:136`）；前端看到库版本变化就刷新 `libraryKeys.all`、`actorKeys.all`、影片状态和离线任务（`web/src/features/tasks/task-events.tsx:130-133`）。SSE 每 300ms 推一次（`internal/api/sse.go:13`），批量刮削期间当前页面接口被持续重拉。
   - 改法：后端合并为每部影片一次、按秒级节流；前端刮削进行中只刷新任务，任务结束或间隔 ≥2s 再刷新 `libraryKeys.all`。
+  - 复核：`invalidateQueries` 只重拉页面上正在用的查询；`refreshQueries` 对同一 key 最多一个请求在途、一个排队（`web/src/api/query-refresh.ts:19-24`），不会堆积。实际是当前影片库/演员页每部影片重拉约两次。P0 第 5 条修复后，已完成影片的重导出只通知一次（`scrape.go:256-258`）。
+  - （已修复：只改前端，后端不变）
+    - `web/src/features/tasks/task-events.tsx`：影片库和演员（`libraryKeys.all`、`actorKeys.all`）的刷新改为 2 秒节流：空闲后的第一次变化立即刷新，2 秒冷却期内的后续变化合并成冷却结束时的一次补刷。冷却用计时器实现，不读系统时钟，时钟回拨不影响。影片状态、离线、订阅仍立即刷新。SSE 重连/卸载时如有待补刷立即执行（重连前修订号已记录，新连接不会再判为变化）。
+    - 后端两次通知保留：`NotifyLibraryChanged` 只是内存计数加一（`internal/tasks/bus.go:97`）。`scrape.go:260` 那次覆盖"元数据已存、发布前遇到暂停或可重试失败"的窗口，删掉后这段时间界面看不到新元数据；节流后两次通知在前端合并，没有额外代价。
+    - 测试：`web/tests/task-events.test.tsx` 新增 `library bursts refresh at once, then once per interval, without delaying offline views`（首次立即刷新、窗口内合并为一次补刷、离线不受节流、重连时补刷不丢）。换回旧代码，或单独去掉重连补刷，测试都会失败。`npx vitest run`（168 个）、`npm run typecheck` 通过；子代理只读 review 未发现 bug。
+  - 遗留（低）：
+    - 批量刮削中途 SSE 重连时，重连补刷加上新连接的首次刷新，2 秒内会刷两次，只多不少。
+    - 其他来源触发的库变化（扫描、手动操作）同样受 2 秒节流，最多延迟 2 秒显示。
 - [ ] 🔴 ✅ **文件没变也通知 Emby**：`internal/export/media.go:20` 的 `WriteMedia` 返回"是否有变化"，但 `internal/library/scrape/publish.go:103` 丢弃该返回值，随后无条件 `NotifyUpdatedTx`；`internal/library/scan/reconcile.go:122` 同样丢弃，全量对账时对每部可复用影片都发通知。
   - 改法：只在 `changed` 为真时通知；重试场景在 payload 里记标记兜底。
 - [ ] 🔴 **启动时 Emby 目录被处理三遍**：

@@ -23,6 +23,11 @@ type ConnectionState = 'connecting' | 'connected' | 'disconnected'
 type TaskConnection = { status: ConnectionState; reconnect: () => void }
 const TaskConnectionContext = createContext<TaskConnection | null>(null)
 
+// Batch scrapes bump the library revision for every movie. Library and actor
+// views refresh at most once per interval: the first change refreshes at once,
+// later ones within the interval share one trailing refresh.
+const libraryRefreshInterval = 2000
+
 export function useTaskConnection() {
   const connection = useContext(TaskConnectionContext)
   if (connection === null) throw new Error('TaskEventsProvider is missing')
@@ -50,7 +55,23 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
     let connectionTimer: ReturnType<typeof setTimeout> | undefined
     let probeTimer: ReturnType<typeof setTimeout> | undefined
     let probeController: AbortController | undefined
+    let libraryTimer: ReturnType<typeof setTimeout> | undefined
+    let libraryPending = false
     let disposed = false
+
+    function refreshLibrary() {
+      if (libraryTimer) {
+        libraryPending = true
+        return
+      }
+      void refreshQueries(queryClient, libraryKeys.all, actorKeys.all)
+      libraryTimer = setTimeout(() => {
+        libraryTimer = undefined
+        if (!libraryPending) return
+        libraryPending = false
+        refreshLibrary()
+      }, libraryRefreshInterval)
+    }
 
     function markDisconnected() {
       setConnection('disconnected')
@@ -129,7 +150,7 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
       const keys: QueryKey[] = []
       const libraryChanged = prev?.library !== next.library
       // Actor catalog and detail derive from library movies (counts, films, merges).
-      if (libraryChanged) keys.push(libraryKeys.all, actorKeys.all)
+      if (libraryChanged) refreshLibrary()
       if (libraryChanged || prev?.offline !== next.offline) {
         keys.push(movieStateKeys.all, offlineKeys.all)
       }
@@ -160,6 +181,9 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
       clearTimeout(probeTimer)
       clearTimeout(retryTimer)
       clearTimeout(connectionTimer)
+      clearTimeout(libraryTimer)
+      // The revisions are already recorded, so a reconnect would not repeat it.
+      if (libraryPending) void refreshQueries(queryClient, libraryKeys.all, actorKeys.all)
     }
   }, [queryClient, attempt])
 
