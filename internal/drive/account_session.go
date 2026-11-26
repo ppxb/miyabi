@@ -56,14 +56,19 @@ func (s *accountSession) checkCredentials(ctx context.Context) error {
 }
 
 func accountWithToken[T any](ctx context.Context, s *accountSession, request func(string) (T, error)) (T, error) {
+	tokens, err := s.drive.accountToken(ctx, s.accountID)
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+	return useToken(ctx, s, tokens, request)
+}
+
+func useToken[T any](ctx context.Context, s *accountSession, tokens pan.Tokens, request func(string) (T, error)) (T, error) {
 	var zero T
 	refreshed := false
 	for {
 		if err := ctx.Err(); err != nil {
-			return zero, err
-		}
-		tokens, err := s.drive.accountToken(ctx, s.accountID)
-		if err != nil {
 			return zero, err
 		}
 		if tokens.AccessToken == "" {
@@ -79,6 +84,11 @@ func accountWithToken[T any](ctx context.Context, s *accountSession, request fun
 		if err := s.drive.refreshAccountTokens(ctx, s.accountID); err != nil {
 			return zero, err
 		}
+		next, err := s.drive.accountToken(ctx, s.accountID)
+		if err != nil {
+			return zero, err
+		}
+		tokens = next
 		refreshed = true
 	}
 }
@@ -115,13 +125,23 @@ func (d *Drive) refreshAccountTokens(ctx context.Context, accountID string) erro
 }
 
 // readAccount discards read results from a replaced account/mount while keeping
-// token refresh independent of the authorization version.
+// token refresh independent of the authorization version. The initial source
+// check and token read share one account row; the check after the request still
+// detects a mount replaced while it was in flight.
 func readAccount[T any](ctx context.Context, s *accountSession, request func(string) (T, error)) (T, error) {
 	var zero T
-	if err := s.checkSource(ctx); err != nil {
+	if s.drive.accountAuthVersion(s.accountID) != s.authVersion {
+		return zero, ErrSourceChanged
+	}
+	record, err := s.drive.accountRecord(ctx, s.accountID)
+	if err != nil {
 		return zero, err
 	}
-	value, err := accountWithToken(ctx, s, request)
+	// Mount reports ok=false for a blank directory, so reject that here too.
+	if record.Directory.ID == "" || record.Directory.ID != s.source.Directory.ID {
+		return zero, ErrSourceChanged
+	}
+	value, err := useToken(ctx, s, record.Tokens, request)
 	if err != nil {
 		return zero, err
 	}

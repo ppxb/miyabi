@@ -55,3 +55,29 @@ func TestMoviesAggregateConfiguredSources(t *testing.T) {
 		t.Fatal("movie from a non-enabled source leaked into the library")
 	}
 }
+
+func TestStartScanQueuesEnabledSourcesWithoutDrive(t *testing.T) {
+	ctx := t.Context()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	enabled := domain.LibrarySource{
+		AccountID: "A",
+		Directory: domain.LibraryDirectory{ID: "10", Name: "Movies", Path: "/Movies"},
+	}
+	lib := New(store.Client, nil, tasks.NewService(store.Client, tasks.NewRegistry()), nil, Options{
+		Sources: func(context.Context) ([]domain.LibrarySource, error) {
+			return []domain.LibrarySource{enabled}, nil
+		},
+	})
+	info, err := lib.StartScan(ctx)
+	if err != nil || info.Source != enabled {
+		t.Fatalf("start scan = %+v, %v", info, err)
+	}
+	if count := store.Client.Task.Query().CountX(ctx); count != 1 {
+		t.Fatalf("queued %d scan tasks, want 1", count)
+	}
+}

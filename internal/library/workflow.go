@@ -81,7 +81,15 @@ func (s *Service) Workflows(ctx context.Context, records []*ent.Task) ([]domain.
 	if err != nil {
 		return nil, err
 	}
-	children, err := metadataGroups(ctx, database, records)
+	payloads := make(map[int]domain.ScanPayload, len(records))
+	for _, record := range records {
+		payload, err := tasks.DecodePayload[domain.ScanPayload](record.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("read scan task %d: %w", record.ID, err)
+		}
+		payloads[record.ID] = payload
+	}
+	children, err := metadataGroups(ctx, database, records, payloads)
 	if err != nil {
 		return nil, fmt.Errorf("read metadata workflow progress: %w", err)
 	}
@@ -90,10 +98,7 @@ func (s *Service) Workflows(ctx context.Context, records []*ent.Task) ([]domain.
 		byParent[child.ParentID] = append(byParent[child.ParentID], child)
 	}
 	for _, record := range records {
-		info, err := scanTaskInfo(record)
-		if err != nil {
-			return nil, err
-		}
+		info := scanTaskInfoFrom(record, payloads[record.ID])
 		active, running, failed, artwork := false, false, false, false
 		for _, child := range byParent[record.ID] {
 			info.Scan.MetadataRetrying += child.Retrying
@@ -140,7 +145,7 @@ func (s *Service) Workflows(ctx context.Context, records []*ent.Task) ([]domain.
 
 // Return one row per parent/type/status, with its count and latest change.
 // Keep large metadata documents inside SQLite instead of decoding every child.
-func metadataGroups(ctx context.Context, database *ent.Client, records []*ent.Task) ([]metadataTaskGroup, error) {
+func metadataGroups(ctx context.Context, database *ent.Client, records []*ent.Task, payloads map[int]domain.ScanPayload) ([]metadataTaskGroup, error) {
 	children := sql.Table(task.Table)
 	parents := make([]any, 0, len(records))
 	for _, record := range records {
@@ -152,10 +157,7 @@ func metadataGroups(ctx context.Context, database *ent.Client, records []*ent.Ta
 		return nil, err
 	}
 	for _, record := range records {
-		input, err := tasks.DecodePayload[domain.ScanPayload](record.Payload)
-		if err != nil {
-			return nil, err
-		}
+		input := payloads[record.ID]
 		if len(input.ReusedTasks) == 0 {
 			continue
 		}
@@ -196,13 +198,17 @@ func scanTaskInfo(record *ent.Task) (domain.TaskInfo, error) {
 	if err != nil {
 		return domain.TaskInfo{}, fmt.Errorf("read scan task %d: %w", record.ID, err)
 	}
+	return scanTaskInfoFrom(record, payload), nil
+}
+
+func scanTaskInfoFrom(record *ent.Task, payload domain.ScanPayload) domain.TaskInfo {
 	return domain.TaskInfo{
 		Rebuild: payload.Rebuild, MovieID: payload.MovieID, Code: payload.Code,
 		ID: record.ID, Type: record.Type, Status: string(record.Status), Progress: record.Progress,
 		Error: record.Error, CanRetry: record.Status == task.StatusFailed, CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
 		RetryAt: record.RetryAt, RetryCount: record.RetryCount,
 		Source: payload.Source, Scan: payload.Scan, OfflineTaskID: payload.OfflineTaskID,
-	}, nil
+	}
 }
 
 // ensureScanTask finds an existing reusable scan task for the source or creates a new queued scan.

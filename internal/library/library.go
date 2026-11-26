@@ -186,8 +186,8 @@ func (s *Service) StartRebuild(ctx context.Context) (domain.TaskInfo, error) {
 }
 
 // enqueueAllScans queues a full scan (or rebuild) for every enabled source:
-// configured local directories and each mounted 115 account, plus the current
-// primary mount. It reports the first queued task and whether anything was
+// configured local directories and enabled 115 sources. It reports the first
+// queued task and whether anything was
 // configured, so callers can fall back to the single primary mount only when no
 // sources exist. This keeps multi-account and local-only setups from needlessly
 // requiring one specific 115 account to be logged in.
@@ -218,7 +218,15 @@ func (s *Service) enqueueAllScans(ctx context.Context, rebuild bool) (domain.Tas
 	}
 
 	var cloud []domain.LibrarySource
-	if s.drive != nil {
+	if s.sources != nil {
+		list, err := s.sources(ctx)
+		if err != nil {
+			return first, queued, err
+		}
+		cloud = list
+	} else if s.drive != nil {
+		// Only tests construct the service without a source provider; production
+		// scans the enabled sources instead of every mounted account.
 		mounts, err := s.drive.Mounts(ctx)
 		if err != nil {
 			return first, queued, err

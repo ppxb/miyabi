@@ -2,7 +2,6 @@ package source
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -98,15 +97,14 @@ func TestLocalRoots(t *testing.T) {
 
 type fakeMounts struct {
 	mounts map[string]domain.LibrarySource
-	broken string
 }
 
-func (f fakeMounts) Mount(_ context.Context, accountID string) (domain.LibrarySource, bool, error) {
-	if accountID == f.broken {
-		return domain.LibrarySource{}, false, errors.New("mount unavailable")
+func (f fakeMounts) Mounts(context.Context) ([]domain.LibrarySource, error) {
+	result := make([]domain.LibrarySource, 0, len(f.mounts))
+	for _, source := range f.mounts {
+		result = append(result, source)
 	}
-	source, ok := f.mounts[accountID]
-	return source, ok, nil
+	return result, nil
 }
 
 func TestLibrarySources(t *testing.T) {
@@ -115,7 +113,7 @@ func TestLibrarySources(t *testing.T) {
 		AccountID: "A",
 		Directory: domain.LibraryDirectory{ID: "10", Name: "Movies", Path: "/Movies"},
 	}
-	service := newTestService(t, fakeMounts{mounts: map[string]domain.LibrarySource{"A": mounted}, broken: "ERR"})
+	service := newTestService(t, fakeMounts{mounts: map[string]domain.LibrarySource{"A": mounted}})
 
 	if _, err := service.Replace(ctx, []Source{
 		{Kind: Kind115, Name: "broken", Enabled: true, Config: map[string]string{"account_id": "ERR"}},

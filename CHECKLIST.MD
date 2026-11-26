@@ -231,13 +231,27 @@
     - 测试：新增 `internal/offline/wake_test.go`（成功提交与取消各产生一次信号；失败的提交不发信号）。`go test -count=1 ./internal/...`、`go vet ./internal/offline/... ./internal/app/...`、`gofmt -l` 通过。
   - 说明（低）：
     - 条目中"monitor 有 `Pending()`"与实际不符：monitor 的 `RunPeriodic` 目前同样传 `nil`。本次仅修复离线同步，monitor 的检查节奏未改。
-- [ ] 🟢 **零碎重复读取**：
+- [x] 🟢 ✅ **零碎重复读取**：
   - `internal/drive/account_session.go:119-132` 的 `readAccount` 每次调用 115 查 3 次 PanAccount；
   - 离线同步 `config()` 每轮读两次（`internal/offline/sync.go:67`、`internal/offline/recovery.go:81`）；
   - `AddByCode` 先调 `Mounts`，`addForAccount` 再调一次 `Mount`；
   - `CatalogueMagnetsByCode` 查内存缓存前先查一次数据库（`internal/catalogue/magnets.go:45`）；
   - 手动扫描用 `drive.Mounts`（含未启用账号，`internal/library/library.go:222`），增量同步用 `s.sources`（`:359`），每个请求重复调用 `Mounts` / `source.List` / 逐账号 `Mount`（`:387-431`）；
   - `internal/library/workflow.go:154-170` 对每条带复用引用的扫描记录各查一次，payload 解码两次。
+  - （已修复：去掉可安全消除的重复读取）
+    - `internal/drive/account_session.go`：`readAccount` 首次换源校验与 token 读取共用同一 PanAccount 行，查询 3 次降为 2 次；请求结束后的二次校验保留（空目录也视为换源）。`accountWithToken` 对其他调用方语义不变。新增 `TestReadRejectsMountChangedDuringRequest`。
+    - `internal/offline/sync.go`、`recovery.go`：`syncSource` 每源只读一次 `subscription.config`，把 cfg/prefs 传给 `recoverSource`；`advance` 仍按操作读取最新配置。
+    - `internal/source/source.go`：`MountProvider` 改为 `Mounts`，`LibrarySources` 一次加载全部挂载后按 account_id 匹配，去掉逐账号 `Mount`；测试 stub 同步更新。
+    - `internal/library/workflow.go`：`Workflows` 每条 scan payload 只解码一次，`scanTaskInfoFrom` 与 `metadataGroups` 复用；单条 `scanTaskInfo` 调用方仍自行解码。
+    - `internal/library/library.go`：手动扫描/重建改用 `s.sources`（仅启用 115 源），未配置 `Sources` 时才回退 `drive.Mounts`；新增 `TestStartScanQueuesEnabledSourcesWithoutDrive`。
+    - 测试：`go test -count=1 ./internal/...`（0 FAIL）、`go vet ./internal/...`、`gofmt -l` 通过。
+  - 已核查/不改：
+    - `AddByCode` 已不存在：离线 API 直接传 account_id，`AddForAccount` 只调用一次 `Mount`。
+    - `CatalogueMagnetsByCode` 的 DB 查询用于决定缓存 key 是否包含 JavDB（无 JavDB 的结果不能回答可含 JavDB 的请求），属正确性要求；单行索引查询，保留。
+  - 遗留（低）：
+    - `cloudSources` 每次调用仍会 `Mounts` + `source.List` + `Mounts`；请求级缓存需要失效设计，本次未做。
+    - `metadataGroups` 对带复用引用的扫描记录仍逐条执行一次 SQL；批量查询复杂度高、收益小，未改。
+    - `source.LibrarySources` 改为单次 `Mounts` 后，整体查询失败会返回错误（不再逐账号跳过）；仅 DB 级故障会触发，属可接受变化。
 
 ---
 

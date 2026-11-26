@@ -78,11 +78,7 @@ func (s *Service) lockTask(ctx context.Context, id int) (func(), error) {
 	return s.operations.Lock(ctx, "task", fmt.Sprint(id))
 }
 
-func (s *Service) recoverSource(ctx context.Context, source domain.LibrarySource, cache *remoteTaskCache) error {
-	cfg, prefs, err := s.config(ctx)
-	if err != nil {
-		return err
-	}
+func (s *Service) recoverSource(ctx context.Context, source domain.LibrarySource, cfg download.Config, prefs magnet.Preferences, cache *remoteTaskCache) error {
 	records, err := s.database.OfflineDownload.Query().Where(
 		offlinedownload.AccountIDEQ(source.AccountID), offlinedownload.DirectoryIDEQ(source.Directory.ID),
 		offlinedownload.StatusIn(offlinedownload.StatusRunning, offlinedownload.StatusFailed)).

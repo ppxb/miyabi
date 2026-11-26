@@ -26,6 +26,23 @@ func TestOpenSourceReads(t *testing.T) {
 	}
 }
 
+func TestReadRejectsMountChangedDuringRequest(t *testing.T) {
+	d, client := mountedTestDrive(t)
+	client.list = func(ctx context.Context, _, _ string, _, _ int) (pan.FilePage, error) {
+		if err := d.ClearDirectoryForAccount(ctx, testSource.AccountID); err != nil {
+			t.Fatal(err)
+		}
+		return pan.FilePage{Files: []pan.File{{ID: "f1"}}}, nil
+	}
+	sess, err := d.OpenSource(t.Context(), testSource)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sess.List(t.Context(), testSource.Directory.ID, 0); !errors.Is(err, ErrSourceChanged) {
+		t.Fatalf("mount changed during read = %v, want ErrSourceChanged", err)
+	}
+}
+
 func TestOpenSourceRejectsChangedMount(t *testing.T) {
 	d, _ := mountedTestDrive(t)
 	sess, err := d.OpenSource(t.Context(), testSource)
