@@ -85,6 +85,7 @@ test('subtitle save refreshes only the queries that render the subtitle badge', 
     new Set([
       ['subtitles', 7, 'tracks'],
       ['library', 'detail', 7],
+      ['actors', 'detail'],
       ['history'],
       ['library', 'movies'],
       ['library', 'browse'],

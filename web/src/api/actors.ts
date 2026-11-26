@@ -48,7 +48,9 @@ export const actorKeys = {
   all: ['actors'] as const,
   catalog: (q: string, page: number, limit: number) =>
     ['actors', 'catalog', q, page, limit] as const,
-  detail: (key: string) => ['actors', 'detail', key] as const
+  detail: (key: string) => ['actors', 'detail', key] as const,
+  // Actor pages embed library cards, so playback and subtitle changes refresh them.
+  details: ['actors', 'detail'] as const
 }
 
 export function useActorCatalog(params: { q?: string; page: number; limit: number }) {

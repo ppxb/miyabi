@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { actorKeys } from '@/api/actors'
 import { apiDelete, apiGet, apiPost } from '@/api/client'
 import { historyKeys } from '@/api/history'
 import { libraryKeys } from '@/api/library'
@@ -109,6 +110,7 @@ export function useSaveSubtitle(movieID: number) {
         queryClient,
         subtitleKeys.tracks(movieID),
         libraryKeys.detail(movieID),
+        actorKeys.details,
         historyKeys.all,
         ...libraryKeys.cards
       ),
@@ -125,6 +127,7 @@ export function useDeleteSubtitle(movieID: number) {
         queryClient,
         subtitleKeys.tracks(movieID),
         libraryKeys.detail(movieID),
+        actorKeys.details,
         historyKeys.all,
         ...libraryKeys.cards
       ),

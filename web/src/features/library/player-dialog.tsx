@@ -15,6 +15,7 @@ import {
 } from 'react'
 import { toast } from 'sonner'
 
+import { actorKeys } from '@/api/actors'
 import { describeApiError } from '@/api/client'
 import { libraryKeys, useLibraryMovie } from '@/api/library'
 import type { LibraryMovieDetail } from '@/api/library'
@@ -441,6 +442,7 @@ function PlaybackSync({
       clearInterval(timer)
       saveProgress()
       void queryClient.invalidateQueries({ queryKey: historyKeys.all })
+      void queryClient.invalidateQueries({ queryKey: actorKeys.details })
       // The finished badge on library cards is derived from saved progress.
       for (const queryKey of libraryKeys.cards) {
         void queryClient.invalidateQueries({ queryKey })
