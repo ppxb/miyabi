@@ -123,8 +123,20 @@
     - 增量模式仍按页查询已完成影片，并对每部 `stat` 一次导出目录，不再读图片。
     - 单个导出文件损坏（目录还在）要等手动全量扫描修复。
     - 多分段影片在增量扫描中删掉一个分段后，残留的 `cd2.strm` 查不到文件行，每次启动仍按旧逻辑导入：重写这部影片的元数据并通知 Emby，直到全量扫描清掉它。因为增量不再写回封面，这种情况不会再形成劣化循环。
-- [ ] 🔴 ✅ **磁力缓存经常失效**：`internal/magnet/aggregator.go:192` 只要有来源失败或被拦即标记 partial；`internal/catalogue/magnets.go:53` 遇 partial 返回 `ErrDoNotCache`。一个来源长期被拦或冷却，1 分钟缓存就形同虚设，叠加 P0 的二次聚合，远程请求翻倍。
+- [x] 🔴 ✅ **磁力缓存经常失效**：`internal/magnet/aggregator.go:192` 只要有来源失败或被拦即标记 partial；`internal/catalogue/magnets.go:53` 遇 partial 返回 `ErrDoNotCache`。一个来源长期被拦或冷却，1 分钟缓存就形同虚设，叠加 P0 的二次聚合，远程请求翻倍。
   - 改法：partial 结果也缓存，TTL 15–30 秒；内部调用方复用已选中的磁力。
+  - （已修复：按用户决定改为统一长 TTL + 空结果短 TTL，不做来源/年龄分级）
+    - `catalogue/service.go`：磁力缓存 `64 条 / 1 分钟` → `512 条 / 6 小时`；新增 `magnetsEmptyTTL = 5 分钟`，并更新缓存注释。
+    - `catalogue/magnets.go`：不再因 partial 丢弃缓存，聚合结果（含部分来源失败、被拦、熔断冷却）一律缓存 6 小时；0 条磁力时按 5 分钟缓存；全部来源失败仍是 error、不缓存。
+    - `magnet/aggregator.go`：删除"部分来源失败且未找到磁力"时返回 error 的分支（按用户决定，方案 A）。该情况改为 0 条结果 + `partial=true` + nil error，于是走 5 分钟空结果缓存、前端显示"暂无磁力"；每个失败来源仍逐条记 `slog.Warn`。只剩"所有活动来源都失败"返回 error。
+    - `catalogue/cache.go`：`responseCache` 的 load 回调可返回条目级 TTL（正数覆盖默认 TTL，0 用默认），`cachedJavDB` 透传；`ErrDoNotCache` 机制保留但磁力不再使用。
+    - `catalogue/magnet_settings.go`：磁力来源开关变更后 `service.magnets.reset()`。原来 1 分钟 TTL 下未处理，长 TTL 会让已关闭来源的磁力继续显示。
+    - 测试：`cache_test.go` 新增 `TestResponseCachePerValueTTLExpiresSooner`（5 分钟条目到期后重载，默认 TTL 条目不受影响）与 `TestResponseCacheResetDropsInFlightLoads`（reset 之前开始的加载完成后不写回）；`javbus_test.go` 原 `TestMagnetsOptionalSourceFailureDoesNotCachePartialResults` 改写为 `TestMagnetsOptionalSourceFailureIsCachedUntilReset`（partial 命中缓存、失败来源不重查，reset 后恢复来源被重新查询）；`magnet_settings_test.go` 新增 `TestMagnetSourceSettingsInvalidateCachedMagnets`（开关注销缓存，关闭来源后返回空且不再查询）；新增 `magnets_cache_test.go`：`TestMagnetsEmptyResultsExpireAfterEmptyTTL`（一个来源失败、另一个返回 0 条：无 error，5 分钟到期重查）、`TestMagnetsTotallyFailedLookupsAreNotCached`（全失败返回 error、不缓存）；`magnet/aggregator_test.go` 原 `TestAggregatorEmptyResultWithPartialFailureFails` 改写为 `TestAggregatorEmptyResultWithPartialFailureReportsPartial`。反向验证：去掉 `magnets.reset()`、恢复 partial 不缓存、空结果改回默认 TTL、恢复聚合器返回 error，四个新测试分别失败（已实测）。`go test ./internal/...` 全部通过，`gofmt -l` 无输出。子代理只读 review 未发现缓存并发、锁序或 TTL 传参问题。
+  - 遗留（中）：
+    - 瞬时失败（单次超时）也会让该来源的磁力缺席 6 小时；熔断冷却只有 5 分钟，但冷却结束后也要最多等 6 小时才会重新查询该来源（没有主动刷新入口）。这是统一长 TTL 的代价。
+    - 离线自动换源：部分来源失败且该番号在所有健康来源都没有磁力时，现在按"暂无其他符合偏好的磁力"把任务标记为 `Exhausted`（`internal/offline/control.go:66-73`）；以前是返回 error、等下一轮重试。只有该番号本来就没有任何磁力时才会触发，已有磁力可换源的下载不受影响。
+    - 前端没有"刷新磁力"入口，用户无法提前绕过缓存，只能等 TTL 到期或重启进程（缓存是进程内存，重启即失）。
+    - 部分来源被拦或冷却时，其结果会以"缺该来源"的形态缓存 6 小时；来源恢复后最多延迟 6 小时补齐。
 
 ### 影响中
 

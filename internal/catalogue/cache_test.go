@@ -14,13 +14,13 @@ func TestResponseCacheSharesLoadsWithoutSharingCallerCancellation(t *testing.T) 
 		cache := newResponseCache[int](2, time.Minute)
 		var calls atomic.Int32
 		finish := make(chan struct{})
-		load := func(ctx context.Context) (int, error) {
+		load := func(ctx context.Context) (int, time.Duration, error) {
 			calls.Add(1)
 			select {
 			case <-finish:
-				return 42, nil
+				return 42, 0, nil
 			case <-ctx.Done():
-				return 0, ctx.Err()
+				return 0, 0, ctx.Err()
 			}
 		}
 		first, cancel := context.WithCancel(t.Context())
@@ -58,13 +58,13 @@ func TestResponseCacheCancelsAbandonedLoad(t *testing.T) {
 		finishOldLoad := make(chan struct{})
 		finished := make(chan struct{})
 		go func() {
-			_, _ = cache.get(ctx, "abandon", func(callCtx context.Context) (int, error) {
+			_, _ = cache.get(ctx, "abandon", func(callCtx context.Context) (int, time.Duration, error) {
 				defer close(finished)
 				select {
 				case <-callCtx.Done():
 					close(upstreamCanceled)
 					<-finishOldLoad
-					return 0, callCtx.Err()
+					return 0, 0, callCtx.Err()
 				}
 			})
 		}()
@@ -84,8 +84,8 @@ func TestResponseCacheCancelsAbandonedLoad(t *testing.T) {
 func TestResponseCacheEvictsLeastRecentlyUsedAtCapacity(t *testing.T) {
 	cache := newResponseCache[string](2, time.Hour)
 	ctx := t.Context()
-	load := func(val string) func(context.Context) (string, error) {
-		return func(context.Context) (string, error) { return val, nil }
+	load := func(val string) func(context.Context) (string, time.Duration, error) {
+		return func(context.Context) (string, time.Duration, error) { return val, 0, nil }
 	}
 	_, _ = cache.get(ctx, "a", load("val-a"))
 	_, _ = cache.get(ctx, "b", load("val-b"))
@@ -95,9 +95,9 @@ func TestResponseCacheEvictsLeastRecentlyUsedAtCapacity(t *testing.T) {
 	_, _ = cache.get(ctx, "c", load("val-c"))
 
 	var reloadedB bool
-	_, _ = cache.get(ctx, "b", func(context.Context) (string, error) {
+	_, _ = cache.get(ctx, "b", func(context.Context) (string, time.Duration, error) {
 		reloadedB = true
-		return "reloaded-b", nil
+		return "reloaded-b", 0, nil
 	})
 	if !reloadedB {
 		t.Fatal("b was not evicted")
@@ -109,26 +109,26 @@ func TestResponseCacheRefreshDetachesOlderLoad(t *testing.T) {
 	started, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(done)
-		_, _ = cache.get(t.Context(), "movie", func(context.Context) (string, error) {
+		_, _ = cache.get(t.Context(), "movie", func(context.Context) (string, time.Duration, error) {
 			close(started)
 			<-release
-			return "old", nil
+			return "old", 0, nil
 		})
 	}()
 	<-started
 	cache.invalidate("movie")
-	_, err := cache.get(t.Context(), "movie", func(context.Context) (string, error) { return "fresh", nil })
+	_, err := cache.get(t.Context(), "movie", func(context.Context) (string, time.Duration, error) { return "fresh", 0, nil })
 	close(release)
 	<-done
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := cache.get(t.Context(), "movie", func(context.Context) (string, error) { t.Error("fresh cache lost"); return "", nil })
+	got, err := cache.get(t.Context(), "movie", func(context.Context) (string, time.Duration, error) { t.Error("fresh cache lost"); return "", 0, nil })
 	if err != nil || got != "fresh" {
 		t.Fatalf("older load overwrote refresh: %s %v", got, err)
 	}
 	cache.invalidate("movie")
-	got, err = cache.get(t.Context(), "movie", func(context.Context) (string, error) { return "newer", nil })
+	got, err = cache.get(t.Context(), "movie", func(context.Context) (string, time.Duration, error) { return "newer", 0, nil })
 	if err != nil || got != "newer" {
 		t.Fatalf("completed cache not invalidated: %s %v", got, err)
 	}
@@ -138,9 +138,9 @@ func TestResponseCacheDoNotCacheBypassesStorage(t *testing.T) {
 	cache := newResponseCache[string](2, time.Hour)
 	ctx := t.Context()
 	var loadCalls int
-	load := func(context.Context) (string, error) {
+	load := func(context.Context) (string, time.Duration, error) {
 		loadCalls++
-		return "partial-val", ErrDoNotCache
+		return "partial-val", 0, ErrDoNotCache
 	}
 
 	val, err := cache.get(ctx, "partial", load)
@@ -158,5 +158,72 @@ func TestResponseCacheDoNotCacheBypassesStorage(t *testing.T) {
 	val2, err := cache.get(ctx, "partial", load)
 	if err != nil || val2 != "partial-val" || loadCalls != 2 {
 		t.Fatalf("expected second load call, loadCalls=%d val2=%s err=%v", loadCalls, val2, err)
+	}
+}
+
+func TestResponseCachePerValueTTLExpiresSooner(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		cache := newResponseCache[string](2, time.Hour)
+		var shortCalls, defaultCalls int
+		short := func(context.Context) (string, time.Duration, error) {
+			shortCalls++
+			return "short", 5 * time.Minute, nil
+		}
+		defaultTTL := func(context.Context) (string, time.Duration, error) {
+			defaultCalls++
+			return "default", 0, nil
+		}
+		for range 2 {
+			if _, err := cache.get(t.Context(), "short", short); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := cache.get(t.Context(), "default", defaultTTL); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if shortCalls != 1 || defaultCalls != 1 {
+			t.Fatalf("values were not cached within their TTLs, loads = %d/%d", shortCalls, defaultCalls)
+		}
+		time.Sleep(5*time.Minute + time.Second)
+		if _, err := cache.get(t.Context(), "short", short); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := cache.get(t.Context(), "default", defaultTTL); err != nil {
+			t.Fatal(err)
+		}
+		if shortCalls != 2 {
+			t.Fatalf("value outlived its per-value TTL, loads = %d", shortCalls)
+		}
+		if defaultCalls != 1 {
+			t.Fatalf("default-TTL entry expired with the shorter one, loads = %d", defaultCalls)
+		}
+	})
+}
+
+func TestResponseCacheResetDropsInFlightLoads(t *testing.T) {
+	cache := newResponseCache[string](2, time.Hour)
+	started, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = cache.get(t.Context(), "movie", func(context.Context) (string, time.Duration, error) {
+			close(started)
+			<-release
+			return "old", 0, nil
+		})
+	}()
+	<-started
+	cache.reset()
+	_, err := cache.get(t.Context(), "movie", func(context.Context) (string, time.Duration, error) { return "fresh", 0, nil })
+	close(release)
+	<-done
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := cache.get(t.Context(), "movie", func(context.Context) (string, time.Duration, error) {
+		t.Error("in-flight load overwrote reset")
+		return "", 0, nil
+	})
+	if err != nil || got != "fresh" {
+		t.Fatalf("reset result = %s, err = %v", got, err)
 	}
 }

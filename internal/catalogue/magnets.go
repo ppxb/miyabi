@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -47,15 +48,19 @@ func (service *Service) magnetsByCode(ctx context.Context, code, javdbID string)
 		key += "|javdb:" + javdbID
 	}
 	ref := domain.MovieRef{Code: code, JavdbID: javdbID}
-	magnets, err := cachedJavDB(ctx, service, service.magnets, key, func(ctx context.Context) ([]domain.Magnet, error) {
-		magnets, partial, err := service.aggregator.FindDetailed(ctx, ref)
+	// Partial results are cached too: a missing source is usually a lasting
+	// block or cooldown, and re-querying every source on each page load is what
+	// made this cache ineffective. Empty results expire sooner so a release
+	// whose magnets have not appeared yet is picked up quickly.
+	magnets, err := cachedJavDB(ctx, service, service.magnets, key, func(ctx context.Context) ([]domain.Magnet, time.Duration, error) {
+		magnets, _, err := service.aggregator.FindDetailed(ctx, ref)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
-		if partial {
-			return magnets, ErrDoNotCache
+		if len(magnets) == 0 {
+			return magnets, magnetsEmptyTTL, nil
 		}
-		return magnets, nil
+		return magnets, 0, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("get magnets by code: %w", err)

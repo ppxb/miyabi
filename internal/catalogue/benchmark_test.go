@@ -14,8 +14,8 @@ var benchmarkCatalogueResult any
 func BenchmarkResponseCache(b *testing.B) {
 	cache := newResponseCache[string](128, time.Minute)
 	ctx := b.Context()
-	load := func(ctx context.Context) (string, error) {
-		return "cached-value", nil
+	load := func(ctx context.Context) (string, time.Duration, error) {
+		return "cached-value", 0, nil
 	}
 	b.ReportAllocs()
 	for b.Loop() {

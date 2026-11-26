@@ -47,7 +47,9 @@ func newResponseCache[T any](capacity int, ttl time.Duration) *responseCache[T] 
 	}
 }
 
-func (cache *responseCache[T]) get(ctx context.Context, key string, load func(context.Context) (T, error)) (T, error) {
+// get returns the cached value for key, loading it on a miss. A load may
+// return a positive TTL to expire this value sooner than the cache default.
+func (cache *responseCache[T]) get(ctx context.Context, key string, load func(context.Context) (T, time.Duration, error)) (T, error) {
 	var zero T
 	if err := ctx.Err(); err != nil {
 		return zero, err
@@ -81,8 +83,8 @@ func (cache *responseCache[T]) get(ctx context.Context, key string, load func(co
 	}
 }
 
-func (cache *responseCache[T]) load(key string, call *cacheLoad[T], load func(context.Context) (T, error)) {
-	value, err := load(call.ctx)
+func (cache *responseCache[T]) load(key string, call *cacheLoad[T], load func(context.Context) (T, time.Duration, error)) {
+	value, ttl, err := load(call.ctx)
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	call.value, call.err = value, err
@@ -92,8 +94,11 @@ func (cache *responseCache[T]) load(key string, call *cacheLoad[T], load func(co
 			if len(cache.entries) == cache.capacity {
 				cache.remove(cache.recent.Back())
 			}
+			if ttl <= 0 {
+				ttl = cache.ttl
+			}
 			cache.entries[key] = cache.recent.PushFront(cacheEntry[T]{
-				key: key, value: value, expires: time.Now().Add(cache.ttl),
+				key: key, value: value, expires: time.Now().Add(ttl),
 			})
 		}
 	}
@@ -119,15 +124,15 @@ func (cache *responseCache[T]) remove(element *list.Element) {
 	cache.recent.Remove(element)
 }
 
-func cachedJavDB[T any](ctx context.Context, service *Service, cache *responseCache[T], key string, load func(context.Context) (T, error)) (T, error) {
-	return cache.get(ctx, key, func(ctx context.Context) (T, error) {
-		value, err := load(ctx)
+func cachedJavDB[T any](ctx context.Context, service *Service, cache *responseCache[T], key string, load func(context.Context) (T, time.Duration, error)) (T, error) {
+	return cache.get(ctx, key, func(ctx context.Context) (T, time.Duration, error) {
+		value, ttl, err := load(ctx)
 		if err == nil {
 			if routeErr := service.persistActiveRoute(ctx); routeErr != nil {
 				slog.WarnContext(ctx, "failed to persist active JavDB route", "error", routeErr)
 			}
 		}
-		return value, err
+		return value, ttl, err
 	})
 }
 

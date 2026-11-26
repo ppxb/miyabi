@@ -34,7 +34,7 @@ func (s *recoveringJavBusSource) Find(_ context.Context, ref domain.MovieRef) ([
 	return []domain.Magnet{{Hash: "2222222222222222222222222222222222222222", Name: "supplement", Sources: []string{domain.MagnetSourceJavBus}}}, nil
 }
 
-func TestMagnetsOptionalSourceFailureDoesNotCachePartialResults(t *testing.T) {
+func TestMagnetsOptionalSourceFailureIsCachedUntilReset(t *testing.T) {
 	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -51,16 +51,23 @@ func TestMagnetsOptionalSourceFailureDoesNotCachePartialResults(t *testing.T) {
 	if err != nil || len(partial) != 1 || partial[0].Hash != primary.magnets[0].Hash {
 		t.Fatalf("primary magnet unavailable during partial failure: magnets=%+v error=%v", partial, err)
 	}
+	// A partial result is cached now: the next lookup must not re-query the
+	// source that failed.
+	cached, err := service.CatalogueMagnetsByCode(t.Context(), "SSIS-001")
+	if err != nil || len(cached) != 1 {
+		t.Fatalf("partial result was not cached: magnets=%+v error=%v", cached, err)
+	}
+	if supplement.calls != 1 {
+		t.Fatalf("cached partial lookup reached JavBus %d times", supplement.calls)
+	}
+	// Only an invalidation makes the recovered source show up.
+	service.magnets.reset()
 	domainMagnets, err := service.CatalogueMagnetsByCode(t.Context(), "SSIS-001")
 	if err != nil || len(domainMagnets) != 2 {
-		t.Fatalf("domain lookup did not retry partial results: magnets=%+v error=%v", domainMagnets, err)
-	}
-	magnets, err := service.MagnetsByCode(t.Context(), "SSIS-001", "")
-	if err != nil || len(magnets) != 2 {
-		t.Fatalf("API lookup lost supplemented result: magnets=%+v error=%v", magnets, err)
+		t.Fatalf("reset did not pick up recovered source: magnets=%+v error=%v", domainMagnets, err)
 	}
 	if supplement.calls != 2 {
-		t.Fatalf("expected retry then cache hit, got %d upstream calls", supplement.calls)
+		t.Fatalf("expected one retry after reset, got %d upstream calls", supplement.calls)
 	}
 }
 

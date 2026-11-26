@@ -125,13 +125,16 @@ func NewWithClients(
 	return service, nil
 }
 
-// Response caches absorb repeated page loads; entries are small and short-lived
-// so JavDB changes (new magnets, edited metadata) surface within minutes.
+// Response caches absorb repeated page loads. Lists and details stay short-lived
+// so JavDB edits surface within minutes. Magnet lists change slowly once a
+// release is out, so they are kept for hours; an empty magnet list is retried
+// after magnetsEmptyTTL because it usually means the release is still fresh.
 const (
 	listCacheSize, listCacheTTL       = 128, time.Minute
 	detailCacheSize, detailCacheTTL   = 256, 5 * time.Minute
 	tagsCacheSize, tagsCacheTTL       = 5, 24 * time.Hour
-	magnetsCacheSize, magnetsCacheTTL = 64, time.Minute
+	magnetsCacheSize, magnetsCacheTTL = 512, 6 * time.Hour
+	magnetsEmptyTTL                   = 5 * time.Minute
 )
 
 func newService(database *ent.Client, primary JavDBClient, supplement JavBusSource, local LocalState, route persistedRoute, sukebei magnet.Source, extraMagnets ...magnet.Source) *Service {
@@ -190,8 +193,9 @@ func (service *Service) Browse(
 	options domain.BrowseOptions,
 ) ([]Movie, error) {
 	key := fmt.Sprintf("browse:%#v", options)
-	movies, err := cachedJavDB(ctx, service, service.lists, key, func(ctx context.Context) ([]domain.Movie, error) {
-		return service.javdb.Browse(ctx, options)
+	movies, err := cachedJavDB(ctx, service, service.lists, key, func(ctx context.Context) ([]domain.Movie, time.Duration, error) {
+		movies, err := service.javdb.Browse(ctx, options)
+		return movies, 0, err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("browse JavDB: %w", err)
@@ -208,15 +212,15 @@ func (service *Service) ResolveMovieID(ctx context.Context, code string) (string
 }
 
 func (service *Service) CatalogueDetail(ctx context.Context, movieID string) (domain.MovieDetail, error) {
-	return cachedJavDB(ctx, service, service.details, movieID, func(ctx context.Context) (domain.MovieDetail, error) {
+	return cachedJavDB(ctx, service, service.details, movieID, func(ctx context.Context) (domain.MovieDetail, time.Duration, error) {
 		detail, err := service.javdb.MovieDetail(ctx, movieID)
 		if err != nil {
-			return domain.MovieDetail{}, err
+			return domain.MovieDetail{}, 0, err
 		}
 		if err := service.completeMovieTags(ctx, &detail); err != nil {
-			return domain.MovieDetail{}, err
+			return domain.MovieDetail{}, 0, err
 		}
-		return detail, nil
+		return detail, 0, nil
 	})
 }
 
@@ -261,8 +265,9 @@ func (service *Service) Media(ctx context.Context, rawURL string) (domain.Media,
 }
 
 func (service *Service) Tags(ctx context.Context, zone domain.Zone) ([]domain.TagCategory, error) {
-	categories, err := cachedJavDB(ctx, service, service.tags, string(zone), func(ctx context.Context) ([]domain.TagCategory, error) {
-		return service.javdb.Tags(ctx, zone)
+	categories, err := cachedJavDB(ctx, service, service.tags, string(zone), func(ctx context.Context) ([]domain.TagCategory, time.Duration, error) {
+		categories, err := service.javdb.Tags(ctx, zone)
+		return categories, 0, err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("get JavDB tags: %w", err)

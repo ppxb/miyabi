@@ -19,8 +19,8 @@ func TestMovieTagsResolveGlobalIDsFromCachedTaxonomies(t *testing.T) {
 		domain.ZoneFC2:        {},
 	}
 	for zone, categories := range fixtures {
-		if _, err := service.tags.get(t.Context(), string(zone), func(context.Context) ([]domain.TagCategory, error) {
-			return categories, nil
+		if _, err := service.tags.get(t.Context(), string(zone), func(context.Context) ([]domain.TagCategory, time.Duration, error) {
+			return categories, 0, nil
 		}); err != nil {
 			t.Fatal(err)
 		}

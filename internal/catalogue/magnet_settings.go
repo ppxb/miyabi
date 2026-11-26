@@ -89,5 +89,7 @@ func (service *Service) UpdateMagnetSourceSettings(ctx context.Context, settings
 		service.magnetToggles[item.ID].SetEnabled(item.Enabled)
 	}
 	service.magnetSettings = slices.Clone(settings)
+	// Cached results were aggregated from the previous source set.
+	service.magnets.reset()
 	return nil
 }

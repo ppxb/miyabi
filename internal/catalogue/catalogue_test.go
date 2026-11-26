@@ -429,9 +429,9 @@ func TestCachedJavDBIgnoresPersistActiveRouteFailure(t *testing.T) {
 
 	cache := newResponseCache[string](2, time.Hour)
 	var loadCalls int
-	load := func(context.Context) (string, error) {
+	load := func(context.Context) (string, time.Duration, error) {
 		loadCalls++
-		return "test-result", nil
+		return "test-result", 0, nil
 	}
 
 	val, err := cachedJavDB(t.Context(), service, cache, "key-1", load)

@@ -81,8 +81,7 @@ type queryResult struct {
 var ErrSkipped = errors.New("magnet source skipped")
 
 // Find returns the merged magnets of all sources. One failing source is only
-// logged; the call fails when every source failed or when no magnets were found
-// despite failures.
+// logged; the call fails only when every active source failed.
 func (a *Aggregator) Find(ctx context.Context, ref domain.MovieRef) ([]domain.Magnet, error) {
 	magnets, _, err := a.FindDetailed(ctx, ref)
 	return magnets, err
@@ -162,10 +161,10 @@ func (a *Aggregator) FindDetailed(ctx context.Context, ref domain.MovieRef) ([]d
 	if activeSources > 0 && len(failures) == activeSources {
 		return nil, false, domain.E(domain.KindUpstream, "所有磁力来源均不可用", errors.Join(failures...))
 	}
-	if len(merged) == 0 && len(failures) > 0 {
-		return nil, false, domain.E(domain.KindUpstream, "部分磁力来源失败且未找到磁力", errors.Join(failures...))
-	}
 
+	// Zero magnets despite some failed sources is reported as an empty result
+	// with partial=true: the failures are logged per source above, and callers
+	// treat "no magnets yet" as a normal answer rather than an error.
 	result := make([]domain.Magnet, 0, len(merged))
 	for _, hash := range order {
 		item := merged[hash]

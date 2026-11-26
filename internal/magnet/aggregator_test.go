@@ -179,14 +179,14 @@ func TestAggregatorSkippedSourceDoesNotMaskFailure(t *testing.T) {
 	}
 }
 
-func TestAggregatorEmptyResultWithPartialFailureFails(t *testing.T) {
+func TestAggregatorEmptyResultWithPartialFailureReportsPartial(t *testing.T) {
 	sources := []Source{
 		&stubSource{name: "javdb", err: errors.New("javdb down")},
 		&stubSource{name: domain.MagnetSourceJavBus, magnets: nil},
 	}
-	_, err := NewAggregator(sources, time.Second).Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
-	if !domain.IsKind(err, domain.KindUpstream) {
-		t.Fatalf("expected KindUpstream when zero magnets found and a source failed, got %v", err)
+	results, partial, err := NewAggregator(sources, time.Second).FindDetailed(t.Context(), domain.MovieRef{Code: "SSIS-001"})
+	if err != nil || len(results) != 0 || !partial {
+		t.Fatalf("expected 0 results, partial=true, nil err; got results=%d partial=%v err=%v", len(results), partial, err)
 	}
 }
 
