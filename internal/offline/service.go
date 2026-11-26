@@ -44,6 +44,7 @@ type Service struct {
 	operations    offlineOperations
 	now           func() time.Time
 	policy        recoveryPolicy
+	wake          chan struct{}
 }
 
 // New creates a new offline download management service. metadata prewarms the
@@ -59,11 +60,23 @@ func New(database *ent.Client, catalogue Catalogue, drive *drive.Drive, tasks *t
 
 		submitTimeout: submitTimeout,
 		now:           time.Now,
+		wake:          make(chan struct{}, 1),
 		policy: recoveryPolicy{
 			zeroProgressTimeout: 15 * time.Minute,
 			stalledTimeout:      30 * time.Minute,
 			completionGrace:     60 * time.Minute,
 			maxAttempts:         3,
 		},
+	}
+}
+
+// Pending signals the periodic sync after a submission or control operation
+// changes remote state, so progress is observed without waiting for the tick.
+func (service *Service) Pending() <-chan struct{} { return service.wake }
+
+func (service *Service) wakeSync() {
+	select {
+	case service.wake <- struct{}{}:
+	default:
 	}
 }

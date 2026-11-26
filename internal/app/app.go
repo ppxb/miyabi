@@ -317,7 +317,7 @@ func (a *App) Run(ctx context.Context) error {
 		})
 	}
 	workers.Go(func() {
-		tasks.RunPeriodic(ctx, a.logger, "sync 115 offline tasks", offlineSyncInterval, nil, a.offline.Sync)
+		tasks.RunPeriodic(ctx, a.logger, "sync 115 offline tasks", offlineSyncInterval, a.offline.Pending(), a.offline.Sync)
 	})
 	workers.Go(func() {
 		tasks.RunPeriodic(ctx, a.logger, "monitor", monitorCheckInterval, nil, a.monitors.Check)

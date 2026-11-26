@@ -149,6 +149,7 @@ func (s *Service) advance(ctx context.Context, id int, requested string, cache *
 		return domain.OfflineSubmission{}, err
 	}
 	s.tasks.NotifyOfflineChanged()
+	s.wakeSync()
 	return s.submission(ctx, record, source)
 }
 

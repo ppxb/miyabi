@@ -222,8 +222,15 @@
   - 附带修复：`internal/app/cover_lock_test.go` 删除过时的 `sess.Info` 阶段断言（`c304103` 起发布改为目录列表校验，不再调用 `Info`），该测试此前一直会失败。
   - 遗留（低）：
     - 暂停缓存是进程内状态，`SetLibraryPaused` 是唯一写入口；未来若出现绕开它的 DB 直写，需要同步更新缓存。
-- [ ] 🟢 **离线同步无唤醒通道**：`internal/app/app.go:319` 传入的 wake 为 `nil`（monitor 有 `Pending()`），提交或取消后最多 30 秒才看到状态更新。
+- [x] 🟢 ✅ **离线同步无唤醒通道**：`internal/app/app.go:319` 传入的 wake 为 `nil`（monitor 有 `Pending()`），提交或取消后最多 30 秒才看到状态更新。
   - 改法：给离线服务加 Pending 通道，提交和控制操作时发信号。
+  - （已修复：离线服务新增 Pending 通道，提交/控制后立即唤醒同步）
+    - `internal/offline/service.go`：Service 增加容量 1 的 `wake` 通道、`Pending()` 与 `wakeSync()`（非阻塞发送，重复信号自动合并）。
+    - `internal/offline/add.go`：成功提交并通知 UI 后调用 `wakeSync()`；`internal/offline/control.go`：取消/换源完成、状态落库并通知 UI 后调用 `wakeSync()`。
+    - `internal/app/app.go`：`RunPeriodic` 的 wake 由 `nil` 改为 `a.offline.Pending()`，离线同步在提交/控制后立即跑一轮，不必等 30 秒 tick。
+    - 测试：新增 `internal/offline/wake_test.go`（成功提交与取消各产生一次信号；失败的提交不发信号）。`go test -count=1 ./internal/...`、`go vet ./internal/offline/... ./internal/app/...`、`gofmt -l` 通过。
+  - 说明（低）：
+    - 条目中"monitor 有 `Pending()`"与实际不符：monitor 的 `RunPeriodic` 目前同样传 `nil`。本次仅修复离线同步，monitor 的检查节奏未改。
 - [ ] 🟢 **零碎重复读取**：
   - `internal/drive/account_session.go:119-132` 的 `readAccount` 每次调用 115 查 3 次 PanAccount；
   - 离线同步 `config()` 每轮读两次（`internal/offline/sync.go:67`、`internal/offline/recovery.go:81`）；

@@ -147,6 +147,7 @@ func (service *Service) addForAccount(ctx context.Context, accountID, movieID, h
 	// attempts do not trigger a wasted metadata scrape.
 	service.warmMetadata(code)
 	service.tasks.NotifyOfflineChanged()
+	service.wakeSync()
 	created, err = service.database.OfflineDownload.Get(submitContext, created.ID)
 	if err != nil {
 		return domain.OfflineSubmission{}, err
