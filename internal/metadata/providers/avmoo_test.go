@@ -116,7 +116,9 @@ func TestAvmooFetchMapsMetadataAndActors(t *testing.T) {
 	if len(m.PreviewImages) != 2 || m.PreviewImages[0].Thumbnail != "https://file.netcdn.space/sample-1.jpg" || !m.HasPreview {
 		t.Fatalf("previews=%+v", m.PreviewImages)
 	}
-	if len(result.Images) != 4 || result.Images[0].Role != "cover" || result.Images[2].Role != "preview" {
+	if len(result.Images) != 4 || result.Images[0].Role != "cover" || result.Images[2].Role != "preview" ||
+		result.Images[2].URL != "https://jp.netcdn.space/sample-1.jpg" ||
+		result.Images[2].Thumbnail != "https://file.netcdn.space/sample-1.jpg" {
 		t.Fatalf("images=%+v", result.Images)
 	}
 	if *detailCalls != 1 {
@@ -151,14 +153,14 @@ func TestAvmooReportsIncompleteDetail(t *testing.T) {
 	}
 }
 
-func TestAvmooSupportsExcludesOfficialFamilies(t *testing.T) {
+func TestAvmooSupportsEveryNonEmptyCode(t *testing.T) {
 	provider := &Avmoo{}
 	for code, want := range map[string]bool{
 		"SSIS-001":      true,
 		"259LUXU-1899":  true,
-		"FC2-PPV-12345": false,
-		"fc2-12345":     false,
-		"HEYZO-1234":    false,
+		"FC2-PPV-12345": true,
+		"fc2-12345":     true,
+		"HEYZO-1234":    true,
 		"":              false,
 	} {
 		if got := provider.Supports(code); got != want {

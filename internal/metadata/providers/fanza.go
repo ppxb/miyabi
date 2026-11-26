@@ -316,7 +316,7 @@ func fanzaMetadata(source fanzaMovie, rating float64) domain.MovieMetadata {
 			url = image.ImageURL
 		}
 		if url != "" {
-			result.Images = append(result.Images, domain.ImageCandidate{Provider: "fanza", URL: url, Role: "preview"})
+			result.Images = append(result.Images, domain.ImageCandidate{Provider: "fanza", URL: url, Thumbnail: image.ImageURL, Role: "preview"})
 			result.Detail.PreviewImages = append(result.Detail.PreviewImages, domain.PreviewImage{Original: url, Thumbnail: image.ImageURL})
 		}
 	}

@@ -76,6 +76,33 @@ func TestActorSync_FindAvatarSkipsEmptyAvatarRows(t *testing.T) {
 	}
 }
 
+func TestActorSync_FindAvatarTriesLaterActorRows(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	store.Client.Actor.Create().SetProvider("javdb").SetSourceID("broken-avatar").SetName("Fallback Actor").
+		SetAvatar("https://broken.example/avatar.jpg").ExecX(t.Context())
+	store.Client.Actor.Create().SetProvider("avmoo").SetSourceID("working-avatar").SetName("Fallback Actor").
+		SetAvatar("https://file.netcdn.space/avatar/fallback.jpg").ExecX(t.Context())
+
+	svc := &actorSync{db: store.Client}
+	media := mediaFetcherFunc(func(_ context.Context, rawURL string) (domain.Media, error) {
+		if rawURL == "https://broken.example/avatar.jpg" {
+			return domain.Media{}, errors.New("broken avatar")
+		}
+		if rawURL != "https://file.netcdn.space/avatar/fallback.jpg" {
+			t.Errorf("fetched %q", rawURL)
+		}
+		return domain.Media{ContentType: "image/jpeg", Body: []byte("fallback")}, nil
+	})
+	got, found, err := svc.findAvatar(t.Context(), nil, media, "Fallback Actor")
+	if err != nil || !found || string(got.Body) != "fallback" {
+		t.Fatalf("findAvatar = %+v, found=%v err=%v", got, found, err)
+	}
+}
+
 func TestActorSync_NegativeCache(t *testing.T) {
 	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {

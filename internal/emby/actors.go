@@ -255,16 +255,21 @@ func (s *actorSync) findAvatar(ctx context.Context, g *gfriends.Client, media Me
 	if media == nil {
 		return domain.Media{}, false, upstreamErr
 	}
-	act, err := s.db.Actor.Query().Where(actor.Or(actor.NameEQ(name), actor.NameZhtEQ(name)), actor.AvatarNEQ("")).First(ctx)
-	if ent.IsNotFound(err) {
+	actors, err := s.db.Actor.Query().Where(actor.Or(actor.NameEQ(name), actor.NameZhtEQ(name)), actor.AvatarNEQ("")).
+		Order(ent.Asc(actor.FieldID)).All(ctx)
+	if err != nil {
+		return domain.Media{}, false, errors.Join(upstreamErr, err)
+	}
+	if len(actors) == 0 {
 		return domain.Media{}, false, upstreamErr
 	}
-	if err != nil {
-		return domain.Media{}, false, errors.Join(upstreamErr, err)
+	var imageErr error
+	for _, act := range actors {
+		image, err := media.Image(ctx, domain.ImageCandidate{Provider: act.Provider, URL: *act.Avatar, Role: "avatar"})
+		if err == nil {
+			return image, true, nil
+		}
+		imageErr = errors.Join(imageErr, err)
 	}
-	image, err := media.Image(ctx, domain.ImageCandidate{Provider: act.Provider, URL: *act.Avatar, Role: "avatar"})
-	if err != nil {
-		return domain.Media{}, false, errors.Join(upstreamErr, err)
-	}
-	return image, true, nil
+	return domain.Media{}, false, errors.Join(upstreamErr, imageErr)
 }

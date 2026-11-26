@@ -27,7 +27,11 @@ func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 			images[key] = true
 			result.Images = append(result.Images, image)
 			if image.Role == "preview" {
-				result.Detail.PreviewImages = append(result.Detail.PreviewImages, domain.PreviewImage{Original: image.URL, Thumbnail: image.URL})
+				thumbnail := image.Thumbnail
+				if thumbnail == "" {
+					thumbnail = image.URL
+				}
+				result.Detail.PreviewImages = append(result.Detail.PreviewImages, domain.PreviewImage{Original: image.URL, Thumbnail: thumbnail})
 			}
 		}
 	}

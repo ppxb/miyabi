@@ -101,6 +101,25 @@ func TestLibraryPreviewRoutesSavedSourceAndRejectsInvalidTargets(t *testing.T) {
 	}
 }
 
+func TestLibraryPreviewServesRequestedThumbnail(t *testing.T) {
+	candidate := domain.ImageCandidate{
+		Provider: "avmoo", URL: "https://jp.netcdn.space/sample.jpg",
+		Thumbnail: "https://file.netcdn.space/sample.jpg", Role: "preview",
+	}
+	metadata := &metadataImageStub{}
+	router := NewRouter(Dependencies{
+		Access: NewAccessGateService("", ""), Library: &libraryPreviewStub{candidate: candidate}, Metadata: metadata,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/library/movies/42/previews/0?thumb=1", nil))
+	want := candidate
+	want.URL = candidate.Thumbnail
+	if response.Code != http.StatusOK || metadata.received != want {
+		t.Fatalf("status=%d received=%+v want=%+v", response.Code, metadata.received, want)
+	}
+}
+
 func (stub *libraryPageStub) Movies(_ context.Context, page, limit int) (library.Page, error) {
 	stub.page, stub.limit = page, limit
 	return library.Page{Page: page, Movies: []library.Movie{}}, nil

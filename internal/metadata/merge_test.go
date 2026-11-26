@@ -88,6 +88,25 @@ func TestMergeTitlePrefersOriginTitle(t *testing.T) {
 	}
 }
 
+func TestMergeKeepsPreviewThumbnails(t *testing.T) {
+	source := domain.MovieMetadata{
+		Detail: domain.MovieDetail{Movie: domain.Movie{
+			Sources: []domain.SourceID{{Provider: "avmoo", ID: "movie"}},
+			Code:    "ABP-1", Title: "T",
+		}},
+		Images: []domain.ImageCandidate{
+			{Provider: "avmoo", Role: "preview", URL: "https://jp.netcdn.space/sample-1.jpg", Thumbnail: "https://file.netcdn.space/sample-1.jpg"},
+			{Provider: "avmoo", Role: "preview", URL: "https://jp.netcdn.space/sample-2.jpg"},
+		},
+	}
+	got := merge([]domain.MovieMetadata{source})
+	if len(got.Detail.PreviewImages) != 2 ||
+		got.Detail.PreviewImages[0].Thumbnail != "https://file.netcdn.space/sample-1.jpg" ||
+		got.Detail.PreviewImages[1].Thumbnail != "https://jp.netcdn.space/sample-2.jpg" {
+		t.Fatalf("previews=%+v", got.Detail.PreviewImages)
+	}
+}
+
 func TestMergeFillsMissingActorAvatarAndAdoptsItsSource(t *testing.T) {
 	official := completeFixture("fanza", "ABP-123")
 	official.Detail.Actors = []domain.Actor{{Provider: "fanza", ID: "fanza-actor", Name: "Shared Actor"}}

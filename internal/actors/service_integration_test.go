@@ -3,6 +3,8 @@ package actors
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -51,6 +53,37 @@ func pidOf(t *testing.T, db *ent.Client, actorID int) int {
 		return 0
 	}
 	return r.Edges.Profile.ID
+}
+
+func TestFetchAvatarTriesEveryScrapedRow(t *testing.T) {
+	db := openDB(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/broken":
+			http.Error(w, "broken", http.StatusBadGateway)
+		case "/good":
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("avatar"))
+		default:
+			http.NotFound(w, request)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	broken := db.Actor.Create().SetProvider("javdb").SetSourceID("broken").SetName("Fallback Avatar").
+		SetAvatar(server.URL + "/broken").SaveX(t.Context())
+	good := db.Actor.Create().SetProvider("avmoo").SetSourceID("good").SetName("Fallback Avatar").
+		SetAvatar(server.URL + "/good").SaveX(t.Context())
+	link(t, db, broken, good)
+
+	svc := New(db, nil, "", server.Client())
+	if err := svc.UpdateSettings(t.Context(), []domain.SourceToggle{{ID: "av-league", Enabled: true}, {ID: "gfriends", Enabled: false}}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := svc.FetchAvatar(t.Context(), pidOf(t, db, good.ID))
+	if err != nil || string(data) != "avatar" {
+		t.Fatalf("FetchAvatar=%q err=%v", data, err)
+	}
 }
 
 func TestLinkProfilesGroupsSpellingsIntoCatalog(t *testing.T) {

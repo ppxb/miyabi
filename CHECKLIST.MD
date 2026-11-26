@@ -301,9 +301,12 @@
   - 匹配/性能：小写、无连字符均可命中（`ssis-001`/`SSIS001`）；带字幕后缀 `SSIS-001-C` 无结果（接入前需 `codeid.Normalize`）。当前在库番号 `HNVR-206`/`PLBY-065`/`WO-028` 搜索均 exact=1；`259LUXU-1899`、`LUXU-1899` 无结果，覆盖非全量。经代理 search ≈1.5s、getMovie ≈2.9s（每片两次请求）。
   - 接入建议：新增 `providers/avmoo.go`（ID `avmoo`，`lang=ja` 取日文原名/演员名，`lang=cn` 取类别本地化），用 `movieFanHao` 精确过滤搜索结果；`starId/genreId/label/series/studio/director` 映射为 domain 实体（Provider=`avmoo`），`posterLarge`→cover、`sampleLarge[]`→preview；注册到 `app.go` 的 `metadata.New`，并评估 `sourceOrder`、设置页开关与 pacing/冷却。
   - （已接入：新增 `internal/metadata/providers/avmoo.go` 与 `avmoo_test.go`；共享 `providers/http.go` 增加 `postJSON`（沿用限速、冷却、16 MiB 上限与状态映射）；`app.go` 注册 `NewAvmoo`；前端 `sourceNames` 与来源描述增加 AVMOO。`lang=ja` 精确匹配 `movieFanHao`，映射标题/日期/时长/演员/类别/厂牌/系列/导演/封面/样图；演员 `avatarUrl` 经 `DetailNFO`→`Actor.Avatar` 落库。`metadata/merge.go` 对同名演员补全头像，并由提供头像的来源持有合并后的演员身份（头像按 provider 路由下载，`FieldSources` 同步）。补充：`metadata/service.go` 给 avmoo 12s 专用超时；search 的 HTTP 404/信封非 200 归为上游错误（HTTP 404 包装成纯上游错误、不保留 `ErrNotFound` 身份，避免 Service 负缓存）、getMovie 信封 404 归为未找到；`OriginTitle` 仅取 `title_ja`；`emby/actors.go` 头像回退改用 `AvatarNEQ("")`，避免同名空头像行挡住 avmoo 头像（新增测试）。测试：`TestAvmoo*`、`TestMerge*Avatar*`、`TestActorSync_FindAvatarSkipsEmptyAvatarRows`；`go build ./internal/... ./cmd/...`、`go vet ./internal/metadata/... ./internal/emby/...`、`go test -count=1 -skip TestStartMoviePlaysLocalFile ./internal/...` 通过；前端仅剩既有的 `settings.download` 路由树类型错误，本次改动文件无 lint/类型错误。）
+  - 后续修复：`domain.ImageCandidate` 增加 `Thumbnail`，avmoo/fanza 填充小图、`merge` 生成 `PreviewImages` 时优先使用；库内详情预览通过 `?thumb=1` 代理缩略图（discover 直接使用 Thumbnail），预览页不再加载大图；演员头像回退改为遍历同名所有非空头像行（`actors.Service.FetchAvatar`/`emby.findAvatar`，逐行尝试，新增两个测试）；放开 avmoo 的 FC2/HEYZO（`Supports` 接受所有非空番号，官方源因注册顺序/sourceOrder 在前仍优先，标量字段只补缺；演员/标签按既有语义取并集、封面按分辨率择优）。
   - 风险：未公开 API 可能随前端改版；域名可能更换；覆盖不全；无评分；中文演员名/标题可能为空；成人内容站点需自行确认使用条款。
 
 - [ ] 查看 https://github.com/tinypinglite/sakuramedia 项目接入光鸭的方式。
+
+- [ ] 设置页数据的媒体库同步，几个按钮的语义不是很清晰。同时影片页面，需要新增筛选已削刮和未削刮（削刮失败）。用户提出，需要有一次性对削刮失败的影片进行重新削刮的功能。
 ---
 
 ## 核查后排除（不是问题）

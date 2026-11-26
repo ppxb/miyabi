@@ -137,6 +137,9 @@ func libraryPreviewHandler(library LibraryManager, metadata MetadataManager) gin
 			c.Error(err)
 			return
 		}
+		if c.Query("thumb") == "1" && candidate.Thumbnail != "" {
+			candidate.URL = candidate.Thumbnail
+		}
 		media, err := metadata.Image(c.Request.Context(), candidate)
 		if err != nil {
 			c.Error(err)

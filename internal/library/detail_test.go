@@ -19,7 +19,7 @@ func TestSavedDetailNeedsNoJavDBAndKeepsSourceIdentities(t *testing.T) {
 		Tags:   []nfo.Tag{{Provider: "fanza", ID: "tag", Name: "Tag"}},
 		Studio: nfo.Entity{Provider: "fanza", ID: "maker", Name: "Maker"},
 		Images: []domain.ImageCandidate{{Provider: "fanza", URL: "https://image.example/cover.jpg", Role: "cover"},
-			{Provider: "fanza", URL: "https://image.example/preview.jpg", Role: "preview"},
+			{Provider: "fanza", URL: "https://image.example/preview.jpg", Thumbnail: "https://image.example/preview-thumb.jpg", Role: "preview"},
 			{Provider: "fc2", URL: "https://image.example/fc2-preview.jpg", Role: "preview"}},
 	}
 	film := lib.database.Movie.Create().SetCode(doc.Code).
@@ -56,6 +56,9 @@ func TestSavedDetailNeedsNoJavDBAndKeepsSourceIdentities(t *testing.T) {
 	}
 	if detail.Cover != "/api/library/artwork/full" || len(detail.PreviewImages) != 2 || !strings.Contains(detail.PreviewImages[0].Original, "/previews/0?v=") {
 		t.Fatalf("wrong artwork projection: %+v", detail)
+	}
+	if !strings.Contains(detail.PreviewImages[0].Thumbnail, "&thumb=1") || detail.PreviewImages[1].Thumbnail != detail.PreviewImages[1].Original {
+		t.Fatalf("preview thumbnails not projected: %+v", detail.PreviewImages)
 	}
 	for i, want := range doc.Images[1:] {
 		candidate, err := lib.Preview(ctx, film.ID, i)

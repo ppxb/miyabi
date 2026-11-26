@@ -66,9 +66,14 @@ func (s *Service) Movie(ctx context.Context, id int) (MovieDetail, error) {
 	if doc.Director.Name != "" {
 		detail.Director = &domain.Director{Provider: doc.Director.Provider, ID: doc.Director.ID, Name: doc.Director.Name}
 	}
-	for i := range previewCandidates(doc) {
+	candidates := previewCandidates(doc)
+	for i, candidate := range candidates {
 		url := fmt.Sprintf("/api/library/movies/%d/previews/%d?v=%d", record.ID, i, record.UpdatedAt.UnixMilli())
-		detail.PreviewImages = append(detail.PreviewImages, domain.PreviewImage{Original: url, Thumbnail: url})
+		thumbnail := url
+		if candidate.Thumbnail != "" && candidate.Thumbnail != candidate.URL {
+			thumbnail = url + "&thumb=1"
+		}
+		detail.PreviewImages = append(detail.PreviewImages, domain.PreviewImage{Original: url, Thumbnail: thumbnail})
 	}
 	detail.HasPreview = len(detail.PreviewImages) > 0
 	// Derive the Chinese-subtitle flag from file and local subtitle names so it

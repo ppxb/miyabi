@@ -636,15 +636,22 @@ func (s *Service) FetchAvatar(ctx context.Context, pid int) ([]byte, error) {
 	}
 	scraped, err := s.db.Actor.Query().
 		Where(actor.HasProfileWith(actorprofile.ID(pid)), actor.AvatarNEQ("")).
-		Select(actor.FieldAvatar).
-		First(ctx)
-	if ent.IsNotFound(err) {
-		return nil, ErrNotFound
-	}
+		Order(ent.Asc(actor.FieldID)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return s.loadImage(ctx, imageSource{provider: "scraped", ref: *scraped.Avatar})
+	if len(scraped) == 0 {
+		return nil, ErrNotFound
+	}
+	var lastErr error
+	for _, row := range scraped {
+		data, err := s.loadImage(ctx, imageSource{provider: "scraped", ref: *row.Avatar})
+		if err == nil {
+			return data, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
 }
 
 type imageSource struct {

@@ -96,7 +96,7 @@ func TestFANZAResolvesOfficialIdentityAcrossPagesAndMapsMetadata(t *testing.T) {
 	if !reflect.DeepEqual(offsets, []float64{0, 40}) || m.ID != "" || m.Sources[0].ID != "unpredictable-content-id" || m.ReleaseDate != "2021-02-19" || m.Duration != 147 || m.RatingMax != 5 || m.RatingSource != "fanza" || m.Plot != "Official synopsis" {
 		t.Fatalf("identity or metadata: %+v offsets=%v", m, offsets)
 	}
-	if len(m.Actors) != 2 || m.Actors[1].Gender != "male" || m.Maker.Provider != "fanza" || m.Tags[0].Provider != "fanza" || len(got.Images) != 3 || m.PreviewImages[0].Original != "original.jpg" {
+	if len(m.Actors) != 2 || m.Actors[1].Gender != "male" || m.Maker.Provider != "fanza" || m.Tags[0].Provider != "fanza" || len(got.Images) != 3 || m.PreviewImages[0].Original != "original.jpg" || m.PreviewImages[0].Thumbnail != "small.jpg" || got.Images[2].Thumbnail != "small.jpg" {
 		t.Fatalf("mapping: %+v", got)
 	}
 	if m.PreviewVideo != "" {

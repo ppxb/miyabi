@@ -30,11 +30,10 @@ func NewAvmoo(proxy *netx.ProxyManager) *Avmoo {
 
 func (*Avmoo) ID() string { return "avmoo" }
 
-// Supports mirrors the JavBus/Jav321 aggregators: any catalogue number except
-// the FC2 and HEYZO families, which dedicated official sources handle.
+// Supports accepts every catalogue number; official FC2/HEYZO sources still
+// come first in merge order, so AVMOO only supplements gaps.
 func (*Avmoo) Supports(code string) bool {
-	upper := strings.ToUpper(code)
-	return upper != "" && !strings.HasPrefix(upper, "FC2") && !strings.HasPrefix(upper, "HEYZO")
+	return strings.TrimSpace(code) != ""
 }
 
 func (s *Avmoo) Fetch(ctx context.Context, ref domain.MovieRef) (domain.MovieMetadata, error) {
@@ -179,7 +178,7 @@ func avmooMetadata(code string, source avmooMovie) domain.MovieMetadata {
 		result.Images = append(result.Images, domain.ImageCandidate{Provider: "avmoo", URL: url, Role: "cover"})
 	}
 	for _, image := range m.PreviewImages {
-		result.Images = append(result.Images, domain.ImageCandidate{Provider: "avmoo", URL: image.Original, Role: "preview"})
+		result.Images = append(result.Images, domain.ImageCandidate{Provider: "avmoo", URL: image.Original, Thumbnail: image.Thumbnail, Role: "preview"})
 	}
 	return result
 }
