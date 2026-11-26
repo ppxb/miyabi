@@ -257,8 +257,19 @@
 
 ## P2 · 架构收敛（同一功能多套实现）
 
-- [ ] 🟠 **两套 115 直链解析和缓存**：`internal/playback/files.go:256-275` 与 `internal/strm/relay.go:82-123` 都实现了"先直链、失败再转码"，缓存各一套。
+- [x] 🟠 ✅ **两套 115 直链解析和缓存**：`internal/playback/files.go:256-275` 与 `internal/strm/relay.go:82-123` 都实现了"先直链、失败再转码"，缓存各一套。
   - 改法：收敛到 `drive` 层，或让 playback 复用 `strm.Relay.StreamURL`（顺带修 P0 第 2 条）。
+  - （已修复：收敛到 `drive` 层）
+    - 新增 `internal/drive/media.go`：`Drive.ResolveMedia` 统一处理空 pickCode、直链优先、转码回退与错误映射；singleflight + `StartWork` 租约 + 45 秒脱离调用方 ctx + 命中后 `WithSource` 校验。
+    - 缓存按 `授权版本:账号:fileID:UA` 分键；过期时间取直链/全部转码流 URL 的最早 `t`/`expires`，任一未知则不缓存；上限 256，插入时淘汰最早到期项。
+    - `internal/playback/files.go`、`service.go`：删除本地解析与 urlCache，`resolveSpecs` 只负责把 `drive.Media` 映射为播放器 specs；`StartHLS` 保留独立转码路径。
+    - `internal/strm/relay.go`：`StreamURL` 复用 `ResolveMedia`，仅保留"原画优先、否则最高分辨率"的选择；删除 `strm/cache.go` 与该包缓存字段。
+    - 行为变化：网页播放与 Emby 共享同一缓存和 singleflight；playback 直链缓存由固定 2 分钟改为签名到期前（最多 1 分钟）；转码结果也按签名缓存（此前仅 STRM 缓存）。
+    - 测试：新增 `internal/drive/media_test.go`（直链/转码优先级、错误映射、空 pickCode、UA 与授权隔离、过期与容量淘汰、刷新时机）；playback/strm 的既有行为测试保留并迁移。`go test -count=1 ./internal/...` 0 FAIL、`go vet ./internal/...`、`gofmt -l` 通过。
+  - 遗留（低）：
+    - 缓存条目返回共享的 `Streams` 切片（调用方只读）；若将来需要修改，应返回副本。
+    - 转码结果按所有流的最早签名到期缓存；任一流过期时间未知时整体不缓存（比旧 STRM 只缓存选中流的策略更保守，混合流集合的命中率会略低）。
+    - 无 `t`/`expires` 的直链不再缓存（旧 playback 对任意直链固定缓存 2 分钟）；115 直链通常带签名参数，最坏情况是退化为每次重新解析。
 - [ ] 🟠 **scrape 任务入队有三套实现，去重规则各不相同**：`internal/library/scan/reconcile.go:210-263`、`internal/library/local.go:164-176`（逐条先查再插，无事务、未拿队列锁）、`internal/library/scan/movie_actions.go:53-128`。
   - 改法：收敛成一个函数。
 - [ ] 🟢 **本地与云盘导入各有一套影片匹配逻辑**：`internal/library/scan/local_ingest.go:113-159`（逐条 Create）与 `internal/library/scan/movies.go:105`（批量建并合并别名）。

@@ -45,58 +45,6 @@ func TestStreamURLCachesByFileAndUserAgent(t *testing.T) {
 	}
 }
 
-func TestStreamURLRefreshesBeforeSignatureExpires(t *testing.T) {
-	for _, lifetime := range []time.Duration{time.Hour, 45 * time.Second} {
-		t.Run(lifetime.String(), func(t *testing.T) {
-			synctest.Test(t, func(t *testing.T) {
-				relay, client := relayFixture(t, "pick-101")
-				var calls int
-				client.downloadURL = func(context.Context, string, string, string) (string, error) {
-					calls++
-					return signedURL(calls, time.Now().Add(lifetime)), nil
-				}
-				first, err := relay.StreamURL(t.Context(), "101", "")
-				if err != nil {
-					t.Fatal(err)
-				}
-				deadline := min(streamCacheTTL, lifetime-streamExpiryMargin)
-				time.Sleep(deadline - time.Nanosecond)
-				if address, err := relay.StreamURL(t.Context(), "101", ""); err != nil || address != first || calls != 1 {
-					t.Fatalf("early refresh: calls=%d err=%v", calls, err)
-				}
-				time.Sleep(time.Nanosecond)
-				if address, err := relay.StreamURL(t.Context(), "101", ""); err != nil || address == first || calls != 2 {
-					t.Fatalf("missing refresh: calls=%d err=%v", calls, err)
-				}
-			})
-		})
-	}
-}
-
-func TestStreamCacheSkipsUncertainOrExpiringSignatures(t *testing.T) {
-	now := time.Unix(1700000000, 0)
-	for _, address := range []string{
-		"https://cdn.example/video.mp4",
-		"https://cdn.example/video.m3u8?auth_key=opaque",
-		"https://cdn.example/video.mp4?t=invalid",
-		"https://cdn.example/video.mp4?t=",
-		"https://cdn.example/video.mp4?t=-1",
-		"https://cdn.example/video.mp4?t=1700003600&expires=invalid",
-		"https://cdn.example/video.mp4?t=1700003600&bad=%zz",
-		signedURL(1, now), signedURL(1, now.Add(streamExpiryMargin)),
-	} {
-		relay := &Relay{}
-		relay.remember("file", address, now)
-		if cached := relay.cached("file", now); cached != "" {
-			t.Errorf("unsafe signature cached: %s", address)
-		}
-	}
-	address := "https://cdn.example/video.mp4?t=1700003600&expires=1700000045"
-	if expires := streamCacheExpiry(address, now); !expires.Equal(now.Add(15 * time.Second)) {
-		t.Errorf("earliest signature deadline = %v", expires)
-	}
-}
-
 func TestStreamURLCachesFallbackOnlyWithKnownExpiry(t *testing.T) {
 	for _, known := range []bool{true, false} {
 		t.Run(fmt.Sprint(known), func(t *testing.T) {
@@ -127,26 +75,6 @@ func TestStreamURLCachesFallbackOnlyWithKnownExpiry(t *testing.T) {
 				t.Fatalf("downloads=%d plays=%d want=%d each", downloads, plays, want)
 			}
 		})
-	}
-}
-
-func TestStreamCacheBoundsAndReclaimsEntries(t *testing.T) {
-	relay := &Relay{}
-	now := time.Unix(1700000000, 0)
-	for i := range streamCacheLimit {
-		relay.remember(fmt.Sprint(i), signedURL(i, now.Add(time.Hour)), now.Add(time.Duration(i)*time.Millisecond))
-	}
-	relay.remember("new", signedURL(999, now.Add(time.Hour)), now.Add(time.Second))
-	if len(relay.urls) != streamCacheLimit || relay.cached("0", now.Add(time.Second)) != "" || relay.cached("new", now.Add(time.Second)) == "" {
-		t.Fatal("cache did not evict the earliest deadline at capacity")
-	}
-	if got := relay.cached("missing", now.Add(2*streamCacheTTL)); got != "" || len(relay.urls) != 0 {
-		t.Fatal("access did not reclaim expired entries")
-	}
-	relay.remember("old", signedURL(1, now.Add(time.Hour)), now)
-	relay.remember("new", signedURL(2, now.Add(time.Hour)), now.Add(2*streamCacheTTL))
-	if len(relay.urls) != 1 {
-		t.Fatal("write did not reclaim expired entries")
 	}
 }
 

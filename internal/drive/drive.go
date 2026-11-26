@@ -53,6 +53,7 @@ type Drive struct {
 
 	login         qrLogin
 	mountListener MountListener
+	media         mediaResolver
 
 	// Credential/authorization versions are runtime invalidation counters for
 	// in-flight sessions; account data itself lives in PanAccount rows.

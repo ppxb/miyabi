@@ -53,7 +53,7 @@ func (service *Service) Start(ctx context.Context, fileID, userAgent string) (Pl
 	}
 	// Prefer the direct download URL: it starts immediately, seeks natively and
 	// avoids waiting for a transcode that may still be generating.
-	specs, err := service.resolveSpecs(ctx, opened.sess, opened.source.AccountID, opened.pickCode, userAgent)
+	specs, err := service.resolveSpecs(ctx, opened.sess, opened.source.AccountID, fileID, opened.pickCode, userAgent)
 	if err != nil {
 		return Playback{}, err
 	}
@@ -172,7 +172,7 @@ func (service *Service) StartMovie(ctx context.Context, movieID int, userAgent s
 	if err != nil {
 		return Playback{}, err
 	}
-	specs, err := service.resolveSpecs(ctx, opened.sess, opened.source.AccountID, opened.pickCode, userAgent)
+	specs, err := service.resolveSpecs(ctx, opened.sess, opened.source.AccountID, target.FileID, opened.pickCode, userAgent)
 	if err != nil {
 		return Playback{}, err
 	}
@@ -246,50 +246,17 @@ func (service *Service) PrimaryFile(ctx context.Context, movieID int) (PrimaryFi
 	return PrimaryFile{FileID: target.FileID, Name: target.Name, Local: target.AccountID == domain.LocalAccountID}, nil
 }
 
-// playSourceSession is the subset of a drive session needed to resolve media.
-type playSourceSession interface {
-	AuthorizationVersion() uint64
-	DownloadURL(ctx context.Context, pickCode, userAgent string) (string, error)
-	PlayURL(ctx context.Context, pickCode, userAgent string) ([]pan.PlaySource, error)
-}
-
-// mediaSpecs prefers the direct download URL and falls back to transcoded HLS.
-func mediaSpecs(ctx context.Context, sess playSourceSession, pickCode, userAgent string) ([]mediaSpec, error) {
-	downloadURL, err := sess.DownloadURL(ctx, pickCode, userAgent)
-	if err == nil {
-		return []mediaSpec{{address: downloadURL, mediaType: "video/mp4", label: "原画"}}, nil
-	}
-	if !errors.Is(err, pan.ErrDownloadUnavailable) {
-		return nil, fmt.Errorf("get 115 download URL: %w", err)
-	}
-	sources, err := sess.PlayURL(ctx, pickCode, userAgent)
-	if err != nil {
-		if errors.Is(err, pan.ErrTranscodeUnavailable) {
-			return nil, drive.ErrTranscodeUnavailable
-		}
-		return nil, fmt.Errorf("get 115 playback URL: %w", err)
-	}
-	return hlsSpecs(sources), nil
-}
-
-// resolveSpecs prefers a recently resolved 115 direct URL so reopening the same
-// file starts without another round trip. Only direct mp4 URLs are cached;
-// transcoded HLS is always re-resolved. 115 binds a direct URL to the user agent
-// that requested it, and a new login re-authorizes the account, so both are part
-// of the key (as in the STRM relay).
-func (service *Service) resolveSpecs(ctx context.Context, sess playSourceSession, accountID, pickCode, userAgent string) ([]mediaSpec, error) {
-	key := fmt.Sprintf("%d:%q:%q:%q", sess.AuthorizationVersion(), accountID, pickCode, strings.TrimSpace(userAgent))
-	if address, ok := service.cachedDownloadURL(key); ok {
-		return []mediaSpec{{address: address, mediaType: "video/mp4", label: "原画"}}, nil
-	}
-	specs, err := mediaSpecs(ctx, sess, pickCode, userAgent)
+// resolveSpecs asks the shared drive resolver for a direct URL or transcoded
+// streams, then maps the result to the player's source list.
+func (service *Service) resolveSpecs(ctx context.Context, sess drive.MediaSession, accountID, fileID, pickCode, userAgent string) ([]mediaSpec, error) {
+	media, err := service.drive.ResolveMedia(ctx, sess, accountID, fileID, pickCode, userAgent)
 	if err != nil {
 		return nil, err
 	}
-	if len(specs) == 1 && specs[0].mediaType == "video/mp4" && !specs[0].playlist && specs[0].address != "" {
-		service.storeDownloadURL(key, specs[0].address)
+	if media.DownloadURL != "" {
+		return []mediaSpec{{address: media.DownloadURL, mediaType: "video/mp4", label: "原画"}}, nil
 	}
-	return specs, nil
+	return hlsSpecs(media.Streams), nil
 }
 
 func hlsSpecs(sources []pan.PlaySource) []mediaSpec {
