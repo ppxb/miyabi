@@ -38,7 +38,7 @@ export function SettingsSection({
         <span className="text-muted-foreground">{icon}</span>
         {title}
       </h2>
-      {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+      {description ? <p className="text-muted-foreground">{description}</p> : null}
       {children}
     </section>
   )
