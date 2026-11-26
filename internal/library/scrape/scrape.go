@@ -51,9 +51,10 @@ type MetadataSource interface {
 }
 
 // Notifier reports committed library updates and queued follow-up work.
+// WakePool with no kinds wakes every worker.
 type Notifier interface {
 	NotifyLibraryChanged()
-	WakePool()
+	WakePool(...tasks.Kind)
 }
 
 // SubtitleExporter copies a movie's downloaded subtitles beside its exported .strm file.

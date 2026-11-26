@@ -41,8 +41,9 @@ func (s *Service) SetLibraryPaused(ctx context.Context, paused bool) error {
 	if err := database.SaveSetting(ctx, s.queue.database, libraryPauseKey, paused); err != nil {
 		return err
 	}
+	s.queue.setLibraryPaused(paused)
 	s.NotifyUI()
-	s.WakePool()
+	s.WakePool(KindScan, KindScrape)
 	return nil
 }
 
@@ -51,7 +52,7 @@ func (q *Queue) runnableKinds(ctx context.Context, kinds []Kind) ([]Kind, error)
 	if !slices.ContainsFunc(kinds, isLibrary) {
 		return kinds, nil
 	}
-	paused, err := LibraryPaused(ctx, q.database)
+	paused, err := q.libraryPaused(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -59,4 +60,36 @@ func (q *Queue) runnableKinds(ctx context.Context, kinds []Kind) ([]Kind, error)
 		kinds = slices.DeleteFunc(slices.Clone(kinds), isLibrary)
 	}
 	return kinds, nil
+}
+
+// libraryPaused caches the persisted flag so claiming and retry scans do not
+// read the setting for every worker wakeup. SetLibraryPaused is the only
+// writer; the first read loads the value left by a previous process.
+func (q *Queue) libraryPaused(ctx context.Context) (bool, error) {
+	q.pauseMu.RLock()
+	if q.pauseLoaded {
+		paused := q.pauseValue
+		q.pauseMu.RUnlock()
+		return paused, nil
+	}
+	q.pauseMu.RUnlock()
+
+	paused, err := LibraryPaused(ctx, q.database)
+	if err != nil {
+		return false, err
+	}
+	q.pauseMu.Lock()
+	defer q.pauseMu.Unlock()
+	if !q.pauseLoaded {
+		q.pauseValue = paused
+		q.pauseLoaded = true
+	}
+	return q.pauseValue, nil
+}
+
+func (q *Queue) setLibraryPaused(paused bool) {
+	q.pauseMu.Lock()
+	q.pauseValue = paused
+	q.pauseLoaded = true
+	q.pauseMu.Unlock()
 }

@@ -23,6 +23,11 @@ const (
 	ChangeMonitor
 )
 
+type workerSubscription struct {
+	updates chan struct{}
+	kinds   map[Kind]struct{}
+}
+
 // Bus separates queued-work wakeups from task and business updates for SSE.
 type Bus struct {
 	mu          sync.Mutex
@@ -30,14 +35,14 @@ type Bus struct {
 	version     uint64
 	revisions   TaskRevisions
 	subscribers map[chan struct{}]struct{}
-	workers     map[chan struct{}]struct{}
+	workers     map[*workerSubscription]struct{}
 }
 
 func NewBus() *Bus {
 	return &Bus{
 		instance:    fmt.Sprintf("%d", time.Now().UnixNano()),
 		subscribers: make(map[chan struct{}]struct{}),
-		workers:     make(map[chan struct{}]struct{}),
+		workers:     make(map[*workerSubscription]struct{}),
 	}
 }
 
@@ -50,9 +55,24 @@ func (b *Bus) Subscribe() (<-chan struct{}, func()) {
 	return b.subscribe(b.subscribers)
 }
 
-// SubscribePool registers one worker for queued-work wakeups.
-func (b *Bus) SubscribePool() (<-chan struct{}, func()) {
-	return b.subscribe(b.workers)
+// SubscribePool registers one worker for queued-work wakeups. With no kinds
+// the worker observes every kind; otherwise only matching wakeups reach it.
+func (b *Bus) SubscribePool(kinds ...Kind) (<-chan struct{}, func()) {
+	sub := &workerSubscription{
+		updates: make(chan struct{}, 1),
+		kinds:   make(map[Kind]struct{}, len(kinds)),
+	}
+	for _, kind := range kinds {
+		sub.kinds[kind] = struct{}{}
+	}
+	b.mu.Lock()
+	b.workers[sub] = struct{}{}
+	b.mu.Unlock()
+	return sub.updates, func() {
+		b.mu.Lock()
+		delete(b.workers, sub)
+		b.mu.Unlock()
+	}
 }
 
 func (b *Bus) subscribe(listeners map[chan struct{}]struct{}) (<-chan struct{}, func()) {
@@ -68,10 +88,32 @@ func (b *Bus) subscribe(listeners map[chan struct{}]struct{}) (<-chan struct{}, 
 }
 
 // WakePool announces committed queued work without invalidating UI snapshots.
-func (b *Bus) WakePool() {
+// With no kinds every worker wakes; otherwise only workers subscribed to a
+// matching kind do.
+func (b *Bus) WakePool(kinds ...Kind) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	signal(b.workers)
+	for worker := range b.workers {
+		if !worker.matches(kinds) {
+			continue
+		}
+		select {
+		case worker.updates <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func (s *workerSubscription) matches(kinds []Kind) bool {
+	if len(s.kinds) == 0 || len(kinds) == 0 {
+		return true
+	}
+	for _, kind := range kinds {
+		if _, ok := s.kinds[kind]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 // NotifyUI refreshes task views without bumping business revisions or waking workers.

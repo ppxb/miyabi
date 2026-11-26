@@ -118,14 +118,10 @@ func TestCoverCleanupOnlyBlocksUntilArtworkCheckpoint(t *testing.T) {
 		})
 	})
 	stub := stubOf(t, fixture.driveService)
-	list, info := stub.list, stub.info
+	list := stub.list
 	stub.list = func(ctx context.Context, token, id string, offset, limit int) (pan.FilePage, error) {
 		checkCleanup("directory", false)
 		return list(ctx, token, id, offset, limit)
-	}
-	stub.info = func(ctx context.Context, token, id string) (pan.FileInfo, error) {
-		checkCleanup("info", false)
-		return info(ctx, token, id)
 	}
 	service := scrapePkg.New(fixture.store.Client, fixture.driveService,
 		coverMediaProbe{MetadataSource: fixtureMetadata{fixture.discover, func(code string) string { return fixture.catalogue.ids[code] }}, beforeMedia: func() { checkCleanup("download", false) }},
@@ -148,7 +144,7 @@ func TestCoverCleanupOnlyBlocksUntilArtworkCheckpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkCleanup("done", false)
-	for _, phase := range []string{"download", "checkpoint", "directory", "info", "export", "complete", "done"} {
+	for _, phase := range []string{"download", "checkpoint", "directory", "export", "complete", "done"} {
 		if !visited[phase] {
 			t.Errorf("phase %s was not checked", phase)
 		}

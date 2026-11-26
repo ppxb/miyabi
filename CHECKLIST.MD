@@ -209,8 +209,19 @@
     - 测试：新增 `web/tests/refresh-keys.test.ts`（`cards` 前缀仅命中三类卡片列表、不命中 `detail`/`filter-options`/`pending`；`taskRefreshKeys` 连接时为空、断线时含 `taskKeys.all`）与 `web/tests/refresh-call-sites.test.tsx`（直接捕获 mutation 选项并执行 `onSuccess`：连接时扫描不再请求 tasks、断线时回退刷新；字幕保存只失效 tracks/detail/actors/history/cards 七个 key）。`npm run test` 29 个文件 176 个用例通过，`npm run typecheck`、`oxlint` 通过。
   - 遗留（低）：
     - `npm run fmt:check` 仍会报 `player-dialog.tsx` 中一段既有 JSX 的格式差异（HEAD 即存在，与本次无关，按最小改动未处理）。
-- [ ] 🟢 ✅ **任务池惊群 + 每次 Claim 读暂停设置**：`internal/tasks/queue.go` 的 `Finish` → `WakePool` 唤醒全部 4 个 worker，每个都要拿全局锁、读一次 `tasks.library_paused`（`internal/tasks/pause.go:52` 的 `runnableKinds`），再跑 `Claim` 和 `NextRetry`。
+- [x] 🟢 ✅ **任务池惊群 + 每次 Claim 读暂停设置**：`internal/tasks/queue.go` 的 `Finish` → `WakePool` 唤醒全部 4 个 worker，每个都要拿全局锁、读一次 `tasks.library_paused`（`internal/tasks/pause.go:52` 的 `runnableKinds`），再跑 `Claim` 和 `NextRetry`。
   - 改法：暂停状态缓存在内存（`SetLibraryPaused` 时更新）；按 kind 只唤醒相关池。
+  - （已修复：按 kind 定向唤醒 + 暂停状态内存缓存。实际池为 scan 1 个 + scrape 2 个，共 3 个 worker）
+    - `internal/tasks/bus.go`：worker 订阅记录 kinds；`SubscribePool(kinds ...Kind)` / `WakePool(kinds ...Kind)`，空参表示全部，只通知 kind 相交的 worker；`kinds` 建立后不再修改，增删都在总线锁内。
+    - `internal/tasks/pool.go`、`service.go`：`Pool.Run` 以自身 `pool.kinds` 订阅；Service 包装同步改为可变参数。
+    - `internal/tasks/queue.go`：`Finish` 在事务内记下任务 kind，提交后只 `WakePool(kind)`；Queue 增加暂停缓存字段。
+    - `internal/tasks/pause.go`：`runnableKinds` 改读进程内缓存（首次懒加载 DB，覆盖重启后已持久化的暂停状态），`SetLibraryPaused` 保存成功后更新缓存并 `WakePool(KindScan, KindScrape)`；`Checkpoint`/`LibraryPaused` 仍读 DB。
+    - 入队路径仍用无参 `WakePool()` 全量唤醒（`EnqueueScan`、reconcile 批量入队、`EnqueueTargetedScan` 的 `OnCommit`、本地源补刮等），跨 kind 不会漏唤醒。
+    - `internal/library/scrape/scrape.go`：`Notifier.WakePool` 随签名改为 `WakePool(...tasks.Kind)`（唯一实现为 `*tasks.Service`）。
+    - 测试：新增 `internal/tasks/bus_test.go`（kind 过滤、全量唤醒、无关 kind 不唤醒）与 `pause_test.go` 的 `TestFinishWakesOnlyItsOwnPool`（scan/scrape 两种 kind 各测一次）、`TestPauseToggleWakesBothLibraryPools`、`TestSetLibraryPausedUpdatesCachedState`（同一 Service 不重新加载即可看到暂停，覆盖缓存写入）。`go test -count=1 ./internal/...`、`go test ./cmd/...`、`go vet ./internal/...`、`gofmt -l` 通过。
+  - 附带修复：`internal/app/cover_lock_test.go` 删除过时的 `sess.Info` 阶段断言（`c304103` 起发布改为目录列表校验，不再调用 `Info`），该测试此前一直会失败。
+  - 遗留（低）：
+    - 暂停缓存是进程内状态，`SetLibraryPaused` 是唯一写入口；未来若出现绕开它的 DB 直写，需要同步更新缓存。
 - [ ] 🟢 **离线同步无唤醒通道**：`internal/app/app.go:319` 传入的 wake 为 `nil`（monitor 有 `Pending()`），提交或取消后最多 30 秒才看到状态更新。
   - 改法：给离线服务加 Pending 通道，提交和控制操作时发信号。
 - [ ] 🟢 **零碎重复读取**：

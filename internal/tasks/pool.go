@@ -23,7 +23,7 @@ type PoolQueue interface {
 
 // PoolBus defines the notification wake operations required by the worker Pool.
 type PoolBus interface {
-	SubscribePool() (<-chan struct{}, func())
+	SubscribePool(...Kind) (<-chan struct{}, func())
 }
 
 // Pool coordinates concurrent background workers executing registered task handlers.
@@ -55,7 +55,7 @@ func (pool *Pool) Run(ctx context.Context) error {
 	// claims broadcasting another event to every pool.
 	pending := make([]<-chan struct{}, pool.size)
 	for i := range pending {
-		updates, unsubscribe := pool.bus.SubscribePool()
+		updates, unsubscribe := pool.bus.SubscribePool(pool.kinds...)
 		pending[i] = updates
 		defer unsubscribe()
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"sync"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -21,6 +22,10 @@ type Queue struct {
 	registry *Registry
 	bus      *Bus
 	lock     syncx.ContextLock
+
+	pauseMu     sync.RWMutex
+	pauseValue  bool
+	pauseLoaded bool
 }
 
 const MaxRetries = 3
@@ -108,11 +113,13 @@ func (q *Queue) Claim(ctx context.Context, kinds []Kind) (*Job, error) {
 // same transaction. Revisions reported by the hook are published after commit.
 func (q *Queue) Finish(ctx context.Context, id int, runError error) error {
 	var change Change
+	var kind Kind
 	if err := ent.WithTx(ctx, q.database, func(tx *ent.Tx) error {
 		record, err := tx.Task.Get(ctx, id)
 		if err != nil {
 			return err
 		}
+		kind = Kind(record.Type)
 		update := tx.Task.UpdateOneID(id)
 		if errors.Is(runError, ErrPaused) {
 			return update.SetStatus(task.StatusQueued).ClearError().Exec(ctx)
@@ -155,7 +162,7 @@ func (q *Queue) Finish(ctx context.Context, id int, runError error) error {
 		return fmt.Errorf("finish task %d: %w", id, err)
 	}
 	q.bus.publish(change)
-	q.bus.WakePool()
+	q.bus.WakePool(kind)
 	return nil
 }
 
