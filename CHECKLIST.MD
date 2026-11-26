@@ -186,8 +186,14 @@
 
 ### 影响小
 
-- [ ] 🟢 **离线任务 SSE 与轮询重复**：`web/src/api/offline.ts:58` 活跃时每 5 秒轮询，而后端 `internal/offline/sync.go:217` 已经 `NotifyOfflineChanged()` 经 SSE 推送。
+- [x] 🟢 ✅ **离线任务 SSE 与轮询重复**：`web/src/api/offline.ts:58` 活跃时每 5 秒轮询，而后端 `internal/offline/sync.go:217` 已经 `NotifyOfflineChanged()` 经 SSE 推送。
   - 改法：仅在 `useTaskConnection().status !== 'connected'` 时启用 `refetchInterval`。
+  - （已修复：SSE 已连接时不再轮询离线活动，断线时兜底轮询）
+    - `web/src/api/offline.ts`：抽出 `offlineActivityOptions(poll)`，仅在 `poll` 为真且有活跃任务时返回 5 秒间隔；`useOfflineActivity(poll = true)` 保持默认旧行为。
+    - `web/src/features/tasks/task-notifications.tsx`：先取 `useTaskConnection()`，传 `poll = connection.status !== 'connected'`；该 hook 的唯一调用点即此处。
+    - 测试：新增 `web/tests/offline-poll.test.ts`（连接时活跃任务 16 秒内仅 1 次请求；断线时每 5 秒共 4 次；无活跃任务不轮询）。`npm run typecheck`、`npm run test`（27 个文件 171 个用例）、`oxlint`、`oxfmt --check` 均通过。
+  - 遗留（低）：
+    - SSE 状态在收到首个 tasks 快照后才变为 `connected`，之前的 `connecting` 窗口仍会 5 秒轮询，属兜底，连接成功后自动停止。
 - [ ] 🟢 **刷新范围过宽**：
   - `web/src/features/library/player-dialog.tsx:445` 关播放器刷新整个 `libraryKeys.all`；
   - `web/src/api/subtitles.ts:105`、`:114` 字幕保存/删除刷新整个 `libraryKeys.all`；

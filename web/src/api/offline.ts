@@ -52,11 +52,18 @@ const activityOptions = queryOptions({
   refetchOnMount: 'always'
 })
 
-export function useOfflineActivity() {
-  return useQuery({
+// Poll only while the SSE stream is unavailable: task-events refreshes this
+// query on every offline revision change, so a connected client needs no polls.
+export function offlineActivityOptions(poll: boolean) {
+  return queryOptions({
     ...activityOptions,
-    refetchInterval: query => (query.state.data?.tasks.some(isOfflineTaskActive) ? 5000 : false)
+    refetchInterval: query =>
+      poll && query.state.data?.tasks.some(isOfflineTaskActive) ? 5000 : false
   })
+}
+
+export function useOfflineActivity(poll = true) {
+  return useQuery(offlineActivityOptions(poll))
 }
 
 export function useMovieOfflineTasks(movieID: string) {

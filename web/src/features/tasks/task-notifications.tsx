@@ -10,8 +10,8 @@ import { notifyOfflineTask, notifyScanTask } from './task-toast'
 
 export function TaskNotifications() {
   const tasks = useTasks()
-  const activity = useOfflineActivity()
   const connection = useTaskConnection()
+  const activity = useOfflineActivity(connection.status !== 'connected')
   const previous = useRef(new Map<string, NotificationEntry>())
   const dismissed = useRef(new Set<string>())
   const scope = useRef<string | undefined>(undefined)
