@@ -18,16 +18,16 @@ import (
 )
 
 func (s *Service) Cancel(ctx context.Context, id int) (domain.OfflineSubmission, error) {
-	return s.advance(ctx, id, actionCancel)
+	return s.advance(ctx, id, actionCancel, nil)
 }
 
 func (s *Service) TryNext(ctx context.Context, id int) (domain.OfflineSubmission, error) {
-	return s.advance(ctx, id, "next")
+	return s.advance(ctx, id, "next", nil)
 }
 
 // advance serializes controls and observations for one stable task ID. Remote
 // calls run outside database transactions and retain a bounded shutdown lease.
-func (s *Service) advance(ctx context.Context, id int, requested string) (domain.OfflineSubmission, error) {
+func (s *Service) advance(ctx context.Context, id int, requested string, cache *remoteTaskCache) (domain.OfflineSubmission, error) {
 	unlock, err := s.lockTask(ctx, id)
 	if err != nil {
 		return domain.OfflineSubmission{}, err
@@ -126,9 +126,20 @@ func (s *Service) advance(ctx context.Context, id int, requested string) (domain
 	}
 	s.tasks.NotifyOfflineChanged()
 	if state.Action == actionSubmit {
-		err = s.resumeSubmission(ctx, sess, record, state)
+		err = s.resumeSubmission(ctx, sess, record, state, cache)
 	} else {
-		err = s.removeCurrent(ctx, sess, record, state)
+		err = s.removeCurrent(ctx, sess, record, state, cache)
+		if err == nil && state.Action == actionSubmit {
+			if updated, getErr := s.database.OfflineDownload.Get(ctx, id); getErr != nil {
+				err = getErr
+			} else {
+				record = updated
+				state = recovery(record, prefs)
+				submitCtx, cancelSubmit := context.WithTimeout(context.WithoutCancel(ctx), s.submitTimeout)
+				err = s.resumeSubmission(submitCtx, sess, record, state, cache)
+				cancelSubmit()
+			}
+		}
 	}
 	if err != nil {
 		return domain.OfflineSubmission{}, s.deferAction(ctx, record, state, err)
@@ -141,12 +152,12 @@ func (s *Service) advance(ctx context.Context, id int, requested string) (domain
 	return s.submission(ctx, record, source)
 }
 
-func (s *Service) removeCurrent(ctx context.Context, sess drive.Session, record *ent.OfflineDownload, state *download.Recovery) error {
+func (s *Service) removeCurrent(ctx context.Context, sess drive.Session, record *ent.OfflineDownload, state *download.Recovery, cache *remoteTaskCache) error {
 	hash := record.InfoHash
 	if hash == "" {
 		hash = currentHash(record)
 	}
-	remote, found, err := s.lookupRemoteTask(ctx, sess, hash)
+	remote, found, err := s.lookupRemoteTask(ctx, sess, hash, cache)
 	if err != nil {
 		return err
 	}
@@ -201,6 +212,7 @@ func (s *Service) removeCurrent(ctx context.Context, sess drive.Session, record 
 		if err := sess.RemoveOffline(ctx, hash); err != nil {
 			return err
 		}
+		cache.delete(hash)
 	}
 	return sess.Commit(ctx, func(tx *ent.Tx) error {
 		update := tx.OfflineDownload.UpdateOneID(record.ID).ClearError()
@@ -222,7 +234,7 @@ func (s *Service) removeCurrent(ctx context.Context, sess drive.Session, record 
 	})
 }
 
-func (s *Service) resumeSubmission(ctx context.Context, sess drive.Session, record *ent.OfflineDownload, state *download.Recovery) error {
+func (s *Service) resumeSubmission(ctx context.Context, sess drive.Session, record *ent.OfflineDownload, state *download.Recovery, cache *remoteTaskCache) error {
 	hash := currentHash(record)
 	other, err := s.database.OfflineDownload.Query().Where(offlinedownload.AccountIDEQ(record.AccountID),
 		candidateHash(hash), offlinedownload.StatusEQ(offlinedownload.StatusRunning), offlinedownload.IDNEQ(record.ID)).Exist(ctx)
@@ -233,7 +245,7 @@ func (s *Service) resumeSubmission(ctx context.Context, sess drive.Session, reco
 		return domain.E(domain.KindConflict, "该磁力已有下载任务", nil)
 	}
 	if state.SubmissionStarted {
-		remote, found, err := s.lookupRemoteTask(ctx, sess, hash)
+		remote, found, err := s.lookupRemoteTask(ctx, sess, hash, cache)
 		if err != nil {
 			return err
 		}
@@ -248,7 +260,7 @@ func (s *Service) resumeSubmission(ctx context.Context, sess drive.Session, reco
 	if err := sess.Commit(ctx, func(tx *ent.Tx) error { return tx.OfflineDownload.UpdateOneID(record.ID).SetRecovery(state).Exec(ctx) }); err != nil {
 		return err
 	}
-	remote, err := s.submit(ctx, sess, hash)
+	remote, err := s.submit(ctx, sess, hash, cache)
 	if err != nil {
 		return err
 	}

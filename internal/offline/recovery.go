@@ -13,6 +13,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/domain/download"
+	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/offlinedownload"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
@@ -77,7 +78,7 @@ func (s *Service) lockTask(ctx context.Context, id int) (func(), error) {
 	return s.operations.Lock(ctx, "task", fmt.Sprint(id))
 }
 
-func (s *Service) recoverSource(ctx context.Context, source domain.LibrarySource) error {
+func (s *Service) recoverSource(ctx context.Context, source domain.LibrarySource, cache *remoteTaskCache) error {
 	cfg, prefs, err := s.config(ctx)
 	if err != nil {
 		return err
@@ -89,7 +90,11 @@ func (s *Service) recoverSource(ctx context.Context, source domain.LibrarySource
 	if err != nil {
 		return err
 	}
+	var errs []error
 	for _, record := range records {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(errs, err)...)
+		}
 		state := recovery(record, prefs)
 		if s.now().Before(state.RetryAt) {
 			continue
@@ -100,8 +105,13 @@ func (s *Service) recoverSource(ctx context.Context, source domain.LibrarySource
 			if state.Action == actionSwitch && !cfg.AutoSwitch && !state.Manual {
 				continue
 			}
-			_, err := s.advance(ctx, record.ID, "")
-			return err
+			if _, err := s.advance(ctx, record.ID, "", cache); err != nil {
+				if errors.Is(err, drive.ErrSourceChanged) || errors.Is(err, pan.ErrUnauthorized) {
+					return err
+				}
+				errs = append(errs, err)
+			}
+			continue
 		}
 		if state.Exhausted {
 			continue
@@ -116,15 +126,19 @@ func (s *Service) recoverSource(ctx context.Context, source domain.LibrarySource
 		if !cfg.AutoSwitch {
 			if stalled && !state.Stalled {
 				if err := s.markStalled(ctx, record.ID); err != nil {
-					return err
+					errs = append(errs, err)
 				}
 			}
 			continue
 		}
-		_, err := s.advance(ctx, record.ID, actionSwitch)
-		return err
+		if _, err := s.advance(ctx, record.ID, actionSwitch, cache); err != nil {
+			if errors.Is(err, drive.ErrSourceChanged) || errors.Is(err, pan.ErrUnauthorized) {
+				return err
+			}
+			errs = append(errs, err)
+		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func (s *Service) markStalled(ctx context.Context, id int) error {

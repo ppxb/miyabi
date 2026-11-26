@@ -135,7 +135,7 @@ func (service *Service) addForAccount(ctx context.Context, accountID, movieID, h
 	}); err != nil {
 		return domain.OfflineSubmission{}, fmt.Errorf("record 115 offline download: %w", err)
 	}
-	remote, err := service.submit(submitContext, sess, hash)
+	remote, err := service.submit(submitContext, sess, hash, nil)
 	if err != nil {
 		return domain.OfflineSubmission{}, service.deferAction(submitContext, created, state, fmt.Errorf("submit 115 offline download: %w", err))
 	}

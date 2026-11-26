@@ -12,10 +12,46 @@ import (
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
+type remoteTaskCache struct {
+	tasks    map[string]pan.OfflineTask
+	complete bool
+}
+
+func (c *remoteTaskCache) get(hash string) (pan.OfflineTask, bool) {
+	if c == nil || c.tasks == nil {
+		return pan.OfflineTask{}, false
+	}
+	task, ok := c.tasks[strings.ToLower(hash)]
+	return task, ok
+}
+
+func (c *remoteTaskCache) record(task pan.OfflineTask) {
+	if c == nil || task.Hash == "" {
+		return
+	}
+	if c.tasks == nil {
+		c.tasks = make(map[string]pan.OfflineTask)
+	}
+	c.tasks[strings.ToLower(task.Hash)] = task
+}
+
+func (c *remoteTaskCache) delete(hash string) {
+	if c == nil || c.tasks == nil {
+		return
+	}
+	delete(c.tasks, strings.ToLower(hash))
+}
+
+func (c *remoteTaskCache) markComplete() {
+	if c != nil {
+		c.complete = true
+	}
+}
+
 // submit handles duplicate history by inspecting its real output. Only a
 // terminal task with confirmed absent video content is removed, never files.
 // The caller holds the account/hash lock, never the shared Pan state lock.
-func (service *Service) submit(ctx context.Context, sess drive.Session, hash string) (pan.OfflineTask, error) {
+func (service *Service) submit(ctx context.Context, sess drive.Session, hash string, cache *remoteTaskCache) (pan.OfflineTask, error) {
 	infoHash, err := sess.AddOffline(ctx, "magnet:?xt=urn:btih:"+hash)
 	if err == nil {
 		return pan.OfflineTask{Hash: infoHash}, nil
@@ -23,7 +59,7 @@ func (service *Service) submit(ctx context.Context, sess drive.Session, hash str
 	if !errors.Is(err, pan.ErrOfflineExists) {
 		return pan.OfflineTask{}, err
 	}
-	remote, err := service.findRemoteTask(ctx, sess, hash)
+	remote, err := service.findRemoteTask(ctx, sess, hash, cache)
 	if err != nil {
 		return pan.OfflineTask{}, err
 	}
@@ -53,12 +89,21 @@ func (service *Service) submit(ctx context.Context, sess drive.Session, hash str
 	if err := sess.RemoveOffline(ctx, remote.Hash); err != nil {
 		return pan.OfflineTask{}, fmt.Errorf("remove stale 115 task history: %w", err)
 	}
+	cache.delete(remote.Hash)
 	infoHash, err = sess.AddOffline(ctx, "magnet:?xt=urn:btih:"+hash)
 	return pan.OfflineTask{Hash: infoHash}, err
 }
 
-func (service *Service) findRemoteTask(ctx context.Context, sess drive.Session, hash string) (pan.OfflineTask, error) {
-	remote, found, err := service.lookupRemoteTask(ctx, sess, hash)
+func (service *Service) findRemoteTask(ctx context.Context, sess drive.Session, hash string, cache *remoteTaskCache) (pan.OfflineTask, error) {
+	if remote, ok := cache.get(hash); ok {
+		return remote, nil
+	}
+	if cache != nil {
+		// 115 explicitly reported the task exists, so a prior complete listing
+		// cannot prove it absent.
+		cache.complete = false
+	}
+	remote, found, err := service.lookupRemoteTask(ctx, sess, hash, cache)
 	if err != nil {
 		return pan.OfflineTask{}, err
 	}
@@ -68,18 +113,30 @@ func (service *Service) findRemoteTask(ctx context.Context, sess drive.Session, 
 	return pan.OfflineTask{}, domain.E(domain.KindBusy, "115 提示任务已存在，但任务列表中未找到它，请稍后重试", nil)
 }
 
-func (service *Service) lookupRemoteTask(ctx context.Context, sess drive.Session, hash string) (pan.OfflineTask, bool, error) {
+func (service *Service) lookupRemoteTask(ctx context.Context, sess drive.Session, hash string, cache *remoteTaskCache) (pan.OfflineTask, bool, error) {
+	if remote, ok := cache.get(hash); ok {
+		return remote, true, nil
+	}
+	if cache != nil && cache.complete {
+		return pan.OfflineTask{}, false, nil
+	}
 	var found *pan.OfflineTask
+	page := 0
 	err := drive.WalkOfflinePages(ctx, func(page int) (pan.OfflinePage, error) {
 		return sess.OfflineTasks(ctx, page)
 	}, func(remote pan.OfflinePage) (bool, error) {
+		page++
 		for _, download := range remote.Tasks {
-			if strings.EqualFold(download.Hash, hash) {
-				found = &download
-				return false, nil
+			cache.record(download)
+			if found == nil && strings.EqualFold(download.Hash, hash) {
+				task := download
+				found = &task
 			}
 		}
-		return true, nil
+		if page >= remote.PageCount {
+			cache.markComplete()
+		}
+		return found == nil, nil
 	})
 	if err != nil {
 		return pan.OfflineTask{}, false, fmt.Errorf("find 115 task: %w", err)

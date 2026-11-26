@@ -60,7 +60,7 @@ func (service *Service) syncSource(ctx context.Context, source domain.LibrarySou
 		return fmt.Errorf("load offline tasks: %w", err)
 	}
 	if len(records) == 0 {
-		return service.recoverSource(ctx, source)
+		return service.recoverSource(ctx, source, &remoteTaskCache{})
 	}
 
 	// Read the preferences once per account instead of once per task.
@@ -90,10 +90,19 @@ func (service *Service) syncSource(ctx context.Context, source domain.LibrarySou
 		wanted[strings.ToLower(record.InfoHash)] = record
 	}
 
+	cache := &remoteTaskCache{}
 	if len(wanted) > 0 {
+		page := 0
 		if err := drive.WalkOfflinePages(ctx, func(page int) (pan.OfflinePage, error) {
 			return sess.OfflineTasks(ctx, page)
 		}, func(remote pan.OfflinePage) (bool, error) {
+			page++
+			for _, download := range remote.Tasks {
+				cache.record(download)
+			}
+			if page >= remote.PageCount {
+				cache.markComplete()
+			}
 			for _, download := range remote.Tasks {
 				if err := ctx.Err(); err != nil {
 					return false, err
@@ -126,7 +135,7 @@ func (service *Service) syncSource(ctx context.Context, source domain.LibrarySou
 		}
 	}
 	if len(syncErrors) == 0 {
-		return service.recoverSource(ctx, source)
+		return service.recoverSource(ctx, source, cache)
 	}
 	return errors.Join(syncErrors...)
 }

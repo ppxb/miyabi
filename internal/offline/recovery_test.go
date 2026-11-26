@@ -86,19 +86,44 @@ func (r *recoveryRig) poll(elapsed time.Duration) {
 func TestRecoverySwitchesSeriallyAndPreservesTaskIdentity(t *testing.T) {
 	r := newRecoveryRig(t)
 	original := r.add(offlineHashA)
+	add := r.client.addOffline
+	sawCheckpoint := false
+	failFirstReplacement := true
+	r.client.addOffline = func(ctx context.Context, token, uri, dir string) (string, error) {
+		hash := strings.TrimPrefix(uri, "magnet:?xt=urn:btih:")
+		if hash == offlineHashB {
+			pending := r.s.database.OfflineDownload.GetX(ctx, original.ID)
+			if currentHash(pending) != offlineHashB || pending.Recovery.Action != actionSubmit || !pending.Recovery.SubmissionStarted || len(r.remote) != 0 {
+				t.Fatalf("replacement was not checkpointed before submission: %+v, %+v", pending, r.remote)
+			}
+			sawCheckpoint = true
+			if failFirstReplacement {
+				failFirstReplacement = false
+				return "", context.DeadlineExceeded
+			}
+		}
+		return add(ctx, token, uri, dir)
+	}
 	r.poll(30 * time.Second)
-	r.poll(30 * time.Second)
+	r.now = r.now.Add(30 * time.Second)
+	if err := r.s.Sync(t.Context()); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected injected replacement failure, got %v", err)
+	}
+	if !sawCheckpoint {
+		t.Fatal("replacement did not attempt submission in the same cycle")
+	}
 	pending := r.s.database.OfflineDownload.GetX(t.Context(), original.ID)
 	if currentHash(pending) != offlineHashB || pending.Recovery.Action != actionSubmit || len(r.remote) != 0 {
-		t.Fatalf("replacement was not checkpointed after cancellation: %+v, %+v", pending, r.remote)
+		t.Fatalf("replacement checkpoint lost after failed submission: %+v, %+v", pending, r.remote)
 	}
 	if !slices.Equal(r.events, []string{"add:" + offlineHashA, "remove:" + offlineHashA}) {
 		t.Fatal(r.events)
 	}
-	// Restart between cancellation and replacement submission.
+	// Restart between cancellation checkpoint and replacement submission.
 	r.s = New(r.s.database, r.s.catalogue, r.s.drive, r.s.tasks, r.s.library, r.s.metadata, r.s.submitTimeout)
 	r.s.now = func() time.Time { return r.now }
-	r.poll(30 * time.Second)
+	r.now = pending.Recovery.RetryAt
+	r.poll(0)
 	current := r.s.database.OfflineDownload.GetX(t.Context(), original.ID)
 	if currentHash(current) != offlineHashB || current.Recovery.Action != "" || len(current.Recovery.Attempts) != 2 || len(r.remote) != 1 {
 		t.Fatalf("restart failed to resume replacement: %+v", current)
@@ -187,7 +212,7 @@ func TestRecoveryHonorsQueueAndCompletionGrace(t *testing.T) {
 			if !queued {
 				r.poll(30 * time.Second)
 				r.poll(30 * time.Second)
-				if len(r.events) != 2 {
+				if !slices.Equal(r.events, []string{"add:" + offlineHashA, "remove:" + offlineHashA, "add:" + offlineHashB}) {
 					t.Fatal("completion grace never expired", r.events)
 				}
 			}
@@ -286,14 +311,18 @@ func TestFailedCancellationNeverSubmitsReplacement(t *testing.T) {
 		t.Fatal(r.events)
 	}
 	// Cancellation may succeed remotely while its response is lost. A later
-	// complete listing resolves the checkpoint without submitting in parallel.
+	// complete listing resolves the checkpoint before submitting the replacement.
 	delete(r.remote, offlineHashA)
+	add := r.client.addOffline
+	r.client.addOffline = func(ctx context.Context, token, uri, dir string) (string, error) {
+		pending := r.s.database.OfflineDownload.GetX(ctx, record.ID)
+		if currentHash(pending) != offlineHashB || pending.Recovery.Action != actionSubmit || len(r.remote) != 0 {
+			t.Fatalf("replacement submitted before cancellation checkpoint: %+v, %+v", pending, r.remote)
+		}
+		return add(ctx, token, uri, dir)
+	}
 	r.now = current.Recovery.RetryAt
 	r.poll(0)
-	if len(r.events) != 1 {
-		t.Fatal("replacement submitted before cancellation checkpoint", r.events)
-	}
-	r.poll(30 * time.Second)
 	if !slices.Equal(r.events, []string{"add:" + offlineHashA, "add:" + offlineHashB}) {
 		t.Fatal(r.events)
 	}
@@ -326,14 +355,22 @@ func TestSubmissionTimeoutRecoversWithoutAnotherAdd(t *testing.T) {
 func TestCancelBetweenSwitchAndSubmissionDoesNotStartNext(t *testing.T) {
 	r := newRecoveryRig(t)
 	record := r.add(offlineHashA)
-	if _, err := r.s.TryNext(t.Context(), record.ID); err != nil {
-		t.Fatal(err)
+	add := r.client.addOffline
+	r.client.addOffline = func(ctx context.Context, token, uri, dir string) (string, error) {
+		if strings.TrimPrefix(uri, "magnet:?xt=urn:btih:") == offlineHashB {
+			return "", context.DeadlineExceeded
+		}
+		return add(ctx, token, uri, dir)
 	}
+	if _, err := r.s.TryNext(t.Context(), record.ID); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected submission failure, got %v", err)
+	}
+	r.client.addOffline = add
 	if _, err := r.s.Cancel(t.Context(), record.ID); err != nil {
 		t.Fatal(err)
 	}
 	r.poll(time.Minute)
-	if len(r.remote) != 0 || len(r.events) != 2 || r.s.database.OfflineDownload.GetX(t.Context(), record.ID).Status != offlinedownload.StatusCancelled {
+	if len(r.remote) != 0 || !slices.Equal(r.events, []string{"add:" + offlineHashA, "remove:" + offlineHashA}) || r.s.database.OfflineDownload.GetX(t.Context(), record.ID).Status != offlinedownload.StatusCancelled {
 		t.Fatal("cancel started next candidate", r.events)
 	}
 }
@@ -448,8 +485,254 @@ func TestRecoveryReplacesExplicitFailureButDefersListingErrors(t *testing.T) {
 	remote.Status = -1
 	r.remote[offlineHashA] = remote
 	r.poll(30 * time.Second)
-	r.poll(30 * time.Second)
 	if currentHash(r.s.database.OfflineDownload.GetX(t.Context(), record.ID)) != offlineHashB || len(r.events) != 3 {
-		t.Fatal("failed task was not replaced", r.events)
+		t.Fatal("failed task was not replaced in a single sync cycle", r.events)
+	}
+}
+
+func TestSyncReusesObservedPagesAcrossRecoveryAndDuplicateHistory(t *testing.T) {
+	const (
+		hashC = "cccccccccccccccccccccccccccccccccccccccc"
+		hashD = "dddddddddddddddddddddddddddddddddddddddd"
+	)
+	r := newRecoveryRig(t)
+	cat := r.s.catalogue.(*stubCatalogue)
+	cat.magnets["ABP-002"] = []domain.Magnet{{Hash: hashC}, {Hash: hashD}}
+
+	first := r.add(offlineHashA)
+	secondRes, err := r.s.AddForAccount(t.Context(), "100", "ABP-002", hashC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.poll(0)
+	second := r.s.database.OfflineDownload.GetX(t.Context(), secondRes.TaskID)
+
+	// Pre-populate stale remote history for hashD on page 2 (its video is gone).
+	r.remote[hashD] = pan.OfflineTask{Hash: hashD, Status: pan.OfflineStatusDone, FileID: "gone-video", DirectoryID: "10"}
+	r.client.info = func(context.Context, string, string) (pan.FileInfo, error) {
+		return pan.FileInfo{}, pan.ErrNotFound
+	}
+	add := r.client.addOffline
+	existedOnce := false
+	r.client.addOffline = func(ctx context.Context, token, uri, dir string) (string, error) {
+		hash := strings.TrimPrefix(uri, "magnet:?xt=urn:btih:")
+		if hash == hashD && !existedOnce {
+			existedOnce = true
+			return "", pan.ErrOfflineExists
+		}
+		return add(ctx, token, uri, dir)
+	}
+
+	pageCalls := 0
+	r.client.offlineTasks = func(_ context.Context, _ string, page int) (pan.OfflinePage, error) {
+		pageCalls++
+		if page == 1 {
+			var tasks []pan.OfflineTask
+			if task, ok := r.remote[offlineHashA]; ok {
+				tasks = append(tasks, task)
+			}
+			return pan.OfflinePage{PageCount: 2, Tasks: tasks}, nil
+		}
+		var tasks []pan.OfflineTask
+		for _, h := range []string{hashC, hashD, offlineHashB} {
+			if task, ok := r.remote[h]; ok {
+				tasks = append(tasks, task)
+			}
+		}
+		return pan.OfflinePage{PageCount: 2, Tasks: tasks}, nil
+	}
+
+	r.poll(30 * time.Second)
+	pageCalls = 0
+	r.poll(30 * time.Second)
+
+	if pageCalls != 2 {
+		t.Fatalf("expected 1 full 2-page pass across sync + recovery + duplicate history, got %d page fetches", pageCalls)
+	}
+	gotFirst := r.s.database.OfflineDownload.GetX(t.Context(), first.ID)
+	gotSecond := r.s.database.OfflineDownload.GetX(t.Context(), second.ID)
+	if currentHash(gotFirst) != offlineHashB || gotFirst.Recovery.Action != "" {
+		t.Fatalf("first task did not switch in one cycle: %+v", gotFirst)
+	}
+	if currentHash(gotSecond) != hashD || gotSecond.Recovery.Action != "" {
+		t.Fatalf("second task did not switch in one cycle: %+v", gotSecond)
+	}
+}
+
+func TestSyncFallsBackWhenPartialListingMissesPendingSubmission(t *testing.T) {
+	const hashC = "cccccccccccccccccccccccccccccccccccccccc"
+	r := newRecoveryRig(t)
+	cat := r.s.catalogue.(*stubCatalogue)
+	cat.magnets["ABP-002"] = []domain.Magnet{{Hash: hashC}}
+
+	// Task 1 is running on page 1 so syncSource stops after page 1.
+	_ = r.add(offlineHashA)
+
+	// Task 2 timed out during submission and actually exists on page 2.
+	add := r.client.addOffline
+	r.client.addOffline = func(ctx context.Context, token, uri, dir string) (string, error) {
+		_, _ = add(ctx, token, uri, dir)
+		return "", context.DeadlineExceeded
+	}
+	if _, err := r.s.AddForAccount(t.Context(), "100", "ABP-002", hashC); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected timeout, got %v", err)
+	}
+	r.client.addOffline = add
+	pending := r.s.database.OfflineDownload.Query().Where(offlinedownload.HashEQ(hashC)).OnlyX(t.Context())
+
+	pageCalls := 0
+	r.client.offlineTasks = func(_ context.Context, _ string, page int) (pan.OfflinePage, error) {
+		pageCalls++
+		if page == 1 {
+			return pan.OfflinePage{PageCount: 2, Tasks: []pan.OfflineTask{r.remote[offlineHashA]}}, nil
+		}
+		return pan.OfflinePage{PageCount: 2, Tasks: []pan.OfflineTask{r.remote[hashC]}}, nil
+	}
+
+	r.now = pending.Recovery.RetryAt
+	r.poll(0)
+
+	got := r.s.database.OfflineDownload.GetX(t.Context(), pending.ID)
+	if got.Recovery.Action != "" || got.InfoHash != hashC {
+		t.Fatalf("pending submission on page 2 was not recovered: %+v", got)
+	}
+	// Page 1 during sync + pages 1..2 during lookup fallback = 3 page fetches (not skipped as missing).
+	if pageCalls != 3 {
+		t.Fatalf("expected 3 page fetches with fallback from partial listing, got %d", pageCalls)
+	}
+}
+
+func TestRecoveryDoesNotHeadOfLineBlockAcrossMultipleStalledTasks(t *testing.T) {
+	const (
+		hashC = "cccccccccccccccccccccccccccccccccccccccc"
+		hashD = "dddddddddddddddddddddddddddddddddddddddd"
+		hashE = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+		hashF = "ffffffffffffffffffffffffffffffffffffffff"
+	)
+	r := newRecoveryRig(t)
+	cat := r.s.catalogue.(*stubCatalogue)
+	cat.magnets["ABP-002"] = []domain.Magnet{{Hash: hashC}, {Hash: hashD}}
+	cat.magnets["ABP-003"] = []domain.Magnet{{Hash: hashE}, {Hash: hashF}}
+
+	first := r.add(offlineHashA)
+	res2, err := r.s.AddForAccount(t.Context(), "100", "ABP-002", hashC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res3, err := r.s.AddForAccount(t.Context(), "100", "ABP-003", hashE)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.poll(0)
+
+	// Make the first task fail removal; tasks 2 and 3 must still switch in the same cycle.
+	remove := r.client.removeOffline
+	removeFailure := errors.New("fixture temporary remove failure")
+	r.client.removeOffline = func(ctx context.Context, token, hash string) error {
+		if hash == offlineHashA {
+			return removeFailure
+		}
+		return remove(ctx, token, hash)
+	}
+
+	r.poll(30 * time.Second)
+	r.now = r.now.Add(30 * time.Second)
+	if err := r.s.Sync(t.Context()); !errors.Is(err, removeFailure) {
+		t.Fatalf("expected first task error to surface, got %v", err)
+	}
+
+	got1 := r.s.database.OfflineDownload.GetX(t.Context(), first.ID)
+	got2 := r.s.database.OfflineDownload.GetX(t.Context(), res2.TaskID)
+	got3 := r.s.database.OfflineDownload.GetX(t.Context(), res3.TaskID)
+	if currentHash(got1) != offlineHashA || got1.Recovery.Action != actionSwitch {
+		t.Fatalf("first task should remain pending switch retry: %+v", got1)
+	}
+	if currentHash(got2) != hashD || got2.Recovery.Action != "" {
+		t.Fatalf("second task was blocked by first task: %+v", got2)
+	}
+	if currentHash(got3) != hashF || got3.Recovery.Action != "" {
+		t.Fatalf("third task was blocked by first task: %+v", got3)
+	}
+}
+
+func TestSyncRefreshesCompleteCacheWhenAddReportsOfflineExists(t *testing.T) {
+	r := newRecoveryRig(t)
+	record := r.add(offlineHashA)
+
+	// Remote listing initially only has offlineHashA (complete 1-page snapshot).
+	// When replacement hashB is submitted, 115 reports ErrOfflineExists because
+	// an external task appeared after the initial listing.
+	r.client.info = func(context.Context, string, string) (pan.FileInfo, error) {
+		return pan.FileInfo{}, pan.ErrNotFound
+	}
+	add := r.client.addOffline
+	existedOnce := false
+	r.client.addOffline = func(ctx context.Context, token, uri, dir string) (string, error) {
+		hash := strings.TrimPrefix(uri, "magnet:?xt=urn:btih:")
+		if hash == offlineHashB && !existedOnce {
+			existedOnce = true
+			r.remote[offlineHashB] = pan.OfflineTask{Hash: strings.ToUpper(offlineHashB), Status: pan.OfflineStatusDone, FileID: "stale-video", DirectoryID: "10"}
+			return "", pan.ErrOfflineExists
+		}
+		return add(ctx, token, uri, dir)
+	}
+
+	pageCalls := 0
+	list := r.client.offlineTasks
+	r.client.offlineTasks = func(ctx context.Context, token string, page int) (pan.OfflinePage, error) {
+		pageCalls++
+		return list(ctx, token, page)
+	}
+
+	r.poll(30 * time.Second)
+	pageCalls = 0
+	r.poll(30 * time.Second)
+
+	if pageCalls != 2 {
+		t.Fatalf("expected 1 initial pass + 1 forced refresh on ErrOfflineExists, got %d page fetches", pageCalls)
+	}
+	got := r.s.database.OfflineDownload.GetX(t.Context(), record.ID)
+	if currentHash(got) != offlineHashB || got.Recovery.Action != "" {
+		t.Fatalf("replacement did not recover after ErrOfflineExists cache miss: %+v", got)
+	}
+}
+
+func TestRecoveryStopsSourceOnAccountAuthError(t *testing.T) {
+	const (
+		hashC = "cccccccccccccccccccccccccccccccccccccccc"
+		hashD = "dddddddddddddddddddddddddddddddddddddddd"
+	)
+	r := newRecoveryRig(t)
+	cat := r.s.catalogue.(*stubCatalogue)
+	cat.magnets["ABP-002"] = []domain.Magnet{{Hash: hashC}, {Hash: hashD}}
+
+	_ = r.add(offlineHashA)
+	res2, err := r.s.AddForAccount(t.Context(), "100", "ABP-002", hashC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.poll(0)
+
+	removeCalls := 0
+	r.client.refreshToken = func(context.Context, string) (pan.Tokens, error) {
+		return pan.Tokens{}, pan.ErrUnauthorized
+	}
+	r.client.removeOffline = func(_ context.Context, _, hash string) error {
+		removeCalls++
+		if hash != offlineHashA {
+			t.Fatalf("unexpected remove for later task %s after auth error", hash)
+		}
+		return pan.ErrUnauthorized
+	}
+
+	r.poll(30 * time.Second)
+	r.poll(30 * time.Second)
+
+	if removeCalls != 1 {
+		t.Fatalf("expected recovery to abort source on ErrUnauthorized, got %d remove calls", removeCalls)
+	}
+	got2 := r.s.database.OfflineDownload.GetX(t.Context(), res2.TaskID)
+	if currentHash(got2) != hashC || got2.Recovery.Action != "" {
+		t.Fatalf("second task should not have started after account auth failure: %+v", got2)
 	}
 }

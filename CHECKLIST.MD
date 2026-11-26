@@ -150,10 +150,20 @@
     - 首调用者取消会让同番号等待者一起收到取消错误；错误不缓存，下次重试可恢复。
     - 只缓存成功页面，不存在的番号（404/空 body）每次仍会请求。
     - 缓存 key 为原始 code，依赖调用方先规范化；当前元数据 provider 和 catalogue 磁力路径都会规范化。
-- [ ] 🟠 **一轮离线同步重复分页拉取 115 任务列表**：`internal/offline/sync.go:94` 先完整走一遍 `WalkOfflinePages`，`internal/offline/control.go:149` 的 `lookupRemoteTask` 再走一遍，`control.go:236`、`internal/offline/submit.go:61` 还会再走。115 客户端限速为每 250ms 一个请求、最多 2 并发（`internal/pan/client.go:34`）。
+- [x] 🟠 ✅ **一轮离线同步重复分页拉取 115 任务列表**：`internal/offline/sync.go:94` 先完整走一遍 `WalkOfflinePages`，`internal/offline/control.go:149` 的 `lookupRemoteTask` 再走一遍，`control.go:236`、`internal/offline/submit.go:61` 还会再走。115 客户端限速为每 250ms 一个请求、最多 2 并发（`internal/pan/client.go:34`）。
   - 改法：`syncSource` 把本轮观察到的 `map[hash]pan.OfflineTask` 传给 `recoverSource` / `advance`，命中即不再拉取。
-- [ ] 🟠 **自动换源队头阻塞，且每次换源至少两轮**：`internal/offline/recovery.go:103`、`:124` 处理完第一个需动作的任务就 `return`；`internal/offline/control.go:216` 移除旧任务后只改状态为 `actionSubmit`，等下一轮 30 秒同步才提交。N 个卡住任务约需 N×60 秒。
+  - （已修复：单轮快照缓存复用，未命中按完整度决定回退）
+    - `internal/offline/submit.go`：新增 `remoteTaskCache`（按小写 hash 缓存本轮已见任务，记录是否已走完最后一页 `complete`）。`lookupRemoteTask` 优先读缓存；未命中且 `complete == true` 直接返回不存在，否则分页拉取并顺带填充缓存。`findRemoteTask` 遇 `ErrOfflineExists` 且缓存未命中时清掉 `complete` 强制远端重查。`submit` 删除历史任务后同步 `cache.delete`。
+    - `internal/offline/sync.go`、`control.go`、`recovery.go`、`add.go`：`syncSource` 建单轮 `remoteTaskCache` 传给 `recoverSource` → `advance` → `removeCurrent`/`resumeSubmission`/`submit`；`removeCurrent` 删除远端任务后同步 `cache.delete`；手动 `Cancel`/`TryNext`/`AddForAccount` 传 `nil` 仍实时查 115。
+    - 测试：`internal/offline/recovery_test.go` 新增 `TestSyncReusesObservedPagesAcrossRecoveryAndDuplicateHistory`（多任务换源 + 重复历史只走 1 遍完整分页）、`TestSyncFallsBackWhenPartialListingMissesPendingSubmission`（同步提前停页时正确回退拉取后续页）、`TestSyncRefreshesCompleteCacheWhenAddReportsOfflineExists`（完整快照未命中但 115 报已存在时强制刷新）。
+  - 遗留（低）：
+    - 单轮有多任务依次换源且前序任务耗时较长时，后序任务 `removeCurrent` 复用期初快照，删前二次观测的时间窗略有放宽（手动操作不受影响）。
+- [x] 🟠 ✅ **自动换源队头阻塞，且每次换源至少两轮**：`internal/offline/recovery.go:103`、`:124` 处理完第一个需动作的任务就 `return`；`internal/offline/control.go:216` 移除旧任务后只改状态为 `actionSubmit`，等下一轮 30 秒同步才提交。N 个卡住任务约需 N×60 秒。
   - 改法：`return` 改 `continue` 或每轮设预算；`removeCurrent` 成功后在同一次 `advance` 里直接 `resumeSubmission`。
+  - （已修复：逐条推进不中断，换源单轮完成删除与提交）
+    - `internal/offline/recovery.go`：`recoverSource` 对每条需恢复/换源的任务改 `continue` 汇总错误，不再处理第一条就返回；遇 `drive.ErrSourceChanged` / `pan.ErrUnauthorized` 账号级错误或 `ctx.Err()` 立即中止当前账号。
+    - `internal/offline/control.go`：`advance` 在 `removeCurrent` 持久化切换到 `actionSubmit` 断点后，重载记录并在独立 `s.submitTimeout` 预算下同轮调用 `resumeSubmission`（先落库断点再提交的崩溃恢复语义保持不变）。
+    - 测试：`internal/offline/recovery_test.go` 更新受单轮换源影响的 4 处原有测试（在 `addOffline` hook 中继续验证先落 `actionSubmit` 断点再提交的不变量），新增 `TestRecoveryDoesNotHeadOfLineBlockAcrossMultipleStalledTasks`（首个任务删除失败时不阻塞第 2/3 个任务同轮换源）与 `TestRecoveryStopsSourceOnAccountAuthError`（遇 `ErrUnauthorized` 立即中止当前账号）。`go test ./internal/...`、`go vet ./internal/offline/...`、`gofmt -l` 全部通过；子代理只读 review 指出的提交超时共用与测试缺口已全部补齐。
 - [ ] 🟠 **每次云盘扫描都重新下载所有 NFO**：`internal/library/scan/identity.go:117` 的 `readNFO` 调 `sess.Read`（最多 2MB），不受扫描节流控制，只用来取番号。
   - 改法：先查已有文件记录，未变化的跳过。
 - [ ] 🟠 **发布时逐视频调 `sess.Info`**：`internal/library/scrape/publish.go:84`、`:140-150`（`verifyVideoPositions`）。`Directories` 刚列过同目录，新增的只有 `WithinSource` 检查。
