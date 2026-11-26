@@ -287,12 +287,14 @@
   - ~~`localMetadataJob`~~（已在 scrape 入队收敛中随 `local.go` 删除，0 引用）
   - ~~`javdb` 的 `parseRetryAfter`~~（已修复：`domain.ParseRetryAfter` 改为 64 位解析并饱和（含 >uint64 的 ErrRange），删除 `javdb/retry.go` 的本地副本，`transport.go` 复用 domain；原格式测试迁入 `domain/retry_test.go` 并补 2^32/阈值/饱和用例。`javdb.HTTPError` 评估后保留：带 provider 专属中文 `PublicMessage`（API 文案与测试依赖），`Retryable` 已委托 domain；改用 domain 类型会丢文案并改动多处类型断言）
   - 验证：`go build ./internal/... ./cmd/...`、`go vet ./internal/...`、`go test ./internal/domain/... ./internal/javdb/... ./internal/pan/... ./internal/metadata/... ./internal/source/... ./internal/app/... ./internal/library/... ./internal/api/...` 通过；子代理只读 review 未发现 bug，指出的 ErrRange 边界与残留注释已修复。
-- [ ] 🟢 **生产代码无调用方**：
-  - 完全无调用：`libraryScope`（`internal/library/library.go:333`）、`catalogue.HasMagnet`（`internal/catalogue/magnets.go:74`）、`catalogue.MovieCode`（`internal/catalogue/service.go:242`）、`offline.Service.Add`（`internal/offline/add.go:19`）、`magnet.Aggregator.Find`（`internal/magnet/aggregator.go:86`）。
-  - 仅测试使用：`StartLocalSourceScan` / `StartLocalSourceScanMode`（`internal/library/local.go:56-64`）、`scan.ReconcileScan`（`internal/library/scan/reconcile.go:31`，另建导出 Manager 绕开共享锁）、`scan.ProcessScanPage`（`internal/library/scan/persist.go:19`）、`drive.Drive.Source`（`internal/drive/drive.go:130`）。
-  - 前端从不调用的路由：`GET /api/play/files`、`GET /api/play/:id`（`internal/api/router.go:145`、`:148`）。外部客户端是否在用无法确认。
+- [x] 🟢 ✅ **生产代码无调用方**：
+  - ~~`libraryScope`~~、~~`StartLocalSourceScan`~~（已删除：全仓与测试均 0 调用；后者是 `StartLocalSourceScanMode` 的死包装）。
+  - ~~`catalogue.HasMagnet`、`catalogue.MovieCode`、`offline.Service.Add`~~（复核时已不存在：分别随 `50dd976`、`05555cf` 等提交删除；`offline` 现在由生产调用的 `AddForAccount` 承担）。
+  - ~~`GET /api/play/files`、`GET /api/play/:id`~~（已删除整条链：路由 → `playFilesHandler`/`playStartHandler` → `PlayManager.Files/Start` → `playback.Service.Files/Start/movieSource` → `PlayFiles` → `domain.LibraryFile`；前端无引用的 `PlayFile` 类型一并删除，`removed_routes_test.go` 加入两条禁止注册路由。仓库仅有 `cmd` + `web`，外部对接 Emby/MPV 走 `/api/strm/play`、`/api/play-local`、`/api/subtitle-file` token 路由，不经过这两条）。
+  - 评估后保留：`StartLocalSourceScanMode`（app/library 测试 seam）、`scan.ReconcileScan` / `scan.ProcessScanPage`（测试入口）、`drive.Drive.Source`（约 10 处测试）、`magnet.Aggregator.Find`（8 处测试；生产只用 `FindDetailed`，原“完全无调用”分类有误）。
+  - 验证：`go build ./internal/... ./cmd/...`、`go vet ./internal/...`、`go test ./internal/api/... ./internal/domain/... ./internal/library/... ./internal/app/... ./internal/offline/... ./internal/magnet/...` 通过；`go test ./internal/playback/ -skip TestStartMoviePlaysLocalFile` 通过（该用例为既有的 Windows 临时目录路径断言失败，与本次无关）。前端 `tsc --noEmit` 仍报既有的 `settings.download` 路由树错误（工作区该文件无改动，与本次无关），`play.ts` 无错误。子代理只读 review 未发现 bug。
 
-- [ ] 验证 https://avmoo.shop/ 能否作为削刮源。
+- [ ] 验证 https://avmoo.shop/ 能否作为削刮源，可以使用本地代理测试。
 
 - [ ] 查看 https://github.com/tinypinglite/sakuramedia 项目接入光鸭的方式。
 ---

@@ -15,8 +15,6 @@ import (
 )
 
 type PlayManager interface {
-	Files(context.Context, int) (playback.PlayFiles, error)
-	Start(context.Context, string, string) (playback.Playback, error)
 	StartMovie(context.Context, int, string) (playback.Playback, error)
 	StartHLS(context.Context, string, string) (playback.Playback, error)
 	Stream(context.Context, string, int, string, http.Header) (*http.Response, error)
@@ -100,32 +98,6 @@ func playStartMovieHandler(play PlayManager) gin.HandlerFunc {
 			return
 		}
 		result, err := play.StartMovie(c.Request.Context(), query.MovieID, c.Request.UserAgent())
-		respond(c, result, err)
-	}
-}
-
-func playFilesHandler(play PlayManager) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		query, ok := bindQuery[struct {
-			MovieID int `form:"movie_id" binding:"required,min=1"`
-		}](c)
-		if !ok {
-			return
-		}
-		files, err := play.Files(c.Request.Context(), query.MovieID)
-		respond(c, files, err)
-	}
-}
-
-func playStartHandler(play PlayManager) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		uri, ok := bindURI[struct {
-			ID string `uri:"id" binding:"required,max=128"`
-		}](c)
-		if !ok {
-			return
-		}
-		result, err := play.Start(c.Request.Context(), uri.ID, c.Request.UserAgent())
 		respond(c, result, err)
 	}
 }

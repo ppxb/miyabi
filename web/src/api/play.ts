@@ -3,8 +3,6 @@ import { useEffect } from 'react'
 
 import { apiDelete, apiGet, apiPost } from '@/api/client'
 
-export type PlayFile = { id: string; name: string; path: string; size: number }
-
 export type PlaySource = { src: string; type: string; label: string }
 
 // Unified, extensible per-movie playback preferences. Future preferences

@@ -39,12 +39,6 @@ func (s *Service) ScheduleLocalScan(ctx context.Context) error {
 	return err
 }
 
-// StartLocalSourceScan queues an import of any user-configured local directory,
-// keeping only local metadata by default (Emby exports already carry sidecars).
-func (s *Service) StartLocalSourceScan(ctx context.Context, root string) (domain.TaskInfo, error) {
-	return s.StartLocalSourceScanMode(ctx, root, true)
-}
-
 // StartLocalSourceScanMode queues a local scan that either auto-completes
 // metadata or reads only local data.
 func (s *Service) StartLocalSourceScanMode(ctx context.Context, root string, metadataOnly bool) (domain.TaskInfo, error) {

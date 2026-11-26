@@ -6,14 +6,6 @@ import (
 	"time"
 )
 
-// LibraryFile is an indexed video file inside a mounted media source.
-type LibraryFile struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Path string `json:"path"`
-	Size int64  `json:"size"`
-}
-
 // PlaybackSettings holds per-movie playback preferences in one extensible blob.
 // New preferences (subtitles, audio tracks, ...) become new fields here without
 // a schema change, since it is persisted as JSON on the watch-history record.

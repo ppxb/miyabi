@@ -10,13 +10,6 @@ import (
 	"github.com/ppxb/miyabi/internal/ent"
 )
 
-type PlayFiles struct {
-	Code   string               `json:"code"`
-	Title  string               `json:"title"`
-	Files  []domain.LibraryFile `json:"files"`
-	Source domain.LibrarySource `json:"source"`
-}
-
 type MediaSource struct {
 	Src   string `json:"src"`
 	Type  string `json:"type"`

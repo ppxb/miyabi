@@ -11,59 +11,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/file"
-	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/pan"
 )
-
-// Files lists the playable videos of one library movie.
-func (service *Service) Files(ctx context.Context, movieID int) (PlayFiles, error) {
-	source, err := service.movieSource(ctx, movieID)
-	if err != nil {
-		return PlayFiles{}, err
-	}
-	scope := database.LibraryFiles(source)
-	record, err := service.database.Movie.Query().
-		Where(movie.IDEQ(movieID), movie.HasFilesWith(scope)).
-		WithFiles(func(query *ent.FileQuery) {
-			query.Where(scope).Order(ent.Desc(file.FieldSize), ent.Asc(file.FieldPath), ent.Asc(file.FieldID))
-		}).Only(ctx)
-	if err != nil {
-		return PlayFiles{}, fmt.Errorf("read playable movie: %w", err)
-	}
-	result := PlayFiles{
-		Code: record.Code, Title: record.Title, Source: source,
-		Files: make([]domain.LibraryFile, 0, len(record.Edges.Files)),
-	}
-	for _, entry := range record.Edges.Files {
-		result.Files = append(result.Files, domain.LibraryFile{ID: entry.FileID, Name: entry.Name, Path: entry.Path, Size: entry.Size})
-	}
-	return result, nil
-}
-
-// Start creates a playback session for one indexed video file.
-func (service *Service) Start(ctx context.Context, fileID, userAgent string) (Playback, error) {
-	opened, err := service.openFile(ctx, fileID)
-	if err != nil {
-		return Playback{}, err
-	}
-	// Prefer the direct download URL: it starts immediately, seeks natively and
-	// avoids waiting for a transcode that may still be generating.
-	specs, err := service.resolveSpecs(ctx, opened.sess, opened.source.AccountID, fileID, opened.pickCode, userAgent)
-	if err != nil {
-		return Playback{}, err
-	}
-	result, err := service.createSession(opened.source, specs)
-	if err != nil {
-		return Playback{}, err
-	}
-	result.FileID = fileID
-	return result, nil
-}
 
 // StartHLS opens a transcode session with the available video renditions.
 func (service *Service) StartHLS(ctx context.Context, fileID, userAgent string) (Playback, error) {
@@ -269,19 +222,6 @@ func hlsSpecs(sources []pan.PlaySource) []mediaSpec {
 		specs = append(specs, mediaSpec{address: item.URL, mediaType: "application/x-mpegurl", label: label, playlist: true})
 	}
 	return specs
-}
-
-func (service *Service) movieSource(ctx context.Context, movieID int) (domain.LibrarySource, error) {
-	record, err := service.database.File.Query().
-		Where(file.MovieIDEQ(movieID), file.AccountIDNEQ(domain.LocalAccountID)).
-		Select(file.FieldAccountID, file.FieldRootID).First(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return domain.LibrarySource{}, domain.E(domain.KindNotFound, "当前挂载目录中未找到该影片的媒体文件", nil)
-		}
-		return domain.LibrarySource{}, err
-	}
-	return service.sourceFor(ctx, record.AccountID, record.RootID)
 }
 
 func (service *Service) sourceFor(ctx context.Context, accountID, rootID string) (domain.LibrarySource, error) {

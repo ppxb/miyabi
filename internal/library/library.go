@@ -332,14 +332,6 @@ func (s *Service) EnqueueTargetedScan(ctx context.Context, tx *ent.Tx, source do
 	return taskRecord.ID, nil
 }
 
-func libraryScope(source *domain.LibrarySource) predicate.File {
-	local := file.AccountIDEQ(domain.LocalAccountID)
-	if source != nil {
-		return file.Or(database.LibraryFiles(*source), local)
-	}
-	return local
-}
-
 // StartIncrementalSync queues an incremental scan for every enabled source.
 // A source that fails to queue does not stop the others; all failures are
 // joined into the returned error.
