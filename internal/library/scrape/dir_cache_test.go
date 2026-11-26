@@ -1,16 +1,22 @@
 package scrape
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"image"
+	"image/png"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/drive"
+	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/pan"
+	"github.com/ppxb/miyabi/internal/tasks"
 )
 
 type mockSession struct {
@@ -253,60 +259,129 @@ func TestDirectoryEntries_AccountIsolation(t *testing.T) {
 	}
 }
 
-func TestVerifyVideoPositions(t *testing.T) {
-	service := &Service{}
+func TestDirectoriesChecksAllPartsAndRefreshesStaleCache(t *testing.T) {
+	ctx := t.Context()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
 	source := domain.LibrarySource{
 		AccountID: "acc-1",
 		Directory: domain.LibraryDirectory{ID: "10"},
 	}
+	film := store.Client.Movie.Create().SetCode("ABP-001").SaveX(ctx)
+	store.Client.File.Create().
+		SetFileID("vid-1").SetName("ABP-001-CD1.mp4").SetSize(domain.MinVideoSize).
+		SetParentID("20").SetAccountID("acc-1").SetRootID("10").SetMovie(film).ExecX(ctx)
+	store.Client.File.Create().
+		SetFileID("vid-2").SetName("ABP-001-CD2.mp4").SetSize(domain.MinVideoSize).
+		SetParentID("20").SetAccountID("acc-1").SetRootID("10").SetMovie(film).ExecX(ctx)
 
-	dir := MovieDirectory{
-		ID:       "20",
-		VideoIDs: map[string]bool{"vid-1": true},
-	}
+	payload := MetadataPayload{Source: source, MovieID: film.ID, Code: film.Code}
 
-	// 1. Success case: video is in the directory and within source
-	sessSuccess := &mockSession{
-		source: source,
-		infoFunc: func(ctx context.Context, fileID string) (pan.FileInfo, error) {
-			return pan.FileInfo{
-				File: pan.File{ID: "vid-1", ParentID: "20"},
-				Path: []pan.Directory{{ID: "10"}, {ID: "20"}},
-			}, nil
-		},
-	}
-	if err := service.verifyVideoPositions(t.Context(), sessSuccess, dir); err != nil {
-		t.Fatalf("expected verifyVideoPositions to succeed, got %v", err)
-	}
+	t.Run("stale cache missing a newly added part refreshes once without calling Info", func(t *testing.T) {
+		service := &Service{
+			db: store.Client,
+			dirCache: map[string]dirCacheEntry{
+				"acc-1:20": {
+					files:     []pan.File{{ID: "vid-1", Name: "ABP-001-CD1.mp4", Size: domain.MinVideoSize}},
+					expiresAt: time.Now().Add(defaultDirCacheTTL),
+				},
+			},
+		}
+		sess := &mockSession{
+			source: source,
+			listFunc: func(context.Context, string, int) (pan.FilePage, error) {
+				return pan.FilePage{
+					Total: 2,
+					Files: []pan.File{
+						{ID: "vid-1", Name: "ABP-001-CD1.mp4", Size: domain.MinVideoSize},
+						{ID: "vid-2", Name: "ABP-001-CD2.mp4", Size: domain.MinVideoSize},
+					},
+					Path: []pan.Directory{{ID: "10"}, {ID: "20"}},
+				}, nil
+			},
+		}
+		dirs, err := service.Directories(ctx, sess, payload)
+		if err != nil {
+			t.Fatalf("expected refreshed listing to succeed, got %v", err)
+		}
+		if len(dirs) != 1 || len(dirs[0].Files) != 2 || sess.listCalls.Load() != 1 || sess.infoCalls.Load() != 0 {
+			t.Fatalf("unexpected Directories result: dirs=%+v list=%d info=%d", dirs, sess.listCalls.Load(), sess.infoCalls.Load())
+		}
+	})
 
-	// 2. Moved case: video's ParentID no longer matches directory ID
-	sessMoved := &mockSession{
-		source: source,
-		infoFunc: func(ctx context.Context, fileID string) (pan.FileInfo, error) {
-			return pan.FileInfo{
-				File: pan.File{ID: "vid-1", ParentID: "999"}, // moved!
-				Path: []pan.Directory{{ID: "10"}, {ID: "999"}},
-			}, nil
-		},
-	}
-	errMoved := service.verifyVideoPositions(t.Context(), sessMoved, dir)
-	if !domain.IsKind(errMoved, domain.KindConflict) {
-		t.Fatalf("expected KindConflict for moved video, got %v", errMoved)
-	}
+	t.Run("missing part in fresh listing fails with KindNotFound without calling Info", func(t *testing.T) {
+		service := &Service{
+			db:       store.Client,
+			dirCache: make(map[string]dirCacheEntry),
+		}
+		sess := &mockSession{
+			source: source,
+			listFunc: func(context.Context, string, int) (pan.FilePage, error) {
+				return pan.FilePage{
+					Total: 1,
+					Files: []pan.File{{ID: "vid-1", Name: "ABP-001-CD1.mp4", Size: domain.MinVideoSize}},
+					Path:  []pan.Directory{{ID: "10"}, {ID: "20"}},
+				}, nil
+			},
+		}
+		_, err := service.Directories(ctx, sess, payload)
+		if !domain.IsKind(err, domain.KindNotFound) {
+			t.Fatalf("expected KindNotFound for missing part, got %v", err)
+		}
+		if sess.listCalls.Load() != 1 || sess.infoCalls.Load() != 0 {
+			t.Fatalf("unexpected remote calls: list=%d info=%d", sess.listCalls.Load(), sess.infoCalls.Load())
+		}
+	})
 
-	// 3. Deleted / Not found case: info returns error
-	sessDeleted := &mockSession{
-		source: source,
-		infoFunc: func(ctx context.Context, fileID string) (pan.FileInfo, error) {
-			return pan.FileInfo{}, pan.ErrNotFound
-		},
-	}
-	errDeleted := service.verifyVideoPositions(t.Context(), sessDeleted, dir)
-	if !domain.IsKind(errDeleted, domain.KindNotFound) {
-		t.Fatalf("expected KindNotFound for deleted video, got %v", errDeleted)
-	}
-	sessDeleted.infoFunc = func(context.Context, string) (pan.FileInfo, error) { return pan.FileInfo{}, context.DeadlineExceeded }
-	if _, retry := domain.RetryDelay(service.verifyVideoPositions(t.Context(), sessDeleted, dir)); !retry {
-		t.Fatal("network timeout was classified as a deleted video")
-	}
+	t.Run("publish rechecks a complete cached listing", func(t *testing.T) {
+		images, err := mediaimage.NewCache(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var cover bytes.Buffer
+		if err := png.Encode(&cover, image.NewRGBA(image.Rect(0, 0, 2, 2))); err != nil {
+			t.Fatal(err)
+		}
+		artwork, err := images.Restore(cover.Bytes(), cover.Bytes())
+		if err != nil {
+			t.Fatal(err)
+		}
+		parts := []pan.File{
+			{ID: "vid-1", Name: "ABP-001-CD1.mp4", Size: domain.MinVideoSize},
+			{ID: "vid-2", Name: "ABP-001-CD2.mp4", Size: domain.MinVideoSize},
+		}
+		for _, test := range []struct {
+			name   string
+			files  []pan.File
+			rootID string
+			want   domain.Kind
+		}{
+			{"one part removed", parts[:1], "10", domain.KindNotFound},
+			{"directory moved outside source", parts, "99", domain.KindConflict},
+		} {
+			t.Run(test.name, func(t *testing.T) {
+				service := &Service{db: store.Client, images: images}
+				page := pan.FilePage{Total: len(parts), Files: parts, Path: []pan.Directory{{ID: "10"}, {ID: "20"}}}
+				sess := &mockSession{source: source, listFunc: func(context.Context, string, int) (pan.FilePage, error) {
+					return page, nil
+				}}
+				if _, err := service.Directories(ctx, sess, payload); err != nil {
+					t.Fatal(err)
+				}
+				page = pan.FilePage{Total: len(test.files), Files: test.files, Path: []pan.Directory{{ID: test.rootID}, {ID: "20"}}}
+				if _, err := service.Directories(ctx, sess, payload); err != nil || sess.listCalls.Load() != 1 {
+					t.Fatalf("metadata should reuse the complete cache: err=%v list=%d", err, sess.listCalls.Load())
+				}
+				before := sess.listCalls.Load()
+				err := service.publishMovie(ctx, sess, tasks.Job{}, Payload{MetadataPayload: payload, Artwork: &artwork})
+				if calls := sess.listCalls.Load() - before; !domain.IsKind(err, test.want) || calls != 1 || sess.infoCalls.Load() != 0 {
+					t.Fatalf("publish: want kind %v, one List and no Info; got err=%v list=%d info=%d", test.want, err, calls, sess.infoCalls.Load())
+				}
+			})
+		}
+	})
 }

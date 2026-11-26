@@ -310,6 +310,10 @@ type MovieDirectory struct {
 
 // Directories returns all directories containing media files for the movie.
 func (service *Service) Directories(ctx context.Context, sess drive.Session, input MetadataPayload) ([]MovieDirectory, error) {
+	return service.movieDirectories(ctx, sess, input, false)
+}
+
+func (service *Service) movieDirectories(ctx context.Context, sess drive.Session, input MetadataPayload, refresh bool) ([]MovieDirectory, error) {
 	files, err := service.db.File.Query().Where(database.LibraryFiles(input.Source), file.MovieIDEQ(input.MovieID)).
 		Order(ent.Asc(file.FieldParentID), ent.Asc(file.FieldFileID)).All(ctx)
 	if err != nil {
@@ -331,27 +335,44 @@ func (service *Service) Directories(ctx context.Context, sess drive.Session, inp
 	}
 	for i := range result {
 		directory := &result[i]
-		directory.Files, err = service.directoryEntries(ctx, sess, directory.ID)
+		files, cached, err := service.loadDirectoryEntries(ctx, sess, directory.ID, refresh)
 		if err != nil {
 			return nil, fmt.Errorf("read metadata directory: %w", err)
 		}
-		present := 0
-		for _, entry := range directory.Files {
-			if !entry.IsDirectory && domain.IsVideo(entry.Name) && entry.Size >= domain.MinVideoSize {
-				if directory.VideoIDs[entry.ID] {
-					present++
-				}
+		if cached && !allVideosPresent(files, directory.VideoIDs) {
+			files, _, err = service.loadDirectoryEntries(ctx, sess, directory.ID, true)
+			if err != nil {
+				return nil, fmt.Errorf("read metadata directory: %w", err)
 			}
 		}
-		if present == 0 {
+		if !allVideosPresent(files, directory.VideoIDs) {
 			return nil, domain.E(domain.KindNotFound, "视频文件已删除或移动，请重新扫描", nil)
 		}
+		directory.Files = files
 	}
 	return result, nil
 }
 
+func allVideosPresent(files []pan.File, videoIDs map[string]bool) bool {
+	if len(videoIDs) == 0 {
+		return false
+	}
+	matched := make(map[string]bool, len(videoIDs))
+	for _, entry := range files {
+		if !entry.IsDirectory && domain.IsVideo(entry.Name) && entry.Size >= domain.MinVideoSize && videoIDs[entry.ID] {
+			matched[entry.ID] = true
+		}
+	}
+	return len(matched) == len(videoIDs)
+}
+
 // directoryEntries retrieves directory entries using a short-lived cache to avoid redundant pagination of large folders.
 func (service *Service) directoryEntries(ctx context.Context, sess drive.Session, dirID string) ([]pan.File, error) {
+	files, _, err := service.loadDirectoryEntries(ctx, sess, dirID, false)
+	return files, err
+}
+
+func (service *Service) loadDirectoryEntries(ctx context.Context, sess drive.Session, dirID string, refresh bool) ([]pan.File, bool, error) {
 	key := dirID
 	if src := sess.Source(); src.AccountID != "" {
 		key = src.AccountID + ":" + dirID
@@ -359,23 +380,28 @@ func (service *Service) directoryEntries(ctx context.Context, sess drive.Session
 
 	service.dirMu.Lock()
 	service.pruneDirCache(time.Now())
-	entry, ok := service.dirCache[key]
-	service.dirMu.Unlock()
-	if ok {
-		return slices.Clone(entry.files), nil
+	if refresh {
+		delete(service.dirCache, key)
+	} else if entry, ok := service.dirCache[key]; ok {
+		service.dirMu.Unlock()
+		return slices.Clone(entry.files), true, nil
 	}
+	service.dirMu.Unlock()
 
 	files, err := drive.DirectoryEntries(ctx, sess, dirID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	// Large directories are still read in full, but must not displace the entire cache.
 	if len(files) > maxDirCacheFiles {
-		return files, nil
+		return files, false, nil
 	}
 
 	service.dirMu.Lock()
 	now := time.Now()
+	if service.dirCache == nil {
+		service.dirCache = make(map[string]dirCacheEntry)
+	}
 	service.dirCache[key] = dirCacheEntry{
 		files:     files,
 		expiresAt: now.Add(defaultDirCacheTTL),
@@ -383,7 +409,7 @@ func (service *Service) directoryEntries(ctx context.Context, sess drive.Session
 	service.pruneDirCache(now)
 	service.dirMu.Unlock()
 
-	return slices.Clone(files), nil
+	return slices.Clone(files), false, nil
 }
 
 // pruneDirCache reclaims expired listings and evicts the oldest listings when over budget.

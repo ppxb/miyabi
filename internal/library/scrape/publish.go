@@ -31,7 +31,7 @@ func (service *Service) publishMovie(ctx context.Context, sess drive.Session, jo
 		return fmt.Errorf("read cached fanart: %w", err)
 	}
 	// Verify current video locations before exporting local files.
-	directories, err := service.Directories(ctx, sess, input.MetadataPayload)
+	directories, err := service.movieDirectories(ctx, sess, input.MetadataPayload, true)
 	if err != nil {
 		return err
 	}
@@ -43,9 +43,6 @@ func (service *Service) publishMovie(ctx context.Context, sess drive.Session, jo
 	}
 	var videos []pan.File
 	for i, directory := range directories {
-		if err := service.verifyVideoPositions(ctx, sess, directory); err != nil {
-			return err
-		}
 		for _, entry := range directory.Files {
 			if directory.VideoIDs[entry.ID] {
 				videos = append(videos, entry)
@@ -241,17 +238,4 @@ func (service *Service) commitPublished(ctx context.Context, cfg export.Config, 
 		}
 		return service.mediaNotifier.NotifyUpdatedTx(ctx, tx, export.EmbyMovieDir(cfg.EmbyDir, input.Code))
 	})
-}
-
-func (service *Service) verifyVideoPositions(ctx context.Context, sess drive.Session, directory MovieDirectory) error {
-	for videoID := range directory.VideoIDs {
-		info, err := sess.Info(ctx, videoID)
-		if err != nil {
-			return fmt.Errorf("确认视频文件位置: %w", err)
-		}
-		if info.ParentID != directory.ID || !drive.WithinSource(info, sess.Source()) {
-			return domain.E(domain.KindConflict, "视频已移动，请重新扫描", nil)
-		}
-	}
-	return nil
 }
