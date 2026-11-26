@@ -8,11 +8,13 @@ import (
 	"math/rand/v2"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	http "github.com/bogdanfinn/fhttp"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/netx"
+	"golang.org/x/sync/singleflight"
 	"golang.org/x/time/rate"
 )
 
@@ -23,6 +25,9 @@ const (
 	defaultRate    = 1
 	defaultBurst   = 2
 	userAgent      = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+	detailCacheTTL = 5 * time.Minute
+	detailCacheCap = 256
 )
 
 type HTTPClient = netx.FingerprintHTTPClient
@@ -35,6 +40,11 @@ type Options struct {
 	testClient HTTPClient
 }
 
+type detailCacheEntry struct {
+	body    string
+	expires time.Time
+}
+
 // Client accesses JavBus for movie magnets and metadata.
 type Client struct {
 	limiter *rate.Limiter
@@ -44,6 +54,13 @@ type Client struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	cacheTTL time.Duration
+	cacheCap int
+
+	mu    sync.Mutex
+	cache map[string]detailCacheEntry
+	group singleflight.Group
 }
 
 type defaultTestHTTPClient struct{}
@@ -67,9 +84,12 @@ func New(options Options) (*Client, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	client := &Client{
-		limiter: rate.NewLimiter(rate.Limit(defaultRate), defaultBurst),
-		ctx:     ctx,
-		cancel:  cancel,
+		limiter:  rate.NewLimiter(rate.Limit(defaultRate), defaultBurst),
+		ctx:      ctx,
+		cancel:   cancel,
+		cacheTTL: detailCacheTTL,
+		cacheCap: detailCacheCap,
+		cache:    make(map[string]detailCacheEntry),
 	}
 
 	if options.testClient != nil {
@@ -98,10 +118,13 @@ func NewForTest(testClients ...HTTPClient) *Client {
 		cl = testClients[0]
 	}
 	return &Client{
-		client:  cl,
-		limiter: rate.NewLimiter(rate.Inf, 0),
-		ctx:     ctx,
-		cancel:  cancel,
+		client:   cl,
+		limiter:  rate.NewLimiter(rate.Inf, 0),
+		ctx:      ctx,
+		cancel:   cancel,
+		cacheTTL: detailCacheTTL,
+		cacheCap: detailCacheCap,
+		cache:    make(map[string]detailCacheEntry),
 	}
 }
 
@@ -147,7 +170,63 @@ func (c *Client) ensureDetailParams(ctx context.Context, code string) (gid, uc, 
 }
 
 // MoviePage retrieves the verified page shared by metadata and magnet parsing.
+// Successful pages are cached briefly so a metadata scrape and the magnet lookup
+// for the same code share one HTTP request. Callers must pass a normalized code
+// (the metadata and catalogue magnet paths both normalize before calling).
 func (c *Client) MoviePage(ctx context.Context, code string) (string, error) {
+	if body, ok := c.cachedPage(code); ok {
+		return body, nil
+	}
+	// The request uses the initiating caller's context. Other callers wait on the
+	// shared result only, so their own context still bounds how long they wait.
+	result := c.group.DoChan(code, func() (any, error) {
+		if body, ok := c.cachedPage(code); ok {
+			return body, nil
+		}
+		body, err := c.fetchPage(ctx, code)
+		if err != nil {
+			return "", err
+		}
+		if body != "" {
+			c.storePage(code, body)
+		}
+		return body, nil
+	})
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case res := <-result:
+		if res.Err != nil {
+			return "", res.Err
+		}
+		return res.Val.(string), nil
+	}
+}
+
+func (c *Client) cachedPage(code string) (string, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	entry, ok := c.cache[code]
+	if !ok || time.Now().After(entry.expires) {
+		return "", false
+	}
+	return entry.body, true
+}
+
+func (c *Client) storePage(code, body string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, exists := c.cache[code]; !exists && c.cacheCap > 0 && len(c.cache) >= c.cacheCap {
+		for key := range c.cache {
+			delete(c.cache, key)
+			break
+		}
+	}
+	c.cache[code] = detailCacheEntry{body: body, expires: time.Now().Add(c.cacheTTL)}
+}
+
+// fetchPage performs the detail request without consulting the cache.
+func (c *Client) fetchPage(ctx context.Context, code string) (string, error) {
 	detailURL := fmt.Sprintf("%s/%s?existmag=all", baseURL, url.PathEscape(code))
 	resp, err := c.get(ctx, detailURL, "detail", http.Header{
 		"Accept": {"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"},

@@ -140,8 +140,16 @@
 
 ### 影响中
 
-- [ ] 🟠 **JavBus 详情页无缓存，同一番号抓两次**：`internal/javbus/client.go:149` 注释称页面由元数据和磁力共用，但无缓存或 singleflight；`internal/metadata/providers/javbus.go:52` 和 `javbus.Find`（`client.go:128`）各自调用 `MoviePage`。
+- [x] 🟠 ✅ **JavBus 详情页无缓存，同一番号抓两次**：`internal/javbus/client.go:149` 注释称页面由元数据和磁力共用，但无缓存或 singleflight；`internal/metadata/providers/javbus.go:52` 和 `javbus.Find`（`client.go:128`）各自调用 `MoviePage`。
   - 改法：照 `internal/freejavbt/client.go:44-57` 加小容量 TTL 缓存 + singleflight。
+  - （已修复：client 内缓存详情页 + singleflight）
+    - `internal/javbus/client.go`：Client 增加 5 分钟 / 256 条详情页缓存（`detailCacheTTL`、`detailCacheCap`）。`MoviePage` 先查缓存，未命中用 `singleflight.Group.DoChan` 合并同番号请求，Do 内二次查缓存；只缓存成功且非空的 body，错误和 404 不缓存。等待者用 `select` 响应自身 ctx 的取消/超时；请求本身使用发起调用者的 ctx（首调用者取消会让等待者一起失败，错误不缓存可自愈，已加注释）。缓存满时只在插入新 key 时淘汰一条，刷新已有 key 不误删。
+    - 两条路径共用同一实例（`internal/app/app.go:128` 创建，`:147` 给 catalogue、`:162` 给 metadata provider），同一番号的元数据刮削和磁力查询只发一次详情请求；磁力 ajax 仍每次查询。
+    - 测试：`internal/javbus/client_test.go` 原 `TestClient_FindUsesFreshDetailParameters` 改写为 `TestClient_SharesDetailPageBetweenMetadataAndMagnets`（MoviePage 后 Find 只 1 次详情请求；TTL 内重复 Find 详情仍 1 次、ajax 递增；TTL 过期后重新抓取并使用新 gid）；新增 `TestClient_ConcurrentDetailFetchesShareOneRequest`（4 并发只 1 次详情请求）与 `TestClient_WaitingCallerHonorsItsOwnDeadline`（leader 阻塞时等待者 1 秒超时返回，释放后仍只 1 次请求）。`go test ./internal/javbus/`、`go vet` 通过；受影响包 `./internal/metadata/...`、`./internal/catalogue/`、`./internal/magnet/`、`./internal/app/` 通过；子代理只读 review 及增量复核未发现正确性问题。
+  - 遗留（低）：
+    - 首调用者取消会让同番号等待者一起收到取消错误；错误不缓存，下次重试可恢复。
+    - 只缓存成功页面，不存在的番号（404/空 body）每次仍会请求。
+    - 缓存 key 为原始 code，依赖调用方先规范化；当前元数据 provider 和 catalogue 磁力路径都会规范化。
 - [ ] 🟠 **一轮离线同步重复分页拉取 115 任务列表**：`internal/offline/sync.go:94` 先完整走一遍 `WalkOfflinePages`，`internal/offline/control.go:149` 的 `lookupRemoteTask` 再走一遍，`control.go:236`、`internal/offline/submit.go:61` 还会再走。115 客户端限速为每 250ms 一个请求、最多 2 并发（`internal/pan/client.go:34`）。
   - 改法：`syncSource` 把本轮观察到的 `map[hash]pan.OfflineTask` 传给 `recoverSource` / `advance`，命中即不再拉取。
 - [ ] 🟠 **自动换源队头阻塞，且每次换源至少两轮**：`internal/offline/recovery.go:103`、`:124` 处理完第一个需动作的任务就 `return`；`internal/offline/control.go:216` 移除旧任务后只改状态为 `actionSubmit`，等下一轮 30 秒同步才提交。N 个卡住任务约需 N×60 秒。

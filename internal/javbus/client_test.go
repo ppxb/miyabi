@@ -57,103 +57,220 @@ func (m *mockHTTPClient) getCallCount(path string) int {
 	return m.calls[path]
 }
 
-func TestClient_FindUsesFreshDetailParameters(t *testing.T) {
-	mock := newMockHTTPClient()
-	detailBody := fixtureFile(t, "detail_ssis-001.html")
-	magnetsBody := fixtureFile(t, "magnets_ssis-001.html")
-	expectedGID := "45622804531"
+func TestClient_SharesDetailPageBetweenMetadataAndMagnets(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		mock := newMockHTTPClient()
+		detailBody := fixtureFile(t, "detail_ssis-001.html")
+		magnetsBody := fixtureFile(t, "magnets_ssis-001.html")
+		expectedGID := "45622804531"
 
-	mock.handlers["/SSIS-001"] = func(req *http.Request) (*http.Response, error) {
-		for key, want := range map[string]string{
-			"User-Agent":       userAgent,
-			"Cookie":           "dv=1; existmag=all",
-			"Accept":           "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-			"Referer":          "",
-			"X-Requested-With": "",
-		} {
-			if got := req.Header.Get(key); got != want {
-				t.Errorf("detail header %s = %q, want %q", key, got, want)
+		mock.handlers["/SSIS-001"] = func(req *http.Request) (*http.Response, error) {
+			for key, want := range map[string]string{
+				"User-Agent":       userAgent,
+				"Cookie":           "dv=1; existmag=all",
+				"Accept":           "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+				"Referer":          "",
+				"X-Requested-With": "",
+			} {
+				if got := req.Header.Get(key); got != want {
+					t.Errorf("detail header %s = %q, want %q", key, got, want)
+				}
+			}
+			if req.URL.Query().Get("existmag") != "all" {
+				t.Errorf("expected existmag=all query parameter")
+			}
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewReader(detailBody)),
+				Header:     make(http.Header),
+			}, nil
+		}
+
+		mock.handlers["/ajax/uncledatoolsbyajax.php"] = func(req *http.Request) (*http.Response, error) {
+			if req.URL.Query().Get("gid") != expectedGID {
+				t.Errorf("unexpected gid query: %s", req.URL.Query().Get("gid"))
+			}
+			if req.URL.Query().Get("uc") != "0" {
+				t.Errorf("unexpected uc query: %s", req.URL.Query().Get("uc"))
+			}
+			for key, want := range map[string]string{
+				"User-Agent":       userAgent,
+				"Cookie":           "dv=1; existmag=all",
+				"Accept":           "",
+				"Referer":          baseURL + "/SSIS-001",
+				"X-Requested-With": "XMLHttpRequest",
+			} {
+				if got := req.Header.Get(key); got != want {
+					t.Errorf("ajax header %s = %q, want %q", key, got, want)
+				}
+			}
+			if floor, err := strconv.Atoi(req.URL.Query().Get("floor")); err != nil || floor < 1 || floor > 1000 {
+				t.Errorf("unexpected floor query: %s", req.URL.Query().Get("floor"))
+			}
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewReader(magnetsBody)),
+				Header:     make(http.Header),
+			}, nil
+		}
+
+		client, err := New(Options{testClient: mock})
+		if err != nil {
+			t.Fatalf("unexpected error creating client: %v", err)
+		}
+		defer client.Close()
+
+		if client.Name() != "javbus" {
+			t.Fatalf("expected name to be javbus, got %s", client.Name())
+		}
+
+		// The metadata path fetches the detail page; the magnet path reuses it.
+		body, err := client.MoviePage(t.Context(), "SSIS-001")
+		if err != nil {
+			t.Fatalf("MoviePage failed: %v", err)
+		}
+		if string(body) != string(detailBody) {
+			t.Fatalf("MoviePage returned an unexpected body")
+		}
+		magnets, err := client.Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
+		if err != nil {
+			t.Fatalf("Find failed: %v", err)
+		}
+		if len(magnets) != 43 {
+			t.Fatalf("expected 43 magnets, got %d", len(magnets))
+		}
+		if mock.getCallCount("/SSIS-001") != 1 {
+			t.Fatalf("expected 1 detail call, got %d", mock.getCallCount("/SSIS-001"))
+		}
+		if mock.getCallCount("/ajax/uncledatoolsbyajax.php") != 1 {
+			t.Fatalf("expected 1 ajax call, got %d", mock.getCallCount("/ajax/uncledatoolsbyajax.php"))
+		}
+
+		// Magnet lookups always refresh the ajax endpoint; the detail page stays cached.
+		magnets2, err := client.Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
+		if err != nil {
+			t.Fatalf("second Find failed: %v", err)
+		}
+		if len(magnets2) != 43 {
+			t.Fatalf("expected 43 magnets, got %d", len(magnets2))
+		}
+		if mock.getCallCount("/SSIS-001") != 1 {
+			t.Fatalf("expected 1 detail call, got %d", mock.getCallCount("/SSIS-001"))
+		}
+		if mock.getCallCount("/ajax/uncledatoolsbyajax.php") != 2 {
+			t.Fatalf("expected 2 ajax calls, got %d", mock.getCallCount("/ajax/uncledatoolsbyajax.php"))
+		}
+
+		// After the TTL the page is fetched again with updated detail parameters.
+		expectedGID = "45622804532"
+		detailBody = bytes.ReplaceAll(detailBody, []byte("45622804531"), []byte(expectedGID))
+		time.Sleep(detailCacheTTL + time.Second)
+		magnets3, err := client.Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
+		if err != nil {
+			t.Fatalf("third Find failed: %v", err)
+		}
+		if len(magnets3) != 43 {
+			t.Fatalf("expected 43 magnets, got %d", len(magnets3))
+		}
+		if mock.getCallCount("/SSIS-001") != 2 {
+			t.Fatalf("expected 2 detail calls, got %d", mock.getCallCount("/SSIS-001"))
+		}
+		if mock.getCallCount("/ajax/uncledatoolsbyajax.php") != 3 {
+			t.Fatalf("expected 3 ajax calls, got %d", mock.getCallCount("/ajax/uncledatoolsbyajax.php"))
+		}
+	})
+}
+
+func TestClient_ConcurrentDetailFetchesShareOneRequest(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		mock := newMockHTTPClient()
+		detailBody := fixtureFile(t, "detail_ssis-001.html")
+		release := make(chan struct{})
+		mock.handlers["/SSIS-001"] = func(*http.Request) (*http.Response, error) {
+			<-release
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewReader(detailBody)),
+				Header:     make(http.Header),
+			}, nil
+		}
+
+		client, err := New(Options{testClient: mock})
+		if err != nil {
+			t.Fatalf("unexpected error creating client: %v", err)
+		}
+		defer client.Close()
+
+		const callers = 4
+		var wg sync.WaitGroup
+		errs := make(chan error, callers)
+		for i := 0; i < callers; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_, err := client.MoviePage(t.Context(), "SSIS-001")
+				errs <- err
+			}()
+		}
+
+		synctest.Wait()
+		close(release)
+		wg.Wait()
+		close(errs)
+		for err := range errs {
+			if err != nil {
+				t.Fatalf("MoviePage failed: %v", err)
 			}
 		}
-		if req.URL.Query().Get("existmag") != "all" {
-			t.Errorf("expected existmag=all query parameter")
+		if got := mock.getCallCount("/SSIS-001"); got != 1 {
+			t.Fatalf("expected 1 detail call, got %d", got)
 		}
-		return &http.Response{
-			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewReader(detailBody)),
-			Header:     make(http.Header),
-		}, nil
-	}
+	})
+}
 
-	mock.handlers["/ajax/uncledatoolsbyajax.php"] = func(req *http.Request) (*http.Response, error) {
-		if req.URL.Query().Get("gid") != expectedGID {
-			t.Errorf("unexpected gid query: %s", req.URL.Query().Get("gid"))
+func TestClient_WaitingCallerHonorsItsOwnDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		mock := newMockHTTPClient()
+		detailBody := fixtureFile(t, "detail_ssis-001.html")
+		release := make(chan struct{})
+		started := make(chan struct{})
+		mock.handlers["/SSIS-001"] = func(*http.Request) (*http.Response, error) {
+			close(started)
+			<-release
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewReader(detailBody)),
+				Header:     make(http.Header),
+			}, nil
 		}
-		if req.URL.Query().Get("uc") != "0" {
-			t.Errorf("unexpected uc query: %s", req.URL.Query().Get("uc"))
+
+		client, err := New(Options{testClient: mock})
+		if err != nil {
+			t.Fatalf("unexpected error creating client: %v", err)
 		}
-		for key, want := range map[string]string{
-			"User-Agent":       userAgent,
-			"Cookie":           "dv=1; existmag=all",
-			"Accept":           "",
-			"Referer":          baseURL + "/SSIS-001",
-			"X-Requested-With": "XMLHttpRequest",
-		} {
-			if got := req.Header.Get(key); got != want {
-				t.Errorf("ajax header %s = %q, want %q", key, got, want)
-			}
+		defer client.Close()
+
+		leader := make(chan error, 1)
+		go func() {
+			_, err := client.MoviePage(t.Context(), "SSIS-001")
+			leader <- err
+		}()
+		<-started
+
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+		_, err = client.MoviePage(ctx, "SSIS-001")
+		cancel()
+		close(release)
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("expected deadline exceeded while sharing the flight, got %v", err)
 		}
-		if floor, err := strconv.Atoi(req.URL.Query().Get("floor")); err != nil || floor < 1 || floor > 1000 {
-			t.Errorf("unexpected floor query: %s", req.URL.Query().Get("floor"))
+		if err := <-leader; err != nil {
+			t.Fatalf("leader failed: %v", err)
 		}
-		return &http.Response{
-			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewReader(magnetsBody)),
-			Header:     make(http.Header),
-		}, nil
-	}
-
-	client, err := New(Options{testClient: mock})
-	if err != nil {
-		t.Fatalf("unexpected error creating client: %v", err)
-	}
-	defer client.Close()
-
-	if client.Name() != "javbus" {
-		t.Fatalf("expected name to be javbus, got %s", client.Name())
-	}
-
-	// Each upstream lookup obtains the current detail parameters.
-	magnets, err := client.Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
-	if err != nil {
-		t.Fatalf("Find failed: %v", err)
-	}
-	if len(magnets) != 43 {
-		t.Fatalf("expected 43 magnets, got %d", len(magnets))
-	}
-	if mock.getCallCount("/SSIS-001") != 1 {
-		t.Fatalf("expected 1 detail call, got %d", mock.getCallCount("/SSIS-001"))
-	}
-	if mock.getCallCount("/ajax/uncledatoolsbyajax.php") != 1 {
-		t.Fatalf("expected 1 ajax call, got %d", mock.getCallCount("/ajax/uncledatoolsbyajax.php"))
-	}
-
-	// The next lookup must use updated detail parameters rather than stale ones.
-	expectedGID = "45622804532"
-	detailBody = bytes.ReplaceAll(detailBody, []byte("45622804531"), []byte(expectedGID))
-	magnets2, err := client.Find(t.Context(), domain.MovieRef{Code: "SSIS-001"})
-	if err != nil {
-		t.Fatalf("second Find failed: %v", err)
-	}
-	if len(magnets2) != 43 {
-		t.Fatalf("expected 43 magnets, got %d", len(magnets2))
-	}
-	if mock.getCallCount("/SSIS-001") != 2 {
-		t.Fatalf("expected 2 detail calls, got %d", mock.getCallCount("/SSIS-001"))
-	}
-	if mock.getCallCount("/ajax/uncledatoolsbyajax.php") != 2 {
-		t.Fatalf("expected 2 ajax calls, got %d", mock.getCallCount("/ajax/uncledatoolsbyajax.php"))
-	}
+		if got := mock.getCallCount("/SSIS-001"); got != 1 {
+			t.Fatalf("expected 1 detail call, got %d", got)
+		}
+	})
 }
 
 func TestClientContextErrorsDoNotDisableSource(t *testing.T) {
