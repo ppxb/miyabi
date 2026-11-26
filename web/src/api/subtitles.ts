@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiDelete, apiGet, apiPost } from '@/api/client'
+import { historyKeys } from '@/api/history'
 import { libraryKeys } from '@/api/library'
 import { refreshQueries } from '@/api/query-refresh'
 
@@ -101,8 +102,16 @@ export function useSaveSubtitle(movieID: number) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (offer: SubtitleOffer) => apiPost<SubtitleTrack>(base(movieID), offer),
-    // Library cards show a Chinese-subtitle badge derived from the tracks.
-    onSuccess: () => refreshQueries(queryClient, subtitleKeys.tracks(movieID), libraryKeys.all),
+    // The Chinese-subtitle badge is derived from the tracks on cards, the
+    // movie detail, and history entries.
+    onSuccess: () =>
+      refreshQueries(
+        queryClient,
+        subtitleKeys.tracks(movieID),
+        libraryKeys.detail(movieID),
+        historyKeys.all,
+        ...libraryKeys.cards
+      ),
     meta: { errorTitle: '下载字幕失败' }
   })
 }
@@ -111,7 +120,14 @@ export function useDeleteSubtitle(movieID: number) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (trackID: number) => apiDelete<{ deleted: boolean }>(`${base(movieID)}/${trackID}`),
-    onSuccess: () => refreshQueries(queryClient, subtitleKeys.tracks(movieID), libraryKeys.all),
+    onSuccess: () =>
+      refreshQueries(
+        queryClient,
+        subtitleKeys.tracks(movieID),
+        libraryKeys.detail(movieID),
+        historyKeys.all,
+        ...libraryKeys.cards
+      ),
     meta: { errorTitle: '删除字幕失败' }
   })
 }

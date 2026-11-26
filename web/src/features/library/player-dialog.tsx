@@ -442,7 +442,9 @@ function PlaybackSync({
       saveProgress()
       void queryClient.invalidateQueries({ queryKey: historyKeys.all })
       // The finished badge on library cards is derived from saved progress.
-      void queryClient.invalidateQueries({ queryKey: libraryKeys.all })
+      for (const queryKey of libraryKeys.cards) {
+        void queryClient.invalidateQueries({ queryKey })
+      }
     }
   }, [fileID, player, saveProgress, queryClient])
 

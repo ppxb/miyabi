@@ -12,7 +12,14 @@ import type { DiscoverMovieDetail } from '@/api/discover'
 import { movieStateKeys } from '@/api/movie-states'
 import { refreshQueries, updateIfCurrent } from '@/api/query-refresh'
 import { panKeys, type PanAccountStatus } from '@/api/pan'
-import { taskKeys, type LibrarySource, type ScanTask, type Task } from '@/api/tasks'
+import { useTaskStreamConnected } from '@/api/task-stream'
+import {
+  taskKeys,
+  taskRefreshKeys,
+  type LibrarySource,
+  type ScanTask,
+  type Task
+} from '@/api/tasks'
 
 export const LIBRARY_PAGE_SIZE = 20
 
@@ -75,7 +82,15 @@ export const libraryKeys = {
   detail: (id: number) => ['library', 'detail', id] as const,
   movies: (page: number) => ['library', 'movies', page] as const,
   browse: (params: BrowseLibraryParams) => ['library', 'browse', params] as const,
-  filterOptions: ['library', 'filter-options'] as const
+  topRated: (limit: number) => ['library', 'top-rated', limit] as const,
+  filterOptions: ['library', 'filter-options'] as const,
+  // Lists that render card badges (finished, has_subtitle). Progress and
+  // subtitle changes refresh these instead of every library query.
+  cards: [
+    ['library', 'movies'],
+    ['library', 'browse'],
+    ['library', 'top-rated']
+  ] as const
 }
 
 export type LibraryMovieDetail = Omit<DiscoverMovieDetail, 'release_status'> & {
@@ -108,7 +123,7 @@ export function useLibraryMovies(page: number) {
 
 export function useTopRatedMovies(limit = 12) {
   return useQuery({
-    queryKey: ['library', 'top-rated', limit] as const,
+    queryKey: libraryKeys.topRated(limit),
     queryFn: ({ signal }) => apiGet<LibraryMovie[]>('/api/library/top-rated', { limit }, signal)
   })
 }
@@ -161,22 +176,25 @@ export function useLibraryFilterOptions() {
 
 export function useStartLibraryScan() {
   const queryClient = useQueryClient()
+  const streamConnected = useTaskStreamConnected()
   return useMutation({
     mutationFn: (rebuild: boolean) =>
       apiPost<ScanTask>(rebuild ? '/api/library/rebuild' : '/api/library/scan'),
     onMutate: () => queryClient.getQueryData<Task[]>(taskKeys.all),
     onSuccess: (task, _rebuild, previous) => {
       cacheScanTask(queryClient, task, previous)
-      return refreshQueries(queryClient, taskKeys.all)
+      return refreshQueries(queryClient, ...taskRefreshKeys(streamConnected))
     }
   })
 }
 
 export function useSyncLibrary() {
   const queryClient = useQueryClient()
+  const streamConnected = useTaskStreamConnected()
   return useMutation({
     mutationFn: () => apiPost<{ started: number }>('/api/library/sync'),
-    onSuccess: () => refreshQueries(queryClient, taskKeys.all, libraryKeys.all)
+    onSuccess: () =>
+      refreshQueries(queryClient, ...taskRefreshKeys(streamConnected), libraryKeys.all)
   })
 }
 
@@ -190,12 +208,18 @@ export function useLibraryPending() {
 
 export function useRescrapeLibraryMovie(id: number) {
   const queryClient = useQueryClient()
+  const streamConnected = useTaskStreamConnected()
   return useMutation({
     mutationFn: (code?: string) => apiPost<ScanTask>(`/api/library/movies/${id}/scrape`, { code }),
     onMutate: () => queryClient.getQueryData<Task[]>(taskKeys.all),
     onSuccess: (task, _code, previous) => {
       cacheScanTask(queryClient, task, previous)
-      return refreshQueries(queryClient, libraryKeys.all, taskKeys.all, movieStateKeys.all)
+      return refreshQueries(
+        queryClient,
+        ...taskRefreshKeys(streamConnected),
+        libraryKeys.all,
+        movieStateKeys.all
+      )
     }
   })
 }

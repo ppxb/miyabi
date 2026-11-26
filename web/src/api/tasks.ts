@@ -4,6 +4,7 @@ import { apiGet, apiPost, apiPut } from '@/api/client'
 import { offlineKeys } from '@/api/offline'
 import { refreshQueries } from '@/api/query-refresh'
 import type { PanDirectory } from '@/api/pan'
+import { useTaskStreamConnected } from '@/api/task-stream'
 
 export type LibrarySource = {
   account_id: string
@@ -55,6 +56,12 @@ export type Task = ScanTask
 
 export const taskKeys = { all: ['tasks'] as const }
 
+// The task SSE stream pushes authoritative snapshots, so refresh over HTTP
+// only while it is unavailable.
+export function taskRefreshKeys(streamConnected: boolean) {
+  return streamConnected ? [] : [taskKeys.all]
+}
+
 export function useTasks() {
   return useQuery({
     queryKey: taskKeys.all,
@@ -66,18 +73,21 @@ export function useTasks() {
 
 export function useRetryTask() {
   const queryClient = useQueryClient()
+  const streamConnected = useTaskStreamConnected()
   return useMutation({
     mutationFn: (id: number) => apiPost<Task>(`/api/tasks/${id}/retry`),
-    onSuccess: () => refreshQueries(queryClient, taskKeys.all, offlineKeys.all),
+    onSuccess: () =>
+      refreshQueries(queryClient, ...taskRefreshKeys(streamConnected), offlineKeys.all),
     meta: { errorTitle: '重试失败' }
   })
 }
 
 export function useSetLibraryPaused() {
   const queryClient = useQueryClient()
+  const streamConnected = useTaskStreamConnected()
   return useMutation({
     mutationFn: (paused: boolean) => apiPut('/api/tasks/library-control', { paused }),
-    onSuccess: () => refreshQueries(queryClient, taskKeys.all),
+    onSuccess: () => refreshQueries(queryClient, ...taskRefreshKeys(streamConnected)),
     meta: { errorTitle: '操作失败' }
   })
 }

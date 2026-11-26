@@ -1,14 +1,5 @@
 import { useQueryClient, type QueryKey } from '@tanstack/react-query'
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PropsWithChildren
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react'
 
 import { actorKeys } from '@/api/actors'
 import { notifyUnauthorized } from '@/api/client'
@@ -17,22 +8,15 @@ import { cancelQueryRefresh, refreshQueries } from '@/api/query-refresh'
 import { libraryKeys } from '@/api/library'
 import { offlineKeys } from '@/api/offline'
 import { subscriptionKeys } from '@/api/subscriptions'
+import { TaskConnectionContext, type ConnectionState } from '@/api/task-stream'
 import { taskKeys, type Task, type TaskRevisions } from '@/api/tasks'
 
-type ConnectionState = 'connecting' | 'connected' | 'disconnected'
-type TaskConnection = { status: ConnectionState; reconnect: () => void }
-const TaskConnectionContext = createContext<TaskConnection | null>(null)
+export { useTaskConnection } from '@/api/task-stream'
 
 // Batch scrapes bump the library revision for every movie. Library and actor
 // views refresh at most once per interval: the first change refreshes at once,
 // later ones within the interval share one trailing refresh.
 const libraryRefreshInterval = 2000
-
-export function useTaskConnection() {
-  const connection = useContext(TaskConnectionContext)
-  if (connection === null) throw new Error('TaskEventsProvider is missing')
-  return connection
-}
 
 export function TaskEventsProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient()

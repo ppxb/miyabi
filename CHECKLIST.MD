@@ -194,11 +194,21 @@
     - 测试：新增 `web/tests/offline-poll.test.ts`（连接时活跃任务 16 秒内仅 1 次请求；断线时每 5 秒共 4 次；无活跃任务不轮询）。`npm run typecheck`、`npm run test`（27 个文件 171 个用例）、`oxlint`、`oxfmt --check` 均通过。
   - 遗留（低）：
     - SSE 状态在收到首个 tasks 快照后才变为 `connected`，之前的 `connecting` 窗口仍会 5 秒轮询，属兜底，连接成功后自动停止。
-- [ ] 🟢 **刷新范围过宽**：
+- [x] 🟢 ✅ **刷新范围过宽**：
   - `web/src/features/library/player-dialog.tsx:445` 关播放器刷新整个 `libraryKeys.all`；
   - `web/src/api/subtitles.ts:105`、`:114` 字幕保存/删除刷新整个 `libraryKeys.all`；
   - `web/src/api/library.ts:170`、`:179`，`web/src/api/tasks.ts:85`、`:94` 操作成功后主动刷新 `taskKeys.all`，SSE 又推一次快照，任务列表被拉两次。
   - 改法：只刷新受影响的 key；SSE 已连接时操作成功后不再刷新 tasks。
+  - （已修复：按徽章承载查询精确刷新；任务刷新改为 SSE 断线兜底）
+    - `web/src/api/library.ts`：新增 `libraryKeys.cards`（`['library','movies']`、`['library','browse']`、`['library','top-rated']` 三个前缀）与 `topRated` key；扫描/同步/重刮三个 mutation 通过 `taskRefreshKeys(streamConnected)` 仅在 SSE 未连接时刷新 `taskKeys.all`。
+    - `web/src/api/tasks.ts`：新增 `taskRefreshKeys`，重试/暂停同样按 SSE 连接状态决定是否刷新；其他 key（`offlineKeys.all`、`libraryKeys.all`、`movieStateKeys.all`）照旧。
+    - 新增 `web/src/api/task-stream.ts`：承载连接 context 与 `useTaskConnection`/`useTaskStreamConnected`；`task-events.tsx` 改为引用该 context 并 re-export `useTaskConnection`。`useTaskStreamConnected` 在无 Provider 时返回 false，数据 hook 在测试等场景保持旧的刷新行为。
+    - `web/src/features/library/player-dialog.tsx`：关闭播放器只刷新 `historyKeys.all` + `libraryKeys.cards`，不再刷 `detail` / `filter-options`。
+    - `web/src/api/subtitles.ts`：保存/删除刷新 `subtitleKeys.tracks(movieID)`、`libraryKeys.detail(movieID)`、`historyKeys.all` 与 `libraryKeys.cards`；顺带修复历史卡片"中文"徽章此前不随字幕变更刷新的问题。
+    - 测试：新增 `web/tests/refresh-keys.test.ts`（`cards` 前缀仅命中三类卡片列表、不命中 `detail`/`filter-options`/`pending`；`taskRefreshKeys` 连接时为空、断线时含 `taskKeys.all`）与 `web/tests/refresh-call-sites.test.tsx`（直接捕获 mutation 选项并执行 `onSuccess`：连接时扫描不再请求 tasks、断线时回退刷新；字幕保存只失效 tracks/detail/history/cards 六个 key）。`npm run test` 29 个文件 176 个用例通过，`npm run typecheck`、`oxlint` 通过。
+  - 遗留（低）：
+    - `npm run fmt:check` 仍会报 `player-dialog.tsx` 中一段既有 JSX 的格式差异（HEAD 即存在，与本次无关，按最小改动未处理）。
+    - 既有问题（非本次引入）：演员详情页 `actorKeys.detail` 渲染的 `LibraryMovieCard` 不随播放进度/字幕变更刷新，`finished`/`has_subtitle` 徽章会过期；原先刷新 `libraryKeys.all` 时也未覆盖该 key。
 - [ ] 🟢 ✅ **任务池惊群 + 每次 Claim 读暂停设置**：`internal/tasks/queue.go` 的 `Finish` → `WakePool` 唤醒全部 4 个 worker，每个都要拿全局锁、读一次 `tasks.library_paused`（`internal/tasks/pause.go:52` 的 `runnableKinds`），再跑 `Claim` 和 `NextRetry`。
   - 改法：暂停状态缓存在内存（`SetLibraryPaused` 时更新）；按 kind 只唤醒相关池。
 - [ ] 🟢 **离线同步无唤醒通道**：`internal/app/app.go:319` 传入的 wake 为 `nil`（monitor 有 `Pending()`），提交或取消后最多 30 秒才看到状态更新。
