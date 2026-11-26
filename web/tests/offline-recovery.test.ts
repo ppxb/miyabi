@@ -18,7 +18,7 @@ test('user cancellation is a neutral terminal notification without a cancel acti
   assert.equal(vi.mocked(toast.error).mock.calls.length, 0)
   const [, options] = vi.mocked(toast.info).mock.calls[0]!
   assert.equal(options?.description, '已取消下载')
-  assert.equal(options?.duration, 8000)
+  assert.equal(options?.duration, 4000)
 })
 
 test('switching candidates updates the existing toast even when the integer progress is unchanged', () => {

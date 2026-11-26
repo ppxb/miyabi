@@ -16,6 +16,10 @@ type TaskToastOptions = {
   onDismiss?: () => void
 }
 
+// Routine completions clear quickly; failures and warnings stay long enough to act on.
+const completedToastDuration = 3000
+const attentionToastDuration = 8000
+
 function taskToastOptions(
   id: string,
   active: boolean,
@@ -25,7 +29,9 @@ function taskToastOptions(
 ) {
   return {
     id,
-    duration: active ? Infinity : 8000,
+    // Same-id toast updates merge options, so explicitly clear a previous spinner icon.
+    icon: undefined,
+    duration: active ? Infinity : attentionToastDuration,
     closeButton: false,
     onDismiss: options.onDismiss,
     action: <TaskToastActions id={id} retryTaskID={retryTaskID} cancelTaskID={cancelTaskID} />
@@ -70,6 +76,7 @@ export function notifyScanTask(task: ScanTask, options: TaskToastOptions = {}) {
   } else {
     toast.success(`${title}完成`, {
       ...props,
+      duration: completedToastDuration,
       // sonner merges updates into a same-id toast; clear a prior failure's
       // description (e.g. after a retry succeeds).
       description: undefined
@@ -129,11 +136,16 @@ export function notifyOfflineTask(
       )
     })
   } else if (task.status === 'cancelled') {
-    toast.info(task.code, { ...props, description: '已取消下载' })
+    toast.info(task.code, {
+      ...props,
+      duration: completedToastDuration,
+      description: '已取消下载'
+    })
   } else if (task.phase === 'in_library') {
     const notify = task.error ? toast.warning : toast.success
     notify(task.code, {
       ...props,
+      duration: task.error ? attentionToastDuration : completedToastDuration,
       description: task.error ? `元数据处理失败：${task.error}` : '下载与入库处理已完成'
     })
   } else if (task.error || task.status === 'failed') {
