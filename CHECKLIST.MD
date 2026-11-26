@@ -175,8 +175,7 @@
     - 极小窗口内若 `applyKnownCodes` 之后、事务落库之前影片刚变为 `ScrapeStatusFailed`，当次扫描仍沿用旧番号，下次扫描自动重读。
 - [ ] 🟠 **发布时逐视频调 `sess.Info`**：`internal/library/scrape/publish.go:84`、`:140-150`（`verifyVideoPositions`）。`Directories` 刚列过同目录，新增的只有 `WithinSource` 检查。
   - 改法：每个目录检查一次。
-- [ ] 🟠 **未开自动下载但已找到磁力的订阅，每天永久重查**：`internal/monitor/check.go:137` 用 `nextDaily`，不走 `nextMovieCheck` 的 stale 策略，每天一次完整多来源聚合。
-  - 改法：复用 `nextMovieCheck`，或找到磁力后停止轮询、等用户手动入库。
+- [x] **已过时：影片订阅每天重查磁力**。订阅定时任务只检查演员新作，不轮询影片磁力；`checkActor` 中的 `nextDaily` 安排的是下一次演员检查，无需修改。
 
 ### 影响小
 
