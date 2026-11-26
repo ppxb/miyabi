@@ -113,17 +113,7 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 	libSvc := library.New(store.Client, driveSvc, taskSvc, images, library.Options{
 		ExportManager: exportMgr,
 		Sources:       sourceSvc.LibrarySources,
-		LocalSources: func(ctx context.Context) ([]library.LocalScanTarget, error) {
-			targets, err := sourceSvc.LocalTargets(ctx)
-			if err != nil {
-				return nil, err
-			}
-			result := make([]library.LocalScanTarget, 0, len(targets))
-			for _, target := range targets {
-				result = append(result, library.LocalScanTarget{Path: target.Path, MetadataOnly: target.MetadataOnly})
-			}
-			return result, nil
-		},
+		LocalSources:  sourceSvc.LocalTargets,
 	})
 	javbusClient, err := javbus.New(javbus.Options{Proxy: networkSvc.ProxyManager()})
 	if err != nil {

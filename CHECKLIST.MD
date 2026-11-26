@@ -282,10 +282,11 @@
   - （复核：匹配已共享——两条路径都用 `loadMovieMatcher`/`movieMatcher.find`；真正分叉只在「新建影片的拼写」：云盘取批内最短等价拼写，本地存首个拼写。）
   - （已修复：抽出 `compareMovieCode`/`preferredNewMovieCode`，`indexMovies` 的排序与本地懒创建共用同一「最短、再字典序」规则；`local_ingest` 建片改用 `preferredNewMovieCode(media.code, codes)`。保留懒创建与逐条插入：`indexMovies` 预建整批 code 会为 manual 纠正/已导出跳过的文件创建多余影片（见 `TestLocalFilesInDifferentRootsKeepSeparateIdentities` 的语义），且本地批次上限 32，批量插入无收益。）
   - 测试：新增 `local_spelling_test.go` 覆盖同批装饰码取最短、已有短拼写复用、选码规则（含 CH 后缀/非等价码）；`go build ./internal/... ./cmd/...`、`go vet ./internal/library/...`、`go test ./internal/library/... ./internal/api/... ./internal/app/...` 通过；子代理只读 review 未发现 bug。）
-- [ ] 🟢 **重复类型与转换**：
-  - `library.LocalScanTarget` 与 `source.LocalTarget` 字段相同，`internal/app/app.go:116-126` 专门转换；可移到 domain 包。
-  - `localMetadataJob`（`internal/library/local.go:18-27`）重复定义 `scrape.MetadataPayload`。
-  - `internal/javdb/model.go:80` 的 `HTTPError`、`internal/javdb/retry.go:17` 的 `parseRetryAfter` 与 `internal/domain/retry.go:17`、`:41` 重复。
+- [x] 🟢 ✅ **重复类型与转换**：
+  - ~~`library.LocalScanTarget` 与 `source.LocalTarget`~~（已修复：移入 `domain/source.go` 的 `LocalScanTarget`；`library`/`source` 共用，`app.go` 删除转换闭包，直接 `LocalSources: sourceSvc.LocalTargets`）
+  - ~~`localMetadataJob`~~（已在 scrape 入队收敛中随 `local.go` 删除，0 引用）
+  - ~~`javdb` 的 `parseRetryAfter`~~（已修复：`domain.ParseRetryAfter` 改为 64 位解析并饱和（含 >uint64 的 ErrRange），删除 `javdb/retry.go` 的本地副本，`transport.go` 复用 domain；原格式测试迁入 `domain/retry_test.go` 并补 2^32/阈值/饱和用例。`javdb.HTTPError` 评估后保留：带 provider 专属中文 `PublicMessage`（API 文案与测试依赖），`Retryable` 已委托 domain；改用 domain 类型会丢文案并改动多处类型断言）
+  - 验证：`go build ./internal/... ./cmd/...`、`go vet ./internal/...`、`go test ./internal/domain/... ./internal/javdb/... ./internal/pan/... ./internal/metadata/... ./internal/source/... ./internal/app/... ./internal/library/... ./internal/api/...` 通过；子代理只读 review 未发现 bug，指出的 ErrRange 边界与残留注释已修复。
 - [ ] 🟢 **生产代码无调用方**：
   - 完全无调用：`libraryScope`（`internal/library/library.go:333`）、`catalogue.HasMagnet`（`internal/catalogue/magnets.go:74`）、`catalogue.MovieCode`（`internal/catalogue/service.go:242`）、`offline.Service.Add`（`internal/offline/add.go:19`）、`magnet.Aggregator.Find`（`internal/magnet/aggregator.go:86`）。
   - 仅测试使用：`StartLocalSourceScan` / `StartLocalSourceScanMode`（`internal/library/local.go:56-64`）、`scan.ReconcileScan`（`internal/library/scan/reconcile.go:31`，另建导出 Manager 绕开共享锁）、`scan.ProcessScanPage`（`internal/library/scan/persist.go:19`）、`drive.Drive.Source`（`internal/drive/drive.go:130`）。

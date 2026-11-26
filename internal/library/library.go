@@ -118,13 +118,7 @@ type Service struct {
 	exportMgr    *export.Manager
 	scanLock     syncx.ContextLock
 	sources      func(context.Context) ([]domain.LibrarySource, error)
-	localSources func(context.Context) ([]LocalScanTarget, error)
-}
-
-// LocalScanTarget is an enabled local source directory and its metadata mode.
-type LocalScanTarget struct {
-	Path         string
-	MetadataOnly bool
+	localSources func(context.Context) ([]domain.LocalScanTarget, error)
 }
 
 type Options struct {
@@ -132,7 +126,7 @@ type Options struct {
 	// Sources supplies the enabled cloud sources to aggregate in the library.
 	Sources func(context.Context) ([]domain.LibrarySource, error)
 	// LocalSources supplies the enabled local source directories.
-	LocalSources func(context.Context) ([]LocalScanTarget, error)
+	LocalSources func(context.Context) ([]domain.LocalScanTarget, error)
 	// Pacing defaults to scan.DefaultPacing; tests can provide a no-op.
 	Pacing func(context.Context) error
 }

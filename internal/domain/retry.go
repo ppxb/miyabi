@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"strconv"
@@ -38,10 +39,22 @@ func (e *HTTPError) Retryable() bool {
 }
 func (e *HTTPError) RetryWait() time.Duration { return e.RetryAfter }
 
+// ParseRetryAfter parses delta-seconds or an HTTP date. Absurdly large values
+// saturate instead of being dropped, so a malformed header cannot trigger an
+// immediate retry storm.
 func ParseRetryAfter(value string, now time.Time) time.Duration {
 	value = strings.TrimSpace(value)
-	if seconds, err := strconv.ParseUint(value, 10, 32); err == nil {
+	seconds, err := strconv.ParseUint(value, 10, 64)
+	switch {
+	case err == nil:
+		if seconds > math.MaxInt64/uint64(time.Second) {
+			return time.Duration(math.MaxInt64)
+		}
 		return time.Duration(seconds) * time.Second
+	case errors.Is(err, strconv.ErrRange):
+		// Wider than uint64 is still a delta-seconds header; treat it as "do not
+		// retry soon" instead of dropping the backoff entirely.
+		return time.Duration(math.MaxInt64)
 	}
 	if until, err := http.ParseTime(value); err == nil && until.After(now) {
 		return until.Sub(now)

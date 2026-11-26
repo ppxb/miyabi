@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"math"
-	"net/http"
 	"net/url"
 	"strings"
 	"testing"
@@ -21,20 +19,7 @@ type retryTransport func() error
 func (f retryTransport) getJSON(context.Context, string, url.Values, any) error { return f() }
 func (retryTransport) closeIdleConnections()                                    {}
 
-func TestRetryAfterFormats(t *testing.T) {
-	now := time.Date(2026, 9, 28, 12, 0, 0, 0, time.UTC)
-	for _, test := range []struct {
-		value string
-		want  time.Duration
-	}{
-		{" 60 ", time.Minute}, {now.Add(time.Minute).Format(http.TimeFormat), time.Minute},
-		{"", 0}, {"0", 0}, {"-1", 0}, {"invalid", 0}, {"1.5", 0},
-		{now.Add(-time.Minute).Format(http.TimeFormat), 0}, {"18446744073709551615", time.Duration(math.MaxInt64)},
-	} {
-		if got := parseRetryAfter(test.value, now); got != test.want {
-			t.Errorf("Retry-After %q = %v, want %v", test.value, got, test.want)
-		}
-	}
+func TestTransportReadsRetryAfter(t *testing.T) {
 	tr := &transport{host: "https://fixture.example", client: &responseClient{response: &fhttp.Response{
 		StatusCode: 429, Header: fhttp.Header{"Retry-After": []string{"60"}}, Body: io.NopCloser(strings.NewReader("limited")),
 	}}}

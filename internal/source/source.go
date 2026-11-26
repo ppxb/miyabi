@@ -36,12 +36,6 @@ type Service struct {
 	mounts MountProvider
 }
 
-// LocalTarget is an enabled local source directory and its metadata mode.
-type LocalTarget struct {
-	Path         string
-	MetadataOnly bool
-}
-
 // MountProvider lists every mounted 115 account directory.
 type MountProvider interface {
 	Mounts(context.Context) ([]domain.LibrarySource, error)
@@ -132,18 +126,18 @@ func (s *Service) LibrarySources(ctx context.Context) ([]domain.LibrarySource, e
 }
 
 // LocalTargets returns the enabled local source directories with their mode.
-func (s *Service) LocalTargets(ctx context.Context) ([]LocalTarget, error) {
+func (s *Service) LocalTargets(ctx context.Context) ([]domain.LocalScanTarget, error) {
 	sources, err := s.List(ctx)
 	if err != nil {
 		return nil, err
 	}
-	targets := make([]LocalTarget, 0)
+	targets := make([]domain.LocalScanTarget, 0)
 	for _, src := range sources {
 		if src.Kind != KindLocal || !src.Enabled {
 			continue
 		}
 		if path := strings.TrimSpace(src.Config["path"]); path != "" {
-			targets = append(targets, LocalTarget{Path: path, MetadataOnly: localMetadataOnly(src)})
+			targets = append(targets, domain.LocalScanTarget{Path: path, MetadataOnly: localMetadataOnly(src)})
 		}
 	}
 	return targets, nil

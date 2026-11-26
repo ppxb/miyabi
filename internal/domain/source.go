@@ -7,6 +7,12 @@ const LocalAccountID = "local"
 // .strm URLs can tell local files apart from 115 file IDs.
 const LocalFileIDPrefix = "local-"
 
+// LocalScanTarget is an enabled local source directory and its metadata mode.
+type LocalScanTarget struct {
+	Path         string
+	MetadataOnly bool
+}
+
 // LibraryDirectory describes a mounted media directory on remote storage.
 type LibraryDirectory struct {
 	ID   string `json:"id"`

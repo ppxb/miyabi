@@ -2,10 +2,6 @@ package javdb
 
 import (
 	"context"
-	"math"
-	"net/http"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -13,20 +9,6 @@ const (
 	maxRateLimitRetries = 3
 	maxRateLimitWait    = 2 * time.Minute
 )
-
-func parseRetryAfter(value string, now time.Time) time.Duration {
-	value = strings.TrimSpace(value)
-	if seconds, err := strconv.ParseUint(value, 10, 64); err == nil {
-		if seconds > math.MaxInt64/uint64(time.Second) {
-			return time.Duration(math.MaxInt64)
-		}
-		return time.Duration(seconds) * time.Second
-	}
-	if until, err := http.ParseTime(value); err == nil && until.After(now) {
-		return until.Sub(now)
-	}
-	return 0
-}
 
 // All API callers share the cooldown, including library and subscription workers.
 // A late response must never shorten an already announced Retry-After interval.
