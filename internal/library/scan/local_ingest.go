@@ -34,9 +34,62 @@ type localMedia struct {
 	artwork                         mediaimage.Artwork
 }
 
+// identifyMedia derives the file identity; a Miyabi .strm names the file it plays.
+func identifyMedia(rootDir string, media *localMedia) error {
+	if domain.IsSTRM(media.name) {
+		body, _ := os.ReadFile(media.path)
+		media.fileID = export.ParseSTRMFileID(string(body))
+		media.linked = media.fileID != ""
+	}
+	rel, err := filepath.Rel(rootDir, media.path)
+	if err != nil {
+		return fmt.Errorf("compute relative path for %s: %w", media.path, err)
+	}
+	media.rel = rel
+	if media.fileID == "" {
+		// Scan normalizes the root first, so the absolute path distinguishes
+		// identical relative names in different libraries without aliasing rescans.
+		hash := sha256.Sum256([]byte(media.path))
+		media.fileID = domain.LocalFileIDPrefix + hex.EncodeToString(hash[:16])
+	}
+	return nil
+}
+
+// settledExports finds Miyabi's own exports of completed movies with cached
+// artwork. Importing them again only rewrites unchanged metadata and re-encodes
+// the exported JPEGs into new cache entries, which the next export writes back.
+func (s *LocalScanner) settledExports(ctx context.Context, batch []localMedia) (map[string]bool, error) {
+	if s.images == nil {
+		return nil, nil
+	}
+	var linked []string
+	for _, media := range batch {
+		if media.linked {
+			linked = append(linked, media.fileID)
+		}
+	}
+	if len(linked) == 0 {
+		return nil, nil
+	}
+	records, err := s.db.File.Query().
+		Where(file.FileIDIn(linked...), file.HasMovieWith(movie.ScrapeStatusEQ(movie.ScrapeStatusDone))).
+		WithMovie().All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("find completed exports: %w", err)
+	}
+	settled := make(map[string]bool, len(records))
+	for _, record := range records {
+		// Artwork outside the cache, or missing from it, is restored by the import.
+		if cached, err := s.images.Exists(scrape.MovieArtwork(record.Edges.Movie)); err == nil && cached {
+			settled[record.FileID] = true
+		}
+	}
+	return settled, nil
+}
+
 // Prepare sidecars and artwork before taking SQLite's writer lock. Only one
 // bounded batch is prepared at a time; decoded images are not kept in memory.
-func (s *LocalScanner) prepareMedia(ctx context.Context, rootDir string, media *localMedia) error {
+func (s *LocalScanner) prepareMedia(ctx context.Context, media *localMedia) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -73,29 +126,24 @@ func (s *LocalScanner) prepareMedia(ctx context.Context, rootDir string, media *
 			}
 		}
 	}
-	if domain.IsSTRM(media.name) {
-		body, _ := os.ReadFile(media.path)
-		media.fileID = export.ParseSTRMFileID(string(body))
-		media.linked = media.fileID != ""
-	}
-	rel, err := filepath.Rel(rootDir, media.path)
-	if err != nil {
-		return fmt.Errorf("compute relative path for %s: %w", media.path, err)
-	}
-	media.rel = rel
-	if media.fileID == "" {
-		// Scan normalizes the root first, so the absolute path distinguishes
-		// identical relative names in different libraries without aliasing rescans.
-		hash := sha256.Sum256([]byte(media.path))
-		media.fileID = domain.LocalFileIDPrefix + hex.EncodeToString(hash[:16])
-	}
 	return ctx.Err()
 }
 
 func (s *LocalScanner) ingestBatch(ctx context.Context, rootDir string, batch []localMedia, result *LocalScanResult) error {
+	codes, fileIDs := make([]string, len(batch)), make([]string, len(batch))
+	for i := range batch {
+		if err := identifyMedia(rootDir, &batch[i]); err != nil {
+			return err
+		}
+		codes[i], fileIDs[i] = batch[i].code, batch[i].fileID
+	}
+	settled, err := s.settledExports(ctx, batch)
+	if err != nil {
+		return err
+	}
 	if s.images != nil {
 		for _, media := range batch {
-			if media.posterPath != "" {
+			if media.posterPath != "" && !settled[media.fileID] {
 				if err := s.images.LockArtwork(ctx); err != nil {
 					return err
 				}
@@ -104,15 +152,16 @@ func (s *LocalScanner) ingestBatch(ctx context.Context, rootDir string, batch []
 			}
 		}
 	}
-	codes, fileIDs := make([]string, len(batch)), make([]string, len(batch))
 	for i := range batch {
-		if err := s.prepareMedia(ctx, rootDir, &batch[i]); err != nil {
+		if settled[batch[i].fileID] {
+			continue
+		}
+		if err := s.prepareMedia(ctx, &batch[i]); err != nil {
 			return fmt.Errorf("prepare %s: %w", batch[i].path, err)
 		}
-		codes[i], fileIDs[i] = batch[i].code, batch[i].fileID
 	}
 	var added, nfoRead int
-	err := ent.WithTx(ctx, s.db, func(tx *ent.Tx) error {
+	err = ent.WithTx(ctx, s.db, func(tx *ent.Tx) error {
 		records, err := tx.File.Query().Where(file.FileIDIn(fileIDs...)).All(ctx)
 		if err != nil {
 			return err
@@ -154,6 +203,16 @@ func (s *LocalScanner) ingestBatch(ctx context.Context, rootDir string, batch []
 			}
 			// A stale exported NFO must not undo a manual correction or reassign its files.
 			if existing != nil && existing.MovieID != nil && manualMovies[*existing.MovieID] {
+				continue
+			}
+			// Unchanged Miyabi output for a completed movie: its sidecars were not
+			// read and Emby already has the directory.
+			if settled[media.fileID] && existing != nil && existing.MovieID != nil {
+				for _, subPath := range media.subPaths {
+					if err := indexLocalSubtitle(ctx, tx, *existing.MovieID, subPath); err != nil {
+						return err
+					}
+				}
 				continue
 			}
 			record := matcher.find(media.code)

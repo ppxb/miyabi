@@ -16,9 +16,11 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/embynotification"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scrape"
 	"github.com/ppxb/miyabi/internal/nfo"
+	"github.com/ppxb/miyabi/internal/pan"
 )
 
 func localScannerFixture(t *testing.T) *LocalScanner {
@@ -80,8 +82,9 @@ func TestLocalScannerBatchesQueriesAndPreservesRemoteFileIdentity(t *testing.T) 
 		if err != nil {
 			t.Fatal(err)
 		}
-		if movieQueries != 3 || fileQueries != 3 {
-			t.Fatalf("run %d: movie queries=%d file queries=%d, want 3 each for %d files", run, movieQueries, fileQueries, count)
+		// Per batch: one completed-export lookup, then one file and one movie read.
+		if movieQueries != 3 || fileQueries != 6 {
+			t.Fatalf("run %d: movie queries=%d file queries=%d, want 3 and 6 for %d files", run, movieQueries, fileQueries, count)
 		}
 		wantAdded := count
 		if run == 1 {
@@ -99,6 +102,52 @@ func TestLocalScannerBatchesQueriesAndPreservesRemoteFileIdentity(t *testing.T) 
 		if got := scanner.db.File.Query().CountX(ctx); got != count {
 			t.Fatalf("file count=%d, want %d", got, count)
 		}
+	}
+}
+
+func TestLocalImportSkipsCompletedExportsWithCachedArtwork(t *testing.T) {
+	for _, cached := range []bool{true, false} {
+		t.Run(fmt.Sprint("cached=", cached), func(t *testing.T) {
+			scanner := localScannerFixture(t)
+			ctx, root := t.Context(), t.TempDir()
+			var notified []string
+			scanner.notifier = localNotifier(func(_ context.Context, _ *ent.Tx, path string) error {
+				notified = append(notified, path)
+				return nil
+			})
+			artwork, err := scanner.images.FromCover(testJPEG(t), "single")
+			if err != nil {
+				t.Fatal(err)
+			}
+			builder := scanner.db.Movie.Create().SetCode("ABP-001").SetTitle("library title").SetScrapeStatus(movie.ScrapeStatusDone)
+			if cached {
+				builder.SetPoster(artwork.Poster).SetCover(artwork.Thumbnail).SetFanarts([]string{artwork.Fanart})
+			}
+			film := builder.SaveX(ctx)
+			scanner.db.File.Create().SetFileID("remote-1").SetName("ABP-001.mp4").SetSize(1 << 30).
+				SetAccountID("account").SetRootID("root").SetPath("/Movies/ABP-001.mp4").SetMovieID(film.ID).ExecX(ctx)
+			if _, err := export.WriteMedia(export.Config{EmbyDir: root, PublicURL: "http://localhost"}, "ABP-001",
+				nfo.Movie{Code: "ABP-001", Title: "exported title"}, []pan.File{{ID: "remote-1", Name: "ABP-001.mp4"}},
+				testJPEG(t), testJPEG(t)); err != nil {
+				t.Fatal(err)
+			}
+			result, err := scanner.Scan(ctx, root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := scanner.db.Movie.GetX(ctx, film.ID)
+			if cached {
+				// The export is Miyabi's own output: no metadata rewrite, re-encoded artwork or Emby refresh.
+				if got.Title != "library title" || got.Poster == nil || *got.Poster != artwork.Poster || len(notified) != 0 || result.NFORead != 0 {
+					t.Fatalf("completed export was imported again: %+v notified=%v result=%+v", got, notified, result)
+				}
+				return
+			}
+			// Without cached artwork the import still restores it from the export.
+			if got.Title != "exported title" || got.Poster == nil || *got.Poster == "" || len(notified) != 1 || result.NFORead != 1 {
+				t.Fatalf("export without cached artwork was not restored: %+v notified=%v result=%+v", got, notified, result)
+			}
+		})
 	}
 }
 

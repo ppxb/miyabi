@@ -120,6 +120,17 @@ func (r *scanRun) prepareReconcile(ctx context.Context, cfg export.Config) (_ ma
 			if !scrape.SnapshotMatches(record, r.payload.Source) {
 				continue
 			}
+			// Incremental syncs only queue pending movies and never consult reusable
+			// ones. They restore missing exports, such as after the Emby directory
+			// changed, and leave repairing existing files to full scans.
+			if r.payload.Incremental {
+				if cfg.EmbyDir == "" {
+					continue
+				}
+				if _, err := os.Stat(export.EmbyMovieDir(cfg.EmbyDir, record.Code)); !os.IsNotExist(err) {
+					continue
+				}
+			}
 			cached, err := r.scanner.images.Exists(scrape.MovieArtwork(record))
 			if err != nil {
 				return nil, fmt.Errorf("check cached artwork: %w", err)

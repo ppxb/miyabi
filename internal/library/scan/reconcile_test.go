@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -311,6 +312,38 @@ func TestReconcileSavesExportsRewrittenBeforeFailure(t *testing.T) {
 	resumed, err := tasks.DecodePayload[domain.ScanPayload](run.scanner.db.Task.GetX(ctx, run.taskID).Payload)
 	if err != nil || resumed.Scan.Stage != "reconciling" || !slices.Equal(resumed.ExportedCodes, []string{"TEST-000", "TEST-001"}) {
 		t.Fatalf("failure lost rewritten exports: %+v %v", resumed, err)
+	}
+}
+
+func TestIncrementalReconcileOnlyRestoresMissingExports(t *testing.T) {
+	run := reconcileFixture(t, 1, 0)
+	ctx := t.Context()
+	nfoPath := filepath.Join(export.EmbyMovieDir(run.scanner.exportMgr.Config().EmbyDir, "TEST-000"), "TEST-000.nfo")
+	reconcile := func(incremental bool) []byte {
+		t.Helper()
+		run.payload.Incremental = incremental
+		if err := run.reconcile(ctx); err != nil {
+			t.Fatal(err)
+		}
+		body, err := os.ReadFile(nfoPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return body
+	}
+	// A missing export directory, e.g. after switching the Emby directory, is restored.
+	complete := reconcile(true)
+	if err := os.WriteFile(nfoPath, []byte("damaged"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := reconcile(true); string(got) != "damaged" {
+		t.Fatal("incremental sync compared and rewrote an existing export")
+	}
+	if got := reconcile(false); !bytes.Equal(got, complete) {
+		t.Fatal("full scan did not repair the damaged export")
+	}
+	if run.scanner.db.Task.Query().Where(task.TypeEQ("scrape")).CountX(ctx) != 0 {
+		t.Fatal("reconcile queued a completed movie")
 	}
 }
 

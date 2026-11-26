@@ -108,12 +108,21 @@
     - 文件已写入、断点未存时进程崩溃，这些影片的通知会丢，Emby 要等自身扫描才能发现。
     - 以前手动全量扫描能顺带让 Emby 把每个目录刷新一遍，改后需在 Emby 里自行扫描。
     - `go build ./...` 会被 `backups/actor-name-key-20261120-163048/tmp-verify/` 里的旧临时脚本卡住（引用的字段已不存在），与本条无关，未处理。
-- [ ] 🔴 **启动时 Emby 目录被处理三遍**：
+- [x] 🔴 ✅ **启动时 Emby 目录被处理三遍**：
   1. `ScheduleLocalScan`（`internal/app/app.go:290`，保存 Emby 设置时 `internal/emby/service.go:158` 也会触发）把自己导出的目录全量再导入：`internal/library/scan/local_ingest.go:65` 重新编码 3 张 JPEG（含 Lanczos 缩放），`:166` 数据库→NFO→数据库来回写，`:214` 每目录发一条 Emby 通知；全程持有 `exportMgr.WithConfig` 全局锁（`internal/library/library.go:285`），卡住所有刮削发布。
   2. STRM 改写再遍历一遍（`internal/app/app.go:296`、`internal/export/export.go:66`）。
   3. 对账再逐片读一遍；增量模式下对账算出的 `reusable` 结果用不上（`internal/library/scan/reconcile.go:154-189`），只剩"修复导出文件"的隐含副作用，且同时持有封面锁和导出配置锁。
   - 不确定：JPEG 重编码后字节可能变化，导致下次对账改写 poster.jpg 形成循环。
   - 改法：本地回导只在数据库为空或用户手动触发时执行，已关联完成影片的文件跳过；记录上次 STRM 改写用的 PublicURL 和 token，未变化则跳过；增量模式跳过对账修复，或拆成显式、分批释放锁的修复任务。
+  - 复核（✅）：循环成立。回导对每部已导出影片解码 `poster.jpg`/`fanart.jpg`，按 JPEG 质量 90 重新编码进按内容哈希命名的缓存（`internal/image/cache.go:82-129`），并把影片封面改指向新缓存（`local_ingest.go:192-196`）；随后增量同步的对账发现缓存和 `poster.jpg` 不一致，写回新字节。用同版本 imaging（v1.6.2）实测：平滑渐变图重编码 2 次后字节稳定，接近照片的噪点图 12 次后仍在变化（合成图，未用真实封面）。后果：封面画质随启动次数下降，缓存每次启动约增加"影片数 × 3 张"，每部影片每次启动通知 Emby 两次；回导还会用 NFO 重写数据库（重建演员、标签）。STRM 改写只读全部 .strm、内容变了才写，影响小。
+  - （已修复：回导跳过已完成的自有导出；增量对账只补缺失的导出；STRM 改写不变）
+    - `scan/local_ingest.go`：`prepareMedia` 拆出 `identifyMedia`（文件 ID、是否 Miyabi 导出、相对路径）。新增 `settledExports`：Miyabi 自己导出的 .strm（能解析出播放地址），关联的影片已完成且封面缓存存在时，跳过读 NFO、解码封面、重写元数据、更新封面和通知 Emby，字幕照常索引，本地文件行的名称、大小、路径照常更新。封面锁只在有未跳过、带封面的条目时获取。用户配置的本地源（真实视频）不受影响。按用户确认，不再读入 Emby 写回 NFO 的元数据改动。
+    - `scan/reconcile.go`：增量模式下，已完成影片只在导出目录不存在时导出（如换了 Emby 目录、手动删了导出目录），已存在的导出不读图片、不逐个比较，修复留给手动全量扫描。增量模式本来就只给待刮削影片排刮削，不用可复用结果。
+    - 测试：`internal/library/scan/local_batch_test.go` 新增 `TestLocalImportSkipsCompletedExportsWithCachedArtwork`（封面已缓存：标题、封面不变，不通知，不读 NFO；未缓存：照旧从导出恢复）；`internal/library/scan/reconcile_test.go` 新增 `TestIncrementalReconcileOnlyRestoresMissingExports`（增量补齐缺失目录、不改写已存在的导出，全量扫描修复损坏的导出）。`TestLocalScannerBatchesQueriesAndPreservesRemoteFileIdentity` 的文件查询期望从每批 1 次改为 2 次（多一次已完成导出查询，仍按批固定）。反向验证：换回旧 `local_ingest.go`，第一个新测试失败；增量也总是修复（修改前的行为）或增量一律跳过，第二个新测试分别失败。`go test ./internal/...` 全部通过；子代理只读 review 未发现正确性问题，指出的"换 Emby 目录后增量不再补导出"已按上面的目录存在判断处理。
+  - 遗留（低）：
+    - 增量模式仍按页查询已完成影片，并对每部 `stat` 一次导出目录，不再读图片。
+    - 单个导出文件损坏（目录还在）要等手动全量扫描修复。
+    - 多分段影片在增量扫描中删掉一个分段后，残留的 `cd2.strm` 查不到文件行，每次启动仍按旧逻辑导入：重写这部影片的元数据并通知 Emby，直到全量扫描清掉它。因为增量不再写回封面，这种情况不会再形成劣化循环。
 - [ ] 🔴 ✅ **磁力缓存经常失效**：`internal/magnet/aggregator.go:192` 只要有来源失败或被拦即标记 partial；`internal/catalogue/magnets.go:53` 遇 partial 返回 `ErrDoNotCache`。一个来源长期被拦或冷却，1 分钟缓存就形同虚设，叠加 P0 的二次聚合，远程请求翻倍。
   - 改法：partial 结果也缓存，TTL 15–30 秒；内部调用方复用已选中的磁力。
 
