@@ -173,8 +173,15 @@
   - 遗留（低）：
     - 对已入库未变且非失败的视频，若事后仅改了云盘 NFO 内的番号而不改视频文件，重扫时不再报错（此前 `IdentifyScanVideos` 落库也会沿用旧影片番号）。
     - 极小窗口内若 `applyKnownCodes` 之后、事务落库之前影片刚变为 `ScrapeStatusFailed`，当次扫描仍沿用旧番号，下次扫描自动重读。
-- [ ] 🟠 **发布时逐视频调 `sess.Info`**：`internal/library/scrape/publish.go:84`、`:140-150`（`verifyVideoPositions`）。`Directories` 刚列过同目录，新增的只有 `WithinSource` 检查。
+- [x] 🟠 ✅ **发布时逐视频调 `sess.Info`**：`internal/library/scrape/publish.go:84`、`:140-150`（`verifyVideoPositions`）。`Directories` 刚列过同目录，新增的只有 `WithinSource` 检查。
   - 改法：每个目录检查一次。
+  - （已修复：发布时每目录刷新一次目录列表，删除逐视频 `sess.Info`）
+    - `internal/library/scrape/publish.go`：删除 `verifyVideoPositions`；`publishMovie` 改为 `movieDirectories(ctx, sess, input.MetadataPayload, true)`，发布前对每个目录强制重新拉取列表后再导出。
+    - `internal/library/scrape/scrape.go`：`Directories` 拆出 `movieDirectories(..., refresh)`；`loadDirectoryEntries(..., refresh)` 在 refresh 时绕过缓存；新增 `allVideosPresent`，用同一次目录列表校验该目录下全部已索引视频仍在。
+    - `internal/drive/session.go:72-91` 的 `DirectoryEntries` 每页校验 `page.Path` 含媒体源目录，等价覆盖原 `WithinSource` 检查；视频移出目录或整个目录移出媒体源都会报错。
+    - 测试：`internal/library/scrape/dir_cache_test.go` 新增 `TestDirectoriesChecksAllPartsAndRefreshesStaleCache`（缓存缺分片时刷新一次；新列表仍缺分片报 `KindNotFound`；发布前对完整缓存强制重查，1 次 List、0 次 Info；目录移出媒体源报 `KindConflict`）。`go test ./internal/library/scrape/... ./internal/library/...` 通过。
+  - 遗留（低）：
+    - 新校验要求视频仍以视频扩展名且 ≥ `MinVideoSize` 出现在列表中；已入库视频若在云盘原地改名为非视频扩展名（不经重扫），发布会报"已删除或移动"，旧 `sess.Info` 实现会放行。正常扫描入库的文件不受影响。
 - [x] **已过时：影片订阅每天重查磁力**。订阅定时任务只检查演员新作，不轮询影片磁力；`checkActor` 中的 `nextDaily` 安排的是下一次演员检查，无需修改。
 
 ### 影响小
