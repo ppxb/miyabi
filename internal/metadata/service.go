@@ -298,11 +298,14 @@ func (s *Service) fetch(ctx context.Context, source Source, ref domain.MovieRef)
 		s.mu.Unlock()
 		defer s.wg.Done()
 		// Bound shared requests independently of one caller leaving a detail dialog.
-		// JavDB is prone to risk-control stalls, so give it a shorter timeout: with
-		// concurrent sources a slow JavDB no longer blocks the others.
+		// Community aggregators can stall on risk control or a dead proxy; bound them
+		// more tightly so they never hold the merge for long.
 		timeout := 25 * time.Second
-		if source.ID() == "javdb" {
+		switch source.ID() {
+		case "javdb":
 			timeout = 8 * time.Second
+		case "avmoo":
+			timeout = 12 * time.Second
 		}
 		queryCtx, cancel := context.WithTimeout(s.ctx, timeout)
 		defer cancel()

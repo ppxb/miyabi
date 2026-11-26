@@ -53,6 +53,29 @@ func TestActorSync_FindAvatarFallsBackToJavDBMedia(t *testing.T) {
 	}
 }
 
+func TestActorSync_FindAvatarSkipsEmptyAvatarRows(t *testing.T) {
+	store, err := database.Open(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	store.Client.Actor.Create().SetProvider("javdb").SetSourceID("empty-avatar").SetName("Fixture Actor").SetAvatar("").ExecX(t.Context())
+	store.Client.Actor.Create().SetProvider("avmoo").SetSourceID("with-avatar").SetName("Fixture Actor").
+		SetAvatar("https://file.netcdn.space/avatar/fixture.jpg").ExecX(t.Context())
+
+	svc := &actorSync{db: store.Client}
+	media := mediaFetcherFunc(func(_ context.Context, rawURL string) (domain.Media, error) {
+		if rawURL != "https://file.netcdn.space/avatar/fixture.jpg" {
+			t.Errorf("fetched %q", rawURL)
+		}
+		return domain.Media{ContentType: "image/jpeg", Body: []byte("avatar")}, nil
+	})
+	got, found, err := svc.findAvatar(t.Context(), nil, media, "Fixture Actor")
+	if err != nil || !found || string(got.Body) != "avatar" {
+		t.Fatalf("findAvatar = %+v, found=%v err=%v", got, found, err)
+	}
+}
+
 func TestActorSync_NegativeCache(t *testing.T) {
 	store, err := database.Open(t.Context(), t.TempDir())
 	if err != nil {

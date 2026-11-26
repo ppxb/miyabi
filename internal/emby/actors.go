@@ -255,15 +255,12 @@ func (s *actorSync) findAvatar(ctx context.Context, g *gfriends.Client, media Me
 	if media == nil {
 		return domain.Media{}, false, upstreamErr
 	}
-	act, err := s.db.Actor.Query().Where(actor.Or(actor.NameEQ(name), actor.NameZhtEQ(name)), actor.AvatarNotNil()).First(ctx)
+	act, err := s.db.Actor.Query().Where(actor.Or(actor.NameEQ(name), actor.NameZhtEQ(name)), actor.AvatarNEQ("")).First(ctx)
 	if ent.IsNotFound(err) {
 		return domain.Media{}, false, upstreamErr
 	}
 	if err != nil {
 		return domain.Media{}, false, errors.Join(upstreamErr, err)
-	}
-	if *act.Avatar == "" {
-		return domain.Media{}, false, upstreamErr
 	}
 	image, err := media.Image(ctx, domain.ImageCandidate{Provider: act.Provider, URL: *act.Avatar, Role: "avatar"})
 	if err != nil {

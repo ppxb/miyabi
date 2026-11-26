@@ -20,6 +20,7 @@ const descriptions: Record<string, string> = {
   javdb: '社区来源，补充影片资料与封面',
   javbus: '社区来源，补充影片资料与封面',
   jav321: '社区来源，补充影片资料与封面',
+  avmoo: '社区来源，补充影片资料、演员头像与图片',
   tokyohot: '官方封面、预览图和影片资料',
   heydouga: '官方封面、预览图和影片资料',
   caribbeancom: '官方封面、预览图和影片资料',

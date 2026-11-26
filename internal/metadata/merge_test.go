@@ -87,3 +87,39 @@ func TestMergeTitlePrefersOriginTitle(t *testing.T) {
 		t.Fatalf("title should prefer the origin title: title=%q origin=%q src=%q", got.Detail.Title, got.Detail.OriginTitle, got.Detail.FieldSources["title"])
 	}
 }
+
+func TestMergeFillsMissingActorAvatarAndAdoptsItsSource(t *testing.T) {
+	official := completeFixture("fanza", "ABP-123")
+	official.Detail.Actors = []domain.Actor{{Provider: "fanza", ID: "fanza-actor", Name: "Shared Actor"}}
+	catalogue := completeFixture("avmoo", "ABP-123")
+	catalogue.Detail.Actors = []domain.Actor{{
+		Provider: "avmoo", ID: "avmoo-actor", Name: "shared actor",
+		NameZHT: "共享演员", Avatar: "https://file.netcdn.space/avatar/shared.jpg",
+	}}
+	got := merge([]domain.MovieMetadata{official, catalogue})
+	if len(got.Detail.Actors) != 1 {
+		t.Fatalf("actors=%+v", got.Detail.Actors)
+	}
+	want := domain.Actor{Provider: "avmoo", ID: "avmoo-actor", Name: "Shared Actor", NameZHT: "共享演员", Avatar: "https://file.netcdn.space/avatar/shared.jpg"}
+	if !reflect.DeepEqual(got.Detail.Actors[0], want) || got.Detail.FieldSources["actors"] != "avmoo" {
+		t.Fatalf("merged actor=%+v sources=%+v", got.Detail.Actors[0], got.Detail.FieldSources)
+	}
+}
+
+func TestMergeKeepsActorIdentityThatAlreadyHasAnAvatar(t *testing.T) {
+	official := completeFixture("fanza", "ABP-123")
+	official.Detail.Actors = []domain.Actor{{
+		Provider: "fanza", ID: "fanza-actor", Name: "Shared Actor",
+		Avatar: "https://pics.dmm.co.jp/avatar.jpg",
+	}}
+	catalogue := completeFixture("avmoo", "ABP-123")
+	catalogue.Detail.Actors = []domain.Actor{{
+		Provider: "avmoo", ID: "avmoo-actor", Name: "Shared Actor",
+		Avatar: "https://file.netcdn.space/avatar/shared.jpg",
+	}}
+	got := merge([]domain.MovieMetadata{official, catalogue})
+	if len(got.Detail.Actors) != 1 || got.Detail.Actors[0].Provider != "fanza" ||
+		got.Detail.Actors[0].Avatar != "https://pics.dmm.co.jp/avatar.jpg" {
+		t.Fatalf("actors=%+v", got.Detail.Actors)
+	}
+}

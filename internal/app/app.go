@@ -154,6 +154,7 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 		providers.NewOnePondo(proxy),
 		providers.NewCodeAV(proxy),
 		providers.NewJav321(proxy),
+		providers.NewAvmoo(proxy),
 		providers.NewTokyoHot(proxy),
 		providers.NewHeydouga(proxy),
 		providers.NewCaribbeancom(proxy),

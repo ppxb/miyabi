@@ -1,7 +1,9 @@
 package providers
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -81,6 +83,34 @@ func (c *client) get(ctx context.Context, target string) ([]byte, error) {
 	if strings.HasPrefix(target, c.base) {
 		req.Header.Set("Cookie", c.cookie)
 	}
+	return c.do(req)
+}
+
+// postJSON sends a JSON request body and reads a JSON response. The shared
+// limiter, cooldown, status handling and body cap apply as for get.
+func (c *client) postJSON(ctx context.Context, target string, payload any) ([]byte, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("encode request: %w", err)
+	}
+	if err := c.admit(ctx); err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Referer", c.base)
+	if strings.HasPrefix(target, c.base) {
+		req.Header.Set("Cookie", c.cookie)
+	}
+	return c.do(req)
+}
+
+func (c *client) do(req *http.Request) ([]byte, error) {
 	response, err := c.http.Do(req)
 	if err != nil {
 		return nil, c.failed(err)

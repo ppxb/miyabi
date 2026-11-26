@@ -15,7 +15,7 @@ func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 	var result domain.MovieMetadata
 	result.Detail.FieldSources = make(map[string]string)
 	images := make(map[string]bool)
-	actors := make(map[string]bool)
+	actors := make(map[string]int)
 	tags := make(map[string]bool)
 	javdbPlot, javdbPlotSource := "", ""
 	for _, item := range results {
@@ -99,10 +99,22 @@ func merge(results []domain.MovieMetadata) domain.MovieMetadata {
 			if strings.TrimSpace(person.Name) == "" {
 				key = person.Provider + ":" + person.ID
 			}
-			if actors[key] {
+			if index, found := actors[key]; found {
+				existing := &out.Actors[index]
+				if existing.NameZHT == "" {
+					existing.NameZHT = person.NameZHT
+				}
+				// Avatars are downloaded through the provider that owns the URL, so
+				// the source supplying the avatar must also own the merged identity.
+				if existing.Avatar == "" && person.Avatar != "" {
+					existing.Avatar = person.Avatar
+					existing.Provider = person.Provider
+					existing.ID = person.ID
+					out.FieldSources["actors"] = person.Provider
+				}
 				continue
 			}
-			actors[key] = true
+			actors[key] = len(out.Actors)
 			out.Actors = append(out.Actors, person)
 			if _, ok := out.FieldSources["actors"]; !ok {
 				out.FieldSources["actors"] = provider
