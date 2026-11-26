@@ -21,4 +21,7 @@ type ScanPayload struct {
 	ReusedTasks []int `json:"reused_tasks,omitempty"`
 	// ObsoleteCodes survives chunk commits until reassigned exports are cleaned.
 	ObsoleteCodes []string `json:"obsolete_codes,omitempty"`
+	// ExportedCodes names exports reconciliation rewrote. It survives a failed
+	// commit, whose retry finds the files complete, until Emby is notified.
+	ExportedCodes []string `json:"exported_codes,omitempty"`
 }

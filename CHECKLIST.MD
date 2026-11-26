@@ -97,8 +97,17 @@
   - 遗留（低）：
     - 批量刮削中途 SSE 重连时，重连补刷加上新连接的首次刷新，2 秒内会刷两次，只多不少。
     - 其他来源触发的库变化（扫描、手动操作）同样受 2 秒节流，最多延迟 2 秒显示。
-- [ ] 🔴 ✅ **文件没变也通知 Emby**：`internal/export/media.go:20` 的 `WriteMedia` 返回"是否有变化"，但 `internal/library/scrape/publish.go:103` 丢弃该返回值，随后无条件 `NotifyUpdatedTx`；`internal/library/scan/reconcile.go:122` 同样丢弃，全量对账时对每部可复用影片都发通知。
+- [x] 🟠 ✅ **文件没变也通知 Emby**（复核后由 🔴 降为 🟠）：`internal/export/media.go:20` 的 `WriteMedia` 返回"是否有变化"，但 `internal/library/scrape/publish.go:103` 丢弃该返回值，随后无条件 `NotifyUpdatedTx`；`internal/library/scan/reconcile.go:122` 同样丢弃，全量对账时对每部可复用影片都发通知。
   - 改法：只在 `changed` 为真时通知；重试场景在 payload 里记标记兜底。
+  - 复核：真问题只在对账。每次手动全量扫描，每部已完成影片都向 Emby 发一条 `/Library/Media/Updated`（每 3 秒 50 条，每批成功后还会排一次演员同步）；增量同步只处理待刮削影片，不发这批通知。刮削发布只在新刮削、重建、换文件、缺封面时执行，文件基本都会变，多发的很少，不改。无条件通知原是有意为之：事务失败后重试时文件已完整，`changed` 为假，按变化通知会丢。
+  - （已修复：只改对账，刮削发布不变）
+    - `domain/scan.go`：扫描 payload 新增 `ExportedCodes`，记录对账改写过导出的番号，事务失败后保留到重试。
+    - `scan/reconcile.go`：`prepareReconcile` 记下 `ExportLocalMovie` 返回有变化的番号；`WriteMedia` 中途出错时仍会报告已改写的文件，同样记下。每批有新增时存一次断点；出错或取消提前退出时，用 `context.WithoutCancel` 补存。`reconcileTx` 只通知这些番号，然后清空列表并标为完成；原来按可复用影片逐部通知的逻辑删除。增量模式下修复的导出现在也会通知（以前漏通知）。
+    - 测试：`internal/library/scan/reconcile_test.go` 新增 `TestReconcileNotifiesOnlyRewrittenExports`（首次导出两部都通知；再次对账只通知被破坏后修复的那部；完成后列表清空）、`TestReconcileSavesExportsRewrittenBeforeFailure`（第二部写完封面后 NFO 写入失败，两部的番号都已存进断点）。原有 `TestReconcileRetryNotifiesExportsWrittenBeforeFailedCommit` 继续覆盖"事务失败后重试仍通知"。反向验证：换回旧代码，第一个新测试失败；去掉批末存盘，重试测试失败；换回 review 前的版本（没有出错补存，出错时也不记番号），第二个新测试失败。`go test ./internal/...` 全部通过；子代理只读 review 发现的"批内出错丢通知"已按上述补存修复。
+  - 遗留（低）：
+    - 文件已写入、断点未存时进程崩溃，这些影片的通知会丢，Emby 要等自身扫描才能发现。
+    - 以前手动全量扫描能顺带让 Emby 把每个目录刷新一遍，改后需在 Emby 里自行扫描。
+    - `go build ./...` 会被 `backups/actor-name-key-20261120-163048/tmp-verify/` 里的旧临时脚本卡住（引用的字段已不存在），与本条无关，未处理。
 - [ ] 🔴 **启动时 Emby 目录被处理三遍**：
   1. `ScheduleLocalScan`（`internal/app/app.go:290`，保存 Emby 设置时 `internal/emby/service.go:158` 也会触发）把自己导出的目录全量再导入：`internal/library/scan/local_ingest.go:65` 重新编码 3 张 JPEG（含 Lanczos 缩放），`:166` 数据库→NFO→数据库来回写，`:214` 每目录发一条 Emby 通知；全程持有 `exportMgr.WithConfig` 全局锁（`internal/library/library.go:285`），卡住所有刮削发布。
   2. STRM 改写再遍历一遍（`internal/app/app.go:296`、`internal/export/export.go:66`）。

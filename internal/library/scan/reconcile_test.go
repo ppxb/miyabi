@@ -264,6 +264,56 @@ func TestReconcileRetryNotifiesExportsWrittenBeforeFailedCommit(t *testing.T) {
 	}
 }
 
+func TestReconcileNotifiesOnlyRewrittenExports(t *testing.T) {
+	run := reconcileFixture(t, 2, 0)
+	ctx := t.Context()
+	embyDir := run.scanner.exportMgr.Config().EmbyDir
+	var notified []string
+	run.scanner.notifier = localNotifier(func(_ context.Context, _ *ent.Tx, path string) error {
+		notified = append(notified, path)
+		return nil
+	})
+	if err := run.reconcile(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(notified) != 2 {
+		t.Fatalf("first export notifications=%v, want both movies", notified)
+	}
+	// A complete export stays quiet; a damaged one is repaired and announced.
+	nfoPath := filepath.Join(export.EmbyMovieDir(embyDir, "TEST-001"), "TEST-001.nfo")
+	if err := os.WriteFile(nfoPath, []byte("damaged"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	notified = nil
+	if err := run.reconcile(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if want := export.EmbyMovieDir(embyDir, "TEST-001"); len(notified) != 1 || notified[0] != want {
+		t.Fatalf("notifications=%v, want only %s", notified, want)
+	}
+	completed, err := tasks.DecodePayload[domain.ScanPayload](run.scanner.db.Task.GetX(ctx, run.taskID).Payload)
+	if err != nil || completed.Scan.Stage != "done" || len(completed.ExportedCodes) != 0 {
+		t.Fatalf("completed scan kept exported codes: %+v %v", completed, err)
+	}
+}
+
+func TestReconcileSavesExportsRewrittenBeforeFailure(t *testing.T) {
+	run := reconcileFixture(t, 2, 0)
+	ctx := t.Context()
+	// TEST-001 writes its artwork, then fails on an NFO path taken by a directory.
+	blocked := filepath.Join(export.EmbyMovieDir(run.scanner.exportMgr.Config().EmbyDir, "TEST-001"), "TEST-001.nfo")
+	if err := os.MkdirAll(blocked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := run.reconcile(ctx); err == nil {
+		t.Fatal("blocked export did not fail")
+	}
+	resumed, err := tasks.DecodePayload[domain.ScanPayload](run.scanner.db.Task.GetX(ctx, run.taskID).Payload)
+	if err != nil || resumed.Scan.Stage != "reconciling" || !slices.Equal(resumed.ExportedCodes, []string{"TEST-000", "TEST-001"}) {
+		t.Fatalf("failure lost rewritten exports: %+v %v", resumed, err)
+	}
+}
+
 func TestReconcileRechecksPreparedMovieVersion(t *testing.T) {
 	run := reconcileFixture(t, 1, 0)
 	ctx := t.Context()

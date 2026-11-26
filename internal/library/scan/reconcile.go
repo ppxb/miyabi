@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -83,10 +84,18 @@ func (r *scanRun) cleanupReassignedExports(ctx context.Context, cfg export.Confi
 
 // Prepare only bounded pages of completed movies. Files that reconciliation
 // will delete must not participate in snapshot comparison or regenerated STRMs.
-func (r *scanRun) prepareReconcile(ctx context.Context, cfg export.Config) (map[int]time.Time, error) {
+func (r *scanRun) prepareReconcile(ctx context.Context, cfg export.Config) (_ map[int]time.Time, err error) {
 	if r.payload.Rebuild {
 		return nil, nil
 	}
+	// Exports rewritten before an error or cancellation look complete to the
+	// retry, so their codes must be saved even when preparation stops early.
+	saved := len(r.payload.ExportedCodes)
+	defer func() {
+		if err != nil && len(r.payload.ExportedCodes) > saved {
+			err = errors.Join(err, SaveScanProgress(context.WithoutCancel(ctx), r.scanner.db.Task, r.taskID, *r.payload))
+		}
+	}()
 	indexed := file.And(database.LibraryFiles(r.payload.Source), file.ScanIDEQ(r.payload.ScanID))
 	retained := file.And(database.LibraryFiles(r.payload.Source), file.Not(r.staleFiles()))
 	reusable := make(map[int]time.Time)
@@ -119,11 +128,22 @@ func (r *scanRun) prepareReconcile(ctx context.Context, cfg export.Config) (map[
 				continue
 			}
 			if cfg.EmbyDir != "" {
-				if _, err := scrape.ExportLocalMovie(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken, record, r.scanner.images); err != nil {
+				// A failed export still reports the files it rewrote first.
+				changed, err := scrape.ExportLocalMovie(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken, record, r.scanner.images)
+				if changed && !slices.Contains(r.payload.ExportedCodes, record.Code) {
+					r.payload.ExportedCodes = append(r.payload.ExportedCodes, record.Code)
+				}
+				if err != nil {
 					return nil, fmt.Errorf("export local movie %s: %w", record.Code, err)
 				}
 			}
 			reusable[record.ID] = record.UpdatedAt
+		}
+		if len(r.payload.ExportedCodes) > saved {
+			if err := SaveScanProgress(ctx, r.scanner.db.Task, r.taskID, *r.payload); err != nil {
+				return nil, err
+			}
+			saved = len(r.payload.ExportedCodes)
 		}
 		after = records[len(records)-1].ID
 	}
@@ -236,13 +256,6 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 				continue
 			}
 			if checked, ok := reusable[record.ID]; ok && checked.Equal(record.UpdatedAt) {
-				if cfg.EmbyDir != "" && r.scanner.notifier != nil {
-					// Also notify on a retry that finds complete exports: a previous
-					// attempt may have written them before its database commit failed.
-					if err := r.scanner.notifier.NotifyUpdatedTx(ctx, tx, export.EmbyMovieDir(cfg.EmbyDir, record.Code)); err != nil {
-						return err
-					}
-				}
 				continue
 			}
 			input := scrape.MetadataPayload{
@@ -265,6 +278,16 @@ func (r *scanRun) reconcileTx(ctx context.Context, tx *ent.Tx, cfg export.Config
 		}
 		after = records[len(records)-1].ID
 	}
+	// Only rewritten exports need a refresh. The list includes exports a
+	// previous attempt wrote before its database commit failed.
+	if cfg.EmbyDir != "" && r.scanner.notifier != nil {
+		for _, code := range r.payload.ExportedCodes {
+			if err := r.scanner.notifier.NotifyUpdatedTx(ctx, tx, export.EmbyMovieDir(cfg.EmbyDir, code)); err != nil {
+				return err
+			}
+		}
+	}
+	r.payload.ExportedCodes = nil
 	r.payload.Scan.Stage = "done"
 	if err := SaveScanProgress(ctx, tx.Task, r.taskID, *r.payload); err != nil {
 		return err
