@@ -148,6 +148,14 @@ func (r *scanRun) reconcile(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
+			// Enqueue decisions must observe a consistent queue; every enqueue
+			// path takes this lock before opening its transaction.
+			if r.scanner.tasksSvc != nil {
+				if err := r.scanner.tasksSvc.Queue().Lock(ctx); err != nil {
+					return err
+				}
+				defer r.scanner.tasksSvc.Queue().Unlock()
+			}
 			return ent.WithTx(ctx, r.scanner.db, func(tx *ent.Tx) error {
 				return r.reconcileTx(ctx, tx, expCfg, reusable)
 			})

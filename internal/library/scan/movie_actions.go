@@ -2,7 +2,6 @@ package scan
 
 import (
 	"context"
-	"fmt"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqljson"
@@ -50,21 +49,19 @@ func (s *Scanner) RescrapeMovie(ctx context.Context, id int, code string) (*ent.
 				return err
 			}
 			correcting := code != "" && code != record.Code
-			active, err := tx.Task.Query().Where(task.TypeEQ(tasks.KindScrape.String()),
-				task.ResourceKeyEQ(fmt.Sprintf("movie:%d", id)), task.StatusIn(task.StatusQueued, task.StatusRunning)).First(ctx)
-			if err != nil && !ent.IsNotFound(err) {
+			policy := ManualScrapePolicy
+			if correcting {
+				policy = ConflictScrapePolicy
+			}
+			plan, err := PlanScrapes(ctx, tx, []ScrapeJob{{
+				MovieID: id, Rebuild: true, Source: sess.Source(),
+			}}, policy)
+			if err != nil {
 				return err
 			}
-			if active != nil {
-				input, err := tasks.DecodePayload[scrape.MetadataPayload](active.Payload)
-				if err != nil {
-					return err
-				}
-				if !correcting && input.Rebuild && input.Source == sess.Source() {
-					parent, err = tx.Task.Get(ctx, input.ScanTaskID)
-					return err
-				}
-				return domain.E(domain.KindConflict, "该影片正在处理中，请完成后再操作", nil)
+			if active, reused := plan.Reused[id]; reused {
+				parent, err = tx.Task.Get(ctx, active.ScanTaskID)
+				return err
 			}
 			busy, err := tx.Task.Query().Where(task.TypeEQ(tasks.KindScan.String()),
 				task.StatusIn(task.StatusQueued, task.StatusRunning), func(q *sql.Selector) {
@@ -114,14 +111,14 @@ func (s *Scanner) RescrapeMovie(ctx context.Context, id int, code string) (*ent.
 			if err != nil {
 				return err
 			}
-			body, err = tasks.EncodePayload(scrape.MetadataPayload{
+			create, err := NewScrapeTask(tx, ScrapeJob{
 				Rebuild: true, Source: sess.Source(), ScanTaskID: parent.ID, MovieID: id,
 				Code: record.Code, ManualCode: record.ManualCode,
 			})
 			if err != nil {
 				return err
 			}
-			return tx.Task.Create().SetType(tasks.KindScrape.String()).SetResourceKey(fmt.Sprintf("movie:%d", id)).SetPayload(body).Exec(ctx)
+			return create.Exec(ctx)
 		})
 	})
 	if err != nil {

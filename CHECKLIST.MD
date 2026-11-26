@@ -270,8 +270,14 @@
     - 缓存条目返回共享的 `Streams` 切片（调用方只读）；若将来需要修改，应返回副本。
     - 转码结果按所有流的最早签名到期缓存；任一流过期时间未知时整体不缓存（比旧 STRM 只缓存选中流的策略更保守，混合流集合的命中率会略低）。
     - 无 `t`/`expires` 的直链不再缓存（旧 playback 对任意直链固定缓存 2 分钟）；115 直链通常带签名参数，最坏情况是退化为每次重新解析。
-- [ ] 🟠 **scrape 任务入队有三套实现，去重规则各不相同**：`internal/library/scan/reconcile.go:210-263`、`internal/library/local.go:164-176`（逐条先查再插，无事务、未拿队列锁）、`internal/library/scan/movie_actions.go:53-128`。
+- [x] 🟠 ✅ **scrape 任务入队有三套实现，去重规则各不相同**：`internal/library/scan/reconcile.go:210-263`、`internal/library/local.go:164-176`（逐条先查再插，无事务、未拿队列锁）、`internal/library/scan/movie_actions.go:53-128`。
   - 改法：收敛成一个函数。
+  - （已修复：抽出 `internal/library/scan/enqueue.go`，`PlanScrapes` 统一「查活跃任务 + 判定」，`NewScrapeTask`/`CreateScrapeTasks` 统一建任务；三处只保留各自策略 preset 与副作用。）
+    - 对账：同源按 `account_id + directory.id`（与旧 SQL 等价，忽略 Name/Path 变化），rebuild 扫描忽略非 rebuild 活跃任务，命中复用并记 `ReusedTasks`；`walker.go` 在开事务前补 `Queue().Lock()`。
+    - 本地：任意来源命中即跳过；补上 `payload.completed` 检查点过滤（已发布任务不再挡住新文件），并改为「队列锁 + 事务 + 分块 `CreateBulk`（500 条/批）」；`localMetadataJob` 随之删除，直接使用 `scrape.MetadataPayload`。
+    - 手动：同源 rebuild 复用父任务，其余冲突；纠正代码时一律冲突；completed 任务忽略（已不再占用影片）。
+    - 活跃任务查询按 500 个 resource key 分块，且只解码判定所需字段（`rebuild/source/scan_task_id/completed`），无关 checkpoint 字段损坏不再使整批失败。
+    - 测试：`enqueue_test.go` 覆盖 completed 检查点、跨源、rebuild、手动冲突、同挂载改名、窄解码、600/4097 条分块；`local_metadata_test.go` 验证本地路径在已发布任务后仍入队。`go build ./internal/... ./cmd/...`、`go vet ./internal/library/...`、`go test ./internal/library/... ./internal/api/... ./internal/app/... ./internal/tasks/...` 通过；子代理只读 review 两轮，发现的批量变量上限、全量解码、同源比较口径、持锁唤醒均已修复并复核，无遗留 bug。）
 - [ ] 🟢 **本地与云盘导入各有一套影片匹配逻辑**：`internal/library/scan/local_ingest.go:113-159`（逐条 Create）与 `internal/library/scan/movies.go:105`（批量建并合并别名）。
 - [ ] 🟢 **重复类型与转换**：
   - `library.LocalScanTarget` 与 `source.LocalTarget` 字段相同，`internal/app/app.go:116-126` 专门转换；可移到 domain 包。
@@ -282,6 +288,9 @@
   - 仅测试使用：`StartLocalSourceScan` / `StartLocalSourceScanMode`（`internal/library/local.go:56-64`）、`scan.ReconcileScan`（`internal/library/scan/reconcile.go:31`，另建导出 Manager 绕开共享锁）、`scan.ProcessScanPage`（`internal/library/scan/persist.go:19`）、`drive.Drive.Source`（`internal/drive/drive.go:130`）。
   - 前端从不调用的路由：`GET /api/play/files`、`GET /api/play/:id`（`internal/api/router.go:145`、`:148`）。外部客户端是否在用无法确认。
 
+- [ ] 验证 https://avmoo.shop/ 能否作为削刮源。
+
+- [ ] 查看 https://github.com/tinypinglite/sakuramedia 项目接入光鸭的方式。
 ---
 
 ## 核查后排除（不是问题）

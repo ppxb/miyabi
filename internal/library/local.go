@@ -7,24 +7,12 @@ import (
 	"path/filepath"
 
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/movie"
-	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/library/scan"
-	"github.com/ppxb/miyabi/internal/tasks"
 )
 
 const embyLocalDirectoryName = "Emby 本地目录"
-
-// localMetadataJob mirrors scrape.MetadataPayload so the library package need
-// not import the scrape package just to queue metadata work.
-type localMetadataJob struct {
-	Rebuild    bool                 `json:"rebuild,omitempty"`
-	Source     domain.LibrarySource `json:"source"`
-	ScanTaskID int                  `json:"scan_task_id"`
-	MovieID    int                  `json:"movie_id"`
-	Code       string               `json:"code"`
-	ManualCode string               `json:"manual_code,omitempty"`
-}
 
 // startLocalScan queues an import of the configured Emby directory.
 func (s *Service) startLocalScan(ctx context.Context) (domain.TaskInfo, error) {
@@ -151,30 +139,28 @@ func (s *Service) applyLocalMetadataMode(ctx context.Context, scanTaskID int, pa
 	if err != nil {
 		return err
 	}
+	jobs := make([]scan.ScrapeJob, 0, len(records))
 	for _, record := range records {
-		input := localMetadataJob{
+		jobs = append(jobs, scan.ScrapeJob{
 			Source: payload.Source, ScanTaskID: scanTaskID, MovieID: record.ID,
 			Code: record.Code, ManualCode: record.ManualCode,
-		}
-		encoded, err := tasks.EncodePayload(input)
-		if err != nil {
-			return err
-		}
-		resourceKey := fmt.Sprintf("movie:%d", record.ID)
-		exists, err := s.database.Task.Query().Where(
-			task.TypeEQ(tasks.KindScrape.String()), task.ResourceKeyEQ(resourceKey),
-			task.StatusIn(task.StatusQueued, task.StatusRunning),
-		).Exist(ctx)
-		if err != nil {
-			return err
-		}
-		if exists {
-			continue
-		}
-		if _, err := s.database.Task.Create().SetType(tasks.KindScrape.String()).
-			SetResourceKey(resourceKey).SetPayload(encoded).Save(ctx); err != nil {
-			return err
-		}
+		})
+	}
+	if err := s.tasks.Queue().Lock(ctx); err != nil {
+		return err
+	}
+	err = func() error {
+		defer s.tasks.Queue().Unlock()
+		return ent.WithTx(ctx, s.database, func(tx *ent.Tx) error {
+			plan, err := scan.PlanScrapes(ctx, tx, jobs, scan.LocalScrapePolicy)
+			if err != nil {
+				return err
+			}
+			return scan.CreateScrapeTasks(ctx, tx, plan.Create)
+		})
+	}()
+	if err != nil {
+		return err
 	}
 	s.tasks.WakePool()
 	return nil
