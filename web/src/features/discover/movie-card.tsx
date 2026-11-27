@@ -9,7 +9,13 @@ export type DiscoverMovieCardData = Pick<
   'id' | 'code' | 'title' | 'cover' | 'rating' | 'release_date'
 >
 
-export function DiscoverMovieCard({ movie }: { movie: DiscoverMovieCardData }) {
+export function DiscoverMovieCard({
+  movie,
+  hideState = false
+}: {
+  movie: DiscoverMovieCardData
+  hideState?: boolean
+}) {
   const title = movie.title || movie.code
   return (
     <MovieDetailTrigger
@@ -19,7 +25,7 @@ export function DiscoverMovieCard({ movie }: { movie: DiscoverMovieCardData }) {
       <MovieCard
         movie={movie}
         hideContent
-        state={<MovieStateBadge movie={movie} />}
+        state={hideState ? undefined : <MovieStateBadge movie={movie} />}
         coverOverlay={
           <>
             <MovieRatingPill rating={movie.rating} />

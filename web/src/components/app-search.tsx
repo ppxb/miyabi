@@ -246,9 +246,7 @@ export function SearchDialog({
     }
   }
 
-  const loading = searching
-    ? movies.isPending && actors.isPending
-    : open && recent.isPending
+  const loading = searching ? movies.isPending && actors.isPending : open && recent.isPending
   const failed = searching && settled && (movies.isError || actors.isError)
   const recentFailed = !searching && recent.isError
   const groupedItems = groupBy(items)
