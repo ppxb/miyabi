@@ -110,13 +110,12 @@ func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 	if page.Source == nil || *page.Source != payload.Source || page.Total != 2 || page.HasMore || len(page.Movies) != 2 {
 		t.Fatalf("library statistics escaped the mounted source: %#v", page)
 	}
-	// One file query counts the scoped movies, one flags which of the page's
-	// movies have files in a 115 source for the source badge, and one reads the
-	// page's file names for the Chinese-subtitle badge; a single subtitle query
-	// covers sidecar subtitle names. All are batched per page, so the count is
-	// constant regardless of the number of cards. Mounts and scope come from one
+	// One file query counts the scoped movies and one derives the source,
+	// subtitle, uncensored and cracked badges; a single subtitle query covers
+	// sidecar subtitle names. All are batched per page, so the count is constant
+	// regardless of the number of cards. Mounts and scope come from one
 	// PanAccount query per page, never a per-card read.
-	wantQueries := map[string]int{"*ent.PanAccountQuery": 1, "*ent.FileQuery": 3, "*ent.SubtitleQuery": 1, "*ent.WatchHistoryQuery": 1, "*ent.MovieQuery": 1, "*ent.ActorQuery": 1}
+	wantQueries := map[string]int{"*ent.PanAccountQuery": 1, "*ent.FileQuery": 2, "*ent.SubtitleQuery": 1, "*ent.WatchHistoryQuery": 1, "*ent.MovieQuery": 1, "*ent.ActorQuery": 1}
 	if !reflect.DeepEqual(queries, wantQueries) {
 		t.Fatalf("library cards made redundant queries: %#v", queries)
 	}
@@ -167,6 +166,37 @@ func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 	}
 	if beyond, err := lib.Movies(ctx, 3, 1); err != nil || beyond.Movies == nil || len(beyond.Movies) != 0 || beyond.HasMore {
 		t.Fatalf("out-of-range page: %#v, %v", beyond, err)
+	}
+}
+
+func TestLibraryListingReusesTheRecentTotalCount(t *testing.T) {
+	lib, _, payload := libraryFixture(t)
+	ctx := t.Context()
+	database := lib.database
+	film := database.Movie.Create().SetCode("CACHE-001").SaveX(ctx)
+	database.File.Create().SetFileID("cache-file").SetName("cache.mp4").SetSize(1).
+		SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).SetMovieID(film.ID).ExecX(ctx)
+
+	var fileQueries int
+	database.Intercept(ent.InterceptFunc(func(next ent.Querier) ent.Querier {
+		return ent.QuerierFunc(func(ctx context.Context, query ent.Query) (ent.Value, error) {
+			if _, ok := query.(*ent.FileQuery); ok {
+				fileQueries++
+			}
+			return next.Query(ctx, query)
+		})
+	}))
+
+	for attempt := 0; attempt < 2; attempt++ {
+		page, err := lib.Movies(ctx, 1, 20)
+		if err != nil || page.Total != 1 || len(page.Movies) != 1 {
+			t.Fatalf("attempt %d: %+v err=%v", attempt, page, err)
+		}
+	}
+	// The first page counts the scoped movies and derives the badges; the
+	// second reuses the cached total and only reads the card files.
+	if fileQueries != 3 {
+		t.Fatalf("expected 3 file queries across two pages, got %d", fileQueries)
 	}
 }
 

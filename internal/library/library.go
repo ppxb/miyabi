@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -42,7 +43,19 @@ type Tag struct {
 	Name     string `json:"name"`
 }
 
-const finishedProgressRatio = 0.95
+const (
+	finishedProgressRatio = 0.95
+	// listingCountTTL bounds staleness for changes outside the task system;
+	// task activity (such as scan completion) invalidates entries sooner.
+	listingCountTTL        = 10 * time.Second
+	listingCountCacheLimit = 64
+)
+
+type listingCountEntry struct {
+	total   int
+	version uint64
+	expires time.Time
+}
 
 type Movie struct {
 	ID           int                `json:"id"`
@@ -120,6 +133,8 @@ type Service struct {
 	scanLock     syncx.ContextLock
 	sources      func(context.Context) ([]domain.LibrarySource, error)
 	localSources func(context.Context) ([]domain.LocalScanTarget, error)
+	countMu      sync.Mutex
+	counts       map[string]listingCountEntry
 }
 
 type Options struct {
@@ -447,12 +462,6 @@ func fileScope(sources []domain.LibrarySource) predicate.File {
 	return file.Or(scopes...)
 }
 
-// cloudFileScope matches files that belong to one of the cloud sources, the
-// same account and root pair scope uses to filter the library.
-func cloudFileScope(sources []domain.LibrarySource) predicate.File {
-	return cloudFileScopeProvider(sources, "")
-}
-
 func cloudFileScopeProvider(sources []domain.LibrarySource, provider string) predicate.File {
 	preds := make([]predicate.File, 0, len(sources))
 	for _, source := range sources {
@@ -474,16 +483,66 @@ func cloudFileScopeProvider(sources []domain.LibrarySource, provider string) pre
 	return file.Or(preds...)
 }
 
+// listingScopeKey identifies the sources a listing total was computed for.
+func listingScopeKey(sources []domain.LibrarySource) string {
+	parts := make([]string, len(sources))
+	for i, source := range sources {
+		parts[i] = source.AccountID + "\x00" + source.Directory.ID
+	}
+	return strings.Join(parts, "\x1e")
+}
+
+func browseCountKey(filter BrowseFilter, sources []domain.LibrarySource) string {
+	return fmt.Sprintf("browse\x1d%q\x1d%q\x1d%q\x1d%t\x1d%q\x1d%q\x1d%q\x1d%q\x1d%s",
+		filter.Query, filter.Source, filter.ScrapeStatus, filter.HighRated,
+		filter.TagNames, filter.ActorNames, filter.MakerNames, filter.SeriesNames,
+		listingScopeKey(sources))
+}
+
+// listingVersion changes whenever task activity publishes an update, including
+// scan completion, so cached totals do not outlive the work that changed them.
+func (s *Service) listingVersion() uint64 {
+	if s.tasks == nil {
+		return 0
+	}
+	return s.tasks.Version()
+}
+
+// cachedListingCount reuses a recently computed listing total. The short TTL
+// covers changes outside the task system while the task version invalidates
+// entries as soon as a scan or other task commits.
+func (s *Service) cachedListingCount(key string, count func() (int, error)) (int, error) {
+	version := s.listingVersion()
+	s.countMu.Lock()
+	if entry, ok := s.counts[key]; ok && entry.version == version && time.Now().Before(entry.expires) {
+		s.countMu.Unlock()
+		return entry.total, nil
+	}
+	s.countMu.Unlock()
+	total, err := count()
+	if err != nil {
+		return 0, err
+	}
+	s.countMu.Lock()
+	if s.counts == nil || len(s.counts) >= listingCountCacheLimit {
+		s.counts = make(map[string]listingCountEntry)
+	}
+	s.counts[key] = listingCountEntry{total: total, version: version, expires: time.Now().Add(listingCountTTL)}
+	s.countMu.Unlock()
+	return total, nil
+}
+
 func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 	mounts := s.mountList(ctx)
 	sources := s.mergeSources(ctx, mounts)
 	result := Page{Movies: []Movie{}, Page: page, Source: firstSource(mounts)}
 	scope := fileScope(sources)
-	cloudScope := cloudFileScope(sources)
 	var err error
-	result.Total, err = s.database.File.Query().Where(scope).Aggregate(func(selector *sql.Selector) string {
-		return sql.As("COUNT(DISTINCT "+selector.C(file.FieldMovieID)+")", "total")
-	}).Int(ctx)
+	result.Total, err = s.cachedListingCount("movies\x1d"+listingScopeKey(sources), func() (int, error) {
+		return s.database.File.Query().Where(scope).Aggregate(func(selector *sql.Selector) string {
+			return sql.As("COUNT(DISTINCT "+selector.C(file.FieldMovieID)+")", "total")
+		}).Int(ctx)
+	})
 	if err != nil {
 		return result, fmt.Errorf("count library index: %w", err)
 	}
@@ -509,10 +568,7 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 	for _, record := range records {
 		result.Movies = append(result.Movies, movieItem(record))
 	}
-	if err := s.markCloudSources(ctx, result.Movies, cloudScope, sourceProviders(sources)); err != nil {
-		return result, err
-	}
-	if err := s.markSubtitleStatus(ctx, result.Movies); err != nil {
+	if err := s.markFileFlags(ctx, result.Movies, sources); err != nil {
 		return result, err
 	}
 	if err := s.markWatchState(ctx, result.Movies); err != nil {
@@ -558,7 +614,6 @@ func (s *Service) TopRated(ctx context.Context, limit int) ([]Movie, error) {
 	}
 	sources := s.cloudSources(ctx)
 	scope := fileScope(sources)
-	cloudScope := cloudFileScope(sources)
 	records, err := s.database.Movie.Query().
 		Where(movie.HasFilesWith(scope), movie.RatingNotNil(), movie.RatingGT(0)).
 		Select(browseScalarFields...).
@@ -574,10 +629,7 @@ func (s *Service) TopRated(ctx context.Context, limit int) ([]Movie, error) {
 	for _, record := range records {
 		items = append(items, movieItem(record))
 	}
-	if err := s.markCloudSources(ctx, items, cloudScope, sourceProviders(sources)); err != nil {
-		return nil, err
-	}
-	if err := s.markSubtitleStatus(ctx, items); err != nil {
+	if err := s.markFileFlags(ctx, items, sources); err != nil {
 		return nil, err
 	}
 	if err := s.markWatchState(ctx, items); err != nil {
@@ -586,7 +638,8 @@ func (s *Service) TopRated(ctx context.Context, limit int) ([]Movie, error) {
 	return items, nil
 }
 
-// markCloudSources flags movies that have at least one file in a 115 source.
+// sourceProviders maps a cloud account to the badge its files show, preferring
+// guangya when one account is mounted by both providers.
 func sourceProviders(sources []domain.LibrarySource) map[string]string {
 	result := make(map[string]string, len(sources))
 	for _, source := range sources {
@@ -604,46 +657,21 @@ func sourceProviders(sources []domain.LibrarySource) map[string]string {
 	return result
 }
 
-func (s *Service) markCloudSources(ctx context.Context, movies []Movie, cloudScope predicate.File, providers map[string]string) error {
-	if cloudScope == nil || len(movies) == 0 {
-		return nil
-	}
-	ids := make([]int, len(movies))
-	for i := range movies {
-		ids[i] = movies[i].ID
-	}
-	records, err := s.database.File.Query().
-		Where(file.MovieIDIn(ids...), cloudScope).
-		Select(file.FieldMovieID, file.FieldAccountID).All(ctx)
-	if err != nil {
-		return fmt.Errorf("detect library movie sources: %w", err)
-	}
-	source := make(map[int]string, len(records))
-	for _, record := range records {
-		if record.MovieID == nil {
-			continue
-		}
-		provider := providers[record.AccountID]
-		if provider == "" {
-			provider = "115"
-		}
-		if source[*record.MovieID] != "guangya" {
-			source[*record.MovieID] = provider
-		}
-	}
-	for i := range movies {
-		if provider, ok := source[movies[i].ID]; ok {
-			movies[i].Source = provider
-		}
-	}
-	return nil
-}
-
-// markSubtitleStatus flags movies whose file or indexed subtitle names carry a
-// Chinese-subtitle marker, keeping list cards consistent with the detail view.
-func (s *Service) markSubtitleStatus(ctx context.Context, movies []Movie) error {
+// markFileFlags derives the source badge and the file-name flags (subtitle,
+// uncensored, cracked) for one page of movies from a single files query, then
+// checks indexed sidecar subtitles. Keeping the badges batched per page keeps
+// the query count constant regardless of the number of cards.
+func (s *Service) markFileFlags(ctx context.Context, movies []Movie, sources []domain.LibrarySource) error {
 	if len(movies) == 0 {
 		return nil
+	}
+	providers := sourceProviders(sources)
+	cloud := make(map[[2]string]bool, len(sources))
+	for _, source := range sources {
+		if source.AccountID == "" || source.AccountID == domain.LocalAccountID {
+			continue
+		}
+		cloud[[2]string{source.AccountID, source.Directory.ID}] = true
 	}
 	ids := make([]int, len(movies))
 	index := make(map[int]*Movie, len(movies))
@@ -653,9 +681,9 @@ func (s *Service) markSubtitleStatus(ctx context.Context, movies []Movie) error 
 	}
 	files, err := s.database.File.Query().
 		Where(file.MovieIDIn(ids...)).
-		Select(file.FieldMovieID, file.FieldName).All(ctx)
+		Select(file.FieldMovieID, file.FieldAccountID, file.FieldRootID, file.FieldName).All(ctx)
 	if err != nil {
-		return fmt.Errorf("read library subtitle files: %w", err)
+		return fmt.Errorf("read library files: %w", err)
 	}
 	for _, record := range files {
 		if record.MovieID == nil {
@@ -665,14 +693,23 @@ func (s *Service) markSubtitleStatus(ctx context.Context, movies []Movie) error 
 		if !ok {
 			continue
 		}
+		if cloud[[2]string{record.AccountID, record.RootID}] {
+			provider := providers[record.AccountID]
+			if provider == "" {
+				provider = "115"
+			}
+			if item.Source != "guangya" {
+				item.Source = provider
+			}
+		}
 		if subtitlemeta.HasChineseSubtitle(record.Name) {
 			item.HasSubtitle = true
 		}
-		inf := magnet.Infer(record.Name)
-		if inf.HasUncensored {
+		inferred := magnet.Infer(record.Name)
+		if inferred.HasUncensored {
 			item.HasUncensored = true
 		}
-		if inf.HasCracked {
+		if inferred.HasCracked {
 			item.HasCracked = true
 		}
 	}
@@ -776,7 +813,6 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 	sources := s.mergeSources(ctx, mounts)
 	result := Page{Movies: []Movie{}, Page: filter.Page, Source: firstSource(mounts)}
 	scope := fileScope(sources)
-	cloudScope := cloudFileScope(sources)
 
 	preds := []predicate.Movie{movie.HasFilesWith(scope)}
 	if q := strings.TrimSpace(filter.Query); q != "" {
@@ -843,7 +879,9 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 		preds = append(preds, movie.Rating10GTE(highRatedThreshold))
 	}
 
-	total, err := s.database.Movie.Query().Where(preds...).Count(ctx)
+	total, err := s.cachedListingCount(browseCountKey(filter, sources), func() (int, error) {
+		return s.database.Movie.Query().Where(preds...).Count(ctx)
+	})
 	if err != nil {
 		return result, fmt.Errorf("count library movies: %w", err)
 	}
@@ -883,10 +921,7 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 		items = append(items, movieItem(record))
 	}
 	result.Movies = items
-	if err := s.markCloudSources(ctx, result.Movies, cloudScope, sourceProviders(sources)); err != nil {
-		return result, err
-	}
-	if err := s.markSubtitleStatus(ctx, result.Movies); err != nil {
+	if err := s.markFileFlags(ctx, result.Movies, sources); err != nil {
 		return result, err
 	}
 	if err := s.markWatchState(ctx, result.Movies); err != nil {
