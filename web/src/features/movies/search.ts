@@ -7,7 +7,6 @@ export type MoviesSearch = {
   sort?: 'recent' | 'rating' | 'release'
   source?: '115' | 'guangya' | 'local'
   status?: 'done' | 'pending' | 'failed'
-  tags?: string
   actors?: string
   makers?: string
   series?: string
@@ -51,7 +50,6 @@ export function validateMoviesSearch(search: Record<string, unknown>): MoviesSea
     sort: sort === 'rating' || sort === 'release' ? sort : undefined,
     source: source === '115' || source === 'guangya' || source === 'local' ? source : undefined,
     status: status === 'done' || status === 'pending' || status === 'failed' ? status : undefined,
-    tags: parseText(search.tags),
     actors: parseText(search.actors),
     makers: parseText(search.makers),
     series: parseText(search.series),
@@ -65,7 +63,6 @@ export function moviesFilterFromSearch(search: MoviesSearch): MoviesFilter {
     sort: search.sort,
     source: search.source,
     status: search.status,
-    tagNames: splitList(search.tags),
     actorNames: splitList(search.actors),
     makerNames: splitList(search.makers),
     seriesNames: splitList(search.series)
@@ -78,7 +75,6 @@ export function moviesSearchFromFilter(filter: MoviesFilter): MoviesSearch {
     sort: filter.sort,
     source: filter.source,
     status: filter.status,
-    tags: joinList(filter.tagNames),
     actors: joinList(filter.actorNames),
     makers: joinList(filter.makerNames),
     series: joinList(filter.seriesNames)

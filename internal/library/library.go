@@ -19,7 +19,6 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
-	"github.com/ppxb/miyabi/internal/ent/tag"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 	"github.com/ppxb/miyabi/internal/export"
@@ -101,7 +100,6 @@ type BrowseFilter struct {
 	Source       string // "" (all), "115", "guangya", "local"
 	ScrapeStatus string // "" (all), "done", "pending", "failed"
 	HighRated    bool
-	TagNames     []string
 	ActorNames   []string
 	MakerNames   []string
 	SeriesNames  []string
@@ -117,7 +115,6 @@ type FilterOption struct {
 
 // FilterOptions lists the values available for browsing filters.
 type FilterOptions struct {
-	Tags   []FilterOption `json:"tags"`
 	Actors []FilterOption `json:"actors"`
 	Makers []FilterOption `json:"makers"`
 	Series []FilterOption `json:"series"`
@@ -493,9 +490,9 @@ func listingScopeKey(sources []domain.LibrarySource) string {
 }
 
 func browseCountKey(filter BrowseFilter, sources []domain.LibrarySource) string {
-	return fmt.Sprintf("browse\x1d%q\x1d%q\x1d%q\x1d%t\x1d%q\x1d%q\x1d%q\x1d%q\x1d%s",
+	return fmt.Sprintf("browse\x1d%q\x1d%q\x1d%q\x1d%t\x1d%q\x1d%q\x1d%q\x1d%s",
 		filter.Query, filter.Source, filter.ScrapeStatus, filter.HighRated,
-		filter.TagNames, filter.ActorNames, filter.MakerNames, filter.SeriesNames,
+		filter.ActorNames, filter.MakerNames, filter.SeriesNames,
 		listingScopeKey(sources))
 }
 
@@ -840,20 +837,6 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 	case "failed":
 		preds = append(preds, movie.ScrapeStatusEQ(movie.ScrapeStatusFailed))
 	}
-	if names := nonEmptyStrings(filter.TagNames); len(names) > 0 {
-		matched, err := s.database.Tag.Query().Where(tag.NameIn(names...)).Select(tag.FieldID).All(ctx)
-		if err != nil {
-			return result, fmt.Errorf("resolve tag filters: %w", err)
-		}
-		if len(matched) == 0 {
-			return result, nil
-		}
-		ids := make([]int, len(matched))
-		for i, item := range matched {
-			ids[i] = item.ID
-		}
-		preds = append(preds, movie.HasTagsWith(tag.IDIn(ids...)))
-	}
 	if names := nonEmptyStrings(filter.ActorNames); len(names) > 0 {
 		matched, err := s.database.Actor.Query().Where(actor.NameIn(names...)).Select(actor.FieldID).All(ctx)
 		if err != nil {
@@ -931,28 +914,16 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 	return result, nil
 }
 
-// FilterOptions lists the tags, actors, makers and series present in the library
+// FilterOptions lists the actors, makers and series present in the library
 // scope so the browse page can offer deduplicated filters.
 func (s *Service) FilterOptions(ctx context.Context) (FilterOptions, error) {
 	result := FilterOptions{
-		Tags:   []FilterOption{},
 		Actors: []FilterOption{},
 		Makers: []FilterOption{},
 		Series: []FilterOption{},
 	}
 	scope := fileScope(s.cloudSources(ctx))
 	movieInScope := movie.HasFilesWith(scope)
-
-	tags, err := s.database.Tag.Query().
-		Where(tag.HasMoviesWith(movieInScope)).
-		Unique(true).
-		Order(ent.Asc(tag.FieldName)).
-		Select(tag.FieldName).
-		Strings(ctx)
-	if err != nil {
-		return result, fmt.Errorf("list filter tags: %w", err)
-	}
-	result.Tags = namedOptions(tags)
 
 	actors, err := s.database.Actor.Query().
 		Where(actor.HasMoviesWith(movieInScope)).

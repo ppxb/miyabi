@@ -101,7 +101,6 @@ func libraryBrowseHandler(library LibraryManager) gin.HandlerFunc {
 			Source:       c.Query("source"),
 			ScrapeStatus: c.Query("status"),
 			HighRated:    c.Query("high") == "true" || c.Query("high") == "1",
-			TagNames:     c.QueryArray("tag"),
 			ActorNames:   c.QueryArray("actor"),
 			MakerNames:   c.QueryArray("maker"),
 			SeriesNames:  c.QueryArray("series"),

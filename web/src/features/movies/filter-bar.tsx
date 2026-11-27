@@ -56,7 +56,6 @@ export function MovieFilterBar({
     Boolean(value.q) ||
     Boolean(value.source) ||
     Boolean(value.status) ||
-    (value.tagNames?.length ?? 0) > 0 ||
     (value.actorNames?.length ?? 0) > 0 ||
     (value.makerNames?.length ?? 0) > 0 ||
     (value.seriesNames?.length ?? 0) > 0
@@ -145,12 +144,6 @@ export function MovieFilterBar({
         </SelectContent>
       </Select>
 
-      <FilterMultiSelect
-        label="标签"
-        options={options?.tags ?? []}
-        value={value.tagNames ?? []}
-        onChange={next => onChange({ ...value, tagNames: next.length ? next : undefined })}
-      />
       <FilterMultiSelect
         label="演员"
         options={options?.actors ?? []}

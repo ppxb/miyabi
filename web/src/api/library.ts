@@ -59,7 +59,6 @@ export type LibraryPage = {
 export type LibraryFilterOption = { id: string; name: string }
 
 export type LibraryFilterOptions = {
-  tags: LibraryFilterOption[]
   actors: LibraryFilterOption[]
   makers: LibraryFilterOption[]
   series: LibraryFilterOption[]
@@ -70,7 +69,6 @@ export type BrowseLibraryParams = {
   sort?: 'recent' | 'rating' | 'release'
   source?: '115' | 'guangya' | 'local'
   status?: 'done' | 'pending' | 'failed'
-  tagNames?: string[]
   actorNames?: string[]
   makerNames?: string[]
   seriesNames?: string[]
@@ -155,7 +153,6 @@ export function useBrowseLibraryMovies(params: BrowseLibraryParams) {
           sort: params.sort,
           source: params.source,
           status: params.status,
-          tag: params.tagNames,
           actor: params.actorNames,
           maker: params.makerNames,
           series: params.seriesNames,

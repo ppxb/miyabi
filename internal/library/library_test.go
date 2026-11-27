@@ -382,13 +382,6 @@ func TestLibraryBrowseFiltersSortAndOptions(t *testing.T) {
 		t.Fatalf("status=failed: %v err=%v", ids(failed), err)
 	}
 
-	byTag, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, TagNames: []string{"A tag"}})
-	if err != nil || byTag.Total != 2 {
-		t.Fatalf("tag filter: %+v err=%v", byTag, err)
-	}
-	if !containsID(ids(byTag), m1) || !containsID(ids(byTag), m2) {
-		t.Fatalf("tag filter must match same-named tags across sources: %v", ids(byTag))
-	}
 	byActor, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, ActorNames: []string{"X actor"}})
 	if err != nil || byActor.Total != 1 || byActor.Movies[0].ID != m1 {
 		t.Fatalf("actor filter: %+v err=%v", byActor, err)
@@ -442,9 +435,6 @@ func TestLibraryBrowseFiltersSortAndOptions(t *testing.T) {
 	filterOptions, err := lib.FilterOptions(ctx)
 	if err != nil {
 		t.Fatalf("filter options: %v", err)
-	}
-	if !reflect.DeepEqual(canvas(filterOptions.Tags), []string{"A tag", "B tag"}) {
-		t.Fatalf("tag options: %v", canvas(filterOptions.Tags))
 	}
 	if !reflect.DeepEqual(canvas(filterOptions.Actors), []string{"X actor"}) {
 		t.Fatalf("actor options: %v", canvas(filterOptions.Actors))
