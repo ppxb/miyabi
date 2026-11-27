@@ -14,7 +14,9 @@ function MoviesRoute() {
   return (
     <MoviesPage
       search={search}
-      onSearchChange={next => void navigate({ search: next, resetScroll: false })}
+      onSearchChange={(next, options) =>
+        void navigate({ search: next, resetScroll: false, replace: options?.replace })
+      }
     />
   )
 }

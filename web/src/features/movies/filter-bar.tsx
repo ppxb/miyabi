@@ -42,9 +42,11 @@ export function MovieFilterBar({
 }: {
   options?: LibraryFilterOptions
   value: MoviesFilter
-  onChange: (next: MoviesFilter) => void
+  onChange: (next: MoviesFilter, options?: { replace?: boolean }) => void
 }) {
-  const [query, setQuery] = useDebouncedSearch(value.q, q => onChange({ ...value, q }))
+  const [query, setQuery] = useDebouncedSearch(value.q, q =>
+    onChange({ ...value, q }, { replace: true })
+  )
 
   const sortValue = value.sort ?? 'recent'
   const sourceValue = value.source ?? 'all'
@@ -61,7 +63,7 @@ export function MovieFilterBar({
 
   const reset = () => {
     setQuery('')
-    onChange({ sort: value.sort })
+    onChange({ sort: value.sort }, { replace: true })
   }
 
   return (

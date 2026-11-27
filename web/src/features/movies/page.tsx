@@ -25,7 +25,7 @@ export function MoviesPage({
   onSearchChange
 }: {
   search: MoviesSearch
-  onSearchChange: (next: MoviesSearch) => void
+  onSearchChange: (next: MoviesSearch, options?: { replace?: boolean }) => void
 }) {
   const [playingId, setPlayingId] = useState<number | null>(null)
   const options = useLibraryFilterOptions()
@@ -36,8 +36,8 @@ export function MoviesPage({
   const totalPages = Math.max(1, Math.ceil((movies.data?.total ?? 0) / PAGE_SIZE))
 
   const handleFiltersChange = useCallback(
-    (next: MoviesFilter) => {
-      onSearchChange({ ...moviesSearchFromFilter(next), page: undefined })
+    (next: MoviesFilter, options?: { replace?: boolean }) => {
+      onSearchChange({ ...moviesSearchFromFilter(next), page: undefined }, options)
     },
     [onSearchChange]
   )
