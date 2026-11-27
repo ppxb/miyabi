@@ -264,6 +264,11 @@ var (
 				Columns: []*schema.Column{MoviesColumns[1], MoviesColumns[0]},
 			},
 			{
+				Name:    "movie_release_date_id",
+				Unique:  false,
+				Columns: []*schema.Column{MoviesColumns[7], MoviesColumns[0]},
+			},
+			{
 				Name:    "movie_rating10_id",
 				Unique:  false,
 				Columns: []*schema.Column{MoviesColumns[16], MoviesColumns[0]},

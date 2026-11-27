@@ -87,30 +87,45 @@ func TestLibraryListingUsesSortIndexAndKeepsScopeAndOrder(t *testing.T) {
 		if driver.query == "" {
 			t.Fatal("listing query was not captured")
 		}
-		rows, err := db.QueryContext(ctx, "EXPLAIN QUERY PLAN "+driver.query, driver.args...)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var plan []string
-		for rows.Next() {
-			var id, parent, unused int
-			var detail string
-			if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
-				rows.Close()
-				t.Fatal(err)
-			}
-			plan = append(plan, detail)
-		}
-		err = rows.Err()
-		rows.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-		joined := strings.Join(plan, "; ")
+		joined := explainQueryPlan(t, db, driver.query, driver.args)
 		// Every source is ordered by the library add time, which the
 		// (created_at, id) index satisfies without a temporary b-tree.
 		if !strings.Contains(joined, "movie_created_at_id") || strings.Contains(joined, "TEMP B-TREE FOR ORDER BY") {
 			t.Fatalf("mounted=%t listing missed sort index: %s", mounted, joined)
 		}
 	}
+
+	driver.query, driver.args = "", nil
+	if _, err := service.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, Sort: "release"}); err != nil {
+		t.Fatal(err)
+	}
+	if driver.query == "" {
+		t.Fatal("release-sorted query was not captured")
+	}
+	joined := explainQueryPlan(t, db, driver.query, driver.args)
+	if !strings.Contains(joined, "movie_release_date_id") || strings.Contains(joined, "TEMP B-TREE FOR ORDER BY") {
+		t.Fatalf("release sort missed its index: %s", joined)
+	}
+}
+
+func explainQueryPlan(t *testing.T, db *stdsql.DB, query string, args []any) string {
+	t.Helper()
+	rows, err := db.QueryContext(t.Context(), "EXPLAIN QUERY PLAN "+query, args...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var plan []string
+	for rows.Next() {
+		var id, parent, unused int
+		var detail string
+		if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
+			t.Fatal(err)
+		}
+		plan = append(plan, detail)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	return strings.Join(plan, "; ")
 }

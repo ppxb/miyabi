@@ -82,6 +82,7 @@ func (Movie) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("canonical_code"),
 		index.Fields("created_at", "id"),
+		index.Fields("release_date", "id"),
 		index.Fields("rating10", "id"),
 	}
 }
