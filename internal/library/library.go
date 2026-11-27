@@ -502,9 +502,6 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 		Offset((page - 1) * limit).Limit(limit).
 		WithActors(func(query *ent.ActorQuery) {
 			query.Select(actor.FieldID, actor.FieldProvider, actor.FieldSourceID, actor.FieldName).Order(ent.Asc(actor.FieldName), ent.Asc(actor.FieldID))
-		}).
-		WithTags(func(query *ent.TagQuery) {
-			query.Select(tag.FieldID, tag.FieldProvider, tag.FieldSourceID, tag.FieldName).Order(ent.Asc(tag.FieldName), ent.Asc(tag.FieldID))
 		}).All(ctx)
 	if err != nil {
 		return result, fmt.Errorf("list library movies: %w", err)
@@ -569,9 +566,6 @@ func (s *Service) TopRated(ctx context.Context, limit int) ([]Movie, error) {
 		Limit(limit).
 		WithActors(func(query *ent.ActorQuery) {
 			query.Select(actor.FieldID, actor.FieldProvider, actor.FieldSourceID, actor.FieldName).Order(ent.Asc(actor.FieldName), ent.Asc(actor.FieldID))
-		}).
-		WithTags(func(query *ent.TagQuery) {
-			query.Select(tag.FieldID, tag.FieldProvider, tag.FieldSourceID, tag.FieldName).Order(ent.Asc(tag.FieldName), ent.Asc(tag.FieldID))
 		}).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list top rated movies: %w", err)
@@ -868,9 +862,6 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 		Select(browseScalarFields...).
 		WithActors(func(query *ent.ActorQuery) {
 			query.Select(actor.FieldID, actor.FieldProvider, actor.FieldSourceID, actor.FieldName).Order(ent.Asc(actor.FieldName), ent.Asc(actor.FieldID))
-		}).
-		WithTags(func(query *ent.TagQuery) {
-			query.Select(tag.FieldID, tag.FieldProvider, tag.FieldSourceID, tag.FieldName).Order(ent.Asc(tag.FieldName), ent.Asc(tag.FieldID))
 		})
 	switch filter.Sort {
 	case "rating":

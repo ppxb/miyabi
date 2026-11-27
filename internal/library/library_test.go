@@ -116,16 +116,15 @@ func TestLibraryPageLoadsCardMetadataWithScopedCounts(t *testing.T) {
 	// covers sidecar subtitle names. All are batched per page, so the count is
 	// constant regardless of the number of cards. Mounts and scope come from one
 	// PanAccount query per page, never a per-card read.
-	wantQueries := map[string]int{"*ent.PanAccountQuery": 1, "*ent.FileQuery": 3, "*ent.SubtitleQuery": 1, "*ent.WatchHistoryQuery": 1, "*ent.MovieQuery": 1, "*ent.TagQuery": 1, "*ent.ActorQuery": 1}
+	wantQueries := map[string]int{"*ent.PanAccountQuery": 1, "*ent.FileQuery": 3, "*ent.SubtitleQuery": 1, "*ent.WatchHistoryQuery": 1, "*ent.MovieQuery": 1, "*ent.ActorQuery": 1}
 	if !reflect.DeepEqual(queries, wantQueries) {
 		t.Fatalf("library cards made redundant queries: %#v", queries)
 	}
 	for _, item := range page.Movies {
 		if item.ID == film.ID {
 			if item.Title != film.Title || item.Cover == nil || *item.Cover != "/cover" ||
-				item.ScrapeStatus != movie.ScrapeStatusDone ||
-				!reflect.DeepEqual(item.Tags, []Tag{{ID: tagA.ID, Provider: "javdb", SourceID: tagA.SourceID, Name: tagA.Name}, {ID: tagB.ID, Provider: "javdb", SourceID: tagB.SourceID, Name: tagB.Name}}) {
-				t.Fatalf("card lost or reordered catalogue data: %#v", item)
+				item.ScrapeStatus != movie.ScrapeStatusDone || len(item.Tags) != 0 {
+				t.Fatalf("card lost catalogue data or preloaded unused tags: %#v", item)
 			}
 			if item.ReleaseDate != "2026-09-12" || item.Duration != 125 || item.Rating != 9 || item.Fanart != "/api/library/artwork/fanart" ||
 				!reflect.DeepEqual(item.Maker, &Entity{ID: "maker-id", Name: "Studio"}) ||
