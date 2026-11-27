@@ -49,13 +49,22 @@ function MovieShelfContent({
       setAtStart(list.scrollLeft <= edge)
       setAtEnd(list.scrollLeft >= maxScroll - edge)
     }
+    let frame = 0
+    const scheduleUpdate = () => {
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        update()
+      })
+    }
     update()
     const observer = new ResizeObserver(update)
     observer.observe(list)
-    list.addEventListener('scroll', update, { passive: true })
+    list.addEventListener('scroll', scheduleUpdate, { passive: true })
     return () => {
+      cancelAnimationFrame(frame)
       observer.disconnect()
-      list.removeEventListener('scroll', update)
+      list.removeEventListener('scroll', scheduleUpdate)
     }
   }, [itemCount])
 
