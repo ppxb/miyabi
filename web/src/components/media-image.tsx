@@ -21,7 +21,7 @@ export function MediaImage(props: MediaImageProps) {
   const nsfwMode = useSettingsStore(state => state.nsfwMode)
   return (
     <MediaImageContent
-      key={JSON.stringify([props.source, props.original, nsfwMode])}
+      key={JSON.stringify([props.source, props.original])}
       {...props}
       concealed={nsfwMode}
     />
@@ -68,15 +68,8 @@ function MediaImageContent({
             {...imageProps}
             alt={alt}
             className={cn('relative size-full', className)}
-            onLoad={async event => {
-              const image = event.currentTarget
-              onImageLoad?.(image)
-              try {
-                await image.decode()
-              } catch {
-                // onLoad already confirmed the image is displayable; a decode
-                // failure must not be treated as a load error.
-              }
+            onLoad={event => {
+              onImageLoad?.(event.currentTarget)
               setStatus('ready')
             }}
             onError={() => setStatus('error')}
