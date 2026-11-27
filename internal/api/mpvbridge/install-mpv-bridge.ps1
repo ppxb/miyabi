@@ -51,9 +51,11 @@ foreach ($pair in $query.Split('&')) {
   if ($kv[0]) { $p[$kv[0]] = [Uri]::UnescapeDataString($kv[1]) }
 }
 if ($p['u'] -notmatch '^https?://') { exit }
-$argList = '"' + $p['u'] + '" --user-agent="' + $ua + '"'
-if ($p['s'] -match '^https?://') { $argList += ' --sub-file="' + $p['s'] + '"' }
-Start-Process -FilePath '__MPV__' -ArgumentList $argList
+$mpvArgs = @("--user-agent=$ua")
+if ($p['s'] -match '^https?://') { $mpvArgs += "--sub-file=$($p['s'])" }
+# Keep options before '--'; everything after it is a media argument.
+$mpvArgs += @('--', $p['u'])
+Start-Process -FilePath '__MPV__' -ArgumentList $mpvArgs
 '@
 $wrapper = $wrapper.Replace('__MPV__', $mpv)
 Set-Content -Path $wrapperPath -Value $wrapper -Encoding UTF8

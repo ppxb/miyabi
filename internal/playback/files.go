@@ -179,9 +179,10 @@ func (service *Service) selectPlayableFile(ctx context.Context, records []*ent.F
 // PrimaryFile reports the file MPV should open for a movie, and whether it is a
 // local file (served from disk) or a cloud file (served through the 115 relay).
 type PrimaryFile struct {
-	FileID string `json:"file_id"`
-	Name   string `json:"name"`
-	Local  bool   `json:"local"`
+	FileID   string `json:"file_id"`
+	Name     string `json:"name"`
+	Local    bool   `json:"local"`
+	Provider string `json:"provider,omitempty"`
 }
 
 func (service *Service) PrimaryFile(ctx context.Context, movieID int) (PrimaryFile, error) {
@@ -196,7 +197,14 @@ func (service *Service) PrimaryFile(ctx context.Context, movieID int) (PrimaryFi
 	if target == nil {
 		return PrimaryFile{}, domain.E(domain.KindNotFound, "当前挂载目录中未找到可播放的文件", nil)
 	}
-	return PrimaryFile{FileID: target.FileID, Name: target.Name, Local: target.AccountID == domain.LocalAccountID}, nil
+	local := target.AccountID == domain.LocalAccountID
+	provider := ""
+	if !local && service.drive != nil {
+		if source, ok, err := service.drive.Mount(ctx, target.AccountID); err == nil && ok {
+			provider = source.Provider
+		}
+	}
+	return PrimaryFile{FileID: target.FileID, Name: target.Name, Local: local, Provider: provider}, nil
 }
 
 // resolveSpecs asks the shared drive resolver for a direct URL or transcoded

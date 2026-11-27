@@ -32,7 +32,9 @@ func withToken(base, token string) string {
 // URL and the subtitle file URL, both usable by an external player without a
 // session cookie. When access is password-protected, the fixed STRM token
 // authorizes them, mirroring how exported .strm files work.
-func mpvLinkHandler(play PlayManager, subtitles SubtitleManager, token string) gin.HandlerFunc {
+const mpvUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+func mpvLinkHandler(play PlayManager, relay STRMRelay, subtitles SubtitleManager, token string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		query, ok := bindQuery[struct {
 			MovieID int `form:"movie_id" binding:"required,min=1"`
@@ -50,12 +52,27 @@ func mpvLinkHandler(play PlayManager, subtitles SubtitleManager, token string) g
 			return
 		}
 		base := requestBase(c)
-		// Local files are served from disk; cloud files go through the 115 relay.
-		streamPath := "/api/strm/play/" + file.FileID
-		if file.Local {
-			streamPath = "/api/play-local/" + file.FileID
+		relayURL := ""
+		if !file.Local {
+			relayURL = withToken(base+"/api/strm/play/"+file.FileID, token)
 		}
-		videoURL := withToken(base+streamPath, token)
+		var videoURL string
+		if file.Local {
+			// Local files are served from disk.
+			videoURL = withToken(base+"/api/play-local/"+file.FileID, token)
+		} else if file.Provider == "guangya" {
+			// Guangya VOD URLs are temporary direct mp4 links; give MPV the
+			// signed URL instead of adding a token-protected relay hop.
+			if direct, err := relay.StreamURL(c.Request.Context(), file.FileID, mpvUserAgent); err == nil && direct != "" {
+				videoURL = direct
+			} else {
+				videoURL = withToken(base+"/api/strm/play/"+file.FileID, token)
+			}
+		} else {
+			// 115 keeps the stable relay so its short-lived signed URL is
+			// resolved by the server at playback time.
+			videoURL = withToken(base+"/api/strm/play/"+file.FileID, token)
+		}
 		link := "miyabi-mpv://play?u=" + url.QueryEscape(videoURL)
 
 		tracks, err := subtitles.List(c.Request.Context(), query.MovieID)
@@ -67,7 +84,7 @@ func mpvLinkHandler(play PlayManager, subtitles SubtitleManager, token string) g
 			subURL := withToken(base+"/api/subtitle-file/"+strconv.Itoa(tracks[0].ID), token)
 			link += "&s=" + url.QueryEscape(subURL)
 		}
-		respond(c, gin.H{"url": link}, nil)
+		respond(c, gin.H{"url": link, "video_url": videoURL, "relay_url": relayURL}, nil)
 	}
 }
 

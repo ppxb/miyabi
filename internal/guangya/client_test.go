@@ -102,7 +102,10 @@ func TestInfoIncludesVideoGCID(t *testing.T) {
 		if strings.Contains(r.URL.Path, "get_file_detail") {
 			writeJSON(w, `{"msg":"success","data":{
 				"fileInfo":{"fileId":"100","fileName":"Movie.mp4","fileSize":"1024","resType":1,"fullParentIds":"10/"},
-				"videoResource":[{"gcid":"VIDEO-GCID","info":{"duration":100}}]}}`)
+				"videoResource":[
+					{"gcid":"ORIGIN-GCID","info":{"source":1,"resolution":{"width":3840,"height":2160}}},
+					{"gcid":"VIDEO-GCID","info":{"source":1,"defaultResolution":true,"resolution":{"width":1920,"height":1080}}}
+				]}}`)
 		}
 	})
 	info, err := client.Info(context.Background(), "token", "100")
@@ -141,7 +144,7 @@ func TestDownloadURLUsesVODForVideo(t *testing.T) {
 			writeJSON(w, `{"msg":"success","data":{
 				"fileInfo":{"fileId":"100","fileName":"Movie.mp4","resType":1,"fullParentIds":"10/"},
 				"videoResource":[{"gcid":"VIDEO-GCID"}]}}`)
-		case "/nd.bizuserres.s/v1/file/get_vod_download_url":
+		case "/userres/v1/file/get_vod_download_url":
 			writeJSON(w, `{"msg":"success","data":{"signedURL":"https://cdn.example/vod.mp4","urlDuration":21600}}`)
 		default:
 			t.Errorf("unexpected path %s", r.URL.Path)

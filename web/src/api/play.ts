@@ -27,7 +27,11 @@ export type Playback = {
   id: string
   file_id: string
   sources: PlaySource[]
-  source: { account_id: string; directory: { id: string; name: string; path: string } }
+  source: {
+    provider?: string
+    account_id: string
+    directory: { id: string; name: string; path: string }
+  }
   resume?: PlaybackResume
 }
 
@@ -74,7 +78,7 @@ export function usePlayQualities(fileID: string | undefined, enabled: boolean) {
   return query
 }
 
-export type MpvLink = { url: string }
+export type MpvLink = { url: string; video_url?: string; relay_url?: string }
 
 /** Build the miyabi-mpv:// deep link for a movie's primary file and subtitle. */
 export function fetchMpvLink(movieID: number) {

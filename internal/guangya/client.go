@@ -596,23 +596,95 @@ func (c *Client) Info(ctx context.Context, accessToken, fileID string) (pan.File
 	}, nil
 }
 
+type videoResource struct {
+	GCID              string `json:"gcid"`
+	MediaID           string `json:"media_id"`
+	DefaultResolution bool   `json:"defaultResolution"`
+	VideoResourceInfo `json:"info"`
+}
+
+type VideoResourceInfo struct {
+	Source            json.Number `json:"source"`
+	DefaultResolution bool        `json:"defaultResolution"`
+	Resolution        *struct {
+		Width  int `json:"width"`
+		Height int `json:"height"`
+	} `json:"resolution"`
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
+
+func (resource videoResource) id() string {
+	if resource.GCID != "" {
+		return resource.GCID
+	}
+	return resource.MediaID
+}
+
+func (resource videoResource) source() int {
+	value, err := resource.Source.Int64()
+	if err != nil {
+		return 0
+	}
+	return int(value)
+}
+
+func (resource videoResource) defaultResolution() bool {
+	return resource.DefaultResolution || resource.VideoResourceInfo.DefaultResolution
+}
+
+func (resource videoResource) pixels() int {
+	if resource.Resolution != nil && resource.Resolution.Width > 0 && resource.Resolution.Height > 0 {
+		return resource.Resolution.Width * resource.Resolution.Height
+	}
+	if resource.Width > 0 && resource.Height > 0 {
+		return resource.Width * resource.Height
+	}
+	return int(^uint(0) >> 1)
+}
+
+// selectVideoGCID mirrors the web player: prefer a default source 1 resource,
+// then a default source 0 resource, then the smallest resolution.
+func selectVideoGCID(resources []videoResource) string {
+	candidates := make([]videoResource, 0, len(resources))
+	for _, resource := range resources {
+		if (resource.source() == 0 || resource.source() == 1) && resource.id() != "" {
+			candidates = append(candidates, resource)
+		}
+	}
+	if len(candidates) == 0 {
+		if len(resources) > 0 && resources[0].id() != "" {
+			return resources[0].id()
+		}
+		return ""
+	}
+	for _, source := range []int{1, 0} {
+		for _, resource := range candidates {
+			if resource.source() == source && resource.defaultResolution() {
+				return resource.id()
+			}
+		}
+	}
+	best := candidates[0]
+	for _, resource := range candidates[1:] {
+		if resource.pixels() < best.pixels() {
+			best = resource
+		}
+	}
+	return best.id()
+}
+
 func (c *Client) detail(ctx context.Context, accessToken, fileID string) (fileItem, string, error) {
 	var data struct {
-		FileInfo      fileItem `json:"fileInfo"`
-		VideoResource []struct {
-			GCID string `json:"gcid"`
-		} `json:"videoResource"`
+		FileInfo      fileItem        `json:"fileInfo"`
+		VideoResource []videoResource `json:"videoResource"`
 	}
 	err := c.callAPI(ctx, accessToken, "/nd.bizuserres.s/v1/file/get_file_detail",
 		map[string]string{"fileId": fileID}, &data)
 	if err != nil {
 		return fileItem{}, "", err
 	}
-	var gcid string
-	if len(data.VideoResource) > 0 {
-		gcid = data.VideoResource[0].GCID
-	}
-	return data.FileInfo, gcid, nil
+	return data.FileInfo, selectVideoGCID(data.VideoResource), nil
 }
 
 func (c *Client) ReadMetadata(ctx context.Context, accessToken, pickCode string, limit int64) ([]byte, error) {
@@ -680,8 +752,13 @@ func (c *Client) vodURL(ctx context.Context, accessToken, fileID, gcid string) (
 	var data struct {
 		SignedURL string `json:"signedURL"`
 	}
-	err := c.callAPI(ctx, accessToken, "/nd.bizuserres.s/v1/file/get_vod_download_url",
-		map[string]string{"fileId": fileID, "gcid": gcid}, &data)
+	body := map[string]string{"fileId": fileID, "gcid": gcid}
+	// The web player uses the userres namespace. Keep the older OpenList
+	// namespace as a fallback for accounts or deployments where it differs.
+	err := c.callAPI(ctx, accessToken, "/userres/v1/file/get_vod_download_url", body, &data)
+	if err != nil {
+		err = c.callAPI(ctx, accessToken, "/nd.bizuserres.s/v1/file/get_vod_download_url", body, &data)
+	}
 	if err != nil {
 		return "", err
 	}

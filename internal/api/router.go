@@ -159,7 +159,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	playAPI.POST("/progress", playProgressHandler(deps.Play))
 
 	// Builds the miyabi-mpv:// deep link used by the movie card context menu.
-	protected.GET("/mpv-link", noStore(), mpvLinkHandler(deps.Play, deps.Subtitles, deps.STRMToken))
+	protected.GET("/mpv-link", noStore(), mpvLinkHandler(deps.Play, deps.STRM, deps.Subtitles, deps.STRMToken))
 
 	protected.GET("/history", noStore(), historyHandler(deps.Play))
 	protected.POST("/history/remove", historyRemoveHandler(deps.Play))
