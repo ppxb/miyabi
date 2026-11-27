@@ -8,6 +8,7 @@ import (
 	"github.com/ppxb/miyabi/internal/catalogue"
 	"github.com/ppxb/miyabi/internal/codeid"
 	"github.com/ppxb/miyabi/internal/domain"
+	mediaimage "github.com/ppxb/miyabi/internal/image"
 )
 
 type CatalogueManager interface {
@@ -25,6 +26,11 @@ type CatalogueManager interface {
 type ViewedManager interface {
 	ViewedMovieIDs(context.Context) ([]string, error)
 	AddViewedMovieIDs(context.Context, []string) error
+}
+
+// MediaFetcher downloads images for the image proxy.
+type MediaFetcher interface {
+	Media(context.Context, string) (domain.Media, error)
 }
 
 type discoverBrowseQuery struct {
@@ -65,7 +71,8 @@ func discoverMovieStatesHandler(discover CatalogueManager) gin.HandlerFunc {
 }
 
 type imageQuery struct {
-	URL string `form:"url" binding:"required,url"`
+	URL   string `form:"url" binding:"required,url"`
+	Width int    `form:"w" binding:"omitempty,min=1,max=1600"`
 }
 
 func discoverBrowseHandler(discover CatalogueManager) gin.HandlerFunc {
@@ -176,19 +183,35 @@ func discoverMagnetsHandler(discover CatalogueManager) gin.HandlerFunc {
 	}
 }
 
-func imageHandler(discover CatalogueManager) gin.HandlerFunc {
+func imageHandler(discover MediaFetcher, images *mediaimage.Cache) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		query, ok := bindQuery[imageQuery](c)
 		if !ok {
 			return
+		}
+		var key string
+		if query.Width > 0 {
+			key = mediaimage.ThumbnailKey(query.URL, query.Width)
+			if body, err := images.Read(key); err == nil {
+				c.Header("Cache-Control", "public, max-age=86400")
+				c.Data(http.StatusOK, "image/jpeg", body)
+				return
+			}
 		}
 		media, err := discover.Media(c.Request.Context(), query.URL)
 		if err != nil {
 			c.Error(err)
 			return
 		}
+		contentType := media.ContentType
+		if query.Width > 0 {
+			if body, resized := mediaimage.Thumbnail(media.Body, query.Width); resized {
+				media.Body, contentType = body, "image/jpeg"
+				_ = images.Write(key, body)
+			}
+		}
 		c.Header("Cache-Control", "public, max-age=86400")
-		c.Data(http.StatusOK, media.ContentType, media.Body)
+		c.Data(http.StatusOK, contentType, media.Body)
 	}
 }
 

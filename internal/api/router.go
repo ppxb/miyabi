@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/domain"
+	mediaimage "github.com/ppxb/miyabi/internal/image"
 )
 
 type Dependencies struct {
@@ -27,6 +28,7 @@ type Dependencies struct {
 	STRM           STRMRelay
 	Tasks          TaskManager
 	Artwork        ArtworkReader
+	Images         *mediaimage.Cache
 	Maintenance    MaintenanceManager
 	Logs           LogReader
 	Network        NetworkManager
@@ -190,7 +192,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.GET("/discover/movies/:id", discoverMovieHandler(deps.Catalogue, deps.Metadata))
 	protected.GET("/discover/movies/:id/magnets", discoverMagnetsHandler(deps.Catalogue))
 	protected.POST("/discover/movies/:id/offline", offlineAddHandler(deps.Offline))
-	protected.GET("/image", imageHandler(deps.Catalogue))
+	protected.GET("/image", imageHandler(deps.Catalogue, deps.Images))
 
 	panAPI := protected.Group("/pan", noStore())
 	panAPI.GET("/accounts", panAccountsHandler(deps.Drive))

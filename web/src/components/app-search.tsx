@@ -118,7 +118,7 @@ function ResultRow({ item }: { item: SearchItem }) {
         </Avatar>
       ) : (
         <div className="h-24 w-36 shrink-0 overflow-hidden rounded-md">
-          <MediaImage source={item.image ?? ''} className="object-cover" />
+          <MediaImage source={item.image ?? ''} width={288} className="object-cover" />
         </div>
       )}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">

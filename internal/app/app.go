@@ -236,6 +236,7 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 		STRM:           strm.New(store.Client, driveSvc),
 		Tasks:          &taskViews{Service: taskSvc, database: store.Client, library: libSvc},
 		Artwork:        scrapeSvc,
+		Images:         images,
 		Maintenance:    maintenanceSvc,
 		Logs:           maintenanceSvc,
 		Network:        networkSvc,

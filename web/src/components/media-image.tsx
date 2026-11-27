@@ -11,6 +11,8 @@ type MediaImageProps = {
   original?: string
   loading?: 'eager' | 'lazy'
   blurredBackground?: boolean
+  /** Requested thumbnail width in pixels; the proxy skips images that are already narrower. */
+  width?: number
   onImageLoad?: (image: HTMLImageElement) => void
   className?: string
 }
@@ -32,6 +34,7 @@ function MediaImageContent({
   original,
   loading = 'lazy',
   blurredBackground = false,
+  width,
   onImageLoad,
   concealed,
   className
@@ -41,8 +44,10 @@ function MediaImageContent({
   const ready = !showImage || status === 'ready'
 
   const imageProps = {
-    src: imageURL(source),
-    srcSet: original ? `${imageURL(source)} 1x, ${imageURL(original)} 2x` : undefined,
+    src: imageURL(source, width),
+    srcSet: original
+      ? `${imageURL(source, width)} 1x, ${imageURL(original, width ? width * 2 : undefined)} 2x`
+      : undefined,
     loading,
     decoding: 'async',
     referrerPolicy: 'no-referrer'
@@ -54,9 +59,9 @@ function MediaImageContent({
       {showImage ? (
         <div className={cn('absolute inset-0', !ready && 'opacity-0')}>
           {blurredBackground ? (
-            <img
-              {...imageProps}
-              className="pointer-events-none absolute inset-0 size-full scale-125 object-cover blur-xl brightness-75"
+            <div
+              className="pointer-events-none absolute inset-0 scale-125 bg-cover bg-center blur-xl brightness-75"
+              style={{ backgroundImage: `url("${imageURL(source, width)}")` }}
             />
           ) : null}
           <img

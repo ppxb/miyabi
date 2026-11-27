@@ -28,7 +28,8 @@ export function MovieCard({
     <Card size="sm" className="h-full gap-0 py-0">
       <div className="relative flex aspect-3/2 items-center justify-center overflow-hidden bg-muted">
         <div className="absolute inset-0">
-          <MovieCover source={movie.cover ?? ''} />
+          {/* 480 matches the cached artwork thumbnail; the proxy scales external covers. */}
+          <MovieCover source={movie.cover ?? ''} width={480} />
         </div>
         <div className="absolute top-2 left-2 flex max-w-[calc(100%-3.5rem)] flex-wrap gap-1.5">
           <Badge variant="frosted" className="max-w-full">

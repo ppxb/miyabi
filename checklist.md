@@ -11,6 +11,20 @@
   顺带：封面走的是全尺寸原图（imageURL → /api/image
   代理，无缩略图参数）。如果还要压首屏开销，可以给图片代理加尺寸参数、卡片只取缩略图——后端改动，优先级低于上面两条。
 
+  已修复（2026-11-27，保留设计的模糊背景）：第二个 `<img>` 改为容器的 CSS `background-image`（同一封面，`bg-cover
+  bg-center scale-125 blur-xl brightness-75`），每张卡少一个 `<img>` 节点；`object-contain` 与异比例留白不变。
+  缩略图参数已做：`/api/image` 新增 `w`（1-1600），用 imaging 等比缩小并重新编码为 JPEG（原图更窄或无法解码时原样返回）；
+  前端 `imageURL(source, width)` 透传，卡片请求 480（与缓存 artwork 缩略图同宽），搜索面板请求 288。
+  说明：媒体库封面落库时本来就是 480px 缩略图（`internal/library/scrape/publish.go:220` SetCover(artwork.Thumbnail)），
+  主要收益在发现页、搜索等走 `/api/image` 的外部封面。
+  文件：`internal/api/discover.go`、`internal/image/resize.go`、`web/src/api/client.ts`、
+  `web/src/components/media-image.tsx`、`movie-cover.tsx`、`movie-card.tsx`、`app-search.tsx`。
+  缩略图磁盘缓存：结果按 `URL + 宽度` 哈希写入现有 `dataDir/images` 缓存（原子写入 + singleflight），
+  命中时不再下载原图、不再缩放；键带 `thumbnail:v1` 版本前缀，调整缩放逻辑时可整体失效。
+  验证：`go test ./internal/image/ ./internal/api/`（含二次请求命中缓存、不重复抓取）通过；typecheck、lint、vitest 190 通过。
+  遗留：模糊滤镜在大图层上的 GPU 成本仍在（保留观感的代价）；缓存以 URL 为键，同一 URL 内容变化不会自动失效；
+  代理缩略图与 artwork 同目录，会被图片清理统计为"未使用"并删除（之后按需重建）。
+
   3. MediaImage 的每图双保险
 
   media-image.tsx:21-26, 66-76：

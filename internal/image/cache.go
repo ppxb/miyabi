@@ -180,6 +180,26 @@ func (cache *Cache) Read(key string) ([]byte, error) {
 	return os.ReadFile(name)
 }
 
+// ThumbnailKey derives the cache key of a proxied image thumbnail. The version
+// prefix lets a change in resize output invalidate existing entries.
+func ThumbnailKey(source string, width int) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("thumbnail:v1:%d:%s", width, source)))
+	return hex.EncodeToString(sum[:])
+}
+
+// Write stores an encoded image under a caller-derived key. URL-derived keys
+// are not artwork references, so a later Prune drops them like any unused entry.
+func (cache *Cache) Write(key string, body []byte) error {
+	destination, err := cache.filePath(key)
+	if err != nil {
+		return err
+	}
+	_, err, _ = imageWrites.Do(destination, func() (any, error) {
+		return nil, cache.write(destination, body)
+	})
+	return err
+}
+
 func (cache *Cache) filePath(key string) (string, error) {
 	if len(key) != 64 {
 		return "", fmt.Errorf("invalid artwork key")
