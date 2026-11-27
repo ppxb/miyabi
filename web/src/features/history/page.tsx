@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import { historyToCard } from '@/features/library/history-card'
 import { LibraryMovieCard } from '@/features/library/movie-card'
 import { LazyLibraryPlayerDialog } from '@/features/library/player-dialog-lazy'
 
@@ -56,24 +57,12 @@ export function HistoryPage({
         <>
           <MovieGridLayout>
             {history.data.items.map(item => {
-              const percent =
-                item.duration > 0
-                  ? Math.max(0, Math.min(100, Math.round((item.position / item.duration) * 100)))
-                  : 0
+              const { movie, progress } = historyToCard(item)
               return (
                 <LibraryMovieCard
                   key={item.movie_id}
-                  movie={{
-                    id: item.movie_id,
-                    code: item.code,
-                    title: item.title,
-                    cover: item.cover,
-                    rating: item.rating ?? 0,
-                    actors: item.actors ?? [],
-                    source: item.source,
-                    has_subtitle: item.has_subtitle
-                  }}
-                  progress={percent}
+                  movie={movie}
+                  progress={progress}
                   onPlay={() => setPlayingId(item.movie_id)}
                 />
               )
