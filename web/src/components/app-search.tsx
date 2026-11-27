@@ -9,6 +9,7 @@ import type { ActorPage } from '@/api/actors'
 import type { LibraryPage } from '@/api/library'
 import { MediaImage } from '@/components/media-image'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Command,
@@ -34,6 +35,7 @@ type SearchItem = {
   id: string
   group: string
   label: string
+  badge?: string
   details?: string[]
   image?: string
   kind: 'movie' | 'actor'
@@ -57,11 +59,11 @@ function useDebounced(value: string, delay: number) {
   return debounced
 }
 
-function movieDetails(movie: LibraryPage['movies'][number], hasTitle: boolean) {
+function movieDetails(movie: LibraryPage['movies'][number]) {
   return [
-    hasTitle ? movie.code : '',
-    movie.release_date ?? '',
-    movie.duration > 0 ? `${movie.duration} 分钟` : '',
+    [movie.release_date, movie.duration > 0 ? `${movie.duration} 分钟` : '']
+      .filter(Boolean)
+      .join(' / '),
     movie.actors
       .map(actor => actor.name)
       .filter(Boolean)
@@ -121,6 +123,11 @@ function ResultRow({ item }: { item: SearchItem }) {
       )}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="truncate text-sm font-medium">{item.label}</span>
+        {item.badge ? (
+          <Badge variant="outline" className="tabular-nums">
+            {item.badge}
+          </Badge>
+        ) : null}
         {item.details?.map((line, index) => (
           <span key={index} className="truncate text-xs text-muted-foreground">
             {line}
@@ -207,7 +214,8 @@ export function SearchDialog({
       id: `movie:${movie.id}`,
       group,
       label: hasTitle ? movie.title : movie.code,
-      details: movieDetails(movie, hasTitle),
+      badge: hasTitle ? movie.code : undefined,
+      details: movieDetails(movie),
       image: movie.cover || movie.poster,
       kind: 'movie',
       run: () => {
@@ -267,7 +275,7 @@ export function SearchDialog({
       onOpenChange={handleOpenChange}
       title="搜索"
       description="搜索本地影片与演员"
-      className="top-1/2 max-h-[90vh] -translate-y-1/2 sm:max-w-3xl"
+      className="top-1/2 max-h-[90vh] -translate-y-1/2 sm:max-w-2xl"
     >
       <Command shouldFilter={false} vimBindings={false}>
         <CommandInput
