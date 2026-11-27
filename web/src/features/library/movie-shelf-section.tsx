@@ -1,5 +1,5 @@
 import type { LinkProps } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
+import { memo, type ReactNode } from 'react'
 
 import { LibraryMovieCard, type LibraryMovieCardData } from '@/features/library/movie-card'
 import { MovieShelf } from '@/features/library/movie-shelf'
@@ -14,7 +14,7 @@ export function MovieShelfItem({ children }: { children: ReactNode }) {
 }
 
 /** Presentational horizontal shelf of movie cards; shelves only supply data. */
-export function MovieShelfSection({
+export const MovieShelfSection = memo(function MovieShelfSection({
   title,
   movies,
   onPlay,
@@ -34,4 +34,4 @@ export function MovieShelfSection({
       ))}
     </MovieShelf>
   )
-}
+})

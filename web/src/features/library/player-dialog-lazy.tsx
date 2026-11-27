@@ -1,9 +1,14 @@
 import { lazy, Suspense } from 'react'
 
+const loadLibraryPlayer = () => import('@/features/library/player-dialog')
+
+/** Warm the player chunk when the user shows intent (hover or keyboard focus). */
+export function preloadLibraryPlayer() {
+  void loadLibraryPlayer().catch(() => {})
+}
+
 const LibraryPlayerDialog = lazy(() =>
-  import('@/features/library/player-dialog').then(module => ({
-    default: module.LibraryPlayerDialog
-  }))
+  loadLibraryPlayer().then(module => ({ default: module.LibraryPlayerDialog }))
 )
 
 /** Shared lazy wrapper so every page mounts the player the same way. */

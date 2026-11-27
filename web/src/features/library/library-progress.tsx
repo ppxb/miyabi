@@ -1,8 +1,10 @@
-import { isTaskActive, type ScanTask } from '@/api/tasks'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useActiveScan } from '@/features/tasks/use-active-scan'
 
-export function LibraryProgress({ task }: { task?: ScanTask }) {
-  if (!task || !isTaskActive(task)) return null
+export function LibraryProgress() {
+  // Any active scan task, including a single-movie rescrape, shows as the ring.
+  const { active: task } = useActiveScan()
+  if (!task) return null
   const { scan } = task
   const total = scan.metadata_total
   const done = scan.metadata_completed

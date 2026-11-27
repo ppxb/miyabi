@@ -4,6 +4,7 @@ import { MovieCard, MovieCoverCaption, MovieRatingPill } from '@/components/movi
 import { Badge } from '@/components/ui/badge'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { LibraryMovieActions } from './movie-actions'
+import { preloadLibraryPlayer } from './player-dialog-lazy'
 
 /** The fields the library card actually renders; kept narrow so callers pass
  * only what the card needs (e.g. a history item) without fabricating a movie. */
@@ -43,6 +44,8 @@ export function LibraryMovieCard({
           role="button"
           tabIndex={0}
           className="group relative block h-full min-w-0 cursor-pointer rounded-2xl outline-ring"
+          onMouseEnter={preloadLibraryPlayer}
+          onFocus={preloadLibraryPlayer}
           onClick={() => onPlay?.()}
           onKeyDown={event => {
             if (event.key !== 'Enter' && event.key !== ' ') return

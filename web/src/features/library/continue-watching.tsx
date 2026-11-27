@@ -1,9 +1,15 @@
+import { memo } from 'react'
+
 import { useHistory } from '@/api/history'
 import { LibraryMovieCard } from '@/features/library/movie-card'
 import { MovieShelf } from '@/features/library/movie-shelf'
 import { MovieShelfItem } from '@/features/library/movie-shelf-section'
 
-export function ContinueWatching({ onPlay }: { onPlay: (movieID: number) => void }) {
+export const ContinueWatching = memo(function ContinueWatching({
+  onPlay
+}: {
+  onPlay: (movieID: number) => void
+}) {
   const history = useHistory(1)
   const items = (history.data?.items ?? [])
     .filter(item => item.duration > 0 && item.position > 0 && item.position / item.duration < 0.95)
@@ -34,4 +40,4 @@ export function ContinueWatching({ onPlay }: { onPlay: (movieID: number) => void
       })}
     </MovieShelf>
   )
-}
+})
