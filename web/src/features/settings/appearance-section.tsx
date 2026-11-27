@@ -20,7 +20,7 @@ export function AppearanceSection() {
           <TabsList>
             {THEME_OPTIONS.map(option => (
               <TabsTrigger key={option.value} value={option.value}>
-                <option.icon className="size-4" />
+                <option.icon />
               </TabsTrigger>
             ))}
           </TabsList>

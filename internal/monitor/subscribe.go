@@ -73,7 +73,12 @@ func (service *Service) Update(ctx context.Context, id int, opts UpdateOptions) 
 		}
 		update.SetStatus(status)
 		if status == subscription.StatusActive {
-			update.SetNextCheckAt(nextDaily(time.Now(), service.config(ctx).CheckTime)).ClearError()
+			next := nextDaily(time.Now(), service.config(ctx).CheckTime)
+			if !decodeCursor(record.Cursor).Initialized {
+				// Paused before its first check: the baseline is still due now.
+				next = time.Now()
+			}
+			update.SetNextCheckAt(next).ClearError()
 		}
 	}
 	updated, err := update.Save(ctx)

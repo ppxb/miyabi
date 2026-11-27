@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
@@ -64,14 +65,36 @@ func (service *Service) Check(ctx context.Context) error {
 
 // dropUntracked deletes actor subscriptions no source can check, such as those
 // recorded by JavDB actor id before following moved to library actors, and
-// the works no followed actor owns any more.
+// the works no followed actor owns any more. A subscription that still maps to
+// a library actor is kept even before its source ids are resolved, so a fresh
+// follow survives until the background check records them.
 func (service *Service) dropUntracked(ctx context.Context) error {
+	untracked, err := service.database.Subscription.Query().
+		Where(subscription.KindEQ(subscription.KindActor), subscription.FanzaIDEQ(""), subscription.JavdbIDEQ("")).All(ctx)
+	if err != nil {
+		return fmt.Errorf("query untracked subscriptions: %w", err)
+	}
+	legacy := make([]int, 0, len(untracked))
+	for _, record := range untracked {
+		_, lookupErr := service.actors(ctx, record.TargetID)
+		if lookupErr == nil {
+			continue
+		}
+		// Only a definitive lookup answer means the row cannot be checked;
+		// a transient failure must not drop a fresh follow.
+		if domain.IsKind(lookupErr, domain.KindNotFound) || domain.IsKind(lookupErr, domain.KindInvalid) {
+			legacy = append(legacy, record.ID)
+		}
+	}
 	removed := 0
-	err := ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
-		actors, err := tx.Subscription.Delete().Where(subscription.KindEQ(subscription.KindActor),
-			subscription.FanzaIDEQ(""), subscription.JavdbIDEQ("")).Exec(ctx)
-		if err != nil {
-			return err
+	err = ent.WithTx(ctx, service.database, func(tx *ent.Tx) error {
+		if len(legacy) > 0 {
+			deleted, err := tx.Subscription.Delete().
+				Where(subscription.KindEQ(subscription.KindActor), subscription.IDIn(legacy...)).Exec(ctx)
+			if err != nil {
+				return err
+			}
+			removed += deleted
 		}
 		owners, err := tx.Subscription.Query().Where(subscription.KindEQ(subscription.KindActor)).IDs(ctx)
 		if err != nil {
@@ -82,7 +105,7 @@ func (service *Service) dropUntracked(ctx context.Context) error {
 			orphan = subscription.Or(orphan, subscription.OriginIDNotIn(owners...))
 		}
 		works, err := tx.Subscription.Delete().Where(subscription.KindEQ(subscription.KindMovie), orphan).Exec(ctx)
-		removed = actors + works
+		removed += works
 		return err
 	})
 	if err == nil && removed > 0 {
@@ -111,16 +134,32 @@ func (service *Service) dueSubscriptions(ctx context.Context, kind subscription.
 
 func (service *Service) checkActor(ctx context.Context, record *ent.Subscription, checkTime string) error {
 	now := time.Now()
-	movies, err := service.actorWorks(ctx, record.FanzaID, record.JavdbID)
+	cursor := decodeCursor(record.Cursor)
+	fanzaID, javdbID, err := service.resolveActorSources(ctx, record, !cursor.Initialized)
+	if err != nil {
+		return service.deferCheck(ctx, record, now, err)
+	}
+	if fanzaID != record.FanzaID || javdbID != record.JavdbID {
+		if err := record.Update().SetFanzaID(fanzaID).SetJavdbID(javdbID).Exec(ctx); err != nil && !ent.IsNotFound(err) {
+			return service.deferCheck(ctx, record, now, fmt.Errorf("update actor subscription %d sources: %w", record.ID, err))
+		}
+	}
+	movies, err := service.actorWorks(ctx, fanzaID, javdbID)
 	if err != nil {
 		return service.deferCheck(ctx, record, now, domain.E(domain.KindUpstream, "查询演员新作失败："+domain.PublicMessage(err), err))
 	}
 	today := now.Format(dateLayout)
-	cursor := decodeCursor(record.Cursor)
 	if !cursor.Initialized {
-		// No baseline yet: record the page without treating the back
-		// catalogue as new releases.
+		// First check: take the page as the baseline and track works released
+		// since the follow right away, without replaying the back catalogue.
+		// The follow date matters when this first check is delayed.
+		since := record.CreatedAt.Format(dateLayout)
 		cursor = snapshotCursor(movies, today)
+		for _, movie := range movies {
+			if movie.ReleaseDate == "" || movie.ReleaseDate >= since {
+				service.spawnMovie(ctx, record, movie)
+			}
+		}
 	} else {
 		for _, movie := range cursor.newWorks(movies) {
 			service.spawnMovie(ctx, record, movie)
@@ -133,6 +172,44 @@ func (service *Service) checkActor(ctx context.Context, record *ent.Subscription
 	}
 	service.tasks.NotifyMonitorChanged()
 	return nil
+}
+
+// resolveActorSources resolves the ids an actor's works are listed by. The
+// library actor supplies the source ids and name spellings known locally;
+// FANZA is asked by name only on the first check, so a subscription that
+// started on JavDB never switches sources and mixes their id namespaces.
+func (service *Service) resolveActorSources(ctx context.Context, record *ent.Subscription, first bool) (fanzaID, javdbID string, err error) {
+	fanzaID, javdbID = record.FanzaID, record.JavdbID
+	if fanzaID != "" || (!first && javdbID != "") {
+		return fanzaID, javdbID, nil
+	}
+	identity, lookupErr := service.actors(ctx, record.TargetID)
+	if lookupErr != nil {
+		if javdbID == "" {
+			return "", "", lookupErr
+		}
+		// The stored JavDB id still works when the library actor is gone.
+		slog.WarnContext(ctx, "library actor lookup failed; checking on JavDB", "subscription", record.ID, "error", lookupErr)
+		return "", javdbID, nil
+	}
+	if javdbID == "" {
+		javdbID = identity.JavdbID
+	}
+	if identity.FanzaID != "" {
+		return identity.FanzaID, javdbID, nil
+	}
+	resolved, resolveErr := service.fanza.ResolveActress(ctx, identity.Names)
+	if resolveErr != nil {
+		if javdbID == "" {
+			return "", "", domain.E(domain.KindUpstream, "查询演员新作失败："+domain.PublicMessage(resolveErr), resolveErr)
+		}
+		slog.WarnContext(ctx, "FANZA lookup failed; checking on JavDB", "actor", identity.Name, "error", resolveErr)
+		return "", javdbID, nil
+	}
+	if resolved == "" && javdbID == "" {
+		return "", "", domain.E(domain.KindInvalid, "FANZA 和 JavDB 都找不到这位演员，无法追踪新作", nil)
+	}
+	return resolved, javdbID, nil
 }
 
 // deferCheck records a transient failure and retries within the hour rather

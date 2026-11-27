@@ -25,12 +25,18 @@ func TestActorSubscriptionSpawnsOnlyNewWorks(t *testing.T) {
 	}
 	f.identities["actor-1"] = ActorIdentity{Name: "Yua Mikami", Avatar: "/api/actors/1/avatar", Names: []string{"Yua Mikami"}, JavdbID: "actor-1"}
 	actor, err := f.service.AddActor(ctx, "actor-1")
-	if err != nil || actor.Title != "Yua Mikami" || actor.Cover == "" || actor.Status != subscription.StatusActive || actor.NextCheckAt == nil || !actor.NextCheckAt.After(time.Now()) {
+	if err != nil || actor.Title != "Yua Mikami" || actor.Cover == "" || actor.Status != subscription.StatusActive || actor.NextCheckAt == nil {
 		t.Fatalf("AddActor: %#v %v", actor, err)
+	}
+	if feed, err := f.service.ActorFeed(ctx, actor.ID, 1, 10); err != nil || len(feed) != 0 {
+		t.Fatalf("following must not fetch the works page: %#v %v", feed, err)
+	}
+	if err := f.service.Check(ctx); err != nil {
+		t.Fatalf("first check: %v", err)
 	}
 	feed, err := f.service.ActorFeed(ctx, actor.ID, 1, 10)
 	if err != nil || len(feed) != 1 || feed[0].TargetID != "act-upcoming" || feed[0].OriginID == nil || *feed[0].OriginID != actor.ID {
-		t.Fatalf("only the unreleased work is tracked at subscription time: %#v %v", feed, err)
+		t.Fatalf("the first check tracks only the unreleased work: %#v %v", feed, err)
 	}
 
 	f.discover.actorMovies["actor-1"] = append([]domain.Movie{
@@ -56,14 +62,22 @@ func TestActorSubscriptionSpawnsOnlyNewWorks(t *testing.T) {
 	}
 }
 
-func TestAddActorRequiresWorksPage(t *testing.T) {
+func TestFollowDefersTheWorksPageToTheBackgroundCheck(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
 	f.discover.browseErr = errors.New("javdb down")
-	if _, err := f.service.AddActor(ctx, "actor-1"); err == nil {
-		t.Fatal("an actor subscription without a cursor baseline must not be created")
+	actor, err := f.service.AddActor(ctx, "actor-1")
+	if err != nil {
+		t.Fatalf("following must not depend on the works page: %v", err)
 	}
-	if list, _ := f.service.List(ctx, "actor", 1, 10); len(list) != 0 {
-		t.Fatalf("expected no actor subscription, got %v", list)
+	if feed, _ := f.service.ActorFeed(ctx, actor.ID, 1, 10); len(feed) != 0 {
+		t.Fatalf("the first works page loads in the background, got %v", feed)
+	}
+	if err := f.service.Check(ctx); err == nil {
+		t.Fatal("the background check must surface the upstream failure")
+	}
+	record := f.client.Subscription.GetX(ctx, actor.ID)
+	if record.Error == nil || record.Status != subscription.StatusActive {
+		t.Fatalf("a failed first check must stay followed with its error: %#v", record)
 	}
 }
 
@@ -95,6 +109,10 @@ func TestActorSubscriptionZeroInitialWorksSpawnsFirstWorks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AddActor: %v", err)
 	}
+	// The first check records the empty page as the baseline.
+	if err := f.service.Check(ctx); err != nil {
+		t.Fatalf("first check: %v", err)
+	}
 
 	// Verify no movies spawned initially
 	feed, err := f.service.ActorFeed(ctx, actor.ID, 1, 10)
@@ -124,7 +142,7 @@ func TestActorSubscriptionZeroInitialWorksSpawnsFirstWorks(t *testing.T) {
 	}
 }
 
-func TestFollowListsWorksOnFANZAFirst(t *testing.T) {
+func TestCheckListsWorksOnFANZAFirst(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
 	f.discover.browseErr = errors.New("JavDB must not be asked")
 	f.identities["7"] = ActorIdentity{Name: "河北彩花", Names: []string{"河北彩花", "河北彩伽"}, JavdbID: "ZY5eq"}
@@ -134,33 +152,46 @@ func TestFollowListsWorksOnFANZAFirst(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if record := f.client.Subscription.GetX(ctx, actor.ID); record.TargetID != "7" || record.JavdbID != "ZY5eq" || record.Title != "河北彩花" {
+		t.Fatalf("follow must store the library key and known source ids: %+v", record)
+	}
+	if err := f.service.Check(ctx); err != nil {
+		t.Fatalf("the check must resolve FANZA and use it first: %v", err)
+	}
 	record := f.client.Subscription.GetX(ctx, actor.ID)
-	if record.TargetID != "7" || record.FanzaID != "1044864" || record.JavdbID != "ZY5eq" || record.Title != "河北彩花" {
-		t.Fatalf("follow must store the library key and both source ids: %+v", record)
+	if record.FanzaID != "1044864" {
+		t.Fatalf("the check must record the resolved FANZA id: %+v", record)
 	}
 	if feed, _ := f.service.ActorFeed(ctx, actor.ID, 1, 10); len(feed) != 1 || feed[0].TargetID != "SNOS-535" {
 		t.Fatalf("works must come from FANZA: %#v", feed)
 	}
+	f.fanza.resolveErr = errors.New("a stored FANZA id must not be resolved again")
 	f.forceDue(t, actor.ID)
 	if err := f.service.Check(ctx); err != nil {
-		t.Fatalf("checks must keep using FANZA: %v", err)
+		t.Fatalf("later checks must reuse the stored FANZA id: %v", err)
 	}
 }
 
-func TestFollowNeedsASource(t *testing.T) {
+func TestCheckReportsAnActorNoSourceKnows(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
 	f.identities["8"] = ActorIdentity{Name: "無名", Names: []string{"無名"}}
-	if _, err := f.service.AddActor(ctx, "8"); !domain.IsKind(err, domain.KindInvalid) {
-		t.Fatalf("an actor no source knows cannot be followed: %v", err)
+	actor, err := f.service.AddActor(ctx, "8")
+	if err != nil {
+		t.Fatalf("following must not wait on source resolution: %v", err)
 	}
-	if count := f.client.Subscription.Query().CountX(ctx); count != 0 {
-		t.Fatalf("a failed follow left %d subscriptions", count)
+	if err := f.service.Check(ctx); err == nil {
+		t.Fatal("an actor no source knows must fail the background check")
+	}
+	record := f.client.Subscription.GetX(ctx, actor.ID)
+	if record.Error == nil || record.Status != subscription.StatusActive {
+		t.Fatalf("the subscription must stay followed with its error: %#v", record)
 	}
 }
 
 func TestCheckDropsUntrackedSubscriptions(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
 	// Recorded by JavDB actor id before following moved to library actors.
+	f.lookupErrors["ZY5eq"] = domain.E(domain.KindNotFound, "演员不存在", nil)
 	legacy := f.client.Subscription.Create().SetKind(subscription.KindActor).SetStatus(subscription.StatusActive).
 		SetTargetID("ZY5eq").SaveX(ctx)
 	f.client.Subscription.Create().SetTargetID("OLD-001").SetOriginID(legacy.ID).SaveX(ctx)
@@ -182,7 +213,20 @@ func TestCheckDropsUntrackedSubscriptions(t *testing.T) {
 	}
 }
 
-func TestFollowFallsBackToJavDBWhenFANZAFails(t *testing.T) {
+func TestCheckKeepsSubscriptionsWhenTheActorLookupFails(t *testing.T) {
+	f, ctx := newFixture(t), t.Context()
+	f.lookupErrors["temp-actor"] = errors.New("database is busy")
+	record := f.client.Subscription.Create().SetKind(subscription.KindActor).
+		SetStatus(subscription.StatusActive).SetTargetID("temp-actor").SaveX(ctx)
+	if err := f.service.Check(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !f.client.Subscription.Query().Where(subscription.IDEQ(record.ID)).ExistX(ctx) {
+		t.Fatal("a transient lookup failure must not drop the subscription")
+	}
+}
+
+func TestCheckFallsBackToJavDBWhenFANZAFails(t *testing.T) {
 	f, ctx := newFixture(t), t.Context()
 	f.fanza.resolveErr = errors.New("FANZA unreachable")
 	f.discover.actorMovies["ZY5eq"] = []domain.Movie{{ID: "NEW-001", Code: "NEW-001", ReleaseDate: "2099-01-01"}}
@@ -191,12 +235,36 @@ func TestFollowFallsBackToJavDBWhenFANZAFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an actor with a JavDB id must still be followed: %v", err)
 	}
+	if err := f.service.Check(ctx); err != nil {
+		t.Fatalf("the check must fall back to JavDB: %v", err)
+	}
 	if record := f.client.Subscription.GetX(ctx, actor.ID); record.FanzaID != "" || record.JavdbID != "ZY5eq" {
-		t.Fatalf("follow must fall back to JavDB: %+v", record)
+		t.Fatalf("the check must keep using JavDB: %+v", record)
+	}
+	// FANZA becoming resolvable must not switch an established JavDB baseline:
+	// the two sources use different work-id namespaces.
+	f.fanza.resolveErr = nil
+	f.fanza.ids["河北彩花"] = "1044864"
+	f.discover.actorMovies["ZY5eq"] = []domain.Movie{
+		{ID: "NEW-001", Code: "NEW-001", ReleaseDate: "2099-01-01"},
+		{ID: "NEW-002", Code: "NEW-002", ReleaseDate: "2099-02-01"},
+	}
+	f.forceDue(t, actor.ID)
+	if err := f.service.Check(ctx); err != nil {
+		t.Fatalf("the check must keep using JavDB: %v", err)
+	}
+	if record := f.client.Subscription.GetX(ctx, actor.ID); record.FanzaID != "" {
+		t.Fatalf("a JavDB-based subscription must not switch sources: %+v", record)
+	}
+	if feed, _ := f.service.ActorFeed(ctx, actor.ID, 1, 10); len(feed) != 2 {
+		t.Fatalf("the new JavDB work must be tracked once: %#v", feed)
 	}
 	f.identities["8"] = ActorIdentity{Name: "無名", Names: []string{"無名"}}
-	if _, err := f.service.AddActor(ctx, "8"); err == nil {
-		t.Fatal("without a JavDB id the FANZA failure must surface")
+	if _, err := f.service.AddActor(ctx, "8"); err != nil {
+		t.Fatalf("following must not wait on source resolution: %v", err)
+	}
+	if err := f.service.Check(ctx); err == nil {
+		t.Fatal("without a JavDB id the FANZA failure must surface from the check")
 	}
 }
 

@@ -124,7 +124,7 @@ export function useAddSubscription() {
     onSuccess: async item => {
       await queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
       toast.success(`已关注 ${item.title}`, {
-        description: '每天检查一次新作，显示在「关注」页。'
+        description: '正在后台检查新作；之后每天检查一次。'
       })
     },
     meta: { errorTitle: '关注失败' }

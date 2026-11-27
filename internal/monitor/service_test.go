@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -73,8 +74,10 @@ type fixture struct {
 	// identities overrides the default library actor, named by its key and
 	// browsed on JavDB under the same id.
 	identities map[string]ActorIdentity
-	tasks      *tasks.Service
-	client     *ent.Client
+	// lookupErrors makes the library actor lookup fail for specific keys.
+	lookupErrors map[string]error
+	tasks        *tasks.Service
+	client       *ent.Client
 }
 
 func newFixture(t *testing.T) fixture {
@@ -84,10 +87,13 @@ func newFixture(t *testing.T) fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
-	f := fixture{discover: newMockDiscoverer(), identities: map[string]ActorIdentity{},
+	f := fixture{discover: newMockDiscoverer(), identities: map[string]ActorIdentity{}, lookupErrors: map[string]error{},
 		fanza: &mockFANZA{ids: map[string]string{}, works: map[string][]domain.Movie{}},
 		tasks: tasks.NewService(store.Client, tasks.NewRegistry()), client: store.Client}
 	lookup := func(_ context.Context, key string) (ActorIdentity, error) {
+		if lookupErr := f.lookupErrors[key]; lookupErr != nil {
+			return ActorIdentity{}, lookupErr
+		}
 		if identity, ok := f.identities[key]; ok {
 			if identity.Key == "" {
 				identity.Key = key
@@ -132,6 +138,9 @@ func TestRemovingActorDropsOnlyItsOwnWorks(t *testing.T) {
 	// The co-starred work is recorded once, under the first actor.
 	first, _ := f.service.AddActor(ctx, "act1")
 	second, _ := f.service.AddActor(ctx, "act2")
+	if err := f.service.Check(ctx); err != nil {
+		t.Fatal(err)
+	}
 	if err := f.service.Remove(ctx, first.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -184,6 +193,9 @@ func TestSubscriptionTargetsAndPagination(t *testing.T) {
 	}
 	actor, err := f.service.AddActor(ctx, "act1")
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.service.Check(ctx); err != nil {
 		t.Fatal(err)
 	}
 	m1, err := f.addMovie(ctx, "m1", AddMovieOptions{})
@@ -315,5 +327,23 @@ func TestActorSubscription_ConstraintErrorRecoversWithoutRecursion(t *testing.T)
 	}
 	if count != 1 {
 		t.Fatalf("expected exactly 1 subscription created, got %d", count)
+	}
+}
+
+func TestResumingBeforeTheFirstCheckSchedulesItNow(t *testing.T) {
+	f, ctx := newFixture(t), t.Context()
+	actor, err := f.service.AddActor(ctx, "actor-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.service.Update(ctx, actor.ID, UpdateOptions{Status: new("paused")}); err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := f.service.Update(ctx, actor.ID, UpdateOptions{Status: new("active")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resumed.NextCheckAt == nil || resumed.NextCheckAt.After(time.Now().Add(time.Minute)) {
+		t.Fatalf("resuming before the first check must schedule it now: %#v", resumed)
 	}
 }

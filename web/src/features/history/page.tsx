@@ -20,6 +20,7 @@ import {
 import { historyToCard } from '@/features/library/history-card'
 import { LibraryMovieCard } from '@/features/library/movie-card'
 import { LazyLibraryPlayerDialog } from '@/features/library/player-dialog-lazy'
+import { TrashIcon } from 'lucide-react'
 
 export function HistoryPage({
   page,
@@ -36,11 +37,12 @@ export function HistoryPage({
   return (
     <AppPage>
       <PageHeader title="观看历史" description="继续观看与最近播放" inlineActions>
-        {history.data && history.data.total > 0 ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => setConfirming(true)}>
+        {history.data && history.data.total > 0 && (
+          <Button type="button" variant="destructive" onClick={() => setConfirming(true)}>
+            <TrashIcon data-icon="inline-start" />
             清空历史
           </Button>
-        ) : null}
+        )}
       </PageHeader>
 
       {history.isPending ? (
@@ -52,7 +54,7 @@ export function HistoryPage({
           retrying={history.isFetching}
         />
       ) : history.data.items.length === 0 ? (
-        <EmptyState className="min-h-0 flex-1 py-12" title="还没有观看记录，去媒体库播放一部吧" />
+        <EmptyState className="min-h-0 flex-1 py-12" title="还没有观看记录" />
       ) : (
         <>
           <MovieGridLayout>

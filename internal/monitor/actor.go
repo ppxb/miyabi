@@ -27,10 +27,10 @@ func (service *Service) existingActor(ctx context.Context, actorID string) (Item
 	return item, true, err
 }
 
-// AddActor follows a library actor by key. Their works are listed on FANZA,
-// or on JavDB when FANZA does not know them; the current works page becomes
-// the cursor baseline, unreleased works are tracked right away, and later
-// releases arrive through the daily check. Re-adding a paused subscription
+// AddActor follows a library actor by key. The subscription is recorded and
+// scheduled for the next background monitor run: resolving the actor's
+// FANZA/JavDB ids and taking the first works baseline happen on that check, so
+// following never waits on an upstream query. Re-adding a paused subscription
 // resumes it.
 func (service *Service) AddActor(ctx context.Context, actorKey string) (Item, error) {
 	identity, err := service.actors(ctx, actorKey)
@@ -42,32 +42,10 @@ func (service *Service) AddActor(ctx context.Context, actorKey string) (Item, er
 	if item, found, err := service.existingActor(ctx, actorKey); err != nil || found {
 		return item, err
 	}
-	fanzaID := identity.FanzaID
-	if fanzaID == "" {
-		if fanzaID, err = service.fanza.ResolveActress(ctx, identity.Names); err != nil {
-			if identity.JavdbID == "" {
-				return Item{}, fmt.Errorf("find %s on FANZA: %w", identity.Name, err)
-			}
-			// FANZA being unreachable or ambiguous must not block the JavDB fallback.
-			slog.WarnContext(ctx, "FANZA lookup failed; following on JavDB", "actor", identity.Name, "error", err)
-			fanzaID = ""
-		}
-	}
-	if fanzaID == "" && identity.JavdbID == "" {
-		return Item{}, domain.E(domain.KindInvalid, "FANZA 和 JavDB 都找不到这位演员，无法追踪新作", nil)
-	}
-	movies, err := service.actorWorks(ctx, fanzaID, identity.JavdbID)
-	if err != nil {
-		return Item{}, err
-	}
-
-	cfg := service.config(ctx)
-	now := time.Now()
-	today := now.Format(dateLayout)
 	record, err := service.database.Subscription.Create().
 		SetKind(subscription.KindActor).SetTargetID(actorKey).SetTitle(identity.Name).SetCover(identity.Avatar).
-		SetFanzaID(fanzaID).SetJavdbID(identity.JavdbID).SetStatus(subscription.StatusActive).
-		SetCursor(snapshotCursor(movies, today).encode()).SetNextCheckAt(nextDaily(now, cfg.CheckTime)).Save(ctx)
+		SetFanzaID(identity.FanzaID).SetJavdbID(identity.JavdbID).SetStatus(subscription.StatusActive).
+		SetNextCheckAt(time.Now()).Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
 			if item, found, findErr := service.existingActor(ctx, actorKey); findErr == nil && found {
@@ -75,11 +53,6 @@ func (service *Service) AddActor(ctx context.Context, actorKey string) (Item, er
 			}
 		}
 		return Item{}, fmt.Errorf("create actor subscription: %w", err)
-	}
-	for _, movie := range movies {
-		if movie.ReleaseDate == "" || movie.ReleaseDate >= today {
-			service.spawnMovie(ctx, record, movie)
-		}
 	}
 	service.tasks.NotifyMonitorChanged()
 	return subscriptionItem(record), nil
