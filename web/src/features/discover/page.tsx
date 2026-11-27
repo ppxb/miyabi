@@ -39,7 +39,10 @@ export function DiscoverPage() {
           <CategoryContent
             category={categoryFromSearch(search)}
             onCategoryChange={filters =>
-              void navigate({ search: previous => updateCategorySearch(previous, filters) })
+              void navigate({
+                search: previous => updateCategorySearch(previous, filters),
+                replace: true
+              })
             }
             page={page}
             onPageChange={next => setPage('category', next)}
