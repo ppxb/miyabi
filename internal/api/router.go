@@ -127,7 +127,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.GET("/library/browse", libraryBrowseHandler(deps.Library))
 	protected.GET("/library/filter-options", libraryFilterOptionsHandler(deps.Library))
 	protected.GET("/library/top-rated", libraryTopRatedHandler(deps.Library))
-	protected.GET("/library/movies/:id", libraryMovieHandler(deps.Library))
+	protected.GET("/library/movies/:id", libraryMovieHandler(deps.Library, deps.Catalogue))
 	protected.POST("/library/movies/:id/scrape", libraryMovieScrapeHandler(deps.Library))
 	protected.GET("/library/movies/:id/previews/:index", libraryPreviewHandler(deps.Library, deps.Metadata))
 	subtitlesAPI := protected.Group("/library/movies/:id/subtitles", noStore())

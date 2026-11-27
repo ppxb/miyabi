@@ -2,7 +2,7 @@ import type { ComponentProps, ReactNode } from 'react'
 
 import { useRecordMovieView } from '@/api/browse-history'
 import { useDiscoverMagnets, useDiscoverMovie } from '@/api/discover'
-import { useLibraryMovie } from '@/api/library'
+import { useLibraryMovie, type LibraryMovieDetail as LibraryMovieDetailData } from '@/api/library'
 import { ErrorState, InlineError } from '@/components/error-state'
 import type { MovieDetailTarget } from './dialog-context'
 import { MovieHero } from './hero'
@@ -40,9 +40,7 @@ function LibraryMovieDetail({ movieId }: { movieId: number }) {
       fetching={detail.isFetching}
       onRetry={() => void detail.refetch()}
     >
-      {detail.data.id ? (
-        <LibraryCatalogueExtras movieId={detail.data.id} code={detail.data.code} />
-      ) : null}
+      {detail.data.id ? <LibraryCatalogueExtras movie={detail.data} /> : null}
     </CatalogueSections>
   )
 }
@@ -92,21 +90,20 @@ function CatalogueSections({
   )
 }
 
-// Catalogue extras remain available for linked films, but cannot block or
-// replace the saved library metadata when the catalogue is unavailable.
-function LibraryCatalogueExtras({ movieId, code }: { movieId: string; code: string }) {
-  const detail = useDiscoverMovie(movieId, code)
-  const magnets = useDiscoverMagnets(movieId, detail.data?.code ?? code)
-  useRecordMovieView(movieId)
+// Extras stay local to the saved library detail: the server fills the
+// recommendations from saved metadata, so no catalogue request is needed.
+function LibraryCatalogueExtras({ movie }: { movie: LibraryMovieDetailData }) {
+  const magnets = useDiscoverMagnets(
+    movie.id,
+    movie.code,
+    movie.sources?.find(source => source.provider === 'javdb' && source.id)?.id
+  )
+  useRecordMovieView(movie.id)
   return (
     <>
-      <MovieMagnets movieID={movieId} query={magnets} />
-      {detail.data ? (
-        <>
-          <MovieRecommendations title="TA（们）还出演过" movies={detail.data.actor_movies} />
-          <MovieRecommendations title="你可能也喜欢" movies={detail.data.related_movies} />
-        </>
-      ) : null}
+      <MovieMagnets movieID={movie.id} query={magnets} />
+      <MovieRecommendations title="TA（们）还出演过" movies={movie.actor_movies} />
+      <MovieRecommendations title="你可能也喜欢" movies={movie.related_movies} />
     </>
   )
 }

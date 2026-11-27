@@ -59,7 +59,7 @@ export function MovieDetailSkeleton() {
       {Array.from({ length: 2 }, (_, section) => (
         <div key={section} className="space-y-4">
           <Skeleton className="h-7 w-40" />
-          <MovieGridSkeleton count={8} />
+          <MovieGridSkeleton count={4} />
         </div>
       ))}
     </div>
@@ -69,7 +69,7 @@ export function MovieDetailSkeleton() {
 export function MovieMagnetsSkeleton() {
   return (
     <div className="space-y-4">
-      {Array.from({ length: 3 }, (_, index) => (
+      {Array.from({ length: 2 }, (_, index) => (
         <Card key={index} size="sm">
           <CardContent className="space-y-3">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">

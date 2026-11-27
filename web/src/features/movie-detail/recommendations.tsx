@@ -9,7 +9,8 @@ export function MovieRecommendations({
   title: string
   movies: MovieReference[]
 }) {
-  const visible = (movies ?? []).slice(0, 8)
+  // One row per section: extra cards only add cover loads inside the dialog.
+  const visible = (movies ?? []).slice(0, 4)
   if (visible.length === 0) return null
 
   return (

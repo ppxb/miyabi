@@ -175,8 +175,9 @@ function cardToDetail(movie: DiscoverMovie): DiscoverMovieDetail {
 
 // JavDB magnets join only when the movie's JavDB id is known: from a cached
 // catalogue card here, or from the library record on the server.
-export function useDiscoverMagnets(id: string, code?: string) {
-  const javdbID = findCachedJavdbID(useQueryClient(), id)
+export function useDiscoverMagnets(id: string, code?: string, knownJavdbID?: string) {
+  const client = useQueryClient()
+  const javdbID = knownJavdbID ?? findCachedJavdbID(client, id)
   return useQuery({
     queryKey: discoverKeys.magnets(id, code, javdbID),
     queryFn: ({ signal }) =>

@@ -119,7 +119,7 @@ func libraryFilterOptionsHandler(library LibraryManager) gin.HandlerFunc {
 	}
 }
 
-func libraryMovieHandler(library LibraryManager) gin.HandlerFunc {
+func libraryMovieHandler(library LibraryManager, discover CatalogueManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		uri, ok := bindURI[struct {
 			ID int `uri:"id" binding:"min=1"`
@@ -128,6 +128,17 @@ func libraryMovieHandler(library LibraryManager) gin.HandlerFunc {
 			return
 		}
 		detail, err := library.Movie(c.Request.Context(), uri.ID)
+		if err == nil {
+			// Recommendations come from the saved metadata and the local library,
+			// matching the discover detail without a catalogue request.
+			actors, related, recErr := discover.LocalRecommendations(c.Request.Context(), domain.MovieMetadata{Detail: detail.MovieDetail})
+			if recErr != nil {
+				c.Error(recErr)
+			} else {
+				detail.ActorMovies = actors
+				detail.RelatedMovies = related
+			}
+		}
 		respond(c, detail, err)
 	}
 }
