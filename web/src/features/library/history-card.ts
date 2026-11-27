@@ -7,15 +7,11 @@ export type HistoryCard = {
 }
 
 /**
- * Maps a watch-history item to the library card's props. Progress is clamped to
- * 0-100 and rounded, the single shared convention for history and shelves (the
- * card also clamps defensively).
+ * Maps a watch-history item to the library card's props. Progress is rounded to
+ * a whole percent; the card clamps out-of-range values for display.
  */
 export function historyToCard(item: WatchHistoryItem): HistoryCard {
-  const progress =
-    item.duration > 0
-      ? Math.max(0, Math.min(100, Math.round((item.position / item.duration) * 100)))
-      : 0
+  const progress = item.duration > 0 ? Math.round((item.position / item.duration) * 100) : 0
   return {
     movie: {
       id: item.movie_id,
