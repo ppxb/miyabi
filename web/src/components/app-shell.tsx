@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type PropsWithChildren } from 'react'
+import { useEffect, useState, type CSSProperties, type PropsWithChildren } from 'react'
 import { MonitorIcon, MoonIcon, SunIcon } from 'lucide-react'
 
 import { AppSidebar } from '@/components/app-sidebar'
@@ -16,6 +16,17 @@ const THEME_CYCLE = ['light', 'dark', 'system'] as const
 
 export function AppShell({ children }: PropsWithChildren) {
   const [searchOpen, setSearchOpen] = useState(false)
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return
+      if (event.key.toLowerCase() !== 'j') return
+      event.preventDefault()
+      setSearchOpen(true)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   return (
     <TaskEventsProvider>

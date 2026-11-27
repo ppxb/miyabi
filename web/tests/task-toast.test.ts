@@ -68,15 +68,15 @@ test('offline completion clears the active spinner and dismisses quickly', () =>
   const completed = optionsOf(toastMocks.success)
   expect(Object.hasOwn(completed, 'icon')).toBe(true)
   expect(completed.icon).toBeUndefined()
-  expect(completed.duration).toBe(4000)
+  expect(completed.duration).toBe(3000)
 })
 
-test('scan success clears the spinner and dismisses in four seconds', () => {
+test('scan success clears the spinner and dismisses in three seconds', () => {
   notifyScanTask(scan)
   const options = optionsOf(toastMocks.success)
   expect(Object.hasOwn(options, 'icon')).toBe(true)
   expect(options.icon).toBeUndefined()
-  expect(options.duration).toBe(4000)
+  expect(options.duration).toBe(3000)
 })
 
 test('failures keep the longer duration', () => {
@@ -88,5 +88,5 @@ test('cancelling an offline task dismisses quickly', () => {
   notifyOfflineTask({ ...offline, status: 'cancelled', phase: 'available' })
   const options = optionsOf(toastMocks.info)
   expect(options.icon).toBeUndefined()
-  expect(options.duration).toBe(4000)
+  expect(options.duration).toBe(3000)
 })

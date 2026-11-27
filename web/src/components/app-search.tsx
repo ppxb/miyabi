@@ -1,13 +1,12 @@
 import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
-import { SearchIcon, UserIcon, type LucideIcon } from 'lucide-react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { SearchIcon, UserIcon } from 'lucide-react'
 import { useScrollFade } from '@animate-ui/react/primitives/effects/scroll-fade'
 
 import { apiGet, imageURL } from '@/api/client'
 import type { ActorPage } from '@/api/actors'
 import type { LibraryPage } from '@/api/library'
-import { APP_NAV_ITEMS } from '@/components/app-navigation'
 import { MediaImage } from '@/components/media-image'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -27,7 +26,9 @@ import { MovieDetailDialogContext } from '@/features/movie-detail/dialog-context
 const MODIFIER_KEY =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘' : 'Ctrl'
 
-const RESULT_LIMIT = 6
+const RECENT_LIMIT = 12
+// The server caps one page at 100; search walks every page instead of truncating results.
+const SEARCH_PAGE_SIZE = 100
 
 type SearchItem = {
   id: string
@@ -35,8 +36,7 @@ type SearchItem = {
   label: string
   details?: string[]
   image?: string
-  kind: 'page' | 'movie' | 'actor'
-  icon?: LucideIcon
+  kind: 'movie' | 'actor'
   run: () => void
 }
 
@@ -80,7 +80,10 @@ function FadingCommandList({ children }: { children: ReactNode }) {
   useScrollFade(listRef, { blur: 4 })
 
   return (
-    <CommandList ref={listRef} className="h-[min(30rem,calc(88vh-3.5rem))] max-h-none">
+    <CommandList
+      ref={listRef}
+      className="h-[min(30rem,calc(88vh-3.5rem))] max-h-none [&_[cmdk-list-sizer]]:h-full"
+    >
       {children}
     </CommandList>
   )
@@ -89,7 +92,7 @@ function FadingCommandList({ children }: { children: ReactNode }) {
 /** Header trigger; the palette itself is mounted once by the shell and opened through props. */
 export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
   return (
-    <Button onClick={onOpen} variant="ghost" className="font-normal text-muted-foreground">
+    <Button onClick={onOpen} variant="secondary" className="font-normal text-muted-foreground">
       <SearchIcon data-icon="inline-start" />
       搜索
       <KbdGroup>
@@ -101,14 +104,6 @@ export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
 }
 
 function ResultRow({ item }: { item: SearchItem }) {
-  if (item.kind === 'page') {
-    return (
-      <span className="flex min-w-0 items-center gap-2">
-        {item.icon && <item.icon />}
-        <span className="truncate">{item.label}</span>
-      </span>
-    )
-  }
   const isActor = item.kind === 'actor'
   return (
     <div className="flex w-full min-w-0 items-center gap-3">
@@ -136,6 +131,32 @@ function ResultRow({ item }: { item: SearchItem }) {
   )
 }
 
+async function fetchAllMovies(q: string, signal: AbortSignal) {
+  const movies: LibraryPage['movies'] = []
+  for (let page = 1; ; page++) {
+    const data = await apiGet<LibraryPage>(
+      '/api/library/browse',
+      { q, page, limit: SEARCH_PAGE_SIZE },
+      signal
+    )
+    movies.push(...data.movies)
+    if (!data.has_more) return movies
+  }
+}
+
+async function fetchAllActors(q: string, signal: AbortSignal) {
+  const actors: ActorPage['actors'] = []
+  for (let page = 1; ; page++) {
+    const data = await apiGet<ActorPage>(
+      '/api/actors',
+      { q, page, limit: SEARCH_PAGE_SIZE },
+      signal
+    )
+    actors.push(...data.actors)
+    if (!data.has_more) return actors
+  }
+}
+
 export function SearchDialog({
   open,
   onOpenChange
@@ -148,59 +169,61 @@ export function SearchDialog({
   const [query, setQuery] = useState('')
   const keyword = query.trim()
   const debounced = useDebounced(keyword, 200)
+  const searching = keyword.length > 0
+  const settled = searching && debounced === keyword
 
   const handleOpenChange = (value: boolean) => {
     onOpenChange(value)
     if (!value) setQuery('')
   }
 
+  // Opening the palette shows recent additions; server queries only run while typing.
+  const recent = useQuery({
+    queryKey: ['header-search', 'recent'] as const,
+    queryFn: ({ signal }) =>
+      apiGet<LibraryPage>('/api/library/movies', { page: 1, limit: RECENT_LIMIT }, signal),
+    enabled: open && !searching,
+    staleTime: 30_000
+  })
+
   const movies = useQuery({
     queryKey: ['header-search', 'movies', debounced] as const,
-    queryFn: ({ signal }) =>
-      apiGet<LibraryPage>('/api/library/movies', { q: debounced, limit: RESULT_LIMIT }, signal),
-    enabled: debounced.length > 0,
+    queryFn: ({ signal }) => fetchAllMovies(debounced, signal),
+    enabled: searching && debounced.length > 0,
+    placeholderData: keepPreviousData,
     staleTime: 30_000
   })
   const actors = useQuery({
     queryKey: ['header-search', 'actors', debounced] as const,
-    queryFn: ({ signal }) =>
-      apiGet<ActorPage>('/api/actors', { q: debounced, page: 1, limit: RESULT_LIMIT }, signal),
-    enabled: debounced.length > 0,
+    queryFn: ({ signal }) => fetchAllActors(debounced, signal),
+    enabled: searching && debounced.length > 0,
+    placeholderData: keepPreviousData,
     staleTime: 30_000
   })
 
-  const items: SearchItem[] = APP_NAV_ITEMS.filter(
-    item => !keyword || item.label.toLowerCase().includes(keyword.toLowerCase())
-  ).map(item => ({
-    id: item.to,
-    group: '页面',
-    label: item.label,
-    kind: 'page',
-    icon: item.icon,
-    run: () => {
-      void navigate({ to: item.to })
+  const movieItem = (movie: LibraryPage['movies'][number], group: string): SearchItem => {
+    const hasTitle = Boolean(movie.title)
+    return {
+      id: `movie:${movie.id}`,
+      group,
+      label: hasTitle ? movie.title : movie.code,
+      details: movieDetails(movie, hasTitle),
+      image: movie.cover || movie.poster,
+      kind: 'movie',
+      run: () => {
+        openMovie?.({ libraryId: movie.id })
+      }
     }
-  }))
+  }
 
-  // Only render server results once the debounced term matches the input, and
-  // never after the input is cleared — this avoids stale rows popping in/out.
-  const settled = keyword.length > 0 && debounced === keyword
-  if (settled) {
-    for (const movie of movies.data?.movies ?? []) {
-      const hasTitle = Boolean(movie.title)
-      items.push({
-        id: `movie:${movie.id}`,
-        group: '影片',
-        label: hasTitle ? movie.title : movie.code,
-        details: movieDetails(movie, hasTitle),
-        image: movie.cover || movie.poster,
-        kind: 'movie',
-        run: () => {
-          openMovie?.({ libraryId: movie.id })
-        }
-      })
-    }
-    for (const actor of actors.data?.actors ?? []) {
+  const items: SearchItem[] = []
+  if (!searching) {
+    for (const movie of recent.data?.movies ?? []) items.push(movieItem(movie, '最近加入'))
+  } else {
+    // Previous results stay on screen while the next keyword settles, so the list never flashes
+    // an empty "searching" state mid-typing.
+    for (const movie of movies.data ?? []) items.push(movieItem(movie, '影片'))
+    for (const actor of actors.data ?? []) {
       items.push({
         id: `actor:${actor.key}`,
         group: '演员',
@@ -215,8 +238,23 @@ export function SearchDialog({
     }
   }
 
-  const loading = keyword.length > 0 && (!settled || movies.isPending || actors.isPending)
+  const loading = searching
+    ? movies.isPending && actors.isPending
+    : open && recent.isPending
+  const failed = searching && settled && (movies.isError || actors.isError)
+  const recentFailed = !searching && recent.isError
   const groupedItems = groupBy(items)
+  const emptyMessage = loading
+    ? searching
+      ? '搜索中'
+      : '加载中'
+    : searching
+      ? failed
+        ? '搜索失败，请检查后端服务'
+        : '没有找到结果'
+      : recentFailed
+        ? '无法加载最近加入，请检查后端服务'
+        : '无影片'
 
   const handleSelect = (item: SearchItem) => {
     handleOpenChange(false)
@@ -231,15 +269,20 @@ export function SearchDialog({
       description="搜索本地影片与演员"
       className="top-1/2 max-h-[90vh] -translate-y-1/2 sm:max-w-3xl"
     >
-      <Command shouldFilter={false}>
+      <Command shouldFilter={false} vimBindings={false}>
         <CommandInput
           placeholder="输入番号、影片名或演员进行搜索"
           value={query}
           onValueChange={setQuery}
         />
         <FadingCommandList>
+          {failed && items.length > 0 ? (
+            <p className="px-2 py-1.5 text-xs text-destructive">部分结果加载失败，请检查后端服务</p>
+          ) : null}
           {items.length === 0 ? (
-            <CommandEmpty>{loading ? '搜索中' : '没有找到结果'}</CommandEmpty>
+            <CommandEmpty className="flex h-full items-center justify-center">
+              {emptyMessage}
+            </CommandEmpty>
           ) : null}
           {groupedItems.map(({ group, items: groupItems }, index) => (
             <Fragment key={group}>
