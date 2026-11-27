@@ -4,6 +4,8 @@
 
 Miyabi 支持直接对接 115、光鸭和本地影片进行刮削、订阅，也可由 Miyabi 作为底层服务，对 Emby 提供支持。
 
+[Telegram Channel](https://t.me/miyabi_cn)
+
 > \[!IMPORTANT]
 > 1.0.0 版本不支持老版本的数据库，请重新进行部署。
 
@@ -143,10 +145,6 @@ docker compose pull && docker compose up -d
 
 同时感谢社区 [LinuxDO](https://linux.do) 的帮助。
 
-## 联系我们
-
-[Telegram](https://t.me/miyabi_cn)
-
 ## 免责声明
 
 本项目仅供学习、研究和技术交流使用。项目作者与任何第三方服务、原始应用或内容提供方无关。
@@ -154,4 +152,4 @@ docker compose pull && docker compose up -d
 
 ## License
 
-遵循 [GNU GPL v3](./LICENSE) 协议。
+[GNU GPL v3](./LICENSE)
