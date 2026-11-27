@@ -133,6 +133,58 @@ func TestLibrarySources(t *testing.T) {
 	}
 }
 
+func TestLibrarySourcesSeparatesProviders(t *testing.T) {
+	ctx := t.Context()
+	mounts := map[string]domain.LibrarySource{
+		"115-A": {
+			AccountID: "A",
+			Directory: domain.LibraryDirectory{ID: "10", Name: "115 media", Path: "/115"},
+		},
+		"guangya-A": {
+			Provider:  string(KindGuangya),
+			AccountID: "A",
+			Directory: domain.LibraryDirectory{ID: "20", Name: "Guangya media", Path: "/guangya"},
+		},
+		"guangya-B": {
+			Provider:  string(KindGuangya),
+			AccountID: "B",
+			Directory: domain.LibraryDirectory{ID: "30", Name: "Other media", Path: "/other"},
+		},
+	}
+	service := newTestService(t, fakeMounts{mounts: mounts})
+	if _, err := service.Replace(ctx, []Source{
+		{Kind: Kind115, Name: "115", Enabled: true, Config: map[string]string{"account_id": "A"}},
+		{Kind: KindGuangya, Name: "guangya", Enabled: true, Config: map[string]string{"account_id": "A"}},
+		{Kind: KindGuangya, Name: "other", Enabled: true, Config: map[string]string{"account_id": "B"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	list, err := service.LibrarySources(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 3 {
+		t.Fatalf("library sources = %+v", list)
+	}
+	byProviderAccount := make(map[string]string, len(list))
+	for _, source := range list {
+		provider := source.Provider
+		if provider == "" {
+			provider = "115"
+		}
+		byProviderAccount[provider+"|"+source.AccountID] = source.Directory.ID
+	}
+	for key, directory := range map[string]string{
+		"115|A":     "10",
+		"guangya|A": "20",
+		"guangya|B": "30",
+	} {
+		if byProviderAccount[key] != directory {
+			t.Errorf("%s directory = %q, want %q", key, byProviderAccount[key], directory)
+		}
+	}
+}
+
 func TestReplaceKeepsOrderAndClears(t *testing.T) {
 	ctx := t.Context()
 	service := newTestService(t, nil)

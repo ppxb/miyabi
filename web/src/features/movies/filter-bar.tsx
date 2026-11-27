@@ -24,6 +24,7 @@ const SORT_OPTIONS = [
 const SOURCE_OPTIONS = [
   { value: 'all', label: '全部来源' },
   { value: '115', label: '115' },
+  { value: 'guangya', label: '光鸭' },
   { value: 'local', label: '本地' }
 ] as const
 

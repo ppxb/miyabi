@@ -25,7 +25,7 @@ test('scan and download workflows advance through their own stages', () => {
 test('waiting phases describe what the workflow is waiting for', () => {
   assert.deepEqual(taskProgressState('queued'), { label: '等待扫描', value: 0 })
   assert.deepEqual(taskProgressState('locating', true), {
-    label: '已下载，等待 115 返回文件信息',
+    label: '已下载，等待网盘返回文件信息',
     value: 20
   })
 })

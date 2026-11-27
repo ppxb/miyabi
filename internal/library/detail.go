@@ -82,9 +82,14 @@ func (s *Service) Movie(ctx context.Context, id int) (MovieDetail, error) {
 	if err != nil {
 		return MovieDetail{}, err
 	}
+	providers := sourceProviders(s.mergeSources(ctx, s.mountList(ctx)))
 	for _, file := range files {
 		if file.AccountID != "" && file.AccountID != domain.LocalAccountID {
-			detail.Source = "115"
+			if providers[file.AccountID] == "guangya" {
+				detail.Source = "guangya"
+			} else if detail.Source != "guangya" {
+				detail.Source = "115"
+			}
 		}
 		if !detail.HasSubtitle && subtitlemeta.HasChineseSubtitle(file.Name) {
 			detail.HasSubtitle = true

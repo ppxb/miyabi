@@ -22,6 +22,7 @@ type LibraryDirectory struct {
 
 // LibrarySource uniquely identifies a mounted media storage location and account.
 type LibrarySource struct {
+	Provider  string           `json:"provider,omitempty"`
 	AccountID string           `json:"account_id"`
 	Directory LibraryDirectory `json:"directory"`
 }

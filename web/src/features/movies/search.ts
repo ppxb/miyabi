@@ -5,7 +5,7 @@ import type { MoviesFilter } from './types'
 export type MoviesSearch = {
   q?: string
   sort?: 'recent' | 'rating' | 'release'
-  source?: '115' | 'local'
+  source?: '115' | 'guangya' | 'local'
   status?: 'done' | 'pending' | 'failed'
   tags?: string
   actors?: string
@@ -40,7 +40,7 @@ export function validateMoviesSearch(search: Record<string, unknown>): MoviesSea
   if (sort !== undefined && sort !== 'recent' && sort !== 'rating' && sort !== 'release') {
     throw new Error('排序无效')
   }
-  if (source !== undefined && source !== '115' && source !== 'local') {
+  if (source !== undefined && source !== '115' && source !== 'guangya' && source !== 'local') {
     throw new Error('来源无效')
   }
   if (status !== undefined && status !== 'done' && status !== 'pending' && status !== 'failed') {
@@ -49,7 +49,7 @@ export function validateMoviesSearch(search: Record<string, unknown>): MoviesSea
   return {
     q: parseText(search.q),
     sort: sort === 'rating' || sort === 'release' ? sort : undefined,
-    source: source === '115' || source === 'local' ? source : undefined,
+    source: source === '115' || source === 'guangya' || source === 'local' ? source : undefined,
     status: status === 'done' || status === 'pending' || status === 'failed' ? status : undefined,
     tags: parseText(search.tags),
     actors: parseText(search.actors),

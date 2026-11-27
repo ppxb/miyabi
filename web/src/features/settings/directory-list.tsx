@@ -25,7 +25,7 @@ export function DirectoryList({ files, disabled = false, onNavigate }: Directory
           onRetry={() => void files.refetch()}
           retrying={files.isFetching}
         >
-          目录读取失败，请检查 115 授权和网络后重试。
+          目录读取失败，请检查网盘授权和网络后重试。
         </InlineError>
       ) : files.data.files.length === 0 ? (
         <p className="flex h-full items-center justify-center text-sm text-muted-foreground">

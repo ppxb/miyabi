@@ -85,7 +85,7 @@ type Page struct {
 type BrowseFilter struct {
 	Query        string
 	Sort         string // "recent" (default), "rating", "release"
-	Source       string // "" (all), "115", "local"
+	Source       string // "" (all), "115", "guangya", "local"
 	ScrapeStatus string // "" (all), "done", "pending", "failed"
 	HighRated    bool
 	TagNames     []string
@@ -355,7 +355,7 @@ func (s *Service) StartIncrementalSync(ctx context.Context) (int, error) {
 		errs = append(errs, err)
 		for _, source := range list {
 			if _, err := s.EnqueueSyncMode(ctx, source, false); err != nil {
-				errs = append(errs, fmt.Errorf("queue 115 source %s: %w", source.AccountID, err))
+				errs = append(errs, fmt.Errorf("queue cloud source %s: %w", source.AccountID, err))
 				continue
 			}
 			started++
@@ -450,9 +450,20 @@ func fileScope(sources []domain.LibrarySource) predicate.File {
 // cloudFileScope matches files that belong to one of the cloud sources, the
 // same account and root pair scope uses to filter the library.
 func cloudFileScope(sources []domain.LibrarySource) predicate.File {
+	return cloudFileScopeProvider(sources, "")
+}
+
+func cloudFileScopeProvider(sources []domain.LibrarySource, provider string) predicate.File {
 	preds := make([]predicate.File, 0, len(sources))
 	for _, source := range sources {
 		if source.AccountID == "" || source.AccountID == domain.LocalAccountID {
+			continue
+		}
+		sourceProvider := source.Provider
+		if sourceProvider == "" {
+			sourceProvider = "115"
+		}
+		if provider != "" && sourceProvider != provider {
 			continue
 		}
 		preds = append(preds, database.LibraryFiles(source))
@@ -506,7 +517,7 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 	for _, record := range records {
 		result.Movies = append(result.Movies, movieItem(record))
 	}
-	if err := s.markCloudSources(ctx, result.Movies, cloudScope); err != nil {
+	if err := s.markCloudSources(ctx, result.Movies, cloudScope, sourceProviders(sources)); err != nil {
 		return result, err
 	}
 	if err := s.markSubtitleStatus(ctx, result.Movies); err != nil {
@@ -574,7 +585,7 @@ func (s *Service) TopRated(ctx context.Context, limit int) ([]Movie, error) {
 	for _, record := range records {
 		items = append(items, movieItem(record))
 	}
-	if err := s.markCloudSources(ctx, items, cloudScope); err != nil {
+	if err := s.markCloudSources(ctx, items, cloudScope, sourceProviders(sources)); err != nil {
 		return nil, err
 	}
 	if err := s.markSubtitleStatus(ctx, items); err != nil {
@@ -587,7 +598,24 @@ func (s *Service) TopRated(ctx context.Context, limit int) ([]Movie, error) {
 }
 
 // markCloudSources flags movies that have at least one file in a 115 source.
-func (s *Service) markCloudSources(ctx context.Context, movies []Movie, cloudScope predicate.File) error {
+func sourceProviders(sources []domain.LibrarySource) map[string]string {
+	result := make(map[string]string, len(sources))
+	for _, source := range sources {
+		if source.AccountID == "" || source.AccountID == domain.LocalAccountID {
+			continue
+		}
+		provider := source.Provider
+		if provider == "" {
+			provider = "115"
+		}
+		if result[source.AccountID] != "guangya" {
+			result[source.AccountID] = provider
+		}
+	}
+	return result
+}
+
+func (s *Service) markCloudSources(ctx context.Context, movies []Movie, cloudScope predicate.File, providers map[string]string) error {
 	if cloudScope == nil || len(movies) == 0 {
 		return nil
 	}
@@ -597,19 +625,26 @@ func (s *Service) markCloudSources(ctx context.Context, movies []Movie, cloudSco
 	}
 	records, err := s.database.File.Query().
 		Where(file.MovieIDIn(ids...), cloudScope).
-		Select(file.FieldMovieID).All(ctx)
+		Select(file.FieldMovieID, file.FieldAccountID).All(ctx)
 	if err != nil {
 		return fmt.Errorf("detect library movie sources: %w", err)
 	}
-	inCloud := make(map[int]bool, len(records))
+	source := make(map[int]string, len(records))
 	for _, record := range records {
-		if record.MovieID != nil {
-			inCloud[*record.MovieID] = true
+		if record.MovieID == nil {
+			continue
+		}
+		provider := providers[record.AccountID]
+		if provider == "" {
+			provider = "115"
+		}
+		if source[*record.MovieID] != "guangya" {
+			source[*record.MovieID] = provider
 		}
 	}
 	for i := range movies {
-		if inCloud[movies[i].ID] {
-			movies[i].Source = "115"
+		if provider, ok := source[movies[i].ID]; ok {
+			movies[i].Source = provider
 		}
 	}
 	return nil
@@ -761,7 +796,7 @@ func normalizeSort(value string) string {
 
 func normalizeSource(value string) string {
 	switch value {
-	case "115", "local":
+	case "115", "guangya", "local":
 		return value
 	default:
 		return ""
@@ -800,11 +835,12 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 	switch filter.Source {
 	case "local":
 		preds = append(preds, movie.HasFilesWith(file.AccountIDEQ(domain.LocalAccountID)))
-	case "115":
-		if cloudScope == nil {
+	case "115", "guangya":
+		scoped := cloudFileScopeProvider(sources, filter.Source)
+		if scoped == nil {
 			return result, nil
 		}
-		preds = append(preds, movie.HasFilesWith(cloudScope))
+		preds = append(preds, movie.HasFilesWith(scoped))
 	}
 	switch filter.ScrapeStatus {
 	case "done":
@@ -898,7 +934,7 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 		items = append(items, movieItem(record))
 	}
 	result.Movies = items
-	if err := s.markCloudSources(ctx, result.Movies, cloudScope); err != nil {
+	if err := s.markCloudSources(ctx, result.Movies, cloudScope, sourceProviders(sources)); err != nil {
 		return result, err
 	}
 	if err := s.markSubtitleStatus(ctx, result.Movies); err != nil {

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiGet, apiPut } from '@/api/client'
 
-export type SourceKind = 'local' | '115' | 'pikpak'
+export type SourceKind = 'local' | '115' | 'guangya' | 'pikpak'
 
 export type StorageSource = {
   id: string

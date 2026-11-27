@@ -16,9 +16,10 @@ import (
 type Kind string
 
 const (
-	KindLocal  Kind = "local"
-	Kind115    Kind = "115"
-	KindPikPak Kind = "pikpak"
+	KindLocal   Kind = "local"
+	Kind115     Kind = "115"
+	KindGuangya Kind = "guangya"
+	KindPikPak  Kind = "pikpak"
 )
 
 // Source is a configurable storage location (a local folder or a cloud drive).
@@ -107,18 +108,26 @@ func (s *Service) LibrarySources(ctx context.Context) ([]domain.LibrarySource, e
 	}
 	byAccount := make(map[string]domain.LibrarySource, len(mounted))
 	for _, mount := range mounted {
-		byAccount[mount.AccountID] = mount
+		provider := mount.Provider
+		if provider == "" {
+			provider = string(Kind115)
+		}
+		byAccount[provider+"|"+mount.AccountID] = mount
 	}
 	result := make([]domain.LibrarySource, 0)
 	for _, src := range sources {
-		if src.Kind != Kind115 || !src.Enabled {
+		if !src.Enabled {
+			continue
+		}
+		kind := string(src.Kind)
+		if kind != string(Kind115) && kind != string(KindGuangya) {
 			continue
 		}
 		accountID := strings.TrimSpace(src.Config["account_id"])
 		if accountID == "" {
 			continue
 		}
-		if mount, ok := byAccount[accountID]; ok {
+		if mount, ok := byAccount[kind+"|"+accountID]; ok {
 			result = append(result, mount)
 		}
 	}
@@ -177,7 +186,7 @@ func validate(src Source) error {
 		if !info.IsDir() {
 			return domain.E(domain.KindInvalid, fmt.Sprintf("路径不是目录：%s", path), nil)
 		}
-	case Kind115:
+	case Kind115, KindGuangya:
 		// Cloud sources are authenticated separately; nothing to validate here.
 	case KindPikPak:
 		// Reserved for a future PikPak drive; there is no login or scan yet.

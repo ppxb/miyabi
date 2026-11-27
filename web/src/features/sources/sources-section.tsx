@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactElement } from 'react'
 import { toast } from 'sonner'
 import {
   FolderOpenIcon,
@@ -8,6 +8,7 @@ import {
   PlusIcon,
   QrCodeIcon,
   SaveIcon,
+  SmartphoneIcon,
   UserRoundIcon
 } from 'lucide-react'
 
@@ -53,6 +54,7 @@ import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
+import { GuangyaLoginDialog } from '@/features/settings/guangya-login-dialog'
 import { PanDirectoryDialog } from '@/features/settings/pan-directory-dialog'
 import { PanLoginDialog } from '@/features/settings/pan-login-dialog'
 import { SettingsSection } from '@/features/settings/shared'
@@ -60,10 +62,11 @@ import { SettingsSection } from '@/features/settings/shared'
 const KIND_LABELS: Record<SourceKind, string> = {
   local: '本地目录',
   '115': '115 网盘',
+  guangya: '光鸭云盘',
   pikpak: 'PikPak'
 }
 
-const KIND_ORDER: SourceKind[] = ['local', '115', 'pikpak']
+const KIND_ORDER: SourceKind[] = ['local', '115', 'guangya', 'pikpak']
 
 // Only local directories need a manually entered path.
 const LOCAL_PATH = { label: '目录路径', placeholder: '/mnt/media' } as const
@@ -227,8 +230,8 @@ function SourceCard({
   onEdit: () => void
   onBind: (accountID: string) => void
 }) {
-  return source.kind === '115' ? (
-    <PanSourceCard source={source} onEdit={onEdit} onBind={onBind} />
+  return source.kind === '115' || source.kind === 'guangya' ? (
+    <PanSourceCard source={source} provider={source.kind} onEdit={onEdit} onBind={onBind} />
   ) : (
     <PlainSourceCard source={source} onEdit={onEdit} />
   )
@@ -264,10 +267,12 @@ function PlainSourceCard({ source, onEdit }: { source: StorageSource; onEdit: ()
 
 function PanSourceCard({
   source,
+  provider,
   onEdit,
   onBind
 }: {
   source: StorageSource
+  provider: '115' | 'guangya'
   onEdit: () => void
   onBind: (accountID: string) => void
 }) {
@@ -275,13 +280,20 @@ function PanSourceCard({
   const status = usePanAccountStatus(accountID)
   const disconnect = useDisconnectPanAccount(accountID)
   const profile = status.data?.account
+  const providerLabel = KIND_LABELS[provider]
+  const login = (trigger: ReactElement) =>
+    provider === 'guangya' ? (
+      <GuangyaLoginDialog onAuthorized={onBind}>{trigger}</GuangyaLoginDialog>
+    ) : (
+      <PanLoginDialog onAuthorized={onBind}>{trigger}</PanLoginDialog>
+    )
 
   return (
     <Card size="sm">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <span className="truncate">{source.name}</span>
-          <Badge variant="secondary">115 网盘</Badge>
+          <Badge variant="secondary">{providerLabel}</Badge>
         </CardTitle>
         <CardAction>
           <EditAction onEdit={onEdit} />
@@ -291,11 +303,11 @@ function PanSourceCard({
         {!accountID ? (
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-muted-foreground">未绑定账号</span>
-            <PanLoginDialog onAuthorized={onBind}>
-              <Button size="icon" aria-label="登录 115">
-                <QrCodeIcon />
+            {login(
+              <Button size="icon" aria-label={`登录${providerLabel}`}>
+                {provider === 'guangya' ? <SmartphoneIcon /> : <QrCodeIcon />}
               </Button>
-            </PanLoginDialog>
+            )}
           </div>
         ) : status.isPending ? (
           <Spinner className="text-muted-foreground" />
@@ -329,7 +341,7 @@ function PanSourceCard({
               </Button>
             </div>
 
-            <PanSpaceBlocks space={profile.space} />
+            {provider === '115' ? <PanSpaceBlocks space={profile.space} /> : null}
 
             <div className="flex items-center justify-between gap-2">
               <span className="truncate text-xs text-muted-foreground">
@@ -398,14 +410,14 @@ function SourceDialog({
       valid = false
     }
     if (!valid) return
+    // Changing the kind invalidates the previous account/path binding.
+    const kept = kind === source.kind ? source.config : undefined
     onSubmit({
       id: source.id,
       kind,
       name: name.trim(),
       enabled,
-      config: needsPath
-        ? { ...source.config, path: path.trim(), scrape_mode: scrapeMode }
-        : { ...source.config }
+      config: needsPath ? { ...kept, path: path.trim(), scrape_mode: scrapeMode } : { ...kept }
     })
   }
 
@@ -496,7 +508,7 @@ function SourceDialog({
               </Field>
             </>
           ) : (
-            <FieldDescription>保存后请在卡片中登录 115，登录后再选择媒体目录。</FieldDescription>
+            <FieldDescription>保存后请在卡片中登录账号，登录后再选择媒体目录。</FieldDescription>
           )}
 
           <Field orientation="horizontal">

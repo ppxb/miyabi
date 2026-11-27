@@ -9924,6 +9924,7 @@ type PanAccountMutation struct {
 	created_at     *time.Time
 	updated_at     *time.Time
 	account_id     *string
+	provider       *string
 	access_token   *string
 	refresh_token  *string
 	expires_at     *time.Time
@@ -10140,6 +10141,42 @@ func (m *PanAccountMutation) OldAccountID(ctx context.Context) (v string, err er
 // ResetAccountID resets all changes to the "account_id" field.
 func (m *PanAccountMutation) ResetAccountID() {
 	m.account_id = nil
+}
+
+// SetProvider sets the "provider" field.
+func (m *PanAccountMutation) SetProvider(s string) {
+	m.provider = &s
+}
+
+// Provider returns the value of the "provider" field in the mutation.
+func (m *PanAccountMutation) Provider() (r string, exists bool) {
+	v := m.provider
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProvider returns the old "provider" field's value of the PanAccount entity.
+// If the PanAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PanAccountMutation) OldProvider(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProvider is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProvider requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProvider: %w", err)
+	}
+	return oldValue.Provider, nil
+}
+
+// ResetProvider resets all changes to the "provider" field.
+func (m *PanAccountMutation) ResetProvider() {
+	m.provider = nil
 }
 
 // SetAccessToken sets the "access_token" field.
@@ -10405,7 +10442,7 @@ func (m *PanAccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PanAccountMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 10)
 	if m.created_at != nil {
 		fields = append(fields, panaccount.FieldCreatedAt)
 	}
@@ -10414,6 +10451,9 @@ func (m *PanAccountMutation) Fields() []string {
 	}
 	if m.account_id != nil {
 		fields = append(fields, panaccount.FieldAccountID)
+	}
+	if m.provider != nil {
+		fields = append(fields, panaccount.FieldProvider)
 	}
 	if m.access_token != nil {
 		fields = append(fields, panaccount.FieldAccessToken)
@@ -10447,6 +10487,8 @@ func (m *PanAccountMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdatedAt()
 	case panaccount.FieldAccountID:
 		return m.AccountID()
+	case panaccount.FieldProvider:
+		return m.Provider()
 	case panaccount.FieldAccessToken:
 		return m.AccessToken()
 	case panaccount.FieldRefreshToken:
@@ -10474,6 +10516,8 @@ func (m *PanAccountMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldUpdatedAt(ctx)
 	case panaccount.FieldAccountID:
 		return m.OldAccountID(ctx)
+	case panaccount.FieldProvider:
+		return m.OldProvider(ctx)
 	case panaccount.FieldAccessToken:
 		return m.OldAccessToken(ctx)
 	case panaccount.FieldRefreshToken:
@@ -10515,6 +10559,13 @@ func (m *PanAccountMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAccountID(v)
+		return nil
+	case panaccount.FieldProvider:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProvider(v)
 		return nil
 	case panaccount.FieldAccessToken:
 		v, ok := value.(string)
@@ -10624,6 +10675,9 @@ func (m *PanAccountMutation) ResetField(name string) error {
 		return nil
 	case panaccount.FieldAccountID:
 		m.ResetAccountID()
+		return nil
+	case panaccount.FieldProvider:
+		m.ResetProvider()
 		return nil
 	case panaccount.FieldAccessToken:
 		m.ResetAccessToken()

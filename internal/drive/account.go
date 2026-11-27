@@ -14,9 +14,10 @@ const (
 	upstreamTimeout = 45 * time.Second
 )
 
-// AccountStatus describes one 115 account and its mounted library directory.
+// AccountStatus describes one cloud account and its mounted library directory.
 type AccountStatus struct {
 	AccountID string                   `json:"account_id,omitempty"`
+	Provider  string                   `json:"provider,omitempty"`
 	Connected bool                     `json:"connected"`
 	Account   *pan.Account             `json:"account,omitempty"`
 	Directory *domain.LibraryDirectory `json:"directory,omitempty"`
@@ -39,7 +40,7 @@ func (d *Drive) acceptLogin(ctx context.Context, session *loginSession, tokens p
 	if err != nil {
 		return fmt.Errorf("verify 115 login account: %w", err)
 	}
-	if err := d.saveAccountTokens(ctx, account.ID, tokens); err != nil {
+	if err := d.saveAccountTokens(ctx, account.ID, tokens, Provider115); err != nil {
 		return err
 	}
 	d.bumpAccountCredential(account.ID)

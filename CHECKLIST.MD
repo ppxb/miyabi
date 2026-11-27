@@ -304,7 +304,13 @@
   - 后续修复：`domain.ImageCandidate` 增加 `Thumbnail`，avmoo/fanza 填充小图、`merge` 生成 `PreviewImages` 时优先使用；库内详情预览通过 `?thumb=1` 代理缩略图（discover 直接使用 Thumbnail），预览页不再加载大图；演员头像回退改为遍历同名所有非空头像行（`actors.Service.FetchAvatar`/`emby.findAvatar`，逐行尝试，新增两个测试）；放开 avmoo 的 FC2/HEYZO（`Supports` 接受所有非空番号，官方源因注册顺序/sourceOrder 在前仍优先，标量字段只补缺；演员/标签按既有语义取并集、封面按分辨率择优）。
   - 风险：未公开 API 可能随前端改版；域名可能更换；覆盖不全；无评分；中文演员名/标题可能为空；成人内容站点需自行确认使用条款。
 
-- [ ] 查看 https://github.com/tinypinglite/sakuramedia 项目接入光鸭的方式。
+- [x] ✅ **接入光鸭云盘（私有 API）**
+  - 调研：sakuramedia 以 storage/云添加插件方式接入；官方 OpenAPI 有目录/详情/直链，但没有云添加/分享；私有接口（guangyaclient）可补齐短信登录、云下载、分享。
+  - 后端：`PanAccount` 增加 `provider`（默认 `115`）；新增 `internal/guangya` 私有 client（短信登录、refresh、目录/详情、`get_res_download_url`、`get_vod_download_url`、`resolve_res`/`create_task`/`list_task`/`delete_task`）；`drive.Client` 按账号 provider 路由，115 路径保持原样；`source.Kind` 增加 `guangya`；`domain.LibrarySource` 增加 provider；`offline` 复用现有状态机（光鸭任务用任务 `res` 中的 btih 对齐 hash，DirectoryID 由 session 补齐）；播放由 `DownloadURL` 按文件是否带 `gcid` 选择接口：视频直接走 VOD 直链，NFO/小文件走普通下载直链，不做 254 回退，也避免被播放层误判为 HLS；`playback` 按账号 provider 选择媒体客户端。
+  - 前端：设置页光鸭源卡片 + 短信登录弹窗；磁力面板按账号 provider 显示“加入 115/光鸭/网盘”；影片库来源筛选、卡片/播放器徽标支持光鸭；任务与错误文案泛化。
+  - 实测：短信登录、token refresh、目录/详情、VOD Range、NFO 小文件读取、云任务 resolve→create→list（status 2）均通过；私有接口 `pageSize` 最大 50，空 `taskIds` 返回 112，已适配。
+  - 测试：`go build ./internal/... ./cmd/...`、`go vet ./internal/... ./cmd/...`、`go test ./internal/... ./cmd/...` 全绿；前端 `npm run typecheck`、`npm run lint`、`npm run fmt:check` 通过；`npm run test` 仅剩既有 7 个失败（完成提示时长 4000 vs 3000，源于 `e8104bc`，与本次无关）。
+  - 遗留/风险：私有接口无官方稳定性承诺，可能随网页改版/风控失效；光鸭容量信息未接入（设置页隐藏容量条）；VOD signedURL 未做到期缓存，每次播放重新解析；`delete_task` v2 未用真实账号验证取消/重试；根目录挂载已加兼容但未实机扫描；私有 API 使用网页端 client_id，账号/合规风险需自行承担。
 
 - [x] ✅ **设置页媒体库同步按钮语义不清；影片页缺刮削状态筛选；缺一次性重刮失败影片**
   - 改法：设置页去掉与全量扫描重复的"同步新增文件"（启动与保存源配置仍自动跑增量同步），按钮收敛为「扫描并修复媒体库 / 重新刮削失败影片 / 重建媒体库」；影片页只加状态筛选，不做批量操作；批量重刮入口放在设置页。

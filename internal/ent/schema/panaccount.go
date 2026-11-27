@@ -21,6 +21,9 @@ func (PanAccount) Fields() []ent.Field {
 			NotEmpty().
 			Unique().
 			Immutable(),
+		field.String("provider").
+			Default("115").
+			Immutable(),
 		field.String("access_token").
 			Default("").
 			Sensitive(),

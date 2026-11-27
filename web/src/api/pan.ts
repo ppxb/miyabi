@@ -33,6 +33,8 @@ export type PanAccount = {
 }
 
 export type PanAccountStatus = {
+  account_id?: string
+  provider?: string
   connected: boolean
   account?: PanAccount
   directory?: PanDirectory
@@ -51,6 +53,32 @@ export type PanLoginSession = {
 }
 
 export type PanLoginState = 'waiting' | 'scanned' | 'authorized' | 'expired' | 'canceled'
+
+export type GuangyaLoginSession = {
+  id: string
+}
+
+export function useBeginGuangyaLogin() {
+  return useMutation({
+    mutationFn: (phone: string) =>
+      apiPost<GuangyaLoginSession>('/api/pan/guangya/login', { phone }),
+    gcTime: 0
+  })
+}
+
+export function useVerifyGuangyaLogin() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, code }: { id: string; code: string }) =>
+      apiPost<PanAccountStatus>(`/api/pan/guangya/login/${encodeURIComponent(id)}/verify`, {
+        code
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: panKeys.accounts })
+      invalidatePanSource(queryClient)
+    }
+  })
+}
 
 type PanLoginStatus = {
   state: PanLoginState

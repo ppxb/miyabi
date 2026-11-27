@@ -19,6 +19,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// FieldAccountID holds the string denoting the account_id field in the database.
 	FieldAccountID = "account_id"
+	// FieldProvider holds the string denoting the provider field in the database.
+	FieldProvider = "provider"
 	// FieldAccessToken holds the string denoting the access_token field in the database.
 	FieldAccessToken = "access_token"
 	// FieldRefreshToken holds the string denoting the refresh_token field in the database.
@@ -41,6 +43,7 @@ var Columns = []string{
 	FieldCreatedAt,
 	FieldUpdatedAt,
 	FieldAccountID,
+	FieldProvider,
 	FieldAccessToken,
 	FieldRefreshToken,
 	FieldExpiresAt,
@@ -68,6 +71,8 @@ var (
 	UpdateDefaultUpdatedAt func() time.Time
 	// AccountIDValidator is a validator for the "account_id" field. It is called by the builders before save.
 	AccountIDValidator func(string) error
+	// DefaultProvider holds the default value on creation for the "provider" field.
+	DefaultProvider string
 	// DefaultAccessToken holds the default value on creation for the "access_token" field.
 	DefaultAccessToken string
 	// DefaultRefreshToken holds the default value on creation for the "refresh_token" field.
@@ -101,6 +106,11 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByAccountID orders the results by the account_id field.
 func ByAccountID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAccountID, opts...).ToFunc()
+}
+
+// ByProvider orders the results by the provider field.
+func ByProvider(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProvider, opts...).ToFunc()
 }
 
 // ByAccessToken orders the results by the access_token field.

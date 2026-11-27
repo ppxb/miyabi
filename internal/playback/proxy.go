@@ -46,7 +46,7 @@ func (service *Service) Stream(ctx context.Context, id string, index int, method
 		// A rewritten playlist is a new representation and cannot reuse upstream byte ranges.
 		headers = nil
 	}
-	response, err := service.drive.OpenMedia(ctx, method, resource.url.String(), headers)
+	response, err := service.drive.OpenMediaFor(ctx, session.source.AccountID, method, resource.url.String(), headers)
 	if err != nil {
 		release()
 		return nil, err

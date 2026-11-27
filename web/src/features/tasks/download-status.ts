@@ -3,7 +3,7 @@ import type { OfflineSubmission } from '@/api/offline'
 export function downloadStatus(task: OfflineSubmission): string {
   switch (task.download_state) {
     case 'queued':
-      return '等待 115 开始下载'
+      return '等待网盘开始下载'
     case 'switching':
       return '正在切换磁力'
     case 'submitting':

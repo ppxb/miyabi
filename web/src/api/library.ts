@@ -68,7 +68,7 @@ export type LibraryFilterOptions = {
 export type BrowseLibraryParams = {
   q?: string
   sort?: 'recent' | 'rating' | 'release'
-  source?: '115' | 'local'
+  source?: '115' | 'guangya' | 'local'
   status?: 'done' | 'pending' | 'failed'
   tagNames?: string[]
   actorNames?: string[]

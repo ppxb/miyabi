@@ -76,7 +76,7 @@ func (s *Service) advance(ctx context.Context, id int, requested string, cache *
 		state.Manual = requested == "next"
 		state.Reason = "下载长时间无进展"
 		if record.Status == offlinedownload.StatusFailed {
-			state.Reason = "115 离线任务失败"
+			state.Reason = "网盘离线任务失败"
 		}
 	}
 	if state.Action == "" {
@@ -176,7 +176,7 @@ func (s *Service) removeCurrent(ctx context.Context, sess drive.Session, record 
 	}
 	if state.Action == actionSwitch && !state.RemovalStarted {
 		if !found {
-			return domain.E(domain.KindConflict, "115 中未找到原任务，请确认下载结果后重试", nil)
+			return domain.E(domain.KindConflict, "网盘中未找到原任务，请确认下载结果后重试", nil)
 		}
 		// A fresh observation always wins over an earlier stall decision.
 		if !state.Manual && remote.Status != pan.OfflineStatusFailed && (remote.ProgressUnknown || rawProgress(remote) > state.Progress || remote.Status == pan.OfflineStatusWaiting) {
@@ -252,7 +252,7 @@ func (s *Service) resumeSubmission(ctx context.Context, sess drive.Session, reco
 		}
 		if found && (remote.Status == pan.OfflineStatusWaiting || remote.Status == pan.OfflineStatusRunning || remote.Status == pan.OfflineStatusDone) {
 			if remote.DirectoryID != record.DirectoryID {
-				return domain.E(domain.KindConflict, "115 任务位于其他目录", nil)
+				return domain.E(domain.KindConflict, "网盘任务位于其他目录", nil)
 			}
 			return s.recordSubmission(ctx, sess, record, state, remote)
 		}

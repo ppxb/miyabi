@@ -14,7 +14,7 @@ export function isPanUnauthorized(error: unknown): boolean {
 }
 
 export function describeApiError(error: unknown): string {
-  if (isPanUnauthorized(error)) return '115 登录已失效，请前往设置重新登录。'
+  if (isPanUnauthorized(error)) return '网盘登录已失效，请前往设置重新登录。'
   return error instanceof ApiError ? error.message : '请检查后端服务和网络后重试。'
 }
 

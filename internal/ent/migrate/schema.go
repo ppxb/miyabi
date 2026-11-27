@@ -318,6 +318,7 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "account_id", Type: field.TypeString, Unique: true},
+		{Name: "provider", Type: field.TypeString, Default: "115"},
 		{Name: "access_token", Type: field.TypeString, Default: ""},
 		{Name: "refresh_token", Type: field.TypeString, Default: ""},
 		{Name: "expires_at", Type: field.TypeTime, Nullable: true},

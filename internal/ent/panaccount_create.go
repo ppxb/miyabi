@@ -56,6 +56,20 @@ func (_c *PanAccountCreate) SetAccountID(v string) *PanAccountCreate {
 	return _c
 }
 
+// SetProvider sets the "provider" field.
+func (_c *PanAccountCreate) SetProvider(v string) *PanAccountCreate {
+	_c.mutation.SetProvider(v)
+	return _c
+}
+
+// SetNillableProvider sets the "provider" field if the given value is not nil.
+func (_c *PanAccountCreate) SetNillableProvider(v *string) *PanAccountCreate {
+	if v != nil {
+		_c.SetProvider(*v)
+	}
+	return _c
+}
+
 // SetAccessToken sets the "access_token" field.
 func (_c *PanAccountCreate) SetAccessToken(v string) *PanAccountCreate {
 	_c.mutation.SetAccessToken(v)
@@ -183,6 +197,10 @@ func (_c *PanAccountCreate) defaults() {
 		v := panaccount.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.Provider(); !ok {
+		v := panaccount.DefaultProvider
+		_c.mutation.SetProvider(v)
+	}
 	if _, ok := _c.mutation.AccessToken(); !ok {
 		v := panaccount.DefaultAccessToken
 		_c.mutation.SetAccessToken(v)
@@ -220,6 +238,9 @@ func (_c *PanAccountCreate) check() error {
 		if err := panaccount.AccountIDValidator(v); err != nil {
 			return &ValidationError{Name: "account_id", err: fmt.Errorf(`ent: validator failed for field "PanAccount.account_id": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.Provider(); !ok {
+		return &ValidationError{Name: "provider", err: errors.New(`ent: missing required field "PanAccount.provider"`)}
 	}
 	if _, ok := _c.mutation.AccessToken(); !ok {
 		return &ValidationError{Name: "access_token", err: errors.New(`ent: missing required field "PanAccount.access_token"`)}
@@ -274,6 +295,10 @@ func (_c *PanAccountCreate) createSpec() (*PanAccount, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.AccountID(); ok {
 		_spec.SetField(panaccount.FieldAccountID, field.TypeString, value)
 		_node.AccountID = value
+	}
+	if value, ok := _c.mutation.Provider(); ok {
+		_spec.SetField(panaccount.FieldProvider, field.TypeString, value)
+		_node.Provider = value
 	}
 	if value, ok := _c.mutation.AccessToken(); ok {
 		_spec.SetField(panaccount.FieldAccessToken, field.TypeString, value)
@@ -457,6 +482,9 @@ func (u *PanAccountUpsertOne) UpdateNewValues() *PanAccountUpsertOne {
 		}
 		if _, exists := u.create.mutation.AccountID(); exists {
 			s.SetIgnore(panaccount.FieldAccountID)
+		}
+		if _, exists := u.create.mutation.Provider(); exists {
+			s.SetIgnore(panaccount.FieldProvider)
 		}
 	}))
 	return u
@@ -775,6 +803,9 @@ func (u *PanAccountUpsertBulk) UpdateNewValues() *PanAccountUpsertBulk {
 			}
 			if _, exists := b.mutation.AccountID(); exists {
 				s.SetIgnore(panaccount.FieldAccountID)
+			}
+			if _, exists := b.mutation.Provider(); exists {
+				s.SetIgnore(panaccount.FieldProvider)
 			}
 		}
 	}))

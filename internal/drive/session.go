@@ -47,8 +47,17 @@ func (d *Drive) OpenSource(ctx context.Context, expected domain.LibrarySource) (
 	if record.Directory.ID != expected.Directory.ID {
 		return nil, ErrSourceChanged
 	}
+	client, ok := d.providerClient(record.Provider)
+	if !ok {
+		return nil, domain.E(domain.KindInvalid, "存储账号的来源不受支持", nil)
+	}
+	if record.Provider != Provider115 {
+		expected.Provider = record.Provider
+	}
 	return &accountSession{
 		drive:       d,
+		client:      client,
+		provider:    record.Provider,
 		accountID:   expected.AccountID,
 		source:      expected,
 		credVersion: d.accountCredVersion(expected.AccountID),
@@ -76,7 +85,8 @@ func DirectoryEntries(ctx context.Context, sess Session, id string) ([]pan.File,
 		if err != nil {
 			return pan.FilePage{}, err
 		}
-		if !slices.ContainsFunc(page.Path, func(directory pan.Directory) bool { return directory.ID == sess.Source().Directory.ID }) {
+		if sess.Source().Directory.ID != "0" &&
+			!slices.ContainsFunc(page.Path, func(directory pan.Directory) bool { return directory.ID == sess.Source().Directory.ID }) {
 			return pan.FilePage{}, domain.E(domain.KindConflict, "该文件夹已移出媒体目录，请重新扫描", nil)
 		}
 		return page, nil

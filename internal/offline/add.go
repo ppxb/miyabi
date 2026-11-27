@@ -60,14 +60,14 @@ func (service *Service) addForAccount(ctx context.Context, accountID, movieID, h
 	}
 
 	if accountID == "" {
-		return domain.OfflineSubmission{}, domain.E(domain.KindInvalid, "请选择 115 账号", nil)
+		return domain.OfflineSubmission{}, domain.E(domain.KindInvalid, "请选择网盘账号", nil)
 	}
 	source, ok, err := service.drive.Mount(ctx, accountID)
 	if err != nil {
 		return domain.OfflineSubmission{}, err
 	}
 	if !ok {
-		return domain.OfflineSubmission{}, domain.E(domain.KindInvalid, "所选 115 账号未挂载媒体目录", nil)
+		return domain.OfflineSubmission{}, domain.E(domain.KindInvalid, "所选网盘账号未挂载媒体目录", nil)
 	}
 	sess, err := service.drive.OpenSource(ctx, source)
 	if err != nil {
@@ -86,7 +86,7 @@ func (service *Service) addForAccount(ctx context.Context, accountID, movieID, h
 		offlinedownload.StatusEQ(offlinedownload.StatusRunning)).First(ctx)
 	if err == nil {
 		if existing.DirectoryID != directory.ID {
-			return domain.OfflineSubmission{}, domain.E(domain.KindConflict, "该磁力正在下载到另一个目录，请先在 115 中处理该任务", nil)
+			return domain.OfflineSubmission{}, domain.E(domain.KindConflict, "该磁力正在下载到另一个目录，请先在网盘客户端处理该任务", nil)
 		}
 		return service.submission(ctx, existing, &source)
 	}

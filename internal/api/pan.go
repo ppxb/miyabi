@@ -14,6 +14,8 @@ type DriveManager interface {
 	AccountStatusFor(context.Context, string) (drive.AccountStatus, error)
 	BeginLogin(context.Context) (drive.LoginSession, error)
 	LoginStatus(context.Context, string) (drive.LoginStatus, error)
+	BeginGuangyaLogin(context.Context, string) (drive.GuangyaLoginSession, error)
+	VerifyGuangyaLogin(context.Context, string, string) (drive.AccountStatus, error)
 	DisconnectAccount(context.Context, string) error
 	FilesFor(context.Context, string, string, int) (pan.FilePage, error)
 	SelectDirectoryForAccount(context.Context, string, string) (domain.LibraryDirectory, error)
@@ -128,5 +130,39 @@ func panLoginStatusHandler(pan DriveManager) gin.HandlerFunc {
 		}
 		status, err := pan.LoginStatus(c.Request.Context(), uri.ID)
 		respond(c, status, err)
+	}
+}
+
+type guangyaLoginInput struct {
+	Phone string `json:"phone" binding:"required"`
+}
+
+type guangyaLoginVerifyInput struct {
+	Code string `json:"code" binding:"required"`
+}
+
+func panBeginGuangyaLoginHandler(pan DriveManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		input, ok := bindJSON[guangyaLoginInput](c)
+		if !ok {
+			return
+		}
+		session, err := pan.BeginGuangyaLogin(c.Request.Context(), input.Phone)
+		respond(c, session, err)
+	}
+}
+
+func panVerifyGuangyaLoginHandler(pan DriveManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uri, ok := bindURI[panLoginURI](c)
+		if !ok {
+			return
+		}
+		input, ok := bindJSON[guangyaLoginVerifyInput](c)
+		if !ok {
+			return
+		}
+		status, err := pan.VerifyGuangyaLogin(c.Request.Context(), uri.ID, input.Code)
+		respond(c, accountResponse(status), err)
 	}
 }

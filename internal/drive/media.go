@@ -97,7 +97,7 @@ func resolveMedia(ctx context.Context, sess MediaSession, fileID, pickCode, user
 			return Media{}, fmt.Errorf("read 115 video info: %w", err)
 		}
 		if info.PickCode == "" {
-			return Media{}, domain.E(domain.KindNotFound, "未能获取到视频的 115 提取码", nil)
+			return Media{}, domain.E(domain.KindNotFound, "未能获取到视频的播放句柄", nil)
 		}
 		pickCode = info.PickCode
 	}

@@ -212,7 +212,7 @@ func (service *Service) updateTask(ctx context.Context, sess drive.Session, reco
 			update.ClearError()
 		}
 		if status == offlinedownload.StatusFailed {
-			update.SetError("115 离线下载失败，请在 115 客户端查看原因")
+			update.SetError("网盘离线下载失败，请在网盘客户端查看原因")
 		}
 		notify = current.Status != status || current.Progress != remote.Progress || current.Recovery != nil &&
 			(current.Recovery.Stalled != state.Stalled || current.Recovery.RemoteStatus != state.RemoteStatus ||
@@ -247,12 +247,12 @@ func (service *Service) markMissing(ctx context.Context, sess drive.Session, rec
 		update := tx.OfflineDownload.UpdateOneID(current.ID)
 		switch current.Status {
 		case offlinedownload.StatusRunning:
-			update.SetStatus(offlinedownload.StatusFailed).SetError("115 中未找到该任务，请在 115 客户端确认下载结果")
+			update.SetStatus(offlinedownload.StatusFailed).SetError("网盘中未找到该任务，请在网盘客户端确认下载结果")
 		case offlinedownload.StatusDone:
 			if !current.AwaitingLocation || current.FileID != "" || current.ScanTaskID != 0 {
 				return nil
 			}
-			update.SetAwaitingLocation(false).SetError("115 已完成下载，但任务记录已移除，无法获取文件位置，请扫描媒体目录确认下载结果")
+			update.SetAwaitingLocation(false).SetError("网盘已完成下载，但任务记录已移除，无法获取文件位置，请扫描媒体目录确认下载结果")
 		default:
 			return nil
 		}

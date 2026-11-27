@@ -201,6 +201,8 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	panAPI.DELETE("/accounts/:accountID", panAccountDisconnectHandler(deps.Drive))
 	panAPI.POST("/login", panBeginLoginHandler(deps.Drive))
 	panAPI.GET("/login/:id", panLoginStatusHandler(deps.Drive))
+	panAPI.POST("/guangya/login", panBeginGuangyaLoginHandler(deps.Drive))
+	panAPI.POST("/guangya/login/:id/verify", panVerifyGuangyaLoginHandler(deps.Drive))
 
 	if deps.Frontend != nil {
 		installFrontend(router, deps.Frontend)

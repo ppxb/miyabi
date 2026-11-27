@@ -66,14 +66,19 @@ const sourceLabels: Record<string, string> = {
 }
 
 const phaseLabels: Record<OfflineSubmission['phase'], string> = {
-  available: '一键加入 115',
+  available: '加入网盘',
   downloading: '下载中',
   processing: '入库处理中',
   in_library: '已入库',
   downloaded: '已下载'
 }
 
-export type OfflineAccount = { id: string; name: string; directory: string }
+export type OfflineAccount = {
+  id: string
+  name: string
+  directory: string
+  provider: '115' | 'guangya'
+}
 
 export function MovieMagnets({
   movieID,
@@ -91,7 +96,8 @@ export function MovieMagnets({
         .map(status => ({
           id: status.account!.id,
           name: status.account!.name || status.account!.id,
-          directory: status.directory!.name
+          directory: status.directory!.name,
+          provider: status.provider === 'guangya' ? 'guangya' : '115'
         }))
   const hasAccounts = (panAccounts.data?.length ?? 0) > 0
   const offline = useMovieOfflineTasks(movieID)
@@ -119,7 +125,7 @@ export function MovieMagnets({
           <Link to="/settings/sources" className="text-foreground underline underline-offset-4">
             设置 → 源管理
           </Link>{' '}
-          为 115 账号挂载媒体目录，再一键加入 115。
+          为网盘账号挂载媒体目录，再一键加入网盘。
         </p>
       ) : null}
       {offline.isError ? (
@@ -180,7 +186,13 @@ function MagnetCard({
   const next = useOfflineControl('next')
   const submitted = task !== undefined && task.phase !== 'available'
   const busy = add.isPending || (checkingStatus && !submitted)
-  let label = '加入 115'
+  const providers = new Set(accounts.map(account => account.provider))
+  let label =
+    providers.size === 1 && providers.has('guangya')
+      ? '加入 光鸭'
+      : providers.size === 1 && providers.has('115')
+        ? '加入 115'
+        : '加入网盘'
   if (add.isPending) {
     label = '提交中'
   } else if (submitted) {
@@ -202,7 +214,7 @@ function MagnetCard({
         onError: submitError =>
           notifyTaskError(
             `offline:submit-error:${movieID}`,
-            '加入 115 失败',
+            '加入网盘失败',
             describeApiError(submitError)
           )
       }
@@ -261,13 +273,18 @@ function MagnetCard({
                   <ChevronDownIcon className="size-3.5 opacity-70" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-44">
-                  <DropdownMenuLabel>选择加入的 115 账号</DropdownMenuLabel>
+                  <DropdownMenuLabel>选择加入的网盘账号</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   {accounts.map(account => (
                     <DropdownMenuItem key={account.id} onClick={() => submit(account.id)}>
                       <CloudDownloadIcon />
                       <div className="min-w-0">
-                        <p className="truncate text-sm">{account.name}</p>
+                        <p className="truncate text-sm">
+                          {account.name}
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            {account.provider === 'guangya' ? '光鸭' : '115'}
+                          </span>
+                        </p>
                         <p className="truncate text-xs text-muted-foreground">
                           {account.directory}
                         </p>

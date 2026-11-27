@@ -23,6 +23,8 @@ type PanAccount struct {
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 	// AccountID holds the value of the "account_id" field.
 	AccountID string `json:"account_id,omitempty"`
+	// Provider holds the value of the "provider" field.
+	Provider string `json:"provider,omitempty"`
 	// AccessToken holds the value of the "access_token" field.
 	AccessToken string `json:"-"`
 	// RefreshToken holds the value of the "refresh_token" field.
@@ -45,7 +47,7 @@ func (*PanAccount) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case panaccount.FieldID:
 			values[i] = new(sql.NullInt64)
-		case panaccount.FieldAccountID, panaccount.FieldAccessToken, panaccount.FieldRefreshToken, panaccount.FieldDirectoryID, panaccount.FieldDirectoryName, panaccount.FieldDirectoryPath:
+		case panaccount.FieldAccountID, panaccount.FieldProvider, panaccount.FieldAccessToken, panaccount.FieldRefreshToken, panaccount.FieldDirectoryID, panaccount.FieldDirectoryName, panaccount.FieldDirectoryPath:
 			values[i] = new(sql.NullString)
 		case panaccount.FieldCreatedAt, panaccount.FieldUpdatedAt, panaccount.FieldExpiresAt:
 			values[i] = new(sql.NullTime)
@@ -87,6 +89,12 @@ func (_m *PanAccount) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field account_id", values[i])
 			} else if value.Valid {
 				_m.AccountID = value.String
+			}
+		case panaccount.FieldProvider:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field provider", values[i])
+			} else if value.Valid {
+				_m.Provider = value.String
 			}
 		case panaccount.FieldAccessToken:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -168,6 +176,9 @@ func (_m *PanAccount) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("account_id=")
 	builder.WriteString(_m.AccountID)
+	builder.WriteString(", ")
+	builder.WriteString("provider=")
+	builder.WriteString(_m.Provider)
 	builder.WriteString(", ")
 	builder.WriteString("access_token=<sensitive>")
 	builder.WriteString(", ")

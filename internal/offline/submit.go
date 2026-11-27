@@ -66,7 +66,7 @@ func (service *Service) submit(ctx context.Context, sess drive.Session, hash str
 	source := sess.Source()
 	if remote.Status == pan.OfflineStatusWaiting || remote.Status == pan.OfflineStatusRunning {
 		if remote.DirectoryID != source.Directory.ID {
-			return pan.OfflineTask{}, domain.E(domain.KindConflict, "115 已有该磁力的下载任务，目标目录与当前媒体目录不一致", nil)
+			return pan.OfflineTask{}, domain.E(domain.KindConflict, "网盘已有该磁力的下载任务，目标目录与当前媒体目录不一致", nil)
 		}
 		return remote, nil
 	}
@@ -74,7 +74,7 @@ func (service *Service) submit(ctx context.Context, sess drive.Session, hash str
 		return pan.OfflineTask{}, fmt.Errorf("115 returned unknown offline status %d", remote.Status)
 	}
 	if remote.FileID == "" {
-		return pan.OfflineTask{}, domain.E(domain.KindConflict, "115 的历史任务未提供资源位置，请先在 115 客户端清理该任务记录", nil)
+		return pan.OfflineTask{}, domain.E(domain.KindConflict, "网盘的历史任务未提供资源位置，请先在网盘客户端清理该任务记录", nil)
 	}
 	present, err := service.remoteHasVideo(ctx, sess, remote.FileID)
 	if err != nil {
@@ -82,7 +82,7 @@ func (service *Service) submit(ctx context.Context, sess drive.Session, hash str
 	}
 	if present {
 		if remote.Status == pan.OfflineStatusFailed {
-			return pan.OfflineTask{}, domain.E(domain.KindConflict, "115 任务失败但目录内仍有视频，请先在 115 客户端确认完整性", nil)
+			return pan.OfflineTask{}, domain.E(domain.KindConflict, "网盘任务失败但目录内仍有视频，请先在网盘客户端确认完整性", nil)
 		}
 		return remote, nil
 	}
@@ -110,7 +110,7 @@ func (service *Service) findRemoteTask(ctx context.Context, sess drive.Session, 
 	if found {
 		return remote, nil
 	}
-	return pan.OfflineTask{}, domain.E(domain.KindBusy, "115 提示任务已存在，但任务列表中未找到它，请稍后重试", nil)
+	return pan.OfflineTask{}, domain.E(domain.KindBusy, "网盘提示任务已存在，但任务列表中未找到它，请稍后重试", nil)
 }
 
 func (service *Service) lookupRemoteTask(ctx context.Context, sess drive.Session, hash string, cache *remoteTaskCache) (pan.OfflineTask, bool, error) {
@@ -157,7 +157,7 @@ func (service *Service) remoteHasVideo(ctx context.Context, sess drive.Session, 
 	}
 	source := sess.Source()
 	if !drive.WithinSource(info, source) {
-		return false, domain.E(domain.KindConflict, "该磁力的资源已在媒体目录之外，请先在 115 中移动资源", nil)
+		return false, domain.E(domain.KindConflict, "该磁力的资源已在媒体目录之外，请先在网盘中移动资源", nil)
 	}
 	if !info.IsDirectory {
 		return domain.IsVideo(info.Name), nil
@@ -170,7 +170,8 @@ func (service *Service) remoteHasVideo(ctx context.Context, sess drive.Session, 
 		err := drive.WalkFilePages(ctx, func(offset int) (pan.FilePage, error) {
 			return sess.List(ctx, dirID, offset)
 		}, func(page pan.FilePage) (bool, error) {
-			if !slices.ContainsFunc(page.Path, func(dir pan.Directory) bool { return dir.ID == source.Directory.ID }) {
+			if source.Directory.ID != "0" &&
+				!slices.ContainsFunc(page.Path, func(dir pan.Directory) bool { return dir.ID == source.Directory.ID }) {
 				return false, domain.E(domain.KindNotFound, "下载目录已移出媒体目录", nil)
 			}
 			for _, entry := range page.Files {

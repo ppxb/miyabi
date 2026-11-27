@@ -15,6 +15,8 @@ import (
 // its own token cache/refresh and credential/authorization version guards.
 type accountSession struct {
 	drive       *Drive
+	client      Client
+	provider    string
 	accountID   string
 	source      domain.LibrarySource
 	credVersion uint64
@@ -97,19 +99,24 @@ func (d *Drive) refreshAccountTokens(ctx context.Context, accountID string) erro
 	result := d.accountRefresh.DoChan(accountID, func() (any, error) {
 		refreshContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), upstreamTimeout)
 		defer cancel()
-		tokens, err := d.accountToken(refreshContext, accountID)
+		record, err := d.accountRecord(refreshContext, accountID)
 		if err != nil {
 			return nil, err
 		}
+		tokens := record.Tokens
 		if tokens.RefreshToken == "" {
 			return nil, pan.ErrUnauthorized
 		}
-		next, err := d.client.RefreshToken(refreshContext, tokens.RefreshToken)
+		client, ok := d.providerClient(record.Provider)
+		if !ok {
+			return nil, domain.E(domain.KindInvalid, "存储账号的来源不受支持", nil)
+		}
+		next, err := client.RefreshToken(refreshContext, tokens.RefreshToken)
 		if err != nil {
 			if errors.Is(err, pan.ErrUnauthorized) {
 				_ = d.removeAccount(refreshContext, accountID)
 			}
-			return nil, fmt.Errorf("refresh 115 credentials: %w", err)
+			return nil, fmt.Errorf("refresh pan credentials: %w", err)
 		}
 		if err := d.updateAccountTokens(refreshContext, accountID, next); err != nil {
 			return nil, err
@@ -153,31 +160,31 @@ func readAccount[T any](ctx context.Context, s *accountSession, request func(str
 
 func (s *accountSession) List(ctx context.Context, dirID string, offset int) (pan.FilePage, error) {
 	return readAccount(ctx, s, func(token string) (pan.FilePage, error) {
-		return s.drive.client.List(ctx, token, dirID, offset, 100)
+		return s.client.List(ctx, token, dirID, offset, 100)
 	})
 }
 
 func (s *accountSession) Info(ctx context.Context, fileID string) (pan.FileInfo, error) {
 	return readAccount(ctx, s, func(token string) (pan.FileInfo, error) {
-		return s.drive.client.Info(ctx, token, fileID)
+		return s.client.Info(ctx, token, fileID)
 	})
 }
 
 func (s *accountSession) Read(ctx context.Context, pickCode string, limit int64) ([]byte, error) {
 	return readAccount(ctx, s, func(token string) ([]byte, error) {
-		return s.drive.client.ReadMetadata(ctx, token, pickCode, limit)
+		return s.client.ReadMetadata(ctx, token, pickCode, limit)
 	})
 }
 
 func (s *accountSession) PlayURL(ctx context.Context, pickCode, userAgent string) ([]pan.PlaySource, error) {
 	return readAccount(ctx, s, func(token string) ([]pan.PlaySource, error) {
-		return s.drive.client.PlayURL(ctx, token, pickCode, userAgent)
+		return s.client.PlayURL(ctx, token, pickCode, userAgent)
 	})
 }
 
 func (s *accountSession) DownloadURL(ctx context.Context, pickCode, userAgent string) (string, error) {
 	return readAccount(ctx, s, func(token string) (string, error) {
-		return s.drive.client.DownloadURL(ctx, token, pickCode, userAgent)
+		return s.client.DownloadURL(ctx, token, pickCode, userAgent)
 	})
 }
 
@@ -186,7 +193,7 @@ func (s *accountSession) AddOffline(ctx context.Context, magnet string) (string,
 		return "", err
 	}
 	return accountWithToken(ctx, s, func(token string) (string, error) {
-		return s.drive.client.AddOffline(ctx, token, magnet, s.source.Directory.ID)
+		return s.client.AddOffline(ctx, token, magnet, s.source.Directory.ID)
 	})
 }
 
@@ -195,7 +202,7 @@ func (s *accountSession) RemoveOffline(ctx context.Context, hash string) error {
 		return err
 	}
 	_, err := accountWithToken(ctx, s, func(token string) (struct{}, error) {
-		return struct{}{}, s.drive.client.RemoveOffline(ctx, token, hash)
+		return struct{}{}, s.client.RemoveOffline(ctx, token, hash)
 	})
 	if err != nil {
 		return err
@@ -207,9 +214,20 @@ func (s *accountSession) OfflineTasks(ctx context.Context, page int) (pan.Offlin
 	if err := s.checkCredentials(ctx); err != nil {
 		return pan.OfflinePage{}, err
 	}
-	return accountWithToken(ctx, s, func(token string) (pan.OfflinePage, error) {
-		return s.drive.client.OfflineTasks(ctx, token, page)
+	result, err := accountWithToken(ctx, s, func(token string) (pan.OfflinePage, error) {
+		return s.client.OfflineTasks(ctx, token, page)
 	})
+	if err != nil {
+		return result, err
+	}
+	if s.provider == ProviderGuangya {
+		// Guangya's task list does not expose the target directory. All tasks
+		// observed through this session belong to the mounted source.
+		for i := range result.Tasks {
+			result.Tasks[i].DirectoryID = s.source.Directory.ID
+		}
+	}
+	return result, nil
 }
 
 func (s *accountSession) Commit(ctx context.Context, fn func(tx *ent.Tx) error) error {

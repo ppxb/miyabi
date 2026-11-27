@@ -7,9 +7,16 @@ import (
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/guangya"
 	"github.com/ppxb/miyabi/internal/pan"
 	"github.com/ppxb/miyabi/internal/syncx"
 	"golang.org/x/sync/singleflight"
+)
+
+const (
+	// Provider115 and ProviderGuangya identify the storage backend of an account.
+	Provider115     = "115"
+	ProviderGuangya = "guangya"
 )
 
 // Client abstracts the upstream 115 API calls.
@@ -33,18 +40,25 @@ type Client interface {
 
 type mountRecord struct {
 	AccountID string `json:"account_id"`
+	Provider  string `json:"provider,omitempty"`
 	domain.LibraryDirectory
 }
 
 func (r mountRecord) source() domain.LibrarySource {
-	return domain.LibrarySource{AccountID: r.AccountID, Directory: r.LibraryDirectory}
+	return domain.LibrarySource{
+		Provider:  r.Provider,
+		AccountID: r.AccountID,
+		Directory: r.LibraryDirectory,
+	}
 }
 
 // Drive coordinates the registry of 115 accounts and their mounts. Every account
 // is independent; there is no primary account.
 type Drive struct {
-	database *ent.Client
-	client   Client
+	database  *ent.Client
+	client    Client
+	providers map[string]Client
+	guangya   *guangya.Client
 
 	mu     sync.Mutex
 	commit syncx.ContextLock
@@ -52,6 +66,7 @@ type Drive struct {
 	closed bool
 
 	login         qrLogin
+	guangyaLogin  guangyaLogin
 	mountListener MountListener
 	media         mediaResolver
 
@@ -64,19 +79,39 @@ type Drive struct {
 }
 
 func New(ctx context.Context, db *ent.Client) (*Drive, error) {
-	return NewWithClient(ctx, db, pan.New())
+	gy := guangya.New()
+	return newDrive(ctx, db, map[string]Client{
+		Provider115:     pan.New(),
+		ProviderGuangya: gy,
+	}, gy)
 }
 
-func NewWithClient(_ context.Context, db *ent.Client, client Client) (*Drive, error) {
+// NewWithClient keeps the 115-only constructor used by tests.
+func NewWithClient(ctx context.Context, db *ent.Client, client Client) (*Drive, error) {
+	return newDrive(ctx, db, map[string]Client{Provider115: client}, nil)
+}
+
+func newDrive(_ context.Context, db *ent.Client, providers map[string]Client, gy *guangya.Client) (*Drive, error) {
 	d := &Drive{
 		database:            db,
-		client:              client,
+		client:              providers[Provider115],
+		providers:           providers,
+		guangya:             gy,
 		refreshStop:         make(chan struct{}),
 		accountCredVersions: make(map[string]uint64),
 		accountAuthVersions: make(map[string]uint64),
 	}
 	d.login.drive = d
+	d.guangyaLogin.drive = d
 	return d, nil
+}
+
+func (d *Drive) providerClient(provider string) (Client, bool) {
+	if provider == "" {
+		provider = Provider115
+	}
+	client, ok := d.providers[provider]
+	return client, ok
 }
 
 func (d *Drive) Close() {
@@ -90,7 +125,12 @@ func (d *Drive) Close() {
 	}
 	d.mu.Unlock()
 	d.work.Wait()
-	d.client.Close()
+	if d.client != nil {
+		d.client.Close()
+	}
+	if d.guangya != nil && Client(d.guangya) != d.client {
+		d.guangya.Close()
+	}
 }
 
 func (d *Drive) closedState() bool {
@@ -121,9 +161,27 @@ func (d *Drive) Commit(ctx context.Context, fn func(tx *ent.Tx) error) error {
 	return ent.WithTx(ctx, d.database, fn)
 }
 
-// OpenMedia streams media from 115 CDN directly.
+// OpenMedia streams media from the default 115 client. Callers that may handle
+// other providers should use OpenMediaFor.
 func (d *Drive) OpenMedia(ctx context.Context, method, address string, headers http.Header) (*http.Response, error) {
-	return d.client.OpenMedia(ctx, method, address, headers)
+	client, ok := d.providerClient(Provider115)
+	if !ok {
+		return nil, domain.E(domain.KindInvalid, "115 client is not configured", nil)
+	}
+	return client.OpenMedia(ctx, method, address, headers)
+}
+
+// OpenMediaFor streams media through the client that owns accountID.
+func (d *Drive) OpenMediaFor(ctx context.Context, accountID, method, address string, headers http.Header) (*http.Response, error) {
+	record, err := d.accountRecord(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	client, ok := d.providerClient(record.Provider)
+	if !ok {
+		return nil, domain.E(domain.KindInvalid, "存储账号的来源不受支持", nil)
+	}
+	return client.OpenMedia(ctx, method, address, headers)
 }
 
 // Source returns one mounted account's library source (the first by account id).

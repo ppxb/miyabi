@@ -24,6 +24,9 @@ type File struct {
 	Size        int64
 	PickCode    string
 	SHA1        string
+	// GCID is the Guangya content id used by its VOD playback endpoint. It is
+	// empty for 115 files.
+	GCID string
 	// UploadTime is the 115 upload timestamp in Unix seconds (the "upt" field).
 	UploadTime int64
 }

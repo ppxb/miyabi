@@ -173,13 +173,13 @@ func (r *scanRun) runTarget(ctx context.Context, isResume bool) error {
 		return fmt.Errorf("read completed download: %w", err)
 	}
 	if r.payload.OfflineTaskID != 0 && info.ID == r.payload.Source.Directory.ID {
-		return domain.E(domain.KindConflict, "115 返回的是媒体根目录，无法确定本次下载的影片文件", nil)
+		return domain.E(domain.KindConflict, "网盘返回的是媒体根目录，无法确定本次下载的影片文件", nil)
 	}
 	r.payload.TargetPath = drive.FilePath(info.Path, info.Name)
 	r.payload.TargetFile = !info.IsDirectory
 	if r.payload.TargetFile {
 		if !domain.IsVideo(info.Name) {
-			return domain.E(domain.KindInvalid, "115 下载结果不是视频文件", nil)
+			return domain.E(domain.KindInvalid, "网盘下载结果不是视频文件", nil)
 		}
 		videos := []Video{IdentifyVideo(info.File)}
 		if r.payload.OfflineTaskID != 0 {
@@ -272,7 +272,8 @@ func (r *scanRun) indexDirectory(ctx context.Context, directory Directory) error
 		if err != nil {
 			return pan.FilePage{}, err
 		}
-		if !slices.ContainsFunc(page.Path, func(d pan.Directory) bool { return d.ID == r.payload.Source.Directory.ID }) {
+		if r.payload.Source.Directory.ID != "0" &&
+			!slices.ContainsFunc(page.Path, func(d pan.Directory) bool { return d.ID == r.payload.Source.Directory.ID }) {
 			return pan.FilePage{}, domain.E(domain.KindConflict, "该文件夹已移出媒体目录，请重新扫描", nil)
 		}
 		return page, nil

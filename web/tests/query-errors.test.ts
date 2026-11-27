@@ -45,7 +45,7 @@ test('API errors preserve business codes and distinguish app auth from 115 auth'
     assert.ok(error instanceof ApiError)
     assert.equal(error.code, 'PAN_UNAUTHORIZED')
     assert.equal(isPanUnauthorized(error), true)
-    assert.equal(describeApiError(error), '115 登录已失效，请前往设置重新登录。')
+    assert.equal(describeApiError(error), '网盘登录已失效，请前往设置重新登录。')
     return true
   })
   assert.equal(dispatch.mock.calls.length, 0)

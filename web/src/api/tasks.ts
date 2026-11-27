@@ -7,6 +7,7 @@ import type { PanDirectory } from '@/api/pan'
 import { useTaskStreamConnected } from '@/api/task-stream'
 
 export type LibrarySource = {
+  provider?: string
   account_id: string
   directory: PanDirectory
 }

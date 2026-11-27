@@ -360,24 +360,28 @@ func init() {
 	panaccountDescAccountID := panaccountFields[0].Descriptor()
 	// panaccount.AccountIDValidator is a validator for the "account_id" field. It is called by the builders before save.
 	panaccount.AccountIDValidator = panaccountDescAccountID.Validators[0].(func(string) error)
+	// panaccountDescProvider is the schema descriptor for provider field.
+	panaccountDescProvider := panaccountFields[1].Descriptor()
+	// panaccount.DefaultProvider holds the default value on creation for the provider field.
+	panaccount.DefaultProvider = panaccountDescProvider.Default.(string)
 	// panaccountDescAccessToken is the schema descriptor for access_token field.
-	panaccountDescAccessToken := panaccountFields[1].Descriptor()
+	panaccountDescAccessToken := panaccountFields[2].Descriptor()
 	// panaccount.DefaultAccessToken holds the default value on creation for the access_token field.
 	panaccount.DefaultAccessToken = panaccountDescAccessToken.Default.(string)
 	// panaccountDescRefreshToken is the schema descriptor for refresh_token field.
-	panaccountDescRefreshToken := panaccountFields[2].Descriptor()
+	panaccountDescRefreshToken := panaccountFields[3].Descriptor()
 	// panaccount.DefaultRefreshToken holds the default value on creation for the refresh_token field.
 	panaccount.DefaultRefreshToken = panaccountDescRefreshToken.Default.(string)
 	// panaccountDescDirectoryID is the schema descriptor for directory_id field.
-	panaccountDescDirectoryID := panaccountFields[4].Descriptor()
+	panaccountDescDirectoryID := panaccountFields[5].Descriptor()
 	// panaccount.DefaultDirectoryID holds the default value on creation for the directory_id field.
 	panaccount.DefaultDirectoryID = panaccountDescDirectoryID.Default.(string)
 	// panaccountDescDirectoryName is the schema descriptor for directory_name field.
-	panaccountDescDirectoryName := panaccountFields[5].Descriptor()
+	panaccountDescDirectoryName := panaccountFields[6].Descriptor()
 	// panaccount.DefaultDirectoryName holds the default value on creation for the directory_name field.
 	panaccount.DefaultDirectoryName = panaccountDescDirectoryName.Default.(string)
 	// panaccountDescDirectoryPath is the schema descriptor for directory_path field.
-	panaccountDescDirectoryPath := panaccountFields[6].Descriptor()
+	panaccountDescDirectoryPath := panaccountFields[7].Descriptor()
 	// panaccount.DefaultDirectoryPath holds the default value on creation for the directory_path field.
 	panaccount.DefaultDirectoryPath = panaccountDescDirectoryPath.Default.(string)
 	settingMixin := schema.Setting{}.Mixin()

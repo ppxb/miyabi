@@ -20,15 +20,26 @@ const (
 // is its own PanAccount row, so writes update a single row and need no global
 // lock or in-memory mirror.
 type accountRecord struct {
+	Provider  string
 	Tokens    pan.Tokens
 	Directory mountRecord
 }
 
 func recordOf(row *ent.PanAccount) accountRecord {
+	provider := row.Provider
+	if provider == "" {
+		provider = Provider115
+	}
+	mountProvider := provider
+	if provider == Provider115 {
+		mountProvider = ""
+	}
 	return accountRecord{
-		Tokens: pan.Tokens{AccessToken: row.AccessToken, RefreshToken: row.RefreshToken, ExpiresAt: row.ExpiresAt},
+		Provider: provider,
+		Tokens:   pan.Tokens{AccessToken: row.AccessToken, RefreshToken: row.RefreshToken, ExpiresAt: row.ExpiresAt},
 		Directory: mountRecord{
 			AccountID:        row.AccountID,
+			Provider:         mountProvider,
 			LibraryDirectory: domain.LibraryDirectory{ID: row.DirectoryID, Name: row.DirectoryName, Path: row.DirectoryPath},
 		},
 	}
@@ -57,12 +68,17 @@ func (d *Drive) listAccounts(ctx context.Context) ([]*ent.PanAccount, error) {
 
 // saveAccountTokens stores the tokens of a newly authorized account, creating
 // its row when needed. Only login may create accounts.
-func (d *Drive) saveAccountTokens(ctx context.Context, accountID string, tokens pan.Tokens) error {
+func (d *Drive) saveAccountTokens(ctx context.Context, accountID string, tokens pan.Tokens, providers ...string) error {
 	if accountID == "" {
 		return nil
 	}
+	provider := Provider115
+	if len(providers) > 0 && providers[0] != "" {
+		provider = providers[0]
+	}
 	return d.database.PanAccount.Create().
 		SetAccountID(accountID).
+		SetProvider(provider).
 		SetAccessToken(tokens.AccessToken).
 		SetRefreshToken(tokens.RefreshToken).
 		SetExpiresAt(tokens.ExpiresAt).
@@ -187,7 +203,7 @@ func (d *Drive) Mounts(ctx context.Context) ([]domain.LibrarySource, error) {
 	return result, nil
 }
 
-// Accounts lists every stored 115 account and its mounted directory.
+// Accounts lists every stored account and its mounted directory.
 func (d *Drive) Accounts(ctx context.Context) ([]AccountStatus, error) {
 	rows, err := d.listAccounts(ctx)
 	if err != nil {
@@ -199,20 +215,25 @@ func (d *Drive) Accounts(ctx context.Context) ([]AccountStatus, error) {
 		record := recordOf(row)
 		if tokensNeedRefresh(record.Tokens) {
 			if err := d.refreshAccountTokens(ctx, id); err != nil {
-				slog.Warn("refresh 115 account tokens", "account", id, "error", err)
-				result = append(result, AccountStatus{AccountID: id, Connected: false})
+				slog.Warn("refresh pan account tokens", "account", id, "provider", record.Provider, "error", err)
+				result = append(result, AccountStatus{AccountID: id, Provider: record.Provider, Connected: false})
 				continue
 			}
 			if record.Tokens, err = d.accountToken(ctx, id); err != nil {
 				return nil, err
 			}
 		}
-		account, err := d.client.Account(ctx, record.Tokens.AccessToken)
-		if err != nil {
-			result = append(result, AccountStatus{AccountID: id, Connected: false})
+		client, ok := d.providerClient(record.Provider)
+		if !ok {
+			result = append(result, AccountStatus{AccountID: id, Provider: record.Provider, Connected: false})
 			continue
 		}
-		status := AccountStatus{AccountID: id, Connected: true, Account: &account}
+		account, err := client.Account(ctx, record.Tokens.AccessToken)
+		if err != nil {
+			result = append(result, AccountStatus{AccountID: id, Provider: record.Provider, Connected: false})
+			continue
+		}
+		status := AccountStatus{AccountID: id, Provider: record.Provider, Connected: true, Account: &account}
 		if record.Directory.ID != "" && record.Directory.AccountID == account.ID {
 			directory := record.Directory.LibraryDirectory
 			status.Directory = &directory

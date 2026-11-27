@@ -69,6 +69,11 @@ func AccountID(v string) predicate.PanAccount {
 	return predicate.PanAccount(sql.FieldEQ(FieldAccountID, v))
 }
 
+// Provider applies equality check predicate on the "provider" field. It's identical to ProviderEQ.
+func Provider(v string) predicate.PanAccount {
+	return predicate.PanAccount(sql.FieldEQ(FieldProvider, v))
+}
+
 // AccessToken applies equality check predicate on the "access_token" field. It's identical to AccessTokenEQ.
 func AccessToken(v string) predicate.PanAccount {
 	return predicate.PanAccount(sql.FieldEQ(FieldAccessToken, v))
@@ -242,6 +247,71 @@ func AccountIDEqualFold(v string) predicate.PanAccount {
 // AccountIDContainsFold applies the ContainsFold predicate on the "account_id" field.
 func AccountIDContainsFold(v string) predicate.PanAccount {
 	return predicate.PanAccount(sql.FieldContainsFold(FieldAccountID, v))
+}
+
+// ProviderEQ applies the EQ predicate on the "provider" field.
+func ProviderEQ(v string) predicate.PanAccount {
+	return predicate.PanAccount(sql.FieldEQ(FieldProvider, v))
+}
+
+// ProviderNEQ applies the NEQ predicate on the "provider" field.
+func ProviderNEQ(v string) predicate.PanAccount {
+	return predicate.PanAccount(sql.FieldNEQ(FieldProvider, v))
+}
+
+// ProviderIn applies the In predicate on the "provider" field.
+func ProviderIn(vs ...string) predicate.PanAccount {
+	return predicate.PanAccount(sql.FieldIn(FieldProvider, vs...))
+}
+
+// ProviderNotIn applies the NotIn predicate on the "provider" field.
+func ProviderNotIn(vs ...string) predicate.PanAccount {
+	return predicate.PanAccount(sql.FieldNotIn(FieldProvider, vs...))
+}
+
+// ProviderGT applies the GT predicate on the "provider" field.
+func ProviderGT(v string) predicate.PanAccount {
+	return predicate.PanAccount(sql.FieldGT(FieldProvider, v))
+}
+
+// ProviderGTE applies the GTE predicate on the "provider" field.
+func ProviderGTE(v string) predicate.PanAccount {
+	return predicate.PanAccount(sql.FieldGTE(FieldProvider, v))
+}
+
+// ProviderLT applies the LT predicate on the "provider" field.
+func ProviderLT(v string) predicate.PanAccount {
+	return predicate.PanAccount(sql.FieldLT(FieldProvider, v))
+}
+
+// ProviderLTE applies the LTE predicate on the "provider" field.
+func ProviderLTE(v string) predicate.PanAccount {
+	return predicate.PanAccount(sql.FieldLTE(FieldProvider, v))
+}
+
+// ProviderContains applies the Contains predicate on the "provider" field.
+func ProviderContains(v string) predicate.PanAccount {
+	return predicate.PanAccount(sql.FieldContains(FieldProvider, v))
+}
+
+// ProviderHasPrefix applies the HasPrefix predicate on the "provider" field.
+func ProviderHasPrefix(v string) predicate.PanAccount {
+	return predicate.PanAccount(sql.FieldHasPrefix(FieldProvider, v))
+}
+
+// ProviderHasSuffix applies the HasSuffix predicate on the "provider" field.
+func ProviderHasSuffix(v string) predicate.PanAccount {
+	return predicate.PanAccount(sql.FieldHasSuffix(FieldProvider, v))
+}
+
+// ProviderEqualFold applies the EqualFold predicate on the "provider" field.
+func ProviderEqualFold(v string) predicate.PanAccount {
+	return predicate.PanAccount(sql.FieldEqualFold(FieldProvider, v))
+}
+
+// ProviderContainsFold applies the ContainsFold predicate on the "provider" field.
+func ProviderContainsFold(v string) predicate.PanAccount {
+	return predicate.PanAccount(sql.FieldContainsFold(FieldProvider, v))
 }
 
 // AccessTokenEQ applies the EQ predicate on the "access_token" field.

@@ -30,7 +30,7 @@ export function taskProgressState(current: TaskStage, offline = false, progress 
       : ((start + (percent / 100) * (metadata ? 2 : 1)) / (visible.length - 1)) * 100
   const label =
     current === 'locating'
-      ? '已下载，等待 115 返回文件信息'
+      ? '已下载，等待网盘返回文件信息'
       : current === 'queued'
         ? '等待扫描'
         : undefined

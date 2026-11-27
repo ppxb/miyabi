@@ -16,7 +16,14 @@ func (d *Drive) accountSessionFor(ctx context.Context, accountID string) (*accou
 	if record.Tokens.AccessToken == "" {
 		return nil, pan.ErrUnauthorized
 	}
-	return &accountSession{drive: d, accountID: accountID, source: record.Directory.source()}, nil
+	client, ok := d.providerClient(record.Provider)
+	if !ok {
+		return nil, domain.E(domain.KindInvalid, "存储账号的来源不受支持", nil)
+	}
+	return &accountSession{
+		drive: d, client: client, provider: record.Provider,
+		accountID: accountID, source: record.Directory.source(),
+	}, nil
 }
 
 // AccountStatusFor reports one stored account's profile and mounted directory.
@@ -26,12 +33,12 @@ func (d *Drive) AccountStatusFor(ctx context.Context, accountID string) (Account
 		return AccountStatus{}, err
 	}
 	account, err := accountWithToken(ctx, session, func(token string) (pan.Account, error) {
-		return d.client.Account(ctx, token)
+		return session.client.Account(ctx, token)
 	})
 	if err != nil {
 		return AccountStatus{}, fmt.Errorf("get 115 account: %w", err)
 	}
-	status := AccountStatus{AccountID: account.ID, Connected: true, Account: &account}
+	status := AccountStatus{AccountID: account.ID, Provider: session.provider, Connected: true, Account: &account}
 	if record, err := d.accountRecord(ctx, accountID); err == nil && record.Directory.ID != "" && record.Directory.AccountID == account.ID {
 		directory := record.Directory.LibraryDirectory
 		status.Directory = &directory
@@ -46,7 +53,7 @@ func (d *Drive) FilesFor(ctx context.Context, accountID, directoryID string, pag
 		return pan.FilePage{}, err
 	}
 	return accountWithToken(ctx, session, func(token string) (pan.FilePage, error) {
-		return d.client.List(ctx, token, directoryID, (page-1)*100, 100)
+		return session.client.List(ctx, token, directoryID, (page-1)*100, 100)
 	})
 }
 
@@ -57,27 +64,36 @@ func (d *Drive) SelectDirectoryForAccount(ctx context.Context, accountID, direct
 		return domain.LibraryDirectory{}, err
 	}
 	files, err := accountWithToken(ctx, session, func(token string) (pan.FilePage, error) {
-		return d.client.List(ctx, token, directoryID, 0, 1)
+		return session.client.List(ctx, token, directoryID, 0, 1)
 	})
 	if err != nil {
-		return domain.LibraryDirectory{}, fmt.Errorf("get 115 media directory: %w", err)
+		return domain.LibraryDirectory{}, fmt.Errorf("get media directory: %w", err)
 	}
-	if len(files.Path) == 0 {
-		return domain.LibraryDirectory{}, domain.E(domain.KindNotFound, "115 目录不存在或已被移除", nil)
+	mountProvider := session.provider
+	if mountProvider == Provider115 {
+		mountProvider = ""
 	}
-	directory := domain.LibraryDirectory{
-		ID:   directoryID,
-		Name: files.Path[len(files.Path)-1].Name,
-		Path: directoryPath(files.Path),
+	var directory domain.LibraryDirectory
+	if directoryID == "0" && session.provider == ProviderGuangya {
+		directory = domain.LibraryDirectory{ID: "0", Name: "光鸭根目录", Path: "/"}
+	} else {
+		if len(files.Path) == 0 {
+			return domain.LibraryDirectory{}, domain.E(domain.KindNotFound, "目录不存在或已被移除", nil)
+		}
+		directory = domain.LibraryDirectory{
+			ID:   directoryID,
+			Name: files.Path[len(files.Path)-1].Name,
+			Path: directoryPath(files.Path),
+		}
 	}
-	record := mountRecord{AccountID: accountID, LibraryDirectory: directory}
+	record := mountRecord{AccountID: accountID, Provider: mountProvider, LibraryDirectory: directory}
 	if err := d.saveAccountMount(ctx, accountID, record); err != nil {
 		return domain.LibraryDirectory{}, err
 	}
 	// The library queues its scan from this event; a stored mount alone is silent.
 	// The mount above is already persisted, so a failure here is surfaced to the
 	// caller without rolling that change back.
-	if err := d.publishMount(ctx, domain.LibrarySource{AccountID: accountID, Directory: directory}); err != nil {
+	if err := d.publishMount(ctx, domain.LibrarySource{Provider: mountProvider, AccountID: accountID, Directory: directory}); err != nil {
 		return domain.LibraryDirectory{}, err
 	}
 	return directory, nil
