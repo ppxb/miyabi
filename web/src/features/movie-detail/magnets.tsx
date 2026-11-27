@@ -26,6 +26,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -272,25 +273,34 @@ function MagnetCard({
                   <SubmitLabel pending={pendingSubmit} submitted={submitted} label={label} />
                   <ChevronDownIcon className="size-3.5 opacity-70" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-44">
-                  <DropdownMenuLabel>选择加入的网盘账号</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {accounts.map(account => (
-                    <DropdownMenuItem key={account.id} onClick={() => submit(account.id)}>
-                      <CloudDownloadIcon />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm">
-                          {account.name}
-                          <span className="ml-1 text-xs text-muted-foreground">
-                            {account.provider === 'guangya' ? '光鸭' : '115'}
-                          </span>
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {account.directory}
-                        </p>
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
+                <DropdownMenuContent
+                  align="end"
+                  className="max-w-[min(24rem,calc(100vw-2rem))] min-w-52"
+                >
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>选择加入的网盘</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {accounts.map(account => (
+                      <DropdownMenuItem
+                        key={account.id}
+                        className="items-start"
+                        onClick={() => submit(account.id)}
+                      >
+                        <CloudDownloadIcon className="mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-start gap-1.5">
+                            <p className="min-w-0 text-sm break-words">{account.name}</p>
+                            <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px]">
+                              {account.provider === 'guangya' ? '光鸭' : '115'}
+                            </Badge>
+                          </div>
+                          <p className="mt-0.5 text-xs break-words text-muted-foreground">
+                            {account.directory}
+                          </p>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : accounts.length === 1 ? (
