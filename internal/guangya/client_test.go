@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/pan"
 )
 
@@ -27,13 +28,20 @@ func writeJSON(w http.ResponseWriter, body string) {
 
 func TestAccount(t *testing.T) {
 	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/v1/user/me" {
+		switch r.URL.Path {
+		case "/v1/user/me":
+			if r.Method != http.MethodGet {
+				t.Errorf("method = %s", r.Method)
+			}
+			if r.Header.Get("authorization") != "Bearer token" {
+				t.Errorf("authorization = %q", r.Header.Get("authorization"))
+			}
+			writeJSON(w, `{"sub":"user-1","name":"Tester"}`)
+		case "/nd.bizassets.s/v1/get_assets":
+			writeJSON(w, `{"msg":"success","data":{"totalSpaceSize":10737418240,"usedSpaceSize":2147483648}}`)
+		default:
 			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
-		if r.Header.Get("authorization") != "Bearer token" {
-			t.Errorf("authorization = %q", r.Header.Get("authorization"))
-		}
-		writeJSON(w, `{"sub":"user-1","name":"Tester"}`)
 	})
 	account, err := client.Account(context.Background(), "token")
 	if err != nil {
@@ -41,6 +49,14 @@ func TestAccount(t *testing.T) {
 	}
 	if account.ID != "user-1" || account.Name != "Tester" {
 		t.Fatalf("account = %+v", account)
+	}
+	if account.Space.Total.Bytes != 10737418240 ||
+		account.Space.Used.Bytes != 2147483648 ||
+		account.Space.Remaining.Bytes != 8589934592 {
+		t.Fatalf("space = %+v", account.Space)
+	}
+	if account.Space.Total.Formatted != "10.0 GB" || account.Space.Used.Formatted != "2.0 GB" {
+		t.Fatalf("formatted space = %+v", account.Space)
 	}
 }
 
@@ -223,6 +239,50 @@ func TestRemoveOfflineFindsTaskByHash(t *testing.T) {
 	}
 	if len(deleted) != 1 || !strings.Contains(deleted[0], "t1") {
 		t.Fatalf("deleted = %+v", deleted)
+	}
+}
+
+func TestSignInSendsVerificationFields(t *testing.T) {
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/auth/signin" {
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+		if token := r.Header.Get("x-captcha-token"); token != "captcha-token" {
+			t.Errorf("x-captcha-token = %q", token)
+		}
+		var body map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode body: %v", err)
+			return
+		}
+		if body["verification_code"] != "123456" ||
+			body["verification_token"] != "verification-token" ||
+			body["username"] != "+8613800138000" ||
+			body["client_id"] != clientID {
+			t.Errorf("body = %+v", body)
+		}
+		writeJSON(w, `{"access_token":"access","refresh_token":"refresh","expires_in":7200}`)
+	})
+	tokens, err := client.SignIn(context.Background(), "+8613800138000", "123456", "verification-token", "captcha-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tokens.AccessToken != "access" || tokens.RefreshToken != "refresh" {
+		t.Fatalf("tokens = %+v", tokens)
+	}
+}
+
+func TestSignInMapsHTTP400WithMessage(t *testing.T) {
+	client := testClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		writeJSON(w, `{"msg":"captcha token expired"}`)
+	})
+	_, err := client.SignIn(context.Background(), "+8613800138000", "123456", "verification-token", "captcha-token")
+	if err == nil || !strings.Contains(err.Error(), "captcha token expired") {
+		t.Fatalf("err = %v", err)
+	}
+	if !domain.IsKind(err, domain.KindInvalid) {
+		t.Fatalf("kind = %v", domain.KindOf(err))
 	}
 }
 

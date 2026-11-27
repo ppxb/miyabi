@@ -152,7 +152,7 @@ func (c *Client) call(ctx context.Context, method, address string, headers map[s
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return domain.E(domain.KindUpstream,
-			fmt.Sprintf("光鸭返回 HTTP %d", resp.StatusCode), nil)
+			fmt.Sprintf("光鸭返回 HTTP %d%s", resp.StatusCode, upstreamDetail(raw)), nil)
 	}
 	if out != nil {
 		if err := json.Unmarshal(raw, out); err != nil {
@@ -245,8 +245,7 @@ func traceparent() string {
 	return "00-" + randomHex(16) + "-" + randomHex(8) + "-01"
 }
 
-// Account returns the signed-in profile. Guangya has no avatar/space in this
-// endpoint; the settings card still renders with zeroed values.
+// Account returns the signed-in profile and storage usage.
 func (c *Client) Account(ctx context.Context, accessToken string) (pan.Account, error) {
 	var me struct {
 		Sub  string `json:"sub"`
@@ -262,7 +261,117 @@ func (c *Client) Account(ctx context.Context, accessToken string) (pan.Account, 
 	if name == "" {
 		name = me.Sub
 	}
-	return pan.Account{ID: me.Sub, Name: name}, nil
+	account := pan.Account{ID: me.Sub, Name: name}
+	space, err := c.space(ctx, accessToken)
+	if err != nil {
+		if errors.Is(err, pan.ErrUnauthorized) {
+			return pan.Account{}, err
+		}
+		return account, nil
+	}
+	account.Space = space
+	return account, nil
+}
+
+func (c *Client) space(ctx context.Context, accessToken string) (pan.AccountSpace, error) {
+	var data struct {
+		Total json.Number `json:"totalSpaceSize"`
+		Used  json.Number `json:"usedSpaceSize"`
+	}
+	if err := c.callAPI(ctx, accessToken, "/nd.bizassets.s/v1/get_assets", map[string]any{}, &data); err != nil {
+		return pan.AccountSpace{}, err
+	}
+	total := numberInt64(data.Total)
+	used := numberInt64(data.Used)
+	if total < 0 {
+		total = 0
+	}
+	if used < 0 {
+		used = 0
+	}
+	remaining := total - used
+	if remaining < 0 {
+		remaining = 0
+	}
+	return pan.AccountSpace{
+		Total:     pan.SpaceAmount{Bytes: total, Formatted: formatBytes(total)},
+		Used:      pan.SpaceAmount{Bytes: used, Formatted: formatBytes(used)},
+		Remaining: pan.SpaceAmount{Bytes: remaining, Formatted: formatBytes(remaining)},
+	}, nil
+}
+
+func loginErrorDetail(err error) string {
+	detail := strings.TrimSpace(strings.TrimPrefix(err.Error(), "光鸭返回 HTTP 400"))
+	detail = strings.TrimSpace(strings.TrimPrefix(detail, ":"))
+	return detail
+}
+
+func loginError(err error, message string) error {
+	if err != nil && domain.IsKind(err, domain.KindUpstream) &&
+		strings.Contains(err.Error(), "HTTP 400") {
+		if detail := loginErrorDetail(err); detail != "" {
+			message += ": " + detail
+		}
+		return domain.E(domain.KindInvalid, message, err)
+	}
+	return err
+}
+
+func upstreamDetail(raw []byte) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var payload struct {
+		Msg              string `json:"msg"`
+		Error            string `json:"error"`
+		ErrorDescription string `json:"error_description"`
+		Message          string `json:"message"`
+	}
+	if json.Unmarshal(raw, &payload) == nil {
+		for _, value := range []string{payload.Msg, payload.Error, payload.ErrorDescription, payload.Message} {
+			if value = strings.TrimSpace(value); value != "" {
+				return ": " + truncate(value, 200)
+			}
+		}
+	}
+	text := strings.Join(strings.Fields(string(raw)), " ")
+	if text == "" {
+		return ""
+	}
+	return ": " + truncate(text, 200)
+}
+
+func truncate(value string, limit int) string {
+	runes := []rune(value)
+	if len(runes) <= limit {
+		return value
+	}
+	return string(runes[:limit]) + "…"
+}
+
+func numberInt64(value json.Number) int64 {
+	number, err := value.Int64()
+	if err != nil {
+		return 0
+	}
+	return number
+}
+
+func formatBytes(bytes int64) string {
+	if bytes <= 0 {
+		return "0 B"
+	}
+	units := []string{"B", "KB", "MB", "GB", "TB", "PB"}
+	value := float64(bytes)
+	index := 0
+	for value >= 1024 && index < len(units)-1 {
+		value /= 1024
+		index++
+	}
+	if index == 0 {
+		return fmt.Sprintf("%d %s", bytes, units[index])
+	}
+	return fmt.Sprintf("%.1f %s", value, units[index])
 }
 
 func (c *Client) BeginLogin(context.Context) (*pan.Login, error) {
@@ -319,7 +428,7 @@ func (c *Client) SMSInit(ctx context.Context, phone string) (string, error) {
 		"meta":      map[string]string{"phone_number": phone},
 	}, &result, nil)
 	if err != nil {
-		return "", err
+		return "", loginError(err, "光鸭未接受该手机号，请检查格式（建议带国家码）")
 	}
 	if result.CaptchaToken == "" {
 		if result.URL != "" {
@@ -340,7 +449,7 @@ func (c *Client) SMSSend(ctx context.Context, phone, captchaToken string) (strin
 		"client_id":    clientID,
 	}, &result, map[string]string{"x-captcha-token": captchaToken})
 	if err != nil {
-		return "", err
+		return "", loginError(err, "光鸭未接受该手机号，请检查格式（建议带国家码）")
 	}
 	if result.VerificationID == "" {
 		return "", domain.E(domain.KindUpstream, "光鸭未返回验证码 ID", nil)
@@ -351,6 +460,7 @@ func (c *Client) SMSSend(ctx context.Context, phone, captchaToken string) (strin
 func (c *Client) SMSVerify(ctx context.Context, verificationID, code string) (string, error) {
 	var result struct {
 		VerificationToken string `json:"verification_token"`
+		Msg               string `json:"msg"`
 	}
 	err := c.callAccount(ctx, http.MethodPost, "", "/v1/auth/verification/verify", map[string]string{
 		"verification_id":   verificationID,
@@ -358,10 +468,14 @@ func (c *Client) SMSVerify(ctx context.Context, verificationID, code string) (st
 		"client_id":         clientID,
 	}, &result, nil)
 	if err != nil {
-		return "", err
+		return "", loginError(err, "验证码错误或已过期，请重新获取")
 	}
 	if result.VerificationToken == "" {
-		return "", domain.E(domain.KindInvalid, "验证码校验失败", nil)
+		message := strings.TrimSpace(result.Msg)
+		if message == "" || strings.EqualFold(message, "success") {
+			message = "验证码错误或已过期，请重新获取"
+		}
+		return "", domain.E(domain.KindInvalid, message, nil)
 	}
 	return result.VerificationToken, nil
 }
@@ -379,7 +493,7 @@ func (c *Client) SignIn(ctx context.Context, phone, code, verificationToken, cap
 		"client_id":          clientID,
 	}, &result, map[string]string{"x-captcha-token": captchaToken})
 	if err != nil {
-		return pan.Tokens{}, err
+		return pan.Tokens{}, loginError(err, "登录失败，请重新获取验证码")
 	}
 	if result.AccessToken == "" {
 		return pan.Tokens{}, pan.ErrUnauthorized

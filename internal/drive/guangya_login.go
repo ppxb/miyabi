@@ -11,6 +11,27 @@ import (
 
 const guangyaLoginLifetime = 10 * time.Minute
 
+// normalizeGuangyaPhone accepts common Chinese input forms and returns E.164.
+// Sign-in is stricter than sending the SMS, so the number must be normalized
+// before the whole login flow.
+func normalizeGuangyaPhone(phone string) string {
+	value := strings.NewReplacer(" ", "", "-", "", "(", "", ")", "").Replace(strings.TrimSpace(phone))
+	switch {
+	case value == "":
+		return ""
+	case strings.HasPrefix(value, "+"):
+		return value
+	case strings.HasPrefix(value, "00"):
+		return "+" + value[2:]
+	case len(value) == 11 && value[0] == '1':
+		return "+86" + value
+	case len(value) == 13 && strings.HasPrefix(value, "86"):
+		return "+" + value
+	default:
+		return value
+	}
+}
+
 // guangyaLogin owns the two-step SMS login session: one phone number, one
 // verification id, then one code. The session lives only in memory.
 type guangyaLogin struct {
@@ -36,7 +57,7 @@ func (d *Drive) BeginGuangyaLogin(ctx context.Context, phone string) (GuangyaLog
 	if d.guangya == nil {
 		return GuangyaLoginSession{}, domain.E(domain.KindInvalid, "光鸭登录未配置", nil)
 	}
-	phone = strings.TrimSpace(phone)
+	phone = normalizeGuangyaPhone(phone)
 	if phone == "" {
 		return GuangyaLoginSession{}, domain.E(domain.KindInvalid, "请输入手机号", nil)
 	}

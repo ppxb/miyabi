@@ -29,6 +29,8 @@ export interface VideoSkinProps extends Omit<
   subtitleOffsetMenu?: NonNullable<
     ComponentProps<typeof DefaultVideoControls>
   >['subtitleOffsetMenu']
+  /** Enables the MPV fallback action in the player's built-in error dialog. */
+  mpvMovieId?: number
 }
 
 export function VideoSkin({
@@ -41,6 +43,7 @@ export function VideoSkin({
   onQualityChange,
   onSettingsOpen,
   subtitleOffsetMenu,
+  mpvMovieId,
   ...props
 }: VideoSkinProps) {
   return (
@@ -53,7 +56,7 @@ export function VideoSkin({
       {children}
       <Poster renderImage={renderPoster} />
       <BufferingIndicator />
-      <ErrorDialog />
+      <ErrorDialog movieId={mpvMovieId} />
       <Title />
 
       <DefaultVideoControls

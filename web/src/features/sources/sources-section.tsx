@@ -341,7 +341,7 @@ function PanSourceCard({
               </Button>
             </div>
 
-            {provider === '115' ? <PanSpaceBlocks space={profile.space} /> : null}
+            <PanSpaceBlocks space={profile.space} />
 
             <div className="flex items-center justify-between gap-2">
               <span className="truncate text-xs text-muted-foreground">

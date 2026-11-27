@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -134,17 +135,21 @@ func panLoginStatusHandler(pan DriveManager) gin.HandlerFunc {
 }
 
 type guangyaLoginInput struct {
-	Phone string `json:"phone" binding:"required"`
+	Phone string `json:"phone"`
 }
 
 type guangyaLoginVerifyInput struct {
-	Code string `json:"code" binding:"required"`
+	Code string `json:"code"`
 }
 
 func panBeginGuangyaLoginHandler(pan DriveManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		input, ok := bindJSON[guangyaLoginInput](c)
 		if !ok {
+			return
+		}
+		if strings.TrimSpace(input.Phone) == "" {
+			c.Error(badRequest(domain.E(domain.KindInvalid, "请输入手机号", nil)))
 			return
 		}
 		session, err := pan.BeginGuangyaLogin(c.Request.Context(), input.Phone)
@@ -160,6 +165,10 @@ func panVerifyGuangyaLoginHandler(pan DriveManager) gin.HandlerFunc {
 		}
 		input, ok := bindJSON[guangyaLoginVerifyInput](c)
 		if !ok {
+			return
+		}
+		if strings.TrimSpace(input.Code) == "" {
+			c.Error(badRequest(domain.E(domain.KindInvalid, "请输入验证码", nil)))
 			return
 		}
 		status, err := pan.VerifyGuangyaLogin(c.Request.Context(), uri.ID, input.Code)

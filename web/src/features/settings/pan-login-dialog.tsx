@@ -35,9 +35,11 @@ export function PanLoginDialog({
   function changeOpen(next: boolean) {
     setOpen(next)
     if (next) {
+      // Reset before starting a new session so the previous QR is not shown,
+      // but keep it mounted while closing so the exit animation stays stable.
+      login.reset()
       login.mutate()
     } else {
-      login.reset()
       void queryClient.invalidateQueries({ queryKey: panKeys.accounts })
     }
   }
