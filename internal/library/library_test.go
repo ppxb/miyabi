@@ -218,7 +218,7 @@ func TestLibraryPageKeepsEmptyAndUnmatchedSourcesUsable(t *testing.T) {
 	}
 }
 
-func TestLibraryOrdersBy115UploadTimeAndFlagsCloudSource(t *testing.T) {
+func TestLibraryOrdersByCreatedAtAndFlagsCloudSource(t *testing.T) {
 	lib, _, payload := libraryFixture(t)
 	ctx := t.Context()
 	base := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
@@ -228,14 +228,13 @@ func TestLibraryOrdersBy115UploadTimeAndFlagsCloudSource(t *testing.T) {
 			SetAccountID(account).SetRootID(root).SetUploadTime(uploadTime).SetMovieID(film.ID).SetCreatedAt(created).ExecX(ctx)
 		return film.ID
 	}
-	// upload_time is the 115 upload timestamp, so it must drive the order even
-	// when the local scan created the movie row later.
+	// The default listing orders every movie by when it entered the library,
+	// regardless of source; the upstream upload time does not reorder anything.
 	lowUpload := create("LOW-UPT", payload.Source.AccountID, payload.Source.Directory.ID, 100, base.Add(10*time.Hour))
 	highUpload := create("HIGH-UPT", payload.Source.AccountID, payload.Source.Directory.ID, 900, base)
-	// Local titles have no 115 file and rank after every 115 title.
 	local := create("LOC-001", domain.LocalAccountID, "local", 999999, base.Add(20*time.Hour))
 	// A 115-account file outside the mounted root stays local: it must not be
-	// badged as 115 nor take a 115 upload time.
+	// badged as 115.
 	stray := create("STRAY-001", domain.LocalAccountID, "local", 1, base.Add(6*time.Hour))
 	lib.database.File.Create().SetFileID("stray-cloud").SetName("stray.mp4").SetSize(1).
 		SetAccountID(payload.Source.AccountID).SetRootID("other-root").SetUploadTime(9999999).SetMovieID(stray).ExecX(ctx)
@@ -247,7 +246,7 @@ func TestLibraryOrdersBy115UploadTimeAndFlagsCloudSource(t *testing.T) {
 	if page.Total != 4 || len(page.Movies) != 4 {
 		t.Fatalf("unexpected page: %+v", page)
 	}
-	wantOrder := []int{highUpload, lowUpload, local, stray}
+	wantOrder := []int{local, lowUpload, stray, highUpload}
 	for i, movie := range page.Movies {
 		if movie.ID != wantOrder[i] {
 			t.Fatalf("order[%d] = %d, want %d (%+v)", i, movie.ID, wantOrder[i], page.Movies)

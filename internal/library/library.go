@@ -491,11 +491,6 @@ func (s *Service) Movies(ctx context.Context, page, limit int) (Page, error) {
 		return result, nil
 	}
 	order := []movie.OrderOption{ent.Desc(movie.FieldCreatedAt), ent.Desc(movie.FieldID)}
-	if cloudScope != nil {
-		// Newest-joined 115 titles first; local-only movies have no 115 join
-		// time and fall after them, ordered by their own creation time.
-		order = append([]movie.OrderOption{cloudAddedOrder(sources)}, order...)
-	}
 	records, err := s.database.Movie.Query().Where(movie.HasFilesWith(scope)).
 		Select(movie.FieldID, movie.FieldCode, movie.FieldTitle, movie.FieldCover, movie.FieldPoster,
 			movie.FieldFanarts, movie.FieldReleaseDate, movie.FieldDuration, movie.FieldRating,
@@ -731,41 +726,6 @@ func (s *Service) markWatchState(ctx context.Context, movies []Movie) error {
 	return nil
 }
 
-// cloudAddedOrder orders movies by the newest 115 upload time, newest first.
-// upload_time is the 115 "upt" value stored when the file was scanned, so it
-// reflects the real "joined 115" order rather than the local scan time.
-// Local-only movies have no 115 file and rank after every 115 title.
-func cloudAddedOrder(sources []domain.LibrarySource) movie.OrderOption {
-	return func(selector *sql.Selector) {
-		query := sql.Dialect(selector.Dialect()).String(func(b *sql.Builder) {
-			b.S("(SELECT MAX(").Ident(file.Table).S(".").Ident(file.FieldUploadTime).S(") FROM ").Ident(file.Table)
-			b.S(" WHERE ").Ident(file.Table).S(".").Ident(file.FieldMovieID).S(" = ").Ident(movie.Table).S(".").Ident(movie.FieldID)
-			b.S(" AND (")
-			first := true
-			for _, source := range sources {
-				if source.AccountID == "" || source.AccountID == domain.LocalAccountID {
-					continue
-				}
-				if !first {
-					b.S(" OR ")
-				}
-				first = false
-				b.S("(").Ident(file.Table).S(".").Ident(file.FieldAccountID).S(" = ? AND ").
-					Ident(file.Table).S(".").Ident(file.FieldRootID).S(" = ?)")
-			}
-			b.S(")) DESC")
-		})
-		args := make([]any, 0, len(sources)*2)
-		for _, source := range sources {
-			if source.AccountID == "" || source.AccountID == domain.LocalAccountID {
-				continue
-			}
-			args = append(args, source.AccountID, source.Directory.ID)
-		}
-		selector.OrderExpr(sql.Expr(query, args...))
-	}
-}
-
 func libraryEntity(id, name *string) *Entity {
 	if name == nil || *name == "" {
 		return nil
@@ -918,11 +878,9 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 	case "release":
 		query = query.Order(ent.Desc(movie.FieldReleaseDate), ent.Desc(movie.FieldID))
 	default:
-		order := []movie.OrderOption{ent.Desc(movie.FieldCreatedAt), ent.Desc(movie.FieldID)}
-		if cloudScope != nil {
-			order = append([]movie.OrderOption{cloudAddedOrder(sources)}, order...)
-		}
-		query = query.Order(order...)
+		// Newest additions first, across every source: "recent" is when the
+		// movie entered the library, not when its file was uploaded upstream.
+		query = query.Order(ent.Desc(movie.FieldCreatedAt), ent.Desc(movie.FieldID))
 	}
 	records, err := query.Offset(start).Limit(filter.Limit).All(ctx)
 	if err != nil {
