@@ -83,16 +83,17 @@ type Page struct {
 
 // BrowseFilter controls a filtered, paginated library browse.
 type BrowseFilter struct {
-	Query       string
-	Sort        string // "recent" (default), "rating", "release"
-	Source      string // "" (all), "115", "local"
-	HighRated   bool
-	TagNames    []string
-	ActorNames  []string
-	MakerNames  []string
-	SeriesNames []string
-	Page        int
-	Limit       int
+	Query        string
+	Sort         string // "recent" (default), "rating", "release"
+	Source       string // "" (all), "115", "local"
+	ScrapeStatus string // "" (all), "done", "pending", "failed"
+	HighRated    bool
+	TagNames     []string
+	ActorNames   []string
+	MakerNames   []string
+	SeriesNames  []string
+	Page         int
+	Limit        int
 }
 
 // FilterOption is one selectable value for a browse filter.
@@ -804,6 +805,14 @@ func (s *Service) BrowseMovies(ctx context.Context, filter BrowseFilter) (Page, 
 			return result, nil
 		}
 		preds = append(preds, movie.HasFilesWith(cloudScope))
+	}
+	switch filter.ScrapeStatus {
+	case "done":
+		preds = append(preds, movie.ScrapeStatusEQ(movie.ScrapeStatusDone))
+	case "pending":
+		preds = append(preds, movie.ScrapeStatusEQ(movie.ScrapeStatusPending))
+	case "failed":
+		preds = append(preds, movie.ScrapeStatusEQ(movie.ScrapeStatusFailed))
 	}
 	if names := nonEmptyStrings(filter.TagNames); len(names) > 0 {
 		matched, err := s.database.Tag.Query().Where(tag.NameIn(names...)).Select(tag.FieldID).All(ctx)

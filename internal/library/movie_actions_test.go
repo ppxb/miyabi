@@ -3,6 +3,7 @@ package library
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -184,6 +185,141 @@ func TestMovieRescrapeQueueWaitDoesNotHoldDatabaseWriter(t *testing.T) {
 			t.Fatal("canceled rescrape created a metadata task")
 		}
 	})
+}
+
+func TestRescrapeFailedQueuesOnlyFailedMoviesAndMarksThemPending(t *testing.T) {
+	lib, done, payload := movieActionFixture(t)
+	ctx := t.Context()
+	db := lib.database
+
+	failed := db.Movie.Create().SetCode("IPX-002").SetScrapeStatus(movie.ScrapeStatusFailed).SaveX(ctx)
+	db.File.Create().SetFileID("102").SetName("IPX-002.mp4").SetSize(1 << 30).
+		SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).SetMovieID(failed.ID).ExecX(ctx)
+
+	root := t.TempDir()
+	lib.localSources = func(context.Context) ([]domain.LocalScanTarget, error) {
+		return []domain.LocalScanTarget{{Path: root}}, nil
+	}
+	local := db.Movie.Create().SetCode("LOC-001").SetScrapeStatus(movie.ScrapeStatusFailed).SaveX(ctx)
+	db.File.Create().SetFileID(domain.LocalFileIDPrefix + "1").SetName("LOC-001.mp4").SetSize(1).
+		SetAccountID(domain.LocalAccountID).SetRootID("local").
+		SetPath(filepath.Join(root, "LOC-001.mp4")).SetMovieID(local.ID).ExecX(ctx)
+
+	count, err := lib.FailedRescrapeCount(ctx)
+	if err != nil || count != 2 {
+		t.Fatalf("FailedRescrapeCount = %d, %v", count, err)
+	}
+	created, reused, skipped, err := lib.RescrapeFailed(ctx)
+	if err != nil || created != 2 || reused != 0 || skipped != 0 {
+		t.Fatalf("RescrapeFailed = created %d reused %d skipped %d err %v", created, reused, skipped, err)
+	}
+	payloads := scrapePayloadsByMovie(t, lib)
+	if len(payloads) != 2 {
+		t.Fatalf("scrape tasks = %d, want 2", len(payloads))
+	}
+	parent := db.Task.Query().Where(task.TypeEQ("scan")).Order(ent.Desc(task.FieldID)).FirstX(ctx)
+	if parent.Status != task.StatusDone {
+		t.Fatalf("bulk workflow status = %s", parent.Status)
+	}
+	if input, err := tasks.DecodePayload[domain.ScanPayload](parent.Payload); err != nil || !input.BulkRescrape {
+		t.Fatalf("bulk workflow payload = %+v, %v", input, err)
+	}
+	cloudJob, ok := payloads[failed.ID]
+	if !ok || cloudJob.Rebuild || cloudJob.Source != payload.Source || cloudJob.ScanTaskID != parent.ID {
+		t.Fatalf("115 failed movie job = %+v", cloudJob)
+	}
+	localJob, ok := payloads[local.ID]
+	if !ok || localJob.Rebuild || localJob.Source.AccountID != domain.LocalAccountID || localJob.ScanTaskID != parent.ID {
+		t.Fatalf("local failed movie job = %+v", localJob)
+	}
+	if canonical, err := canonicalDirectory(root); err != nil || localJob.Source.Directory.ID != canonical {
+		t.Fatalf("local source = %q, want %q (err %v)", localJob.Source.Directory.ID, canonical, err)
+	}
+	if _, ok := payloads[done.ID]; ok {
+		t.Fatal("completed movie was enqueued")
+	}
+	if got := db.Movie.GetX(ctx, failed.ID).ScrapeStatus; got != movie.ScrapeStatusPending {
+		t.Fatalf("cloud failed movie status = %s, want pending", got)
+	}
+	if got := db.Movie.GetX(ctx, local.ID).ScrapeStatus; got != movie.ScrapeStatusPending {
+		t.Fatalf("local failed movie status = %s, want pending", got)
+	}
+	if got := db.Movie.GetX(ctx, done.ID).ScrapeStatus; got != movie.ScrapeStatusDone {
+		t.Fatalf("completed movie status = %s, want done", got)
+	}
+	if count, err := lib.FailedRescrapeCount(ctx); err != nil || count != 0 {
+		t.Fatalf("FailedRescrapeCount after enqueue = %d, %v", count, err)
+	}
+
+	// A second click finds nothing left to retry and does not stack duplicates.
+	created, reused, skipped, err = lib.RescrapeFailed(ctx)
+	if err != nil || created != 0 || reused != 0 || skipped != 0 {
+		t.Fatalf("second RescrapeFailed = created %d reused %d skipped %d err %v", created, reused, skipped, err)
+	}
+	if count := db.Task.Query().Where(task.TypeEQ("scrape")).CountX(ctx); count != 2 {
+		t.Fatalf("scrape tasks after second retry = %d, want 2", count)
+	}
+}
+
+func TestRescrapeFailedSkipsUnmappedAndMetadataOnlyMovies(t *testing.T) {
+	lib, _, _ := movieActionFixture(t)
+	ctx := t.Context()
+	db := lib.database
+
+	// The source is configured but has no current mount, so its files stay in
+	// the library scope and must be reported as skipped.
+	lib.sources = func(context.Context) ([]domain.LibrarySource, error) {
+		return []domain.LibrarySource{{
+			AccountID: "999",
+			Directory: domain.LibraryDirectory{ID: "20", Name: "Other", Path: "/Other"},
+		}}, nil
+	}
+	unmounted := db.Movie.Create().SetCode("AAA-001").SetScrapeStatus(movie.ScrapeStatusFailed).SaveX(ctx)
+	db.File.Create().SetFileID("201").SetName("AAA-001.mp4").SetSize(1).
+		SetAccountID("999").SetRootID("20").SetMovieID(unmounted.ID).ExecX(ctx)
+
+	outside := db.Movie.Create().SetCode("LOC-002").SetScrapeStatus(movie.ScrapeStatusFailed).SaveX(ctx)
+	db.File.Create().SetFileID(domain.LocalFileIDPrefix + "2").SetName("LOC-002.mp4").SetSize(1).
+		SetAccountID(domain.LocalAccountID).SetRootID("local").
+		SetPath(filepath.Join(t.TempDir(), "LOC-002.mp4")).SetMovieID(outside.ID).ExecX(ctx)
+
+	root := t.TempDir()
+	lib.localSources = func(context.Context) ([]domain.LocalScanTarget, error) {
+		return []domain.LocalScanTarget{{Path: root, MetadataOnly: true}}, nil
+	}
+	metadataOnly := db.Movie.Create().SetCode("LOC-003").SetScrapeStatus(movie.ScrapeStatusFailed).SaveX(ctx)
+	db.File.Create().SetFileID(domain.LocalFileIDPrefix + "3").SetName("LOC-003.mp4").SetSize(1).
+		SetAccountID(domain.LocalAccountID).SetRootID("local").
+		SetPath(filepath.Join(root, "LOC-003.mp4")).SetMovieID(metadataOnly.ID).ExecX(ctx)
+
+	if count, err := lib.FailedRescrapeCount(ctx); err != nil || count != 0 {
+		t.Fatalf("FailedRescrapeCount = %d, %v", count, err)
+	}
+	created, reused, skipped, err := lib.RescrapeFailed(ctx)
+	if err != nil || created != 0 || reused != 0 || skipped != 3 {
+		t.Fatalf("RescrapeFailed = created %d reused %d skipped %d err %v", created, reused, skipped, err)
+	}
+	if count := db.Task.Query().Where(task.TypeEQ("scrape")).CountX(ctx); count != 0 {
+		t.Fatalf("scrape tasks = %d, want 0", count)
+	}
+	for _, id := range []int{unmounted.ID, outside.ID, metadataOnly.ID} {
+		if got := db.Movie.GetX(ctx, id).ScrapeStatus; got != movie.ScrapeStatusFailed {
+			t.Fatalf("skipped movie %d status = %s, want failed", id, got)
+		}
+	}
+}
+
+func scrapePayloadsByMovie(t *testing.T, lib *libraryTestService) map[int]scrape.MetadataPayload {
+	t.Helper()
+	result := make(map[int]scrape.MetadataPayload)
+	for _, row := range lib.database.Task.Query().Where(task.TypeEQ("scrape")).AllX(t.Context()) {
+		input, err := tasks.DecodePayload[scrape.MetadataPayload](row.Payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		result[input.MovieID] = input
+	}
+	return result
 }
 
 func TestMovieCorrectionValidatesBeforeChangingIdentity(t *testing.T) {

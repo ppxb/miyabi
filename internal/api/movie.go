@@ -22,6 +22,8 @@ type LibraryManager interface {
 	StartIncrementalSync(context.Context) (int, error)
 	PendingCount(context.Context) (int, error)
 	RescrapeMovie(context.Context, int, string) (domain.TaskInfo, error)
+	RescrapeFailed(context.Context) (created, reused, skipped int, err error)
+	FailedRescrapeCount(context.Context) (int, error)
 }
 
 func libraryMovieScrapeHandler(library LibraryManager) gin.HandlerFunc {
@@ -50,10 +52,17 @@ func libraryRebuildHandler(library LibraryManager) gin.HandlerFunc {
 	}
 }
 
-func librarySyncHandler(library LibraryManager) gin.HandlerFunc {
+func libraryScrapeFailedHandler(library LibraryManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		started, err := library.StartIncrementalSync(c.Request.Context())
-		respond(c, gin.H{"started": started}, err)
+		created, reused, skipped, err := library.RescrapeFailed(c.Request.Context())
+		respond(c, gin.H{"created": created, "reused": reused, "skipped": skipped}, err)
+	}
+}
+
+func libraryScrapeFailedCountHandler(library LibraryManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		count, err := library.FailedRescrapeCount(c.Request.Context())
+		respond(c, gin.H{"count": count}, err)
 	}
 }
 
@@ -87,16 +96,17 @@ func libraryBrowseHandler(library LibraryManager) gin.HandlerFunc {
 			return
 		}
 		filter := lib.BrowseFilter{
-			Query:       c.Query("q"),
-			Sort:        c.DefaultQuery("sort", "recent"),
-			Source:      c.Query("source"),
-			HighRated:   c.Query("high") == "true" || c.Query("high") == "1",
-			TagNames:    c.QueryArray("tag"),
-			ActorNames:  c.QueryArray("actor"),
-			MakerNames:  c.QueryArray("maker"),
-			SeriesNames: c.QueryArray("series"),
-			Page:        query.Page,
-			Limit:       query.Limit,
+			Query:        c.Query("q"),
+			Sort:         c.DefaultQuery("sort", "recent"),
+			Source:       c.Query("source"),
+			ScrapeStatus: c.Query("status"),
+			HighRated:    c.Query("high") == "true" || c.Query("high") == "1",
+			TagNames:     c.QueryArray("tag"),
+			ActorNames:   c.QueryArray("actor"),
+			MakerNames:   c.QueryArray("maker"),
+			SeriesNames:  c.QueryArray("series"),
+			Page:         query.Page,
+			Limit:        query.Limit,
 		}
 		movies, err := library.BrowseMovies(c.Request.Context(), filter)
 		respond(c, movies, err)

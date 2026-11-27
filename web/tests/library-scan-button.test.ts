@@ -1,19 +1,17 @@
-import { Children, createElement, isValidElement, type ReactElement, type ReactNode } from 'react'
+import { Children, createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { expect, test, vi } from 'vitest'
 
-import { useLibraryMovies, useStartLibraryScan } from '@/api/library'
+import { useLibraryMovies } from '@/api/library'
 import { useTasks } from '@/api/tasks'
 import { LibraryPage } from '@/features/library/page'
 import { LibraryScanButton } from '@/features/library/scan-button'
-import { notifyScanTask, notifyTaskError } from '@/features/tasks/task-toast'
 
 vi.mock('@/api/library', () => ({
   LIBRARY_PAGE_SIZE: 20,
   useLibraryMovies: vi.fn(),
   useRecentMovies: () => ({ data: { movies: [], total: 0 }, isPending: false }),
-  useTopRatedMovies: () => ({ data: [] }),
-  useStartLibraryScan: vi.fn()
+  useTopRatedMovies: () => ({ data: [] })
 }))
 vi.mock('@/api/tasks', () => ({
   useTasks: vi.fn(),
@@ -32,8 +30,18 @@ vi.mock('@/features/tasks/task-toast', () => {
   return { notifyScanTask, useNotifyScanTask: () => notifyScanTask, notifyTaskError: vi.fn() }
 })
 
-function elements(node: ReactNode): ReactElement<Record<string, unknown>>[] {
-  return Children.toArray(node).filter(isValidElement) as ReactElement<Record<string, unknown>>[]
+function label(button: { props: Record<string, unknown> }): ReactNode {
+  return Children.toArray(button.props.children as ReactNode).at(-1)
+}
+
+const base = {
+  loading: false,
+  scanning: false,
+  active: false,
+  connected: true,
+  pending: false,
+  blocked: false,
+  onSubmit: () => {}
 }
 
 test('library page header shows the multi-source description without scan controls', () => {
@@ -44,64 +52,44 @@ test('library page header shows the multi-source description without scan contro
   } as unknown as ReturnType<typeof useLibraryMovies>)
   const html = renderToStaticMarkup(createElement(LibraryPage))
   expect(html).toContain('最近加入、正在观看与高分影片')
-  expect(html).not.toContain('同步媒体库')
+  expect(html).not.toContain('扫描并修复')
 })
 
-test('the loading placeholder still retains the scan mutation hook', () => {
-  vi.mocked(useStartLibraryScan).mockReturnValue({ isPending: true } as ReturnType<
-    typeof useStartLibraryScan
-  >)
-  LibraryScanButton({ scanning: false, rebuilding: false, connected: true, loading: true })
-  expect(useStartLibraryScan).toHaveBeenCalledTimes(1)
+test('the loading placeholder renders without a scan action', () => {
+  const node = LibraryScanButton({ ...base, rebuild: false, loading: true })!
+  expect(node.props.onClick).toBeUndefined()
 })
 
-test('scan submission keeps success navigation and failure notification', () => {
-  const mutate = vi.fn()
-  vi.mocked(useStartLibraryScan).mockReturnValue({
-    isPending: false,
-    mutate
-  } as unknown as ReturnType<typeof useStartLibraryScan>)
-  const tree = LibraryScanButton({
-    loading: false,
-    scanning: false,
-    rebuilding: false,
-    connected: true
-  })!
-  const button = elements(tree.props.children)[0]!
-  ;(button.props.onClick as () => void)()
-  expect(mutate.mock.calls[0]![0]).toBe(false)
-  const callbacks = mutate.mock.calls[0]![1]
-  const task = { id: 123 }
-  callbacks.onSuccess(task)
-  expect(notifyScanTask).toHaveBeenCalledWith(task)
-  callbacks.onError(new Error('request failed'))
-  expect(notifyTaskError).toHaveBeenCalledWith(
-    'scan:submit-error',
-    '无法创建同步任务',
-    '请检查后端服务和网络后重试。'
-  )
+test('scan and rebuild controls submit their own modes', () => {
+  const submit = vi.fn()
+  const scan = LibraryScanButton({ ...base, rebuild: false, onSubmit: submit })!
+  const rebuild = LibraryScanButton({ ...base, rebuild: true, onSubmit: submit })!
+  expect(label(scan)).toBe('扫描并修复')
+  expect(label(rebuild)).toBe('重建媒体库')
+  ;(scan.props.onClick as () => void)()
+  ;(rebuild.props.onClick as () => void)()
+  expect(submit.mock.calls).toEqual([[false], [true]])
 })
 
-test('rebuild control submits a full rebuild and both controls disable during processing', () => {
-  const mutate = vi.fn()
-  vi.mocked(useStartLibraryScan).mockReturnValue({
-    isPending: false,
-    mutate
-  } as unknown as ReturnType<typeof useStartLibraryScan>)
-  const props = {
-    loading: false,
-    scanning: false,
-    rebuilding: false,
-    connected: true
+test('either submission and any running scan disable both controls', () => {
+  for (const rebuild of [false, true]) {
+    expect(LibraryScanButton({ ...base, rebuild, pending: true })!.props.disabled).toBe(true)
+    expect(LibraryScanButton({ ...base, rebuild, scanning: true })!.props.disabled).toBe(true)
+    expect(LibraryScanButton({ ...base, rebuild })!.props.disabled).toBe(false)
   }
-  const buttons = (tree: ReturnType<typeof LibraryScanButton>) => elements(tree!.props.children)
-  const controls = buttons(LibraryScanButton(props))
-  expect(
-    controls.map(button => Children.toArray(button.props.children as ReactNode).at(-1))
-  ).toEqual(['同步媒体库', '重建媒体库'])
-  ;(controls[1]!.props.onClick as () => void)()
-  expect(mutate.mock.calls[0]![0]).toBe(true)
-  for (const button of buttons(LibraryScanButton({ ...props, scanning: true, rebuilding: true }))) {
-    expect(button.props.disabled).toBe(true)
+})
+
+test('a sibling action disables the control without a scan spinner', () => {
+  for (const rebuild of [false, true]) {
+    const node = LibraryScanButton({ ...base, rebuild, blocked: true })!
+    expect(node.props.disabled).toBe(true)
+    expect(label(node)).toBe(rebuild ? '重建媒体库' : '扫描并修复')
   }
+})
+
+test('active scans show their own progress labels', () => {
+  const props = { ...base, scanning: true, active: true }
+  expect(label(LibraryScanButton({ ...props, rebuild: false })!)).toBe('正在扫描')
+  expect(label(LibraryScanButton({ ...props, rebuild: true })!)).toBe('正在重建')
+  expect(label(LibraryScanButton({ ...props, rebuild: false, connected: false })!)).toBe('连接中')
 })

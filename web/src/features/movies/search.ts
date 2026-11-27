@@ -6,6 +6,7 @@ export type MoviesSearch = {
   q?: string
   sort?: 'recent' | 'rating' | 'release'
   source?: '115' | 'local'
+  status?: 'done' | 'pending' | 'failed'
   tags?: string
   actors?: string
   makers?: string
@@ -35,16 +36,21 @@ function joinList(value?: string[]): string | undefined {
 export function validateMoviesSearch(search: Record<string, unknown>): MoviesSearch {
   const sort = search.sort
   const source = search.source
+  const status = search.status
   if (sort !== undefined && sort !== 'recent' && sort !== 'rating' && sort !== 'release') {
     throw new Error('排序无效')
   }
   if (source !== undefined && source !== '115' && source !== 'local') {
     throw new Error('来源无效')
   }
+  if (status !== undefined && status !== 'done' && status !== 'pending' && status !== 'failed') {
+    throw new Error('刮削状态无效')
+  }
   return {
     q: parseText(search.q),
     sort: sort === 'rating' || sort === 'release' ? sort : undefined,
     source: source === '115' || source === 'local' ? source : undefined,
+    status: status === 'done' || status === 'pending' || status === 'failed' ? status : undefined,
     tags: parseText(search.tags),
     actors: parseText(search.actors),
     makers: parseText(search.makers),
@@ -58,6 +64,7 @@ export function moviesFilterFromSearch(search: MoviesSearch): MoviesFilter {
     q: search.q,
     sort: search.sort,
     source: search.source,
+    status: search.status,
     tagNames: splitList(search.tags),
     actorNames: splitList(search.actors),
     makerNames: splitList(search.makers),
@@ -70,6 +77,7 @@ export function moviesSearchFromFilter(filter: MoviesFilter): MoviesSearch {
     q: filter.q,
     sort: filter.sort,
     source: filter.source,
+    status: filter.status,
     tags: joinList(filter.tagNames),
     actors: joinList(filter.actorNames),
     makers: joinList(filter.makerNames),

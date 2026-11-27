@@ -15,8 +15,10 @@ type ScanPayload struct {
 	// MetadataOnly keeps local scans from auto-completing metadata from sources.
 	MetadataOnly bool `json:"metadata_only,omitempty"`
 	// Incremental limits metadata work to still-pending movies.
-	Incremental bool   `json:"incremental,omitempty"`
-	Checkpoint  string `json:"checkpoint,omitempty"`
+	Incremental bool `json:"incremental,omitempty"`
+	// BulkRescrape marks the parent workflow created by the bulk failed-movie retry.
+	BulkRescrape bool   `json:"bulk_rescrape,omitempty"`
+	Checkpoint   string `json:"checkpoint,omitempty"`
 	// ReusedTasks links this scan to work already owned by another scan.
 	ReusedTasks []int `json:"reused_tasks,omitempty"`
 	// ObsoleteCodes survives chunk commits until reassigned exports are cleaned.

@@ -30,6 +30,7 @@ export type ScanTask = TaskBase & {
   movie_id?: number
   code?: string
   rebuild?: boolean
+  bulk_rescrape?: boolean
   source: LibrarySource
   offline_task_id?: number
   paused?: boolean

@@ -305,6 +305,9 @@ func TestLibraryBrowseFiltersSortAndOptions(t *testing.T) {
 	m2 := createMovie("BRW-002", "Beta", 3.6, "2026-03-05", "maker-2", "Studio Two", "", false, tagADup)
 	m3 := createMovie("BRW-003", "Gamma", 5.0, "2026-02-01", "maker-3", "Studio Three", "Series Two", false, tagB)
 	m4 := createMovie("LOC-001", "Delta", 0, "", "", "", "", true)
+	db.Movie.UpdateOneID(m1).SetScrapeStatus(movie.ScrapeStatusDone).ExecX(ctx)
+	db.Movie.UpdateOneID(m2).SetScrapeStatus(movie.ScrapeStatusFailed).ExecX(ctx)
+	db.Movie.UpdateOneID(m3).SetScrapeStatus(movie.ScrapeStatusDone).ExecX(ctx)
 
 	ids := func(page Page) []int {
 		result := make([]int, len(page.Movies))
@@ -336,6 +339,19 @@ func TestLibraryBrowseFiltersSortAndOptions(t *testing.T) {
 	local, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, Source: "local"})
 	if err != nil || local.Total != 1 || local.Movies[0].ID != m4 {
 		t.Fatalf("source=local: %+v err=%v", local, err)
+	}
+
+	done, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, ScrapeStatus: "done"})
+	if err != nil || done.Total != 2 || !containsID(ids(done), m1) || !containsID(ids(done), m3) {
+		t.Fatalf("status=done: %v err=%v", ids(done), err)
+	}
+	pending, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, ScrapeStatus: "pending"})
+	if err != nil || pending.Total != 1 || pending.Movies[0].ID != m4 {
+		t.Fatalf("status=pending: %v err=%v", ids(pending), err)
+	}
+	failed, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, ScrapeStatus: "failed"})
+	if err != nil || failed.Total != 1 || failed.Movies[0].ID != m2 {
+		t.Fatalf("status=failed: %v err=%v", ids(failed), err)
 	}
 
 	byTag, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, TagNames: []string{"A tag"}})
@@ -383,7 +399,7 @@ func TestLibraryBrowseFiltersSortAndOptions(t *testing.T) {
 	if err != nil || clamped.Page != 2 || len(clamped.Movies) != 2 || clamped.HasMore {
 		t.Fatalf("clamped page: %+v err=%v", clamped, err)
 	}
-	bogus, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, Sort: "nope", Source: "nope"})
+	bogus, err := lib.BrowseMovies(ctx, BrowseFilter{Page: 1, Limit: 20, Sort: "nope", Source: "nope", ScrapeStatus: "nope"})
 	if err != nil || bogus.Total != 4 {
 		t.Fatalf("bogus filters fallback: %+v err=%v", bogus, err)
 	}

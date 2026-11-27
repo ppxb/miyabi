@@ -7,6 +7,7 @@ type TaskInfo struct {
 	MovieID       int           `json:"movie_id,omitempty"`
 	Code          string        `json:"code,omitempty"`
 	Rebuild       bool          `json:"rebuild,omitempty"`
+	BulkRescrape  bool          `json:"bulk_rescrape,omitempty"`
 	ID            int           `json:"id"`
 	Type          string        `json:"type"`
 	Status        string        `json:"status"`

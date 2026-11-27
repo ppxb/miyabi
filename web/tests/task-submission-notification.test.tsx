@@ -8,11 +8,21 @@ import { useRescrapeLibraryMovie, useStartLibraryScan } from '@/api/library'
 import { taskKeys, type ScanTask } from '@/api/tasks'
 import { LibraryMovieActions } from '@/features/library/movie-actions'
 import { LibraryScanButton } from '@/features/library/scan-button'
+import { MediaSyncSection } from '@/features/settings/media-sync-section'
 import { notifyScanTask } from '@/features/tasks/task-toast'
 
 vi.mock('@/api/library', () => ({
   useRescrapeLibraryMovie: vi.fn(),
-  useStartLibraryScan: vi.fn()
+  useStartLibraryScan: vi.fn(),
+  useLibraryPending: () => ({ data: { count: 0 } }),
+  useFailedRescrapeCount: () => ({ data: { count: 3 }, isPending: false }),
+  useRescrapeFailedMovies: () => ({ mutate: vi.fn(), isPending: false })
+}))
+vi.mock('@/features/tasks/use-active-scan', () => ({
+  useActiveScan: () => ({ tasks: { isPending: false }, scans: [], active: null })
+}))
+vi.mock('@/features/tasks/task-events', () => ({
+  useTaskConnection: () => ({ status: 'connected' })
 }))
 vi.mock('sonner', () => ({
   toast: { info: vi.fn(), error: vi.fn(), success: vi.fn() }
@@ -51,7 +61,12 @@ const queued: ScanTask = {
 function elements(node: ReactNode): ReactElement<Record<string, unknown>>[] {
   return Children.toArray(node).flatMap(child => {
     if (!isValidElement<Record<string, unknown>>(child)) return []
-    return [child, ...elements(child.props.children as ReactNode)]
+    // Expand the presentational scan control so its button is clickable here.
+    const children =
+      child.type === LibraryScanButton
+        ? (child.type as unknown as (props: Record<string, unknown>) => ReactNode)(child.props)
+        : (child.props.children as ReactNode)
+    return [child, ...elements(children)]
   })
 }
 
@@ -77,12 +92,7 @@ function submission(action: 'rescrape' | 'scan' | 'rebuild') {
               code: queued.code!
             }
           })
-        : LibraryScanButton({
-            loading: false,
-            scanning: false,
-            rebuilding: false,
-            connected: true
-          })
+        : MediaSyncSection()
     return null
   }
   renderToStaticMarkup(
@@ -92,7 +102,8 @@ function submission(action: 'rescrape' | 'scan' | 'rebuild') {
   )
   const event = 'onClick'
   const controls = elements(tree).filter(element => typeof element.props[event] === 'function')
-  ;(controls[action === 'rebuild' ? 1 : 0]!.props[event] as () => void)()
+  // The section renders scan, rescrape and rebuild controls in that order.
+  ;(controls[action === 'rebuild' ? 2 : 0]!.props[event] as () => void)()
   const callbacks = mutate.mock.calls[0]![1] as { onSuccess: (task: ScanTask) => void }
   return { client, complete: () => callbacks.onSuccess(queued) }
 }

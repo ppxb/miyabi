@@ -27,6 +27,13 @@ const SOURCE_OPTIONS = [
   { value: 'local', label: '本地' }
 ] as const
 
+const STATUS_OPTIONS = [
+  { value: 'all', label: '全部状态' },
+  { value: 'done', label: '已刮削' },
+  { value: 'pending', label: '待刮削' },
+  { value: 'failed', label: '刮削失败' }
+] as const
+
 export function MovieFilterBar({
   options,
   value,
@@ -40,10 +47,12 @@ export function MovieFilterBar({
 
   const sortValue = value.sort ?? 'recent'
   const sourceValue = value.source ?? 'all'
+  const statusValue = value.status ?? 'all'
 
   const hasFilters =
     Boolean(value.q) ||
     Boolean(value.source) ||
+    Boolean(value.status) ||
     (value.tagNames?.length ?? 0) > 0 ||
     (value.actorNames?.length ?? 0) > 0 ||
     (value.makerNames?.length ?? 0) > 0 ||
@@ -101,6 +110,30 @@ export function MovieFilterBar({
         <SelectContent align="start">
           <SelectGroup>
             {SOURCE_OPTIONS.map(option => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+
+      <Select
+        items={STATUS_OPTIONS}
+        value={statusValue}
+        onValueChange={next =>
+          onChange({
+            ...value,
+            status: next === 'all' ? undefined : (next as MoviesFilter['status'])
+          })
+        }
+      >
+        <SelectTrigger className="w-28">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent align="start">
+          <SelectGroup>
+            {STATUS_OPTIONS.map(option => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>

@@ -203,7 +203,7 @@ func scanTaskInfo(record *ent.Task) (domain.TaskInfo, error) {
 
 func scanTaskInfoFrom(record *ent.Task, payload domain.ScanPayload) domain.TaskInfo {
 	return domain.TaskInfo{
-		Rebuild: payload.Rebuild, MovieID: payload.MovieID, Code: payload.Code,
+		Rebuild: payload.Rebuild, BulkRescrape: payload.BulkRescrape, MovieID: payload.MovieID, Code: payload.Code,
 		ID: record.ID, Type: record.Type, Status: string(record.Status), Progress: record.Progress,
 		Error: record.Error, CanRetry: record.Status == task.StatusFailed, CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
 		RetryAt: record.RetryAt, RetryCount: record.RetryCount,

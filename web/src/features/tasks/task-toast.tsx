@@ -155,7 +155,7 @@ export function notifyOfflineTask(
       ...props,
       description:
         task.phase === 'downloaded'
-          ? '视频已下载，但尚未识别为对应影片，请在 115 检查文件名和大小后同步媒体库。'
+          ? '视频已下载，但尚未识别为对应影片，请在 115 检查文件名和大小后扫描并修复媒体库。'
           : '当前媒体目录内未找到该任务的视频文件。'
     })
   }

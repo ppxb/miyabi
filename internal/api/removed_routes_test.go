@@ -12,6 +12,7 @@ func TestRemovedRoutesLeaveActiveWorkflowsRegistered(t *testing.T) {
 		"GET /api/health",
 		"POST /api/auth/logout",
 		"POST /api/library/scan/local",
+		"POST /api/library/sync",
 		"GET /api/discover/movies/:id/offline",
 		"GET /api/javdb/route",
 		"PUT /api/javdb/route",
@@ -26,6 +27,8 @@ func TestRemovedRoutesLeaveActiveWorkflowsRegistered(t *testing.T) {
 	for _, route := range []string{
 		"POST /api/auth/login",
 		"POST /api/library/scan",
+		"GET /api/library/scrape-failed",
+		"POST /api/library/scrape-failed",
 		"POST /api/discover/movies/:id/offline",
 		"GET /api/offline/tasks",
 	} {

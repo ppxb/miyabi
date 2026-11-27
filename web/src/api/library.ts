@@ -69,6 +69,7 @@ export type BrowseLibraryParams = {
   q?: string
   sort?: 'recent' | 'rating' | 'release'
   source?: '115' | 'local'
+  status?: 'done' | 'pending' | 'failed'
   tagNames?: string[]
   actorNames?: string[]
   makerNames?: string[]
@@ -153,6 +154,7 @@ export function useBrowseLibraryMovies(params: BrowseLibraryParams) {
           q: params.q,
           sort: params.sort,
           source: params.source,
+          status: params.status,
           tag: params.tagNames,
           actor: params.actorNames,
           maker: params.makerNames,
@@ -188,13 +190,23 @@ export function useStartLibraryScan() {
   })
 }
 
-export function useSyncLibrary() {
+export function useRescrapeFailedMovies() {
   const queryClient = useQueryClient()
   const streamConnected = useTaskStreamConnected()
   return useMutation({
-    mutationFn: () => apiPost<{ started: number }>('/api/library/sync'),
+    mutationFn: () =>
+      apiPost<{ created: number; reused: number; skipped: number }>('/api/library/scrape-failed'),
     onSuccess: () =>
       refreshQueries(queryClient, ...taskRefreshKeys(streamConnected), libraryKeys.all)
+  })
+}
+
+export function useFailedRescrapeCount() {
+  return useQuery({
+    queryKey: ['library', 'scrape-failed'] as const,
+    queryFn: ({ signal }) =>
+      apiGet<{ count: number }>('/api/library/scrape-failed', undefined, signal),
+    staleTime: 15_000
   })
 }
 

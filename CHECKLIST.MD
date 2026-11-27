@@ -306,7 +306,16 @@
 
 - [ ] 查看 https://github.com/tinypinglite/sakuramedia 项目接入光鸭的方式。
 
-- [ ] 设置页数据的媒体库同步，几个按钮的语义不是很清晰。同时影片页面，需要新增筛选已削刮和未削刮（削刮失败）。用户提出，需要有一次性对削刮失败的影片进行重新削刮的功能。
+- [x] ✅ **设置页媒体库同步按钮语义不清；影片页缺刮削状态筛选；缺一次性重刮失败影片**
+  - 改法：设置页去掉与全量扫描重复的"同步新增文件"（启动与保存源配置仍自动跑增量同步），按钮收敛为「扫描并修复媒体库 / 重新刮削失败影片 / 重建媒体库」；影片页只加状态筛选，不做批量操作；批量重刮入口放在设置页。
+  - 后端：`library.BrowseFilter` 增加 `ScrapeStatus`（done/pending/failed，未知忽略），`libraryBrowseHandler` 读取 `status`。新增 `Service.RescrapeFailed`：每 500 部一页，逐页持有队列锁 + 事务，避免长时间阻塞 worker 领取与数据库写入；115 按文件账号一次解析挂载，本地按已配置根/Emby 目录前缀匹配；跳过未挂载账号、无匹配本地根与 metadataOnly 本地源；Rebuild=false，复用活跃任务；入队成功的影片置 Pending（失败时由现有刮削流程改回 Failed）；创建父 scan 任务让批量工作出现在任务列表。数量统计新增 `Service.FailedRescrapeCount`，与动作使用同一套来源解析，只统计真正可重刮的失败影片；接口 `GET/POST /api/library/scrape-failed`。删除前端已无调用方的 `POST /api/library/sync` 路由与 handler（`StartIncrementalSync` 仍供启动和保存源配置使用）。
+  - 前端：设置页三行按钮；失败数量改用 `GET /api/library/scrape-failed`；提交结果分别显示已提交/已在队列中/无法匹配来源；`LibraryScanButton` 改为单按钮展示组件，扫描与重建共用父组件的 mutation；三个按钮互斥：扫描/重建提交中、全量扫描运行中、批量重刮提交中或运行中，任意一个发生都会禁用全部按钮。批量父任务的 payload 增加 `bulk_rescrape` 标记并透传到 `TaskInfo`，扫描按钮不再把批量重刮误判为"正在扫描"，批量运行中重刮按钮显示"正在重新刮削"。提交成功后刷新整个 library 查询（失败数、影片列表）。影片页 `filter-bar.tsx` 增加「全部状态 / 已刮削 / 待刮削 / 刮削失败」，`search.ts` 同步 URL 状态白名单与双向映射。删除无调用方的 `useSyncLibrary`。
+  - 测试：`movie_actions_test.go` 两条（仅 failed 入队、done 不动、本地/115 混合、父 scan 任务、入队后转 Pending、二次点击不重复；未挂载账号、无匹配本地根、metadataOnly 本地源均 skipped 且数量统计为 0）；`library_test.go` 补 done/pending/failed/未知状态断言；`library-scan-button.test.ts` 改为展示组件测试，新增 `media-sync-section.test.tsx`（数量文案、按钮禁用、三个按钮互斥、提交结果拆分、失败通知）与 `movies-search.test.ts`。`go build ./internal/... ./cmd/...`、`go vet ./internal/...`、`go test -count=1 ./internal/... ./cmd/...` 全绿；`npm run typecheck`、`oxlint`、`oxfmt --check`（改动文件）通过；`npm run test` 仅剩既有 7 个失败（完成提示时长断言 4000 vs 源码 3000，源于 `e8104bc`，与本次无关）。
+  - 遗留（低）：
+    - 批量重刮不逐片验证 115 会话，授权失效时任务会再次失败，影片从 Pending 回到 Failed。
+    - 失败数量与提交动作各自做一次来源解析（各一次挂载/本地根读取），设置页加载时多一次只读查询。
+    - 父 scan 任务的来源取本批第一个可解析影片的来源，混合来源时任务页的来源展示不完全准确。
+    - 页面先显示的数量与点击时实际结果之间仍可能变化（期间影片状态被其他任务改动），以提交后 toast 的数字为准。
 ---
 
 ## 核查后排除（不是问题）
