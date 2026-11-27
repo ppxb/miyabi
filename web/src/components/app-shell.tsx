@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { LazyLibraryPlayerDialog } from '@/features/library/player-dialog-lazy'
 import { TaskEventsProvider } from '@/features/tasks/task-events'
 import { TaskNotifications } from '@/features/tasks/task-notifications'
 import { useTheme } from '@/stores/theme'
@@ -16,6 +17,7 @@ const THEME_CYCLE = ['light', 'dark', 'system'] as const
 
 export function AppShell({ children }: PropsWithChildren) {
   const [searchOpen, setSearchOpen] = useState(false)
+  const [playingId, setPlayingId] = useState<number | null>(null)
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -42,7 +44,8 @@ export function AppShell({ children }: PropsWithChildren) {
         </div>
       </SidebarProvider>
 
-      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} onPlay={setPlayingId} />
+      <LazyLibraryPlayerDialog movieId={playingId} onClose={() => setPlayingId(null)} />
       <Toaster position="top-right" closeButton duration={6000} />
       <TaskNotifications />
     </TaskEventsProvider>

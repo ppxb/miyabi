@@ -1,4 +1,4 @@
-import { Fragment, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { SearchIcon, UserIcon } from 'lucide-react'
@@ -22,7 +22,6 @@ import {
   CommandSeparator
 } from '@/components/ui/command'
 import { Kbd, KbdGroup } from '@/components/ui/kbd'
-import { MovieDetailDialogContext } from '@/features/movie-detail/dialog-context'
 
 const MODIFIER_KEY =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? '⌘' : 'Ctrl'
@@ -166,13 +165,14 @@ async function fetchAllActors(q: string, signal: AbortSignal) {
 
 export function SearchDialog({
   open,
-  onOpenChange
+  onOpenChange,
+  onPlay
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onPlay: (movieId: number) => void
 }) {
   const navigate = useNavigate()
-  const openMovie = useContext(MovieDetailDialogContext)
   const [query, setQuery] = useState('')
   const keyword = query.trim()
   const debounced = useDebounced(keyword, 200)
@@ -218,9 +218,7 @@ export function SearchDialog({
       details: movieDetails(movie),
       image: movie.cover || movie.poster,
       kind: 'movie',
-      run: () => {
-        openMovie?.({ libraryId: movie.id })
-      }
+      run: () => onPlay(movie.id)
     }
   }
 

@@ -1,5 +1,5 @@
-import { CaptionsIcon, PencilIcon, PlayIcon, RefreshCwIcon } from 'lucide-react'
-import { useState } from 'react'
+import { CaptionsIcon, InfoIcon, PencilIcon, PlayIcon, RefreshCwIcon } from 'lucide-react'
+import { useContext, useState } from 'react'
 import { toast } from 'sonner'
 
 import { describeApiError } from '@/api/client'
@@ -18,11 +18,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { SubtitleDialog } from '@/features/library/subtitle-dialog'
+import { MovieDetailDialogContext } from '@/features/movie-detail/dialog-context'
 import { notifyTaskError, useNotifyScanTask } from '@/features/tasks/task-toast'
 
 // Renders the context-menu content and its correction dialog. The ContextMenu
 // root/trigger live in the card so right-clicking the whole card opens it.
 export function LibraryMovieActions({ movie }: { movie: Pick<LibraryMovie, 'id' | 'code'> }) {
+  const openMovie = useContext(MovieDetailDialogContext)
   const [correcting, setCorrecting] = useState(false)
   const [managingSubtitles, setManagingSubtitles] = useState(false)
   const [code, setCode] = useState(movie.code)
@@ -82,6 +84,10 @@ export function LibraryMovieActions({ movie }: { movie: Pick<LibraryMovie, 'id' 
         <ContextMenuItem disabled={launchingMpv} onClick={() => void playWithMpv()}>
           <PlayIcon />
           使用 MPV 播放
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => openMovie?.({ libraryId: movie.id })}>
+          <InfoIcon />
+          查看详情
         </ContextMenuItem>
       </ContextMenuContent>
       <SubtitleDialog movie={movie} open={managingSubtitles} onOpenChange={setManagingSubtitles} />
