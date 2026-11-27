@@ -28,7 +28,12 @@ export function CategoryContent({
           limit: PAGE_SIZE,
           sort: 'release',
           order: 'desc',
-          ...categoryBrowseParams({ ...category, categoryID: selectedCategory?.id ?? '' })
+          ...categoryBrowseParams({
+            ...category,
+            // Fall back to the requested id before taxonomy loads, so a year
+            // filter is not briefly sent as a tag id.
+            categoryID: selectedCategory?.id ?? category.categoryID
+          })
         }}
         onPageChange={onPageChange}
       />

@@ -94,7 +94,27 @@ func discoverBrowseHandler(discover CatalogueManager) gin.HandlerFunc {
 			Page:       query.Page,
 			Limit:      query.Limit,
 		})
+		if err == nil {
+			trimBrowseMovies(movies)
+		}
 		respond(c, movies, err)
+	}
+}
+
+// trimBrowseMovies keeps browse pages to the fields their cards need. Cast,
+// tags, previews and plot belong to the detail response, which is fetched when
+// a card opens; dropping them here avoids transferring them twice.
+func trimBrowseMovies(movies []catalogue.Movie) {
+	for i := range movies {
+		movie := &movies[i]
+		movie.Plot = ""
+		movie.PreviewImages = []domain.PreviewImage{}
+		movie.PreviewVideo = ""
+		movie.MagnetsCount = 0
+		movie.HasPreview = false
+		movie.Actors = []domain.Actor{}
+		movie.Tags = []domain.Tag{}
+		movie.FieldSources = nil
 	}
 }
 

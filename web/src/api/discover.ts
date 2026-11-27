@@ -119,6 +119,9 @@ export function useDiscoverMovies(params: BrowseMoviesParams) {
   return useQuery({
     queryKey: discoverKeys.movies(params),
     placeholderData: keepPreviousData,
+    // Matches the server's one-minute list cache: revisiting a page or tab
+    // reuses the response instead of asking again.
+    staleTime: 60_000,
     queryFn: ({ signal }) =>
       apiGet<DiscoverMovie[]>(
         '/api/discover/movies',

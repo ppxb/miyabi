@@ -9,40 +9,13 @@
     "rating": 4.5,
     "thumbnail": "https://media.example/thumb.jpg",
     "cover": "https://media.example/cover.jpg",
-    "preview_images": [
-      {
-        "thumbnail": "https://media.example/preview-thumb.jpg",
-        "original": "https://media.example/preview.jpg"
-      }
-    ],
-    "preview_video": "https://media.example/preview.m3u8",
-    "magnets_count": 3,
+    "preview_images": [],
+    "preview_video": "",
+    "magnets_count": 0,
     "has_subtitle": true,
-    "has_preview": true,
-    "actors": [
-      {
-        "id": "actor-1",
-        "name": "Actor",
-        "name_zht": "演員",
-        "gender": "female",
-        "avatar": "https://media.example/actor.jpg"
-      },
-      {
-        "id": "actor-2",
-        "name": "Actor Two",
-        "name_zht": "",
-        "gender": "male",
-        "avatar": "https://media.example/actor-two.jpg"
-      }
-    ],
-    "tags": [
-      {
-        "id": "tag-1",
-        "name": "Tag",
-        "name_zht": "標籤",
-        "category_id": "category-1"
-      }
-    ],
+    "has_preview": false,
+    "actors": [],
+    "tags": [],
     "series": {
       "id": "series-1",
       "name": "Series"
