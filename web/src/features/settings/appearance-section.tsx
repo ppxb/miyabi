@@ -5,9 +5,9 @@ import { useTheme, type ThemeMode } from '@/stores/theme'
 import { SettingRow, SettingsSection } from './shared'
 
 const THEME_OPTIONS = [
-  { value: 'system', icon: MonitorIcon },
-  { value: 'light', icon: SunIcon },
-  { value: 'dark', icon: MoonIcon }
+  { value: 'system', label: '跟随系统', icon: MonitorIcon },
+  { value: 'light', label: '浅色', icon: SunIcon },
+  { value: 'dark', label: '深色', icon: MoonIcon }
 ]
 
 export function AppearanceSection() {
@@ -19,7 +19,12 @@ export function AppearanceSection() {
         <Tabs value={theme} onValueChange={value => setTheme(value as ThemeMode)}>
           <TabsList>
             {THEME_OPTIONS.map(option => (
-              <TabsTrigger key={option.value} value={option.value}>
+              <TabsTrigger
+                key={option.value}
+                value={option.value}
+                aria-label={option.label}
+                title={option.label}
+              >
                 <option.icon />
               </TabsTrigger>
             ))}

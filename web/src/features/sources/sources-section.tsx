@@ -133,6 +133,15 @@ export function SourcesSection() {
 
   return (
     <SettingsSection icon={<HardDriveIcon className="size-4" />} title="存储源">
+      {sources.isError ? (
+        <InlineError
+          onRetry={() => void sources.refetch()}
+          retrying={sources.isFetching}
+          retryLabel="重试"
+        >
+          无法读取存储源
+        </InlineError>
+      ) : null}
       <div className="flex justify-end">
         <Button
           onClick={() => openDraft({ id: '', kind: 'local', name: '', enabled: true, config: {} })}
@@ -143,15 +152,6 @@ export function SourcesSection() {
       </div>
 
       {sources.isPending ? <Skeleton className="h-4 w-40" /> : null}
-      {sources.isError ? (
-        <InlineError
-          onRetry={() => void sources.refetch()}
-          retrying={sources.isFetching}
-          retryLabel="重试"
-        >
-          无法读取存储源
-        </InlineError>
-      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {(sources.data ?? []).map(source => (

@@ -27,6 +27,11 @@ export function NetworkSection() {
 
   return (
     <SettingsSection icon={<GlobeIcon className="size-4" />} title="网络代理">
+      {network.isError ? (
+        <InlineError onRetry={() => void network.refetch()} retrying={network.isFetching}>
+          后端服务暂不可用，无法读取网络设置。请检查后端服务状态后刷新重试。
+        </InlineError>
+      ) : null}
       {network.isPending ? <Skeleton className="h-4 w-40" /> : null}
       {network.data ? (
         <NetworkForm
@@ -34,12 +39,6 @@ export function NetworkSection() {
           config={network.data}
           onSaved={() => setResetToken(token => token + 1)}
         />
-      ) : null}
-
-      {network.isError ? (
-        <InlineError onRetry={() => void network.refetch()} retrying={network.isFetching}>
-          后端服务暂不可用，无法读取网络设置。请检查后端服务状态后刷新重试。
-        </InlineError>
       ) : null}
     </SettingsSection>
   )
@@ -108,7 +107,12 @@ function NetworkForm({ config, onSaved }: { config: NetworkConfig; onSaved: () =
   return (
     <>
       <SettingRow title="启用代理服务" description="将代理除 115 以外的所有网络请求" inline>
-        <Switch checked={form.enabled} disabled={disabled} onCheckedChange={handleToggle} />
+        <Switch
+          checked={form.enabled}
+          disabled={disabled}
+          aria-label="启用代理服务"
+          onCheckedChange={handleToggle}
+        />
       </SettingRow>
 
       {form.enabled ? (

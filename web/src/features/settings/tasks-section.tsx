@@ -14,10 +14,6 @@ export function TasksSection() {
 
   return (
     <SettingsSection icon={<ListChecksIcon className="size-4" />} title="任务">
-      <SettingRow title="媒体库进度" description="管理同步与重建进度">
-        {active && <LibraryPauseButton paused={!!active.paused} />}
-      </SettingRow>
-      {tasks.isPending && <Skeleton className="h-4 w-40" />}
       {tasks.isError ? (
         <InlineError
           onRetry={connection.reconnect}
@@ -27,6 +23,10 @@ export function TasksSection() {
           无法读取任务，请启动后端服务后重试。
         </InlineError>
       ) : null}
+      <SettingRow title="媒体库进度" description="管理同步与重建进度">
+        {active && <LibraryPauseButton paused={!!active.paused} />}
+      </SettingRow>
+      {tasks.isPending && <Skeleton className="h-4 w-40" />}
       {scans?.length === 0 ? (
         <p className="text-xs text-muted-foreground">还没有媒体库任务。</p>
       ) : null}

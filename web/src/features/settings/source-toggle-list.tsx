@@ -37,24 +37,6 @@ export function SourceToggleList({
   const sources = (update.isPending ? update.variables : query.data) ?? []
   return (
     <>
-      {query.isPending ? <Skeleton className="h-4 w-40" /> : null}
-      {sources.map(source => (
-        <SettingRow
-          key={source.id}
-          title={names[source.id] ?? source.id}
-          description={descriptions[source.id]}
-          inline
-        >
-          <Switch
-            checked={source.enabled}
-            onCheckedChange={enabled =>
-              update.mutate(
-                sources.map(item => (item.id === source.id ? { ...item, enabled } : item))
-              )
-            }
-          />
-        </SettingRow>
-      ))}
       {query.isError || update.isError ? (
         <InlineError
           onRetry={() => {
@@ -66,6 +48,26 @@ export function SourceToggleList({
           {errorText}
         </InlineError>
       ) : null}
+      {query.isPending ? <Skeleton className="h-4 w-40" /> : null}
+      {sources.map(source => (
+        <SettingRow
+          key={source.id}
+          title={names[source.id] ?? source.id}
+          description={descriptions[source.id]}
+          inline
+        >
+          <Switch
+            checked={source.enabled}
+            disabled={update.isPending}
+            aria-label={names[source.id] ?? source.id}
+            onCheckedChange={enabled =>
+              update.mutate(
+                sources.map(item => (item.id === source.id ? { ...item, enabled } : item))
+              )
+            }
+          />
+        </SettingRow>
+      ))}
     </>
   )
 }

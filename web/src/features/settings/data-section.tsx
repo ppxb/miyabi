@@ -59,6 +59,11 @@ export function DataSection() {
 
   return (
     <SettingsSection icon={<DatabaseIcon className="size-4" />} title="数据与缓存">
+      {info.isError ? (
+        <InlineError onRetry={() => void info.refetch()} retrying={info.isFetching}>
+          无法读取数据与缓存统计，请稍后重试。
+        </InlineError>
+      ) : null}
       <SettingRow
         title="数据目录"
         description={info.data?.data_directory ?? '无法读取数据目录'}
@@ -102,11 +107,13 @@ export function DataSection() {
           onScroll={handleLogScroll}
           className="h-64 overflow-auto p-3 font-sans text-xs leading-5 break-words whitespace-pre-wrap text-muted-foreground"
         >
-          {logs.isPending
-            ? '正在读取日志…'
-            : logs.data?.lines.length
-              ? logs.data.lines.join('\n')
-              : '暂无日志'}
+          {logs.data?.lines.length
+            ? logs.data.lines.join('\n')
+            : logs.isError
+              ? '无法读取运行日志'
+              : logs.isPending
+                ? '正在读取日志…'
+                : '暂无日志'}
         </pre>
       </div>
       {logs.isError ? (
@@ -142,11 +149,6 @@ export function DataSection() {
           清理未使用缓存
         </Button>
       </SettingRow>
-      {info.isError ? (
-        <InlineError onRetry={() => void info.refetch()} retrying={info.isFetching}>
-          无法读取数据与缓存统计，请稍后重试。
-        </InlineError>
-      ) : null}
       <Dialog
         open={confirmOpen}
         onOpenChange={open => {

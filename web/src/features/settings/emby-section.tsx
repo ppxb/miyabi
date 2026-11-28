@@ -38,6 +38,11 @@ export function EmbySection() {
 
   return (
     <SettingsSection icon={<TvMinimalIcon className="size-4" />} title="Emby">
+      {emby.isError ? (
+        <InlineError onRetry={() => void emby.refetch()} retrying={emby.isFetching}>
+          后端服务暂不可用，无法读取 Emby 配置。
+        </InlineError>
+      ) : null}
       {emby.isPending ? <Skeleton className="h-4 w-40" /> : null}
       {emby.data ? (
         <EmbyForm
@@ -45,12 +50,6 @@ export function EmbySection() {
           config={emby.data}
           onSaved={() => setResetToken(token => token + 1)}
         />
-      ) : null}
-
-      {emby.isError ? (
-        <InlineError onRetry={() => void emby.refetch()} retrying={emby.isFetching}>
-          后端服务暂不可用，无法读取 Emby 配置。
-        </InlineError>
       ) : null}
     </SettingsSection>
   )
@@ -165,7 +164,12 @@ function EmbyForm({ config, onSaved }: { config: EmbyConfig; onSaved: () => void
   return (
     <>
       <SettingRow title="启用 Emby" description="连接和管理 Emby" inline>
-        <Switch checked={form.enabled} disabled={disabled} onCheckedChange={handleToggle} />
+        <Switch
+          checked={form.enabled}
+          disabled={disabled}
+          aria-label="启用 Emby"
+          onCheckedChange={handleToggle}
+        />
       </SettingRow>
 
       {form.enabled ? (
@@ -178,6 +182,7 @@ function EmbyForm({ config, onSaved }: { config: EmbyConfig; onSaved: () => void
             <Switch
               checked={form.sync_actors}
               disabled={disabled}
+              aria-label="同步演员头像"
               onCheckedChange={checked => updateField('sync_actors', checked)}
             />
           </SettingRow>

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 
+import { Separator } from '@/components/ui/separator'
 import { MagnetSourcesSection } from '@/features/settings/magnet-sources-section'
 import { ActorSourcesSection, ScrapingSection } from '@/features/settings/scraping-section'
 import { SettingsCard } from '@/features/settings/shared'
@@ -12,7 +13,9 @@ function SettingsMetadataPage() {
   return (
     <SettingsCard>
       <ScrapingSection />
+      <Separator />
       <ActorSourcesSection />
+      <Separator />
       <MagnetSourcesSection />
     </SettingsCard>
   )
