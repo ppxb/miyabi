@@ -21,6 +21,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/task"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scrape"
+	"github.com/ppxb/miyabi/internal/logging"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
 
@@ -131,6 +132,26 @@ func TestInfoReusesCacheStatsWithinTTL(t *testing.T) {
 	}
 	if forced.Cache.EntryCount != first.Cache.EntryCount+6 {
 		t.Fatalf("refresh did not rescan the cache: %+v", forced.Cache)
+	}
+}
+
+func TestLogMetaAndTail(t *testing.T) {
+	service := dataFixture(t)
+	path := logging.Path(service.directory)
+	content := "first\nsecond\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	meta, err := service.LogMeta(t.Context())
+	if err != nil || meta.Path != path || meta.SizeBytes != int64(len(content)) || meta.ModTime.IsZero() {
+		t.Fatalf("log meta = %+v err=%v", meta, err)
+	}
+
+	info, err := service.Logs(t.Context(), 500)
+	if err != nil || info.SizeBytes != meta.SizeBytes || len(info.Lines) != 2 ||
+		info.Lines[0] != "first" || info.Lines[1] != "second" {
+		t.Fatalf("log tail = %+v err=%v", info, err)
 	}
 }
 

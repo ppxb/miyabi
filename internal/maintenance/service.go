@@ -44,19 +44,37 @@ type LogInfo struct {
 	SizeBytes int64    `json:"size_bytes"`
 }
 
+// LogMeta describes the runtime log file without reading its contents.
+type LogMeta struct {
+	Path      string
+	SizeBytes int64
+	ModTime   time.Time
+}
+
+// LogMeta reads the runtime log file's size and modification time so callers
+// can decide whether its contents need to be read at all.
+func (service *Service) LogMeta(context.Context) (LogMeta, error) {
+	path, info, err := service.logFile()
+	if err != nil {
+		return LogMeta{}, err
+	}
+	meta := LogMeta{Path: path}
+	if info != nil {
+		meta.SizeBytes = info.Size()
+		meta.ModTime = info.ModTime()
+	}
+	return meta, nil
+}
+
 // Logs reads the newest lines of the runtime log without loading the whole file.
 func (service *Service) Logs(ctx context.Context, limit int) (LogInfo, error) {
-	path := logging.Path(service.directory)
+	path, info, err := service.logFile()
 	result := LogInfo{Path: path, Lines: []string{}}
-	info, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		return result, nil
-	}
 	if err != nil {
-		return result, fmt.Errorf("stat runtime log: %w", err)
+		return result, err
 	}
-	if !info.Mode().IsRegular() {
-		return result, errors.New("runtime log path is not a regular file")
+	if info == nil {
+		return result, nil
 	}
 	result.SizeBytes = info.Size()
 	if limit <= 0 {
@@ -97,6 +115,22 @@ func (service *Service) Logs(ctx context.Context, limit int) (LogInfo, error) {
 	}
 	result.Lines = lines
 	return result, nil
+}
+
+// logFile stats the runtime log; a missing file returns a nil FileInfo.
+func (service *Service) logFile() (string, os.FileInfo, error) {
+	path := logging.Path(service.directory)
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return path, nil, nil
+	}
+	if err != nil {
+		return path, nil, fmt.Errorf("stat runtime log: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return path, nil, errors.New("runtime log path is not a regular file")
+	}
+	return path, info, nil
 }
 
 // ArtworkLocker excludes pruning while new images gain durable references.
