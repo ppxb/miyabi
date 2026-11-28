@@ -184,6 +184,7 @@ func New(cfg *config.Config, logger *slog.Logger) (_ *App, err error) {
 		cfg.DataDir,
 		netx.NewSafeDownloadClient(networkSvc.ProxyManager(), 30*time.Second),
 		actors.NewAVLeague(networkSvc.ProxyManager()),
+		actors.NewMinNano(networkSvc.ProxyManager()),
 	)
 	monitorSvc := monitor.New(store.Client, catalogueSvc, fanza, followedActor(actorsSvc), taskSvc)
 	syncActors := cfg.EmbySyncActors

@@ -78,7 +78,7 @@ func TestFetchAvatarTriesEveryScrapedRow(t *testing.T) {
 	link(t, db, broken, good)
 
 	svc := New(db, nil, "", server.Client())
-	if err := svc.UpdateSettings(t.Context(), []domain.SourceToggle{{ID: "av-league", Enabled: true}, {ID: "gfriends", Enabled: false}}); err != nil {
+	if err := svc.UpdateSettings(t.Context(), []domain.SourceToggle{{ID: "av-league", Enabled: true}, {ID: "minnano-av", Enabled: false}, {ID: "gfriends", Enabled: false}}); err != nil {
 		t.Fatal(err)
 	}
 	data, err := svc.FetchAvatar(t.Context(), pidOf(t, db, good.ID))
@@ -321,7 +321,7 @@ func TestDetailEnrichesOnce(t *testing.T) {
 	provider := &countingProvider{err: errors.New("timeout")}
 	svc := New(db, nil, "", nil, provider)
 	// gfriends is switched off so the test never reaches its remote index.
-	if err := svc.UpdateSettings(ctx, []domain.SourceToggle{{ID: "av-league", Enabled: true}, {ID: "gfriends", Enabled: false}}); err != nil {
+	if err := svc.UpdateSettings(ctx, []domain.SourceToggle{{ID: "av-league", Enabled: true}, {ID: "minnano-av", Enabled: false}, {ID: "gfriends", Enabled: false}}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := svc.Detail(ctx, pid); err != nil {
@@ -366,7 +366,7 @@ func TestDetailEnrichmentOutlivesTheRequest(t *testing.T) {
 
 	provider := &blockingProvider{started: make(chan struct{}, 1), release: make(chan struct{})}
 	svc := New(db, nil, "", nil, provider)
-	if err := svc.UpdateSettings(t.Context(), []domain.SourceToggle{{ID: "av-league", Enabled: true}, {ID: "gfriends", Enabled: false}}); err != nil {
+	if err := svc.UpdateSettings(t.Context(), []domain.SourceToggle{{ID: "av-league", Enabled: true}, {ID: "minnano-av", Enabled: false}, {ID: "gfriends", Enabled: false}}); err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
@@ -489,5 +489,157 @@ func TestIdentityListsSpellingsAndProviderIDs(t *testing.T) {
 	}
 	if _, err := New(db, nil, "", nil).Identity(ctx, pid+100); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("missing actor: %v", err)
+	}
+}
+
+type fixedProvider struct {
+	name    string
+	profile *Profile
+	calls   int
+}
+
+func (p *fixedProvider) Name() string { return p.name }
+
+func (p *fixedProvider) Lookup(context.Context, string) (*Profile, error) {
+	p.calls++
+	return p.profile, nil
+}
+
+// Every enabled provider is consulted once; their profiles merge field by
+// field in provider order, and each provider's images keep their own source.
+func TestEnrichMergesProviderFields(t *testing.T) {
+	ctx := t.Context()
+	db := openDB(t)
+	a := db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("瀬戸環奈").SaveX(ctx)
+	db.Movie.Create().SetCode("TEST-001").AddActors(a).SaveX(ctx)
+	link(t, db, a)
+	pid := pidOf(t, db, a.ID)
+
+	league := &fixedProvider{name: "av-league", profile: &Profile{
+		Name: "瀬戸環奈", Birthday: "2000-01-01", Height: 160, CupSize: "D",
+		Measurements: "B:88 / W:58 / H:88",
+		SourceURL:    "https://www.av-league.com/actress/1.html", SourceID: "1",
+		Images: []string{"https://img.example/league.jpg"},
+	}}
+	minnano := &fixedProvider{name: "minnano-av", profile: &Profile{
+		Name: "瀬戸環奈", Birthday: "2001-02-03", BloodType: "A", Nationality: "東京都",
+		Hobby: "映画鑑賞", DebutDate: "2019-07-01", Aliases: []string{"せと かんな"},
+		SourceURL: "https://www.minnano-av.com/actress2.html", SourceID: "2",
+		Images: []string{"https://img.example/minnano.jpg"},
+	}}
+	svc := New(db, nil, "", nil, league, minnano)
+	if err := svc.UpdateSettings(ctx, []domain.SourceToggle{
+		{ID: "av-league", Enabled: true},
+		{ID: "minnano-av", Enabled: true},
+		{ID: "gfriends", Enabled: false},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	detail, err := svc.Detail(ctx, pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if league.calls != 1 || minnano.calls != 1 {
+		t.Fatalf("lookups = %d/%d, want 1/1", league.calls, minnano.calls)
+	}
+	if detail.Birthday != "2000-01-01" {
+		t.Fatalf("birthday = %q, want the first provider's", detail.Birthday)
+	}
+	if detail.BloodType != "A" || detail.Nationality != "東京都" || detail.Hobby != "映画鑑賞" || detail.DebutDate != "2019-07-01" {
+		t.Fatalf("merged bio = %+v", detail)
+	}
+	if detail.SourceURL != league.profile.SourceURL {
+		t.Fatalf("source url = %q", detail.SourceURL)
+	}
+	if !slices.Contains(detail.Aliases, "せと かんな") {
+		t.Fatalf("aliases = %v", detail.Aliases)
+	}
+	providers := make(map[string]bool)
+	for _, image := range db.ActorImage.Query().AllX(ctx) {
+		providers[image.Provider] = true
+	}
+	if !providers["av-league"] || !providers["minnano-av"] {
+		t.Fatalf("image providers = %v", providers)
+	}
+}
+
+type failingProvider struct{ name string }
+
+func (p *failingProvider) Name() string { return p.name }
+
+func (p *failingProvider) Lookup(context.Context, string) (*Profile, error) {
+	return nil, errors.New("lookup failed")
+}
+
+// One provider failing must not discard another's successful profile; the
+// attempt stays unmarked so the failed provider is retried later.
+func TestEnrichKeepsSuccessfulProviderWhenAnotherFails(t *testing.T) {
+	ctx := t.Context()
+	db := openDB(t)
+	a := db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("瀬戸環奈").SaveX(ctx)
+	db.Movie.Create().SetCode("TEST-001").AddActors(a).SaveX(ctx)
+	link(t, db, a)
+	pid := pidOf(t, db, a.ID)
+
+	league := &fixedProvider{name: "av-league", profile: &Profile{Birthday: "2000-01-01"}}
+	svc := New(db, nil, "", nil, league, &failingProvider{name: "minnano-av"})
+	if err := svc.UpdateSettings(ctx, []domain.SourceToggle{
+		{ID: "av-league", Enabled: true},
+		{ID: "minnano-av", Enabled: true},
+		{ID: "gfriends", Enabled: false},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	detail, err := svc.Detail(ctx, pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.Birthday != "2000-01-01" {
+		t.Fatalf("birthday = %q, want the successful provider's", detail.Birthday)
+	}
+	if db.ActorProfile.GetX(ctx, pid).EnrichedAt != nil {
+		t.Fatal("a failed provider must leave enriched_at unset")
+	}
+}
+
+// The avatar falls back to a provider photo when gfriends has none, in
+// provider order.
+func TestFetchAvatarUsesProviderPhotoWithoutGFriends(t *testing.T) {
+	ctx := t.Context()
+	db := openDB(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte(r.URL.Path))
+	}))
+	t.Cleanup(server.Close)
+
+	a := db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("瀬戸環奈").SaveX(ctx)
+	db.Movie.Create().SetCode("TEST-001").AddActors(a).SaveX(ctx)
+	link(t, db, a)
+	pid := pidOf(t, db, a.ID)
+	db.ActorImage.Create().SetActorID(pid).SetURL(server.URL + "/minnano.jpg").
+		SetProvider("minnano-av").SetRole("gallery").SetPosition(1).SaveX(ctx)
+
+	svc := New(db, nil, "", server.Client(), &fixedProvider{name: "av-league"}, &fixedProvider{name: "minnano-av"})
+	if err := svc.UpdateSettings(ctx, []domain.SourceToggle{
+		{ID: "av-league", Enabled: true},
+		{ID: "minnano-av", Enabled: true},
+		{ID: "gfriends", Enabled: false},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := svc.FetchAvatar(ctx, pid)
+	if err != nil || string(data) != "/minnano.jpg" {
+		t.Fatalf("avatar = %q, err = %v", data, err)
+	}
+
+	// av-league is registered first, so its photo wins when both exist.
+	db.ActorImage.Create().SetActorID(pid).SetURL(server.URL + "/league.jpg").
+		SetProvider("av-league").SetRole("gallery").SetPosition(0).SaveX(ctx)
+	data, err = svc.FetchAvatar(ctx, pid)
+	if err != nil || string(data) != "/league.jpg" {
+		t.Fatalf("avatar = %q, err = %v", data, err)
 	}
 }

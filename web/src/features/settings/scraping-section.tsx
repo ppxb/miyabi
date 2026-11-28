@@ -40,6 +40,7 @@ const descriptions: Record<string, string> = {
 
 const actorDescriptions: Record<string, string> = {
   'av-league': '演员个性化数据来源',
+  'minnano-av': '演员资料与头像补充来源',
   gfriends: '演员头像来源'
 }
 

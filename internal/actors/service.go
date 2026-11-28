@@ -6,6 +6,7 @@ package actors
 import (
 	"context"
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -103,10 +104,14 @@ func New(db *ent.Client, g *gfriends.Client, dataDir string, imageHTTP *http.Cli
 
 const actorSourcesSetting = "metadata.actor_sources"
 
-var actorSourceIDs = map[string]bool{"av-league": true, "gfriends": true}
+var actorSourceIDs = map[string]bool{"av-league": true, "minnano-av": true, "gfriends": true}
 
 func defaultActorSources() []domain.SourceToggle {
-	return []domain.SourceToggle{{ID: "av-league", Enabled: true}, {ID: "gfriends", Enabled: true}}
+	return []domain.SourceToggle{
+		{ID: "av-league", Enabled: true},
+		{ID: "minnano-av", Enabled: true},
+		{ID: "gfriends", Enabled: true},
+	}
 }
 
 // Settings returns the actor data source switches (merged with defaults).
@@ -376,9 +381,12 @@ func (s *Service) Detail(ctx context.Context, id int) (Detail, error) {
 		return Detail{}, err
 	}
 	names := sourceNames(p)
-	// Persist gfriends images (rel paths) only when none are stored yet, so a
-	// detail request doesn't hit the remote gfriends index on every visit.
-	if n, err := s.db.ActorImage.Query().Where(actorimage.HasActorWith(actorprofile.ID(id))).Count(ctx); err == nil && n == 0 {
+	// Persist gfriends images (rel paths) while the profile has none, so a
+	// detail request doesn't hit the remote gfriends index on every visit and
+	// provider photos never block them from being added later.
+	if n, err := s.db.ActorImage.Query().
+		Where(actorimage.HasActorWith(actorprofile.ID(id)), actorimage.ProviderEQ("gfriends")).
+		Count(ctx); err == nil && n == 0 {
 		if err := s.persistImages(ctx, id, s.imageRels(ctx, names)); err != nil {
 			slog.WarnContext(ctx, "persist gfriends actor images failed", "profile", id, "error", err)
 		}
@@ -756,9 +764,30 @@ func (s *Service) FetchImage(ctx context.Context, pid, index int) ([]byte, error
 	return s.loadImage(ctx, sources[index])
 }
 
-// FetchAvatar returns the round avatar: the first gfriends image when there is
-// one, else the avatar scraped with the actor's movies. av-league photos are
-// gallery-only and never used here.
+// placeholderAvatarHashes are known "no image" assets that sources serve as if
+// they were photos: gfriends' "Now Printing" PNG and DMM's nowprinting.gif.
+var placeholderAvatarHashes = map[string]bool{
+	"bfbfca4ddd493082b2dec9919fac67ede1da8483b0c38d617ef3e828ed83bf12": true,
+	"fda71b4588a369235dde57cdb4e34023fd30001e97e16f0f5ed6471e99f95811": true,
+}
+
+// isPlaceholderAvatar reports whether an avatar is a known "no image" asset,
+// which must count as no avatar so the next source or the text fallback wins.
+func isPlaceholderAvatar(src imageSource, data []byte) bool {
+	if strings.Contains(strings.ToLower(src.ref), "nowprinting") {
+		return true
+	}
+	if len(data) == 0 {
+		return false
+	}
+	sum := sha256.Sum256(data)
+	return placeholderAvatarHashes[hex.EncodeToString(sum[:])]
+}
+
+// FetchAvatar returns the round avatar: the first usable gfriends image, else
+// the first actor provider photo, else the avatar scraped with the actor's
+// movies. Placeholder images count as missing; ErrNotFound lets the frontend
+// fall back to the actor's initial.
 func (s *Service) FetchAvatar(ctx context.Context, pid int) ([]byte, error) {
 	names, err := s.profileNames(ctx, pid)
 	if err != nil {
@@ -770,11 +799,36 @@ func (s *Service) FetchAvatar(ctx context.Context, pid int) ([]byte, error) {
 				continue
 			}
 			data, err := s.loadImage(ctx, src)
-			if err == nil {
+			if err == nil && !isPlaceholderAvatar(src, data) {
 				return data, nil
 			}
-			slog.WarnContext(ctx, "load gfriends actor avatar failed", "profile", pid, "error", err)
-			break
+			if err != nil {
+				slog.WarnContext(ctx, "load gfriends actor avatar failed", "profile", pid, "error", err)
+			}
+		}
+	}
+	// Without a usable gfriends portrait, provider photos fill in.
+	for _, provider := range s.providers {
+		name := provider.Name()
+		if !s.sourceEnabled(ctx, name) {
+			continue
+		}
+		photos, err := s.db.ActorImage.Query().
+			Where(actorimage.HasActorWith(actorprofile.ID(pid)), actorimage.ProviderEQ(name)).
+			Order(ent.Asc(actorimage.FieldPosition)).
+			All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, photo := range photos {
+			src := imageSource{provider: photo.Provider, ref: photo.URL}
+			data, err := s.loadImage(ctx, src)
+			if err == nil && !isPlaceholderAvatar(src, data) {
+				return data, nil
+			}
+			if err != nil {
+				slog.WarnContext(ctx, "load provider actor avatar failed", "profile", pid, "provider", name, "error", err)
+			}
 		}
 	}
 	scraped, err := s.db.Actor.Query().
@@ -783,18 +837,19 @@ func (s *Service) FetchAvatar(ctx context.Context, pid int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(scraped) == 0 {
-		return nil, ErrNotFound
-	}
 	var lastErr error
 	for _, row := range scraped {
-		data, err := s.loadImage(ctx, imageSource{provider: "scraped", ref: *row.Avatar})
-		if err == nil {
+		src := imageSource{provider: "scraped", ref: *row.Avatar}
+		data, err := s.loadImage(ctx, src)
+		if err == nil && !isPlaceholderAvatar(src, data) {
 			return data, nil
 		}
 		lastErr = err
 	}
-	return nil, lastErr
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, ErrNotFound
 }
 
 type imageSource struct {
@@ -904,9 +959,10 @@ func (s *Service) enrichIfNeeded(ctx context.Context, pid int, display string) {
 	}
 }
 
-// enrichProfile fills biography fields (and extra images) from the first
-// enabled ActorProvider that knows the actor, then marks the attempt done.
-// Provider errors other than not-found are returned and leave it unmarked.
+// enrichProfile fills biography fields (and extra images) from every enabled
+// ActorProvider that knows the actor, merges the field sets in provider order
+// and marks the attempt done. Provider errors other than not-found are
+// returned and leave it unmarked.
 func (s *Service) enrichProfile(ctx context.Context, pid int, display string) error {
 	p, err := s.db.ActorProfile.Get(ctx, pid)
 	if err != nil {
@@ -916,6 +972,8 @@ func (s *Service) enrichProfile(ctx context.Context, pid int, display string) er
 		return nil
 	}
 	consulted := false
+	var found []providerProfile
+	var lookupErr error
 	for _, provider := range s.providers {
 		if !s.sourceEnabled(ctx, provider.Name()) {
 			continue
@@ -926,12 +984,18 @@ func (s *Service) enrichProfile(ctx context.Context, pid int, display string) er
 			continue
 		}
 		if err != nil {
+			lookupErr = errors.Join(lookupErr, err)
+			continue
+		}
+		found = append(found, providerProfile{name: provider.Name(), profile: profile})
+	}
+	if len(found) > 0 {
+		if err := s.applyProfiles(ctx, pid, found); err != nil {
 			return err
 		}
-		if err := s.applyProfile(ctx, pid, provider.Name(), profile); err != nil {
-			return err
-		}
-		break
+	}
+	if lookupErr != nil {
+		return lookupErr
 	}
 	// With every provider switched off nothing was tried; a provider enabled
 	// later still gets its first attempt.
@@ -941,10 +1005,17 @@ func (s *Service) enrichProfile(ctx context.Context, pid int, display string) er
 	return s.db.ActorProfile.UpdateOneID(pid).SetEnrichedAt(time.Now()).Exec(ctx)
 }
 
-// applyProfile writes the provider-sourced biography and images atomically.
-// It takes persistMu before the transaction to keep the global lock order
-// (persistMu -> db tx) consistent with the other image writers.
-func (s *Service) applyProfile(ctx context.Context, pid int, providerName string, p *Profile) error {
+// providerProfile is one provider's successful lookup for an actor.
+type providerProfile struct {
+	name    string
+	profile *Profile
+}
+
+// applyProfiles writes the merged provider biography and each provider's
+// images atomically. It takes persistMu before the transaction to keep the
+// global lock order (persistMu -> db tx) consistent with the other image
+// writers.
+func (s *Service) applyProfiles(ctx context.Context, pid int, found []providerProfile) error {
 	s.persistMu.Lock()
 	defer s.persistMu.Unlock()
 
@@ -954,6 +1025,7 @@ func (s *Service) applyProfile(ctx context.Context, pid int, providerName string
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	p := mergeProfiles(found)
 	update := tx.ActorProfile.UpdateOneID(pid)
 	if p.Summary != "" {
 		update.SetSummary(p.Summary)
@@ -991,10 +1063,100 @@ func (s *Service) applyProfile(ctx context.Context, pid int, providerName string
 	if err := update.Exec(ctx); err != nil {
 		return err
 	}
-	if err := s.appendProfileImages(ctx, tx, pid, providerName, p.Images); err != nil {
+	if err := appendProfileAliases(ctx, tx, pid, p.Aliases); err != nil {
 		return err
 	}
+	for _, item := range found {
+		if err := s.appendProfileImages(ctx, tx, pid, item.name, item.profile.Images); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
+}
+
+// appendProfileAliases adds provider aliases to a profile, skipping spellings
+// it already knows. The caller must hold persistMu.
+func appendProfileAliases(ctx context.Context, tx *ent.Tx, pid int, aliases []string) error {
+	if len(aliases) == 0 {
+		return nil
+	}
+	existing, err := tx.ActorAlias.Query().Where(actoralias.HasActorWith(actorprofile.ID(pid))).All(ctx)
+	if err != nil {
+		return err
+	}
+	seen := make(map[string]bool, len(existing))
+	for _, alias := range existing {
+		seen[alias.Normalized] = true
+	}
+	for _, alias := range aliases {
+		normalized := normalizeName(alias)
+		if normalized == "" || seen[normalized] {
+			continue
+		}
+		seen[normalized] = true
+		if err := tx.ActorAlias.Create().SetActorID(pid).SetAlias(alias).SetNormalized(normalized).Exec(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// mergeProfiles folds the providers' profiles into one record. Providers are
+// consulted in registration order and the first non-empty value wins; aliases
+// are combined in order.
+func mergeProfiles(found []providerProfile) *Profile {
+	merged := &Profile{}
+	for _, item := range found {
+		p := item.profile
+		if merged.Name == "" {
+			merged.Name = p.Name
+		}
+		if merged.NameZHT == "" {
+			merged.NameZHT = p.NameZHT
+		}
+		if merged.Summary == "" {
+			merged.Summary = p.Summary
+		}
+		if merged.Birthday == "" {
+			merged.Birthday = p.Birthday
+		}
+		if merged.Height == 0 {
+			merged.Height = p.Height
+		}
+		if merged.CupSize == "" {
+			merged.CupSize = p.CupSize
+		}
+		if merged.Measurements == "" {
+			merged.Measurements = p.Measurements
+		}
+		if merged.BloodType == "" {
+			merged.BloodType = p.BloodType
+		}
+		if merged.Nationality == "" {
+			merged.Nationality = p.Nationality
+		}
+		if merged.Hobby == "" {
+			merged.Hobby = p.Hobby
+		}
+		if merged.Skill == "" {
+			merged.Skill = p.Skill
+		}
+		if merged.DebutDate == "" {
+			merged.DebutDate = p.DebutDate
+		}
+		if merged.SourceURL == "" {
+			merged.SourceURL = p.SourceURL
+		}
+		if merged.SourceID == "" {
+			merged.SourceID = p.SourceID
+		}
+		for _, alias := range p.Aliases {
+			if alias != "" && !slices.Contains(merged.Aliases, alias) {
+				merged.Aliases = append(merged.Aliases, alias)
+			}
+		}
+	}
+	return merged
 }
 
 // appendProfileImages appends the provider's image URLs inside the caller's

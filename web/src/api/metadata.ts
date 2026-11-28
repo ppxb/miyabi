@@ -55,6 +55,7 @@ const actorSourcesKey = ['settings', 'actor-sources'] as const
 
 export const actorSourceNames: Record<string, string> = {
   'av-league': 'AV-LEAGUE',
+  'minnano-av': 'MINNANO-AV',
   gfriends: 'gfriends'
 }
 
