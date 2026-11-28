@@ -100,12 +100,16 @@ function LoginContent({
   const showQR = session !== undefined && !deadCode
   const needsRetry = exhausted || deadCode
   const refreshedSessionId = useRef<string | null>(null)
+  // onAuthorized changes identity on every parent render; calling it again on
+  // each render would re-enter the close/bind flow endlessly. Handle one
+  // successful authorization per login session.
+  const authorizedSessionId = useRef<string | null>(null)
 
   useEffect(() => {
-    if (state === 'authorized') {
-      onAuthorized(status.data?.account_id ?? '')
-    }
-  }, [state, status.data?.account_id, onAuthorized])
+    if (state !== 'authorized' || !session?.id || authorizedSessionId.current === session.id) return
+    authorizedSessionId.current = session.id
+    onAuthorized(status.data?.account_id ?? '')
+  }, [state, status.data?.account_id, session?.id, onAuthorized])
 
   // An expired code is 115 saying this QR is dead, so replacing it costs the user
   // nothing. A cancellation is the user's own doing: leave that one to them.
