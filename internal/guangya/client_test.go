@@ -245,46 +245,87 @@ func TestRemoveOfflineFindsTaskByHash(t *testing.T) {
 	}
 }
 
-func TestSignInSendsVerificationFields(t *testing.T) {
+func TestBeginDeviceLogin(t *testing.T) {
 	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/auth/signin" {
+		if r.URL.Path != "/v1/auth/device/code" {
 			t.Errorf("unexpected path %s", r.URL.Path)
-		}
-		if token := r.Header.Get("x-captcha-token"); token != "captcha-token" {
-			t.Errorf("x-captcha-token = %q", token)
 		}
 		var body map[string]string
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Errorf("decode body: %v", err)
 			return
 		}
-		if body["verification_code"] != "123456" ||
-			body["verification_token"] != "verification-token" ||
-			body["username"] != "+8613800138000" ||
-			body["client_id"] != clientID {
+		if body["scope"] != "user" || body["client_id"] != clientID {
 			t.Errorf("body = %+v", body)
 		}
-		writeJSON(w, `{"access_token":"access","refresh_token":"refresh","expires_in":7200}`)
+		writeJSON(w, `{"device_code":"device","user_code":"user","expires_in":120,"interval":2,`+
+			`"verification_uri_complete":"https://account.guangyapan.com/__/auth/device/?user_code=user"}`)
 	})
-	tokens, err := client.SignIn(context.Background(), "+8613800138000", "123456", "verification-token", "captcha-token")
+	login, err := client.BeginDeviceLogin(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tokens.AccessToken != "access" || tokens.RefreshToken != "refresh" {
-		t.Fatalf("tokens = %+v", tokens)
+	if login.DeviceCode != "device" || login.ExpiresIn != 120 || login.VerificationURIComplete == "" {
+		t.Fatalf("login = %+v", login)
 	}
 }
 
-func TestSignInMapsHTTP400WithMessage(t *testing.T) {
+func TestPollDeviceLogin(t *testing.T) {
+	cases := []struct {
+		name       string
+		status     int
+		body       string
+		wantState  pan.LoginState
+		wantAccess string
+	}{
+		{"pending", http.StatusBadRequest, `{"error":"authorization_pending"}`, pan.LoginWaiting, ""},
+		{"slow down", http.StatusBadRequest, `{"error":"slow_down"}`, pan.LoginWaiting, ""},
+		{"denied", http.StatusBadRequest, `{"error":"access_denied"}`, pan.LoginCanceled, ""},
+		{"expired", http.StatusBadRequest, `{"error":"expired_token"}`, pan.LoginExpired, ""},
+		{"authorized", http.StatusOK,
+			`{"access_token":"access","refresh_token":"refresh","expires_in":7200}`,
+			pan.LoginAuthorized, "access"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/v1/auth/token" {
+					t.Errorf("unexpected path %s", r.URL.Path)
+				}
+				var body map[string]string
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Errorf("decode body: %v", err)
+					return
+				}
+				if body["grant_type"] != "urn:ietf:params:oauth:grant-type:device_code" ||
+					body["device_code"] != "device" || body["client_id"] != clientID {
+					t.Errorf("body = %+v", body)
+				}
+				w.Header().Set("content-type", "application/json")
+				w.WriteHeader(tc.status)
+				writeJSON(w, tc.body)
+			})
+			tokens, state, err := client.PollDeviceLogin(context.Background(), "device")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if state != tc.wantState || tokens.AccessToken != tc.wantAccess {
+				t.Fatalf("state = %q, tokens = %+v", state, tokens)
+			}
+		})
+	}
+}
+
+func TestPollDeviceLoginMapsUpstreamError(t *testing.T) {
 	client := testClient(t, func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusBadRequest)
-		writeJSON(w, `{"msg":"captcha token expired"}`)
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, `{"error":"server_error","error_description":"boom"}`)
 	})
-	_, err := client.SignIn(context.Background(), "+8613800138000", "123456", "verification-token", "captcha-token")
-	if err == nil || !strings.Contains(err.Error(), "captcha token expired") {
+	_, _, err := client.PollDeviceLogin(context.Background(), "device")
+	if err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("err = %v", err)
 	}
-	if !domain.IsKind(err, domain.KindInvalid) {
+	if !domain.IsKind(err, domain.KindUpstream) {
 		t.Fatalf("kind = %v", domain.KindOf(err))
 	}
 }

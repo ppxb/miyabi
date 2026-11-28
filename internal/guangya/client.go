@@ -116,18 +116,18 @@ func (e *envelope) err() error {
 	return &apiError{code: e.Code, msg: e.Msg}
 }
 
-func (c *Client) call(ctx context.Context, method, address string, headers map[string]string, body any, out any) error {
+func (c *Client) do(ctx context.Context, method, address string, headers map[string]string, body any) (int, []byte, error) {
 	var reader io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
 		if err != nil {
-			return err
+			return 0, nil, err
 		}
 		reader = bytes.NewReader(data)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, address, reader)
 	if err != nil {
-		return err
+		return 0, nil, err
 	}
 	for key, value := range headers {
 		req.Header.Set(key, value)
@@ -136,23 +136,31 @@ func (c *Client) call(ctx context.Context, method, address string, headers map[s
 		req.Header.Set("content-type", "application/json")
 	}
 	if err := c.limiter.Wait(ctx); err != nil {
-		return err
+		return 0, nil, err
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return domain.E(domain.KindUpstream, "光鸭请求失败", err)
+		return 0, nil, domain.E(domain.KindUpstream, "光鸭请求失败", err)
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
 	if err != nil {
-		return domain.E(domain.KindUpstream, "读取光鸭响应失败", err)
+		return 0, nil, domain.E(domain.KindUpstream, "读取光鸭响应失败", err)
 	}
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+	return resp.StatusCode, raw, nil
+}
+
+func (c *Client) call(ctx context.Context, method, address string, headers map[string]string, body any, out any) error {
+	status, raw, err := c.do(ctx, method, address, headers, body)
+	if err != nil {
+		return err
+	}
+	if status == http.StatusUnauthorized || status == http.StatusForbidden {
 		return pan.ErrUnauthorized
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if status < 200 || status >= 300 {
 		return domain.E(domain.KindUpstream,
-			fmt.Sprintf("光鸭返回 HTTP %d%s", resp.StatusCode, upstreamDetail(raw)), nil)
+			fmt.Sprintf("光鸭返回 HTTP %d%s", status, upstreamDetail(raw)), nil)
 	}
 	if out != nil {
 		if err := json.Unmarshal(raw, out); err != nil {
@@ -178,7 +186,7 @@ func (c *Client) callAPI(ctx context.Context, token, path string, body any, out 
 	return nil
 }
 
-func (c *Client) callAccount(ctx context.Context, method, token, path string, body any, out any, extra map[string]string) error {
+func (c *Client) accountCall(ctx context.Context, method, token, path string, body any, extra map[string]string) (int, []byte, error) {
 	headers := c.accountHeaders()
 	if token != "" {
 		headers["authorization"] = "Bearer " + token
@@ -186,7 +194,27 @@ func (c *Client) callAccount(ctx context.Context, method, token, path string, bo
 	for key, value := range extra {
 		headers[key] = value
 	}
-	return c.call(ctx, method, c.accountBase+path, headers, body, out)
+	return c.do(ctx, method, c.accountBase+path, headers, body)
+}
+
+func (c *Client) callAccount(ctx context.Context, method, token, path string, body any, out any, extra map[string]string) error {
+	status, raw, err := c.accountCall(ctx, method, token, path, body, extra)
+	if err != nil {
+		return err
+	}
+	if status == http.StatusUnauthorized || status == http.StatusForbidden {
+		return pan.ErrUnauthorized
+	}
+	if status < 200 || status >= 300 {
+		return domain.E(domain.KindUpstream,
+			fmt.Sprintf("光鸭返回 HTTP %d%s", status, upstreamDetail(raw)), nil)
+	}
+	if out != nil && len(raw) > 0 {
+		if err := json.Unmarshal(raw, out); err != nil {
+			return domain.E(domain.KindUpstream, "解析光鸭响应失败", err)
+		}
+	}
+	return nil
 }
 
 func (c *Client) accountHeaders() map[string]string {
@@ -300,23 +328,6 @@ func (c *Client) space(ctx context.Context, accessToken string) (pan.AccountSpac
 	}, nil
 }
 
-func loginErrorDetail(err error) string {
-	detail := strings.TrimSpace(strings.TrimPrefix(err.Error(), "光鸭返回 HTTP 400"))
-	detail = strings.TrimSpace(strings.TrimPrefix(detail, ":"))
-	return detail
-}
-
-func loginError(err error, message string) error {
-	if err != nil && domain.IsKind(err, domain.KindUpstream) &&
-		strings.Contains(err.Error(), "HTTP 400") {
-		if detail := loginErrorDetail(err); detail != "" {
-			message += ": " + detail
-		}
-		return domain.E(domain.KindInvalid, message, err)
-	}
-	return err
-}
-
 func upstreamDetail(raw []byte) string {
 	if len(raw) == 0 {
 		return ""
@@ -375,15 +386,15 @@ func formatBytes(bytes int64) string {
 }
 
 func (c *Client) BeginLogin(context.Context) (*pan.Login, error) {
-	return nil, domain.E(domain.KindInvalid, "光鸭使用短信登录", nil)
+	return nil, domain.E(domain.KindInvalid, "光鸭使用扫码登录", nil)
 }
 
 func (c *Client) LoginStatus(context.Context, *pan.Login) (pan.LoginState, error) {
-	return pan.LoginExpired, domain.E(domain.KindInvalid, "光鸭使用短信登录", nil)
+	return pan.LoginExpired, domain.E(domain.KindInvalid, "光鸭使用扫码登录", nil)
 }
 
 func (c *Client) ExchangeToken(context.Context, *pan.Login) (pan.Tokens, error) {
-	return pan.Tokens{}, domain.E(domain.KindInvalid, "光鸭使用短信登录", nil)
+	return pan.Tokens{}, domain.E(domain.KindInvalid, "光鸭使用扫码登录", nil)
 }
 
 func (c *Client) RefreshToken(ctx context.Context, refreshToken string) (pan.Tokens, error) {
@@ -414,91 +425,94 @@ func tokensOf(accessToken, refreshToken string, expiresIn int64) pan.Tokens {
 	return tokens
 }
 
-// SMSInit starts the SMS login and returns the captcha token required by the
-// send step. If the upstream asks for a human challenge, an error is returned.
-func (c *Client) SMSInit(ctx context.Context, phone string) (string, error) {
-	var result struct {
-		CaptchaToken string `json:"captcha_token"`
-		URL          string `json:"url"`
-	}
-	err := c.callAccount(ctx, http.MethodPost, "", "/v1/shield/captcha/init", map[string]any{
+// DeviceLogin is the device authorization response behind the website's QR
+// login. VerificationURIComplete is the URL rendered as the QR code.
+type DeviceLogin struct {
+	DeviceCode              string `json:"device_code"`
+	UserCode                string `json:"user_code"`
+	ExpiresIn               int64  `json:"expires_in"`
+	Interval                int64  `json:"interval"`
+	VerificationURI         string `json:"verification_url"`
+	VerificationURIComplete string `json:"verification_uri_complete"`
+}
+
+// BeginDeviceLogin starts the same device authorization flow the website uses
+// for QR login.
+func (c *Client) BeginDeviceLogin(ctx context.Context) (DeviceLogin, error) {
+	var result DeviceLogin
+	err := c.callAccount(ctx, http.MethodPost, "", "/v1/auth/device/code", map[string]string{
+		"scope":     "user",
 		"client_id": clientID,
-		"action":    "POST:/v1/auth/verification",
-		"device_id": c.did,
-		"meta":      map[string]string{"phone_number": phone},
 	}, &result, nil)
 	if err != nil {
-		return "", loginError(err, "光鸭未接受该手机号，请检查格式（建议带国家码）")
-	}
-	if result.CaptchaToken == "" {
-		if result.URL != "" {
-			return "", domain.E(domain.KindConflict, "光鸭要求人机验证，请在浏览器完成后再试", nil)
+		if errors.Is(err, pan.ErrUnauthorized) {
+			return DeviceLogin{}, domain.E(domain.KindUpstream, "光鸭登录请求被拒绝", nil)
 		}
-		return "", domain.E(domain.KindUpstream, "光鸭未返回验证码凭证", nil)
+		return DeviceLogin{}, err
 	}
-	return result.CaptchaToken, nil
+	if result.DeviceCode == "" || result.VerificationURIComplete == "" {
+		return DeviceLogin{}, domain.E(domain.KindUpstream, "光鸭未返回扫码登录信息", nil)
+	}
+	return result, nil
 }
 
-func (c *Client) SMSSend(ctx context.Context, phone, captchaToken string) (string, error) {
-	var result struct {
-		VerificationID string `json:"verification_id"`
-	}
-	err := c.callAccount(ctx, http.MethodPost, "", "/v1/auth/verification", map[string]string{
-		"phone_number": phone,
-		"target":       "ANY",
-		"client_id":    clientID,
-	}, &result, map[string]string{"x-captcha-token": captchaToken})
+// PollDeviceLogin performs one device authorization check. OAuth pending and
+// slow_down responses are waiting states, not errors.
+func (c *Client) PollDeviceLogin(ctx context.Context, deviceCode string) (pan.Tokens, pan.LoginState, error) {
+	status, raw, err := c.accountCall(ctx, http.MethodPost, "", "/v1/auth/token", map[string]string{
+		"grant_type":  "urn:ietf:params:oauth:grant-type:device_code",
+		"device_code": deviceCode,
+		"client_id":   clientID,
+	}, nil)
 	if err != nil {
-		return "", loginError(err, "光鸭未接受该手机号，请检查格式（建议带国家码）")
+		return pan.Tokens{}, pan.LoginWaiting, err
 	}
-	if result.VerificationID == "" {
-		return "", domain.E(domain.KindUpstream, "光鸭未返回验证码 ID", nil)
-	}
-	return result.VerificationID, nil
-}
-
-func (c *Client) SMSVerify(ctx context.Context, verificationID, code string) (string, error) {
 	var result struct {
-		VerificationToken string `json:"verification_token"`
-		Msg               string `json:"msg"`
+		AccessToken      string `json:"access_token"`
+		RefreshToken     string `json:"refresh_token"`
+		ExpiresIn        int64  `json:"expires_in"`
+		Error            string `json:"error"`
+		ErrorDescription string `json:"error_description"`
 	}
-	err := c.callAccount(ctx, http.MethodPost, "", "/v1/auth/verification/verify", map[string]string{
-		"verification_id":   verificationID,
-		"verification_code": code,
-		"client_id":         clientID,
-	}, &result, nil)
-	if err != nil {
-		return "", loginError(err, "验证码错误或已过期，请重新获取")
-	}
-	if result.VerificationToken == "" {
-		message := strings.TrimSpace(result.Msg)
-		if message == "" || strings.EqualFold(message, "success") {
-			message = "验证码错误或已过期，请重新获取"
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &result); err != nil && status >= 200 && status < 300 {
+			return pan.Tokens{}, pan.LoginWaiting,
+				domain.E(domain.KindUpstream, "解析光鸭登录响应失败", err)
 		}
-		return "", domain.E(domain.KindInvalid, message, nil)
 	}
-	return result.VerificationToken, nil
-}
-
-func (c *Client) SignIn(ctx context.Context, phone, code, verificationToken, captchaToken string) (pan.Tokens, error) {
-	var result struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-		ExpiresIn    int64  `json:"expires_in"`
+	switch result.Error {
+	case "authorization_pending", "slow_down":
+		return pan.Tokens{}, pan.LoginWaiting, nil
+	case "access_denied":
+		return pan.Tokens{}, pan.LoginCanceled, nil
+	case "expired_token", "invalid_grant":
+		return pan.Tokens{}, pan.LoginExpired, nil
 	}
-	err := c.callAccount(ctx, http.MethodPost, "", "/v1/auth/signin", map[string]string{
-		"verification_code":  code,
-		"verification_token": verificationToken,
-		"username":           phone,
-		"client_id":          clientID,
-	}, &result, map[string]string{"x-captcha-token": captchaToken})
-	if err != nil {
-		return pan.Tokens{}, loginError(err, "登录失败，请重新获取验证码")
+	if status == http.StatusUnauthorized || status == http.StatusForbidden {
+		return pan.Tokens{}, pan.LoginWaiting,
+			domain.E(domain.KindUpstream, "光鸭登录请求被拒绝", nil)
+	}
+	if status == http.StatusTooManyRequests {
+		return pan.Tokens{}, pan.LoginWaiting,
+			domain.E(domain.KindRateLimited, "光鸭登录请求过于频繁，请稍后再试", nil)
+	}
+	if status < 200 || status >= 300 {
+		detail := strings.TrimSpace(result.ErrorDescription)
+		if detail == "" {
+			detail = strings.TrimSpace(result.Error)
+		}
+		message := "光鸭登录失败"
+		if detail != "" {
+			message += ": " + detail
+		}
+		return pan.Tokens{}, pan.LoginWaiting, domain.E(domain.KindUpstream, message, nil)
 	}
 	if result.AccessToken == "" {
-		return pan.Tokens{}, pan.ErrUnauthorized
+		return pan.Tokens{}, pan.LoginWaiting,
+			domain.E(domain.KindUpstream, "光鸭登录未返回令牌", nil)
 	}
-	return tokensOf(result.AccessToken, result.RefreshToken, result.ExpiresIn), nil
+	return tokensOf(result.AccessToken, result.RefreshToken, result.ExpiresIn),
+		pan.LoginAuthorized, nil
 }
 
 type fileItem struct {

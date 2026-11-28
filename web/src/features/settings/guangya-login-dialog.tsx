@@ -1,8 +1,15 @@
-import { useEffect, useState, type ReactElement } from 'react'
-import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
+import { CheckCircle2Icon, QrCodeIcon, RefreshCwIcon } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
+import { useEffect, useRef, useState, type ReactElement } from 'react'
 
-import { describeApiError } from '@/api/client'
-import { useBeginGuangyaLogin, useVerifyGuangyaLogin } from '@/api/pan'
+import {
+  invalidatePanSource,
+  panKeys,
+  useBeginGuangyaLogin,
+  useGuangyaLoginStatus,
+  type GuangyaLoginSession
+} from '@/api/pan'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import {
@@ -13,10 +20,8 @@ import {
   DialogTitle,
   DialogTrigger
 } from '@/components/ui/dialog'
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
 
-/** Two-step SMS login for the Guangya private API. */
+/** Device (QR) login for the Guangya private API. */
 export function GuangyaLoginDialog({
   children,
   onAuthorized
@@ -24,133 +29,147 @@ export function GuangyaLoginDialog({
   children: ReactElement
   onAuthorized?: (accountID: string) => void
 }) {
+  const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
-  const [phone, setPhone] = useState('')
-  const [code, setCode] = useState('')
-  const [sessionID, setSessionID] = useState('')
-  const [cooldown, setCooldown] = useState(0)
-  const begin = useBeginGuangyaLogin()
-  const verify = useVerifyGuangyaLogin()
-
-  useEffect(() => {
-    if (cooldown <= 0) return
-    const timer = window.setTimeout(() => setCooldown(value => value - 1), 1000)
-    return () => window.clearTimeout(timer)
-  }, [cooldown])
+  const login = useBeginGuangyaLogin()
+  // Binding the account switches the source card away from its login branch,
+  // which unmounts this dialog. Wait for the exit animation to finish first.
+  const authorizedAccountID = useRef('')
 
   function changeOpen(next: boolean) {
     setOpen(next)
-    // Reset only on open: clearing fields while the popup is animating out makes
-    // the code row disappear before the dialog has finished closing.
     if (next) {
-      setPhone('')
-      setCode('')
-      setSessionID('')
-      setCooldown(0)
-      begin.reset()
-      verify.reset()
+      // Reset before starting a new session so the previous QR is not shown,
+      // but keep it mounted while closing so the exit animation stays stable.
+      login.reset()
+      login.mutate()
+    } else {
+      void queryClient.invalidateQueries({ queryKey: panKeys.accounts })
     }
   }
 
-  function sendCode() {
-    begin.mutate(phone.trim(), {
-      onSuccess: session => {
-        setSessionID(session.id)
-        setCooldown(60)
-        toast.success('验证码已发送，请查看短信')
-      },
-      onError: error => toast.error(describeApiError(error))
-    })
+  function completeLogin(accountID: string) {
+    void queryClient.invalidateQueries({ queryKey: panKeys.accounts })
+    invalidatePanSource(queryClient)
+    authorizedAccountID.current = accountID
+    changeOpen(false)
   }
 
-  function submit() {
-    verify.mutate(
-      { id: sessionID, code: code.trim() },
-      {
-        onSuccess: status => {
-          const accountID = status.account?.id ?? status.account_id ?? ''
-          if (accountID) {
-            onAuthorized?.(accountID)
-          }
-          toast.success('光鸭账号登录成功')
-          changeOpen(false)
-        },
-        onError: error => toast.error(describeApiError(error))
-      }
-    )
+  function finishClose(next: boolean) {
+    if (next) return
+    const accountID = authorizedAccountID.current
+    authorizedAccountID.current = ''
+    if (onAuthorized && accountID) {
+      onAuthorized(accountID)
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={changeOpen}>
+    <Dialog open={open} onOpenChange={changeOpen} onOpenChangeComplete={finishClose}>
       <DialogTrigger render={children} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>登录光鸭云盘</DialogTitle>
-          <DialogDescription>
-            输入手机号获取验证码，验证码会发送到光鸭绑定的手机。
-          </DialogDescription>
+          <DialogDescription>请使用光鸭 App 扫码，并在手机上确认登录。</DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <Field>
-            <FieldLabel htmlFor="guangya-phone">手机号</FieldLabel>
-            <Input
-              id="guangya-phone"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="请输入手机号码"
-              value={phone}
-              disabled={begin.isPending || verify.isPending}
-              onChange={event => {
-                setPhone(event.target.value)
-                setSessionID('')
-                setCode('')
-                // A different number needs its own code; allow sending again.
-                setCooldown(0)
-              }}
-            />
-            <FieldDescription>中国手机号可只输入 11 位，系统会自动补 +86。</FieldDescription>
-          </Field>
-          {sessionID ? (
-            <Field>
-              <FieldLabel htmlFor="guangya-code">短信验证码</FieldLabel>
-              <Input
-                id="guangya-code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                placeholder="请输入验证码"
-                value={code}
-                disabled={verify.isPending}
-                onChange={event => setCode(event.target.value)}
-              />
-            </Field>
-          ) : null}
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={begin.isPending || verify.isPending || cooldown > 0 || phone.trim() === ''}
-              onClick={sendCode}
-            >
-              {begin.isPending ? <Spinner data-icon="inline-start" /> : null}
-              {begin.isPending
-                ? '发送中…'
-                : cooldown > 0
-                  ? `${cooldown}s 后重新发送`
-                  : '发送验证码'}
-            </Button>
-            {sessionID ? (
-              <Button
-                type="button"
-                disabled={verify.isPending || code.trim() === ''}
-                onClick={submit}
-              >
-                {verify.isPending ? <Spinner data-icon="inline-start" /> : null}
-                登录
-              </Button>
-            ) : null}
-          </div>
-        </div>
+        <LoginContent
+          session={login.data}
+          pending={login.isPending}
+          failed={login.isError}
+          onRetry={() => login.mutate()}
+          onAuthorized={completeLogin}
+        />
       </DialogContent>
     </Dialog>
+  )
+}
+
+function LoginContent({
+  session,
+  pending,
+  failed,
+  onRetry,
+  onAuthorized
+}: {
+  session?: GuangyaLoginSession
+  pending: boolean
+  failed: boolean
+  onRetry: () => void
+  onAuthorized: (accountID: string) => void
+}) {
+  const status = useGuangyaLoginStatus(session?.id ?? '')
+  const state = status.data?.state
+  // A failing poll retries on its own budget before it reports an error, so an
+  // error is a run of failures long enough to mean the backend is unreachable.
+  // Until then the last answer stays on screen and the retries only show as such.
+  const exhausted = status.isError
+  const retrying = !exhausted && status.failureCount > 0
+  const deadCode = failed || state === 'expired' || state === 'canceled'
+  // A failing poll keeps the QR code on screen: it is the one the user is aiming
+  // at, and it may still be live once the connection recovers.
+  const showQR = session !== undefined && !deadCode
+  const needsRetry = exhausted || deadCode
+  // onAuthorized changes identity on every parent render; calling it again on
+  // each render would re-enter the close/bind flow endlessly. Handle one
+  // successful authorization per login session.
+  const authorizedSessionId = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (state !== 'authorized' || !session?.id || authorizedSessionId.current === session.id) return
+    authorizedSessionId.current = session.id
+    onAuthorized(status.data?.account_id ?? '')
+  }, [state, status.data?.account_id, session?.id, onAuthorized])
+
+  let message = '等待扫码'
+  if (pending) {
+    message = '正在获取二维码…'
+  } else if (failed) {
+    message = '二维码获取失败，请检查后端服务和网络后重试。'
+  } else if (exhausted) {
+    message = '登录未完成，请重新获取二维码。'
+  } else if (state === 'expired') {
+    message = '二维码已过期，请重新获取。'
+  } else if (state === 'canceled') {
+    message = '已取消授权或会话已被替换，请重新扫码。'
+  } else if (state === 'scanned') {
+    message = '已扫码，请在手机上确认登录'
+  } else if (state === 'authorized') {
+    message = '登录成功'
+  } else if (retrying) {
+    message = '网络异常，正在重试…'
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-5">
+      <div className="flex aspect-square w-full max-w-64 items-center justify-center overflow-hidden rounded-2xl border bg-muted">
+        {pending ? (
+          <Spinner className="size-8 text-muted-foreground" />
+        ) : showQR ? (
+          <div className="size-full bg-white p-3">
+            <QRCodeSVG
+              value={session.qr_code_url}
+              size={256}
+              level="M"
+              bgColor="#ffffff"
+              fgColor="#000000"
+              title="光鸭登录二维码"
+              className="size-full"
+            />
+          </div>
+        ) : (
+          <QrCodeIcon className="size-12 text-muted-foreground" />
+        )}
+      </div>
+      <p className="flex items-center gap-2 text-center text-sm text-muted-foreground">
+        {state === 'scanned' ? <CheckCircle2Icon className="size-4 shrink-0 text-success" /> : null}
+        {message}
+      </p>
+      {needsRetry && !pending ? (
+        <Button type="button" variant="outline" onClick={onRetry}>
+          <RefreshCwIcon className="size-4" />
+          重新获取二维码
+        </Button>
+      ) : null}
+    </div>
   )
 }

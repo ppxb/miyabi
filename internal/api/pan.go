@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ppxb/miyabi/internal/domain"
@@ -15,8 +14,8 @@ type DriveManager interface {
 	AccountStatusFor(context.Context, string) (drive.AccountStatus, error)
 	BeginLogin(context.Context) (drive.LoginSession, error)
 	LoginStatus(context.Context, string) (drive.LoginStatus, error)
-	BeginGuangyaLogin(context.Context, string) (drive.GuangyaLoginSession, error)
-	VerifyGuangyaLogin(context.Context, string, string) (drive.AccountStatus, error)
+	BeginGuangyaLogin(context.Context) (drive.GuangyaLoginSession, error)
+	GuangyaLoginStatus(context.Context, string) (drive.LoginStatus, error)
 	DisconnectAccount(context.Context, string) error
 	FilesFor(context.Context, string, string, int) (pan.FilePage, error)
 	SelectDirectoryForAccount(context.Context, string, string) (domain.LibraryDirectory, error)
@@ -134,44 +133,20 @@ func panLoginStatusHandler(pan DriveManager) gin.HandlerFunc {
 	}
 }
 
-type guangyaLoginInput struct {
-	Phone string `json:"phone"`
-}
-
-type guangyaLoginVerifyInput struct {
-	Code string `json:"code"`
-}
-
 func panBeginGuangyaLoginHandler(pan DriveManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		input, ok := bindJSON[guangyaLoginInput](c)
-		if !ok {
-			return
-		}
-		if strings.TrimSpace(input.Phone) == "" {
-			c.Error(badRequest(domain.E(domain.KindInvalid, "请输入手机号", nil)))
-			return
-		}
-		session, err := pan.BeginGuangyaLogin(c.Request.Context(), input.Phone)
+		session, err := pan.BeginGuangyaLogin(c.Request.Context())
 		respond(c, session, err)
 	}
 }
 
-func panVerifyGuangyaLoginHandler(pan DriveManager) gin.HandlerFunc {
+func panGuangyaLoginStatusHandler(pan DriveManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		uri, ok := bindURI[panLoginURI](c)
 		if !ok {
 			return
 		}
-		input, ok := bindJSON[guangyaLoginVerifyInput](c)
-		if !ok {
-			return
-		}
-		if strings.TrimSpace(input.Code) == "" {
-			c.Error(badRequest(domain.E(domain.KindInvalid, "请输入验证码", nil)))
-			return
-		}
-		status, err := pan.VerifyGuangyaLogin(c.Request.Context(), uri.ID, input.Code)
-		respond(c, accountResponse(status), err)
+		status, err := pan.GuangyaLoginStatus(c.Request.Context(), uri.ID)
+		respond(c, status, err)
 	}
 }

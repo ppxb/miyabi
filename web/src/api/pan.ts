@@ -56,27 +56,13 @@ export type PanLoginState = 'waiting' | 'scanned' | 'authorized' | 'expired' | '
 
 export type GuangyaLoginSession = {
   id: string
+  qr_code_url: string
 }
 
 export function useBeginGuangyaLogin() {
   return useMutation({
-    mutationFn: (phone: string) =>
-      apiPost<GuangyaLoginSession>('/api/pan/guangya/login', { phone }),
+    mutationFn: () => apiPost<GuangyaLoginSession>('/api/pan/guangya/login'),
     gcTime: 0
-  })
-}
-
-export function useVerifyGuangyaLogin() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, code }: { id: string; code: string }) =>
-      apiPost<PanAccountStatus>(`/api/pan/guangya/login/${encodeURIComponent(id)}/verify`, {
-        code
-      }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: panKeys.accounts })
-      invalidatePanSource(queryClient)
-    }
   })
 }
 
@@ -92,6 +78,7 @@ export const panKeys = {
   accountFiles: (accountID: string, directoryID: string, page: number) =>
     ['pan', 'accounts', accountID, 'files', directoryID, page] as const,
   login: (id: string) => ['pan', 'login', id] as const,
+  guangyaLogin: (id: string) => ['pan', 'guangya-login', id] as const,
   files: (accountID: string, directoryID: string, page: number) =>
     ['pan', 'files', accountID, directoryID, page] as const
 }
@@ -133,6 +120,32 @@ export function panLoginOptions(id: string) {
 
 export function usePanLoginStatus(id: string) {
   return useQuery(panLoginOptions(id))
+}
+
+const guangyaLoginPollInterval = 2000
+
+export function guangyaLoginOptions(id: string) {
+  return queryOptions({
+    queryKey: panKeys.guangyaLogin(id),
+    queryFn: ({ signal }) =>
+      apiGet<PanLoginStatus>(`/api/pan/guangya/login/${encodeURIComponent(id)}`, undefined, signal),
+    enabled: id !== '',
+    // Four retries plus the first attempt preserve the five-failure budget.
+    retry: 4,
+    retryDelay: guangyaLoginPollInterval,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnReconnect: false,
+    refetchInterval: query => {
+      if (query.state.status === 'error') return false
+      const state = query.state.data?.state
+      return !state || state === 'waiting' || state === 'scanned' ? guangyaLoginPollInterval : false
+    }
+  })
+}
+
+export function useGuangyaLoginStatus(id: string) {
+  return useQuery(guangyaLoginOptions(id))
 }
 
 export function usePanAccounts() {

@@ -8,24 +8,27 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/ppxb/miyabi/internal/drive"
+	"github.com/ppxb/miyabi/internal/pan"
 )
 
 type guangyaLoginStub struct {
 	DriveManager
 }
 
-func (guangyaLoginStub) BeginGuangyaLogin(_ context.Context, phone string) (drive.GuangyaLoginSession, error) {
-	return drive.GuangyaLoginSession{ID: uuid.NewString()}, nil
+func (guangyaLoginStub) BeginGuangyaLogin(context.Context) (drive.GuangyaLoginSession, error) {
+	return drive.GuangyaLoginSession{
+		ID:        uuid.NewString(),
+		QRCodeURL: "https://account.guangyapan.com/__/auth/device/?user_code=user",
+	}, nil
 }
 
-func (guangyaLoginStub) VerifyGuangyaLogin(_ context.Context, id, code string) (drive.AccountStatus, error) {
-	return drive.AccountStatus{AccountID: id, Provider: drive.ProviderGuangya, Connected: true}, nil
+func (guangyaLoginStub) GuangyaLoginStatus(context.Context, string) (drive.LoginStatus, error) {
+	return drive.LoginStatus{State: pan.LoginAuthorized, AccountID: "account-1"}, nil
 }
 
 func guangyaLoginRouter() *gin.Engine {
@@ -34,7 +37,7 @@ func guangyaLoginRouter() *gin.Engine {
 	router := gin.New()
 	router.Use(errorMiddleware(logger))
 	router.POST("/guangya/login", panBeginGuangyaLoginHandler(guangyaLoginStub{}))
-	router.POST("/guangya/login/:id/verify", panVerifyGuangyaLoginHandler(guangyaLoginStub{}))
+	router.GET("/guangya/login/:id", panGuangyaLoginStatusHandler(guangyaLoginStub{}))
 	return router
 }
 
@@ -46,31 +49,34 @@ func postJSON(router *gin.Engine, path, body string) *httptest.ResponseRecorder 
 	return recorder
 }
 
-func TestGuangyaLoginHandlersAcceptValidJSON(t *testing.T) {
+func getRequest(router *gin.Engine, path string) *httptest.ResponseRecorder {
+	request := httptest.NewRequest(http.MethodGet, path, nil)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	return recorder
+}
+
+func TestGuangyaLoginHandlersStartAndPoll(t *testing.T) {
 	router := guangyaLoginRouter()
-	begin := postJSON(router, "/guangya/login", `{"phone":"+8613800138000"}`)
+	begin := postJSON(router, "/guangya/login", `{}`)
 	if begin.Code != http.StatusOK {
 		t.Fatalf("begin status = %d, body = %s", begin.Code, begin.Body.String())
 	}
 	var session drive.GuangyaLoginSession
-	if err := json.Unmarshal(begin.Body.Bytes(), &session); err != nil || session.ID == "" {
+	if err := json.Unmarshal(begin.Body.Bytes(), &session); err != nil ||
+		session.ID == "" || session.QRCodeURL == "" {
 		t.Fatalf("begin body = %s, err = %v", begin.Body.String(), err)
 	}
 
-	verify := postJSON(router, "/guangya/login/"+session.ID+"/verify", `{"code":"123456"}`)
-	if verify.Code != http.StatusOK {
-		t.Fatalf("verify status = %d, body = %s", verify.Code, verify.Body.String())
+	status := getRequest(router, "/guangya/login/"+session.ID)
+	if status.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", status.Code, status.Body.String())
 	}
-}
-
-func TestGuangyaLoginHandlersReportMissingFields(t *testing.T) {
-	router := guangyaLoginRouter()
-	begin := postJSON(router, "/guangya/login", `{}`)
-	if begin.Code != http.StatusBadRequest || !strings.Contains(begin.Body.String(), "请输入手机号") {
-		t.Fatalf("begin = %d %s", begin.Code, begin.Body.String())
+	var login drive.LoginStatus
+	if err := json.Unmarshal(status.Body.Bytes(), &login); err != nil {
+		t.Fatal(err)
 	}
-	verify := postJSON(router, "/guangya/login/"+uuid.NewString()+"/verify", `{}`)
-	if verify.Code != http.StatusBadRequest || !strings.Contains(verify.Body.String(), "请输入验证码") {
-		t.Fatalf("verify = %d %s", verify.Code, verify.Body.String())
+	if login.State != pan.LoginAuthorized || login.AccountID != "account-1" {
+		t.Fatalf("login = %+v", login)
 	}
 }
