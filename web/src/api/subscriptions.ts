@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
+import { actorKeys } from './actors'
 import { apiDelete, apiGet, apiPatch, apiPost } from './client'
 
 export type SubscriptionKind = 'movie' | 'actor'
@@ -123,6 +124,7 @@ export function useAddSubscription() {
     // Awaiting the refetch keeps the follow button busy until it shows the new state.
     onSuccess: async item => {
       await queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
+      void queryClient.invalidateQueries({ queryKey: actorKeys.all })
       toast.success(`已关注 ${item.title}`, {
         description: '正在后台检查新作；之后每天检查一次。'
       })
@@ -136,8 +138,9 @@ export function useUpdateSubscription() {
   return useMutation({
     mutationFn: ({ id, ...patch }: { id: number; status?: 'active' | 'paused' }) =>
       apiPatch<SubscriptionItem>(`/api/subscriptions/${id}`, patch),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
+      void queryClient.invalidateQueries({ queryKey: actorKeys.all })
     },
     meta: { errorTitle: '更新关注失败' }
   })
@@ -147,7 +150,10 @@ export function useRemoveSubscription() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (item: { id: number }) => apiDelete<null>(`/api/subscriptions/${item.id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: subscriptionKeys.all }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: subscriptionKeys.all })
+      void queryClient.invalidateQueries({ queryKey: actorKeys.all })
+    },
     meta: { errorTitle: '取消关注失败' }
   })
 }

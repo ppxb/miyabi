@@ -138,7 +138,7 @@ export function TaskEventsProvider({ children }: PropsWithChildren) {
       if (libraryChanged || prev?.offline !== next.offline) {
         keys.push(movieStateKeys.all, offlineKeys.all)
       }
-      if (prev?.monitor !== next.monitor) keys.push(subscriptionKeys.all)
+      if (prev?.monitor !== next.monitor) keys.push(subscriptionKeys.all, actorKeys.all)
       revisionsRef.current = next
       void refreshQueries(queryClient, ...keys)
     })

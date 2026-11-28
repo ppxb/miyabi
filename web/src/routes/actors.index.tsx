@@ -14,6 +14,7 @@ function ActorsRoute() {
   return (
     <ActorsCatalogPage
       q={search.q}
+      follow={search.follow}
       page={search.page ?? 1}
       onSearchChange={next => void navigate({ search: next, resetScroll: false })}
     />

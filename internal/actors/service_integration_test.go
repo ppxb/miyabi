@@ -17,6 +17,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/actorprofile"
+	"github.com/ppxb/miyabi/internal/ent/subscription"
 	"github.com/ppxb/miyabi/internal/gfriends"
 )
 
@@ -107,7 +108,7 @@ func TestLinkProfilesGroupsSpellingsIntoCatalog(t *testing.T) {
 	}
 
 	svc := New(db, nil, "", nil)
-	page, err := svc.Catalog(ctx, "", 1, 10)
+	page, err := svc.Catalog(ctx, CatalogFilter{Page: 1, Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +121,7 @@ func TestLinkProfilesGroupsSpellingsIntoCatalog(t *testing.T) {
 		t.Fatalf("summary = %+v", got)
 	}
 	for q, want := range map[string]int{"七ツ森": 1, "ﾅﾅﾂ": 0, "りり": 1} {
-		page, err := svc.Catalog(ctx, q, 1, 10)
+		page, err := svc.Catalog(ctx, CatalogFilter{Query: q, Page: 1, Limit: 10})
 		if err != nil || page.Total != want {
 			t.Fatalf("search %q: total %d, err %v", q, page.Total, err)
 		}
@@ -138,13 +139,120 @@ func TestCatalogPagesInSQL(t *testing.T) {
 	link(t, db, created...)
 
 	svc := New(db, nil, "", nil)
-	first, err := svc.Catalog(ctx, "", 1, 2)
+	first, err := svc.Catalog(ctx, CatalogFilter{Page: 1, Limit: 2})
 	if err != nil || first.Total != 3 || !first.HasMore || len(first.Actors) != 2 || first.Actors[0].Name != "a" || first.Actors[1].Name != "b" {
 		t.Fatalf("page 1 = %+v, %v", first, err)
 	}
-	second, err := svc.Catalog(ctx, "", 2, 2)
+	second, err := svc.Catalog(ctx, CatalogFilter{Page: 2, Limit: 2})
 	if err != nil || second.HasMore || len(second.Actors) != 1 || second.Actors[0].Name != "c" {
 		t.Fatalf("page 2 = %+v, %v", second, err)
+	}
+}
+
+func TestCatalogFiltersFollowing(t *testing.T) {
+	ctx := t.Context()
+	db := openDB(t)
+	m := db.Movie.Create().SetCode("FOLLOW-001").SaveX(ctx)
+	followedActor := db.Actor.Create().SetProvider("p").SetSourceID("a").SetName("Followed").AddMovieIDs(m.ID).SaveX(ctx)
+	otherActor := db.Actor.Create().SetProvider("p").SetSourceID("b").SetName("Other").AddMovieIDs(m.ID).SaveX(ctx)
+	link(t, db, followedActor, otherActor)
+	profileID := pidOf(t, db, followedActor.ID)
+	db.Subscription.Create().SetKind(subscription.KindActor).SetTargetID(strconv.Itoa(profileID)).SaveX(ctx)
+
+	svc := New(db, nil, "", nil)
+	following := true
+	page, err := svc.Catalog(ctx, CatalogFilter{Following: &following, Page: 1, Limit: 10})
+	if err != nil || page.Total != 1 || len(page.Actors) != 1 || page.Actors[0].Name != "Followed" {
+		t.Fatalf("following catalog = %+v, %v", page, err)
+	}
+
+	notFollowing := false
+	page, err = svc.Catalog(ctx, CatalogFilter{Following: &notFollowing, Page: 1, Limit: 10})
+	if err != nil || page.Total != 1 || len(page.Actors) != 1 || page.Actors[0].Name != "Other" {
+		t.Fatalf("unfollowed catalog = %+v, %v", page, err)
+	}
+
+	page, err = svc.Catalog(ctx, CatalogFilter{Page: 1, Limit: 10})
+	if err != nil || page.Total != 2 {
+		t.Fatalf("all catalog = %+v, %v", page, err)
+	}
+}
+
+func TestCatalogFollowingWithoutSubscriptions(t *testing.T) {
+	ctx := t.Context()
+	db := openDB(t)
+	m := db.Movie.Create().SetCode("FOLLOW-EMPTY").SaveX(ctx)
+	a := db.Actor.Create().SetProvider("p").SetSourceID("a").SetName("Only").AddMovieIDs(m.ID).SaveX(ctx)
+	link(t, db, a)
+
+	following := true
+	page, err := New(db, nil, "", nil).Catalog(ctx, CatalogFilter{Following: &following, Page: 1, Limit: 10})
+	if err != nil || page.Total != 0 || len(page.Actors) != 0 || page.HasMore {
+		t.Fatalf("following catalog = %+v, %v", page, err)
+	}
+}
+
+func TestCatalogFollowingResolvesLegacySubscriptions(t *testing.T) {
+	ctx := t.Context()
+	db := openDB(t)
+	m := db.Movie.Create().SetCode("LEGACY-001").SaveX(ctx)
+	sourceActor := db.Actor.Create().SetProvider("javdb").SetSourceID("legacy-source").SetName("Legacy Source").AddMovieIDs(m.ID).SaveX(ctx)
+	fanzaActor := db.Actor.Create().SetProvider("fanza").SetSourceID("1044864").SetName("Legacy Fanza").AddMovieIDs(m.ID).SaveX(ctx)
+	link(t, db, sourceActor, fanzaActor)
+	db.Subscription.Create().SetKind(subscription.KindActor).SetTargetID("legacy-source").SaveX(ctx)
+	db.Subscription.Create().SetKind(subscription.KindActor).SetTargetID("old-fanza-key").SetFanzaID("1044864").SaveX(ctx)
+
+	following := true
+	page, err := New(db, nil, "", nil).Catalog(ctx, CatalogFilter{Following: &following, Page: 1, Limit: 10})
+	if err != nil || page.Total != 2 {
+		t.Fatalf("legacy following catalog = %+v, %v", page, err)
+	}
+	names := make(map[string]bool, len(page.Actors))
+	for _, actor := range page.Actors {
+		names[actor.Name] = true
+	}
+	if !names["Legacy Source"] || !names["Legacy Fanza"] {
+		t.Fatalf("legacy follows = %+v", page.Actors)
+	}
+}
+
+func TestCatalogFollowingPrefersProfileTargetOverSourceCollision(t *testing.T) {
+	ctx := t.Context()
+	db := openDB(t)
+	m := db.Movie.Create().SetCode("COLLIDE-001").SaveX(ctx)
+	followedActor := db.Actor.Create().SetProvider("javdb").SetSourceID("followed").SetName("Followed").AddMovieIDs(m.ID).SaveX(ctx)
+	link(t, db, followedActor)
+	profileID := pidOf(t, db, followedActor.ID)
+	// An unrelated provider actor whose id collides with the profile key.
+	collision := db.Actor.Create().SetProvider("fanza").SetSourceID(strconv.Itoa(profileID)).SetName("Collision").AddMovieIDs(m.ID).SaveX(ctx)
+	link(t, db, collision)
+	db.Subscription.Create().SetKind(subscription.KindActor).SetTargetID(strconv.Itoa(profileID)).SaveX(ctx)
+
+	following := true
+	page, err := New(db, nil, "", nil).Catalog(ctx, CatalogFilter{Following: &following, Page: 1, Limit: 10})
+	if err != nil || page.Total != 1 || len(page.Actors) != 1 || page.Actors[0].Name != "Followed" {
+		t.Fatalf("collision follow = %+v, %v", page, err)
+	}
+}
+
+func TestCatalogFollowingUsesProfileAfterUnmatchedProviderID(t *testing.T) {
+	ctx := t.Context()
+	db := openDB(t)
+	m := db.Movie.Create().SetCode("REMOTE-001").SaveX(ctx)
+	actor := db.Actor.Create().SetProvider("javdb").SetSourceID("remote-source").SetName("Remote Follow").AddMovieIDs(m.ID).SaveX(ctx)
+	link(t, db, actor)
+	profileID := pidOf(t, db, actor.ID)
+	// The monitor can persist a remotely resolved id with no local Actor row.
+	db.Subscription.Create().
+		SetKind(subscription.KindActor).
+		SetTargetID(strconv.Itoa(profileID)).
+		SetFanzaID("remote-fanza-id").
+		SaveX(ctx)
+
+	following := true
+	page, err := New(db, nil, "", nil).Catalog(ctx, CatalogFilter{Following: &following, Page: 1, Limit: 10})
+	if err != nil || page.Total != 1 || len(page.Actors) != 1 || page.Actors[0].Name != "Remote Follow" {
+		t.Fatalf("remote provider follow = %+v, %v", page, err)
 	}
 }
 
@@ -313,7 +421,7 @@ func TestMergeMovieCrossLanguageAndLaterLatinActor(t *testing.T) {
 	if pidOf(t, db, later.ID) != canonical {
 		t.Fatal("later Latin actor did not join the merged profile")
 	}
-	page, err := svc.Catalog(ctx, "kanna", 1, 10)
+	page, err := svc.Catalog(ctx, CatalogFilter{Query: "kanna", Page: 1, Limit: 10})
 	if err != nil || len(page.Actors) != 1 || page.Actors[0].MovieCount != 2 || page.Actors[0].Name != "瀬戸環奈" {
 		t.Fatalf("catalog = %+v, %v", page, err)
 	}
@@ -353,7 +461,7 @@ func TestLinkProfilesAliasesRenamedLinkedActor(t *testing.T) {
 	if pidOf(t, db, a.ID) != pid || db.ActorProfile.Query().CountX(ctx) != 1 {
 		t.Fatal("rename moved the actor to another profile")
 	}
-	page, err := New(db, nil, "", nil).Catalog(ctx, "seto kanna", 1, 10)
+	page, err := New(db, nil, "", nil).Catalog(ctx, CatalogFilter{Query: "seto kanna", Page: 1, Limit: 10})
 	if err != nil || page.Total != 1 {
 		t.Fatalf("new spelling not searchable: %+v, %v", page, err)
 	}

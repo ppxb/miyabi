@@ -26,6 +26,10 @@ export type ActorPage = {
   has_more: boolean
 }
 
+export const ACTOR_PAGE_SIZE = 40
+
+export type ActorFollowFilter = 'followed' | 'unfollowed'
+
 export type ActorDetail = ActorSummary & {
   aliases: string[]
   names: string[]
@@ -46,21 +50,26 @@ export type ActorDetail = ActorSummary & {
 
 export const actorKeys = {
   all: ['actors'] as const,
-  catalog: (q: string, page: number, limit: number) =>
-    ['actors', 'catalog', q, page, limit] as const,
+  catalog: (q: string, follow: string, page: number) =>
+    ['actors', 'catalog', q, follow, page] as const,
   detail: (key: string) => ['actors', 'detail', key] as const,
   // Actor pages embed library cards, so playback and subtitle changes refresh them.
   details: ['actors', 'detail'] as const
 }
 
-export function useActorCatalog(params: { q?: string; page: number; limit: number }) {
+export function useActorCatalog(params: { q?: string; follow?: ActorFollowFilter; page: number }) {
   return useQuery({
-    queryKey: actorKeys.catalog(params.q ?? '', params.page, params.limit),
+    queryKey: actorKeys.catalog(params.q ?? '', params.follow ?? '', params.page),
     placeholderData: keepPreviousData,
     queryFn: ({ signal }) =>
       apiGet<ActorPage>(
         '/api/actors',
-        { q: params.q, page: params.page, limit: params.limit },
+        {
+          q: params.q,
+          follow: params.follow,
+          page: params.page,
+          limit: ACTOR_PAGE_SIZE
+        },
         signal
       )
   })

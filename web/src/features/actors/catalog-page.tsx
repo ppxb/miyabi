@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { useActorCatalog } from '@/api/actors'
+import { ACTOR_PAGE_SIZE, useActorCatalog, type ActorFollowFilter } from '@/api/actors'
 import { imageURL } from '@/api/client'
 import { AppPage } from '@/components/app-page'
 import { EmptyState } from '@/components/empty-state'
@@ -8,38 +8,78 @@ import { ListPagination } from '@/components/list-pagination'
 import { PageHeader } from '@/components/page-header'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useDebouncedSearch } from '@/hooks/use-debounced-search'
 
-const PAGE_SIZE = 40
+const FOLLOW_OPTIONS = [
+  { value: 'all', label: '全部状态' },
+  { value: 'followed', label: '已关注' },
+  { value: 'unfollowed', label: '未关注' }
+] as const
 
 export function ActorsCatalogPage({
   q,
+  follow,
   page,
   onSearchChange
 }: {
   q?: string
+  follow?: ActorFollowFilter
   page: number
-  onSearchChange: (next: { q?: string; page?: number }) => void
+  onSearchChange: (next: { q?: string; follow?: ActorFollowFilter; page?: number }) => void
 }) {
   const [query, setQuery] = useDebouncedSearch(q, next =>
-    onSearchChange({ q: next, page: undefined })
+    onSearchChange({ q: next, follow, page: undefined })
   )
 
-  const catalog = useActorCatalog({ q: q ?? '', page, limit: PAGE_SIZE })
+  const catalog = useActorCatalog({ q: q ?? '', follow, page })
   const items = catalog.data?.actors ?? []
-  const totalPages = Math.max(1, Math.ceil((catalog.data?.total ?? 0) / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil((catalog.data?.total ?? 0) / ACTOR_PAGE_SIZE))
 
   return (
     <AppPage>
       <PageHeader title="演员" description="按演员浏览作品" />
-      <Input
-        aria-label="搜索演员名称"
-        className="w-full sm:w-60"
-        placeholder="搜索演员名称"
-        value={query}
-        onChange={event => setQuery(event.target.value)}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          aria-label="搜索演员名称"
+          className="w-full sm:w-60"
+          placeholder="搜索演员名称"
+          value={query}
+          onChange={event => setQuery(event.target.value)}
+        />
+        <Select
+          items={FOLLOW_OPTIONS}
+          value={follow ?? 'all'}
+          onValueChange={next =>
+            onSearchChange({
+              q: q?.trim() || undefined,
+              follow: next === 'all' ? undefined : (next as ActorFollowFilter),
+              page: undefined
+            })
+          }
+        >
+          <SelectTrigger className="w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="start">
+            <SelectGroup>
+              {FOLLOW_OPTIONS.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </div>
       {catalog.isPending ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {Array.from({ length: 10 }).map((_, index) => (
@@ -87,7 +127,11 @@ export function ActorsCatalogPage({
             hasMore={catalog.data?.has_more ?? false}
             disabled={catalog.isFetching}
             onPageChange={next =>
-              onSearchChange({ q: q?.trim() || undefined, page: next > 1 ? next : undefined })
+              onSearchChange({
+                q: q?.trim() || undefined,
+                follow,
+                page: next > 1 ? next : undefined
+              })
             }
           />
         </>

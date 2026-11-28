@@ -14,7 +14,7 @@ import (
 
 // ActorManager exposes the canonical actor read model.
 type ActorManager interface {
-	Catalog(context.Context, string, int, int) (actors.Page, error)
+	Catalog(context.Context, actors.CatalogFilter) (actors.Page, error)
 	Detail(context.Context, int) (actors.Detail, error)
 	FetchImage(context.Context, int, int) ([]byte, error)
 	FetchAvatar(context.Context, int) ([]byte, error)
@@ -47,13 +47,24 @@ func actorSourceUpdateHandler(manager ActorManager) gin.HandlerFunc {
 func actorListHandler(manager ActorManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		query, ok := bindQuery[struct {
-			Page  int `form:"page,default=1" binding:"min=1"`
-			Limit int `form:"limit,default=24" binding:"min=1,max=100"`
+			Page   int    `form:"page,default=1" binding:"min=1"`
+			Limit  int    `form:"limit,default=24" binding:"min=1,max=100"`
+			Follow string `form:"follow" binding:"omitempty,oneof=followed unfollowed"`
 		}](c)
 		if !ok {
 			return
 		}
-		result, err := manager.Catalog(c.Request.Context(), c.Query("q"), query.Page, query.Limit)
+		var following *bool
+		if query.Follow != "" {
+			value := query.Follow == "followed"
+			following = &value
+		}
+		result, err := manager.Catalog(c.Request.Context(), actors.CatalogFilter{
+			Query:     c.Query("q"),
+			Following: following,
+			Page:      query.Page,
+			Limit:     query.Limit,
+		})
 		respond(c, result, err)
 	}
 }

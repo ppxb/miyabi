@@ -32,6 +32,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/actorprofile"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
+	"github.com/ppxb/miyabi/internal/ent/subscription"
 	"github.com/ppxb/miyabi/internal/gfriends"
 	"golang.org/x/sync/singleflight"
 )
@@ -146,10 +147,20 @@ func normalizeName(name string) string {
 	return domain.NormalizeActorName(name)
 }
 
+// CatalogFilter controls the actor catalog query. Following is nil for all
+// actors, true for followed actors, and false for actors without a follow.
+type CatalogFilter struct {
+	Query     string
+	Following *bool
+	Page      int
+	Limit     int
+}
+
 // Catalog lists canonical actors that appear in at least one movie, optionally
-// filtered by a normalized substring of any of their names. Filtering, ordering
-// and paging run in SQL on ActorProfile.
-func (s *Service) Catalog(ctx context.Context, query string, page, limit int) (Page, error) {
+// filtered by a normalized substring of any of their names and by follow state.
+// Filtering, ordering and paging run in SQL on ActorProfile.
+func (s *Service) Catalog(ctx context.Context, filter CatalogFilter) (Page, error) {
+	page, limit := filter.Page, filter.Limit
 	if page < 1 {
 		page = 1
 	}
@@ -157,11 +168,25 @@ func (s *Service) Catalog(ctx context.Context, query string, page, limit int) (P
 		limit = 20
 	}
 	where := []predicate.ActorProfile{actorprofile.HasSourcesWith(actor.HasMovies())}
-	if q := normalizeName(query); q != "" {
+	if q := normalizeName(filter.Query); q != "" {
 		where = append(where, actorprofile.Or(
 			actorprofile.MatchKeyContains(q),
 			actorprofile.HasAliasesWith(actoralias.NormalizedContains(q)),
 		))
+	}
+	if filter.Following != nil {
+		ids, err := s.followingActorIDs(ctx)
+		if err != nil {
+			return Page{}, err
+		}
+		switch {
+		case *filter.Following && len(ids) == 0:
+			return Page{Actors: []Summary{}, Page: page}, nil
+		case *filter.Following:
+			where = append(where, actorprofile.IDIn(ids...))
+		case len(ids) > 0:
+			where = append(where, actorprofile.IDNotIn(ids...))
+		}
 	}
 	total, err := s.db.ActorProfile.Query().Where(where...).Count(ctx)
 	if err != nil {
@@ -180,6 +205,115 @@ func (s *Service) Catalog(ctx context.Context, query string, page, limit int) (P
 		items = append(items, summaryOf(p))
 	}
 	return Page{Actors: items, Total: total, Page: page, HasMore: page*limit < total}, nil
+}
+
+// followingActorIDs resolves actor subscriptions to ActorProfile ids. Actor
+// subscriptions store the canonical profile key in target_id, but rows created
+// before that format exist: their target_id can be a JavDB/FANZA actor id, and
+// fanza_id/javdb_id may carry the provider spelling. Resolve those through the
+// actor rows so legacy follows do not disappear from the filter.
+func (s *Service) followingActorIDs(ctx context.Context) ([]int, error) {
+	records, err := s.db.Subscription.Query().
+		Where(subscription.KindEQ(subscription.KindActor)).
+		Select(subscription.FieldTargetID, subscription.FieldFanzaID, subscription.FieldJavdbID).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(records) == 0 {
+		return nil, nil
+	}
+
+	sourceIDs := make([]string, 0, len(records)*3)
+	seenSource := make(map[string]bool, len(records)*3)
+	profileCandidates := make([]int, 0, len(records))
+	for _, record := range records {
+		for _, sourceID := range []string{record.TargetID, record.FanzaID, record.JavdbID} {
+			if sourceID == "" || seenSource[sourceID] {
+				continue
+			}
+			seenSource[sourceID] = true
+			sourceIDs = append(sourceIDs, sourceID)
+		}
+		if id, err := strconv.Atoi(record.TargetID); err == nil && id > 0 {
+			profileCandidates = append(profileCandidates, id)
+		}
+	}
+
+	actors, err := s.db.Actor.Query().
+		Where(actor.SourceIDIn(sourceIDs...), actor.HasProfile()).
+		Select(actor.FieldProvider, actor.FieldSourceID).
+		WithProfile(func(q *ent.ActorProfileQuery) { q.Select(actorprofile.FieldID) }).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byProviderSource := make(map[string]int, len(actors))
+	bySource := make(map[string][]int, len(actors))
+	for _, record := range actors {
+		if record.Edges.Profile == nil {
+			continue
+		}
+		profileID := record.Edges.Profile.ID
+		byProviderSource[record.Provider+"\x00"+record.SourceID] = profileID
+		bySource[record.SourceID] = append(bySource[record.SourceID], profileID)
+	}
+
+	profileIDs := make(map[int]bool, len(profileCandidates))
+	if len(profileCandidates) > 0 {
+		existing, err := s.db.ActorProfile.Query().
+			Where(actorprofile.IDIn(profileCandidates...)).
+			Select(actorprofile.FieldID).
+			Ints(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range existing {
+			profileIDs[id] = true
+		}
+	}
+
+	ids := make(map[int]bool, len(records))
+	add := func(id int) {
+		if id > 0 {
+			ids[id] = true
+		}
+	}
+	for _, record := range records {
+		resolved := false
+		if record.FanzaID != "" {
+			if id, ok := byProviderSource["fanza\x00"+record.FanzaID]; ok {
+				add(id)
+				resolved = true
+			}
+		}
+		if !resolved && record.JavdbID != "" {
+			if id, ok := byProviderSource["javdb\x00"+record.JavdbID]; ok {
+				add(id)
+				resolved = true
+			}
+		}
+		// Current follows store the profile id in target_id. Check that before
+		// the legacy source-id fallback: a provider actor id can coincidentally
+		// equal a profile id and must not hijack the current follow.
+		if !resolved {
+			if id, err := strconv.Atoi(record.TargetID); err == nil && profileIDs[id] {
+				add(id)
+				resolved = true
+			}
+		}
+		if !resolved {
+			for _, id := range bySource[record.TargetID] {
+				add(id)
+				resolved = true
+			}
+		}
+	}
+	result := make([]int, 0, len(ids))
+	for id := range ids {
+		result = append(result, id)
+	}
+	return result, nil
 }
 
 func withSourceMovies(q *ent.ActorQuery) {
@@ -435,6 +569,15 @@ func (s *Service) mergeProfiles(ctx context.Context, canonical, merged int) erro
 		}
 	}
 	if _, err := tx.ActorImage.Delete().Where(actorimage.HasActorWith(actorprofile.ID(merged))).Exec(ctx); err != nil {
+		return err
+	}
+	// Keep a follow on the merged profile attached to the surviving profile.
+	// If the canonical profile is already followed, the update conflicts; that
+	// follow still identifies the merged actor through its actor source rows.
+	if err := tx.Subscription.Update().
+		Where(subscription.KindEQ(subscription.KindActor), subscription.TargetIDEQ(strconv.Itoa(merged))).
+		SetTargetID(strconv.Itoa(canonical)).
+		Exec(ctx); err != nil && !ent.IsConstraintError(err) {
 		return err
 	}
 	if err := tx.ActorProfile.DeleteOneID(merged).Exec(ctx); err != nil {
