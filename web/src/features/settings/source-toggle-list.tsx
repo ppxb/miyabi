@@ -1,7 +1,6 @@
 import { InlineError } from '@/components/error-state'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
-import { SettingRow } from './shared'
+import { SettingRow, SettingsLoading } from './shared'
 
 type ToggleSource = { id: string; enabled: boolean }
 type ToggleQuery = {
@@ -48,7 +47,7 @@ export function SourceToggleList({
           {errorText}
         </InlineError>
       ) : null}
-      {query.isPending ? <Skeleton className="h-4 w-40" /> : null}
+      {query.isPending ? <SettingsLoading /> : null}
       {sources.map(source => (
         <SettingRow
           key={source.id}

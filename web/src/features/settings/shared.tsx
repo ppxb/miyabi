@@ -15,10 +15,15 @@ export function SettingsCard({ children }: { children: ReactNode }) {
   return (
     <Card>
       <CardContent>
-        <FieldGroup className="gap-8">{children}</FieldGroup>
+        <FieldGroup className="gap-6">{children}</FieldGroup>
       </CardContent>
     </Card>
   )
+}
+
+/** Placeholder for a settings section while its data loads. */
+export function SettingsLoading() {
+  return <Skeleton className="h-4 w-40" />
 }
 
 export function SettingsSection({
@@ -35,7 +40,7 @@ export function SettingsSection({
   return (
     <section className="space-y-5">
       <h2 className="flex items-center gap-2 text-sm font-semibold">
-        <span className="text-muted-foreground">{icon}</span>
+        <span className="text-muted-foreground [&_svg]:size-4">{icon}</span>
         {title}
       </h2>
       {description ? <p className="text-muted-foreground">{description}</p> : null}
@@ -62,7 +67,7 @@ export function SettingRow({
   return (
     <Field
       orientation={inline ? 'horizontal' : 'responsive'}
-      className={cn('justify-between gap-3 @md/field-group:gap-6', inline && 'gap-4')}
+      className={cn('justify-between @md/field-group:gap-6', inline ? 'gap-4' : 'gap-3')}
     >
       <FieldContent>
         <FieldTitle>{title}</FieldTitle>

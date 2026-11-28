@@ -51,7 +51,7 @@ export function MediaSyncSection() {
 
   return (
     <SettingsSection
-      icon={<ScanSearchIcon className="size-4" />}
+      icon={<ScanSearchIcon />}
       title="媒体库同步"
       description={pending.data ? `待刮削 ${pending.data.count} 部影片` : undefined}
     >

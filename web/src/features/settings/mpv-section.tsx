@@ -20,7 +20,7 @@ function downloadScript(path: string, filename: string) {
  */
 export function MpvSection() {
   return (
-    <SettingsSection icon={<PlayIcon className="size-4" />} title="MPV 播放器">
+    <SettingsSection icon={<PlayIcon />} title="MPV 播放器">
       <SettingRow
         title="使用 MPV 播放"
         description="安装脚本后可直接唤起本机 MPV 播放。首次使用请下载安装脚本并执行。"

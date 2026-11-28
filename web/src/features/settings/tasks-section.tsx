@@ -1,8 +1,7 @@
 import { ListChecksIcon } from 'lucide-react'
 
 import { InlineError } from '@/components/error-state'
-import { Skeleton } from '@/components/ui/skeleton'
-import { SettingRow, SettingsSection } from '@/features/settings/shared'
+import { SettingRow, SettingsLoading, SettingsSection } from '@/features/settings/shared'
 import { LibraryPauseButton } from '@/features/tasks/library-pause-button'
 import { ScanProgressView } from '@/features/tasks/scan-progress'
 import { useTaskConnection } from '@/features/tasks/task-events'
@@ -13,7 +12,7 @@ export function TasksSection() {
   const connection = useTaskConnection()
 
   return (
-    <SettingsSection icon={<ListChecksIcon className="size-4" />} title="任务">
+    <SettingsSection icon={<ListChecksIcon />} title="任务">
       {tasks.isError ? (
         <InlineError
           onRetry={connection.reconnect}
@@ -26,7 +25,7 @@ export function TasksSection() {
       <SettingRow title="媒体库进度" description="管理同步与重建进度">
         {active && <LibraryPauseButton paused={!!active.paused} />}
       </SettingRow>
-      {tasks.isPending && <Skeleton className="h-4 w-40" />}
+      {tasks.isPending && <SettingsLoading />}
       {scans?.length === 0 ? (
         <p className="text-xs text-muted-foreground">还没有媒体库任务。</p>
       ) : null}

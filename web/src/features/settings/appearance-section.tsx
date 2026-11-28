@@ -14,7 +14,7 @@ export function AppearanceSection() {
   const { theme, setTheme } = useTheme()
 
   return (
-    <SettingsSection icon={<MonitorCogIcon className="size-4" />} title="外观">
+    <SettingsSection icon={<MonitorCogIcon />} title="外观">
       <SettingRow title="主题" description="控制应用的明暗色主题" inline>
         <Tabs value={theme} onValueChange={value => setTheme(value as ThemeMode)}>
           <TabsList>

@@ -15,7 +15,7 @@ export function MagnetSourcesSection() {
 
   return (
     <SettingsSection
-      icon={<MagnetIcon className="size-4" />}
+      icon={<MagnetIcon />}
       title="磁力链来源"
       description="以下来源补充影片磁力链接（需要代理）。"
     >

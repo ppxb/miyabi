@@ -16,9 +16,8 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
-import { SettingRow, SettingsSection } from './shared'
+import { SettingRow, SettingsLoading, SettingsSection } from './shared'
 
 const levelOptions = [
   { value: 'preferred', label: '优先' },
@@ -87,13 +86,13 @@ export function DownloadSection() {
   }
 
   return (
-    <SettingsSection icon={<DownloadIcon className="size-4" />} title="下载">
+    <SettingsSection icon={<DownloadIcon />} title="下载">
       {settings.isError ? (
         <InlineError onRetry={() => void settings.refetch()} retrying={settings.isFetching}>
           后端服务暂不可用，无法读取下载设置。
         </InlineError>
       ) : null}
-      {settings.isPending ? <Skeleton className="h-4 w-40" /> : null}
+      {settings.isPending ? <SettingsLoading /> : null}
       {config ? (
         <>
           <SettingRow

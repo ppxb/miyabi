@@ -58,7 +58,7 @@ export function DataSection() {
   }
 
   return (
-    <SettingsSection icon={<DatabaseIcon className="size-4" />} title="数据与缓存">
+    <SettingsSection icon={<DatabaseIcon />} title="数据与缓存">
       {info.isError ? (
         <InlineError onRetry={() => void info.refetch()} retrying={info.isFetching}>
           无法读取数据与缓存统计，请稍后重试。

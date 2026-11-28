@@ -51,13 +51,12 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { GuangyaLoginDialog } from '@/features/settings/guangya-login-dialog'
 import { PanDirectoryDialog } from '@/features/settings/pan-directory-dialog'
 import { PanLoginDialog } from '@/features/settings/pan-login-dialog'
-import { SettingsSection } from '@/features/settings/shared'
+import { SettingsLoading, SettingsSection } from '@/features/settings/shared'
 
 const KIND_LABELS: Record<SourceKind, string> = {
   local: '本地目录',
@@ -132,7 +131,7 @@ export function SourcesSection() {
   }
 
   return (
-    <SettingsSection icon={<HardDriveIcon className="size-4" />} title="存储源">
+    <SettingsSection icon={<HardDriveIcon />} title="存储源">
       {sources.isError ? (
         <InlineError
           onRetry={() => void sources.refetch()}
@@ -151,7 +150,7 @@ export function SourcesSection() {
         </Button>
       </div>
 
-      {sources.isPending ? <Skeleton className="h-4 w-40" /> : null}
+      {sources.isPending ? <SettingsLoading /> : null}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {(sources.data ?? []).map(source => (

@@ -9,7 +9,7 @@ export function PrivacySection() {
   const setNsfwMode = useSettingsStore(state => state.setNsfwMode)
 
   return (
-    <SettingsSection icon={<ShieldIcon className="size-4" />} title="NSFW 保护">
+    <SettingsSection icon={<ShieldIcon />} title="NSFW 保护">
       <SettingRow title="封面隐私模式" description="开启后遮挡影片封面和预览图" inline>
         <Switch checked={nsfwMode} aria-label="封面隐私模式" onCheckedChange={setNsfwMode} />
       </SettingRow>

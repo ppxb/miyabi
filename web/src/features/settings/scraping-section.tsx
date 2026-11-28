@@ -48,7 +48,7 @@ export function ScrapingSection() {
   const update = useUpdateScrapingSources()
   return (
     <SettingsSection
-      icon={<ScanSearchIcon className="size-4" />}
+      icon={<ScanSearchIcon />}
       title="影片刮削"
       description="以下来源补充图片及缺失资料（需要代理）。"
     >
@@ -68,7 +68,7 @@ export function ActorSourcesSection() {
   const update = useUpdateActorSources()
   return (
     <SettingsSection
-      icon={<UserRoundIcon className="size-4" />}
+      icon={<UserRoundIcon />}
       title="演员数据源"
       description="以下来源补充演员档案与图片（需要代理）。"
     >
