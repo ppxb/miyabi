@@ -9,6 +9,28 @@ import (
 	"github.com/ppxb/miyabi/internal/nfo"
 )
 
+func TestDetailSourceRequiresMountedAccount(t *testing.T) {
+	lib, _, _ := libraryFixture(t)
+	ctx := t.Context()
+	film := lib.database.Movie.Create().SetCode("ABP-777").SaveX(ctx)
+	lib.database.File.Create().SetFileID("detail-local").SetName("ABP-777.mp4").SetSize(1).
+		SetAccountID(domain.LocalAccountID).SetRootID(domain.LocalAccountID).
+		SetPath("sub/ABP-777.mp4").SetMovieID(film.ID).ExecX(ctx)
+	lib.database.File.Create().SetFileID("detail-unmounted").SetName("ABP-777-UC.mp4").SetSize(1).
+		SetAccountID("unknown-account").SetRootID("unknown-root").SetMovieID(film.ID).ExecX(ctx)
+
+	detail, err := lib.Movie(ctx, film.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.Source != "" {
+		t.Fatalf("unmounted source badge = %q", detail.Source)
+	}
+	if !detail.HasUncensored {
+		t.Fatal("file flag missing")
+	}
+}
+
 func TestSavedDetailNeedsNoJavDBAndKeepsSourceIdentities(t *testing.T) {
 	lib, _, payload := libraryFixture(t)
 	ctx := t.Context()
@@ -53,6 +75,9 @@ func TestSavedDetailNeedsNoJavDBAndKeepsSourceIdentities(t *testing.T) {
 	}
 	if detail.RatingSource != "fanza" || detail.RatingMax != 10 || detail.Actors[0].Provider != "fanza" || detail.Maker.Provider != "fanza" {
 		t.Fatalf("source identity lost: %+v", detail)
+	}
+	if detail.Source != "115" {
+		t.Fatalf("detail source badge = %q", detail.Source)
 	}
 	if detail.Cover != "/api/library/artwork/full" || len(detail.PreviewImages) != 2 || !strings.Contains(detail.PreviewImages[0].Original, "/previews/0?v=") {
 		t.Fatalf("wrong artwork projection: %+v", detail)

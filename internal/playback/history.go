@@ -7,14 +7,13 @@ import (
 	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
-	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/panaccount"
-	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/ent/watchhistory"
+	"github.com/ppxb/miyabi/internal/movieflags"
 )
 
 const HistoryPageSize = 20
@@ -166,12 +165,6 @@ func (service *Service) History(ctx context.Context, page int) (domain.WatchHist
 	for _, item := range movies {
 		byID[item.ID] = item
 	}
-	historyFiles, err := service.database.File.Query().
-		Where(file.MovieIDIn(ids...)).
-		Select(file.FieldMovieID, file.FieldName, file.FieldAccountID, file.FieldRootID).All(ctx)
-	if err != nil {
-		return result, fmt.Errorf("read history files: %w", err)
-	}
 	accounts, err := service.database.PanAccount.Query().
 		Select(panaccount.FieldAccountID, panaccount.FieldProvider, panaccount.FieldDirectoryID).All(ctx)
 	if err != nil {
@@ -189,44 +182,15 @@ func (service *Service) History(ctx context.Context, page int) (domain.WatchHist
 			mounted[[2]string{account.AccountID, account.DirectoryID}] = true
 		}
 	}
-	cloud := make(map[int]string, len(historyFiles))
-	subtitled := make(map[int]bool, len(historyFiles))
-	for _, record := range historyFiles {
-		if record.MovieID == nil {
-			continue
-		}
-		id := *record.MovieID
-		if record.AccountID != "" && record.AccountID != domain.LocalAccountID &&
-			mounted[[2]string{record.AccountID, record.RootID}] {
-			provider := providers[record.AccountID]
-			if provider == "" {
-				provider = "115"
-			}
-			if cloud[id] != "guangya" {
-				cloud[id] = provider
-			}
-		}
-		if subtitlemeta.HasChineseSubtitle(record.Name) {
-			subtitled[id] = true
-		}
-	}
-	tracks, err := service.database.Subtitle.Query().
-		Where(subtitle.MovieIDIn(ids...)).
-		Select(subtitle.FieldMovieID, subtitle.FieldName).All(ctx)
+	flags, err := movieflags.Load(ctx, service.database, ids, providers, mounted)
 	if err != nil {
-		return result, fmt.Errorf("read history subtitles: %w", err)
-	}
-	for _, track := range tracks {
-		if subtitlemeta.HasChineseSubtitle(track.Name) {
-			subtitled[track.MovieID] = true
-		}
+		return result, err
 	}
 	for _, record := range records {
 		item, ok := byID[record.MovieID]
 		if !ok {
 			continue
 		}
-		source := cloud[record.MovieID]
 		actors := make([]domain.Actor, 0, len(item.Edges.Actors))
 		for _, person := range item.Edges.Actors {
 			actors = append(actors, domain.Actor{Provider: person.Provider, ID: person.SourceID, Name: person.Name})
@@ -235,7 +199,7 @@ func (service *Service) History(ctx context.Context, page int) (domain.WatchHist
 		result.Items = append(result.Items, domain.WatchHistoryItem{
 			MovieID: item.ID, Code: item.Code, Title: item.Title, Cover: item.Cover, Poster: item.Poster,
 			Rating: domain.NormalizeRating10(domain.ValueOrZero(item.Rating), doc.RatingMax),
-			Actors: actors, Source: source, HasSubtitle: subtitled[record.MovieID],
+			Actors: actors, Source: flags.Source[record.MovieID], HasSubtitle: flags.HasSubtitle[record.MovieID],
 			WatchedAt: record.WatchedAt, Position: record.Position, Duration: record.Duration,
 		})
 	}

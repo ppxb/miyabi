@@ -47,7 +47,7 @@ func TestStartMoviePlaysLocalFile(t *testing.T) {
 	}
 
 	abs, err := service.LocateLocalFile(ctx, "local-abc")
-	if err != nil || abs != filepath.Join(root, rel) {
+	if err != nil || abs != canonicalPath(filepath.Join(root, rel)) {
 		t.Fatalf("locate local file = %q, %v", abs, err)
 	}
 

@@ -14,7 +14,13 @@ function HistoryRoute() {
   return (
     <HistoryPage
       page={search.page ?? 1}
-      onPageChange={page => void navigate({ search: page > 1 ? { page } : {}, resetScroll: false })}
+      onPageChange={(page, options) =>
+        void navigate({
+          search: page > 1 ? { page } : {},
+          resetScroll: false,
+          replace: options?.replace
+        })
+      }
     />
   )
 }

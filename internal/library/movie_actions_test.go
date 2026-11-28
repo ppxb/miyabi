@@ -196,7 +196,10 @@ func TestRescrapeFailedQueuesOnlyFailedMoviesAndMarksThemPending(t *testing.T) {
 	db.File.Create().SetFileID("102").SetName("IPX-002.mp4").SetSize(1 << 30).
 		SetAccountID(payload.Source.AccountID).SetRootID(payload.Source.Directory.ID).SetMovieID(failed.ID).ExecX(ctx)
 
-	root := t.TempDir()
+	root, err := canonicalDirectory(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	lib.localSources = func(context.Context) ([]domain.LocalScanTarget, error) {
 		return []domain.LocalScanTarget{{Path: root}}, nil
 	}

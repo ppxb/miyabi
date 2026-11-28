@@ -11,20 +11,18 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
-	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/drive"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/ent/predicate"
-	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/ent/task"
 	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/library/scan"
-	"github.com/ppxb/miyabi/internal/magnet"
+	"github.com/ppxb/miyabi/internal/movieflags"
 	"github.com/ppxb/miyabi/internal/syncx"
 	"github.com/ppxb/miyabi/internal/tasks"
 )
@@ -654,6 +652,20 @@ func sourceProviders(sources []domain.LibrarySource) map[string]string {
 	return result
 }
 
+// sourceBadgeMaps resolves the provider names and mounted account/directory
+// pairs used to mark a movie's source badge.
+func sourceBadgeMaps(sources []domain.LibrarySource) (map[string]string, map[[2]string]bool) {
+	providers := sourceProviders(sources)
+	mounted := make(map[[2]string]bool, len(sources))
+	for _, source := range sources {
+		if source.AccountID == "" || source.AccountID == domain.LocalAccountID {
+			continue
+		}
+		mounted[[2]string{source.AccountID, source.Directory.ID}] = true
+	}
+	return providers, mounted
+}
+
 // markFileFlags derives the source badge and the file-name flags (subtitle,
 // uncensored, cracked) for one page of movies from a single files query, then
 // checks indexed sidecar subtitles. Keeping the badges batched per page keeps
@@ -662,65 +674,27 @@ func (s *Service) markFileFlags(ctx context.Context, movies []Movie, sources []d
 	if len(movies) == 0 {
 		return nil
 	}
-	providers := sourceProviders(sources)
-	cloud := make(map[[2]string]bool, len(sources))
-	for _, source := range sources {
-		if source.AccountID == "" || source.AccountID == domain.LocalAccountID {
-			continue
-		}
-		cloud[[2]string{source.AccountID, source.Directory.ID}] = true
-	}
+	providers, mounted := sourceBadgeMaps(sources)
 	ids := make([]int, len(movies))
-	index := make(map[int]*Movie, len(movies))
 	for i := range movies {
 		ids[i] = movies[i].ID
-		index[movies[i].ID] = &movies[i]
 	}
-	files, err := s.database.File.Query().
-		Where(file.MovieIDIn(ids...)).
-		Select(file.FieldMovieID, file.FieldAccountID, file.FieldRootID, file.FieldName).All(ctx)
+	flags, err := movieflags.Load(ctx, s.database, ids, providers, mounted)
 	if err != nil {
-		return fmt.Errorf("read library files: %w", err)
+		return err
 	}
-	for _, record := range files {
-		if record.MovieID == nil {
-			continue
+	for i := range movies {
+		if source, ok := flags.Source[movies[i].ID]; ok {
+			movies[i].Source = source
 		}
-		item, ok := index[*record.MovieID]
-		if !ok {
-			continue
+		if flags.HasSubtitle[movies[i].ID] {
+			movies[i].HasSubtitle = true
 		}
-		if cloud[[2]string{record.AccountID, record.RootID}] {
-			provider := providers[record.AccountID]
-			if provider == "" {
-				provider = "115"
-			}
-			if item.Source != "guangya" {
-				item.Source = provider
-			}
+		if flags.HasUncensored[movies[i].ID] {
+			movies[i].HasUncensored = true
 		}
-		if subtitlemeta.HasChineseSubtitle(record.Name) {
-			item.HasSubtitle = true
-		}
-		inferred := magnet.Infer(record.Name)
-		if inferred.HasUncensored {
-			item.HasUncensored = true
-		}
-		if inferred.HasCracked {
-			item.HasCracked = true
-		}
-	}
-	tracks, err := s.database.Subtitle.Query().
-		Where(subtitle.MovieIDIn(ids...)).
-		Select(subtitle.FieldMovieID, subtitle.FieldName).All(ctx)
-	if err != nil {
-		return fmt.Errorf("read library subtitles: %w", err)
-	}
-	for _, track := range tracks {
-		if subtitlemeta.HasChineseSubtitle(track.Name) {
-			if item, ok := index[track.MovieID]; ok {
-				item.HasSubtitle = true
-			}
+		if flags.HasCracked[movies[i].ID] {
+			movies[i].HasCracked = true
 		}
 	}
 	return nil

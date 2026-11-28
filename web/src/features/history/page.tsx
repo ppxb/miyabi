@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { HISTORY_PAGE_SIZE, useClearHistory, useHistory } from '@/api/history'
 import { AppPage } from '@/components/app-page'
@@ -27,12 +27,25 @@ export function HistoryPage({
   onPageChange
 }: {
   page: number
-  onPageChange: (page: number) => void
+  onPageChange: (page: number, options?: { replace?: boolean }) => void
 }) {
   const history = useHistory(page)
   const clear = useClearHistory()
   const [confirming, setConfirming] = useState(false)
   const [playingId, setPlayingId] = useState<number | null>(null)
+  const totalPages = Math.max(1, Math.ceil((history.data?.total ?? 0) / HISTORY_PAGE_SIZE))
+  const dataPage = history.data?.page
+  // Only the current page's own result may trigger a redirect; placeholder
+  // data from the previous page can carry an outdated total.
+  const pageOutOfRange = dataPage === page && page > totalPages
+  // keepPreviousData keeps the out-of-range page while the redirect target
+  // loads; keep showing the redirect state instead of an empty history.
+  const redirecting =
+    pageOutOfRange || (history.isPlaceholderData && dataPage !== undefined && dataPage > totalPages)
+
+  useEffect(() => {
+    if (pageOutOfRange) onPageChange(totalPages, { replace: true })
+  }, [pageOutOfRange, totalPages, onPageChange])
 
   return (
     <AppPage>
@@ -53,6 +66,8 @@ export function HistoryPage({
           onRetry={() => void history.refetch()}
           retrying={history.isFetching}
         />
+      ) : redirecting ? (
+        <EmptyState className="min-h-0 flex-1 py-12" title="正在返回最后一页…" />
       ) : history.data.items.length === 0 ? (
         <EmptyState className="min-h-0 flex-1 py-12" title="还没有观看记录" />
       ) : (
@@ -72,7 +87,7 @@ export function HistoryPage({
           </MovieGridLayout>
           <ListPagination
             page={page}
-            totalPages={Math.max(1, Math.ceil(history.data.total / HISTORY_PAGE_SIZE))}
+            totalPages={totalPages}
             hasMore={history.data.has_more}
             disabled={history.isFetching}
             onPageChange={onPageChange}

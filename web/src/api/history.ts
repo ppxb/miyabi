@@ -35,8 +35,7 @@ export const historyKeys = {
 export function useHistory(page: number) {
   return useQuery({
     queryKey: historyKeys.page(page),
-    queryFn: ({ signal }) =>
-      apiGet<WatchHistoryPage>('/api/history', { page, limit: HISTORY_PAGE_SIZE }, signal),
+    queryFn: ({ signal }) => apiGet<WatchHistoryPage>('/api/history', { page }, signal),
     placeholderData: keepPreviousData
   })
 }

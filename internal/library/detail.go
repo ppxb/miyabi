@@ -5,10 +5,9 @@ import (
 	"fmt"
 
 	"github.com/ppxb/miyabi/internal/domain"
-	subtitlemeta "github.com/ppxb/miyabi/internal/domain/subtitle"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/movie"
-	"github.com/ppxb/miyabi/internal/magnet"
+	"github.com/ppxb/miyabi/internal/movieflags"
 	"github.com/ppxb/miyabi/internal/nfo"
 )
 
@@ -76,44 +75,17 @@ func (s *Service) Movie(ctx context.Context, id int) (MovieDetail, error) {
 		detail.PreviewImages = append(detail.PreviewImages, domain.PreviewImage{Original: url, Thumbnail: thumbnail})
 	}
 	detail.HasPreview = len(detail.PreviewImages) > 0
-	// Derive the Chinese-subtitle flag from file and local subtitle names so it
-	// survives metadata rescrapes and needs no dedicated column.
-	files, err := record.QueryFiles().All(ctx)
+	// Derive the display flags from indexed files and subtitles so they survive
+	// metadata rescrapes and match the library lists.
+	providers, mounted := sourceBadgeMaps(s.mergeSources(ctx, s.mountList(ctx)))
+	flags, err := movieflags.Load(ctx, s.database, []int{record.ID}, providers, mounted)
 	if err != nil {
 		return MovieDetail{}, err
 	}
-	providers := sourceProviders(s.mergeSources(ctx, s.mountList(ctx)))
-	for _, file := range files {
-		if file.AccountID != "" && file.AccountID != domain.LocalAccountID {
-			if providers[file.AccountID] == "guangya" {
-				detail.Source = "guangya"
-			} else if detail.Source != "guangya" {
-				detail.Source = "115"
-			}
-		}
-		if !detail.HasSubtitle && subtitlemeta.HasChineseSubtitle(file.Name) {
-			detail.HasSubtitle = true
-		}
-		inf := magnet.Infer(file.Name)
-		if inf.HasUncensored {
-			detail.HasUncensored = true
-		}
-		if inf.HasCracked {
-			detail.HasCracked = true
-		}
-	}
-	if !detail.HasSubtitle {
-		tracks, err := record.QuerySubtitles().All(ctx)
-		if err != nil {
-			return MovieDetail{}, err
-		}
-		for _, track := range tracks {
-			if subtitlemeta.HasChineseSubtitle(track.Name) {
-				detail.HasSubtitle = true
-				break
-			}
-		}
-	}
+	detail.Source = flags.Source[record.ID]
+	detail.HasSubtitle = flags.HasSubtitle[record.ID]
+	detail.HasUncensored = flags.HasUncensored[record.ID]
+	detail.HasCracked = flags.HasCracked[record.ID]
 	return detail, nil
 }
 
