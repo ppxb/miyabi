@@ -36,7 +36,23 @@ export function useLogs() {
   return useQuery({
     queryKey: dataKeys.logs,
     queryFn: ({ signal }) => apiGet<LogInfo>('/api/settings/logs', { limit: 500 }, signal),
-    refetchInterval: 3000
+    refetchInterval: 5000
+  })
+}
+
+export function useRefreshDataInfo() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiGet<DataInfo>('/api/settings/system', { refresh: 1 }),
+    meta: { errorTitle: '刷新统计失败' },
+    onMutate: () => ({ previous: queryClient.getQueryData<DataInfo>(dataKeys.system) }),
+    onSuccess: (info, _variables, context) => {
+      // A cleanup or refetch may have replaced the cache while the forced
+      // scan was in flight; keep that newer result.
+      if (queryClient.getQueryData(dataKeys.system) === context?.previous) {
+        queryClient.setQueryData(dataKeys.system, info)
+      }
+    }
   })
 }
 

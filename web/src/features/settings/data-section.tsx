@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { describeApiError } from '@/api/client'
-import { useClearCache, useDataInfo, useLogs } from '@/api/data'
+import { useClearCache, useDataInfo, useLogs, useRefreshDataInfo } from '@/api/data'
 import { InlineError } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,16 +24,24 @@ const numberFormat = new Intl.NumberFormat('zh-CN')
 export function DataSection() {
   const info = useDataInfo()
   const logs = useLogs()
+  const refreshInfo = useRefreshDataInfo()
   const clearCache = useClearCache()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const cache = info.data?.cache
   const logRef = useRef<HTMLPreElement>(null)
+  // Follow new lines only while the user is already at the bottom, so reading
+  // older entries is not interrupted by the refresh.
+  const stickToBottom = useRef(true)
 
-  // Keep the newest lines in view as the log refreshes.
   useEffect(() => {
     const el = logRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (el && stickToBottom.current) el.scrollTop = el.scrollHeight
   }, [logs.data])
+
+  function handleLogScroll() {
+    const el = logRef.current
+    if (el) stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 8
+  }
 
   function openConfirmation() {
     clearCache.reset()
@@ -61,10 +69,10 @@ export function DataSection() {
           variant="outline"
           size="icon"
           title="刷新统计"
-          disabled={info.isFetching || clearCache.isPending}
-          onClick={() => void info.refetch()}
+          disabled={info.isFetching || refreshInfo.isPending || clearCache.isPending}
+          onClick={() => refreshInfo.mutate()}
         >
-          {info.isFetching ? <Spinner /> : <RefreshCwIcon />}
+          {info.isFetching || refreshInfo.isPending ? <Spinner /> : <RefreshCwIcon />}
         </Button>
       </SettingRow>
       <SettingRow title="数据库" description="包含媒体库索引与应用设置">
@@ -91,6 +99,7 @@ export function DataSection() {
       <div className="overflow-hidden rounded-xl border bg-muted/30">
         <pre
           ref={logRef}
+          onScroll={handleLogScroll}
           className="h-64 overflow-auto p-3 font-sans text-xs leading-5 break-words whitespace-pre-wrap text-muted-foreground"
         >
           {logs.isPending
@@ -117,7 +126,11 @@ export function DataSection() {
           type="button"
           variant="destructive"
           disabled={
-            clearCache.isPending || info.isError || !cache || cache.unused_entry_count === 0
+            clearCache.isPending ||
+            refreshInfo.isPending ||
+            info.isError ||
+            !cache ||
+            cache.unused_entry_count === 0
           }
           onClick={openConfirmation}
         >

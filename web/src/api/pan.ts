@@ -151,7 +151,9 @@ export function usePanAccountStatus(accountID: string) {
         undefined,
         signal
       ),
-    enabled: accountID !== ''
+    enabled: accountID !== '',
+    // The profile comes from a remote provider call and rarely changes.
+    staleTime: 6 * 60 * 60 * 1000
   })
 }
 

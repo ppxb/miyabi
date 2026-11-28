@@ -21,6 +21,10 @@ func (dummyDataStub) Info(context.Context) (maintenance.Info, error) {
 	return maintenance.Info{DataDirectory: "/test/dir"}, nil
 }
 
+func (dummyDataStub) RefreshInfo(context.Context) (maintenance.Info, error) {
+	return maintenance.Info{DataDirectory: "/test/dir"}, nil
+}
+
 func (dummyDataStub) ClearCache(context.Context) (maintenance.Info, error) {
 	return maintenance.Info{}, nil
 }

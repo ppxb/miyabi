@@ -3,10 +3,15 @@ package drive
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/pan"
 )
+
+// accountStatusTTL bounds how long an account profile may be reused. The
+// profile comes from a provider call; mount changes invalidate it explicitly.
+const accountStatusTTL = 6 * time.Hour
 
 func (d *Drive) accountSessionFor(ctx context.Context, accountID string) (*accountSession, error) {
 	record, err := d.accountRecord(ctx, accountID)
@@ -28,6 +33,10 @@ func (d *Drive) accountSessionFor(ctx context.Context, accountID string) (*accou
 
 // AccountStatusFor reports one stored account's profile and mounted directory.
 func (d *Drive) AccountStatusFor(ctx context.Context, accountID string) (AccountStatus, error) {
+	if status, ok := d.cachedAccountStatus(accountID); ok {
+		return status, nil
+	}
+	generation := d.accountStatusCacheGeneration()
 	session, err := d.accountSessionFor(ctx, accountID)
 	if err != nil {
 		return AccountStatus{}, err
@@ -43,7 +52,40 @@ func (d *Drive) AccountStatusFor(ctx context.Context, accountID string) (Account
 		directory := record.Directory.LibraryDirectory
 		status.Directory = &directory
 	}
+	d.storeAccountStatus(accountID, status, generation)
 	return status, nil
+}
+
+func (d *Drive) cachedAccountStatus(accountID string) (AccountStatus, bool) {
+	d.statusMu.Lock()
+	defer d.statusMu.Unlock()
+	entry, ok := d.accountStatuses[accountID]
+	if !ok || d.now().Sub(entry.cachedAt) >= accountStatusTTL {
+		return AccountStatus{}, false
+	}
+	return entry.status, true
+}
+
+func (d *Drive) accountStatusCacheGeneration() uint64 {
+	d.statusMu.Lock()
+	defer d.statusMu.Unlock()
+	return d.statusGeneration
+}
+
+func (d *Drive) storeAccountStatus(accountID string, status AccountStatus, generation uint64) {
+	d.statusMu.Lock()
+	// Do not restore a profile read before a concurrent mount or account change.
+	if d.statusGeneration == generation {
+		d.accountStatuses[accountID] = accountStatusCacheEntry{status: status, cachedAt: d.now()}
+	}
+	d.statusMu.Unlock()
+}
+
+func (d *Drive) invalidateAccountStatus(accountID string) {
+	d.statusMu.Lock()
+	d.statusGeneration++
+	delete(d.accountStatuses, accountID)
+	d.statusMu.Unlock()
 }
 
 // FilesFor lists a directory of a stored account.

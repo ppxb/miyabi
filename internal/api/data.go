@@ -10,6 +10,7 @@ import (
 
 type MaintenanceManager interface {
 	Info(context.Context) (maintenance.Info, error)
+	RefreshInfo(context.Context) (maintenance.Info, error)
 	ClearCache(context.Context) (maintenance.Info, error)
 }
 
@@ -32,7 +33,11 @@ func dataLogsHandler(logs LogReader) gin.HandlerFunc {
 
 func dataInfoHandler(data MaintenanceManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		info, err := data.Info(c.Request.Context())
+		read := data.Info
+		if c.Query("refresh") == "1" {
+			read = data.RefreshInfo
+		}
+		info, err := read(c.Request.Context())
 		respond(c, info, err)
 	}
 }

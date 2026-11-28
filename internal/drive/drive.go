@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
@@ -44,6 +45,11 @@ type mountRecord struct {
 	domain.LibraryDirectory
 }
 
+type accountStatusCacheEntry struct {
+	status   AccountStatus
+	cachedAt time.Time
+}
+
 func (r mountRecord) source() domain.LibrarySource {
 	return domain.LibrarySource{
 		Provider:  r.Provider,
@@ -69,6 +75,13 @@ type Drive struct {
 	guangyaLogin  guangyaLogin
 	mountListener MountListener
 	media         mediaResolver
+
+	// Account profiles come from the provider; reuse them and invalidate when
+	// the stored account or mount changes.
+	statusMu         sync.Mutex
+	accountStatuses  map[string]accountStatusCacheEntry
+	statusGeneration uint64
+	now              func() time.Time
 
 	// Credential/authorization versions are runtime invalidation counters for
 	// in-flight sessions; account data itself lives in PanAccount rows.
@@ -100,6 +113,8 @@ func newDrive(_ context.Context, db *ent.Client, providers map[string]Client, gy
 		refreshStop:         make(chan struct{}),
 		accountCredVersions: make(map[string]uint64),
 		accountAuthVersions: make(map[string]uint64),
+		accountStatuses:     make(map[string]accountStatusCacheEntry),
+		now:                 time.Now,
 	}
 	d.login.drive = d
 	d.guangyaLogin.drive = d

@@ -16,14 +16,20 @@ import (
 )
 
 type dataStub struct {
-	info    maintenance.Info
-	err     error
-	reads   int
-	cleared int
+	info      maintenance.Info
+	err       error
+	reads     int
+	refreshed int
+	cleared   int
 }
 
 func (stub *dataStub) Info(context.Context) (maintenance.Info, error) {
 	stub.reads++
+	return stub.info, stub.err
+}
+
+func (stub *dataStub) RefreshInfo(context.Context) (maintenance.Info, error) {
+	stub.refreshed++
 	return stub.info, stub.err
 }
 
@@ -34,13 +40,15 @@ func (stub *dataStub) ClearCache(context.Context) (maintenance.Info, error) {
 
 func TestDataEndpointsReturnUncachedStatsAndCleanupErrors(t *testing.T) {
 	for _, scenario := range []struct {
-		name   string
-		method string
-		path   string
-		err    error
-		status int
+		name    string
+		method  string
+		path    string
+		refresh bool
+		err     error
+		status  int
 	}{
 		{name: "statistics", method: http.MethodGet, path: "/api/settings/system", status: http.StatusOK},
+		{name: "statistics refresh", method: http.MethodGet, path: "/api/settings/system?refresh=1", refresh: true, status: http.StatusOK},
 		{name: "cleanup", method: http.MethodDelete, path: "/api/settings/cache", status: http.StatusOK},
 		{name: "busy", method: http.MethodDelete, path: "/api/settings/cache", err: maintenance.ErrCacheBusy, status: http.StatusConflict},
 		{name: "cleanup failure", method: http.MethodDelete, path: "/api/settings/cache", err: errors.New("cleanup failed"), status: http.StatusInternalServerError},
@@ -57,9 +65,19 @@ func TestDataEndpointsReturnUncachedStatsAndCleanupErrors(t *testing.T) {
 			if response.Code != scenario.status || response.Header().Get("Cache-Control") != "no-store" {
 				t.Fatalf("status=%d headers=%v body=%s", response.Code, response.Header(), response.Body)
 			}
-			if (scenario.method == http.MethodGet && (stub.reads != 1 || stub.cleared != 0)) ||
-				(scenario.method == http.MethodDelete && (stub.reads != 0 || stub.cleared != 1)) {
-				t.Fatalf("unexpected data operations: reads=%d cleared=%d", stub.reads, stub.cleared)
+			switch {
+			case scenario.method == http.MethodDelete:
+				if stub.reads != 0 || stub.refreshed != 0 || stub.cleared != 1 {
+					t.Fatalf("unexpected data operations: reads=%d refreshed=%d cleared=%d", stub.reads, stub.refreshed, stub.cleared)
+				}
+			case scenario.refresh:
+				if stub.reads != 0 || stub.refreshed != 1 || stub.cleared != 0 {
+					t.Fatalf("unexpected data operations: reads=%d refreshed=%d cleared=%d", stub.reads, stub.refreshed, stub.cleared)
+				}
+			default:
+				if stub.reads != 1 || stub.refreshed != 0 || stub.cleared != 0 {
+					t.Fatalf("unexpected data operations: reads=%d refreshed=%d cleared=%d", stub.reads, stub.refreshed, stub.cleared)
+				}
 			}
 			if scenario.err != nil {
 				var failure struct {

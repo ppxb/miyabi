@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/ent"
@@ -88,6 +89,49 @@ func loadTestSetting[T any](ctx context.Context, db *ent.Client, key string) (T,
 		return value, false, err
 	}
 	return value, true, nil
+}
+
+func TestInfoReusesCacheStatsWithinTTL(t *testing.T) {
+	service := dataFixture(t)
+	ctx := t.Context()
+	base := time.Unix(1700000000, 0)
+	service.now = func() time.Time { return base }
+	dataArtwork(t, service, 1)
+
+	first, err := service.Info(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Cache.EntryCount != 3 {
+		t.Fatalf("initial cache entries = %d", first.Cache.EntryCount)
+	}
+
+	dataArtwork(t, service, 2)
+	cached, err := service.Info(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cached.Cache.EntryCount != first.Cache.EntryCount {
+		t.Fatalf("stats were rescanned before the TTL: %+v", cached.Cache)
+	}
+
+	service.now = func() time.Time { return base.Add(statsTTL + time.Second) }
+	refreshed, err := service.Info(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refreshed.Cache.EntryCount != first.Cache.EntryCount+3 {
+		t.Fatalf("stats were not rescanned after the TTL: %+v", refreshed.Cache)
+	}
+
+	dataArtwork(t, service, 3)
+	forced, err := service.RefreshInfo(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if forced.Cache.EntryCount != first.Cache.EntryCount+6 {
+		t.Fatalf("refresh did not rescan the cache: %+v", forced.Cache)
+	}
 }
 
 func TestDataCleanupPreservesAllLibraryAndUnfinishedTaskReferences(t *testing.T) {

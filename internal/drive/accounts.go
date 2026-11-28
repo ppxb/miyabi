@@ -154,6 +154,7 @@ func (d *Drive) saveAccountMount(ctx context.Context, accountID string, mount mo
 		SetDirectoryName(mount.Name).
 		SetDirectoryPath(mount.Path).
 		Save(ctx)
+	d.invalidateAccountStatus(accountID)
 	if err == nil && updated == 0 {
 		return pan.ErrUnauthorized
 	}
@@ -165,6 +166,7 @@ func (d *Drive) removeAccount(ctx context.Context, accountID string) error {
 		return nil
 	}
 	removed, err := d.database.PanAccount.Delete().Where(panaccount.AccountID(accountID)).Exec(ctx)
+	d.invalidateAccountStatus(accountID)
 	if err != nil || removed == 0 {
 		return err
 	}

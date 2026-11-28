@@ -27,6 +27,10 @@ var ErrCacheBusy = domain.E(domain.KindBusy, "封面正在处理或缓存正在�
 // Pruning never uses this cache; ClearCache always recomputes references.
 const retainedTTL = 30 * time.Minute
 
+// statsTTL bounds how often Info rescans the image cache directory. The scan
+// reads every cached file, and ClearCache always recomputes the counts.
+const statsTTL = 30 * time.Second
+
 type Info struct {
 	DataDirectory     string                `json:"data_directory"`
 	DatabaseSizeBytes int64                 `json:"database_size_bytes"`
@@ -110,7 +114,12 @@ type Service struct {
 	mu         sync.Mutex
 	retained   map[string]bool
 	retainedAt time.Time
-	now        func() time.Time
+	stats      mediaimage.CacheStats
+	statsAt    time.Time
+	// statsGeneration invalidates a Stats scan that was already running when
+	// a cleanup changed the cache contents.
+	statsGeneration uint64
+	now             func() time.Time
 }
 
 func New(directory string, db *ent.Client, images *mediaimage.Cache, scrapeSvc ArtworkLocker) (*Service, error) {
@@ -127,6 +136,13 @@ func (service *Service) Info(ctx context.Context) (Info, error) {
 		return Info{}, err
 	}
 	return service.info(ctx, retained)
+}
+
+// RefreshInfo recomputes the displayed statistics instead of reusing the short
+// cache kept for repeated Info calls.
+func (service *Service) RefreshInfo(ctx context.Context) (Info, error) {
+	service.invalidateStats()
+	return service.Info(ctx)
 }
 
 // cachedRetainedArtwork reuses the last reference snapshot for a short window so
@@ -154,6 +170,36 @@ func (service *Service) storeRetained(retained map[string]bool) {
 	service.mu.Unlock()
 }
 
+func (service *Service) cachedStats(ctx context.Context, retained map[string]bool) (mediaimage.CacheStats, error) {
+	service.mu.Lock()
+	if !service.statsAt.IsZero() && service.now().Sub(service.statsAt) < statsTTL {
+		stats := service.stats
+		service.mu.Unlock()
+		return stats, nil
+	}
+	generation := service.statsGeneration
+	service.mu.Unlock()
+	stats, err := service.images.Stats(ctx, retained)
+	if err != nil {
+		return mediaimage.CacheStats{}, err
+	}
+	service.mu.Lock()
+	// A cleanup that finished during the scan must not be overwritten.
+	if service.statsGeneration == generation {
+		service.stats = stats
+		service.statsAt = service.now()
+	}
+	service.mu.Unlock()
+	return stats, nil
+}
+
+func (service *Service) invalidateStats() {
+	service.mu.Lock()
+	service.statsGeneration++
+	service.statsAt = time.Time{}
+	service.mu.Unlock()
+}
+
 func (service *Service) ClearCache(ctx context.Context) (Info, error) {
 	if err := ctx.Err(); err != nil {
 		return Info{}, err
@@ -167,8 +213,12 @@ func (service *Service) ClearCache(ctx context.Context) (Info, error) {
 	if err != nil {
 		return Info{}, err
 	}
-	if err := service.images.Prune(ctx, retained); err != nil {
-		return Info{}, err
+	pruneErr := service.images.Prune(ctx, retained)
+	// Pruning may delete some files before failing; never return the counts
+	// from before the cleanup in either case.
+	service.invalidateStats()
+	if pruneErr != nil {
+		return Info{}, pruneErr
 	}
 	service.storeRetained(retained)
 	return service.info(ctx, retained)
@@ -176,11 +226,11 @@ func (service *Service) ClearCache(ctx context.Context) (Info, error) {
 
 func (service *Service) info(ctx context.Context, retained map[string]bool) (Info, error) {
 	result := Info{DataDirectory: service.directory}
-	var err error
-	result.Cache, err = service.images.Stats(ctx, retained)
+	cache, err := service.cachedStats(ctx, retained)
 	if err != nil {
 		return Info{}, err
 	}
+	result.Cache = cache
 	if err := ctx.Err(); err != nil {
 		return Info{}, err
 	}
