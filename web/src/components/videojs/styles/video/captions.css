@@ -15,6 +15,26 @@
       transition-delay: var(--media-caption-track-delay);
     }
 
+    /* The WebKit display layer is a full-width block. Shrink it to the caption
+       text so the rounded background does not become a full-width banner. */
+    video::-webkit-media-text-track-display {
+      overflow: visible !important;
+      box-sizing: border-box;
+      width: fit-content !important;
+      max-width: 100%;
+      left: 50% !important;
+      right: auto !important;
+      transform: translateX(-50%);
+      padding: 0.25em 0.6em;
+      border-radius: var(--media-popup-radius);
+      background: var(--media-backdrop);
+    }
+
+    video::-webkit-media-text-track-display-backdrop {
+      border-radius: var(--media-popup-radius);
+      background: var(--media-backdrop);
+    }
+
     :scope[data-controls-visible] {
       --media-caption-track-y: var(--media-caption-controls-y);
     }
