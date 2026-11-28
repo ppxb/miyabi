@@ -8,6 +8,37 @@ import (
 	"github.com/ppxb/miyabi/internal/domain"
 )
 
+func TestWatchHistorySourceUsesMountedProvider(t *testing.T) {
+	ctx := context.Background()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	film := store.Client.Movie.Create().SetCode("ABP-002").SetTitle("Guangya").SaveX(ctx)
+	store.Client.File.Create().SetFileID("f2").SetName("ABP-002.mp4").SetSize(1024).
+		SetAccountID("200").SetRootID("20").SetMovieID(film.ID).ExecX(ctx)
+	account := store.Client.PanAccount.Create().SetAccountID("200").SetProvider("guangya").
+		SetDirectoryID("20").SaveX(ctx)
+
+	service := &Service{database: store.Client}
+	if err := service.SaveProgress(ctx, film.ID, "f2", 30, 100, nil); err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.History(ctx, 1)
+	if err != nil || len(page.Items) != 1 || page.Items[0].Source != "guangya" {
+		t.Fatalf("history source = %+v, %v", page.Items, err)
+	}
+
+	// The badge follows the mounted source, matching the library card.
+	store.Client.PanAccount.UpdateOne(account).SetDirectoryID("").ExecX(ctx)
+	page, err = service.History(ctx, 1)
+	if err != nil || len(page.Items) != 1 || page.Items[0].Source != "" {
+		t.Fatalf("unmounted history source = %+v, %v", page.Items, err)
+	}
+}
+
 func TestWatchHistorySaveResumeAndClear(t *testing.T) {
 	ctx := context.Background()
 	store, err := database.Open(ctx, t.TempDir())

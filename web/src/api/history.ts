@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { apiDelete, apiGet, apiPost } from '@/api/client'
+import { apiDelete, apiGet } from '@/api/client'
+import { libraryKeys } from '@/api/library'
 
 export const HISTORY_PAGE_SIZE = 20
 
@@ -44,14 +45,13 @@ export function useClearHistory() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => apiDelete<{ removed: number }>('/api/history'),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: historyKeys.all })
-  })
-}
-
-export function useRemoveHistory() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (ids: number[]) => apiPost<{ removed: number }>('/api/history/remove', { ids }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: historyKeys.all })
+    meta: { errorTitle: '清空观看历史失败' },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: historyKeys.all })
+      // The finished badge on library cards is derived from saved history.
+      for (const queryKey of libraryKeys.cards) {
+        void queryClient.invalidateQueries({ queryKey })
+      }
+    }
   })
 }

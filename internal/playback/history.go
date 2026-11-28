@@ -12,6 +12,7 @@ import (
 	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/file"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/ent/panaccount"
 	"github.com/ppxb/miyabi/internal/ent/subtitle"
 	"github.com/ppxb/miyabi/internal/ent/watchhistory"
 )
@@ -167,19 +168,43 @@ func (service *Service) History(ctx context.Context, page int) (domain.WatchHist
 	}
 	historyFiles, err := service.database.File.Query().
 		Where(file.MovieIDIn(ids...)).
-		Select(file.FieldMovieID, file.FieldName, file.FieldAccountID).All(ctx)
+		Select(file.FieldMovieID, file.FieldName, file.FieldAccountID, file.FieldRootID).All(ctx)
 	if err != nil {
 		return result, fmt.Errorf("read history files: %w", err)
 	}
-	cloud := make(map[int]bool, len(historyFiles))
+	accounts, err := service.database.PanAccount.Query().
+		Select(panaccount.FieldAccountID, panaccount.FieldProvider, panaccount.FieldDirectoryID).All(ctx)
+	if err != nil {
+		return result, fmt.Errorf("read history accounts: %w", err)
+	}
+	providers := make(map[string]string, len(accounts))
+	mounted := make(map[[2]string]bool, len(accounts))
+	for _, account := range accounts {
+		provider := account.Provider
+		if provider == "" {
+			provider = "115"
+		}
+		providers[account.AccountID] = provider
+		if account.DirectoryID != "" {
+			mounted[[2]string{account.AccountID, account.DirectoryID}] = true
+		}
+	}
+	cloud := make(map[int]string, len(historyFiles))
 	subtitled := make(map[int]bool, len(historyFiles))
 	for _, record := range historyFiles {
 		if record.MovieID == nil {
 			continue
 		}
 		id := *record.MovieID
-		if record.AccountID != "" && record.AccountID != domain.LocalAccountID {
-			cloud[id] = true
+		if record.AccountID != "" && record.AccountID != domain.LocalAccountID &&
+			mounted[[2]string{record.AccountID, record.RootID}] {
+			provider := providers[record.AccountID]
+			if provider == "" {
+				provider = "115"
+			}
+			if cloud[id] != "guangya" {
+				cloud[id] = provider
+			}
 		}
 		if subtitlemeta.HasChineseSubtitle(record.Name) {
 			subtitled[id] = true
@@ -201,10 +226,7 @@ func (service *Service) History(ctx context.Context, page int) (domain.WatchHist
 		if !ok {
 			continue
 		}
-		source := ""
-		if cloud[record.MovieID] {
-			source = "115"
-		}
+		source := cloud[record.MovieID]
 		actors := make([]domain.Actor, 0, len(item.Edges.Actors))
 		for _, person := range item.Edges.Actors {
 			actors = append(actors, domain.Actor{Provider: person.Provider, ID: person.SourceID, Name: person.Name})
@@ -219,18 +241,6 @@ func (service *Service) History(ctx context.Context, page int) (domain.WatchHist
 	}
 	result.HasMore = (page-1)*HistoryPageSize+len(result.Items) < result.Total
 	return result, nil
-}
-
-// RemoveHistory deletes selected history entries.
-func (service *Service) RemoveHistory(ctx context.Context, ids []int) (int, error) {
-	if len(ids) == 0 {
-		return 0, nil
-	}
-	count, err := service.database.WatchHistory.Delete().Where(watchhistory.IDIn(ids...)).Exec(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("remove watch history: %w", err)
-	}
-	return count, nil
 }
 
 // ClearHistory deletes all history entries.

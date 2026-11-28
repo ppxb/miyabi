@@ -23,7 +23,6 @@ type PlayManager interface {
 	PrimaryFile(context.Context, int) (playback.PrimaryFile, error)
 	SaveProgress(context.Context, int, string, float64, float64, *domain.PlaybackSettings) error
 	History(context.Context, int) (domain.WatchHistoryPage, error)
-	RemoveHistory(context.Context, []int) (int, error)
 	ClearHistory(context.Context) (int, error)
 }
 
@@ -66,19 +65,6 @@ func historyHandler(play PlayManager) gin.HandlerFunc {
 		}
 		page, err := play.History(c.Request.Context(), query.Page)
 		respond(c, page, err)
-	}
-}
-
-func historyRemoveHandler(play PlayManager) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		request, ok := bindJSON[struct {
-			IDs []int `json:"ids" binding:"required,min=1,max=100,unique,dive,min=1"`
-		}](c)
-		if !ok {
-			return
-		}
-		count, err := play.RemoveHistory(c.Request.Context(), request.IDs)
-		respond(c, gin.H{"removed": count}, err)
 	}
 }
 

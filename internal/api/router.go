@@ -164,7 +164,6 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	protected.GET("/mpv-link", noStore(), mpvLinkHandler(deps.Play, deps.STRM, deps.Subtitles, deps.STRMToken))
 
 	protected.GET("/history", noStore(), historyHandler(deps.Play))
-	protected.POST("/history/remove", historyRemoveHandler(deps.Play))
 	protected.DELETE("/history", historyClearHandler(deps.Play))
 
 	protected.GET("/tasks", noStore(), tasksHandler(deps.Tasks))
