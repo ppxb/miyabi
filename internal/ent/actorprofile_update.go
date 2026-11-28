@@ -346,6 +346,18 @@ func (_u *ActorProfileUpdate) ClearSourceURL() *ActorProfileUpdate {
 	return _u
 }
 
+// SetSourceUrls sets the "source_urls" field.
+func (_u *ActorProfileUpdate) SetSourceUrls(v map[string]string) *ActorProfileUpdate {
+	_u.mutation.SetSourceUrls(v)
+	return _u
+}
+
+// ClearSourceUrls clears the value of the "source_urls" field.
+func (_u *ActorProfileUpdate) ClearSourceUrls() *ActorProfileUpdate {
+	_u.mutation.ClearSourceUrls()
+	return _u
+}
+
 // SetEnrichedAt sets the "enriched_at" field.
 func (_u *ActorProfileUpdate) SetEnrichedAt(v time.Time) *ActorProfileUpdate {
 	_u.mutation.SetEnrichedAt(v)
@@ -639,6 +651,12 @@ func (_u *ActorProfileUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if _u.mutation.SourceURLCleared() {
 		_spec.ClearField(actorprofile.FieldSourceURL, field.TypeString)
+	}
+	if value, ok := _u.mutation.SourceUrls(); ok {
+		_spec.SetField(actorprofile.FieldSourceUrls, field.TypeJSON, value)
+	}
+	if _u.mutation.SourceUrlsCleared() {
+		_spec.ClearField(actorprofile.FieldSourceUrls, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.EnrichedAt(); ok {
 		_spec.SetField(actorprofile.FieldEnrichedAt, field.TypeTime, value)
@@ -1116,6 +1134,18 @@ func (_u *ActorProfileUpdateOne) ClearSourceURL() *ActorProfileUpdateOne {
 	return _u
 }
 
+// SetSourceUrls sets the "source_urls" field.
+func (_u *ActorProfileUpdateOne) SetSourceUrls(v map[string]string) *ActorProfileUpdateOne {
+	_u.mutation.SetSourceUrls(v)
+	return _u
+}
+
+// ClearSourceUrls clears the value of the "source_urls" field.
+func (_u *ActorProfileUpdateOne) ClearSourceUrls() *ActorProfileUpdateOne {
+	_u.mutation.ClearSourceUrls()
+	return _u
+}
+
 // SetEnrichedAt sets the "enriched_at" field.
 func (_u *ActorProfileUpdateOne) SetEnrichedAt(v time.Time) *ActorProfileUpdateOne {
 	_u.mutation.SetEnrichedAt(v)
@@ -1439,6 +1469,12 @@ func (_u *ActorProfileUpdateOne) sqlSave(ctx context.Context) (_node *ActorProfi
 	}
 	if _u.mutation.SourceURLCleared() {
 		_spec.ClearField(actorprofile.FieldSourceURL, field.TypeString)
+	}
+	if value, ok := _u.mutation.SourceUrls(); ok {
+		_spec.SetField(actorprofile.FieldSourceUrls, field.TypeJSON, value)
+	}
+	if _u.mutation.SourceUrlsCleared() {
+		_spec.ClearField(actorprofile.FieldSourceUrls, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.EnrichedAt(); ok {
 		_spec.SetField(actorprofile.FieldEnrichedAt, field.TypeTime, value)

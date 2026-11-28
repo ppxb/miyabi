@@ -124,6 +124,7 @@ var (
 		{Name: "skill", Type: field.TypeString, Nullable: true},
 		{Name: "debut_date", Type: field.TypeString, Nullable: true},
 		{Name: "source_url", Type: field.TypeString, Nullable: true},
+		{Name: "source_urls", Type: field.TypeJSON, Nullable: true},
 		{Name: "enriched_at", Type: field.TypeTime, Nullable: true},
 	}
 	// ActorProfilesTable holds the schema information for the "actor_profiles" table.

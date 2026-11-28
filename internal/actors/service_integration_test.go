@@ -386,6 +386,41 @@ func TestDetailEnrichmentOutlivesTheRequest(t *testing.T) {
 	}
 }
 
+// A request that stops waiting on a running lookup reports it, so the page can
+// show a background-enrichment badge and poll until it finishes.
+func TestDetailReportsBackgroundEnrichment(t *testing.T) {
+	ctx := t.Context()
+	db := openDB(t)
+	a := db.Actor.Create().SetProvider("javdb").SetSourceID("x1").SetName("瀬戸環奈").SaveX(ctx)
+	db.Movie.Create().SetCode("TEST-001").AddActors(a).SaveX(ctx)
+	link(t, db, a)
+	pid := pidOf(t, db, a.ID)
+
+	provider := &blockingProvider{started: make(chan struct{}, 1), release: make(chan struct{})}
+	svc := New(db, nil, "", nil, provider)
+	if err := svc.UpdateSettings(ctx, []domain.SourceToggle{
+		{ID: "av-league", Enabled: true},
+		{ID: "minnano-av", Enabled: false},
+		{ID: "gfriends", Enabled: false},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cctx, cancel := context.WithCancel(ctx)
+	cancel()
+	if !svc.enrichIfNeeded(cctx, pid, "瀬戸環奈") {
+		t.Fatal("want enriching=true while the lookup is running")
+	}
+	close(provider.release)
+
+	deadline := time.Now().Add(5 * time.Second)
+	for db.ActorProfile.GetX(t.Context(), pid).EnrichedAt == nil {
+		if time.Now().After(deadline) {
+			t.Fatal("enrichment did not finish")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 // Merging folds the Latin profile into the CJK one and deletes it; the Latin
 // name scraped later for another movie joins the merged profile via its alias.
 func TestMergeMovieCrossLanguageAndLaterLatinActor(t *testing.T) {
@@ -561,6 +596,13 @@ func TestEnrichMergesProviderFields(t *testing.T) {
 	}
 	if !providers["av-league"] || !providers["minnano-av"] {
 		t.Fatalf("image providers = %v", providers)
+	}
+	wantLinks := []SourceLink{
+		{Provider: "av-league", URL: league.profile.SourceURL},
+		{Provider: "minnano-av", URL: minnano.profile.SourceURL},
+	}
+	if !slices.Equal(detail.SourceLinks, wantLinks) {
+		t.Fatalf("source links = %v", detail.SourceLinks)
 	}
 }
 

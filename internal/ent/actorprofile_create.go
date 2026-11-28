@@ -261,6 +261,12 @@ func (_c *ActorProfileCreate) SetNillableSourceURL(v *string) *ActorProfileCreat
 	return _c
 }
 
+// SetSourceUrls sets the "source_urls" field.
+func (_c *ActorProfileCreate) SetSourceUrls(v map[string]string) *ActorProfileCreate {
+	_c.mutation.SetSourceUrls(v)
+	return _c
+}
+
 // SetEnrichedAt sets the "enriched_at" field.
 func (_c *ActorProfileCreate) SetEnrichedAt(v time.Time) *ActorProfileCreate {
 	_c.mutation.SetEnrichedAt(v)
@@ -499,6 +505,10 @@ func (_c *ActorProfileCreate) createSpec() (*ActorProfile, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.SourceURL(); ok {
 		_spec.SetField(actorprofile.FieldSourceURL, field.TypeString, value)
 		_node.SourceURL = &value
+	}
+	if value, ok := _c.mutation.SourceUrls(); ok {
+		_spec.SetField(actorprofile.FieldSourceUrls, field.TypeJSON, value)
+		_node.SourceUrls = value
 	}
 	if value, ok := _c.mutation.EnrichedAt(); ok {
 		_spec.SetField(actorprofile.FieldEnrichedAt, field.TypeTime, value)
@@ -889,6 +899,24 @@ func (u *ActorProfileUpsert) UpdateSourceURL() *ActorProfileUpsert {
 // ClearSourceURL clears the value of the "source_url" field.
 func (u *ActorProfileUpsert) ClearSourceURL() *ActorProfileUpsert {
 	u.SetNull(actorprofile.FieldSourceURL)
+	return u
+}
+
+// SetSourceUrls sets the "source_urls" field.
+func (u *ActorProfileUpsert) SetSourceUrls(v map[string]string) *ActorProfileUpsert {
+	u.Set(actorprofile.FieldSourceUrls, v)
+	return u
+}
+
+// UpdateSourceUrls sets the "source_urls" field to the value that was provided on create.
+func (u *ActorProfileUpsert) UpdateSourceUrls() *ActorProfileUpsert {
+	u.SetExcluded(actorprofile.FieldSourceUrls)
+	return u
+}
+
+// ClearSourceUrls clears the value of the "source_urls" field.
+func (u *ActorProfileUpsert) ClearSourceUrls() *ActorProfileUpsert {
+	u.SetNull(actorprofile.FieldSourceUrls)
 	return u
 }
 
@@ -1288,6 +1316,27 @@ func (u *ActorProfileUpsertOne) UpdateSourceURL() *ActorProfileUpsertOne {
 func (u *ActorProfileUpsertOne) ClearSourceURL() *ActorProfileUpsertOne {
 	return u.Update(func(s *ActorProfileUpsert) {
 		s.ClearSourceURL()
+	})
+}
+
+// SetSourceUrls sets the "source_urls" field.
+func (u *ActorProfileUpsertOne) SetSourceUrls(v map[string]string) *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetSourceUrls(v)
+	})
+}
+
+// UpdateSourceUrls sets the "source_urls" field to the value that was provided on create.
+func (u *ActorProfileUpsertOne) UpdateSourceUrls() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateSourceUrls()
+	})
+}
+
+// ClearSourceUrls clears the value of the "source_urls" field.
+func (u *ActorProfileUpsertOne) ClearSourceUrls() *ActorProfileUpsertOne {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearSourceUrls()
 	})
 }
 
@@ -1856,6 +1905,27 @@ func (u *ActorProfileUpsertBulk) UpdateSourceURL() *ActorProfileUpsertBulk {
 func (u *ActorProfileUpsertBulk) ClearSourceURL() *ActorProfileUpsertBulk {
 	return u.Update(func(s *ActorProfileUpsert) {
 		s.ClearSourceURL()
+	})
+}
+
+// SetSourceUrls sets the "source_urls" field.
+func (u *ActorProfileUpsertBulk) SetSourceUrls(v map[string]string) *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.SetSourceUrls(v)
+	})
+}
+
+// UpdateSourceUrls sets the "source_urls" field to the value that was provided on create.
+func (u *ActorProfileUpsertBulk) UpdateSourceUrls() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.UpdateSourceUrls()
+	})
+}
+
+// ClearSourceUrls clears the value of the "source_urls" field.
+func (u *ActorProfileUpsertBulk) ClearSourceUrls() *ActorProfileUpsertBulk {
+	return u.Update(func(s *ActorProfileUpsert) {
+		s.ClearSourceUrls()
 	})
 }
 

@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router'
+import { useCanGoBack, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import {
   ArrowLeftIcon,
@@ -32,19 +32,18 @@ import { FollowButton } from './follow-button'
 
 function ActorStats({ actor }: { actor: ReturnType<typeof useActorDetail>['data'] }) {
   if (!actor) return null
-  const stats: Array<{ label: string; value: string; icon: LucideIcon }> = []
-  if (actor.birthday) stats.push({ label: '生日', value: actor.birthday, icon: CakeIcon })
-  if (actor.height) stats.push({ label: '身高', value: `${actor.height} cm`, icon: RulerIcon })
-  if (actor.measurements) {
-    stats.push({ label: '三围', value: actor.measurements, icon: PersonStandingIcon })
-  }
-  if (actor.cup_size) stats.push({ label: '罩杯', value: actor.cup_size, icon: CupSodaIcon })
-  if (actor.blood_type) stats.push({ label: '血型', value: actor.blood_type, icon: DropletIcon })
-  if (actor.nationality) stats.push({ label: '出身', value: actor.nationality, icon: MapPinIcon })
-  if (actor.debut_date) {
-    stats.push({ label: '出道', value: actor.debut_date, icon: CalendarDaysIcon })
-  }
-  if (stats.length === 0) return null
+  // Show the whole strip for actors with any data; missing fields use "-".
+  const text = (value?: string) => (value && value !== '-' ? value : '-')
+  const stats: Array<{ label: string; value: string; icon: LucideIcon }> = [
+    { label: '生日', value: text(actor.birthday), icon: CakeIcon },
+    { label: '身高', value: actor.height ? `${actor.height} cm` : '-', icon: RulerIcon },
+    { label: '三围', value: text(actor.measurements), icon: PersonStandingIcon },
+    { label: '罩杯', value: text(actor.cup_size), icon: CupSodaIcon },
+    { label: '血型', value: text(actor.blood_type), icon: DropletIcon },
+    { label: '出身', value: text(actor.nationality), icon: MapPinIcon },
+    { label: '出道', value: text(actor.debut_date), icon: CalendarDaysIcon }
+  ]
+  if (stats.every(stat => stat.value === '-')) return null
 
   return <StatList stats={stats} />
 }
@@ -52,6 +51,8 @@ function ActorStats({ actor }: { actor: ReturnType<typeof useActorDetail>['data'
 export function ActorDetailPage({ actorKey }: { actorKey: string }) {
   const detail = useActorDetail(actorKey)
   const [playingId, setPlayingId] = useState<number | null>(null)
+  const router = useRouter()
+  const canGoBack = useCanGoBack()
   if (detail.isPending) {
     return (
       <AppPage>
@@ -93,16 +94,27 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
 
   const actor = detail.data
   const films = actor.films?.movies ?? []
+  const sourceLinks = actor.source_links?.length
+    ? actor.source_links
+    : actor.source_url
+      ? [{ provider: '', url: actor.source_url }]
+      : []
 
   return (
     <AppPage>
-      <Link
-        to="/actors"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      <Button
+        type="button"
+        variant="ghost"
+        // History back keeps the catalog's search and page in the URL.
+        className="h-11 gap-2 self-start px-3 text-base"
+        onClick={() => {
+          if (canGoBack) router.history.back()
+          else void router.navigate({ to: '/actors', replace: true })
+        }}
       >
-        <ArrowLeftIcon className="size-4" />
+        <ArrowLeftIcon className="size-5" />
         返回
-      </Link>
+      </Button>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <Avatar className="size-32">
@@ -119,6 +131,7 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
             {actor.name_zht ? (
               <span className="text-lg text-muted-foreground">{actor.name_zht}</span>
             ) : null}
+            {actor.enriching ? <Badge variant="secondary">后台补全中</Badge> : null}
             <FollowButton actorKey={actor.key} />
           </div>
           {actor.aliases?.length ? (
@@ -129,16 +142,21 @@ export function ActorDetailPage({ actorKey }: { actorKey: string }) {
             {actor.sources.map(source => (
               <Badge key={`${source.provider}:${source.source_id}`}>{source.provider}</Badge>
             ))}
-            {actor.source_url ? (
-              <Button
-                variant="link"
-                size="sm"
-                nativeButton={false}
-                render={<a href={actor.source_url} target="_blank" rel="noreferrer" />}
-              >
-                资料来源
-                <ExternalLinkIcon data-icon="inline-end" />
-              </Button>
+            {sourceLinks.length ? (
+              <>
+                {sourceLinks.map(link => (
+                  <Button
+                    key={`${link.provider}:${link.url}`}
+                    variant="link"
+                    size="sm"
+                    nativeButton={false}
+                    render={<a href={link.url} target="_blank" rel="noreferrer" />}
+                  >
+                    {link.provider || '资料来源'}
+                    <ExternalLinkIcon data-icon="inline-end" />
+                  </Button>
+                ))}
+              </>
             ) : null}
           </div>
         </div>

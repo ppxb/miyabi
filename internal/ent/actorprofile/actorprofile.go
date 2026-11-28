@@ -51,6 +51,8 @@ const (
 	FieldDebutDate = "debut_date"
 	// FieldSourceURL holds the string denoting the source_url field in the database.
 	FieldSourceURL = "source_url"
+	// FieldSourceUrls holds the string denoting the source_urls field in the database.
+	FieldSourceUrls = "source_urls"
 	// FieldEnrichedAt holds the string denoting the enriched_at field in the database.
 	FieldEnrichedAt = "enriched_at"
 	// EdgeSources holds the string denoting the sources edge name in mutations.
@@ -105,6 +107,7 @@ var Columns = []string{
 	FieldSkill,
 	FieldDebutDate,
 	FieldSourceURL,
+	FieldSourceUrls,
 	FieldEnrichedAt,
 }
 

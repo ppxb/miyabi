@@ -46,6 +46,8 @@ export type ActorDetail = ActorSummary & {
   skill?: string
   debut_date?: string
   source_url?: string
+  enriching?: boolean
+  source_links?: { provider: string; url: string }[]
 }
 
 export const actorKeys = {
@@ -78,6 +80,9 @@ export function useActorCatalog(params: { q?: string; follow?: ActorFollowFilter
 export function useActorDetail(key: string) {
   return useQuery({
     queryKey: actorKeys.detail(key),
-    queryFn: ({ signal }) => apiGet<ActorDetail>(`/api/actors/${key}`, undefined, signal)
+    queryFn: ({ signal }) => apiGet<ActorDetail>(`/api/actors/${key}`, undefined, signal),
+    // Provider lookups keep running after the first response; poll until the
+    // background enrichment finishes (the backend then stops setting enriching).
+    refetchInterval: query => (query.state.data?.enriching ? 3000 : false)
   })
 }

@@ -44,6 +44,9 @@ func (ActorProfile) Fields() []ent.Field {
 		field.String("skill").Optional().Nillable(),
 		field.String("debut_date").Optional().Nillable(),
 		field.String("source_url").Optional().Nillable(),
+		field.JSON("source_urls", map[string]string{}).
+			Optional().
+			Comment("Provider page URLs that supplied the profile, keyed by provider."),
 		field.Time("enriched_at").
 			Optional().
 			Nillable().

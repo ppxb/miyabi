@@ -2295,6 +2295,7 @@ type ActorProfileMutation struct {
 	skill          *string
 	debut_date     *string
 	source_url     *string
+	source_urls    *map[string]string
 	enriched_at    *time.Time
 	clearedFields  map[string]struct{}
 	sources        map[int]struct{}
@@ -3247,6 +3248,55 @@ func (m *ActorProfileMutation) ResetSourceURL() {
 	delete(m.clearedFields, actorprofile.FieldSourceURL)
 }
 
+// SetSourceUrls sets the "source_urls" field.
+func (m *ActorProfileMutation) SetSourceUrls(value map[string]string) {
+	m.source_urls = &value
+}
+
+// SourceUrls returns the value of the "source_urls" field in the mutation.
+func (m *ActorProfileMutation) SourceUrls() (r map[string]string, exists bool) {
+	v := m.source_urls
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceUrls returns the old "source_urls" field's value of the ActorProfile entity.
+// If the ActorProfile object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ActorProfileMutation) OldSourceUrls(ctx context.Context) (v map[string]string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceUrls is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceUrls requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceUrls: %w", err)
+	}
+	return oldValue.SourceUrls, nil
+}
+
+// ClearSourceUrls clears the value of the "source_urls" field.
+func (m *ActorProfileMutation) ClearSourceUrls() {
+	m.source_urls = nil
+	m.clearedFields[actorprofile.FieldSourceUrls] = struct{}{}
+}
+
+// SourceUrlsCleared returns if the "source_urls" field was cleared in this mutation.
+func (m *ActorProfileMutation) SourceUrlsCleared() bool {
+	_, ok := m.clearedFields[actorprofile.FieldSourceUrls]
+	return ok
+}
+
+// ResetSourceUrls resets all changes to the "source_urls" field.
+func (m *ActorProfileMutation) ResetSourceUrls() {
+	m.source_urls = nil
+	delete(m.clearedFields, actorprofile.FieldSourceUrls)
+}
+
 // SetEnrichedAt sets the "enriched_at" field.
 func (m *ActorProfileMutation) SetEnrichedAt(t time.Time) {
 	m.enriched_at = &t
@@ -3492,7 +3542,7 @@ func (m *ActorProfileMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ActorProfileMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 20)
 	if m.created_at != nil {
 		fields = append(fields, actorprofile.FieldCreatedAt)
 	}
@@ -3547,6 +3597,9 @@ func (m *ActorProfileMutation) Fields() []string {
 	if m.source_url != nil {
 		fields = append(fields, actorprofile.FieldSourceURL)
 	}
+	if m.source_urls != nil {
+		fields = append(fields, actorprofile.FieldSourceUrls)
+	}
 	if m.enriched_at != nil {
 		fields = append(fields, actorprofile.FieldEnrichedAt)
 	}
@@ -3594,6 +3647,8 @@ func (m *ActorProfileMutation) Field(name string) (ent.Value, bool) {
 		return m.DebutDate()
 	case actorprofile.FieldSourceURL:
 		return m.SourceURL()
+	case actorprofile.FieldSourceUrls:
+		return m.SourceUrls()
 	case actorprofile.FieldEnrichedAt:
 		return m.EnrichedAt()
 	}
@@ -3641,6 +3696,8 @@ func (m *ActorProfileMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldDebutDate(ctx)
 	case actorprofile.FieldSourceURL:
 		return m.OldSourceURL(ctx)
+	case actorprofile.FieldSourceUrls:
+		return m.OldSourceUrls(ctx)
 	case actorprofile.FieldEnrichedAt:
 		return m.OldEnrichedAt(ctx)
 	}
@@ -3778,6 +3835,13 @@ func (m *ActorProfileMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetSourceURL(v)
 		return nil
+	case actorprofile.FieldSourceUrls:
+		v, ok := value.(map[string]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceUrls(v)
+		return nil
 	case actorprofile.FieldEnrichedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -3869,6 +3933,9 @@ func (m *ActorProfileMutation) ClearedFields() []string {
 	if m.FieldCleared(actorprofile.FieldSourceURL) {
 		fields = append(fields, actorprofile.FieldSourceURL)
 	}
+	if m.FieldCleared(actorprofile.FieldSourceUrls) {
+		fields = append(fields, actorprofile.FieldSourceUrls)
+	}
 	if m.FieldCleared(actorprofile.FieldEnrichedAt) {
 		fields = append(fields, actorprofile.FieldEnrichedAt)
 	}
@@ -3924,6 +3991,9 @@ func (m *ActorProfileMutation) ClearField(name string) error {
 		return nil
 	case actorprofile.FieldSourceURL:
 		m.ClearSourceURL()
+		return nil
+	case actorprofile.FieldSourceUrls:
+		m.ClearSourceUrls()
 		return nil
 	case actorprofile.FieldEnrichedAt:
 		m.ClearEnrichedAt()
@@ -3989,6 +4059,9 @@ func (m *ActorProfileMutation) ResetField(name string) error {
 		return nil
 	case actorprofile.FieldSourceURL:
 		m.ResetSourceURL()
+		return nil
+	case actorprofile.FieldSourceUrls:
+		m.ResetSourceUrls()
 		return nil
 	case actorprofile.FieldEnrichedAt:
 		m.ResetEnrichedAt()

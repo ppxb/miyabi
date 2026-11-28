@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -53,6 +54,8 @@ type ActorProfile struct {
 	DebutDate *string `json:"debut_date,omitempty"`
 	// SourceURL holds the value of the "source_url" field.
 	SourceURL *string `json:"source_url,omitempty"`
+	// Provider page URLs that supplied the profile, keyed by provider.
+	SourceUrls map[string]string `json:"source_urls,omitempty"`
 	// Set once actor providers were consulted (found or not); nil retries on the next detail view.
 	EnrichedAt *time.Time `json:"enriched_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -106,6 +109,8 @@ func (*ActorProfile) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case actorprofile.FieldSourceUrls:
+			values[i] = new([]byte)
 		case actorprofile.FieldID, actorprofile.FieldHeight:
 			values[i] = new(sql.NullInt64)
 		case actorprofile.FieldMatchKey, actorprofile.FieldName, actorprofile.FieldNameZht, actorprofile.FieldGender, actorprofile.FieldAvatar, actorprofile.FieldSummary, actorprofile.FieldBirthday, actorprofile.FieldCupSize, actorprofile.FieldMeasurements, actorprofile.FieldBloodType, actorprofile.FieldNationality, actorprofile.FieldHobby, actorprofile.FieldSkill, actorprofile.FieldDebutDate, actorprofile.FieldSourceURL:
@@ -254,6 +259,14 @@ func (_m *ActorProfile) assignValues(columns []string, values []any) error {
 				_m.SourceURL = new(string)
 				*_m.SourceURL = value.String
 			}
+		case actorprofile.FieldSourceUrls:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field source_urls", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.SourceUrls); err != nil {
+					return fmt.Errorf("unmarshal field source_urls: %w", err)
+				}
+			}
 		case actorprofile.FieldEnrichedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field enriched_at", values[i])
@@ -391,6 +404,9 @@ func (_m *ActorProfile) String() string {
 		builder.WriteString("source_url=")
 		builder.WriteString(*v)
 	}
+	builder.WriteString(", ")
+	builder.WriteString("source_urls=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SourceUrls))
 	builder.WriteString(", ")
 	if v := _m.EnrichedAt; v != nil {
 		builder.WriteString("enriched_at=")

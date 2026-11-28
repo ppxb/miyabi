@@ -76,6 +76,17 @@ type Detail struct {
 	Skill        string   `json:"skill,omitempty"`
 	DebutDate    string   `json:"debut_date,omitempty"`
 	SourceURL    string   `json:"source_url,omitempty"`
+	// Enriching reports that provider lookups were still running when the
+	// request stopped waiting; the page can poll until they finish.
+	Enriching bool `json:"enriching,omitempty"`
+	// SourceLinks are the provider pages that supplied the profile.
+	SourceLinks []SourceLink `json:"source_links,omitempty"`
+}
+
+// SourceLink is one provider page that supplied a profile.
+type SourceLink struct {
+	Provider string `json:"provider"`
+	URL      string `json:"url"`
 }
 
 // Page is one page of the actor catalog.
@@ -391,7 +402,7 @@ func (s *Service) Detail(ctx context.Context, id int) (Detail, error) {
 			slog.WarnContext(ctx, "persist gfriends actor images failed", "profile", id, "error", err)
 		}
 	}
-	s.enrichIfNeeded(ctx, id, p.Name)
+	enriching := s.enrichIfNeeded(ctx, id, p.Name)
 
 	// Reload: enrichment may have filled the biography.
 	bio, err := s.db.ActorProfile.Query().Where(actorprofile.ID(id)).WithAliases().Only(ctx)
@@ -422,7 +433,48 @@ func (s *Service) Detail(ctx context.Context, id int) (Detail, error) {
 		Skill:        deref(bio.Skill),
 		DebutDate:    deref(bio.DebutDate),
 		SourceURL:    deref(bio.SourceURL),
+		Enriching:    enriching,
+		SourceLinks:  s.sourceLinks(bio),
 	}, nil
+}
+
+// sourceLinks lists the provider pages that supplied a profile, in provider
+// registration order. Rows enriched before per-provider URLs were stored fall
+// back to the single stored URL.
+func (s *Service) sourceLinks(p *ent.ActorProfile) []SourceLink {
+	var links []SourceLink
+	seen := make(map[string]bool, len(p.SourceUrls))
+	for _, provider := range s.providers {
+		name := provider.Name()
+		if url := p.SourceUrls[name]; url != "" {
+			links = append(links, SourceLink{Provider: name, URL: url})
+			seen[name] = true
+		}
+	}
+	rest := make([]string, 0, len(p.SourceUrls))
+	for name, url := range p.SourceUrls {
+		if !seen[name] && url != "" {
+			rest = append(rest, name)
+		}
+	}
+	sort.Strings(rest)
+	for _, name := range rest {
+		links = append(links, SourceLink{Provider: name, URL: p.SourceUrls[name]})
+	}
+	if len(links) == 0 && p.SourceURL != nil && *p.SourceURL != "" {
+		links = append(links, SourceLink{Provider: inferSourceProvider(*p.SourceURL), URL: *p.SourceURL})
+	}
+	return links
+}
+
+func inferSourceProvider(rawURL string) string {
+	switch {
+	case strings.Contains(rawURL, "av-league.com"):
+		return "av-league"
+	case strings.Contains(rawURL, "minnano-av.com"):
+		return "minnano-av"
+	}
+	return ""
 }
 
 // Identity is what following an actor needs, read from the database only.
@@ -936,10 +988,11 @@ const (
 // records a finished attempt (found or not), so only transient errors retry on
 // a later view; concurrent first views share one attempt. The attempt runs
 // detached from the request, so a viewer leaving neither cancels it nor fails
-// the other waiters.
-func (s *Service) enrichIfNeeded(ctx context.Context, pid int, display string) {
+// the other waiters. It reports whether the attempt was still running when the
+// request stopped waiting.
+func (s *Service) enrichIfNeeded(ctx context.Context, pid int, display string) bool {
 	if len(s.providers) == 0 {
-		return
+		return false
 	}
 	done := s.enriching.DoChan(strconv.Itoa(pid), func() (any, error) {
 		enrichCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), enrichTimeout)
@@ -954,8 +1007,11 @@ func (s *Service) enrichIfNeeded(ctx context.Context, pid int, display string) {
 	defer wait.Stop()
 	select {
 	case <-done:
+		return false
 	case <-wait.C:
+		return true
 	case <-ctx.Done():
+		return true
 	}
 }
 
@@ -1060,6 +1116,9 @@ func (s *Service) applyProfiles(ctx context.Context, pid int, found []providerPr
 	if p.SourceURL != "" {
 		update.SetSourceURL(p.SourceURL)
 	}
+	if urls := profileSourceURLs(found); len(urls) > 0 {
+		update.SetSourceUrls(urls)
+	}
 	if err := update.Exec(ctx); err != nil {
 		return err
 	}
@@ -1099,6 +1158,17 @@ func appendProfileAliases(ctx context.Context, tx *ent.Tx, pid int, aliases []st
 		}
 	}
 	return nil
+}
+
+// profileSourceURLs maps each provider to the page its profile came from.
+func profileSourceURLs(found []providerProfile) map[string]string {
+	urls := make(map[string]string, len(found))
+	for _, item := range found {
+		if item.profile.SourceURL != "" {
+			urls[item.name] = item.profile.SourceURL
+		}
+	}
+	return urls
 }
 
 // mergeProfiles folds the providers' profiles into one record. Providers are

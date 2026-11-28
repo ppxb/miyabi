@@ -1325,6 +1325,16 @@ func SourceURLContainsFold(v string) predicate.ActorProfile {
 	return predicate.ActorProfile(sql.FieldContainsFold(FieldSourceURL, v))
 }
 
+// SourceUrlsIsNil applies the IsNil predicate on the "source_urls" field.
+func SourceUrlsIsNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldIsNull(FieldSourceUrls))
+}
+
+// SourceUrlsNotNil applies the NotNil predicate on the "source_urls" field.
+func SourceUrlsNotNil() predicate.ActorProfile {
+	return predicate.ActorProfile(sql.FieldNotNull(FieldSourceUrls))
+}
+
 // EnrichedAtEQ applies the EQ predicate on the "enriched_at" field.
 func EnrichedAtEQ(v time.Time) predicate.ActorProfile {
 	return predicate.ActorProfile(sql.FieldEQ(FieldEnrichedAt, v))
