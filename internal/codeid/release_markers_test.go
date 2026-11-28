@@ -50,18 +50,26 @@ func TestLTXLayers(t *testing.T) {
 	}
 }
 
-// TestAttachedCIsLookupFallbackOnly keeps the existing guarantee that a bare C is
-// a serial letter (distinct identity, preserved at parse time), while still
-// offering the base code as a relaxed lookup candidate for Chinese-subtitle C.
-func TestAttachedCIsLookupFallbackOnly(t *testing.T) {
-	if got, _ := Parse("FJIN-106C.mp4"); got != "FJIN-106C" {
-		t.Errorf("Parse(FJIN-106C) = %q; want FJIN-106C (serial C must be preserved)", got)
+// TestAttachedCSubtitleSuffix treats a C glued to the numeric serial as a
+// Chinese-subtitle marker. Other serial letters (A/B) stay distinct.
+func TestAttachedCSubtitleSuffix(t *testing.T) {
+	for _, tc := range []struct{ input, want string }{
+		{"FJIN-106C.mp4", "FJIN-106"},
+		{"DVDMS-669C.mp4", "DVDMS-669"},
+		{"SSIS-748C.mp4", "SSIS-748"},
+	} {
+		if got, ok := Parse(tc.input); !ok || got != tc.want {
+			t.Errorf("Parse(%q) = %q,%v; want %q", tc.input, got, ok, tc.want)
+		}
 	}
-	if IsFormatEquivalent("FJIN-106C", "FJIN-106") {
-		t.Error("FJIN-106C must stay distinct from FJIN-106")
+	if !IsFormatEquivalent("FJIN-106C", "FJIN-106") {
+		t.Error("FJIN-106C must be equivalent to FJIN-106")
 	}
-	if IsFormatEquivalent("DVDMS-669C", "DVDMS-669") {
-		t.Error("DVDMS-669C must stay distinct from DVDMS-669")
+	if !IsFormatEquivalent("DVDMS-669C", "DVDMS-669") {
+		t.Error("DVDMS-669C must be equivalent to DVDMS-669")
+	}
+	if IsFormatEquivalent("FJIN-106A", "FJIN-106") {
+		t.Error("FJIN-106A must stay distinct from FJIN-106")
 	}
 	for _, tc := range []struct{ in, base string }{
 		{"FJIN-106C", "FJIN-106"},

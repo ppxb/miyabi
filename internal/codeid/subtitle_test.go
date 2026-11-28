@@ -12,6 +12,9 @@ func TestSubtitleSuffixVariants(t *testing.T) {
 	}{
 		{"MEYD-589CH", "MEYD-589"},
 		{"NTRH-016CH", "NTRH-016"},
+		{"DVDMS-669C", "DVDMS-669"},
+		{"SSIS-748C", "SSIS-748"},
+		{"FJIN-106C", "FJIN-106"},
 	}
 	for _, testCase := range cases {
 		if got := withoutSubtitleSuffix(testCase.code); got != testCase.base {
@@ -35,11 +38,11 @@ func TestSubtitleSuffixVariants(t *testing.T) {
 	}
 }
 
-func TestSubtitleSuffixDoesNotStripSerialLetters(t *testing.T) {
+func TestSubtitleSuffixKeepsOtherSerialLetters(t *testing.T) {
 	if IsFormatEquivalent("ABC-123A", "ABC-123") {
 		t.Fatal("serial letter A must not be treated as a subtitle suffix")
 	}
-	if IsFormatEquivalent("DVDMS-669C", "DVDMS-669") {
-		t.Fatal("a bare C stays a serial identity, not a subtitle suffix")
+	if !IsFormatEquivalent("DVDMS-669C", "DVDMS-669") {
+		t.Fatal("a trailing C must be treated as a subtitle suffix")
 	}
 }

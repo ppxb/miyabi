@@ -36,7 +36,7 @@ export function FilterMultiSelect({
       >
         <span className="min-w-0 truncate">
           {label}
-          {value.length > 0 ? ` · ${value.length}` : ''}
+          {value.length > 0 ? `(${value.length})` : ''}
         </span>
         <ChevronsUpDownIcon className="size-3.5 shrink-0 opacity-60" />
       </PopoverTrigger>

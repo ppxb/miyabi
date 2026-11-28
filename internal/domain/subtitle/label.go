@@ -41,10 +41,11 @@ var (
 	// chineseSubtitleTag matches an explicit Chinese language tag or label in a
 	// subtitle or video file name, such as .chs / .zh-CN / 中字.
 	chineseSubtitleTag = regexp.MustCompile(`(?i)(?:[._-](?:chi|chs|cht|zh|zh[-_]?cn|zh[-_]?tw|hans|hant)(?:[._-]|$)|中文字幕|中字)`)
-	// videoChineseSuffix matches a -C/-CH suffix or a CH glued to the number at
-	// the end of a video stem (MEYD-589CH). UC (uncensored) is intentionally not
-	// matched so uncensored releases are not reported as Chinese subtitles.
-	videoChineseSuffix = regexp.MustCompile(`(?i)(?:[-_](?:c|ch)|[0-9]ch)$`)
+	// videoChineseSuffix matches a -C/-CH suffix or a C/CH glued to the number at
+	// the end of a video stem (MEYD-589CH, DVDMS-669C). UC (uncensored) is
+	// intentionally not matched so uncensored releases are not reported as
+	// Chinese subtitles.
+	videoChineseSuffix = regexp.MustCompile(`(?i)(?:[-_](?:c|ch)|[0-9](?:c|ch))$`)
 
 	traditionalHint = regexp.MustCompile(`(?i)(zh[-_]?(tw|hk|hant)|\bcht\b|繁)`)
 	simplifiedHint  = regexp.MustCompile(`(?i)(zh[-_]?(cn|hans)|\bchs\b|简|簡)`)

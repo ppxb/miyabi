@@ -99,6 +99,8 @@ func TestHasChineseSubtitle(t *testing.T) {
 		"SSIS-589_ch.mp4":    true,
 		"MEYD-589CH.mp4":     true,
 		"NTRH-016CH.mp4":     true,
+		"DVDMS-669C.mp4":     true,
+		"FJIN-106C.mp4":      true,
 		"SSIS-589-UC.mkv":    false,
 		"SSIS-589.mp4":       false,
 		"SSIS-589-CD1.mp4":   false,

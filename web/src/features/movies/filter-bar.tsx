@@ -82,7 +82,7 @@ export function MovieFilterBar({
           onChange({ ...value, sort: (next ?? 'recent') as MoviesFilter['sort'] })
         }
       >
-        <SelectTrigger className="w-32">
+        <SelectTrigger>
           <SelectValue />
         </SelectTrigger>
         <SelectContent align="start">
@@ -106,7 +106,7 @@ export function MovieFilterBar({
           })
         }
       >
-        <SelectTrigger className="w-28">
+        <SelectTrigger>
           <SelectValue />
         </SelectTrigger>
         <SelectContent align="start">
@@ -130,7 +130,7 @@ export function MovieFilterBar({
           })
         }
       >
-        <SelectTrigger className="w-28">
+        <SelectTrigger>
           <SelectValue />
         </SelectTrigger>
         <SelectContent align="start">
@@ -165,7 +165,7 @@ export function MovieFilterBar({
 
       {hasFilters ? (
         <Button type="button" variant="ghost" onClick={reset}>
-          <XIcon className="size-4" />
+          <XIcon />
           清除
         </Button>
       ) : null}

@@ -44,21 +44,15 @@ var (
 		prefix + `[-_ ]+[A-Z]+[0-9][A-Z0-9]*|` +
 		prefix + `[-_. ]+[0-9]+[A-Z0-9]*|` +
 		compactPrefix + `[0-9]{2,}[A-Z0-9]*)(?:[^A-Z0-9]|$)`)
-	domainNoise = regexp.MustCompile(`(?:\[(?:[A-Z0-9-]+\.)+[A-Z]{2,}\]|(?:HTTPS?://)?(?:[A-Z0-9-]+\.)+[A-Z]{2,}[@/\\])`)
-	codecNoise  = regexp.MustCompile(`\b[HX][ ._-]?26[45]\b`)
-	partNoise   = regexp.MustCompile(`([0-9][A-Z0-9]*)[-_. ]+(?:CD|DISC|PART)[0-9]+([^A-Z0-9]|$)`)
-	nameSuffix  = regexp.MustCompile(`^[-_]+([A-Z][A-Z0-9]*)(?:[^A-Z0-9]|$)`)
-	fileMarker  = regexp.MustCompile(`^(?:C|U|UC|CHS|CHT|SUB|HD|FHD|UHD|LTX|(?:CD|DISC|PART)[0-9]+)$`)
-	// SSNI releases append C directly to the numeric serial for subtitles.
-	// Limit this filename alias to the known family; other catalogues have real letter variants.
-	ssniSubtitle  = regexp.MustCompile(`^(SSNI-[0-9]+)C$`)
+	domainNoise   = regexp.MustCompile(`(?:\[(?:[A-Z0-9-]+\.)+[A-Z]{2,}\]|(?:HTTPS?://)?(?:[A-Z0-9-]+\.)+[A-Z]{2,}[@/\\])`)
+	codecNoise    = regexp.MustCompile(`\b[HX][ ._-]?26[45]\b`)
+	partNoise     = regexp.MustCompile(`([0-9][A-Z0-9]*)[-_. ]+(?:CD|DISC|PART)[0-9]+([^A-Z0-9]|$)`)
+	nameSuffix    = regexp.MustCompile(`^[-_]+([A-Z][A-Z0-9]*)(?:[^A-Z0-9]|$)`)
+	fileMarker    = regexp.MustCompile(`^(?:C|U|UC|CHS|CHT|SUB|HD|FHD|UHD|LTX|(?:CD|DISC|PART)[0-9]+)$`)
 	versionSuffix = regexp.MustCompile(`^[-_]([A-Z])(?:[^A-Z0-9]|$)`)
-	// attachedLTX / attachedC match a marker glued to the numeric serial without a
-	// separator (SSIS-001LTX, FJIN-106C). LTX is a leak/uncensored release marker;
-	// a bare C is only offered as a relaxed lookup fallback, never at parse time,
-	// because it can be a genuine serial letter (FJIN-106C is distinct from FJIN-106).
+	// attachedLTX matches a leak/uncensored marker glued to the numeric serial
+	// without a separator (SSIS-001LTX).
 	attachedLTX  = regexp.MustCompile(`^(.*[0-9])LTX$`)
-	attachedC    = regexp.MustCompile(`^(.*[0-9])C$`)
 	layerToken   = regexp.MustCompile(`[A-Z0-9]+(?:[-_.][A-Z0-9]+)*`)
 	layerSerial  = regexp.MustCompile(`[A-Z][A-Z0-9]*[-_.]?[0-9]`)
 	layerNumeric = regexp.MustCompile(`^[0-9]+[-_][0-9]+(?:[-_][A-Z0-9]+)*$`)
@@ -77,8 +71,7 @@ func Parse(name string) (string, bool) {
 		return "", false
 	}
 	code := Normalize(name[match[2]:match[3]])
-	code = ssniSubtitle.ReplaceAllString(code, "$1")
-	// A trailing CH marks a Chinese-subtitle variant, not part of the number.
+	// A trailing C or CH marks a Chinese-subtitle variant, not part of the number.
 	if base := withoutSubtitleSuffix(code); base != "" {
 		code = base
 	}
@@ -114,9 +107,9 @@ func removeNameNoise(name string) string {
 	return codecNoise.ReplaceAllString(domainNoise.ReplaceAllString(name, " "), " ")
 }
 
-// subtitleSuffix marks a Chinese-subtitle variant (CH) appended to a code.
-// A bare single letter stays a serial identity (FJIN-106 vs FJIN-106C).
-var subtitleSuffix = regexp.MustCompile(`(?i)^(.+[0-9])(?:CH)$`)
+// subtitleSuffix marks a Chinese-subtitle variant (C or CH) appended to a code.
+// Other bare letters stay serial identities (FJIN-106A vs FJIN-106).
+var subtitleSuffix = regexp.MustCompile(`(?i)^(.+[0-9])(?:CH|C)$`)
 
 func withoutSubtitleSuffix(code string) string {
 	if match := subtitleSuffix.FindStringSubmatch(code); match != nil {
@@ -222,14 +215,11 @@ func Layers(name string) [][]string {
 	}
 	addLayer(dualFallbacks)
 
-	// Release markers and possible subtitle letters glued to the serial are offered
-	// as the lowest-priority candidates so the base code can still resolve without
-	// altering the stored identity.
+	// Release markers glued to the serial are offered as the lowest-priority
+	// candidates so the base code can still resolve without altering the stored
+	// identity. Subtitle C/CH variants already resolve through the layer above.
 	if base := stripAttachedReleaseLTX(complete); base != "" {
 		addLayer([]string{base})
-	}
-	if match := attachedC.FindStringSubmatch(complete); match != nil {
-		addLayer([]string{match[1]})
 	}
 
 	return layers
@@ -340,6 +330,9 @@ func Candidates(code string) []string {
 // variants with Queries; stored keys retain the original date/year spelling.
 // Sharing a key is not proof of identity: callers must still check IsEquivalent.
 func MatchKey(code string) string {
+	if base := withoutSubtitleSuffix(code); base != "" {
+		code = base
+	}
 	candidates := Candidates(code)
 	if len(candidates) == 0 {
 		return ""
