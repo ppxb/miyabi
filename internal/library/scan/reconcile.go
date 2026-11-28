@@ -138,7 +138,7 @@ func (r *scanRun) prepareReconcile(ctx context.Context, cfg export.Config) (_ ma
 			}
 			if cfg.EmbyDir != "" {
 				// A failed export still reports the files it rewrote first.
-				changed, err := scrape.ExportLocalMovie(cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken, record, r.scanner.images)
+				changed, err := scrape.ExportLocalMovie(ctx, r.scanner.db, cfg.EmbyDir, cfg.PublicURL, cfg.STRMToken, record, r.scanner.images)
 				if changed && !slices.Contains(r.payload.ExportedCodes, record.Code) {
 					r.payload.ExportedCodes = append(r.payload.ExportedCodes, record.Code)
 				}

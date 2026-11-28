@@ -55,13 +55,18 @@ type Series struct {
 }
 
 type Actor struct {
-	Provider string `xml:"provider,attr,omitempty" json:"provider,omitempty"`
-	ID       string `xml:"sourceid,omitempty" json:"id"`
+	// Provider and ID are Miyabi's source identity. They use miyabi_* names so
+	// media servers do not treat per-source ids as the person's identity.
+	Provider string `xml:"miyabi_provider,attr,omitempty" json:"provider,omitempty"`
+	ID       string `xml:"miyabi_sourceid,omitempty" json:"id"`
 	Name     string `xml:"name" json:"name"`
 	NameZHT  string `xml:"name_zht,omitempty" json:"name_zht"`
 	Gender   string `xml:"gender,omitempty" json:"gender"`
 	// Actor images are uploaded by Miyabi after decoding, not fetched by Emby.
 	Thumb string `xml:"miyabi_avatar,omitempty" json:"thumb"`
+	// MediaServerID is the stable person identity written to the standard
+	// <sourceid> element. It comes from the canonical ActorProfile.
+	MediaServerID string `xml:"sourceid,omitempty" json:"-"`
 }
 
 // Read ordinary NFO thumbnails as well as Miyabi's preserved source URL.

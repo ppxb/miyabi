@@ -100,7 +100,11 @@ func (service *Service) publishMovie(ctx context.Context, sess drive.Session, jo
 				service.dirMu.Unlock()
 				return &domain.RetryError{Cause: domain.E(domain.KindConflict, "媒体文件索引已更新，等待重新导出", nil)}
 			}
-			if _, err := export.WriteMedia(cfg, input.Code, input.Document, videos, poster, fanart); err != nil {
+			exportDoc, err := canonicalExportDocument(ctx, service.db, input.MovieID, input.Document)
+			if err != nil {
+				return err
+			}
+			if _, err := export.WriteMedia(cfg, input.Code, exportDoc, videos, poster, fanart); err != nil {
 				return err
 			}
 			oldDir, err := service.removePreviousExport(ctx, cfg.EmbyDir, record, input.Code)
@@ -182,7 +186,11 @@ func (service *Service) publishLocal(ctx context.Context, job tasks.Job, input P
 				PosterVersion: input.PosterVersion,
 				Videos:        VideoFingerprint(videos),
 			}
-			if _, err := export.WriteMedia(cfg, input.Code, input.Document, videos, poster, fanart); err != nil {
+			exportDoc, err := canonicalExportDocument(ctx, service.db, input.MovieID, input.Document)
+			if err != nil {
+				return err
+			}
+			if _, err := export.WriteMedia(cfg, input.Code, exportDoc, videos, poster, fanart); err != nil {
 				return err
 			}
 			if oldDir, err = service.removePreviousExport(ctx, cfg.EmbyDir, record, input.Code); err != nil {

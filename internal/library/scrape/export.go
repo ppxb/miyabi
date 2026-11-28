@@ -1,6 +1,8 @@
 package scrape
 
 import (
+	"context"
+
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
@@ -8,12 +10,16 @@ import (
 )
 
 // ExportLocalMovie repairs missing or changed outputs using saved metadata and artwork.
-func ExportLocalMovie(embyDir, publicURL, strmToken string, record *ent.Movie, images *mediaimage.Cache) (bool, error) {
+func ExportLocalMovie(ctx context.Context, db *ent.Client, embyDir, publicURL, strmToken string, record *ent.Movie, images *mediaimage.Cache) (bool, error) {
 	if record.Code == "" {
 		return false, nil
 	}
 
 	doc, err := MovieNFO(record)
+	if err != nil {
+		return false, err
+	}
+	doc, err = canonicalExportDocument(ctx, db, record.ID, doc)
 	if err != nil {
 		return false, err
 	}

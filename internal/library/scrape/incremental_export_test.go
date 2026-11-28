@@ -32,7 +32,7 @@ func TestIncrementalExportOnlyWritesChangedFiles(t *testing.T) {
 				Edges: ent.MovieEdges{Files: []*ent.File{{FileID: "one", Name: "ABP-123-CD1.mp4"}, {FileID: "two", Name: "ABP-123-CD2.mp4"}}}}
 			root := t.TempDir()
 			host, token := "http://localhost", "old-token"
-			if changed, err := ExportLocalMovie(root, host, token, record, images); err != nil || !changed {
+			if changed, err := ExportLocalMovie(t.Context(), nil, root, host, token, record, images); err != nil || !changed {
 				t.Fatalf("initial export: %v %v", changed, err)
 			}
 			dir := export.EmbyMovieDir(root, doc.Code)
@@ -62,7 +62,7 @@ func TestIncrementalExportOnlyWritesChangedFiles(t *testing.T) {
 				}
 				changedFiles = []string{scenario}
 			}
-			changed, err := ExportLocalMovie(root, host, token, record, images)
+			changed, err := ExportLocalMovie(t.Context(), nil, root, host, token, record, images)
 			if err != nil || changed != (len(changedFiles) > 0) {
 				t.Fatalf("repair: %v %v", changed, err)
 			}
@@ -75,7 +75,7 @@ func TestIncrementalExportOnlyWritesChangedFiles(t *testing.T) {
 					t.Fatalf("unexpected write: %s", name)
 				}
 			}
-			if changed, err := ExportLocalMovie(root, host, token, record, images); err != nil || changed {
+			if changed, err := ExportLocalMovie(t.Context(), nil, root, host, token, record, images); err != nil || changed {
 				t.Fatalf("second scan wrote files: %v %v", changed, err)
 			}
 		})

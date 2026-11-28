@@ -25,7 +25,7 @@ func TestLocalExportRejectsMissingURLWithoutChangingSidecars(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	changed, err := ExportLocalMovie(root, "", "", record, nil)
+	changed, err := ExportLocalMovie(t.Context(), nil, root, "", "", record, nil)
 	if err == nil || changed {
 		t.Fatalf("incomplete configuration exported: changed = %t, error = %v", changed, err)
 	}

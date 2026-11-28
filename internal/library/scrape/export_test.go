@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -11,11 +12,52 @@ import (
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
 	"github.com/ppxb/miyabi/internal/ent"
+	"github.com/ppxb/miyabi/internal/ent/actor"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
 	"github.com/ppxb/miyabi/internal/nfo"
 )
+
+func TestExportLocalMovieWritesCanonicalActorIdentity(t *testing.T) {
+	ctx := t.Context()
+	store, err := database.Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	profile := store.Client.ActorProfile.Create().
+		SetMatchKey("森日向子").SetName("森日向子").SaveX(ctx)
+	record := store.Client.Movie.Create().SetCode("ABP-900").SetMetadata(&nfo.Movie{
+		Code: "ABP-900", Title: "Fixture",
+		Actors: []nfo.Actor{{Provider: "fanza", ID: "f1", Name: "森日向子"}},
+	}).SaveX(ctx)
+	source := store.Client.Actor.Create().SetProvider("fanza").SetSourceID("f1").
+		SetName("森日向子").AddMovieIDs(record.ID).SaveX(ctx)
+	store.Client.Actor.Update().Where(actor.IDEQ(source.ID)).SetProfileID(profile.ID).ExecX(ctx)
+
+	embyDir := t.TempDir()
+	if _, err := ExportLocalMovie(ctx, store.Client, embyDir, "http://localhost", "", record, nil); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(export.EmbyMovieDir(embyDir, "ABP-900"), "ABP-900.nfo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := nfo.Decode(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantID := "miyabi-actor-" + strconv.Itoa(profile.ID)
+	if len(doc.Actors) != 1 || doc.Actors[0].MediaServerID != wantID ||
+		doc.Actors[0].Provider != "fanza" || doc.Actors[0].ID != "f1" {
+		t.Fatalf("exported actors = %+v", doc.Actors)
+	}
+	if record.Metadata.Actors[0].MediaServerID != "" {
+		t.Fatal("export rewrote stored movie metadata")
+	}
+}
 
 func TestExportLocalMovie_ScrapedRecordExportsMissingSidecars(t *testing.T) {
 	tempDir := t.TempDir()
@@ -95,7 +137,7 @@ func TestExportLocalMovie_ScrapedRecordExportsMissingSidecars(t *testing.T) {
 	}
 
 	// Call ExportLocalMovie
-	_, err = ExportLocalMovie(embyDir, "http://127.0.0.1:8080", "testtoken", loadedMovie, images)
+	_, err = ExportLocalMovie(t.Context(), nil, embyDir, "http://127.0.0.1:8080", "testtoken", loadedMovie, images)
 	if err != nil {
 		t.Fatalf("ExportLocalMovie failed: %v", err)
 	}
@@ -138,7 +180,7 @@ func TestExportLocalMovie_ScrapedRecordExportsMissingSidecars(t *testing.T) {
 	}
 
 	// 5. Subsequent call returns nil cleanly without error (noop check)
-	_, err = ExportLocalMovie(embyDir, "http://127.0.0.1:8080", "testtoken", loadedMovie, images)
+	_, err = ExportLocalMovie(t.Context(), nil, embyDir, "http://127.0.0.1:8080", "testtoken", loadedMovie, images)
 	if err != nil {
 		t.Fatalf("second ExportLocalMovie failed: %v", err)
 	}
@@ -155,7 +197,7 @@ func TestExportLocalMovieRejectsMissingMetadataWithoutOverwritingFiles(t *testin
 	if err := os.WriteFile(filename, []byte("saved document"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	changed, err := ExportLocalMovie(root, "http://localhost", "", record, nil)
+	changed, err := ExportLocalMovie(t.Context(), nil, root, "http://localhost", "", record, nil)
 	if changed || !domain.IsKind(err, domain.KindInvalid) {
 		t.Fatalf("incomplete record was exported: %v %v", changed, err)
 	}

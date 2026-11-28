@@ -9,8 +9,8 @@ import (
 
 func TestActorAvatarSourceRoundTripsWithoutAnEmbyDownloadURL(t *testing.T) {
 	for _, input := range []string{
-		`<movie><num>ABP-001</num><actor provider="javdb"><sourceid>actor-1</sourceid><name>Actor</name><thumb>https://cdn.example/encoded.jpg</thumb></actor></movie>`,
-		`<movie><num>ABP-001</num><actor provider="javdb"><sourceid>actor-1</sourceid><name>Actor</name><miyabi_avatar>https://cdn.example/encoded.jpg</miyabi_avatar></actor></movie>`,
+		`<movie><num>ABP-001</num><actor miyabi_provider="javdb"><miyabi_sourceid>actor-1</miyabi_sourceid><sourceid>miyabi-actor-7</sourceid><name>Actor</name><thumb>https://cdn.example/encoded.jpg</thumb></actor></movie>`,
+		`<movie><num>ABP-001</num><actor miyabi_provider="javdb"><miyabi_sourceid>actor-1</miyabi_sourceid><sourceid>miyabi-actor-7</sourceid><name>Actor</name><miyabi_avatar>https://cdn.example/encoded.jpg</miyabi_avatar></actor></movie>`,
 	} {
 		doc, err := Decode([]byte(input))
 		if err != nil {
@@ -38,6 +38,27 @@ func TestActorAvatarSourceRoundTripsWithoutAnEmbyDownloadURL(t *testing.T) {
 		if err != nil || restored.Actors[0].Thumb != doc.Actors[0].Thumb || restored.Actors[0].ID != "actor-1" {
 			t.Fatalf("rescan lost avatar metadata: %+v, %v", restored.Actors, err)
 		}
+	}
+}
+
+func TestActorWritesStableSourceIDAndKeepsMiyabiIdentity(t *testing.T) {
+	doc := Movie{Code: "ABP-001", Actors: []Actor{
+		{Provider: "fanza", ID: "1061586", Name: "森日向子", MediaServerID: "miyabi-actor-107"},
+	}}
+	body, err := Encode(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(body)
+	if !strings.Contains(text, `miyabi_provider="fanza"`) ||
+		!strings.Contains(text, "<miyabi_sourceid>1061586</miyabi_sourceid>") ||
+		!strings.Contains(text, "<sourceid>miyabi-actor-107</sourceid>") {
+		t.Fatalf("unexpected actor identity: %s", body)
+	}
+	restored, err := Decode(body)
+	if err != nil || restored.Actors[0].Provider != "fanza" || restored.Actors[0].ID != "1061586" ||
+		restored.Actors[0].MediaServerID != "miyabi-actor-107" {
+		t.Fatalf("actor identity lost: %+v, %v", restored.Actors, err)
 	}
 }
 
@@ -74,7 +95,7 @@ func TestRoundTripPreservesSourceIDs(t *testing.T) {
   <premiered>2024-01-02</premiered><runtime>120</runtime><rating>4.5</rating>
   <director provider="javdb" sourceid="director-1">Director</director>
   <studio provider="javdb" sourceid="maker-1">Maker</studio><set provider="javdb" sourceid="series-1"><name>Series</name></set>
-  <actor provider="javdb"><name>Actor</name><sourceid>actor-1</sourceid><name_zht>演員</name_zht><gender>female</gender></actor>
+  <actor miyabi_provider="javdb"><miyabi_sourceid>actor-1</miyabi_sourceid><name>Actor</name><sourceid>miyabi-actor-7</sourceid><name_zht>演員</name_zht><gender>female</gender></actor>
   <tag provider="javdb" sourceid="tag-1" category="category-1" name_zht="標籤">Tag</tag>
   <thumb aspect="poster">ABP-001-poster.jpg</thumb><fanart><thumb>ABP-001-fanart.jpg</thumb></fanart>
   <plot>Source synopsis</plot>
@@ -99,7 +120,8 @@ func TestRoundTripPreservesSourceIDs(t *testing.T) {
 		got.Runtime != 120 || got.Premiered != "2024-01-02" || got.Rating != 4.5 {
 		t.Fatalf("movie metadata changed: %#v", got)
 	}
-	if len(got.Actors) != 1 || got.Actors[0].ID != "actor-1" || got.Actors[0].Gender != "female" || got.Actors[0].NameZHT != "演員" {
+	if len(got.Actors) != 1 || got.Actors[0].ID != "actor-1" || got.Actors[0].Gender != "female" ||
+		got.Actors[0].NameZHT != "演員" || got.Actors[0].MediaServerID != "miyabi-actor-7" {
 		t.Fatalf("actor metadata changed: %#v", got.Actors)
 	}
 	if len(got.Tags) != 1 || got.Tags[0].ID != "tag-1" || got.Tags[0].CategoryID != "category-1" {
